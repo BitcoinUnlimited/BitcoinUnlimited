@@ -14,24 +14,23 @@
 
 
 /*
-This mutex has two levels of access, shared and exclusive. Multiple threads can own this mutex in shared mode but only
-one can own it in exclusive mode.
-A thread is considered to have ownership when it successfully calls either lock or try_lock.
-A thread may recusively call lock for ownership and must call a matching number of unlock calls to end ownership.
-A thread MAY call for shared ownership if it already has exclusive ownership. This should just add an additional lock on
-top of write counter
-and not actually lock. If a thread has exclusive ownership and checks for shared ownership this should return true.
-*/
+ * This mutex has two levels of access, shared and exclusive. Multiple threads can own this mutex in shared mode but
+ * only
+ * one can own it in exclusive mode.
+ * - A thread is considered to have ownership when it successfully calls either lock or try_lock.
+ * - A thread may recusively call lock for ownership and must call a matching number of unlock calls to end ownership.
+ * - A thread MAY call for shared ownership if it already has exclusive ownership. This should just add an additional
+ * lock on
+ * top of write counter and not actually lock. If a thread has exclusive ownership and checks for shared ownership this
+ * should return true.
+ * - A thread MAY obtain exclusive ownership if no threads excluding itself has shared ownership. (this might need to
+ * check
+ * for another write lock already
+ * queued up so we dont jump the line)
+ */
 
-/*
-TODO
-- A thread MAY obtain exclusive ownership if no threads excluding itself has shared ownership. (this might need to check
-for another write lock already
-    queued up so we dont jump the line)
-*/
 
 static const std::thread::id NON_THREAD_ID = std::thread::id();
-static const uint64_t SANE_LOCK_LIMIT = 1000; // this instead of uint64_t max value
 
 class recursive_shared_mutex
 {

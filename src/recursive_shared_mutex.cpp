@@ -7,7 +7,7 @@
 
 bool recursive_shared_mutex::check_for_write_lock(const std::thread::id &locking_thread_id)
 {
-    if (_write_owner_id == locking_thread_id && _write_counter < SANE_LOCK_LIMIT)
+    if (_write_owner_id == locking_thread_id)
     {
         _write_counter++;
         return true;
@@ -71,7 +71,11 @@ void recursive_shared_mutex::unlock_shared_internal(const std::thread::id &locki
 void recursive_shared_mutex::unlock_shared_internal(const std::thread::id &locking_thread_id, const uint64_t &count)
 {
     auto it = _read_owner_ids.find(locking_thread_id);
-    assert(it != _read_owner_ids.end());
+    // assert(it != _read_owner_ids.end());
+    if (it == _read_owner_ids.end())
+    {
+        throw std::logic_error("can not unlock_shared more times than we locked for shared ownership");
+    }
     it->second = it->second - count;
     if (it->second == 0)
     {
@@ -115,7 +119,10 @@ uint64_t recursive_shared_mutex::get_auto_lock_count(const std::thread::id &lock
 void recursive_shared_mutex::unlock_auto_locks(const std::thread::id &locking_thread_id)
 {
     auto it = _auto_unlocked_ids.find(locking_thread_id);
-    assert(it != _auto_unlocked_ids.end());
+    if (it == _auto_unlocked_ids.end())
+    {
+        throw std::logic_error("unlock_auto_locks incorrectly called on a thread with no auto locks");
+    }
     _auto_unlocked_ids.erase(it);
 }
 
@@ -127,7 +134,7 @@ void recursive_shared_mutex::unlock_auto_locks(const std::thread::id &locking_th
 void recursive_shared_mutex::lock(const std::thread::id &locking_thread_id)
 {
     std::unique_lock<std::mutex> _lock(_mutex);
-    if (_write_owner_id == locking_thread_id && _write_counter < SANE_LOCK_LIMIT)
+    if (_write_owner_id == locking_thread_id)
     {
         _write_counter++;
     }
@@ -156,7 +163,7 @@ bool recursive_shared_mutex::try_promotion(const std::thread::id &locking_thread
 {
     std::unique_lock<std::mutex> _lock(_mutex);
 
-    if (_write_owner_id == locking_thread_id && _write_counter < SANE_LOCK_LIMIT)
+    if (_write_owner_id == locking_thread_id)
     {
         _write_counter++;
         return true;
@@ -188,7 +195,7 @@ bool recursive_shared_mutex::try_lock(const std::thread::id &locking_thread_id)
 {
     std::unique_lock<std::mutex> _lock(_mutex, std::try_to_lock);
 
-    if (_write_owner_id == locking_thread_id && _write_counter < SANE_LOCK_LIMIT)
+    if (_write_owner_id == locking_thread_id)
     {
         _write_counter++;
         return true;
@@ -210,12 +217,21 @@ void recursive_shared_mutex::unlock(const std::thread::id &locking_thread_id)
     // this might be redundant with the mutex being locked
     if (_promotion_candidate_id != NON_THREAD_ID)
     {
-        assert(_write_promotion_counter != 0 && _write_owner_id == locking_thread_id &&
-               _write_owner_id == _promotion_candidate_id);
+        // assert(_write_promotion_counter != 0 && _write_owner_id == locking_thread_id &&
+        //       _write_owner_id == _promotion_candidate_id);
+        if (_write_promotion_counter == 0 || _write_owner_id != locking_thread_id ||
+            _write_owner_id != _promotion_candidate_id)
+        {
+            throw std::logic_error("unlock(promotion) incorrectly called on a thread with no exclusive lock");
+        }
     }
     else
     {
-        assert(_write_counter != 0 && _write_owner_id == locking_thread_id);
+        // assert(_write_counter != 0 && _write_owner_id == locking_thread_id);
+        if (_write_counter == 0 || _write_owner_id != locking_thread_id)
+        {
+            throw std::logic_error("unlock(standard) incorrectly called on a thread with no exclusive lock");
+        }
     }
 
     if (_promotion_candidate_id != NON_THREAD_ID)
@@ -308,7 +324,11 @@ void recursive_shared_mutex::unlock_shared(const std::thread::id &locking_thread
         return;
     }
     std::lock_guard<std::mutex> _lock(_mutex);
-    assert(_read_owner_ids.size() > 0);
+    // assert(_read_owner_ids.size() > 0);
+    if (_read_owner_ids.size() == 0)
+    {
+        throw std::logic_error("unlock_shared incorrectly called on a thread with no shared lock");
+    }
     unlock_shared_internal(locking_thread_id);
     if (_write_promotion_counter != 0 && _promotion_candidate_id != NON_THREAD_ID)
     {
