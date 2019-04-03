@@ -340,7 +340,7 @@ CTweakRef<std::string> subverOverrideTweak("net.subversionOverride",
 CTweak<bool> enableCanonicalTxOrder("consensus.enableCanonicalTxOrder",
     "True if canonical transaction ordering is enabled.  Reflects the actual state so may be switched on or off by"
     " fork time flags and blockchain reorganizations.",
-    false);
+    true);
 
 CTweak<unsigned int> numMsgHandlerThreads("net.msgHandlerThreads", "Max message handler threads", 0);
 CTweak<unsigned int> numTxAdmissionThreads("net.txAdmissionThreads", "Max transaction mempool admission threads", 0);
