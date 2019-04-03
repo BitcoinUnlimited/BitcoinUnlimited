@@ -123,6 +123,8 @@ pubkey.cpp
 pubkey.h
 random.cpp
 random.h
+recursive_shared_mutex.cpp
+recursive_shared_mutex.h
 requestManager.cpp
 requestManager.h
 rest.cpp
@@ -325,6 +327,7 @@ test/prevector_tests.cpp
 test/requestmanager_tests.cpp
 test/reverselock_tests.cpp
 test/rpc_tests.cpp
+test/rsm_tests.cpp
 test/sanity_tests.cpp
 test/scriptnum10.h
 test/scriptnum_tests.cpp
