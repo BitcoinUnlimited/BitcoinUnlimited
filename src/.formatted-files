@@ -327,7 +327,8 @@ test/prevector_tests.cpp
 test/requestmanager_tests.cpp
 test/reverselock_tests.cpp
 test/rpc_tests.cpp
-test/rsm_tests.cpp
+test/rsm_promotion_tests.cpp
+test/rsm_simple_tests.cpp
 test/sanity_tests.cpp
 test/scriptnum10.h
 test/scriptnum_tests.cpp
