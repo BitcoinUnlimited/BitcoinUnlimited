@@ -143,13 +143,13 @@ public:
     uint64_t GetRankSerializationSize() { return ::GetSerializeSize(encodedRank, SER_NETWORK, PROTOCOL_VERSION); }
     ~CGrapheneSet()
     {
-        if (computeOptimized && pFastFilter)
+        if (pFastFilter)
         {
             delete pFastFilter;
             pFastFilter = nullptr;
         }
 
-        if (!computeOptimized && pSetFilter)
+        if (pSetFilter)
         {
             delete pSetFilter;
             pSetFilter = nullptr;
