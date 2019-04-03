@@ -155,8 +155,12 @@ void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, CNode *pskip
         // to the current chain tip in case of a re-org.
         if (!pindex || pindex->nChainWork < chainActive.Tip()->nChainWork)
         {
-            LOGA("Not sending expedited block %s from peer %s, does not extend longest chain\n",
-                thinBlock.header.GetHash().ToString(), pskip ? pskip->GetLogName() : "none");
+            // Don't print out a log message here. We can sometimes get them during IBD which during
+            // periods where the chain is almost syncd but really isn't. This typically happens in regtest
+            // and is can be confusing to see this in the logs when trying to debug other issues.
+            //
+            // LOGA("Not sending expedited block %s from peer %s, does not extend longest chain\n",
+            //    thinBlock.header.GetHash().ToString(), pskip ? pskip->GetLogName() : "none");
             return;
         }
     }
