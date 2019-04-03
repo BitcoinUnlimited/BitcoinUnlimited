@@ -14,7 +14,6 @@
 #include "unlimited.h"
 #include "util.h"
 #include "utilmoneystr.h"
-#include "wallet/wallet.h"
 
 void TxConfirmStats::Initialize(std::vector<double> &defaultBuckets,
     unsigned int maxConfirms,
@@ -95,7 +94,11 @@ double TxConfirmStats::EstimateMedianVal(int confTarget,
 {
     CAmount minTxFee = 0;
     // its safe just to parse here because the validity of mintxfee was checked in init.cpp
-    ParseMoney(std::to_string(GetArg("-mintxfee", DEFAULT_TRANSACTION_MINFEE)), minTxFee);
+
+    // DEFAULT_TRANSACTION_MINFEE = 1000 defined in wallet.h, we hardcode it here as a hack fix
+    // due to --disable-wallet configs compiling policy estimator which would use wallet.h
+    // even though wallet.h isnt included when compiled with --disable-wallet
+    ParseMoney(std::to_string(GetArg("-mintxfee", 1000)), minTxFee);
     // convert from satoshis to COIN
     minTxFee = minTxFee / COIN;
 
