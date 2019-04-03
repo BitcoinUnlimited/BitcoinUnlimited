@@ -9,13 +9,13 @@
 #include "serialize.h"
 #include "util.h"
 #include <cmath>
+#include <limits>
 #include <vector>
 
 #define LN2SQUARED 0.4804530139182014246671025263266649717305529515945455
 #define LN2 0.6931471805599453094172321214581765680755001343602552
 #define MIN_N_HASH_FUNC 1
 #define MAX_N_HASH_FUNC 32
-const uint32_t MAX_32_BIT = (int)pow(2, 32) - 1;
 class uint256;
 
 /**
@@ -50,8 +50,8 @@ public:
         nFilterBytes = (uint32_t)(std::ceil(-1 / LN2SQUARED * nElements * log(nFPRate) / 8));
         nFilterItems = 8 * nFilterBytes;
 
-        if (nFilterBytes > MAX_32_BIT)
-            throw std::runtime_error("CVariableFastFilter can have size no greater than 2**32-1 bytes.");
+        if (nFilterBytes > std::numeric_limits<uint32_t>::max())
+            throw std::runtime_error("CVariableFastFilter can have size no greater maximum uint32_t.");
 
         vData.resize(nFilterBytes, 0);
 
