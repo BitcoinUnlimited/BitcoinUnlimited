@@ -885,7 +885,7 @@ void CTxMemPool::_removeConflicts(const CTransaction &tx, std::list<CTransaction
 // Whenever a tx is removed from the mempool, any of its descendants are placed back onto the
 // queue of tx that are removable.
 void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
-    unsigned int nBlockHeight,
+    uint64_t nBlockHeight,
     std::list<CTransactionRef> &conflicts,
     bool fCurrentEstimate,
     std::vector<CTxChange> *txChanges)
@@ -1185,22 +1185,6 @@ CFeeRate CTxMemPool::estimateFee(int nBlocks) const
 {
     READLOCK(cs_txmempool);
     return minerPolicyEstimator->estimateFee(nBlocks);
-}
-CFeeRate CTxMemPool::estimateSmartFee(int nBlocks, int *answerFoundAtBlocks) const
-{
-    READLOCK(cs_txmempool);
-    return minerPolicyEstimator->estimateSmartFee(nBlocks, answerFoundAtBlocks, *this);
-}
-
-double CTxMemPool::estimatePriority(int nBlocks) const
-{
-    READLOCK(cs_txmempool);
-    return minerPolicyEstimator->estimatePriority(nBlocks);
-}
-double CTxMemPool::estimateSmartPriority(int nBlocks, int *answerFoundAtBlocks) const
-{
-    READLOCK(cs_txmempool);
-    return minerPolicyEstimator->estimateSmartPriority(nBlocks, answerFoundAtBlocks, *this);
 }
 
 bool CTxMemPool::WriteFeeEstimates(CAutoFile &fileout) const

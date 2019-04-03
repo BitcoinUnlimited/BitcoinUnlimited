@@ -2512,10 +2512,8 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
                 if (fSendFreeTransactions && nBytes <= MAX_STANDARD_TX_SIZE &&
                     GetBoolArg("-relaypriority", DEFAULT_RELAYPRIORITY))
                 {
-                    // Not enough fee: enough priority?
-                    double dPriorityNeeded = mempool.estimateSmartPriority(nTxConfirmTarget);
                     // Require at least hard-coded AllowFree.
-                    if (dPriority >= dPriorityNeeded && AllowFree(dPriority))
+                    if (dPriority >= AllowFree(dPriority))
                         break;
                 }
                 if (fSendFreeTransactions && AreFreeTxnsDisallowed())
@@ -2633,8 +2631,7 @@ CAmount CWallet::GetMinimumFee(unsigned int nTxBytes, unsigned int nConfirmTarge
     // User didn't set: use -txconfirmtarget to estimate...
     if (nFeeNeeded == 0)
     {
-        int estimateFoundTarget = nConfirmTarget;
-        nFeeNeeded = pool.estimateSmartFee(nConfirmTarget, &estimateFoundTarget).GetFee(nTxBytes);
+        nFeeNeeded = pool.estimateFee(nConfirmTarget).GetFee(nTxBytes);
         // ... unless we don't have enough mempool data for estimatefee, then use fallbackFee
         if (nFeeNeeded == 0)
             nFeeNeeded = fallbackFee.GetFee(nTxBytes);
