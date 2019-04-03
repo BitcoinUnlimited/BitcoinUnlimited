@@ -473,14 +473,13 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
         if (!semThreadCount.try_wait())
         {
             /** The following functionality is for the case when ALL thread queues and grants are in use, meaning
-             * somehow an attacker
-             *  has been able to craft blocks or sustain an attack in such a way as to use up every availabe thread
-             * queue.
+             * somehow an attacker has been able to craft blocks or sustain an attack in such a way as to use up
+             * every available script queue thread.
              *  When/If that should occur, we must assume we are under a sustained attack and we will have to make a
-             * determination
-             *  as to which of the currently running threads we should terminate based on the following critera:
-             *     1) If all queues are in use and another block arrives, then terminate the running thread validating
-             * the largest block
+             * determination as to which of the currently running threads we should terminate based on the
+             * following critera:
+             *     1) If all queues are in use and another block arrives, then terminate the running thread
+             *        which has the largest block
              */
 
             {
@@ -488,6 +487,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
                 if (mapBlockValidationThreads.size() >= nScriptCheckQueues)
                 {
                     uint64_t nLargestBlockSize = 0;
+                    bool fCompeting = false;
                     map<boost::thread::id, CParallelValidation::CHandleBlockMsgThreads>::iterator miLargestBlock =
                         mapBlockValidationThreads.end();
                     map<boost::thread::id, CParallelValidation::CHandleBlockMsgThreads>::iterator iter =
@@ -498,6 +498,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
                         // it's a competitor to to your block.
                         if ((*iter).second.hashPrevBlock == pblock->GetBlockHeader().hashPrevBlock)
                         {
+                            fCompeting = true;
                             if ((*iter).second.nBlockSize > nLargestBlockSize)
                             {
                                 nLargestBlockSize = (*iter).second.nBlockSize;
@@ -507,18 +508,23 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
                         iter++;
                     }
 
-                    // if your block is the biggest or of equal size to the biggest then reject it.
-                    if (nLargestBlockSize <= nBlockSize)
+                    // if the new competing block is the biggest or of equal size to the biggest then reject it.
+                    if (fCompeting && (nLargestBlockSize <= nBlockSize))
                     {
-                        LOG(PARALLEL, "Block validation terminated - Too many blocks currently being validated: %s\n",
+                        LOG(PARALLEL,
+                            "New Block validation terminated - Too many blocks currently being validated: %s\n",
                             pblock->GetHash().ToString());
-                        return; // new block is rejected and does not enter PV
+                        return;
                     }
+                    // Terminate the thread with the largest block.
                     else if (miLargestBlock != mapBlockValidationThreads.end())
-                    { // terminate the chosen PV thread
-                        (*miLargestBlock).second.pScriptQueue->Quit(); // terminate the script queue threads
+                    {
+                        // terminate the script queue thread
+                        (*miLargestBlock).second.pScriptQueue->Quit();
                         LOG(PARALLEL, "Sending Quit() to scriptcheckqueue\n");
-                        (*miLargestBlock).second.fQuit = true; // terminate the PV thread
+
+                        // terminate the PV thread which releases the semaphore grant
+                        (*miLargestBlock).second.fQuit = true;
                         LOG(PARALLEL, "Too many blocks being validated, interrupting thread with blockhash %s "
                                       "and previous blockhash %s\n",
                             (*miLargestBlock).second.hash.ToString(),
@@ -532,7 +538,8 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
         }
     }
     else
-    { // for IBD just wait for the next available
+    {
+        // for IBD just wait for the next available
         semThreadCount.wait();
     }
 
@@ -549,7 +556,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
     if (PV->Enabled())
     {
         boost::thread thread(boost::bind(&HandleBlockMessageThread, pfrom, strCommand, pblock, inv));
-        thread.detach(); // Separate actual thread from the "thread" object so its fine to fall out of scope
+        thread.detach();
     }
     else
     {
