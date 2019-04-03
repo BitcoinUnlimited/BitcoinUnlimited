@@ -37,14 +37,12 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     : // Use cryptographically strong pseudorandom number because
       // we will extract SipHash secret key from this
       sipHashNonce(GetRand(std::numeric_limits<uint64_t>::max())),
-      shorttxidk0(0), shorttxidk1(0)
+      shorttxidk0(0), shorttxidk1(0), version(_version), computeOptimized(_computeOptimized)
 {
     header = pblock->GetBlockHeader();
     nBlockTxs = pblock->vtx.size();
     uint64_t grapheneSetVersion = 0;
 
-    version = _version;
-    computeOptimized = _computeOptimized;
     if (version >= 2)
         FillShortTxIDSelector();
 

@@ -24,18 +24,9 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     bool _computeOptimized,
     bool _ordered,
     bool fDeterministic)
+    : ordered(_ordered), nReceiverUniverseItems(_nReceiverUniverseItems), shorttxidk0(_shorttxidk0),
+      shorttxidk1(_shorttxidk1), ibltSalt(ibltEntropy), version(_version), computeOptimized(_computeOptimized)
 {
-    ordered = _ordered;
-
-    // Below is the parameter "m" from the graphene paper
-    nReceiverUniverseItems = _nReceiverUniverseItems;
-
-    shorttxidk0 = _shorttxidk0;
-    shorttxidk1 = _shorttxidk1;
-    ibltSalt = ibltEntropy;
-    version = _version;
-    computeOptimized = _computeOptimized;
-
     // Below is the parameter "n" from the graphene paper
     uint64_t nItems = _itemHashes.size();
 
