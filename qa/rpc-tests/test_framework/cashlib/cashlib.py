@@ -20,7 +20,6 @@ BCH = 100000000
 
 cashlib = None
 
-
 class Error(BaseException):
     pass
 
@@ -104,6 +103,52 @@ def signTxInput(tx, inputIdx, inputAmount, prevoutScript, key, sigHashType=SIGHA
         raise Error("cashlib signtx error")
     return result.raw[0:siglen]
 
+def signTxInputSchnorr(tx, inputIdx, inputAmount, prevoutScript, key, sigHashType=SIGHASH_FORKID | SIGHASH_ALL):
+    """Signs one input of a transaction.  Schnorr signature is returned.  You must use this signature to construct the spend script
+    Parameters:
+    tx: Transaction in object, hex or binary format
+    inputIdx: index of input being signed
+    inputAmount: how many Satoshi's does this input add to the transaction?
+    prevoutScript: the script that this input is spending.
+    key: sign using this private key in binary format
+    sigHashType: flags describing what should be signed (SIGHASH_FORKID | SIGHASH_ALL (default), SIGHASH_NONE, SIGHASH_SINGLE, SIGHASH_ANYONECANPAY)
+    """
+    assert (sigHashType & SIGHASH_FORKID) > 0, "Did you forget to indicate the bitcoin cash hashing algorithm?"
+    if type(tx) == str:
+        tx = unhexlify(tx)
+    elif type(tx) != bytes:
+        tx = tx.serialize()
+    if type(prevoutScript) == str:
+        prevoutScript = unhexlify(prevoutScript)
+    if type(inputAmount) is decimal.Decimal:
+        inputAmount = int(inputAmount * BCH)
+
+    result = create_string_buffer(100)
+    siglen = cashlib.SignTxSchnorr(tx, len(tx), inputIdx, c_longlong(inputAmount), prevoutScript,
+                            len(prevoutScript), sigHashType, key, result, 100)
+    if siglen == 0:
+        raise Error("cashlib signtx error")
+    return result.raw[0:siglen]
+
+def signHashSchnorr(key, hsh):
+    """Signs a 32 byte message (presumably the hash of something).  A Schnorr signature is returned.  You must use this signature to construct the spend script
+    Parameters:
+    hsh: 32 bytes of data, hex, binary, or object (contains serialize member) format
+    key: sign using this private key in binary format
+    sigHashType: flags describing what should be signed (SIGHASH_FORKID | SIGHASH_ALL (default), SIGHASH_NONE, SIGHASH_SINGLE, SIGHASH_ANYONECANPAY)
+    """
+    if type(hsh) == str:
+        hsh = unhexlify(hsh)
+    elif type(hsh) != bytes:
+        hsh = hsh.serialize()
+
+    result = create_string_buffer(100)
+    assert len(hsh) == 32
+    siglen = cashlib.SignHashSchnorr(hsh, key, result, 100)
+    if siglen == 0:
+        raise Error("cashlib signtx error")
+    return result.raw[0:siglen]
+
 
 def randombytes(length):
     """Get cryptographically acceptable pseudorandom bytes from the OS"""
@@ -111,7 +156,7 @@ def randombytes(length):
     worked = cashlib.RandomBytes(result, length)
     if worked != length:
         raise Error("cashlib randombytes error")
-    return result.value
+    return result.raw
 
 
 def pubkey(key):

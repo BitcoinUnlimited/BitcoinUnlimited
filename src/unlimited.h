@@ -91,6 +91,9 @@ extern uint64_t nMiningForkTime;
 /** This specifies the MTP time of the SV fork */
 extern uint64_t nMiningSvForkTime;
 
+//! are schnorr signatures allowed in the mempool and in blocks
+extern bool schnorrEnabled;
+
 /** BU Default maximum number of Outbound connections to simultaneously allow*/
 extern int nMaxOutConnections;
 

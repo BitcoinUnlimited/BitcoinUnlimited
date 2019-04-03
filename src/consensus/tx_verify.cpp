@@ -141,7 +141,7 @@ unsigned int GetLegacySigOpCount(const CTransactionRef &tx, const uint32_t flags
 
 unsigned int GetP2SHSigOpCount(const CTransactionRef &tx, const CCoinsViewCache &inputs, const uint32_t flags)
 {
-    if ((flags && SCRIPT_VERIFY_P2SH) == 0 || tx->IsCoinBase())
+    if ((flags & SCRIPT_VERIFY_P2SH) == 0 || tx->IsCoinBase())
         return 0;
 
     unsigned int nSigOps = 0;
