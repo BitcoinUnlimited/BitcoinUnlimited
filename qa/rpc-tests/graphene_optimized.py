@@ -12,7 +12,17 @@ from test_framework.util import *
 class GrapheneOptimizedTest(GrapheneBlockTest):
     
     def setup_network(self, split=False):
-        node_opts = [
+        standard_node_opts = [
+            "-rpcservertimeout=0",
+            "-debug=graphene",
+            "-use-grapheneblocks=1",
+            "-use-thinblocks=0",
+            "-compute-optimize-graphene=0",
+            "-excessiveblocksize=6000000",
+            "-blockprioritysize=6000000",
+            "-blockmaxsize=6000000"]
+
+        optimized_node_opts = [
             "-rpcservertimeout=0",
             "-debug=graphene",
             "-use-grapheneblocks=1",
@@ -23,9 +33,9 @@ class GrapheneOptimizedTest(GrapheneBlockTest):
             "-blockmaxsize=6000000"]
 
         self.nodes = [
-            start_node(0, self.options.tmpdir, node_opts),
-            start_node(1, self.options.tmpdir, node_opts),
-            start_node(2, self.options.tmpdir, node_opts)
+            start_node(0, self.options.tmpdir, standard_node_opts),
+            start_node(1, self.options.tmpdir, optimized_node_opts),
+            start_node(2, self.options.tmpdir, optimized_node_opts)
         ]
 
         interconnect_nodes(self.nodes)

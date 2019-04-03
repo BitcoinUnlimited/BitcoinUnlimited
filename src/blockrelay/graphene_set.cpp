@@ -79,10 +79,12 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     // Construct Bloom filter
     if (computeOptimized)
     {
+        LOG(GRAPHENE, "using compute-optimized Bloom filter\n");
         pFastFilter = new CVariableFastFilter(nItems, fpr);
     }
     else
     {
+        LOG(GRAPHENE, "using regular Bloom filter\n");
         pSetFilter = new CBloomFilter(
             nItems, fpr, insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
     }
