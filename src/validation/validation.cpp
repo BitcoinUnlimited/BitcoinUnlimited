@@ -1367,8 +1367,8 @@ bool ContextualCheckBlock(const CBlock &block,
                 10, error("%s: contains a non-final transaction", __func__), REJECT_INVALID, "bad-txns-nonfinal");
         }
 
-        // Make sure tx size is acceptable after Nov 15, 2018 fork
-        if (IsNov152018Scheduled() && IsNov152018Enabled(consensusParams, chainActive.Tip()))
+        // Make sure tx size is equal or higher to 100 bytes if we are on the BCH chain
+        if (AreWeOnBCHChain() && IsNov152018Activated(consensusParams, chainActive.Tip()))
         {
             if (tx->GetTxSize() < MIN_TX_SIZE)
             {
@@ -1703,16 +1703,26 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
 
-    // The Nov 15, 2018 HF enable sig push only and atrt enforcing also
-    // clean stack rules (see  BIP 62 for more details)
-    if (IsNov152018Scheduled() && IsNov152018Enabled(consensusparams, pindex->pprev))
+    // Since Nov 15, 2018 HF activates sig push only, clean stack rules
+    // are enforced and CHECKDATASIG has been introduced on the BCH chain
+    // (see  BIP 62 and CHECKDATASIG specification or more details)
+    if (AreWeOnBCHChain() && IsNov152018Activated(consensusparams, chainActive.Tip()))
     {
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
         flags |= SCRIPT_VERIFY_CLEANSTACK;
         flags |= SCRIPT_ENABLE_CHECKDATASIG;
     }
+
+    // TODO: add here the needed flag related to the new features that need to
+    // be activate in May 15th, 2019 protocol upgrade.
+    if (AreWeOnBCHChain() && IsMay152019Enabled(consensusparams, pindex->pprev))
+    {
+        // schnoor
+        // segwit_recovery
+    }
+
     // The SV Nov 15, 2018 HF rules
-    if (IsSv2018Scheduled() && IsSv2018Enabled(consensusparams, pindex->pprev))
+    if (AreWeOnSVChain() && IsSv2018Activated(consensusparams, chainActive.Tip()))
     {
         flags |= SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES;
     }
@@ -2432,17 +2442,11 @@ bool ConnectBlock(const CBlock &block,
 
     // Discover how to handle this block
     bool canonical = enableCanonicalTxOrder.Value();
-    if (IsNov152018Scheduled())
+    // Always allow overwite of enableCanonicalTxOrder but for regtest
+    if (AreWeOnBCHChain() && IsNov152018Activated(chainparams.GetConsensus(), chainActive.Tip()) &&
+        !(chainparams.NetworkIDString() == "regtest"))
     {
-        // pindex-pprev != null because pindex is not genesis block (or fn would have returned above)
-        if (IsNov152018Enabled(chainparams.GetConsensus(), pindex->pprev))
-        {
-            canonical = true;
-        }
-        else
-        {
-            canonical = false;
-        }
+        canonical = true;
     }
 
     if (canonical)
@@ -2729,29 +2733,23 @@ void UpdateTip(CBlockIndex *pindexNew)
         CheckAndAlertUnknownVersionbits(chainParams, chainActive.Tip());
     }
 
-    if (IsNov152018Scheduled()) // Set the global variables based on the fork state of the NEXT block
+    // Set the global variables based on the fork state of the NEXT block
+    // Always allow overwite of enableCanonicalTxOrder but for regtest)
+    if (AreWeOnBCHChain() && IsNov152018Activated(chainParams.GetConsensus(), chainActive.Tip()) &&
+        chainParams.NetworkIDString() != "regtest")
     {
-        if (IsNov152018Enabled(chainParams.GetConsensus(), pindexNew))
-        {
-            enableCanonicalTxOrder = true;
-        }
-        else
-        {
-            enableCanonicalTxOrder = false;
-        }
+        enableCanonicalTxOrder = AreWeOnBCHChain();
     }
-    if (IsSv2018Scheduled())
+
+    if (AreWeOnSVChain() && IsSv2018Activated(chainParams.GetConsensus(), chainActive.Tip()))
     {
-        if (IsSv2018Enabled(chainParams.GetConsensus(), pindexNew))
-        {
-            maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
-            excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
-        }
-        else // if blockchain reorg we may need to back it out
-        {
-            maxScriptOps = MAX_OPS_PER_SCRIPT;
-            excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
-        }
+        maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
+        excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
+    }
+    else
+    {
+        maxScriptOps = MAX_OPS_PER_SCRIPT;
+        excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
     }
 }
 
@@ -2781,20 +2779,13 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
 
-    // If this block enabled the nov152018 protocol upgrade, then we need to clear the mempool of any transaction using
+    // If this block enabled the may152019 protocol upgrade, then we need to clear the mempool of any transaction using
     // not previously avaiable features (e.g. OP_CHECKDATASIGVERIFY).
-    if (IsNov152018Scheduled())
+
+    if (AreWeOnBCHChain())
     {
-        if (IsNov152018Enabled(consensusParams, pindexDelete) &&
-            !IsNov152018Enabled(consensusParams, pindexDelete->pprev))
-        {
-            mempool.clear();
-        }
-    }
-    // Same if we undid the SV hard fork
-    if (IsSv2018Scheduled())
-    {
-        if (IsSv2018Enabled(consensusParams, pindexDelete) && !IsSv2018Enabled(consensusParams, pindexDelete->pprev))
+        if (IsMay152019Enabled(consensusParams, pindexDelete) &&
+            !IsMay152019Enabled(consensusParams, pindexDelete->pprev))
         {
             mempool.clear();
         }

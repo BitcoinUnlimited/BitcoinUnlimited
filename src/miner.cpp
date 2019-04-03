@@ -169,8 +169,8 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _n
 
     // Make sure the coinbase is big enough.
     uint64_t nCoinbaseSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-    if (nCoinbaseSize < MIN_TX_SIZE && IsNov152018Scheduled() &&
-        IsNov152018Enabled(Params().GetConsensus(), chainActive.Tip()))
+    if (nCoinbaseSize < MIN_TX_SIZE &&
+        (AreWeOnBCHChain() && IsNov152018Activated(Params().GetConsensus(), chainActive.Tip())))
     {
         tx.vin[0].scriptSig << std::vector<uint8_t>(MIN_TX_SIZE - nCoinbaseSize - 1);
     }
@@ -248,16 +248,11 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
             nBlockSigOps);
 
         bool canonical = enableCanonicalTxOrder.Value();
-        if (IsNov152018Scheduled())
+        // Always allow overwite of enableCanonicalTxOrder but not for regtest
+        if (AreWeOnBCHChain() && IsNov152018Activated(Params().GetConsensus(), chainActive.Tip()) &&
+            chainparams.NetworkIDString() != "regtest")
         {
-            if (IsNov152018Enabled(chainparams.GetConsensus(), pindexPrev))
-            {
-                canonical = true;
-            }
-            else
-            {
-                canonical = false;
-            }
+            canonical = true;
         }
 
         // sort tx if there are any and the feature is enabled
@@ -386,8 +381,8 @@ bool BlockAssembler::TestForBlock(CTxMemPool::txiter iter)
     if (!IsFinalTx(iter->GetSharedTx(), nHeight, nLockTimeCutoff))
         return false;
 
-    // Make sure tx size is acceptable after Nov 15, 2018 fork
-    if (IsNov152018Scheduled() && IsNov152018Enabled(Params().GetConsensus(), chainActive.Tip()))
+    // Make sure tx size is greater o equal of 100 bytes
+    if (AreWeOnBCHChain() && IsNov152018Activated(Params().GetConsensus(), chainActive.Tip()))
     {
         if (iter->GetTxSize() < MIN_TX_SIZE)
             return false;
@@ -584,8 +579,8 @@ void IncrementExtraNonce(CBlock *pblock, unsigned int &nExtraNonce)
 
     // Make sure the coinbase is big enough
     uint64_t nCoinbaseSize = ::GetSerializeSize(txCoinbase, SER_NETWORK, PROTOCOL_VERSION);
-    if (nCoinbaseSize < MIN_TX_SIZE && IsNov152018Scheduled() &&
-        IsNov152018Enabled(Params().GetConsensus(), chainActive.Tip()))
+    if (nCoinbaseSize < MIN_TX_SIZE &&
+        (AreWeOnBCHChain() && IsNov152018Activated(Params().GetConsensus(), chainActive.Tip())))
     {
         txCoinbase.vin[0].scriptSig << std::vector<uint8_t>(MIN_TX_SIZE - nCoinbaseSize - 1);
     }
