@@ -251,8 +251,8 @@ std::vector<uint64_t> CGrapheneSet::Reconcile(const std::vector<uint256> &receiv
             throw std::runtime_error("Cheap hash collision while decoding graphene set");
         }
 
-        if ((computeOptimized && (*pFastFilter).contains(itemHash)) ||
-            (!computeOptimized && (*pSetFilter).contains(itemHash)))
+        if ((computeOptimized && pFastFilter->contains(itemHash)) ||
+            (!computeOptimized && pSetFilter->contains(itemHash)))
         {
             receiverSet.insert(cheapHash);
             localIblt.insert(cheapHash, IBLT_NULL_VALUE);
@@ -275,8 +275,8 @@ std::vector<uint64_t> CGrapheneSet::Reconcile(const std::map<uint64_t, uint256> 
 
     for (const auto &entry : mapCheapHashes)
     {
-        if ((computeOptimized && (*pFastFilter).contains(entry.second)) ||
-            (!computeOptimized && (*pSetFilter).contains(entry.second)))
+        if ((computeOptimized && pFastFilter->contains(entry.second)) ||
+            (!computeOptimized && pSetFilter->contains(entry.second)))
         {
             receiverSet.insert(entry.first);
             localIblt.insert(entry.first, IBLT_NULL_VALUE);
