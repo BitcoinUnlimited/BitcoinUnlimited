@@ -178,8 +178,12 @@ class SchnorrSigTest (BitcoinTestFramework):
 
 if __name__ == '__main__':
     binpath = findBitcoind()
-    cashlib.init(binpath + os.sep + ".libs" + os.sep + "libbitcoincash.so")
-    SchnorrSigTest().main()
+    try:
+        cashlib.init(binpath + os.sep + ".libs" + os.sep + "libbitcoincash.so")
+        SchnorrSigTest().main()
+    except OSError as e:
+        print("Issue loading cashlib shared library.  This is expected during cross compilation since the native python will not load the .so so no error will be reported: %s" % str(e))
+
 
 # Create a convenient function for an interactive python debugging session
 def Test():
