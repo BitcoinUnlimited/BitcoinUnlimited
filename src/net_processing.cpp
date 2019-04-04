@@ -553,7 +553,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CXVersionMessage xver;
         xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
         xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
-        xver.set_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED, 4);
+        xver.set_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED, GRAPHENE_MAX_VERSION_SUPPORTED);
         xver.set_u64c(XVer::BU_XTHIN_VERSION, 2); // xthin version
         pfrom->PushMessage(NetMsgType::XVERSION, xver);
 

@@ -337,7 +337,8 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
     int nSizeGrapheneBlock = vRecv.size();
     CInv inv(MSG_BLOCK, uint256());
 
-    CGrapheneBlock grapheneBlock(pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
+    CGrapheneBlock grapheneBlock(
+        (int)std::min(GRAPHENE_MAX_VERSION_SUPPORTED, pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED)));
     vRecv >> grapheneBlock;
 
     // Message consistency checking (FIXME: some redundancy here with AcceptBlockHeader)
@@ -1350,8 +1351,10 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
             uint64_t nSenderMempoolPlusBlock =
                 GetGrapheneMempoolInfo().nTx + pblock->vtx.size() - 1; // exclude coinbase
 
-            CGrapheneBlock grapheneBlock(MakeBlockRef(*pblock), mempoolinfo.nTx, nSenderMempoolPlusBlock,
-                pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED), computeOptimizeGraphene);
+            uint64_t compatibleBlockVersion = (int)std::min(
+                GRAPHENE_MAX_VERSION_SUPPORTED, pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
+            CGrapheneBlock grapheneBlock(
+                MakeBlockRef(*pblock), mempoolinfo.nTx, nSenderMempoolPlusBlock, compatibleBlockVersion, computeOptimizeGraphene);
             pfrom->gr_shorttxidk0 = grapheneBlock.shorttxidk0;
             pfrom->gr_shorttxidk1 = grapheneBlock.shorttxidk1;
             int nSizeBlock = pblock->GetBlockSize();

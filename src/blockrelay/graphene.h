@@ -21,6 +21,7 @@
 #include <atomic>
 #include <vector>
 
+const uint64_t GRAPHENE_MAX_VERSION_SUPPORTED = 4;
 const unsigned char MIN_MEMPOOL_INFO_BYTES = 8;
 const uint8_t SHORTTXIDS_LENGTH = 8;
 
