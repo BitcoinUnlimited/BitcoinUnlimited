@@ -5,7 +5,9 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-export LC_ALL=C.UTF-8
+if [ $DIST != "RPM" ]; then
+  export LC_ALL=C.UTF-8
+fi
 
 travis_retry docker pull "$DOCKER_NAME_TAG"
 env | grep -E '^(CCACHE_|WINEDEBUG|LC_ALL|BOOST_TEST_RANDOM|CONFIG_SHELL)' | tee /tmp/env
