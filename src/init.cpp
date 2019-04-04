@@ -1286,6 +1286,8 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     {
         LOGA("Unsetting NODE_NETWORK on prune mode\n");
         nLocalServices &= ~NODE_NETWORK;
+        LOGA("Setting NODE_NETWORK_LIMITED on prune mode\n");
+        nLocalServices |= NODE_NETWORK_LIMITED;
         if (!fReindex)
         {
             uiInterface.InitMessage(_("Pruning blockstore..."));

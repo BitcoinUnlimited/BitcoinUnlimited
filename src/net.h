@@ -429,6 +429,9 @@ public:
     bool fOneShot;
     bool fClient;
 
+    //! after BIP159
+    bool m_limited_node;
+
     //! If true a remote node initiated the connection.  If false, we initiated.
     //! The protocol is slightly asymmetric:
     //! initial version exchange

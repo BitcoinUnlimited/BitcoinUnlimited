@@ -343,7 +343,7 @@ const std::vector<std::string> &getAllNetMessageTypes();
 /** nServices flags */
 enum
 {
-    // NODE_NETWORK means that the node is capable of serving the block chain. It is currently
+    // NODE_NETWORK means that the node is capable of serving the complete block chain. It is currently
     // set by all Bitcoin Unlimited nodes, and is unset by SPV clients or other peers that just want
     // network services but don't provide them.
     NODE_NETWORK = (1 << 0),
@@ -389,7 +389,12 @@ enum
     NODE_WEAKBLOCKS = (1 << 7),
 
     // NODE_CF indicates the node is capable of serving compact block filters to SPV clients.
-    NODE_CF = (1 << 8)
+    NODE_CF = (1 << 8),
+
+    // NODE_NETWORK_LIMITED means the same as NODE_NETWORK with the limitation
+    // of only serving a small subset of the blockchain
+    // See BIP159 for details on how this is implemented.
+    NODE_NETWORK_LIMITED = (1 << 10),
 };
 
 /** A CService with information about it as peer */
