@@ -25,6 +25,7 @@ bool recursive_shared_mutex::unlock_if_write_lock(const std::thread::id &locking
     return false;
 }
 
+
 void recursive_shared_mutex::lock_shared_internal(const std::thread::id &locking_thread_id)
 {
     auto it = _read_owner_ids.find(locking_thread_id);
@@ -36,6 +37,11 @@ void recursive_shared_mutex::lock_shared_internal(const std::thread::id &locking
     {
         it->second = it->second + 1;
     }
+}
+
+bool recursive_shared_mutex::already_has_lock_shared(const std::thread::id &locking_thread_id)
+{
+    return (_read_owner_ids.find(locking_thread_id) != _read_owner_ids.end());
 }
 
 void recursive_shared_mutex::lock_shared_internal(const std::thread::id &locking_thread_id, const uint64_t &count)
@@ -294,8 +300,15 @@ void recursive_shared_mutex::lock_shared(const std::thread::id &locking_thread_i
     {
         return;
     }
-    _read_gate.wait(_lock, [=] { return _write_counter == 0; });
-    lock_shared_internal(locking_thread_id);
+    if (already_has_lock_shared(locking_thread_id))
+    {
+        lock_shared_internal(locking_thread_id);
+    }
+    else
+    {
+        _read_gate.wait(_lock, [=] { return _write_counter == 0 && _write_promotion_counter == 0; });
+        lock_shared_internal(locking_thread_id);
+    }
 }
 
 bool recursive_shared_mutex::try_lock_shared(const std::thread::id &locking_thread_id)
@@ -305,11 +318,16 @@ bool recursive_shared_mutex::try_lock_shared(const std::thread::id &locking_thre
     {
         return true;
     }
+    if (already_has_lock_shared(locking_thread_id))
+    {
+        lock_shared_internal(locking_thread_id);
+        return true;
+    }
     if (!_lock.owns_lock())
     {
         return false;
     }
-    if (_write_counter == 0)
+    if (_write_counter == 0 && _write_promotion_counter == 0)
     {
         lock_shared_internal(locking_thread_id);
         return true;
