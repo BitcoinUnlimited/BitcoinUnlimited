@@ -18,12 +18,13 @@ BOOST_AUTO_TEST_CASE(rsm_lock_unlock)
     rsm.lock(std::this_thread::get_id());
 
     // try to unlock_shared an exclusive lock
-    BOOST_CHECK_NO_THROW(rsm.unlock_shared(std::this_thread::get_id()));
+    // we should error here because exclusive locks can
+    // be not be unlocked by shared_ unlock method
+    BOOST_CHECK_THROW(rsm.unlock_shared(std::this_thread::get_id()), std::logic_error);
 
     // unlock exclusive lock
-    // we should error here because we already unlocked. exclusive locks can
-    // be unlocked by either shared or exclusive unlock methods
-    BOOST_CHECK_THROW(rsm.unlock(std::this_thread::get_id()), std::logic_error);
+
+    BOOST_CHECK_NO_THROW(rsm.unlock(std::this_thread::get_id()));
 
     // exclusive lock once
     rsm.lock(std::this_thread::get_id());
@@ -61,13 +62,13 @@ BOOST_AUTO_TEST_CASE(rsm_try_lock)
     // try lock
     rsm.try_lock(std::this_thread::get_id());
 
-    // unlock shared while we have exclusive lock
-    BOOST_CHECK_NO_THROW(rsm.unlock_shared(std::this_thread::get_id()));
+    // try to unlock_shared an exclusive lock
+    // we should error here because exclusive locks can
+    // be not be unlocked by shared_ unlock method
+    BOOST_CHECK_THROW(rsm.unlock_shared(std::this_thread::get_id()), std::logic_error);
 
-    // unlock exclusive
-    // we should error here because we already unlocked. exclusive locks can
-    // be unlocked by either shared or exclusive unlock methods
-    BOOST_CHECK_THROW(rsm.unlock(std::this_thread::get_id()), std::logic_error);
+    // unlock exclusive lock
+    BOOST_CHECK_NO_THROW(rsm.unlock(std::this_thread::get_id()));
 
     // try lock
     rsm.try_lock(std::this_thread::get_id());

@@ -9,17 +9,22 @@ bool recursive_shared_mutex::check_for_write_lock(const std::thread::id &locking
 {
     if (_write_owner_id == locking_thread_id)
     {
-        _write_counter++;
+        _shared_while_exclusive_counter++;
         return true;
     }
     return false;
 }
 
-bool recursive_shared_mutex::unlock_if_write_lock(const std::thread::id &locking_thread_id)
+bool recursive_shared_mutex::check_for_write_unlock(const std::thread::id &locking_thread_id)
 {
     if (_write_owner_id == locking_thread_id)
     {
-        unlock(locking_thread_id);
+        if (_shared_while_exclusive_counter == 0)
+        {
+            throw std::logic_error("can not unlock_shared more times than we locked for shared ownership while holding "
+                                   "exclusive ownership");
+        }
+        _shared_while_exclusive_counter--;
         return true;
     }
     return false;
@@ -71,35 +76,36 @@ uint64_t recursive_shared_mutex::get_shared_lock_count(const std::thread::id &lo
 
 void recursive_shared_mutex::lock_auto_locks(const std::thread::id &locking_thread_id, const uint64_t &count)
 {
-    auto it = _auto_unlocked_ids.find(locking_thread_id);
-    if (it == _auto_unlocked_ids.end())
+    if (_auto_unlock_id != NON_THREAD_ID)
     {
-        _auto_unlocked_ids.emplace(locking_thread_id, count);
+        throw std::logic_error("lock_auto_locks incorrectly called while already occupied by another thread");
     }
-    else
-    {
-        it->second = it->second + count;
-    }
+    _auto_unlock_id = locking_thread_id;
+    _auto_unlock_count = count;
 }
 
 uint64_t recursive_shared_mutex::get_auto_lock_count(const std::thread::id &locking_thread_id)
 {
-    auto it = _auto_unlocked_ids.find(locking_thread_id);
-    if (it == _auto_unlocked_ids.end())
+    if (_auto_unlock_id == locking_thread_id)
     {
-        return 0;
+        return _auto_unlock_count;
     }
-    return it->second;
+#ifdef DEBUG
+    throw std::logic_error("get_auto_lock_count incorrectly called on a thread with no auto locks");
+#else
+    return 0;
+#endif
 }
 
 void recursive_shared_mutex::unlock_auto_locks(const std::thread::id &locking_thread_id)
 {
-    auto it = _auto_unlocked_ids.find(locking_thread_id);
-    if (it == _auto_unlocked_ids.end())
+    if (_auto_unlock_id == locking_thread_id)
     {
-        throw std::logic_error("unlock_auto_locks incorrectly called on a thread with no auto locks");
+        _auto_unlock_count = 0;
+        _auto_unlock_id = NON_THREAD_ID;
+        return;
     }
-    _auto_unlocked_ids.erase(it);
+    throw std::logic_error("unlock_auto_locks incorrectly called on a thread with no auto locks");
 }
 
 ////////////////////////
@@ -116,14 +122,6 @@ void recursive_shared_mutex::lock(const std::thread::id &locking_thread_id)
     }
     else
     {
-        // unlock our shared locks and add to the auto list that if did this
-        uint64_t lock_count = get_shared_lock_count(locking_thread_id);
-        if (lock_count > 0)
-        {
-            lock_auto_locks(locking_thread_id, lock_count);
-            unlock_shared_internal(locking_thread_id, lock_count);
-        }
-
         // Wait until we can set the write-entered.
         _read_gate.wait(_lock, [=] { return _write_counter == 0; });
 
@@ -244,13 +242,6 @@ void recursive_shared_mutex::unlock(const std::thread::id &locking_thread_id)
         }
         if (_write_counter == 0)
         {
-            // restore auto unlocked locks if they exist
-            uint64_t auto_lock_count = get_auto_lock_count(locking_thread_id);
-            if (auto_lock_count > 0)
-            {
-                lock_shared_internal(locking_thread_id, auto_lock_count);
-                unlock_auto_locks(locking_thread_id);
-            }
             // reset the write owner id back to a non thread id once we unlock all write locks
             _write_owner_id = NON_THREAD_ID;
             // call notify_all() while mutex is held so that another thread can't
@@ -307,11 +298,11 @@ bool recursive_shared_mutex::try_lock_shared(const std::thread::id &locking_thre
 
 void recursive_shared_mutex::unlock_shared(const std::thread::id &locking_thread_id)
 {
-    if (unlock_if_write_lock(locking_thread_id))
+    std::lock_guard<std::mutex> _lock(_mutex);
+    if (check_for_write_unlock(locking_thread_id))
     {
         return;
     }
-    std::lock_guard<std::mutex> _lock(_mutex);
     // assert(_read_owner_ids.size() > 0);
     if (_read_owner_ids.size() == 0)
     {
