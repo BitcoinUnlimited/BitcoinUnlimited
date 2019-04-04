@@ -137,10 +137,10 @@ class AcceptBlockTest(BitcoinTestFramework):
         # from peers which are not whitelisted, while Node1 will be used for
         # the whitelisted case.
         self.nodes = []
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug=net", "-debug=req"],
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug=net", "-debug=req", "-net.txAdmissionThreads=1", "-net.msgHandlerThreads=1"],
                                      binary=self.options.testbinary))
         self.nodes.append(start_node(1, self.options.tmpdir,
-                                     ["-debug=net", "-debug=req", "-whitelist=127.0.0.1"],
+                                     ["-debug=net", "-debug=req", "-whitelist=127.0.0.1", "-net.txAdmissionThreads=1", "-net.msgHandlerThreads=1"],
                                      binary=self.options.testbinary))
 
     def run_test(self):
@@ -243,7 +243,6 @@ class AcceptBlockTest(BitcoinTestFramework):
                     headers_message.headers.append(CBlockHeader(next_block))
                 tips[j] = next_block
                 test_node.sync_with_ping()
-        time.sleep(2)
 
         for x in all_blocks:
             try:
@@ -260,7 +259,7 @@ class AcceptBlockTest(BitcoinTestFramework):
         white_node.send_message(headers_message) # Send headers leading to tip
         white_node.send_message(msg_block(tips[1]))  # Now deliver the tip
         try:
-            time.sleep(2) # give time for the tip to be delivered
+            white_node.sync_with_ping()
             self.nodes[1].getblock(tips[1].hash)
             print("Unrequested block far ahead of tip accepted from whitelisted peer")
         except:
