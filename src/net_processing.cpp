@@ -31,6 +31,7 @@ extern std::atomic<int> nPreferredDownload;
 extern int nSyncStarted;
 extern std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders;
 extern CTweak<unsigned int> maxBlocksInTransitPerPeer;
+extern CTweak<uint64_t> grapheneFastFilterCompatibility;
 
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
@@ -554,6 +555,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
         xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
         xver.set_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED, GRAPHENE_MAX_VERSION_SUPPORTED);
+        xver.set_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF, grapheneFastFilterCompatibility.Value());
         xver.set_u64c(XVer::BU_XTHIN_VERSION, 2); // xthin version
         pfrom->PushMessage(NetMsgType::XVERSION, xver);
 

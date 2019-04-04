@@ -281,7 +281,7 @@ BOOST_AUTO_TEST_CASE(compute_optimized_graphene_set_can_serde)
 
     senderItems.push_back(SerializeHash(3));
     CGrapheneSet sentGrapheneSet(1, 1, senderItems, 0, 0, 3, 0, true, false, true);
-    CGrapheneSet receivedGrapheneSet(3);
+    CGrapheneSet receivedGrapheneSet(3, true);
 
     ss << sentGrapheneSet;
     ss >> receivedGrapheneSet;
@@ -381,7 +381,7 @@ BOOST_AUTO_TEST_CASE(graphene_block_can_serde)
         const CTransactionRef ptx = MakeTransactionRef(tx);
         block.vtx.push_back(ptx);
         CGrapheneBlock senderGrapheneBlock(MakeBlockRef(block), 5, 6, 4, true);
-        CGrapheneBlock receiverGrapheneBlock(4);
+        CGrapheneBlock receiverGrapheneBlock(4, true);
         CDataStream ss(SER_DISK, 0);
 
         ss << senderGrapheneBlock;

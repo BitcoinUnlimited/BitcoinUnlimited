@@ -18,7 +18,7 @@ class GrapheneOptimizedTest(GrapheneBlockTest):
             "-use-grapheneblocks=1",
             "-use-thinblocks=0",
             "-use-compactblocks=0",
-            "-compute-optimize-graphene=0",
+            "-net.grapheneFastFilterCompatibility=2",
             "-excessiveblocksize=6000000",
             "-blockprioritysize=6000000",
             "-blockmaxsize=6000000"]
@@ -29,14 +29,14 @@ class GrapheneOptimizedTest(GrapheneBlockTest):
             "-use-grapheneblocks=1",
             "-use-thinblocks=0",
             "-use-compactblocks=0",
-            "-compute-optimize-graphene=1",
+            "-net.grapheneFastFilterCompatibility=0",
             "-excessiveblocksize=6000000",
             "-blockprioritysize=6000000",
             "-blockmaxsize=6000000"]
 
         self.nodes = [
-            start_node(0, self.options.tmpdir, standard_node_opts),
-            start_node(1, self.options.tmpdir, optimized_node_opts),
+            start_node(0, self.options.tmpdir, optimized_node_opts),
+            start_node(1, self.options.tmpdir, standard_node_opts),
             start_node(2, self.options.tmpdir, optimized_node_opts)
         ]
 

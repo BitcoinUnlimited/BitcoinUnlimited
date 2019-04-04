@@ -658,10 +658,6 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
             DEFAULT_BLOOM_FILTER_TARGETING)
         .addArg("use-grapheneblocks", optionalBool,
             strprintf(_("Enable graphene to speed up the relay of blocks (default: %d)"), DEFAULT_USE_GRAPHENE_BLOCKS))
-        .addArg("compute-optimize-graphene", optionalBool,
-            strprintf(_("Use CPU optimized data structures for Graphene even if this could lead to somewhat larger "
-                        "blocks (default: %d)"),
-                    COMPUTE_OPTIMIZE_GRAPHENE))
         .addArg("use-compactblocks", optionalBool,
             strprintf(_("Enable compact blocks to speed up the relay of blocks (default: %d)"),
                     DEFAULT_USE_COMPACT_BLOCKS))

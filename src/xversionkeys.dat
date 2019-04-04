@@ -28,6 +28,9 @@ KEY i BU_MSG_IGNORE_CHECKSUM                    0x0002                   0x0002 
 # XTHIN version
 KEY i BU_XTHIN_VERSION                          0x0002                   0x0003         u64c
 
+# Graphene Fast Filter Preference
+KEY i BU_GRAPHENE_FAST_FILTER_PREF              0x0002                   0x0004         u64c
+
 # KEY i ABC_...                                0x0000                   ...
 # KEY i XT_DOUBLESPEND_FORWARDING_SCHEME       0x0003                   ...            vector
 # ...

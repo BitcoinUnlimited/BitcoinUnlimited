@@ -65,10 +65,14 @@ public:
     {
     }
     CGrapheneSet(uint64_t _version)
-        : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), ibltSalt(0),
+        : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), ibltSalt(0), version(_version),
           computeOptimized(false), pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr)
     {
-        version = _version;
+    }
+    CGrapheneSet(uint64_t _version, bool _computeOptimized)
+        : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), ibltSalt(0), version(_version),
+          computeOptimized(_computeOptimized), pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr)
+    {
     }
     CGrapheneSet(size_t _nReceiverUniverseItems,
         uint64_t nSenderUniverseItems,
@@ -178,8 +182,6 @@ public:
         }
         if (version >= 2)
             READWRITE(ibltSalt);
-        if (version >= 3)
-            READWRITE(computeOptimized);
         READWRITE(encodedRank);
         if (version >= 3 && computeOptimized)
         {

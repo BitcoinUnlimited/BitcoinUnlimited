@@ -235,7 +235,7 @@ testScripts = [ RpcTest(t) for t in [
     'importprunedfunds',
     'compactblocks_1',
     'compactblocks_2',
-    'grapheneblocks',
+    'graphene_optimized',
     'thinblocks',
     'checkdatasig_activation',
     'xversion',

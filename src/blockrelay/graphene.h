@@ -21,6 +21,14 @@
 #include <atomic>
 #include <vector>
 
+enum FastFilterSupport
+{
+    EITHER,
+    FAST,
+    REGULAR
+};
+
+const uint8_t GRAPHENE_FAST_FILTER_SUPPORT = EITHER;
 const uint64_t GRAPHENE_MAX_VERSION_SUPPORTED = 4;
 const unsigned char MIN_MEMPOOL_INFO_BYTES = 8;
 const uint8_t SHORTTXIDS_LENGTH = 8;
@@ -70,9 +78,13 @@ public:
         uint64_t _version,
         bool _computeOptimized);
     CGrapheneBlock() : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(2), computeOptimized(false) {}
-    CGrapheneBlock(uint64_t _version) : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), computeOptimized(false)
+    CGrapheneBlock(uint64_t _version)
+        : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(_version), computeOptimized(false)
     {
-        version = _version;
+    }
+    CGrapheneBlock(uint64_t _version, bool _computeOptimized)
+        : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(_version), computeOptimized(_computeOptimized)
+    {
     }
     ~CGrapheneBlock();
     // Create seeds for SipHash using the sipHashNonce generated in the constructor
@@ -110,7 +122,7 @@ public:
         if (!pGrapheneSet)
         {
             if (version > 3)
-                pGrapheneSet = new CGrapheneSet(3);
+                pGrapheneSet = new CGrapheneSet(3, computeOptimized);
             else if (version == 3)
                 pGrapheneSet = new CGrapheneSet(2);
             else if (version == 2)
@@ -342,5 +354,8 @@ CMemPoolInfo GetGrapheneMempoolInfo();
 void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash);
 // Generate cheap hash from seeds using SipHash
 uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256 &txhash, uint64_t grapheneVersion);
+// This method decides on the value of computeOptimized depending on what modes are supported
+// by both the sender and receiver
+bool NegotiateFastFilterSupport(CNode *pfrom);
 
 #endif // BITCOIN_GRAPHENE_H
