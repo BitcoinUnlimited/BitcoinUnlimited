@@ -131,6 +131,7 @@ BITCOIN_TESTS =\
   test/univalue_tests.cpp \
   test/util_tests.cpp \
   test/utilhttp_tests.cpp \
+  test/utilprocess_tests.cpp \
   test/xversionmessage_tests.cpp
 
 # recursive shared mutex tests #
