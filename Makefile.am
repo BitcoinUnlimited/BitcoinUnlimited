@@ -4,7 +4,7 @@
 
 ACLOCAL_AMFLAGS = -I build-aux/m4
 SUBDIRS = src
-.PHONY: deploy FORCE
+.PHONY: deploy FORCE electrs
 
 GZIP_ENV="-9n"
 export PYTHONPATH
@@ -218,8 +218,8 @@ endif
 check-formatting:
 	$(MAKE) -C src $@
 
-electrs: ${PWD}/src/electrs
-	$(top_srcdir)/contrib/electrs/build_electrs.py --dst=${PWD}/src
+electrs:
+	$(top_srcdir)/contrib/electrs/build_electrs.py --dst=${PWD}/src --target=$(host)
 
 dist_noinst_SCRIPTS = autogen.sh
 

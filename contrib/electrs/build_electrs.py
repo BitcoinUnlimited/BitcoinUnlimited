@@ -19,6 +19,8 @@ parser.add_argument('--verbose', help='Sets log level to DEBUG',
         action = "store_true")
 parser.add_argument('--dst', help='Where to copy produced binary',
     default=os.path.join(ROOT_DIR, "src"))
+parser.add_argument('--target', help='Target platform (e.g. x86_64-pc-linux-gnu)',
+    default="x86_64-unknown-linux-gnu")
 args = parser.parse_args()
 
 level = logging.DEBUG if args.verbose else logging.INFO
@@ -104,16 +106,30 @@ def cargo_run(args):
     if rc != 0:
         bail("cargo failed with return code %s", rc)
 
+def get_target(makefile_target):
+    # Try to map target passed from makefile to the equalent in rust
+    # To see supported targets, run: rustc --print target-list
+    target_map = {
+            'x86_64-pc-linux-gnu' : 'x86_64-unknown-linux-gnu',
+            'i686-pc-linux-gnu' : 'i686-unknown-linux-gnu'
+    }
+    if makefile_target in target_map:
+        return target_map[makefile_target]
+    logging.warn("Target %s is not mapped, passing it rust and hoping it works"
+            % makefile_target)
+    return makefile_target
+
+
 check_dependencies()
 
 if not os.path.exists(ELECTRS_DIR):
     clone_repo()
 verify_repo(args.allow_modified)
 
-cargo_run(["build", "--release"])
-cargo_run(["test", "--release"])
+cargo_run(["build", "--release", "--target=%s" % get_target(args.target)])
+cargo_run(["test", "--release", "--target=%s" % get_target(args.target)])
 
-src = os.path.join(ELECTRS_DIR, "target", "release", "electrs")
+src = os.path.join(ELECTRS_DIR, "target", get_target(args.target), "release", "electrs")
 logging.info("Copying %s to %s", src, args.dst)
 shutil.copy(src, args.dst)
 
