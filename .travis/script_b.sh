@@ -5,7 +5,9 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-export LC_ALL=C.UTF-8
+if [ $DIST != "RPM" ]; then
+  export LC_ALL=C.UTF-8
+fi
 
 cd "build" || (echo "could not enter distdir build"; exit 1)
 

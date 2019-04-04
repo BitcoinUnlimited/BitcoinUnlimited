@@ -28,6 +28,7 @@ env:
     - PYTHON_DEBUG=1
     - WINEDEBUG=fixme-all
     - DOCKER_PACKAGES="build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git ca-certificates ccache python3"
+    - DIST=DEB
 
 matrix:
   include:
@@ -113,6 +114,17 @@ matrix:
         - BITCOIN_CONFIG="--enable-reduce-exports"
         - OSX_SDK=10.11 GOAL="deploy"
 
+    - compiler: gcc
+      env:
+        - CXX=g++ CC=gcc
+        - HOST=x86_64-unknown-linux-gnu
+        - DOCKER_NAME_TAG=centos:latest
+        - DIST=RPM
+        - DEP_OPTS="ALLOW_HOST_PACKAGES=1"
+        - PACKAGES="libtool libevent-devel autoconf automake openssl-devel boost-devel python36u libdb4-devel libdb4-cxx-devel devtoolset-6-gcc* miniupnpc-devel zeromq-devel"
+        - RUN_TESTS=false GOAL="install"
+        - BITCOIN_CONFIG="--enable-zmq --with-gui=no --disable-bench"
+
 before_install:
     - set -o errexit; source .travis/before_install.sh
 install:
@@ -120,8 +132,8 @@ install:
 before_script:
     - set -o errexit; source .travis/before_script.sh
 script:
-    - if [ $SECONDS -gt 1200 ]; then set +o errexit; echo "Travis early exit to cache current state"; false; else set -o errexit; source .travis/script_a.sh; fi
-    - if [ $SECONDS -gt 1500 ]; then set +o errexit; echo "Travis early exit to cache current state"; false; else set -o errexit; source .travis/script_b.sh; fi
+    - if [ $SECONDS -gt 1980 ]; then set +o errexit; echo "Travis early exit to cache current state"; false; else set -o errexit; source .travis/script_a.sh; fi
+    - if [ $SECONDS -gt 1980 ]; then set +o errexit; echo "Travis early exit to cache current state"; false; else set -o errexit; source .travis/script_b.sh; fi
 after_script:
     - set -o errexit; cd $TRAVIS_BUILD_DIR; source .travis/after_script.sh
 after_failure:
