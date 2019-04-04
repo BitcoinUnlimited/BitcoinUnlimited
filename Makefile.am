@@ -79,7 +79,7 @@ $(OSX_APP)/Contents/PkgInfo:
 
 $(OSX_APP)/Contents/Resources/empty.lproj:
 	$(MKDIR_P) $(@D)
-	@touch $@ 
+	@touch $@
 
 $(OSX_APP)/Contents/Info.plist: $(OSX_PLIST)
 	$(MKDIR_P) $(@D)
@@ -218,9 +218,8 @@ endif
 check-formatting:
 	$(MAKE) -C src $@
 
-.PHONY: electrs
-electrs:
-	$(top_srcdir)/contrib/electrs/build_electrs.py
+electrs: ${PWD}/src/electrs
+	$(top_srcdir)/contrib/electrs/build_electrs.py --dst=${PWD}/src
 
 dist_noinst_SCRIPTS = autogen.sh
 

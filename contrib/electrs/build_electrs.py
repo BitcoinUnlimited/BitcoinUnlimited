@@ -17,6 +17,8 @@ parser.add_argument('--allow-modified', help='Allow building modified/dirty repo
         action = "store_true")
 parser.add_argument('--verbose', help='Sets log level to DEBUG',
         action = "store_true")
+parser.add_argument('--dst', help='Where to copy produced binary',
+    default=os.path.join(ROOT_DIR, "src"))
 args = parser.parse_args()
 
 level = logging.DEBUG if args.verbose else logging.INFO
@@ -46,6 +48,9 @@ def check_dependencies():
         logging.error("Cannot find 'cargo', will not be able to build electrs")
         logging.error("You need to install rust (1.28+) https://rustup.rs/")
         bail("rust not found")
+
+    if not os.path.isdir(args.dst):
+        bail("--dst provided '%s' is not a directory", args.dst)
 
 def clone_repo():
     import git
@@ -109,8 +114,7 @@ cargo_run(["build", "--release"])
 cargo_run(["test", "--release"])
 
 src = os.path.join(ELECTRS_DIR, "target", "release", "electrs")
-dst = os.path.join(ROOT_DIR, "src")
-logging.info("Copying %s to %s", src, dst)
-shutil.copy(src, dst)
+logging.info("Copying %s to %s", src, args.dst)
+shutil.copy(src, args.dst)
 
 logging.info("Done")
