@@ -64,10 +64,8 @@ private:
     bool unlock_if_write_lock(const std::thread::id &locking_thread_id);
 
     bool already_has_lock_shared(const std::thread::id &locking_thread_id);
-    void lock_shared_internal(const std::thread::id &locking_thread_id);
-    void lock_shared_internal(const std::thread::id &locking_thread_id, const uint64_t &count);
-    void unlock_shared_internal(const std::thread::id &locking_thread_id);
-    void unlock_shared_internal(const std::thread::id &locking_thread_id, const uint64_t &count);
+    void lock_shared_internal(const std::thread::id &locking_thread_id, const uint64_t &count = 1);
+    void unlock_shared_internal(const std::thread::id &locking_thread_id, const uint64_t &count = 1);
     uint64_t get_shared_lock_count(const std::thread::id &locking_thread_id);
 
     void lock_auto_locks(const std::thread::id &locking_thread_id, const uint64_t &count);
