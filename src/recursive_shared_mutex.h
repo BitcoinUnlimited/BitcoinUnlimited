@@ -34,7 +34,7 @@ static const std::thread::id NON_THREAD_ID = std::thread::id();
 
 class recursive_shared_mutex
 {
-private:
+protected:
     // Only locked when accessing counters, ids, or waiting on condition variables.
     std::mutex _mutex;
 
