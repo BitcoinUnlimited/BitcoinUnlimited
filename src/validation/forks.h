@@ -21,6 +21,8 @@ class CBlockIndex;
 class CScript;
 class CTxMemPoolEntry;
 
+extern CChain chainActive;
+
 // Return true if this transaction can only be committed post-fork
 bool IsTxUAHFOnly(const CTxMemPoolEntry &tx);
 

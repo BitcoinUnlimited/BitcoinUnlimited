@@ -655,7 +655,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     }
 
     // Make sure tx size is acceptable after Nov 15, 2018 fork
-    if (AreWeOnBCHChain() && IsNov152018Activated(chainparams.GetConsensus(), chainActive.Tip()))
+    if (AreWeOnBCHChain())
     {
         if (tx->GetTxSize() < MIN_TX_SIZE)
             return state.DoS(0, false, REJECT_INVALID, "txn-undersize");

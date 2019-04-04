@@ -1367,8 +1367,8 @@ bool ContextualCheckBlock(const CBlock &block,
                 10, error("%s: contains a non-final transaction", __func__), REJECT_INVALID, "bad-txns-nonfinal");
         }
 
-        // Make sure tx size is equal or higher to 100 bytes if we are on the BCH chain
-        if (AreWeOnBCHChain() && IsNov152018Activated(consensusParams, chainActive.Tip()))
+        // Make sure tx size is equal or higher to 100 bytes if we are on the BCH chain and Nov 15th 2018 activated
+        if (AreWeOnBCHChain())
         {
             if (tx->GetTxSize() < MIN_TX_SIZE)
             {
@@ -1706,7 +1706,7 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
     // Since Nov 15, 2018 HF activates sig push only, clean stack rules
     // are enforced and CHECKDATASIG has been introduced on the BCH chain
     // (see  BIP 62 and CHECKDATASIG specification or more details)
-    if (AreWeOnBCHChain() && IsNov152018Activated(consensusparams, chainActive.Tip()))
+    if (AreWeOnBCHChain())
     {
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
         flags |= SCRIPT_VERIFY_CLEANSTACK;
@@ -2442,11 +2442,13 @@ bool ConnectBlock(const CBlock &block,
 
     // Discover how to handle this block
     bool canonical = enableCanonicalTxOrder.Value();
-    // Always allow overwite of enableCanonicalTxOrder but for regtest
-    if (AreWeOnBCHChain() && IsNov152018Activated(chainparams.GetConsensus(), chainActive.Tip()) &&
-        !(chainparams.NetworkIDString() == "regtest"))
+    // Always allow overwite of enableCanonicalTxOrder but for regtest on BCH
+    if (AreWeOnBCHChain())
     {
-        canonical = true;
+        if (!(chainparams.NetworkIDString() == "regtest"))
+        {
+            canonical = true;
+        }
     }
 
     if (canonical)
@@ -2735,10 +2737,12 @@ void UpdateTip(CBlockIndex *pindexNew)
 
     // Set the global variables based on the fork state of the NEXT block
     // Always allow overwite of enableCanonicalTxOrder but for regtest)
-    if (AreWeOnBCHChain() && IsNov152018Activated(chainParams.GetConsensus(), chainActive.Tip()) &&
-        chainParams.NetworkIDString() != "regtest")
+    if (AreWeOnBCHChain())
     {
-        enableCanonicalTxOrder = AreWeOnBCHChain();
+        if (chainParams.NetworkIDString() != "regtest")
+        {
+            enableCanonicalTxOrder = true;
+        }
     }
 
     if (AreWeOnSVChain() && IsSv2018Activated(chainParams.GetConsensus(), chainActive.Tip()))
