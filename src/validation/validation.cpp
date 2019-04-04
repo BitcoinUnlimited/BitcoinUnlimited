@@ -2753,7 +2753,10 @@ void UpdateTip(CBlockIndex *pindexNew)
     else
     {
         maxScriptOps = MAX_OPS_PER_SCRIPT;
-        excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
+        if (chainParams.NetworkIDString() != "regtest")
+        {
+            excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
+        }
     }
 }
 
