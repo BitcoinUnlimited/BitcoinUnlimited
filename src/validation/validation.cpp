@@ -2745,16 +2745,16 @@ void UpdateTip(CBlockIndex *pindexNew)
         }
     }
 
-    if (AreWeOnSVChain() && IsSv2018Activated(chainParams.GetConsensus(), chainActive.Tip()))
+    if (AreWeOnSVChain())
     {
-        maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
-        excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
-    }
-    else
-    {
-        maxScriptOps = MAX_OPS_PER_SCRIPT;
-        if (chainParams.NetworkIDString() != "regtest")
+        if (IsSv2018Activated(chainParams.GetConsensus(), chainActive.Tip()))
         {
+            maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
+            excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
+        }
+        else // if blockchain reorg we may need to back it out
+        {
+            maxScriptOps = MAX_OPS_PER_SCRIPT;
             excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
         }
     }
