@@ -1240,6 +1240,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
         excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
         settingsToUserAgentString();
+        enableCanonicalTxOrder = false;
     }
 
     // Set enableCanonicalTxOrder for the BCH early in the bootstrap phase
