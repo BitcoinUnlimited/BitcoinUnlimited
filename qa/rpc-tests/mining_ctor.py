@@ -28,7 +28,7 @@ class CTORMiningTest(BitcoinTestFramework):
         # it errors out if it is not connected to other nodes
         self.nodes = []
 
-        opts = ['-spendzeroconfchange=0', '-debug', '-whitelist=127.0.0.1']
+        opts = ['-spendzeroconfchange=0', '-debug', '-whitelist=127.0.0.1', '-consensus.enableCanonicalTxOrder=1']
         for i in range(2):
             self.nodes.append(start_node(i, self.options.tmpdir, opts))
 
