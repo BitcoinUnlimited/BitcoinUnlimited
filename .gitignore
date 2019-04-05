@@ -86,6 +86,7 @@ Bitcoin-Qt.app
 Makefile.test
 bitcoin-qt_test
 src/test/buildenv.py
+script_tests.json.gen
 
 # Resources cpp
 qrc_*.cpp
