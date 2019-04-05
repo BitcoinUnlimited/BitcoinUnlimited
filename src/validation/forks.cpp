@@ -102,7 +102,7 @@ bool AreWeOnBCHChain()
     return ((miningForkTime.Value() != 0) && (IsNov152018Activated(consensusparams, chainActive.Tip())));
 }
 
-bool IsMay152019Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
+bool IsMay2019Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
 {
     if (pindexTip == nullptr)
     {
@@ -111,7 +111,7 @@ bool IsMay152019Enabled(const Consensus::Params &consensusparams, const CBlockIn
     return pindexTip->IsforkActiveOnNextBlock(miningForkTime.Value());
 }
 
-bool IsMay152019Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
+bool IsMay2019Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
 {
     if (pindexTip == nullptr)
     {

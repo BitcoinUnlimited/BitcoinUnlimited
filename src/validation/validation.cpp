@@ -1715,7 +1715,7 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
 
     // TODO: add here the needed flag related to the new features that need to
     // be activate in May 15th, 2019 protocol upgrade.
-    if (AreWeOnBCHChain() && IsMay152019Enabled(consensusparams, pindex->pprev))
+    if (AreWeOnBCHChain() && IsMay2019Enabled(consensusparams, pindex->pprev))
     {
         // schnoor
         // segwit_recovery
@@ -2791,8 +2791,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
 
     if (AreWeOnBCHChain())
     {
-        if (IsMay152019Enabled(consensusParams, pindexDelete) &&
-            !IsMay152019Enabled(consensusParams, pindexDelete->pprev))
+        if (IsMay2019Enabled(consensusParams, pindexDelete) && !IsMay2019Enabled(consensusParams, pindexDelete->pprev))
         {
             mempool.clear();
         }
