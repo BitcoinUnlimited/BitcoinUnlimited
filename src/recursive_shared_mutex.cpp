@@ -127,12 +127,12 @@ void recursive_shared_mutex::lock()
     else
     {
         // Wait until we can set the write-entered.
-        _read_gate.wait(_lock, [=] { return end_of_exclusive_ownership(); });
+        _read_gate.wait(_lock, [this] { return end_of_exclusive_ownership(); });
 
         _write_counter++;
         // Then wait until there are no more readers.
         _write_gate.wait(
-            _lock, [=] { return _read_owner_ids.size() == 0 && _promotion_candidate_id == NON_THREAD_ID; });
+            _lock, [this] { return _read_owner_ids.size() == 0 && _promotion_candidate_id == NON_THREAD_ID; });
         _write_owner_id = locking_thread_id;
     }
 }
@@ -160,7 +160,7 @@ bool recursive_shared_mutex::try_promotion()
             unlock_shared_internal(locking_thread_id, lock_count);
         }
         // Then wait until there are no more readers.
-        _promotion_write_gate.wait(_lock, [=] { return _read_owner_ids.size() == 0; });
+        _promotion_write_gate.wait(_lock, [this] { return _read_owner_ids.size() == 0; });
         _write_owner_id = locking_thread_id;
         // it is possible that if we cut the line, another thread could have incremented the _write_counter
         // already, so we should check this and decrement + save what they did
@@ -270,7 +270,7 @@ void recursive_shared_mutex::lock_shared()
     else
     {
         _read_gate.wait(
-            _lock, [=] { return end_of_exclusive_ownership() && _promotion_candidate_id == NON_THREAD_ID; });
+            _lock, [this] { return end_of_exclusive_ownership() && _promotion_candidate_id == NON_THREAD_ID; });
         lock_shared_internal(locking_thread_id);
     }
 }
