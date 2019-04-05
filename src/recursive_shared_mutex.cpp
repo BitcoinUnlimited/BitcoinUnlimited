@@ -14,12 +14,7 @@ bool recursive_shared_mutex::end_of_exclusive_ownership()
 
 bool recursive_shared_mutex::check_for_write_lock(const std::thread::id &locking_thread_id)
 {
-    if (_write_owner_id == locking_thread_id)
-    {
-        _shared_while_exclusive_counter++;
-        return true;
-    }
-    return false;
+    return (_write_owner_id == locking_thread_id);
 }
 
 bool recursive_shared_mutex::check_for_write_unlock(const std::thread::id &locking_thread_id)
@@ -31,7 +26,6 @@ bool recursive_shared_mutex::check_for_write_unlock(const std::thread::id &locki
             throw std::logic_error("can not unlock_shared more times than we locked for shared ownership while holding "
                                    "exclusive ownership");
         }
-        _shared_while_exclusive_counter--;
         return true;
     }
     return false;
@@ -216,6 +210,7 @@ void recursive_shared_mutex::lock_shared()
     std::unique_lock<std::mutex> _lock(_mutex);
     if (check_for_write_lock(locking_thread_id))
     {
+        _shared_while_exclusive_counter++;
         return;
     }
     if (already_has_lock_shared(locking_thread_id))
@@ -236,6 +231,7 @@ bool recursive_shared_mutex::try_lock_shared()
     std::unique_lock<std::mutex> _lock(_mutex, std::try_to_lock);
     if (check_for_write_lock(locking_thread_id))
     {
+        _shared_while_exclusive_counter++;
         return true;
     }
     if (already_has_lock_shared(locking_thread_id))
@@ -261,6 +257,7 @@ void recursive_shared_mutex::unlock_shared()
     std::lock_guard<std::mutex> _lock(_mutex);
     if (check_for_write_unlock(locking_thread_id))
     {
+        _shared_while_exclusive_counter--;
         return;
     }
     if (_read_owner_ids.size() == 0)
