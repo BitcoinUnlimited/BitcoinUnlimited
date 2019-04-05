@@ -70,10 +70,19 @@ public:
     // returns true IF this function made a change (i.e. the value was previously not set).
     bool checkAndSet(const uint256 &hash)
     {
-        const uint32_t *pos = (const uint32_t *)hash.begin();
+        uint256 rotHash; // We require a mutable hash for rotation
+        memcpy(rotHash.begin(), hash.begin(), 32);
+        const uint32_t *pos = (const uint32_t *)rotHash.begin();
         bool unset = 0; // If any position is not set, then this will be true
         for (unsigned int i = 0; i < nHashFuncs; i++, pos++)
         {
+            // Rotate hash array once pos gets to the end of the array
+            if (i % 8 == 7)
+            {
+                std::rotate(rotHash.begin(), rotHash.begin() + 1, rotHash.end());
+                pos = (const uint32_t *)rotHash.begin();
+            }
+
             uint32_t val = *pos;
             uint32_t idx = val % (nFilterItems - 1);
             uint32_t bit = (1 << (idx & 7));
@@ -87,9 +96,18 @@ public:
 
     void insert(const uint256 &hash)
     {
-        const uint32_t *pos = (const uint32_t *)hash.begin();
+        uint256 rotHash; // We require a mutable hash for rotation
+        memcpy(rotHash.begin(), hash.begin(), 32);
+        const uint32_t *pos = (const uint32_t *)rotHash.begin();
         for (unsigned int i = 0; i < nHashFuncs; i++, pos++)
         {
+            // Rotate hash array once pos gets to the end of the array
+            if (i % 8 == 7)
+            {
+                std::rotate(rotHash.begin(), rotHash.begin() + 1, rotHash.end());
+                pos = (const uint32_t *)rotHash.begin();
+            }
+
             uint32_t val = *pos;
             uint32_t idx = val % (nFilterItems - 1);
             vData[idx >> 3] |= (1 << (idx & 7));
@@ -98,10 +116,19 @@ public:
 
     bool contains(const uint256 &hash) const
     {
-        const uint32_t *pos = (const uint32_t *)hash.begin();
+        uint256 rotHash; // We require a mutable hash for rotation
+        memcpy(rotHash.begin(), hash.begin(), 32);
+        const uint32_t *pos = (const uint32_t *)rotHash.begin();
         bool unset = 0; // If any position is not set, then this will be true
         for (unsigned int i = 0; i < nHashFuncs; i++, pos++)
         {
+            // Rotate hash array once pos gets to the end of the array
+            if (i % 8 == 7)
+            {
+                std::rotate(rotHash.begin(), rotHash.begin() + 1, rotHash.end());
+                pos = (const uint32_t *)rotHash.begin();
+            }
+
             uint32_t val = *pos;
             uint32_t idx = val % (nFilterItems - 1);
             unset |= (0 == (vData[idx >> 3] & (1 << (idx & 7))));
