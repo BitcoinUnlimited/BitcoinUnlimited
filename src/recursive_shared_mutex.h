@@ -13,7 +13,7 @@
 #include <type_traits>
 
 
-/*
+/**
  * This mutex has two levels of access, shared and exclusive. Multiple threads can own this mutex in shared mode but
  * only one can own it in exclusive mode.
  * - A thread is considered to have ownership when it successfully calls either lock or try_lock.
@@ -56,9 +56,14 @@ protected:
     // this is used to allow the thread with exclusive ownership to lock_shared
     uint64_t _shared_while_exclusive_counter;
 
+    // _write_counter tracks how many times exclusive ownership has been recursively locked
     uint64_t _write_counter;
+    // _write_promotion_counter tracks how many times exclusive ownership has been recursively locked
+    // by a thread that was promoted to exclusive ownership via try_promotion
     uint64_t _write_promotion_counter;
+    // _write_owner_id is the id of the thread with exclusive ownership
     std::thread::id _write_owner_id;
+    // _promotion_candidate_id is the id of the thread waiting for a promotion
     std::thread::id _promotion_candidate_id;
 
 private:
@@ -91,12 +96,119 @@ public:
     recursive_shared_mutex(const recursive_shared_mutex &) = delete;
     recursive_shared_mutex &operator=(const recursive_shared_mutex &) = delete;
 
+    /**
+     * "Wait in line" for exclusive ownership of the mutex.
+     *
+     * This call is blocking when waiting for exclusive ownership.
+     * When exclusive ownership is obtained the id of the thread that made this call
+     * is stored in _write_ownder_id and _write_counter is incremeneted by 1.
+     * When called by a thread that already has exclusive ownership,t
+     * the _write_counter is incremeneted by 1 and call does not block.
+     *
+     *
+     * @param none
+     * @return none
+     */
     void lock();
+
+    /**
+     * Become "next in line" for exclusive ownership of the mutex if the promotion
+     * slot is not already occupied by another thread.
+     *
+     * When called by a thread that has shared ownership or no ownership, attempt to
+     * obtain the promotion slot. Only one thread can hold the promotion slot at a time.
+     * While promotion slot is obtained and waiting for exclusive ownership this
+     * call is blocking.
+     * When called by a thread that already has exclusive ownership,
+     * _write_counter is incremeneted by 1 and call does not block
+     *
+     *
+     * @param none
+     * @return: false on failure to be put in the promotion slot because
+     * it is already occupied by another thread.
+     * true when _write_counter has been incremented or exclusive ownership has been
+     * obtained
+     */
     bool try_promotion();
+
+    /**
+     * Attempt to claim exclusive ownership of the mutex if no threads
+     * have exclusive or shared ownership of the mutex including this one.
+     *
+     * This call never blocks.
+     * When called by a thread that already has exclusive ownership,
+     * _write_counter is incremeneted by 1
+     *
+     *
+     * @param none
+     * @return: false on failure to obtain exclusive ownership.
+     * true when _write_counter has been incremented or exclusive ownership has been
+     * obtained
+     */
     bool try_lock();
+
+    /**
+     * Release 1 count of exclusive ownership.
+     *
+     * This call never blocks.
+     * When called by a thread that has exclusive ownership, either _write_counter is
+     * decremented by 1 or _write_promotion_counter is decremented by 1 depending on how
+     * the thread obtained exclusive ownership. When both _write_promotion_counter and write_counter
+     * are 0 exclusive ownership is released.
+     *
+     *
+     * @param none
+     * @return: none
+     */
     void unlock();
+
+    /**
+     * Attempt to claim shared ownership
+     *
+     * This call is blocking when waiting for shared ownership due to a thread having
+     * exclusive ownership.
+     * When shared ownership is obtained the id of the thread that made this call
+     * is stored in _read_owner_ids with a value of 1. Recursively locking for shared
+     * ownership increments the threads value in _read_owner_ids by 1.
+     * If this is called by a thread with exclusive ownership, increment the _shared_while_exclusive_counter
+     * by 1 instead of making an entry in _read_owner_ids
+     *
+     *
+     * @param none
+     * @return none
+     */
     void lock_shared();
+
+    /**
+     * Attempt to claim shared ownership of the mutex if no threads
+     * have exclusive ownership of the mutex.
+     *
+     * This call never blocks.
+     * When called by a thread that already has shared ownership, the threads
+     * _read_owner_ids value is incremeneted by 1
+     * When called by a thread that has exclusive ownership, _shared_while_exclusive_counter is incremeneted by 1
+     *
+     *
+     * @param none
+     * @return: false on failure to obtain shared ownership.
+     * true when the threads _read_owner_ids has been incremented or shared ownership has been
+     * obtained
+     */
     bool try_lock_shared();
+
+    /**
+     * Release 1 count of ownership
+     *
+     * This call never blocks.
+     * When called by a thread that has shared ownership, decrement the value of that thread in
+     * _read_owner_ids by 1. When that threads value reaches 0, remove it from _read_owner_ids signifying the
+     * end of shared ownership.
+     * When called by a thread with exclusive ownership decrement _shared_while_exclusive_counter by 1.
+     *
+     *
+     * @param none
+     * @return none
+     */
     void unlock_shared();
 };
 
