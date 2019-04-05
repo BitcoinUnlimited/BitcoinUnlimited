@@ -1,7 +1,5 @@
 #include "recursive_shared_mutex.h"
 
-#include "util.h"
-
 ////////////////////////
 ///
 /// Private Functions
@@ -23,8 +21,12 @@ bool recursive_shared_mutex::check_for_write_unlock(const std::thread::id &locki
     {
         if (_shared_while_exclusive_counter == 0)
         {
+#ifdef DEBUG_ASSERTION
             throw std::logic_error("can not unlock_shared more times than we locked for shared ownership while holding "
                                    "exclusive ownership");
+#else
+            return true;
+#endif
         }
         return true;
     }
@@ -54,7 +56,11 @@ void recursive_shared_mutex::unlock_shared_internal(const std::thread::id &locki
     auto it = _read_owner_ids.find(locking_thread_id);
     if (it == _read_owner_ids.end())
     {
+#ifdef DEBUG_ASSERTION
         throw std::logic_error("can not unlock_shared more times than we locked for shared ownership");
+#else
+        return;
+#endif
     }
     it->second = it->second - count;
     if (it->second == 0)
@@ -150,11 +156,19 @@ void recursive_shared_mutex::unlock()
     // this might be redundant with the mutex being locked
     if (_write_counter == 0 || _write_owner_id != locking_thread_id)
     {
+#ifdef DEBUG_ASSERTION
         throw std::logic_error("unlock(standard logic) incorrectly called on a thread with no exclusive lock");
+#else
+        return;
+#endif
     }
     if (_promotion_candidate_id != NON_THREAD_ID && _write_owner_id != _promotion_candidate_id)
     {
+#ifdef DEBUG_ASSERTION
         throw std::logic_error("unlock(promotion logic) incorrectly called on a thread with no exclusive lock");
+#else
+        return;
+#endif
     }
     if (_promotion_candidate_id != NON_THREAD_ID)
     {
@@ -262,7 +276,11 @@ void recursive_shared_mutex::unlock_shared()
     }
     if (_read_owner_ids.size() == 0)
     {
+#ifdef DEBUG_ASSERTION
         throw std::logic_error("unlock_shared incorrectly called on a thread with no shared lock");
+#else
+        return;
+#endif
     }
     unlock_shared_internal(locking_thread_id);
     if (_promotion_candidate_id != NON_THREAD_ID)

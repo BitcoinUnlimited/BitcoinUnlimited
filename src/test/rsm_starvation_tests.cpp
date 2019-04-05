@@ -68,15 +68,15 @@ BOOST_AUTO_TEST_CASE(rsm_test_starvation)
     MilliSleep(50);
     std::thread four(exclusive_only);
     MilliSleep(75);
-    // we should always get 2 because five, six, and seven should be blocked by
-    // three promotion request
-    BOOST_CHECK_EQUAL(rsm.get_shared_owners_count(), 2);
+    // we should always get 3 because five, six, and seven should be blocked by
+    // three promotion request leaving only one, two, and three with shared ownership
+    BOOST_CHECK_EQUAL(rsm.get_shared_owners_count(), 3);
     std::thread five(shared_only);
-    BOOST_CHECK_EQUAL(rsm.get_shared_owners_count(), 2);
+    BOOST_CHECK_EQUAL(rsm.get_shared_owners_count(), 3);
     std::thread six(shared_only);
-    BOOST_CHECK_EQUAL(rsm.get_shared_owners_count(), 2);
+    BOOST_CHECK_EQUAL(rsm.get_shared_owners_count(), 3);
     std::thread seven(shared_only);
-    BOOST_CHECK_EQUAL(rsm.get_shared_owners_count(), 2);
+    BOOST_CHECK_EQUAL(rsm.get_shared_owners_count(), 3);
 
     one.join();
     two.join();
