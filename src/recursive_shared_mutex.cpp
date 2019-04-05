@@ -214,8 +214,16 @@ void recursive_shared_mutex::unlock()
     if (_promotion_candidate_id != NON_THREAD_ID)
     {
         _write_counter--;
-        if (end_of_exclusive_ownership())
+        if (_write_counter == 0)
         {
+#ifdef DEBUG_ASSERTION
+            assert(_shared_while_exclusive_counter == 0);
+#endif
+            if (_shared_while_exclusive_counter > 0)
+            {
+                lock_shared_internal(locking_thread_id, _shared_while_exclusive_counter);
+                _shared_while_exclusive_counter = 0
+            }
             // restore auto unlocked locks if they exist
             uint64_t auto_lock_count = get_auto_lock_count(locking_thread_id);
             if (auto_lock_count > 0)
@@ -243,6 +251,9 @@ void recursive_shared_mutex::unlock()
     else
     {
         _write_counter--;
+#ifdef DEBUG_ASSERTION
+        assert(_write_counter_reserve == 0);
+#endif
         if (end_of_exclusive_ownership())
         {
             // reset the write owner id back to a non thread id once we unlock all write locks
