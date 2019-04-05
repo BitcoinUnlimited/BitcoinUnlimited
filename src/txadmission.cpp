@@ -601,7 +601,9 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         IsNov152018Enabled(chainparams.GetConsensus(), chainActive.Tip()) ? SCRIPT_ENABLE_CHECKDATASIG : 0;
     const uint32_t svflag =
         IsSv2018Enabled(chainparams.GetConsensus(), chainActive.Tip()) ? SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES : 0;
-    const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | cds_flag | svflag;
+    const uint32_t schnorrflag = schnorrEnabled ? SCRIPT_ENABLE_SCHNORR : 0;
+    const uint32_t featureFlags = cds_flag | svflag | schnorrflag;
+    const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;
 
     // LOG(MEMPOOL, "Mempool: Considering Tx %s\n", tx->GetHash().ToString());
 
@@ -943,7 +945,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
         unsigned char sighashType2 = 0;
-        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | cds_flag | svflag, maxScriptOps.Value(),
+        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | featureFlags, maxScriptOps.Value(),
                 true, nullptr, nullptr, &sighashType2))
         {
             if (state.GetDebugMessage() == "")

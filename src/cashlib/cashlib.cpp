@@ -10,6 +10,7 @@
 #include "base58.h"
 #include "random.h"
 #include "streams.h"
+#include "uint256.h"
 #include "util.h"
 #include "utilstrencodings.h"
 
@@ -159,6 +160,100 @@ SLAPI int SignTx(unsigned char *txData,
         return 0;
     }
     sig.push_back((unsigned char)nHashType);
+    unsigned int sigSize = sig.size();
+    if (sigSize > resultLen)
+        return 0;
+    std::copy(sig.begin(), sig.end(), result);
+    return sigSize;
+}
+
+/** Sign one input of a transaction
+    All buffer arguments should be in binary-serialized data.
+    The transaction (txData) must contain the COutPoint (tx hash and vout) of all relevant inputs,
+    however, it is not necessary to provide the spend script.
+*/
+SLAPI int SignTxSchnorr(unsigned char *txData,
+    int txbuflen,
+    unsigned int inputIdx,
+    int64_t inputAmount,
+    unsigned char *prevoutScript,
+    uint32_t priorScriptLen,
+    uint32_t nHashType,
+    unsigned char *keyData,
+    unsigned char *result,
+    unsigned int resultLen)
+{
+    DbgAssert(nHashType & SIGHASH_FORKID, return 0);
+
+    if (!sigInited)
+    {
+        sigInited = true;
+        ECC_Start();
+        verifyContext = new ECCVerifyHandle();
+    }
+
+    CTransaction tx;
+    result[0] = 0;
+
+    CDataStream ssData((char *)txData, (char *)txData + txbuflen, SER_NETWORK, PROTOCOL_VERSION);
+    try
+    {
+        ssData >> tx;
+    }
+    catch (const std::exception &)
+    {
+        return 0;
+    }
+
+    if (inputIdx >= tx.vin.size())
+        return 0;
+
+    CScript priorScript(prevoutScript, prevoutScript + priorScriptLen);
+    CKey key = LoadKey(keyData);
+
+    size_t nHashedOut = 0;
+    uint256 sighash = SignatureHash(priorScript, tx, inputIdx, nHashType, inputAmount, &nHashedOut);
+    std::vector<unsigned char> sig;
+    if (!key.SignSchnorr(sighash, sig))
+    {
+        return 0;
+    }
+    sig.push_back((unsigned char)nHashType);
+    unsigned int sigSize = sig.size();
+    if (sigSize > resultLen)
+        return 0;
+    std::copy(sig.begin(), sig.end(), result);
+    return sigSize;
+}
+
+/** Sign data via the Schnorr signature algorithm.  hash must be 32 bytes.
+    All buffer arguments should be in binary-serialized data.
+    The transaction (txData) must contain the COutPoint (tx hash and vout) of all relevant inputs,
+    however, it is not necessary to provide the spend script.
+
+    The returned signature will not have a sighashtype byte.
+*/
+SLAPI int SignHashSchnorr(const unsigned char *hash,
+    unsigned char *keyData,
+    unsigned char *result,
+    unsigned int resultLen)
+{
+    uint256 sighash(hash);
+    std::vector<unsigned char> sig;
+
+    if (!sigInited)
+    {
+        sigInited = true;
+        ECC_Start();
+        verifyContext = new ECCVerifyHandle();
+    }
+
+    CKey key = LoadKey(keyData);
+
+    if (!key.SignSchnorr(sighash, sig))
+    {
+        return 0;
+    }
     unsigned int sigSize = sig.size();
     if (sigSize > resultLen)
         return 0;

@@ -1717,6 +1717,11 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
         flags |= SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES;
     }
 
+    if (schnorrEnabled)
+    {
+        flags |= SCRIPT_ENABLE_SCHNORR;
+    }
+
     return flags;
 }
 
