@@ -413,6 +413,17 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
     }
 
+    bool grapheneVersionCompatible = true;
+    try
+    {
+        NegotiateFastFilterSupport(pfrom);
+    }
+    catch (const std::runtime_error &e)
+    {
+        LOG(GRAPHENE, "Incompatible Graphene versions, graphene blocks will not be sent");
+        grapheneVersionCompatible = false;
+    }
+
     /* Special handling for xversion messages, as they are optional but still
      have to be properly sequenced to be at the beginning of a connection. So
      if anything but an xversion comes in whilst in
@@ -1594,7 +1605,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     }
 
     // Handle Graphene blocks
-    else if (strCommand == NetMsgType::GET_GRAPHENE && !fImporting && !fReindex && IsGrapheneBlockEnabled())
+    else if (strCommand == NetMsgType::GET_GRAPHENE && !fImporting && !fReindex && IsGrapheneBlockEnabled() &&
+             grapheneVersionCompatible)
     {
         if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
@@ -1604,7 +1616,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     }
 
     else if (strCommand == NetMsgType::GRAPHENEBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
-             IsGrapheneBlockEnabled())
+             IsGrapheneBlockEnabled() && grapheneVersionCompatible)
     {
         LOCK(pfrom->cs_graphene);
         return CGrapheneBlock::HandleMessage(vRecv, pfrom, strCommand, 0);
@@ -1612,7 +1624,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
 
     else if (strCommand == NetMsgType::GET_GRAPHENETX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
-             IsGrapheneBlockEnabled())
+             IsGrapheneBlockEnabled() && grapheneVersionCompatible)
     {
         if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
@@ -1623,7 +1635,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
 
     else if (strCommand == NetMsgType::GRAPHENETX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
-             IsGrapheneBlockEnabled())
+             IsGrapheneBlockEnabled() && grapheneVersionCompatible)
     {
         LOCK(pfrom->cs_graphene);
         return CGrapheneBlockTx::HandleMessage(vRecv, pfrom);
