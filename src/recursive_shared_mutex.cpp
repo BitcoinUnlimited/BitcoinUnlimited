@@ -7,7 +7,7 @@
 
 bool recursive_shared_mutex::end_of_exclusive_ownership()
 {
-    return (_shared_while_exclusive_counter== 0 && _write_counter == 0);
+    return (_shared_while_exclusive_counter == 0 && _write_counter == 0);
 }
 
 bool recursive_shared_mutex::check_for_write_lock(const std::thread::id &locking_thread_id)
@@ -131,11 +131,8 @@ void recursive_shared_mutex::lock()
 
         _write_counter++;
         // Then wait until there are no more readers.
-        _write_gate.wait(_lock, [=]
-            {
-                return _read_owner_ids.size() == 0 && _promotion_candidate_id == NON_THREAD_ID;
-            }
-        );
+        _write_gate.wait(
+            _lock, [=] { return _read_owner_ids.size() == 0 && _promotion_candidate_id == NON_THREAD_ID; });
         _write_owner_id = locking_thread_id;
     }
 }
@@ -190,8 +187,8 @@ bool recursive_shared_mutex::try_lock()
         return true;
     }
     // checking _write_owner_id might be redundant here with the mutex already being locked
-    else if (_lock.owns_lock() && _write_counter == 0 &&
-        _read_owner_ids.size() == 0 && _promotion_candidate_id == NON_THREAD_ID)
+    else if (_lock.owns_lock() && _write_counter == 0 && _read_owner_ids.size() == 0 &&
+             _promotion_candidate_id == NON_THREAD_ID)
     {
         _write_counter++;
         _write_owner_id = locking_thread_id;

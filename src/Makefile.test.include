@@ -109,6 +109,7 @@ BITCOIN_TESTS =\
   test/rpc_tests.cpp \
   test/rsm_promotion_tests.cpp \
   test/rsm_simple_tests.cpp \
+  test/rsm_starvation_tests.cpp \
   test/sanity_tests.cpp \
   test/schnorr_tests.cpp \
   test/script_P2SH_tests.cpp \
