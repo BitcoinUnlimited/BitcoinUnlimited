@@ -1,5 +1,7 @@
 #include "recursive_shared_mutex.h"
 
+#include "util.h"
+
 ////////////////////////
 ///
 /// Private Functions
@@ -67,50 +69,6 @@ void recursive_shared_mutex::unlock_shared_internal(const std::thread::id &locki
     }
 }
 
-uint64_t recursive_shared_mutex::get_shared_lock_count(const std::thread::id &locking_thread_id)
-{
-    auto it = _read_owner_ids.find(locking_thread_id);
-    if (it == _read_owner_ids.end())
-    {
-        return 0;
-    }
-    return it->second;
-}
-
-void recursive_shared_mutex::lock_auto_locks(const std::thread::id &locking_thread_id, const uint64_t &count)
-{
-    if (_auto_unlock_id != NON_THREAD_ID)
-    {
-        throw std::logic_error("lock_auto_locks incorrectly called while already occupied by another thread");
-    }
-    _auto_unlock_id = locking_thread_id;
-    _auto_unlock_count = count;
-}
-
-uint64_t recursive_shared_mutex::get_auto_lock_count(const std::thread::id &locking_thread_id)
-{
-    if (_auto_unlock_id == locking_thread_id)
-    {
-        return _auto_unlock_count;
-    }
-#ifdef DEBUG
-    throw std::logic_error("get_auto_lock_count incorrectly called on a thread with no auto locks");
-#else
-    return 0;
-#endif
-}
-
-void recursive_shared_mutex::unlock_auto_locks(const std::thread::id &locking_thread_id)
-{
-    if (_auto_unlock_id == locking_thread_id)
-    {
-        _auto_unlock_count = 0;
-        _auto_unlock_id = NON_THREAD_ID;
-        return;
-    }
-    throw std::logic_error("unlock_auto_locks incorrectly called on a thread with no auto locks");
-}
-
 ////////////////////////
 ///
 /// Public Functions
@@ -152,15 +110,9 @@ bool recursive_shared_mutex::try_promotion()
     else if (_promotion_candidate_id == NON_THREAD_ID)
     {
         _promotion_candidate_id = locking_thread_id;
-        // unlock our shared locks and store their values
-        uint64_t lock_count = get_shared_lock_count(locking_thread_id);
-        if (lock_count > 0)
-        {
-            lock_auto_locks(locking_thread_id, lock_count);
-            unlock_shared_internal(locking_thread_id, lock_count);
-        }
         // Then wait until there are no more readers.
-        _promotion_write_gate.wait(_lock, [this] { return _read_owner_ids.size() == 0; });
+        _promotion_write_gate.wait(_lock,
+            [this] { return _read_owner_ids.size() == 1 && already_has_lock_shared(std::this_thread::get_id()); });
         _write_owner_id = locking_thread_id;
         // it is possible that if we cut the line, another thread could have incremented the _write_counter
         // already, so we should check this and decrement + save what they did
@@ -186,7 +138,6 @@ bool recursive_shared_mutex::try_lock()
         _write_counter++;
         return true;
     }
-    // checking _write_owner_id might be redundant here with the mutex already being locked
     else if (_lock.owns_lock() && end_of_exclusive_ownership() && _read_owner_ids.size() == 0 &&
              _promotion_candidate_id == NON_THREAD_ID)
     {
@@ -222,14 +173,7 @@ void recursive_shared_mutex::unlock()
             if (_shared_while_exclusive_counter > 0)
             {
                 lock_shared_internal(locking_thread_id, _shared_while_exclusive_counter);
-                _shared_while_exclusive_counter = 0
-            }
-            // restore auto unlocked locks if they exist
-            uint64_t auto_lock_count = get_auto_lock_count(locking_thread_id);
-            if (auto_lock_count > 0)
-            {
-                lock_shared_internal(locking_thread_id, auto_lock_count);
-                unlock_auto_locks(locking_thread_id);
+                _shared_while_exclusive_counter = 0;
             }
             // reset the write owner id back to a non thread id once we unlock all write locks
             _write_owner_id = NON_THREAD_ID;
@@ -326,7 +270,7 @@ void recursive_shared_mutex::unlock_shared()
     unlock_shared_internal(locking_thread_id);
     if (_promotion_candidate_id != NON_THREAD_ID)
     {
-        if (_read_owner_ids.size() == 0)
+        if (_read_owner_ids.size() == 1 && already_has_lock_shared(_promotion_candidate_id))
         {
             _promotion_write_gate.notify_one();
         }

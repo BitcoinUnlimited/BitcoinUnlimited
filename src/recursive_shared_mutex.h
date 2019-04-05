@@ -45,12 +45,6 @@ protected:
     // holds a list of owner ids that have shared ownership and the number of times they locked it
     std::map<std::thread::id, uint64_t> _read_owner_ids;
 
-    // holds the owner id and count of shared locks when a thread was promoted
-    // this data is used to restore proper shared locks when promoted thread
-    // releases exclusive ownership and "demotes" back to only shared ownership
-    std::thread::id _auto_unlock_id;
-    uint64_t _auto_unlock_count;
-
     // holds the number of shared locks the thread with exclusive ownership has
     // this is used to allow the thread with exclusive ownership to lock_shared
     uint64_t _shared_while_exclusive_counter;
@@ -73,18 +67,11 @@ private:
     bool already_has_lock_shared(const std::thread::id &locking_thread_id);
     void lock_shared_internal(const std::thread::id &locking_thread_id, const uint64_t &count = 1);
     void unlock_shared_internal(const std::thread::id &locking_thread_id, const uint64_t &count = 1);
-    uint64_t get_shared_lock_count(const std::thread::id &locking_thread_id);
-
-    void lock_auto_locks(const std::thread::id &locking_thread_id, const uint64_t &count);
-    uint64_t get_auto_lock_count(const std::thread::id &locking_thread_id);
-    void unlock_auto_locks(const std::thread::id &locking_thread_id);
 
 public:
     recursive_shared_mutex()
     {
         _read_owner_ids.clear();
-        _auto_unlock_id = NON_THREAD_ID;
-        _auto_unlock_count = 0;
         _write_counter = 0;
         _shared_while_exclusive_counter = 0;
         _write_owner_id = NON_THREAD_ID;
