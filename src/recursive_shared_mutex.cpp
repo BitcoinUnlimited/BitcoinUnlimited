@@ -269,7 +269,8 @@ void recursive_shared_mutex::lock_shared()
     }
     else
     {
-        _read_gate.wait(_lock, [=] { return end_of_exclusive_ownership() && _promotion_candidate_id == NON_THREAD_ID; });
+        _read_gate.wait(
+            _lock, [=] { return end_of_exclusive_ownership() && _promotion_candidate_id == NON_THREAD_ID; });
         lock_shared_internal(locking_thread_id);
     }
 }

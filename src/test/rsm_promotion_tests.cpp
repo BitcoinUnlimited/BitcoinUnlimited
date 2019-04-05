@@ -12,11 +12,7 @@ BOOST_FIXTURE_TEST_SUITE(rsm_promotion_tests, BasicTestingSetup)
 recursive_shared_mutex rsm;
 std::vector<int> rsm_guarded_vector;
 
-void helper_fail()
-{
-    BOOST_CHECK_EQUAL(rsm.try_lock(), false);
-}
-
+void helper_fail() { BOOST_CHECK_EQUAL(rsm.try_lock(), false); }
 void helper_pass()
 {
     BOOST_CHECK_EQUAL(rsm.try_lock(), true);
@@ -49,7 +45,7 @@ BOOST_AUTO_TEST_CASE(rsm_lock_shared_while_exclusive_owner)
     std::thread one(helper_fail);
     one.join();
 
-    //relock
+    // relock
     rsm.lock();
     rsm.lock();
     rsm.lock_shared();

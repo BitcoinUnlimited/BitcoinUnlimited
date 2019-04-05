@@ -12,10 +12,7 @@ BOOST_FIXTURE_TEST_SUITE(rsm_starvation_tests, BasicTestingSetup)
 class rsm_watcher : public recursive_shared_mutex
 {
 public:
-    size_t get_shared_owners_count()
-    {
-        return _read_owner_ids.size();
-    }
+    size_t get_shared_owners_count() { return _read_owner_ids.size(); }
 };
 
 rsm_watcher rsm;
