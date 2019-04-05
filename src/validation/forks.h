@@ -21,8 +21,6 @@ class CBlockIndex;
 class CScript;
 class CTxMemPoolEntry;
 
-extern CChain chainActive;
-
 // Return true if this transaction can only be committed post-fork
 bool IsTxUAHFOnly(const CTxMemPoolEntry &tx);
 
@@ -42,7 +40,7 @@ bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *p
 
 /** Test if this node is configured to follow the BCH chain (miningForkTime tweak is nonzero),
     or whether the operator is enabling/disabling features manually. */
-bool AreWeOnBCHChain();
+bool AreWeOnBCHChain(const Consensus::Params &params, const CBlockIndex *pTip);
 
 /** Check if Nov 15th, 2018 protocol upgrade is activated using block height */
 bool IsNov152018Activated(const Consensus::Params &consensusparams, const int32_t nHeight);

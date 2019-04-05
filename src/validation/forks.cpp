@@ -96,10 +96,9 @@ bool IsNov152018Activated(const Consensus::Params &consensusparams, const CBlock
     return IsNov152018Activated(consensusparams, pindexTip->nHeight);
 }
 
-bool AreWeOnBCHChain()
+bool AreWeOnBCHChain(const Consensus::Params &params, const CBlockIndex *pTip)
 {
-    const Consensus::Params &consensusparams = Params().GetConsensus();
-    return ((miningForkTime.Value() != 0) && (IsNov152018Activated(consensusparams, chainActive.Tip())));
+    return ((miningForkTime.Value() != 0) && (IsNov152018Activated(params, pTip)));
 }
 
 bool IsMay2019Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
