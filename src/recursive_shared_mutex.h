@@ -91,13 +91,13 @@ public:
     recursive_shared_mutex(const recursive_shared_mutex &) = delete;
     recursive_shared_mutex &operator=(const recursive_shared_mutex &) = delete;
 
-    void lock(const std::thread::id &locking_thread_id);
-    bool try_promotion(const std::thread::id &locking_thread_id);
-    bool try_lock(const std::thread::id &locking_thread_id);
-    void unlock(const std::thread::id &locking_thread_id);
-    void lock_shared(const std::thread::id &locking_thread_id);
-    bool try_lock_shared(const std::thread::id &locking_thread_id);
-    void unlock_shared(const std::thread::id &locking_thread_id);
+    void lock();
+    bool try_promotion();
+    bool try_lock();
+    void unlock();
+    void lock_shared();
+    bool try_lock_shared();
+    void unlock_shared();
 };
 
 

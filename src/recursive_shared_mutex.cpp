@@ -113,8 +113,9 @@ void recursive_shared_mutex::unlock_auto_locks(const std::thread::id &locking_th
 /// Public Functions
 ///
 
-void recursive_shared_mutex::lock(const std::thread::id &locking_thread_id)
+void recursive_shared_mutex::lock()
 {
+    const std::thread::id &locking_thread_id = std::this_thread::get_id();
     std::unique_lock<std::mutex> _lock(_mutex);
     if (_write_owner_id == locking_thread_id)
     {
@@ -133,8 +134,9 @@ void recursive_shared_mutex::lock(const std::thread::id &locking_thread_id)
     }
 }
 
-bool recursive_shared_mutex::try_promotion(const std::thread::id &locking_thread_id)
+bool recursive_shared_mutex::try_promotion()
 {
+    const std::thread::id &locking_thread_id = std::this_thread::get_id();
     std::unique_lock<std::mutex> _lock(_mutex);
 
     if (_write_owner_id == locking_thread_id)
@@ -165,8 +167,9 @@ bool recursive_shared_mutex::try_promotion(const std::thread::id &locking_thread
     return false;
 }
 
-bool recursive_shared_mutex::try_lock(const std::thread::id &locking_thread_id)
+bool recursive_shared_mutex::try_lock()
 {
+    const std::thread::id &locking_thread_id = std::this_thread::get_id();
     std::unique_lock<std::mutex> _lock(_mutex, std::try_to_lock);
 
     if (_write_owner_id == locking_thread_id)
@@ -184,8 +187,9 @@ bool recursive_shared_mutex::try_lock(const std::thread::id &locking_thread_id)
     return false;
 }
 
-void recursive_shared_mutex::unlock(const std::thread::id &locking_thread_id)
+void recursive_shared_mutex::unlock()
 {
+    const std::thread::id &locking_thread_id = std::this_thread::get_id();
     std::lock_guard<std::mutex> _lock(_mutex);
     // you cannot unlock if you are not the write owner so check that here
     // this might be redundant with the mutex being locked
@@ -254,8 +258,9 @@ void recursive_shared_mutex::unlock(const std::thread::id &locking_thread_id)
     }
 }
 
-void recursive_shared_mutex::lock_shared(const std::thread::id &locking_thread_id)
+void recursive_shared_mutex::lock_shared()
 {
+    const std::thread::id &locking_thread_id = std::this_thread::get_id();
     std::unique_lock<std::mutex> _lock(_mutex);
     if (check_for_write_lock(locking_thread_id))
     {
@@ -272,8 +277,9 @@ void recursive_shared_mutex::lock_shared(const std::thread::id &locking_thread_i
     }
 }
 
-bool recursive_shared_mutex::try_lock_shared(const std::thread::id &locking_thread_id)
+bool recursive_shared_mutex::try_lock_shared()
 {
+    const std::thread::id &locking_thread_id = std::this_thread::get_id();
     std::unique_lock<std::mutex> _lock(_mutex, std::try_to_lock);
     if (check_for_write_lock(locking_thread_id))
     {
@@ -296,8 +302,9 @@ bool recursive_shared_mutex::try_lock_shared(const std::thread::id &locking_thre
     return false;
 }
 
-void recursive_shared_mutex::unlock_shared(const std::thread::id &locking_thread_id)
+void recursive_shared_mutex::unlock_shared()
 {
+    const std::thread::id &locking_thread_id = std::this_thread::get_id();
     std::lock_guard<std::mutex> _lock(_mutex);
     if (check_for_write_unlock(locking_thread_id))
     {
