@@ -144,6 +144,21 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     pfrom->fDisconnect = true;
                     fSend = false;
                 }
+                // Avoid leaking prune-height by never sending blocks below the
+                // NODE_NETWORK_LIMITED threshold.
+                // Add two blocks buffer extension for possible races
+                if (fSend && !pfrom->fWhitelisted &&
+                    ((((nLocalServices & NODE_NETWORK_LIMITED) == NODE_NETWORK_LIMITED) &&
+                        ((nLocalServices & NODE_NETWORK) != NODE_NETWORK) &&
+                        (chainActive.Tip()->nHeight - mi->nHeight > (int)NODE_NETWORK_LIMITED_MIN_BLOCKS + 2))))
+                {
+                    LOG(NET, "Ignore block request below NODE_NETWORK_LIMITED threshold from peer=%d\n",
+                        pfrom->GetId());
+                    // disconnect node and prevent it from stalling (would
+                    // otherwise wait for the missing block)
+                    pfrom->fDisconnect = true;
+                    fSend = false;
+                }
                 // Pruned nodes may have deleted the block, so check whether
                 // it's available before trying to send.
                 if (fSend && (mi->nStatus & BLOCK_HAVE_DATA))
@@ -472,7 +487,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (pfrom->fInbound)
             pfrom->PushVersion();
 
-        pfrom->fClient = !(pfrom->nServices & NODE_NETWORK);
+
+        // set nodes not relaying blocks and tx and not serving (parts) of the historical blockchain as "clients"
+        pfrom->fClient = (!(pfrom->nServices & NODE_NETWORK) && !(pfrom->nServices & NODE_NETWORK_LIMITED));
+
+        // set nodes not capable of serving the complete blockchain history as "limited nodes"
+        pfrom->m_limited_node = (!(pfrom->nServices & NODE_NETWORK) && (pfrom->nServices & NODE_NETWORK_LIMITED));
 
         // Potentially mark this peer as a preferred download peer.
         UpdatePreferredDownload(pfrom);
