@@ -64,13 +64,31 @@ class TestNode(NodeConnCB):
         self.connection = None
         self.ping_counter = 1
         self.last_pong = msg_pong()
+        self.last_getdata = []
+
+    def sync_getdata(self, hash_list, timeout=60):
+        while timeout > 0:
+            with mininode_lock:
+                #Check whether any getdata responses are in the hash list and
+                #if so remove them from both lists.
+                for x in self.last_getdata:
+                    for y in hash_list:
+                        if (str(x.inv).find(hex(y)[2:]) > 0):
+                            self.last_getdata.remove(x)
+                            hash_list.remove(y)
+                if hash_list == []:
+                    return
+
+            time.sleep(0.1)
+            timeout -= 0.1
+        raise AssertionError("Sync getdata failed to complete")
 
     def add_connection(self, conn):
         self.connection = conn
 
     # Track the last getdata message we receive (used in the test)
     def on_getdata(self, conn, message):
-        self.last_getdata = message
+        self.last_getdata.append(message)
 
     # Spin until verack message is received from the node.
     # We use this to signal that our test can begin. This
@@ -119,10 +137,10 @@ class AcceptBlockTest(BitcoinTestFramework):
         # from peers which are not whitelisted, while Node1 will be used for
         # the whitelisted case.
         self.nodes = []
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug"],
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug=net", "-debug=req", "-net.txAdmissionThreads=1", "-net.msgHandlerThreads=1"],
                                      binary=self.options.testbinary))
         self.nodes.append(start_node(1, self.options.tmpdir,
-                                     ["-debug", "-whitelist=127.0.0.1"],
+                                     ["-debug=net", "-debug=req", "-whitelist=127.0.0.1", "-net.txAdmissionThreads=1", "-net.msgHandlerThreads=1"],
                                      binary=self.options.testbinary))
 
     def run_test(self):
@@ -157,7 +175,8 @@ class AcceptBlockTest(BitcoinTestFramework):
         test_node.send_message(msg_block(blocks_h2[0]))
         white_node.send_message(msg_block(blocks_h2[1]))
 
-        [ x.sync_with_ping() for x in [test_node, white_node] ]
+        waitFor(10, lambda: self.nodes[0].getblockcount() == 2)
+        waitFor(10, lambda: self.nodes[1].getblockcount() == 2)
         assert_equal(self.nodes[0].getblockcount(), 2)
         assert_equal(self.nodes[1].getblockcount(), 2)
         print("First height 2 block accepted by both nodes")
@@ -224,7 +243,7 @@ class AcceptBlockTest(BitcoinTestFramework):
                     headers_message.headers.append(CBlockHeader(next_block))
                 tips[j] = next_block
                 test_node.sync_with_ping()
-        time.sleep(2)
+
         for x in all_blocks:
             try:
                 self.nodes[0].getblock(x.hash)
@@ -256,7 +275,7 @@ class AcceptBlockTest(BitcoinTestFramework):
         # the node processes it and incorrectly advances the tip).
         # But this would be caught later on, when we verify that an inv triggers
         # a getdata request for this block.
-        test_node.sync_with_ping()
+        waitFor(10, lambda: self.nodes[0].getblockcount() == 2)
         assert_equal(self.nodes[0].getblockcount(), 2)
         print("Unrequested block that would complete more-work chain was ignored")
 
@@ -265,27 +284,18 @@ class AcceptBlockTest(BitcoinTestFramework):
         # triggers a getdata on block 2 (it should if block 2 is missing).
         with mininode_lock:
             # Clear state so we can check the getdata request
-            test_node.last_getdata = None
+            test_node.last_getdata = []
             test_node.send_message(msg_inv([CInv(2, blocks_h3[0].sha256)]))
 
-        test_node.sync_with_ping()
-        with mininode_lock:
-            getdata = test_node.last_getdata
-
         # Check that the getdata includes the right block
-        assert_equal(getdata.inv[0].hash, blocks_h2f[0].sha256)
+        test_node.sync_getdata([blocks_h2f[0].sha256], timeout=10)
         print("Inv at tip triggered getdata for unprocessed block")
 
         # 7. Send the missing block for the third time (now it is requested)
         test_node.send_message(msg_block(blocks_h2f[0]))
-        test_node.sync_with_ping()
 
         # Wait for the reorg to complete. It can be slower on some systems.
-        while self.nodes[0].getblockcount() != 290:
-            time.sleep(1)
-            j = j + 1
-            if (j > 60):
-                break
+        waitFor(30, lambda: self.nodes[0].getblockcount() == 290)
 
         assert_equal(self.nodes[0].getblockcount(), 290)
         print("Successfully reorged to longer chain from non-whitelisted peer")
