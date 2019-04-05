@@ -7,6 +7,7 @@
 
 #include "clientversion.h"
 #include "primitives/transaction.h"
+#include "reverse_iterator.h"
 #include "sync.h"
 #include "test/test_bitcoin.h"
 #include "test/test_random.h"
@@ -854,6 +855,23 @@ BOOST_AUTO_TEST_CASE(enum_toString)
     BOOST_CHECK_EQUAL(toString(6, map2), "TWO | FOUR");
     BOOST_CHECK_EQUAL(toString(7, map1), "ONE | TWO | FOUR");
     BOOST_CHECK_EQUAL(toString(7, map2), "ALL");
+}
+
+BOOST_AUTO_TEST_CASE(reverse_iterator)
+{
+    std::vector<int> v = {5, 4, 3, 2, 1};
+    int cnt = 1;
+    for (auto x : reverse_iterate(v))
+    {
+        BOOST_CHECK_EQUAL(x, cnt);
+        cnt++;
+    }
+
+    v = {}; // check empty vector
+    for (auto x : reverse_iterate(v))
+    {
+        BOOST_CHECK(x == 100); // should never get here but use x to avoid warning
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
