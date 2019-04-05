@@ -36,11 +36,10 @@ protected:
     // the read_gate is locked (blocked) when threads have write ownership
     std::condition_variable _read_gate;
 
-    // the write_gate is locked (blocked) when threads have read ownership
+    // the write_gate is locked (blocked) when threads have read ownership or someone is waiting for promotion
     std::condition_variable _write_gate;
 
-    // promotion_gates
-    std::condition_variable _promotion_read_gate;
+    // // the write_gate is locked (blocked) when threads have read ownership
     std::condition_variable _promotion_write_gate;
 
     // holds a list of owner ids that have shared ownership and the number of times they locked it
@@ -58,15 +57,16 @@ protected:
 
     // _write_counter tracks how many times exclusive ownership has been recursively locked
     uint64_t _write_counter;
-    // _write_promotion_counter tracks how many times exclusive ownership has been recursively locked
-    // by a thread that was promoted to exclusive ownership via try_promotion
-    uint64_t _write_promotion_counter;
     // _write_owner_id is the id of the thread with exclusive ownership
     std::thread::id _write_owner_id;
     // _promotion_candidate_id is the id of the thread waiting for a promotion
     std::thread::id _promotion_candidate_id;
 
+    // used to keep track of normal thread exclusive line if a thread has promoted
+    uint64_t _write_counter_reserve;
+
 private:
+    bool end_of_exclusive_ownership();
     bool check_for_write_lock(const std::thread::id &locking_thread_id);
     bool check_for_write_unlock(const std::thread::id &locking_thread_id);
 
@@ -86,10 +86,10 @@ public:
         _auto_unlock_id = NON_THREAD_ID;
         _auto_unlock_count = 0;
         _write_counter = 0;
-        _write_promotion_counter = 0;
         _shared_while_exclusive_counter = 0;
         _write_owner_id = NON_THREAD_ID;
         _promotion_candidate_id = NON_THREAD_ID;
+        _write_counter_reserve = 0;
     }
 
     ~recursive_shared_mutex() {}
@@ -152,9 +152,8 @@ public:
      *
      * This call never blocks.
      * When called by a thread that has exclusive ownership, either _write_counter is
-     * decremented by 1 or _write_promotion_counter is decremented by 1 depending on how
-     * the thread obtained exclusive ownership. When both _write_promotion_counter and write_counter
-     * are 0 exclusive ownership is released.
+     * decremented by 1. When both write_counter and _shared_while_exclusive_counter
+     * are 0, exclusive ownership is released.
      *
      *
      * @param none
