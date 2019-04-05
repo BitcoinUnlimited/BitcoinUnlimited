@@ -73,8 +73,11 @@ public:
                 GENERAL_NAME *generalName = sk_GENERAL_NAME_value(altNames, i);
                 if ((generalName->type == GEN_URI) || (generalName->type == GEN_DNS))
                 {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#define ASN1_STRING_get0_data ASN1_STRING_data
+#endif
                     std::string san = std::string(
-                        reinterpret_cast<char *>(ASN1_STRING_data(generalName->d.uniformResourceIdentifier)),
+                        reinterpret_cast<const char *>(ASN1_STRING_get0_data(generalName->d.uniformResourceIdentifier)),
                         ASN1_STRING_length(generalName->d.uniformResourceIdentifier));
                     if (san.find(cert_hostname_) != std::string::npos)
                     {
