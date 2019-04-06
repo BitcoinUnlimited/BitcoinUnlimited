@@ -169,6 +169,7 @@ BITCOIN_CORE_H = \
   netbase.h \
   noui.h \
   parallel.h \
+  persistent_map.h \
   policy/fees.h \
   policy/policy.h \
   pow.h \

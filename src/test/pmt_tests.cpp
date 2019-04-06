@@ -54,8 +54,6 @@ BOOST_AUTO_TEST_CASE(pmt_test1)
             block.add(MakeTransactionRef(std::move(tx)));
         }
 
-        std::vector<CTransactionRef> vtx = block.allTransactions();
-
         // calculate actual merkle root and height
         uint256 merkleRoot1 = BlockMerkleRoot(block);
         std::vector<uint256> vTxid(nTx, uint256());
