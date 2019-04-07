@@ -494,15 +494,8 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         CBlockIndex *pIndex = nullptr;
         if (!AcceptBlockHeader(thinBlock.header, state, Params(), &pIndex))
         {
-            int nDoS;
-            if (state.IsInvalid(nDoS))
-            {
-                if (nDoS > 0)
-                    dosMan.Misbehaving(pfrom, nDoS);
-                LOGA("Received an invalid %s header from peer %s\n", strCommand, pfrom->GetLogName());
-            }
-
             thindata.ClearThinBlockData(pfrom, thinBlock.header.GetHash());
+            LOGA("Received an invalid %s header from peer %s\n", strCommand, pfrom->GetLogName());
             return false;
         }
 
