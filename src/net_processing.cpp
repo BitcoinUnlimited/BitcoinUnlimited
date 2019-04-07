@@ -1550,10 +1550,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         {
             LOCK(pfrom->cs_xthinblock);
             if (!HandleExpeditedBlock(vRecv, pfrom))
-            {
-                dosMan.Misbehaving(pfrom, 5);
                 return false;
-            }
         }
     }
 
