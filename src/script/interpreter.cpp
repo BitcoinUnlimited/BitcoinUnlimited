@@ -496,7 +496,7 @@ static bool CheckSignatureEncodingSigHashChoice(const vector<unsigned char> &vch
 
     if (flags & SCRIPT_ENABLE_SCHNORR)
     {
-        if (vchSig.size() == 64 + (check_sighash == true) ? 1 : 0) // 64 sig length plus 1 sighashtype
+        if (vchSig.size() == 64 + ((check_sighash == true) ? 1 : 0)) // 64 sig length plus 1 sighashtype
         {
             // In a generic-signature context, 64-byte signatures are interpreted
             // as Schnorr signatures (always correctly encoded) when flag set.
