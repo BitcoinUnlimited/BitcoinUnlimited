@@ -223,7 +223,7 @@ void SubProcess::Run()
     int status;
     if (waitpid(pid, &status, 0) == -1)
     {
-        throw std::subprocess_error("waitpid failed");
+        throw subprocess_error("waitpid failed");
     }
 
     if (WIFEXITED(status))
