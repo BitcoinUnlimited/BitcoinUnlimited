@@ -36,6 +36,7 @@ BITCOIN_INCLUDES=-I$(builddir) -I$(builddir)/obj $(BDB_CPPFLAGS) $(BOOST_CPPFLAG
 
 BITCOIN_INCLUDES += -I$(srcdir)/secp256k1/include
 BITCOIN_INCLUDES += -I$(srcdir)/univalue/include
+BITCOIN_INCLUDES += -I$(srcdir)/rsm
 
 LIBBITCOIN_SERVER=libbitcoin_server.a
 LIBBITCOIN_COMMON=libbitcoin_common.a
@@ -166,8 +167,8 @@ BITCOIN_CORE_H = \
   pow.h \
   protocol.h \
   random.h \
-  recursive_shared_mutex.h \
   reverse_iterator.h \
+  rsm/recursive_shared_mutex.h \
   reverselock.h \
   rpc/client.h \
   rpc/protocol.h \
@@ -464,7 +465,7 @@ libbitcoin_util_a_SOURCES = \
   compat/strnlen.cpp \
   fs.cpp \
   random.cpp \
-  recursive_shared_mutex.cpp \
+  rsm/recursive_shared_mutex.cpp \
   rpc/protocol.cpp \
   support/cleanse.cpp \
   sync.cpp \
