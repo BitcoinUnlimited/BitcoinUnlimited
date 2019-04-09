@@ -1368,7 +1368,7 @@ bool ContextualCheckBlock(const CBlock &block,
         }
 
         // Make sure tx size is equal or higher to 100 bytes if we are on the BCH chain and Nov 15th 2018 activated
-        if (AreWeOnBCHChain() && IsNov152018Activated(consensusParams, chainActive.Tip()))
+        if (AreWeOnBCHChain() && IsNov2018Activated(consensusParams, chainActive.Tip()))
         {
             if (tx->GetTxSize() < MIN_TX_SIZE)
             {
@@ -1706,7 +1706,7 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
     // Since Nov 15, 2018 HF activates sig push only, clean stack rules
     // are enforced and CHECKDATASIG has been introduced on the BCH chain
     // (see  BIP 62 and CHECKDATASIG specification or more details)
-    if (AreWeOnBCHChain() && IsNov152018Activated(consensusparams, chainActive.Tip()))
+    if (AreWeOnBCHChain() && IsNov2018Activated(consensusparams, chainActive.Tip()))
     {
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
         flags |= SCRIPT_VERIFY_CLEANSTACK;
@@ -2443,7 +2443,7 @@ bool ConnectBlock(const CBlock &block,
     // Discover how to handle this block
     bool canonical = enableCanonicalTxOrder.Value();
     // Always allow overwite of enableCanonicalTxOrder but for regtest on BCH
-    if (AreWeOnBCHChain() && IsNov152018Activated(chainparams.GetConsensus(), chainActive.Tip()))
+    if (AreWeOnBCHChain() && IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip()))
     {
         if (!(chainparams.NetworkIDString() == "regtest"))
         {
@@ -2737,7 +2737,7 @@ void UpdateTip(CBlockIndex *pindexNew)
 
     // Set the global variables based on the fork state of the NEXT block
     // Always allow overwite of enableCanonicalTxOrder but for regtest)
-    if (AreWeOnBCHChain() && IsNov152018Activated(chainParams.GetConsensus(), chainActive.Tip()))
+    if (AreWeOnBCHChain() && IsNov2018Activated(chainParams.GetConsensus(), chainActive.Tip()))
     {
         if (chainParams.NetworkIDString() != "regtest")
         {
@@ -2789,7 +2789,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     // If this block enabled the may152019 protocol upgrade, then we need to clear the mempool of any transaction using
     // not previously avaiable features (e.g. OP_CHECKDATASIGVERIFY).
 
-    if (AreWeOnBCHChain() && IsNov152018Activated(consensusParams, chainActive.Tip()))
+    if (AreWeOnBCHChain() && IsNov2018Activated(consensusParams, chainActive.Tip()))
     {
         if (IsMay2019Enabled(consensusParams, pindexDelete) && !IsMay2019Enabled(consensusParams, pindexDelete->pprev))
         {

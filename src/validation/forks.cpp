@@ -82,18 +82,18 @@ bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *p
     return IsDAAEnabled(consensusparams, pindexTip->nHeight);
 }
 
-bool IsNov152018Activated(const Consensus::Params &consensusparams, const int32_t nHeight)
+bool IsNov2018Activated(const Consensus::Params &consensusparams, const int32_t nHeight)
 {
     return nHeight >= consensusparams.nov2018Height;
 }
 
-bool IsNov152018Activated(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
+bool IsNov2018Activated(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
 {
     if (pindexTip == nullptr)
     {
         return false;
     }
-    return IsNov152018Activated(consensusparams, pindexTip->nHeight);
+    return IsNov2018Activated(consensusparams, pindexTip->nHeight);
 }
 
 bool AreWeOnBCHChain() { return (miningForkTime.Value() != 0); }
