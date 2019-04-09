@@ -349,7 +349,7 @@ public:
         consensus.may2018Height = 1233070;
         // Nov 15, 2018 hard fork
         consensus.nov2018Height = 1267996;
-        consensus.sv2018Height = 0; // FIXME still to be determine
+        consensus.sv2018Height = 1267996;
         // Wed, 15 May 2019 12:00:00 UTC hard fork activation time
         consensus.may2019ActivationTime = 1557921600;
 
