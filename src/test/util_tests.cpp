@@ -732,7 +732,8 @@ BOOST_AUTO_TEST_CASE(util_Logging)
     }
 }
 
-BOOST_AUTO_TEST_CASE(isstringtrue) {
+BOOST_AUTO_TEST_CASE(isstringtrue)
+{
     BOOST_CHECK(IsStringTrue("true"));
     BOOST_CHECK(IsStringTrue("enable"));
     BOOST_CHECK(IsStringTrue("1"));

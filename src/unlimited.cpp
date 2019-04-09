@@ -1713,7 +1713,8 @@ UniValue setlog(const UniValue &params, bool fHelp)
         std::string data = params[0].get_str();
         std::transform(data.begin(), data.end(), std::back_inserter(category), ::tolower);
         catg = Logging::LogFindCategory(category);
-        if (catg == NONE) {
+        if (catg == NONE)
+        {
             throw std::invalid_argument("Category not found: " + params[0].get_str());
         }
     }

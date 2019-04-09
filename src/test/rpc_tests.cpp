@@ -415,7 +415,8 @@ BOOST_AUTO_TEST_CASE(rpc_help)
     BOOST_CHECK(s.substr(p + 1).find("== Mining ==") == string::npos);
 }
 
-BOOST_AUTO_TEST_CASE(rpc_setlog) {
+BOOST_AUTO_TEST_CASE(rpc_setlog)
+{
     CallRPC("log all on");
     BOOST_CHECK_EQUAL(ALL, Logging::categoriesEnabled);
     CallRPC("log all off");

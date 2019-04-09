@@ -1024,8 +1024,8 @@ std::string CopyrightHolders(const std::string &strPrefix)
 
 bool IsStringTrue(const std::string &str)
 {
-    static const std::set<std::string> strOn = {"enable", "1", "true", "on"};
-    static const std::set<std::string> strOff = {"disable", "0", "false", "off"};
+    static const std::set<std::string> strOn = {"enable", "1", "true", "True", "on"};
+    static const std::set<std::string> strOff = {"disable", "0", "false", "False", "off"};
 
     if (strOn.count(str))
         return true;
