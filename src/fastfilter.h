@@ -76,19 +76,19 @@ public:
         bool unset = 0; // If any position is not set, then this will be true
         for (unsigned int i = 0; i < nHashFuncs; i++, pos++)
         {
-            // Rotate hash array once pos gets to the end of the array
-            if (i % 8 == 7)
-            {
-                std::rotate(rotHash.begin(), rotHash.begin() + 1, rotHash.end());
-                pos = (const uint32_t *)rotHash.begin();
-            }
-
             uint32_t val = *pos;
             uint32_t idx = val % (nFilterItems - 1);
             uint32_t bit = (1 << (idx & 7));
             idx >>= 3;
             unset |= (0 == (vData[idx] & bit));
             vData[idx] |= bit;
+            
+            // Rotate hash array once pos gets to the end of the array
+            if (i % 8 == 7)
+            {
+                std::rotate(rotHash.begin(), rotHash.begin() + 1, rotHash.end());
+                pos = (const uint32_t *)rotHash.begin();
+            }
         }
 
         return unset;
@@ -101,16 +101,16 @@ public:
         const uint32_t *pos = (const uint32_t *)rotHash.begin();
         for (unsigned int i = 0; i < nHashFuncs; i++, pos++)
         {
+            uint32_t val = *pos;
+            uint32_t idx = val % (nFilterItems - 1);
+            vData[idx >> 3] |= (1 << (idx & 7));
+
             // Rotate hash array once pos gets to the end of the array
             if (i % 8 == 7)
             {
                 std::rotate(rotHash.begin(), rotHash.begin() + 1, rotHash.end());
                 pos = (const uint32_t *)rotHash.begin();
             }
-
-            uint32_t val = *pos;
-            uint32_t idx = val % (nFilterItems - 1);
-            vData[idx >> 3] |= (1 << (idx & 7));
         }
     }
 
@@ -122,16 +122,16 @@ public:
         bool unset = 0; // If any position is not set, then this will be true
         for (unsigned int i = 0; i < nHashFuncs; i++, pos++)
         {
+            uint32_t val = *pos;
+            uint32_t idx = val % (nFilterItems - 1);
+            unset |= (0 == (vData[idx >> 3] & (1 << (idx & 7))));
+            
             // Rotate hash array once pos gets to the end of the array
             if (i % 8 == 7)
             {
                 std::rotate(rotHash.begin(), rotHash.begin() + 1, rotHash.end());
                 pos = (const uint32_t *)rotHash.begin();
             }
-
-            uint32_t val = *pos;
-            uint32_t idx = val % (nFilterItems - 1);
-            unset |= (0 == (vData[idx >> 3] & (1 << (idx & 7))));
         }
 
         return !unset;
