@@ -329,11 +329,6 @@ inline void LogWrite(const std::string &str)
 // Flush log file (if you know you are about to abort)
 void LogFlush();
 
-// Log tests:
-UniValue setlog(const UniValue &params, bool fHelp);
-// END logging.
-
-
 /**
  * Translate a boolean string to a bool.
  * Throws an exception if not one of the strings.

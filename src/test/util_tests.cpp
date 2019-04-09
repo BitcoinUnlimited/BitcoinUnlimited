@@ -706,37 +706,6 @@ BOOST_AUTO_TEST_CASE(test_ConvertBits)
         {0x00, 0x04, 0x11, 0x14, 0x0a, 0x19, 0x1c, 0x09, 0x15, 0x0f, 0x06, 0x1e, 0x1e});
 }
 
-// Log tests:
-bool TestSetLog(uint64_t categoriesExpected, const char *arg1, const char *arg2 = NULL)
-{
-    UniValue logargs(UniValue::VARR);
-    bool ret = false;
-    logargs.push_back(arg1);
-    if (arg2 != NULL)
-        logargs.push_back(arg2);
-
-    setlog(logargs, false); // The function to be tested
-
-    if (categoriesExpected == Logging::categoriesEnabled)
-        ret = true;
-
-    // LOGA("TestSetLog %s %s ret: %d\n", arg1, ((arg2 == NULL)?"":arg2),(int)ret);
-    return ret;
-}
-
-bool IsStringTrueBadArgTest(const char *arg1)
-{
-    try
-    {
-        IsStringTrue(arg1);
-    }
-    catch (...)
-    {
-        return true; // If bad arg return true
-    }
-    return false;
-}
-
 BOOST_AUTO_TEST_CASE(util_Logging)
 {
     {
@@ -755,13 +724,6 @@ BOOST_AUTO_TEST_CASE(util_Logging)
         LogToggleCategory(ALL, false);
         BOOST_CHECK_EQUAL(NONE, categoriesEnabled);
         BOOST_CHECK_EQUAL(LogGetLabel(ADDRMAN), "addrman");
-        BOOST_CHECK(TestSetLog(ALL, "all", "on"));
-        BOOST_CHECK(TestSetLog(NONE, "all", "off"));
-        BOOST_CHECK(TestSetLog(NONE, "tor"));
-        BOOST_CHECK(TestSetLog(TOR, "tor", "on"));
-        BOOST_CHECK(TestSetLog(NONE, "tor", "off"));
-        BOOST_CHECK(!TestSetLog(TOR, "tor", "bad-arg"));
-        BOOST_CHECK(TestSetLog(categoriesEnabled, "badcategory", "on"));
         LogToggleCategory(ALL, true);
         LOG(THIN, "missing args %s %d\n");
         LOG(THIN, "wrong order args %s %d\n", 3, "hello");

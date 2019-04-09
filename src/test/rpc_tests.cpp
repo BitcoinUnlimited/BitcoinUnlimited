@@ -414,4 +414,22 @@ BOOST_AUTO_TEST_CASE(rpc_help)
     BOOST_CHECK(p != string::npos);
     BOOST_CHECK(s.substr(p + 1).find("== Mining ==") == string::npos);
 }
+
+BOOST_AUTO_TEST_CASE(rpc_setlog) {
+    CallRPC("log all on");
+    BOOST_CHECK_EQUAL(ALL, Logging::categoriesEnabled);
+    CallRPC("log all off");
+    BOOST_CHECK_EQUAL(NONE, Logging::categoriesEnabled);
+    CallRPC("log tor");
+    BOOST_CHECK_EQUAL(NONE, Logging::categoriesEnabled);
+    CallRPC("log tor on");
+    BOOST_CHECK_EQUAL(TOR, Logging::categoriesEnabled);
+    CallRPC("log tor off");
+    BOOST_CHECK_EQUAL(NONE, Logging::categoriesEnabled);
+    BOOST_CHECK_THROW(CallRPC("log tor bad-arg"), std::invalid_argument);
+    BOOST_CHECK_EQUAL(NONE, Logging::categoriesEnabled);
+    BOOST_CHECK_THROW(CallRPC("log badcategory on"), std::invalid_argument);
+    BOOST_CHECK_EQUAL(NONE, Logging::categoriesEnabled);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
