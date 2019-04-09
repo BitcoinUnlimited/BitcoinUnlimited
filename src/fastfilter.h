@@ -82,7 +82,7 @@ public:
             idx >>= 3;
             unset |= (0 == (vData[idx] & bit));
             vData[idx] |= bit;
-            
+
             // Rotate hash array once pos gets to the end of the array
             if (i % 8 == 7)
             {
@@ -125,7 +125,7 @@ public:
             uint32_t val = *pos;
             uint32_t idx = val % (nFilterItems - 1);
             unset |= (0 == (vData[idx >> 3] & (1 << (idx & 7))));
-            
+
             // Rotate hash array once pos gets to the end of the array
             if (i % 8 == 7)
             {
