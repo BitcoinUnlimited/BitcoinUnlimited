@@ -169,7 +169,8 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _n
 
     // Make sure the coinbase is big enough.
     uint64_t nCoinbaseSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-    if (nCoinbaseSize < MIN_TX_SIZE && AreWeOnBCHChain(Params().GetConsensus(), chainActive.Tip()))
+    if (nCoinbaseSize < MIN_TX_SIZE && AreWeOnBCHChain() &&
+        IsNov152018Activated(Params().GetConsensus(), chainActive.Tip()))
     {
         tx.vin[0].scriptSig << std::vector<uint8_t>(MIN_TX_SIZE - nCoinbaseSize - 1);
     }
@@ -248,7 +249,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
 
         bool canonical = enableCanonicalTxOrder.Value();
         // On BCH always allow overwite of enableCanonicalTxOrder but not for regtest
-        if (AreWeOnBCHChain(Params().GetConsensus(), chainActive.Tip()))
+        if (AreWeOnBCHChain() && IsNov152018Activated(Params().GetConsensus(), chainActive.Tip()))
         {
             if (chainparams.NetworkIDString() != "regtest")
             {
@@ -384,7 +385,7 @@ bool BlockAssembler::TestForBlock(CTxMemPool::txiter iter)
 
     // On BCH if Nov 15th 2019 has been activaterd make sure tx size
     // is greater or equal than 100 bytes
-    if (AreWeOnBCHChain(Params().GetConsensus(), chainActive.Tip()))
+    if (AreWeOnBCHChain() && IsNov152018Activated(Params().GetConsensus(), chainActive.Tip()))
     {
         if (iter->GetTxSize() < MIN_TX_SIZE)
             return false;
@@ -581,7 +582,8 @@ void IncrementExtraNonce(CBlock *pblock, unsigned int &nExtraNonce)
 
     // On BCH if Nov15th 2018 has been activated make sure the coinbase is big enough
     uint64_t nCoinbaseSize = ::GetSerializeSize(txCoinbase, SER_NETWORK, PROTOCOL_VERSION);
-    if (nCoinbaseSize < MIN_TX_SIZE && AreWeOnBCHChain(Params().GetConsensus(), chainActive.Tip()))
+    if (nCoinbaseSize < MIN_TX_SIZE && AreWeOnBCHChain() &&
+        IsNov152018Activated(Params().GetConsensus(), chainActive.Tip()))
     {
         txCoinbase.vin[0].scriptSig << std::vector<uint8_t>(MIN_TX_SIZE - nCoinbaseSize - 1);
     }

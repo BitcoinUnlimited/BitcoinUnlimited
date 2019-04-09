@@ -1244,7 +1244,8 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     }
 
     // Set enableCanonicalTxOrder for the BCH early in the bootstrap phase
-    if (AreWeOnBCHChain(Params().GetConsensus(), chainActive.Tip()) && chainparams.NetworkIDString() != "regtest")
+    if (AreWeOnBCHChain() && IsNov152018Activated(Params().GetConsensus(), chainActive.Tip()) &&
+        chainparams.NetworkIDString() != "regtest")
     {
         enableCanonicalTxOrder = true;
     }

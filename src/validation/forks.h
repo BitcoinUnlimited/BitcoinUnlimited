@@ -40,7 +40,7 @@ bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *p
 
 /** Test if this node is configured to follow the BCH chain (miningForkTime tweak is nonzero),
     or whether the operator is enabling/disabling features manually. */
-bool AreWeOnBCHChain(const Consensus::Params &params, const CBlockIndex *pTip);
+bool AreWeOnBCHChain();
 
 /** Check if Nov 15th, 2018 protocol upgrade is activated using block height */
 bool IsNov152018Activated(const Consensus::Params &consensusparams, const int32_t nHeight);
