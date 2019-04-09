@@ -22,7 +22,6 @@ env:
     - CCACHE_COMPRESS=1
     - CCACHE_DIR=$HOME/.ccache
     - BASE_OUTDIR=$TRAVIS_BUILD_DIR/out
-    - USE_CLANG=false
     - SDK_URL=https://www.bitcoinunlimited.info/sdks
     - LINTER_DEB_URL=https://www.bitcoinunlimited.info/depends-sources/
     - PYTHON_DEBUG=1
@@ -35,7 +34,6 @@ matrix:
     #bitcoind clang (no depend, only system lib installed via apt)
     - compiler: clang
       env:
-        - USE_CLANG=true
         - CXX=clang++-5.0 CC=clang-5.0
         - CXXFLAGS="-std=c++14"
         - HOST=x86_64-unknown-linux-gnu
@@ -43,6 +41,7 @@ matrix:
         - PACKAGES="python3-zmq libzmq3-dev qttools5-dev-tools qttools5-dev clang-5.0 libssl1.0-dev libevent-dev bsdmainutils libboost-system-dev libboost-program-options-dev libboost-filesystem-dev libboost-chrono-dev libboost-test-dev libboost-thread-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libprotobuf-dev protobuf-compiler libqrencode-dev"
         - GOAL="install"
         - BITCOIN_CONFIG="--enable-zmq --with-gui=qt5 CC=clang-5.0 --with-incompatible-bdb CXX=clang++-5.0 CPPFLAGS=-DDEBUG_LOCKORDER CXXFLAGS=\"-std=c++14\""
+        - NODEPENDS=true
     #bitcoind
     - compiler: gcc
       env:
@@ -124,6 +123,7 @@ matrix:
         - PACKAGES="libtool libevent-devel autoconf automake openssl-devel boost-devel python36u libdb4-devel libdb4-cxx-devel devtoolset-6-gcc* miniupnpc-devel zeromq-devel"
         - RUN_TESTS=false GOAL="install"
         - BITCOIN_CONFIG="--enable-zmq --with-gui=no --disable-bench"
+        - NODEPENDS=true
 
 before_install:
     - set -o errexit; source .travis/before_install.sh
