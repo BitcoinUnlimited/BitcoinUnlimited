@@ -252,7 +252,6 @@ testScriptsExt = [ RpcTest(t) for t in [
     'txPerf',
     'excessive --extensive',
     'parallel --extensive',
-    'bip9-softforks',
     'bip65-cltv',
     'bip68-sequence',
     Disabled('bipdersig-p2p', "keep as an example of testing fork activation"),
