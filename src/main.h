@@ -162,7 +162,7 @@ static const bool DEFAULT_PRINTTOCONSOLE = false;
 
 // BU - Xtreme Thinblocks Auto Mempool Limiter - begin section
 /** The default value for -minrelaytxfee in sat/byte */
-static const double DEFAULT_MINLIMITERTXFEE = 0.0;
+static const double DEFAULT_MINLIMITERTXFEE = (double)DEFAULT_MIN_RELAY_TX_FEE / 1000;
 /** The default value for -maxrelaytxfee in sat/byte */
 static const double DEFAULT_MAXLIMITERTXFEE = (double)DEFAULT_MIN_RELAY_TX_FEE / 1000;
 /** The number of block heights to gradually choke spam transactions over */
