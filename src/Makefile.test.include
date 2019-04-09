@@ -133,6 +133,12 @@ BITCOIN_TESTS =\
   test/utilhttp_tests.cpp \
   test/xversionmessage_tests.cpp
 
+# recursive shared mutex tests #
+BITCOIN_TESTS += \
+  rsm/test/rsm_promotion_tests.cpp \
+  rsm/test/rsm_simple_tests.cpp \
+  rsm/test/rsm_starvation_tests.cpp
+
 if ENABLE_WALLET
 BITCOIN_TESTS += \
   wallet/test/accounting_tests.cpp \
