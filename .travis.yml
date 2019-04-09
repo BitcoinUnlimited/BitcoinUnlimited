@@ -125,6 +125,7 @@ matrix:
         - PACKAGES="libtool libevent-devel autoconf automake openssl-devel boost-devel python36u libdb4-devel libdb4-cxx-devel devtoolset-6-gcc* miniupnpc-devel zeromq-devel"
         - RUN_TESTS=false GOAL="install"
         - BITCOIN_CONFIG="--enable-zmq --with-gui=no --disable-bench"
+        - NODEPENDS=true
 
 before_install:
     - set -o errexit; source .travis/before_install.sh
