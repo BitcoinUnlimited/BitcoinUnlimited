@@ -1,5 +1,5 @@
 ---
-name: "BUcash-win-1.5"
+name: "BUcash-win-1.6"
 enable_cache: true
 suites:
 - "bionic"
@@ -22,7 +22,7 @@ packages:
 - "ca-certificates"
 - "python"
 - "rename"
-reference_datetime: "2018-10-12 00:00:00"
+reference_datetime: "2019-04-09 00:00:00"
 remotes:
 - "url": "https://github.com/BitcoinUnlimited/BitcoinUnlimited.git"
   "dir": "bitcoin"
