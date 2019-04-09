@@ -32,32 +32,29 @@ bool IsTxProbablyNewSigHash(const CTransaction &tx);
 // was the fork activated on this or any prior block?
 bool UAHFforkActivated(int height);
 
-// Is the next block the fork block?
-bool UAHFforkAtNextBlock(int height);
-
 // Is the fork active on the next block?
 bool IsUAHFforkActiveOnNextBlock(int height);
 
 /** Check is Cash HF has activated. */
 bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 
-bool IsNov152018Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
-
-/** Test if this node is configured to follow the Nov 15 fork (consensus.forkNov2018Time is nonzero),
+/** Test if this node is configured to follow the BCH chain (miningForkTime tweak is nonzero),
     or whether the operator is enabling/disabling features manually. */
-bool IsNov152018Scheduled();
+bool AreWeOnBCHChain();
 
-/** Test if fork is active */
-bool IsNov152018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
+/** Check if Nov 15th, 2018 protocol upgrade is activated using block height */
+bool IsNov2018Activated(const Consensus::Params &consensusparams, const int32_t nHeight);
+bool IsNov2018Activated(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 
+/** Check if the next will be the first block where the new set of rules will be enforced */
+bool IsMay2019Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
+
+/** Test if May 15th 2019 fork has actived */
+bool IsMay2019Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 
 /** Test if this node is configured to follow the Bitcoin SV defined hard fork */
-bool IsSv2018Scheduled();
-
-/** Test if SV fork is active */
-bool IsSv2018Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
-
-/** Test if SV fork is happening on the next block */
-bool IsSv2018Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
-
+bool AreWeOnSVChain();
+/** Check if SV Nov 15th, 2018 protocol upgrade is activated using block height */
+bool IsSv2018Activated(const Consensus::Params &consensusparams, const int32_t nHeight);
+bool IsSv2018Activated(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 #endif

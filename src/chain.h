@@ -284,7 +284,7 @@ public:
      * state fork: enabled or activated */
     bool IsforkActiveOnNextBlock(int time) const;
 
-    /** return true only if 1st condition is true (Median past time > UAHF time)
+    /** return true only if 1st condition is true (Median past time > fork time)
      * and not the 2nd, i.e. we are at precisely [x-1,x-1]
      * state: fork enabled but not activateda */
     bool forkAtNextBlock(int time) const;

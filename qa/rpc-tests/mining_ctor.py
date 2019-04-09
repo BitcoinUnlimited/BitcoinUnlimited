@@ -28,8 +28,7 @@ class CTORMiningTest(BitcoinTestFramework):
         # it errors out if it is not connected to other nodes
         self.nodes = []
 
-        opts = ['-spendzeroconfchange=0', '-debug', '-whitelist=127.0.0.1',
-                '-consensus.forkNov2018Time=%d' % self.mocktime]
+        opts = ['-spendzeroconfchange=0', '-debug', '-whitelist=127.0.0.1', '-consensus.enableCanonicalTxOrder=1']
         for i in range(2):
             self.nodes.append(start_node(i, self.options.tmpdir, opts))
 
@@ -39,20 +38,12 @@ class CTORMiningTest(BitcoinTestFramework):
     def run_test(self):
         mining_node = self.nodes[0]
 
-        # Helper for updating the times
-        def update_time():
-            mining_node.setmocktime(self.mocktime)
-            self.mocktime = self.mocktime + 600
-
         mining_node.getnewaddress()
 
-        # Generate some unspent utxos and also
-        # activate magnetic anomaly
+        # Generate some unspent utxos
         for x in range(150):
-            update_time()
             mining_node.generate(1)
 
-        update_time()
         unspent = mining_node.listunspent()
 
         assert len(unspent) == 100

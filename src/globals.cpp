@@ -284,17 +284,18 @@ CTweakRef<unsigned int> maxDataCarrierTweak("mining.dataCarrierSize",
     &nMaxDatacarrierBytes,
     &MaxDataCarrierValidator);
 
-CTweakRef<uint64_t> miningForkTime("consensus.forkNov2018Time",
-    "Time in seconds since the epoch to initiate the Bitcoin ABC hard fork scheduled on 15th Nov 2018.  A setting of 1 "
+CTweakRef<uint64_t> miningForkTime("consensus.forkMay2019Time",
+    "Time in seconds since the epoch to initiate the Bitcoin Cash hard fork scheduled on 15th May 2019.  A setting of "
+    "1 "
     "will turn on the fork at the appropriate time.",
     &nMiningForkTime,
-    &ForkTimeValidator); // Thu Nov 15 17:40:00 CET 2018
+    &ForkTimeValidator); // Thu May 15 12:00:00 UTC 2019
 
 CTweakRef<uint64_t> miningSvForkTime("consensus.svForkNov2018Time",
     "Time in seconds since the epoch to initiate the Bitcoin SV defined hard fork scheduled on 15th Nov 2018.  A "
     "setting of 1 will turn on the fork at the appropriate time.",
     &nMiningSvForkTime,
-    &ForkTimeValidatorSV); // Thu Nov 15 17:40:00 CET 2018
+    &ForkTimeValidatorSV); // Thu Nov 15 15:40:00 UTC 2018
 
 CTweakRef<bool> consensusSchnorr("consensus.schnorrEnabled",
     "Schnorr signatures are allowed in the next block",

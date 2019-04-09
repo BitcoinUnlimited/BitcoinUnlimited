@@ -144,7 +144,7 @@ class CompactBlocksTest(BitcoinTestFramework):
 
     def setup_network(self):
         self.nodes = []
-        self.nodes = start_nodes(self.num_nodes, self.options.tmpdir, [["-debug=net", "-debug=thin", "-debug=cmpctblocks", "-debug=mempool", "-net.msgHandlerThreads=1"]])
+        self.nodes = start_nodes(self.num_nodes, self.options.tmpdir, [["-consensus.enableCanonicalTxOrder=1", "-debug=net", "-debug=thin", "-debug=cmpctblocks", "-debug=mempool", "-net.msgHandlerThreads=1"]])
 
 
     def build_block_on_tip(self):

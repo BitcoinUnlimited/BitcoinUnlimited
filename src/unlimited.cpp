@@ -240,7 +240,7 @@ std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool valida
     {
         if (*item == 1)
         {
-            *item = Params().GetConsensus().nov2018ActivationTime;
+            *item = Params().GetConsensus().may2019ActivationTime;
         }
         settingsToUserAgentString();
     }
@@ -264,7 +264,10 @@ std::string ForkTimeValidatorSV(const uint64_t &value, uint64_t *item, bool vali
     {
         if (*item == 1)
         {
-            *item = Params().GetConsensus().nov2018ActivationTime;
+            // Since SV there's no other fork upcoming we going to use nov2018ActivationTime
+            // but since we removed the variable from src/chainparams.cpp we are going to use
+            // a literal integer here 1542300000 (Nov 15, 2019 15:40:00 UTC)
+            *item = 1542300000;
         }
         settingsToUserAgentString();
     }
@@ -479,9 +482,9 @@ void UnlimitedSetup(void)
 
     // If the user configures it to 1, assume this means default
     if (miningForkTime.Value() == 1)
-        miningForkTime = Params().GetConsensus().nov2018ActivationTime;
+        miningForkTime = Params().GetConsensus().may2019ActivationTime;
     if (miningSvForkTime.Value() == 1)
-        miningSvForkTime = Params().GetConsensus().nov2018ActivationTime;
+        miningSvForkTime = 1542300000;
 
     if (miningForkTime.Value() != 0 && miningSvForkTime.Value() != 0)
     {
