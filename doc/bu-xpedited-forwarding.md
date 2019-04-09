@@ -13,9 +13,12 @@ is found, an Xthin-format block is forwarded to every node you are connected to 
 the Xthin-format block, the header is quickly checked to make sure it is valid (and of appropriate difficulty) and then forwarded to the next
 set of nodes and so on.
 
-It's important to note that the block is verified and accepted only after being forwarded.  And the normal 3-phase conversation 
-(INV, GET, response) is reduced to a single send.  This allows for a much faster propagation through the network.
+It's important to note that the block is verified and accepted only after being forwarded.  And the normal 3-phase  conversation (INV, GET, response) is reduced to a single send.  This allows for a much faster propagation through 
+the network.
 
+Furthermore, upstream expedited peers will not be banned or disconnected for any reason due to any misbehavior. For 
+example, Node 'A' which initiates the expedited connection to node 'B' will not ban node 'B' in the event that any 
+expedited blocks which are forwarded to the node 'A' fail to reconstruct in any way. 
 
 ## Setting up an Xpedited connection
 

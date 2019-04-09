@@ -3146,14 +3146,21 @@ void CNode::DisconnectIfBanned()
         fShouldBan = false;
 
         if (fWhitelisted)
-            LOGA("Warning: not punishing whitelisted peer %s!\n", GetLogName());
+        {
+            LOGA("Warning: not banning whitelisted peer %s!\n", GetLogName());
+        }
+        else if (connmgr->IsExpeditedUpstream(this))
+        {
+            LOG(THIN, "Warning: not banning expedited peer %s!\n", GetLogName());
+        }
+        else if (addr.IsLocal())
+        {
+            LOGA("Warning: not banning local peer %s!\n", GetLogName());
+        }
         else
         {
             fDisconnect = true;
-            if (addr.IsLocal())
-                LOGA("Warning: not banning local peer %s!\n", GetLogName());
-            else
-                dosMan.Ban(addr, BanReasonNodeMisbehaving);
+            dosMan.Ban(addr, BanReasonNodeMisbehaving);
         }
     }
 }
