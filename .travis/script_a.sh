@@ -21,7 +21,7 @@ if [ -n "$USE_SHELL" ]; then export CONFIG_SHELL="$USE_SHELL"; fi
 OUTDIR=$BASE_OUTDIR/$TRAVIS_PULL_REQUEST/$TRAVIS_JOB_NUMBER-$HOST
 BITCOIN_CONFIG_ALL="--disable-dependency-tracking --prefix=$TRAVIS_BUILD_DIR/depends/$HOST --bindir=$OUTDIR/bin --libdir=$OUTDIR/lib";
 if [ -z "$NODEPENDS" ]; then
-  if [ "$USE_CLANG" = "false" ]; then DOCKER_EXEC ccache --max-size=$CCACHE_SIZE; fi
+  then DOCKER_EXEC ccache --max-size=$CCACHE_SIZE;
 fi
 test -n "$USE_SHELL" && DOCKER_EXEC "$CONFIG_SHELL" -c "./autogen.sh 2>&1 > autogen.out" || ./autogen.sh 2>&1 > autogen.out || (cat autogen.out && false)
 END_FOLD
