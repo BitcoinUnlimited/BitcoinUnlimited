@@ -362,6 +362,15 @@ CTweak<unsigned int> blockDownloadWindow("net.blockDownloadWindow",
     "How far ahead of our current height do we fetch? 0 means use algorithm.",
     0);
 
+/** This setting dictates the peer's Bloom filter compatibility when sending and
+ * receiving Graphene blocks. In this implementation, either regular or fast Bloom
+ * filters are supported. However, other (or future) implementations may elect to
+ * drop support for one or the other.
+ */
+CTweak<uint64_t> grapheneFastFilterCompatibility("net.grapheneFastFilterCompatibility",
+    "Support fast Bloom filter: 0 - either, 1 - fast only, 2 - regular only (default: either)",
+    GRAPHENE_FAST_FILTER_SUPPORT);
+
 /** This is the initial size of CFileBuffer's RAM buffer during reindex.  A
 larger size will result in a tiny bit better performance if blocks are that
 size.

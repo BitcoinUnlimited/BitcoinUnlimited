@@ -26,23 +26,24 @@
 
 #include <iomanip>
 static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount);
+extern CTweak<uint64_t> grapheneFastFilterCompatibility;
 
 CMemPoolInfo::CMemPoolInfo(uint64_t _nTx) : nTx(_nTx) {}
 CMemPoolInfo::CMemPoolInfo() { this->nTx = 0; }
 CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     uint64_t nReceiverMemPoolTx,
     uint64_t nSenderMempoolPlusBlock,
-    uint64_t _version)
+    uint64_t _version,
+    bool _computeOptimized)
     : // Use cryptographically strong pseudorandom number because
       // we will extract SipHash secret key from this
       sipHashNonce(GetRand(std::numeric_limits<uint64_t>::max())),
-      shorttxidk0(0), shorttxidk1(0)
+      shorttxidk0(0), shorttxidk1(0), version(_version), computeOptimized(_computeOptimized)
 {
     header = pblock->GetBlockHeader();
     nBlockTxs = pblock->vtx.size();
     uint64_t grapheneSetVersion = 0;
 
-    version = _version;
     if (version >= 2)
         FillShortTxIDSelector();
 
@@ -50,8 +51,10 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
         grapheneSetVersion = 0;
     if (version == 2)
         grapheneSetVersion = 1;
-    else if (version >= 3)
+    else if (version == 3)
         grapheneSetVersion = 2;
+    else if (version == 4)
+        grapheneSetVersion = 3;
 
     std::vector<uint256> blockHashes;
     for (auto &tx : pblock->vtx)
@@ -64,10 +67,10 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
 
     if (enableCanonicalTxOrder.Value())
         pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, shorttxidk0,
-            shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, false);
+            shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, computeOptimized, false);
     else
         pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, shorttxidk0,
-            shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, true);
+            shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, computeOptimized, true);
 }
 
 CGrapheneBlock::~CGrapheneBlock()
@@ -335,7 +338,9 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
     int nSizeGrapheneBlock = vRecv.size();
     CInv inv(MSG_BLOCK, uint256());
 
-    CGrapheneBlock grapheneBlock(pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
+    CGrapheneBlock grapheneBlock(
+        (int)std::min(GRAPHENE_MAX_VERSION_SUPPORTED, pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED)),
+        NegotiateFastFilterSupport(pfrom));
     vRecv >> grapheneBlock;
 
     // Message consistency checking (FIXME: some redundancy here with AcceptBlockHeader)
@@ -1348,8 +1353,10 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
             uint64_t nSenderMempoolPlusBlock =
                 GetGrapheneMempoolInfo().nTx + pblock->vtx.size() - 1; // exclude coinbase
 
+            uint64_t compatibleBlockVersion = (int)std::min(
+                GRAPHENE_MAX_VERSION_SUPPORTED, pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
             CGrapheneBlock grapheneBlock(MakeBlockRef(*pblock), mempoolinfo.nTx, nSenderMempoolPlusBlock,
-                pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
+                compatibleBlockVersion, NegotiateFastFilterSupport(pfrom));
             pfrom->gr_shorttxidk0 = grapheneBlock.shorttxidk0;
             pfrom->gr_shorttxidk1 = grapheneBlock.shorttxidk1;
             int nSizeBlock = pblock->GetBlockSize();
@@ -1518,4 +1525,35 @@ uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256 &t
 
     static_assert(SHORTTXIDS_LENGTH == 8, "shorttxids calculation assumes 8-byte shorttxids");
     return SipHashUint256(shorttxidk0, shorttxidk1, txhash) & 0xffffffffffffffL;
+}
+
+bool NegotiateFastFilterSupport(CNode *pfrom)
+{
+    if (grapheneFastFilterCompatibility.Value() == EITHER)
+    {
+        if (pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF) == EITHER)
+            return true;
+        else if (pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF) == FAST)
+            return true;
+        else
+            return false;
+    }
+    else if (grapheneFastFilterCompatibility.Value() == FAST)
+    {
+        if (pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF) == EITHER)
+            return true;
+        else if (pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF) == FAST)
+            return true;
+        else
+            throw std::runtime_error("Sender and receiver have incompatible fast filter preferences");
+    }
+    else
+    {
+        if (pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF) == EITHER)
+            return false;
+        else if (pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF) == FAST)
+            throw std::runtime_error("Sender and receiver have incompatible fast filter preferences");
+        else
+            return false;
+    }
 }

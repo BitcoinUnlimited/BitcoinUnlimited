@@ -31,6 +31,7 @@ extern std::atomic<int> nPreferredDownload;
 extern int nSyncStarted;
 extern std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders;
 extern CTweak<unsigned int> maxBlocksInTransitPerPeer;
+extern CTweak<uint64_t> grapheneFastFilterCompatibility;
 
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
@@ -412,6 +413,17 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
     }
 
+    bool grapheneVersionCompatible = true;
+    try
+    {
+        NegotiateFastFilterSupport(pfrom);
+    }
+    catch (const std::runtime_error &e)
+    {
+        LOG(GRAPHENE, "Incompatible Graphene versions, graphene blocks will not be sent");
+        grapheneVersionCompatible = false;
+    }
+
     /* Special handling for xversion messages, as they are optional but still
      have to be properly sequenced to be at the beginning of a connection. So
      if anything but an xversion comes in whilst in
@@ -553,7 +565,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CXVersionMessage xver;
         xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
         xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
-        xver.set_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED, 3);
+        xver.set_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED, GRAPHENE_MAX_VERSION_SUPPORTED);
+        xver.set_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF, grapheneFastFilterCompatibility.Value());
         xver.set_u64c(XVer::BU_XTHIN_VERSION, 2); // xthin version
         pfrom->PushMessage(NetMsgType::XVERSION, xver);
 
@@ -1589,7 +1602,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     }
 
     // Handle Graphene blocks
-    else if (strCommand == NetMsgType::GET_GRAPHENE && !fImporting && !fReindex && IsGrapheneBlockEnabled())
+    else if (strCommand == NetMsgType::GET_GRAPHENE && !fImporting && !fReindex && IsGrapheneBlockEnabled() &&
+             grapheneVersionCompatible)
     {
         if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
@@ -1599,7 +1613,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     }
 
     else if (strCommand == NetMsgType::GRAPHENEBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
-             IsGrapheneBlockEnabled())
+             IsGrapheneBlockEnabled() && grapheneVersionCompatible)
     {
         LOCK(pfrom->cs_graphene);
         return CGrapheneBlock::HandleMessage(vRecv, pfrom, strCommand, 0);
@@ -1607,7 +1621,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
 
     else if (strCommand == NetMsgType::GET_GRAPHENETX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
-             IsGrapheneBlockEnabled())
+             IsGrapheneBlockEnabled() && grapheneVersionCompatible)
     {
         if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
@@ -1618,7 +1632,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
 
     else if (strCommand == NetMsgType::GRAPHENETX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
-             IsGrapheneBlockEnabled())
+             IsGrapheneBlockEnabled() && grapheneVersionCompatible)
     {
         LOCK(pfrom->cs_graphene);
         return CGrapheneBlockTx::HandleMessage(vRecv, pfrom);

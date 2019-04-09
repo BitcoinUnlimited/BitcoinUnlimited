@@ -21,19 +21,13 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     uint64_t _shorttxidk1,
     uint64_t _version,
     uint32_t ibltEntropy,
+    bool _computeOptimized,
     bool _ordered,
     bool fDeterministic)
+    : ordered(_ordered), nReceiverUniverseItems(_nReceiverUniverseItems), shorttxidk0(_shorttxidk0),
+      shorttxidk1(_shorttxidk1), version(_version), ibltSalt(ibltEntropy), computeOptimized(_computeOptimized),
+      pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr)
 {
-    ordered = _ordered;
-
-    // Below is the parameter "m" from the graphene paper
-    nReceiverUniverseItems = _nReceiverUniverseItems;
-
-    shorttxidk0 = _shorttxidk0;
-    shorttxidk1 = _shorttxidk1;
-    ibltSalt = ibltEntropy;
-    version = _version;
-
     // Below is the parameter "n" from the graphene paper
     uint64_t nItems = _itemHashes.size();
 
@@ -75,8 +69,17 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     optSymDiff += nReceiverMissingItems;
 
     // Construct Bloom filter
-    pSetFilter = new CBloomFilter(
-        nItems, fpr, insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
+    if (computeOptimized)
+    {
+        LOG(GRAPHENE, "using compute-optimized Bloom filter\n");
+        pFastFilter = new CVariableFastFilter(nItems, fpr);
+    }
+    else
+    {
+        LOG(GRAPHENE, "using regular Bloom filter\n");
+        pSetFilter = new CBloomFilter(
+            nItems, fpr, insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
+    }
     LOG(GRAPHENE, "fp rate: %f Num elements in bloom filter: %d\n", fpr, nItems);
 
     // Construct IBLT
@@ -90,7 +93,14 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     {
         uint64_t cheapHash = GetShortID(itemHash);
 
-        pSetFilter->insert(itemHash);
+        if (computeOptimized)
+        {
+            pFastFilter->insert(itemHash);
+        }
+        else
+        {
+            pSetFilter->insert(itemHash);
+        }
 
         if (mapCheapHashes.count(cheapHash))
             throw std::runtime_error("Cheap hash collision while encoding graphene set");
@@ -242,7 +252,8 @@ std::vector<uint64_t> CGrapheneSet::Reconcile(const std::vector<uint256> &receiv
             throw std::runtime_error("Cheap hash collision while decoding graphene set");
         }
 
-        if ((*pSetFilter).contains(itemHash))
+        if ((computeOptimized && pFastFilter->contains(itemHash)) ||
+            (!computeOptimized && pSetFilter->contains(itemHash)))
         {
             receiverSet.insert(cheapHash);
             localIblt.insert(cheapHash, IBLT_NULL_VALUE);
@@ -265,7 +276,8 @@ std::vector<uint64_t> CGrapheneSet::Reconcile(const std::map<uint64_t, uint256> 
 
     for (const auto &entry : mapCheapHashes)
     {
-        if ((*pSetFilter).contains(entry.second))
+        if ((computeOptimized && pFastFilter->contains(entry.second)) ||
+            (!computeOptimized && pSetFilter->contains(entry.second)))
         {
             receiverSet.insert(entry.first);
             localIblt.insert(entry.first, IBLT_NULL_VALUE);

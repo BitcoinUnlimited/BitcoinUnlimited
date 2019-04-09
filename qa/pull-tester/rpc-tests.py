@@ -235,7 +235,7 @@ testScripts = [ RpcTest(t) for t in [
     'importprunedfunds',
     'compactblocks_1',
     'compactblocks_2',
-    'grapheneblocks',
+    'graphene_optimized',
     'thinblocks',
     Disabled('checkdatasig_activation', "CDSV has been already succesfully activated, keep test around as a template for other OP activation"),
     'xversion',

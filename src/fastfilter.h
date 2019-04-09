@@ -7,9 +7,147 @@
 
 #include "random.h"
 #include "serialize.h"
+#include "util.h"
+#include <cmath>
+#include <limits>
 #include <vector>
 
+#define LN2SQUARED 0.4804530139182014246671025263266649717305529515945455
+#define LN2 0.6931471805599453094172321214581765680755001343602552
+#define MIN_N_HASH_FUNC 1
+#define MAX_N_HASH_FUNC 32
 class uint256;
+
+/**
+ * This class can be used anywhere a Bloom filter is used so long as the input data is random.
+ *
+ * If nHashFuncs is 16 and nFilterItems is >= 64k all bits in the uint256 input data will be used to set bits in
+ * the filter.
+ *
+ * nHashFuncs may range from 2 to 32 inclusive.
+ */
+class CVariableFastFilter
+{
+protected:
+    // A bit vector containing the bloom filter data
+    std::vector<unsigned char> vData;
+
+public:
+    uint8_t nHashFuncs;
+    uint32_t nFilterBytes;
+    uint64_t nFilterItems;
+
+    CVariableFastFilter() : nHashFuncs(2), nFilterItems(2){};
+
+    CVariableFastFilter(uint64_t nElements, double nFPRate)
+    {
+        if (nElements == 0)
+        {
+            LOGA("Construction of empty CVariableFastFilter attempted.\n");
+            nElements = 1;
+        }
+
+        nFilterBytes = (uint32_t)(std::ceil(-1 / LN2SQUARED * nElements * log(nFPRate) / 8));
+        nFilterItems = 8 * nFilterBytes;
+
+        if (nFilterBytes > std::numeric_limits<uint32_t>::max())
+            throw std::runtime_error("CVariableFastFilter can have size no greater maximum uint32_t.");
+
+        vData.resize(nFilterBytes, 0);
+
+        unsigned int optimalNHashFuncs =
+            (unsigned int)std::max(MIN_N_HASH_FUNC, int(nFilterBytes * 8 / nElements * LN2));
+        if (optimalNHashFuncs > MAX_N_HASH_FUNC)
+        {
+            LOGA("CVariableFastFilter constructed with suboptimal number of hash functions.\n");
+            nHashFuncs = MAX_N_HASH_FUNC;
+        }
+        else
+            nHashFuncs = optimalNHashFuncs;
+    }
+
+
+    // returns true IF this function made a change (i.e. the value was previously not set).
+    bool checkAndSet(const uint256 &hash)
+    {
+        uint256 rotHash; // We require a mutable hash for rotation
+        memcpy(rotHash.begin(), hash.begin(), 32);
+        const uint32_t *pos = (const uint32_t *)rotHash.begin();
+        bool unset = 0; // If any position is not set, then this will be true
+        for (unsigned int i = 0; i < nHashFuncs; i++, pos++)
+        {
+            uint32_t val = *pos;
+            uint32_t idx = val % (nFilterItems - 1);
+            uint32_t bit = (1 << (idx & 7));
+            idx >>= 3;
+            unset |= (0 == (vData[idx] & bit));
+            vData[idx] |= bit;
+
+            // Rotate hash array once pos gets to the end of the array
+            if (i % 8 == 7)
+            {
+                std::rotate(rotHash.begin(), rotHash.begin() + 1, rotHash.end());
+                pos = (const uint32_t *)rotHash.begin();
+            }
+        }
+
+        return unset;
+    }
+
+    void insert(const uint256 &hash)
+    {
+        uint256 rotHash; // We require a mutable hash for rotation
+        memcpy(rotHash.begin(), hash.begin(), 32);
+        const uint32_t *pos = (const uint32_t *)rotHash.begin();
+        for (unsigned int i = 0; i < nHashFuncs; i++, pos++)
+        {
+            uint32_t val = *pos;
+            uint32_t idx = val % (nFilterItems - 1);
+            vData[idx >> 3] |= (1 << (idx & 7));
+
+            // Rotate hash array once pos gets to the end of the array
+            if (i % 8 == 7)
+            {
+                std::rotate(rotHash.begin(), rotHash.begin() + 1, rotHash.end());
+                pos = (const uint32_t *)rotHash.begin();
+            }
+        }
+    }
+
+    bool contains(const uint256 &hash) const
+    {
+        uint256 rotHash; // We require a mutable hash for rotation
+        memcpy(rotHash.begin(), hash.begin(), 32);
+        const uint32_t *pos = (const uint32_t *)rotHash.begin();
+        bool unset = 0; // If any position is not set, then this will be true
+        for (unsigned int i = 0; i < nHashFuncs; i++, pos++)
+        {
+            uint32_t val = *pos;
+            uint32_t idx = val % (nFilterItems - 1);
+            unset |= (0 == (vData[idx >> 3] & (1 << (idx & 7))));
+
+            // Rotate hash array once pos gets to the end of the array
+            if (i % 8 == 7)
+            {
+                std::rotate(rotHash.begin(), rotHash.begin() + 1, rotHash.end());
+                pos = (const uint32_t *)rotHash.begin();
+            }
+        }
+
+        return !unset;
+    }
+
+    void reset() { memset(&vData[0], 0, nFilterBytes); }
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream &s, Operation ser_action)
+    {
+        READWRITE(vData);
+        READWRITE(nHashFuncs);
+        READWRITE(nFilterItems);
+    }
+};
 
 // Statically evaluated expression to return whether a number is a power of 2
 constexpr bool isPow2(unsigned int num) { return num && !(num & (num - 1)); }
