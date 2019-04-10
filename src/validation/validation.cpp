@@ -2700,6 +2700,16 @@ void CheckAndAlertUnknownVersionbits(const CChainParams &chainParams, const CBlo
             fWarned = true;
         }
     }
+    else
+    {
+        strMiscWarning = _("");
+        // Clear message when conditions have returned to normal
+        if (fWarned)
+        {
+            AlertNotify(strMiscWarning);
+            fWarned = false;
+        }
+    }
 }
 // bip135 end
 
