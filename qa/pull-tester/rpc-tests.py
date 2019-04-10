@@ -181,6 +181,7 @@ if ENABLE_ZMQ:
 #Tests
 testScripts = [ RpcTest(t) for t in [
     'schnorrsig',
+    Disabled('segwit-recovery-activation','Need to be updated to work with BU'),
     'bip135basic',
     'ctor',
     'mining_ctor',

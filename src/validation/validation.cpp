@@ -948,8 +948,17 @@ bool CheckInputs(const CTransactionRef &tx,
                 }
                 else if (!check())
                 {
-                    const bool hasNonMandatoryFlags = (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
-                    if (hasNonMandatoryFlags)
+                    // Compute flags without the optional standardness flags.
+                    // This differs from MANDATORY_SCRIPT_VERIFY_FLAGS as it contains
+                    // additional upgrade flags (see ParallelAcceptToMemoryPool variable
+                    // featureFlags).
+                    // Even though it is not a mandatory flag,SCRIPT_ALLOW_SEGWIT_RECOVERY
+                    // is strictly more permissive than the set of standard flags.
+                    // It therefore needs to be added in order to check if we need to penalize
+                    // the peer that sent us the transaction or not.
+                    uint32_t mandatoryFlags =
+                        (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS) | SCRIPT_ALLOW_SEGWIT_RECOVERY;
+                    if (flags != mandatoryFlags)
                     {
                         // Check whether the failure was caused by a
                         // non-mandatory script verification check, such as
@@ -957,8 +966,7 @@ bool CheckInputs(const CTransactionRef &tx,
                         // arguments; if so, don't trigger DoS protection to
                         // avoid splitting the network between upgraded and
                         // non-upgraded nodes.
-                        CScriptCheck check2(nullptr, scriptPubKey, amount, *tx, i,
-                            (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS), maxOps, cacheStore);
+                        CScriptCheck check2(nullptr, scriptPubKey, amount, *tx, i, mandatoryFlags, maxOps, cacheStore);
                         if (check2())
                             return state.Invalid(
                                 false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)",
@@ -1718,7 +1726,7 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
     if (AreWeOnBCHChain() && IsMay2019Enabled(consensusparams, pindex->pprev))
     {
         // schnoor
-        // segwit_recovery
+        flags |= SCRIPT_ALLOW_SEGWIT_RECOVERY;
     }
 
     // The SV Nov 15, 2018 HF rules
