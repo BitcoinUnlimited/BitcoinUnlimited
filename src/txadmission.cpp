@@ -597,16 +597,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
     const CChainParams &chainparams = Params();
 
-    const uint32_t cds_flag = (AreWeOnBCHChain() && IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip())) ?
-                                  SCRIPT_ENABLE_CHECKDATASIG :
-                                  0;
-    const uint32_t schnorrflag = schnorrEnabled ? SCRIPT_ENABLE_SCHNORR : 0;
-    const uint32_t svflag = (AreWeOnSVChain() && IsSv2018Activated(chainparams.GetConsensus(), chainActive.Tip())) ?
-                                SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES :
-                                0;
-    const uint32_t featureFlags = cds_flag | svflag | schnorrflag;
-    const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;
-
     if (!CheckTransaction(tx, state))
     {
         if (state.GetDebugMessage() == "")
@@ -632,6 +622,20 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         state.SetDebugMessage("IsStandardTx failed");
         return state.DoS(0, false, REJECT_NONSTANDARD, reason);
     }
+
+    const uint32_t cds_flag = (AreWeOnBCHChain() && IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip())) ?
+                                  SCRIPT_ENABLE_CHECKDATASIG :
+                                  0;
+    const uint32_t schnorrflag = schnorrEnabled ? SCRIPT_ENABLE_SCHNORR : 0;
+    const uint32_t segwit_flag =
+        (AreWeOnBCHChain() && IsMay2019Enabled(chainparams.GetConsensus(), chainActive.Tip()) && !fRequireStandard) ?
+            SCRIPT_ALLOW_SEGWIT_RECOVERY :
+            0;
+    const uint32_t svflag = (AreWeOnSVChain() && IsSv2018Activated(chainparams.GetConsensus(), chainActive.Tip())) ?
+                                SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES :
+                                0;
+    const uint32_t featureFlags = cds_flag | schnorrflag | segwit_flag | svflag;
+    const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;
 
     // Don't relay version 2 transactions until CSV is active, and we can be
     // sure that such transactions will be mined (unless we're on
