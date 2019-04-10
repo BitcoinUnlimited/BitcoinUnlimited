@@ -1704,51 +1704,37 @@ UniValue setlog(const UniValue &params, bool fHelp)
             HelpExampleCli("log", "\"tor\" ") + HelpExampleCli("log", "\"ALL\" ") + HelpExampleCli("log", " "));
     }
 
-    try
+    if (nparm == 0)
+        ret = UniValue(Logging::LogGetAllString(true));
+
+    if (nparm > 0)
     {
-        if (nparm == 0)
-            ret = UniValue(Logging::LogGetAllString(true));
-
-        if (nparm > 0)
+        std::string category;
+        std::string data = params[0].get_str();
+        std::transform(data.begin(), data.end(), std::back_inserter(category), ::tolower);
+        catg = Logging::LogFindCategory(category);
+        if (catg == NONE)
         {
-            std::string category;
-            std::string data = params[0].get_str();
-            std::transform(data.begin(), data.end(), std::back_inserter(category), ::tolower);
-            catg = Logging::LogFindCategory(category);
-            if (catg == NONE)
-                return UniValue("Category not found: " + params[0].get_str()); // quit
-        }
-
-        switch (nparm)
-        {
-        case 1:
-            if (catg == ALL)
-                ret = UniValue(Logging::LogGetAllString());
-            else
-                ret = UniValue(Logging::LogAcceptCategory(catg) ? "on" : "off");
-            break;
-
-        case 2:
-            try
-            {
-                action = IsStringTrue(params[1].get_str());
-            }
-            catch (...)
-            {
-                ret = UniValue("Please pass on|off as last argument.");
-                break; // quit
-            }
-
-            Logging::LogToggleCategory(catg, action);
-
-        default:
-            break;
+            throw std::invalid_argument("Category not found: " + params[0].get_str());
         }
     }
-    catch (...)
+
+    switch (nparm)
     {
-        LOG(ALL, "LOG: Something went wrong in setlog function \n");
-        ret = UniValue("Something went wrong. That is all we know.");
+    case 1:
+        if (catg == ALL)
+            ret = UniValue(Logging::LogGetAllString());
+        else
+            ret = UniValue(Logging::LogAcceptCategory(catg) ? "on" : "off");
+        break;
+
+    case 2:
+        action = IsStringTrue(params[1].get_str());
+
+        Logging::LogToggleCategory(catg, action);
+
+    default:
+        break;
     }
 
     return ret;

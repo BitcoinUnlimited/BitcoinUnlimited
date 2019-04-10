@@ -1024,20 +1024,21 @@ std::string CopyrightHolders(const std::string &strPrefix)
 
 bool IsStringTrue(const std::string &str)
 {
-    const std::set<std::string> strOn = {"enable", "1", "true", "on"};
-    const std::set<std::string> strOff = {"disable", "0", "false", "off"};
-    const std::string lowstr = boost::algorithm::to_lower_copy(str);
+    static const std::set<std::string> strOn = {"enable", "1", "true", "True", "on"};
+    static const std::set<std::string> strOff = {"disable", "0", "false", "False", "off"};
 
-    if (strOn.count(lowstr))
+    if (strOn.count(str))
         return true;
 
-    if (strOff.count(lowstr))
+    if (strOff.count(str))
         return false;
 
-    // If not found:
-    throw std::string("IsStringTrue() was passed an Invalid string");
-
-    return false;
+    std::ostringstream err;
+    err << "invalid argument '" << str << "', expected any of: ";
+    std::copy(begin(strOn), end(strOn), std::ostream_iterator<std::string>(err, ", "));
+    std::copy(begin(strOff), end(strOff), std::ostream_iterator<std::string>(err, ", "));
+    // substr to chop off last ', '
+    throw std::invalid_argument(err.str().substr(0, err.str().size() - 2));
 }
 
 static const int wildmatch_max_length = 1024;
