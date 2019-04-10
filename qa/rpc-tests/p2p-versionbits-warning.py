@@ -159,13 +159,20 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         assert(self.nodes[0].getblockcount() ==  VB_PERIOD * 3)
 
         # Mine a period worth of expected blocks so the generic block-version warning
-        # is cleared, and restart the node.
+        # is cleared
         # OBSOLETE: This should no longer move the versionbit state to ACTIVE.
         # State transitions are NOT tracked for unconfigured bits in bip135,
         # since we do not have sufficient information to assess those reliably.
         self.nodes[0].generate(VB_PERIOD)
+        assert(self.nodes[0].getinfo()["errors"] == "")
+        assert(self.nodes[0].getmininginfo()["errors"] == "")
+        assert(self.nodes[0].getnetworkinfo()["warnings"] == "")
+        assert(len(self.nodes[0].getinfo()["errors"]) == 0)
+
+        # Restart the node.
         stop_node(self.nodes[0], 0)
         wait_bitcoinds()
+
         # Empty out the alert file
         with open(self.alert_filename, 'w', encoding='utf8') as f:
             pass
