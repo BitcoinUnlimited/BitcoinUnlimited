@@ -626,7 +626,9 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     const uint32_t cds_flag = (AreWeOnBCHChain() && IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip())) ?
                                   SCRIPT_ENABLE_CHECKDATASIG :
                                   0;
-    const uint32_t schnorrflag = schnorrEnabled ? SCRIPT_ENABLE_SCHNORR : 0;
+    const uint32_t schnorrflag =
+        (AreWeOnBCHChain() && IsMay2019Enabled(chainparams.GetConsensus(), chainActive.Tip())) ? SCRIPT_ENABLE_SCHNORR :
+                                                                                                 0;
     const uint32_t segwit_flag =
         (AreWeOnBCHChain() && IsMay2019Enabled(chainparams.GetConsensus(), chainActive.Tip()) && !fRequireStandard) ?
             SCRIPT_ALLOW_SEGWIT_RECOVERY :

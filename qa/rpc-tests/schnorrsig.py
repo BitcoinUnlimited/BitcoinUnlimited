@@ -21,10 +21,16 @@ import sys
 if sys.version_info[0] < 3:
     raise "Use Python 3"
 
+# This is test is not about actually veryfing node behavior
+# across fork but just to test how nodes behave once schnorr
+# is activated. Hence just set activation time in the past so
+# that node 0 and 1 would be able to use schnorr sig and drop
+# transaction that come from pre-activation nodes
+MAY_2019_FORK_TIME = 1500000000
+
 class PlaceHolder():
     def __init__(self, d=None):
         self.data = d
-
 
 class SchnorrSigTest (BitcoinTestFramework):
 
@@ -78,9 +84,10 @@ class SchnorrSigTest (BitcoinTestFramework):
 
         logging.info("Schnorr signature transaction generation and commitment")
 
-        # create a fork with 2 schnorr nodes and 2 regular nodes
-        self.nodes[0].set("consensus.schnorrEnabled=true")
-        self.nodes[1].set("consensus.schnorrEnabled=true")
+        self.nodes[0].set("consensus.forkMay2019Time={}".format(MAY_2019_FORK_TIME))
+        self.nodes[1].set("consensus.forkMay2019Time={}".format(MAY_2019_FORK_TIME))
+        #self.nodes[1].setmocktime(MAY_2019_FORK_TIME)
+        #self.nodes[1].setmocktime(MAY_2019_FORK_TIME)
 
         # grab inputs from 2 different full nodes and sign a single tx that spends them both
 

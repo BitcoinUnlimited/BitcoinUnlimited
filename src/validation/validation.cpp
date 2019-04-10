@@ -1725,19 +1725,14 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
     // be activate in May 15th, 2019 protocol upgrade.
     if (AreWeOnBCHChain() && IsMay2019Enabled(consensusparams, pindex->pprev))
     {
-        // schnoor
         flags |= SCRIPT_ALLOW_SEGWIT_RECOVERY;
+        flags |= SCRIPT_ENABLE_SCHNORR;
     }
 
     // The SV Nov 15, 2018 HF rules
     if (AreWeOnSVChain() && IsSv2018Activated(consensusparams, chainActive.Tip()))
     {
         flags |= SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES;
-    }
-
-    if (schnorrEnabled)
-    {
-        flags |= SCRIPT_ENABLE_SCHNORR;
     }
 
     return flags;
