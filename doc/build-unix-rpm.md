@@ -60,11 +60,14 @@ compilation will take much longer due to swap thrashing.
 
 Build requirements:
 
+## NOTE: you do not need to get boost from this source, but you do need at least boost 1.55 and CentOS7 by default has boost 1.53. This was the only place I could find a higher version of boost for CentOS7 that avoided compiling from source. If you do not trust it feel free to compile boost from source from the official boost github.
 ```bash
 sudo yum groupinstall development
 sudo yum install https://centos7.iuscommunity.org/ius-release.rpm
 sudo yum install centos-release-scl
-sudo yum install libtool libevent-devel autoconf automake openssl-devel boost-devel python36u libdb4-devel libdb4-cxx-devel
+sudo yum install http://repo.okay.com.mx/centos/7/x86_64/release/okay-release-1-1.noarch.rpm
+sudo yum install boost166-devel
+sudo yum install libtool libevent-devel autoconf automake openssl-devel python36u libdb4-devel libdb4-cxx-devel
 sudo yum install devtoolset-6-gcc*
 sudo scl enable devtoolset-6 bash
 ```
