@@ -177,6 +177,10 @@ public:
     const std::string& get_str() const;
     int get_int() const;
     int64_t get_int64() const;
+    uint64_t get_uint64() const;
+    uint32_t get_uint32() const;
+    uint16_t get_uint16() const;
+    uint8_t get_uint8() const;
     double get_real() const;
     const UniValue& get_obj() const;
     const UniValue& get_array() const;
