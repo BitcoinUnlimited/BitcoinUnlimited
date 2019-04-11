@@ -510,7 +510,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         CBlockIndex *pIndex = nullptr;
         if (!AcceptBlockHeader(thinBlock.header, state, Params(), &pIndex))
         {
-            thindata.ClearThinBlockData(pfrom, pblock);
+            thinrelay.ClearAllBlockData(pfrom, pblock);
             LOGA("Received an invalid %s header from peer %s\n", strCommand, pfrom->GetLogName());
             return false;
         }
