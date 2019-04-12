@@ -599,6 +599,16 @@ UniValue getblockheader(const UniValue &params, bool fHelp)
     return blockheaderToJSON(pblockindex);
 }
 
+// Allows passing int instead of bool
+static bool is_param_trueish(const UniValue &param)
+{
+    if (param.isNum())
+    {
+        return static_cast<bool>(param.get_int());
+    }
+    return param.get_bool();
+}
+
 UniValue getblock(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 3)
@@ -650,9 +660,13 @@ UniValue getblock(const UniValue &params, bool fHelp)
     bool fVerbose = true;
     bool fListTxns = true;
     if (params.size() > 1)
-        fVerbose = params[1].get_bool();
+    {
+        fVerbose = is_param_trueish(params[1]);
+    }
     if (params.size() == 3)
-        fListTxns = params[2].get_bool();
+    {
+        fListTxns = is_param_trueish(params[2]);
+    }
 
     CBlockIndex *pblockindex = LookupBlockIndex(hash);
     if (!pblockindex)
