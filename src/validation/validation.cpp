@@ -972,6 +972,23 @@ bool CheckInputs(const CTransactionRef &tx,
                                 false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)",
                                                                ScriptErrorString(check.GetScriptError())));
                     }
+
+                    // We also, regardless, need to check whether the transaction would
+                    // be valid on the other side of the upgrade, so as to avoid
+                    // splitting the network between upgraded and non-upgraded nodes.
+                    // Note that this will create strange error messages like
+                    // "upgrade-conditional-script-failure (Non-canonical DER ...)"
+                    // -- the tx was refused entry due to STRICTENC, a mandatory flag,
+                    // but after the upgrade the signature would have been interpreted
+                    // as valid Schnorr and thus STRICTENC would not happen.
+                    CScriptCheck check3(nullptr, scriptPubKey, amount, *tx, i, mandatoryFlags ^ SCRIPT_ENABLE_SCHNORR,
+                        maxOps, cacheStore);
+                    if (check3())
+                    {
+                        return state.Invalid(false, REJECT_INVALID, strprintf("upgrade-conditional-script-failure (%s)",
+                                                                        ScriptErrorString(check.GetScriptError())));
+                    }
+
                     // Failures of other flags indicate a transaction that is
                     // invalid in new blocks, e.g. a invalid P2SH. We DoS ban
                     // such nodes as they are not following the protocol. That
@@ -1721,23 +1738,21 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
         flags |= SCRIPT_ENABLE_CHECKDATASIG;
     }
 
-    // TODO: add here the needed flag related to the new features that need to
-    // be activate in May 15th, 2019 protocol upgrade.
+    // if May 15th, 2019 protocol upgrade is activated we start accepting transactions
+    // recovering coins sent to segwit addresses. We also start accepting
+    // 65/64-byte Schnorr signatures in CHECKSIG and CHECKDATASIG respectively,
+    // and their verify variants. We also stop accepting 65 byte signatures in
+    // CHECKMULTISIG and its verify variant.
     if (AreWeOnBCHChain() && IsMay2019Enabled(consensusparams, pindex->pprev))
     {
-        // schnoor
         flags |= SCRIPT_ALLOW_SEGWIT_RECOVERY;
+        flags |= SCRIPT_ENABLE_SCHNORR;
     }
 
     // The SV Nov 15, 2018 HF rules
     if (AreWeOnSVChain() && IsSv2018Activated(consensusparams, chainActive.Tip()))
     {
         flags |= SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES;
-    }
-
-    if (schnorrEnabled)
-    {
-        flags |= SCRIPT_ENABLE_SCHNORR;
     }
 
     return flags;

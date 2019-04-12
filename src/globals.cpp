@@ -297,10 +297,6 @@ CTweakRef<uint64_t> miningSvForkTime("consensus.svForkNov2018Time",
     &nMiningSvForkTime,
     &ForkTimeValidatorSV); // Thu Nov 15 15:40:00 UTC 2018
 
-CTweakRef<bool> consensusSchnorr("consensus.schnorrEnabled",
-    "Schnorr signatures are allowed in the next block",
-    &schnorrEnabled);
-
 CTweak<uint64_t> maxScriptOps("consensus.maxScriptOps",
     "Maximum number of script operations allowed.  Stack pushes are excepted.",
     MAX_OPS_PER_SCRIPT);
