@@ -268,7 +268,7 @@ testScriptsExt = [ RpcTest(t) for t in [
     'invalidateblock',
     Disabled('rpcbind_test', "temporary, bug in libevent, see #6655"),
     'smartfees',
-    'maxblocksinflight',
+    Disabled('maxblocksinflight', "needs a rewrite and is already somewhat tested in sendheaders.py"),
     'p2p-acceptblock',
     'mempool_packages',
     'maxuploadtarget'

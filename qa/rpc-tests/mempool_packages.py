@@ -161,6 +161,8 @@ class MempoolPackagesTest(BitcoinTestFramework):
         self.nodes[1].invalidateblock(self.nodes[1].getbestblockhash())
 
         # Now check that the transaction is in the mempool, with the right modified fee
+        waitFor(30, lambda: self.nodes[1].getmempoolinfo()['size'] == 5)
+        waitFor(30, lambda: self.nodes[0].getmempoolinfo()['size'] == 25)
         mempool = self.nodes[0].getrawmempool(True)
 
         descendant_fees = 0
