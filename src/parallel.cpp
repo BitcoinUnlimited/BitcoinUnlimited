@@ -47,7 +47,10 @@ bool CScriptCheck::operator()()
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
     CachingTransactionSignatureChecker checker(ptxTo, nIn, amount, nFlags, cacheStore);
     if (!VerifyScript(scriptSig, scriptPubKey, nFlags, maxOps, checker, &error, &sighashType))
+    {
+        LOG(PARALLEL, "Signature verification failed: %s\n", ScriptErrorString(GetScriptError()));
         return false;
+    }
     if (resourceTracker)
         resourceTracker->Update(ptxTo->GetHash(), checker.GetNumSigops(), checker.GetBytesHashed());
     return true;
