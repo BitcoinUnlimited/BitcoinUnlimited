@@ -21,9 +21,14 @@ class GrapheneBlockTest(BitcoinTestFramework):
                       'response_time', 
                       'summary', 
                       'validation_time'}
-    def __init__(self):
+    def __init__(self, test_assertion='success'):
         self.rep = False
         BitcoinTestFramework.__init__(self)
+
+        if test_assertion == 'success':
+            self.test_assertion = self.assert_success
+        else:
+            self.test_assertion = self.assert_failure
 
     def setup_chain(self):
         print ("Initializing test directory " + self.options.tmpdir)
@@ -58,6 +63,22 @@ class GrapheneBlockTest(BitcoinTestFramework):
 
         return tbs
 
+    def assert_success(self):
+        # Nodes 0 and 1 should have received one block from node 2.
+        assert '1 inbound and 0 outbound graphene blocks' in self.extract_stats_fields(self.nodes[0])['summary']
+        assert '1 inbound and 0 outbound graphene blocks' in self.extract_stats_fields(self.nodes[1])['summary']
+
+        # Node 2 should have sent a block to the two other nodes
+        assert '0 inbound and 2 outbound graphene blocks' in self.extract_stats_fields(self.nodes[2])['summary']
+
+    def assert_failure(self):
+        try:
+            self.assert_success()
+        except AssertionError:
+            return
+
+        raise AssertionError('graphene block failure was expected but not encountered')
+
     def run_test(self):
         # Generate blocks so we can send a few transactions.  We need some transactions in a block
         # before a graphene block can be sent and created, otherwise we'll just end up sending a regular
@@ -91,13 +112,7 @@ class GrapheneBlockTest(BitcoinTestFramework):
         self.nodes[2].generate(1)
         self.sync_all()
 
-        # Nodes 0 and 1 should have received one block from node 2.
-        assert '1 inbound and 0 outbound graphene blocks' in self.extract_stats_fields(self.nodes[0])['summary']
-        assert '1 inbound and 0 outbound graphene blocks' in self.extract_stats_fields(self.nodes[1])['summary']
-
-        # Node 2 should have sent a block to the two other nodes
-        assert '0 inbound and 2 outbound graphene blocks' in self.extract_stats_fields(self.nodes[2])['summary']
-
+        self.test_assertion()
 
 if __name__ == '__main__':
     GrapheneBlockTest().main()

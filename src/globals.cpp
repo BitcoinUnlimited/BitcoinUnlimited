@@ -358,6 +358,24 @@ CTweak<unsigned int> blockDownloadWindow("net.blockDownloadWindow",
     "How far ahead of our current height do we fetch? 0 means use algorithm.",
     0);
 
+/** This setting specifies the minimum supported Graphene version (inclusive).
+ *  The actual version used will be negotiated between sender and receiver.
+ */
+std::string grMinVerStr =
+    "Minimum Graphene version supported (default: " + std::to_string(GRAPHENE_MIN_VERSION_SUPPORTED) + ")";
+CTweak<uint64_t> grapheneMinVersionSupported("net.grapheneMinVersionSupported",
+    grMinVerStr,
+    GRAPHENE_MIN_VERSION_SUPPORTED);
+
+/** This setting specifies the maximum supported Graphene version (inclusive).
+ *  The actual version used will be negotiated between sender and receiver.
+ */
+std::string grMaxVerStr =
+    "Maximum Graphene version supported (default: " + std::to_string(GRAPHENE_MAX_VERSION_SUPPORTED) + ")";
+CTweak<uint64_t> grapheneMaxVersionSupported("net.grapheneMaxVersionSupported",
+    grMaxVerStr,
+    GRAPHENE_MAX_VERSION_SUPPORTED);
+
 /** This setting dictates the peer's Bloom filter compatibility when sending and
  * receiving Graphene blocks. In this implementation, either regular or fast Bloom
  * filters are supported. However, other (or future) implementations may elect to
