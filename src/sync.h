@@ -348,7 +348,11 @@ class SCOPED_LOCKABLE CMutexReadLock
 {
 private:
     boost::shared_lock<Mutex> lock;
+// Checking elapsed lock time is very inefficient compared to the lock/unlock operation so we must be able to
+// turn the feature on and off at compile time.
+#ifdef DEBUG_LOCKTIME
     uint64_t lockedTime = 0;
+#endif
     const char *name = "unknown-name";
     const char *file = "unknown-file";
     unsigned int line = 0;
