@@ -1,0 +1,145 @@
+diff --git a/src/univalue/include/univalue.h b/src/univalue/include/univalue.h
+index b272544d0..5f5cd2cbe 100644
+--- a/src/univalue/include/univalue.h
++++ b/src/univalue/include/univalue.h
+@@ -177,6 +177,10 @@ public:
+     const std::string& get_str() const;
+     int get_int() const;
+     int64_t get_int64() const;
++    uint64_t get_uint64() const;
++    uint32_t get_uint32() const;
++    uint16_t get_uint16() const;
++    uint8_t get_uint8() const;
+     double get_real() const;
+     const UniValue& get_obj() const;
+     const UniValue& get_array() const;
+diff --git a/src/univalue/lib/univalue_get.cpp b/src/univalue/lib/univalue_get.cpp
+index eabcf2dad..ba9533bc8 100644
+--- a/src/univalue/lib/univalue_get.cpp
++++ b/src/univalue/lib/univalue_get.cpp
+@@ -58,6 +58,22 @@ bool ParseInt64(const std::string& str, int64_t *out)
+         n <= std::numeric_limits<int64_t>::max();
+ }
+ 
++
++bool ParseUint64(const std::string& str, uint64_t *out)
++{
++    if (!ParsePrechecks(str))
++        return false;
++    char *endp = NULL;
++    errno = 0; // strtoll will not set errno if valid
++    unsigned long long int n = strtoull(str.c_str(), &endp, 10);
++    if(out) *out = (uint64_t)n;
++    // Note that strtoll returns a *long long int*, so even if strtol doesn't report a over/underflow
++    // we still have to check that the returned value is within the range of an *int64_t*.
++    return endp && *endp == 0 && !errno &&
++        n >= std::numeric_limits<uint64_t>::min() &&
++        n <= std::numeric_limits<uint64_t>::max();
++}
++
+ bool ParseDouble(const std::string& str, double *out)
+ {
+     if (!ParsePrechecks(str))
+@@ -121,6 +137,55 @@ int64_t UniValue::get_int64() const
+     return retval;
+ }
+ 
++uint64_t UniValue::get_uint64() const
++{
++    if (typ != VNUM)
++        throw std::runtime_error("JSON value is not an integer as expected");
++    uint64_t retval;
++    if (!ParseUint64(getValStr(), &retval))
++        throw std::runtime_error("JSON integer out of range");
++    return retval;
++}
++
++uint32_t UniValue::get_uint32() const
++{
++    if (typ != VNUM)
++        throw std::runtime_error("JSON value is not an integer as expected");
++    uint64_t parseval;
++    if (!ParseUint64(getValStr(), &parseval))
++        throw std::runtime_error("JSON integer out of range");
++    if (parseval >= std::numeric_limits<uint32_t>::max())
++        throw std::runtime_error("JSON integer out of range");
++    uint32_t retval = (uint32_t)parseval;
++    return retval;
++}
++
++uint16_t UniValue::get_uint16() const
++{
++    if (typ != VNUM)
++        throw std::runtime_error("JSON value is not an integer as expected");
++    uint64_t parseval;
++    if (!ParseUint64(getValStr(), &parseval))
++        throw std::runtime_error("JSON integer out of range");
++    if (parseval >= std::numeric_limits<uint16_t>::max())
++        throw std::runtime_error("JSON integer out of range");
++    uint16_t retval = (uint16_t)parseval;
++    return retval;
++}
++
++uint8_t UniValue::get_uint8() const
++{
++    if (typ != VNUM)
++        throw std::runtime_error("JSON value is not an integer as expected");
++    uint64_t parseval;
++    if (!ParseUint64(getValStr(), &parseval))
++        throw std::runtime_error("JSON integer out of range");
++    if (parseval >= std::numeric_limits<uint8_t>::max())
++        throw std::runtime_error("JSON integer out of range");
++    uint8_t retval = (uint8_t)parseval;
++    return retval;
++}
++
+ double UniValue::get_real() const
+ {
+     if (typ != VNUM)
+@@ -144,4 +209,3 @@ const UniValue& UniValue::get_array() const
+         throw std::runtime_error("JSON value is not an array as expected");
+     return *this;
+ }
+-
+diff --git a/src/univalue/test/object.cpp b/src/univalue/test/object.cpp
+index 70ccc0d08..afd95cf28 100644
+--- a/src/univalue/test/object.cpp
++++ b/src/univalue/test/object.cpp
+@@ -103,16 +103,30 @@ BOOST_AUTO_TEST_CASE(univalue_typecheck)
+ 
+     UniValue v4;
+     BOOST_CHECK(v4.setNumStr("2147483648"));
+-    BOOST_CHECK_EQUAL(v4.get_int64(), 2147483648);
++    BOOST_CHECK_EQUAL(v4.get_int64(), (int64_t)2147483648);
++    BOOST_CHECK_EQUAL(v4.get_uint64(), (uint64_t)2147483648);
+     BOOST_CHECK_THROW(v4.get_int(), std::runtime_error);
++    BOOST_CHECK_EQUAL(v4.get_uint32(), (uint32_t)2147483648);
++    BOOST_CHECK_THROW(v4.get_uint16(), std::runtime_error);
++    BOOST_CHECK_THROW(v4.get_uint8(), std::runtime_error);
+     BOOST_CHECK(v4.setNumStr("1000"));
+-    BOOST_CHECK_EQUAL(v4.get_int(), 1000);
++    BOOST_CHECK_EQUAL(v4.get_int(), (int32_t)1000);
++    BOOST_CHECK_EQUAL(v4.get_uint32(), (uint32_t)1000);
++    BOOST_CHECK_EQUAL(v4.get_uint16(), (uint16_t)1000);
++    BOOST_CHECK_THROW(v4.get_uint8(), std::runtime_error);
+     BOOST_CHECK_THROW(v4.get_str(), std::runtime_error);
+     BOOST_CHECK_EQUAL(v4.get_real(), 1000);
+     BOOST_CHECK_THROW(v4.get_array(), std::runtime_error);
+     BOOST_CHECK_THROW(v4.getKeys(), std::runtime_error);
+     BOOST_CHECK_THROW(v4.getValues(), std::runtime_error);
+     BOOST_CHECK_THROW(v4.get_obj(), std::runtime_error);
++    BOOST_CHECK(v4.setNumStr("100"));
++    BOOST_CHECK_EQUAL(v4.get_int64(), (int64_t)100);
++    BOOST_CHECK_EQUAL(v4.get_uint64(), (uint64_t)100);
++    BOOST_CHECK_EQUAL(v4.get_int(), (int32_t)100);
++    BOOST_CHECK_EQUAL(v4.get_uint32(), (uint32_t)100);
++    BOOST_CHECK_EQUAL(v4.get_uint16(), (uint16_t)100);
++    BOOST_CHECK_EQUAL(v4.get_uint8(), (uint8_t)100);
+ 
+     UniValue v5;
+     BOOST_CHECK(v5.read("[true, 10]"));
+@@ -405,4 +419,3 @@ int main (int argc, char *argv[])
+     univalue_readwrite();
+     return 0;
+ }
+-
