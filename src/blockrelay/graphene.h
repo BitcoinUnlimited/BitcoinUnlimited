@@ -29,6 +29,7 @@ enum FastFilterSupport
 };
 
 const uint8_t GRAPHENE_FAST_FILTER_SUPPORT = EITHER;
+const uint64_t GRAPHENE_MIN_VERSION_SUPPORTED = 0;
 const uint64_t GRAPHENE_MAX_VERSION_SUPPORTED = 4;
 const unsigned char MIN_MEMPOOL_INFO_BYTES = 8;
 const uint8_t SHORTTXIDS_LENGTH = 8;
@@ -357,5 +358,6 @@ uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256 &t
 // This method decides on the value of computeOptimized depending on what modes are supported
 // by both the sender and receiver
 bool NegotiateFastFilterSupport(CNode *pfrom);
+uint64_t NegotiateGrapheneVersion(CNode *pfrom);
 
 #endif // BITCOIN_GRAPHENE_H

@@ -26,6 +26,8 @@
 
 #include <iomanip>
 static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount);
+extern CTweak<uint64_t> grapheneMinVersionSupported;
+extern CTweak<uint64_t> grapheneMaxVersionSupported;
 extern CTweak<uint64_t> grapheneFastFilterCompatibility;
 
 CMemPoolInfo::CMemPoolInfo(uint64_t _nTx) : nTx(_nTx) {}
@@ -155,7 +157,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // If canonical ordering is activated, locate empty indexes in pfrom->grapheneBlockHashes to be used in sorting
     std::vector<size_t> missingTxIdxs;
-    if (enableCanonicalTxOrder.Value() && pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED) >= 1)
+    if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
     {
         uint256 nullhash;
         for (size_t idx = 0; idx < pfrom->grapheneBlockHashes.size(); idx++)
@@ -169,21 +171,21 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     for (const CTransaction &tx : grapheneBlockTx.vMissingTx)
     {
         pfrom->mapMissingTx[GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, tx.GetHash(),
-            pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED))] = MakeTransactionRef(tx);
+            NegotiateGrapheneVersion(pfrom))] = MakeTransactionRef(tx);
 
         uint256 hash = tx.GetHash();
-        uint64_t cheapHash = GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash,
-            pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
+        uint64_t cheapHash =
+            GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash, NegotiateGrapheneVersion(pfrom));
 
         // Insert in arbitrary order if canonical ordering is enabled and xversion is recent enough
-        if (enableCanonicalTxOrder.Value() && pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED) >= 1)
+        if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
             pfrom->grapheneBlockHashes[missingTxIdxs[idx++]] = hash;
         // Otherwise, use ordering information
         else
             pfrom->grapheneBlockHashes[pfrom->grapheneMapHashOrderIndex[cheapHash]] = hash;
     }
     // Sort order transactions if canonical ordering is enabled and xversion is recent enough
-    if (enableCanonicalTxOrder.Value() && pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED) >= 1)
+    if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
     {
         // coinbase is always first
         std::sort(pfrom->grapheneBlockHashes.begin() + 1, pfrom->grapheneBlockHashes.end());
@@ -300,8 +302,8 @@ bool CRequestGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         {
             for (auto &tx : block.vtx)
             {
-                uint64_t cheapHash = GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, tx->GetHash(),
-                    pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
+                uint64_t cheapHash = GetShortID(
+                    pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, tx->GetHash(), NegotiateGrapheneVersion(pfrom));
 
                 if (grapheneRequestBlockTx.setCheapHashesToRequest.count(cheapHash))
                     vTx.push_back(*tx);
@@ -338,10 +340,11 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
     int nSizeGrapheneBlock = vRecv.size();
     CInv inv(MSG_BLOCK, uint256());
 
-    CGrapheneBlock grapheneBlock(
-        (int)std::min(GRAPHENE_MAX_VERSION_SUPPORTED, pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED)),
-        NegotiateFastFilterSupport(pfrom));
+    CGrapheneBlock grapheneBlock(NegotiateGrapheneVersion(pfrom), NegotiateFastFilterSupport(pfrom));
     vRecv >> grapheneBlock;
+
+    LOG(GRAPHENE, "Block %s from peer %s using Graphene version %d\n", grapheneBlock.header.GetHash().ToString(),
+        pfrom->GetLogName(), grapheneBlock.version);
 
     // Message consistency checking (FIXME: some redundancy here with AcceptBlockHeader)
     if (!IsGrapheneBlockValid(pfrom, grapheneBlock.header))
@@ -561,8 +564,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
 
                     // If canonical order is not enabled or xversion is less than 1, update mapHashOrderIndex so
                     // it is available if we later receive missing txs
-                    if (!enableCanonicalTxOrder.Value() ||
-                        pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED) < 1)
+                    if (!enableCanonicalTxOrder.Value() || NegotiateGrapheneVersion(pfrom) < 1)
                         pfrom->grapheneMapHashOrderIndex[cheapHash] = i;
 
                     const auto &elem = mapPartialTxHash.find(cheapHash);
@@ -580,7 +582,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
                 }
 
                 // Sort order transactions if canonical order is enabled and graphene version is late enough
-                if (enableCanonicalTxOrder.Value() && pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED) >= 1)
+                if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
                 {
                     // coinbase is always first
                     std::sort(pfrom->grapheneBlockHashes.begin() + 1, pfrom->grapheneBlockHashes.end());
@@ -753,7 +755,7 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
             }
 
             bool inMissingTx = pfrom->mapMissingTx.count(GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash,
-                                   pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED))) > 0;
+                                   NegotiateGrapheneVersion(pfrom))) > 0;
             bool inAdditionalTxs = mapAdditionalTxs.count(hash) > 0;
             bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
 
@@ -772,8 +774,8 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
             }
             else if (inMissingTx)
             {
-                ptx = pfrom->mapMissingTx[GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash,
-                    pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED))];
+                ptx = pfrom->mapMissingTx[GetShortID(
+                    pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash, NegotiateGrapheneVersion(pfrom))];
                 pfrom->grapheneBlock.setUnVerifiedTxns.insert(hash);
             }
         }
@@ -1353,10 +1355,12 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
             uint64_t nSenderMempoolPlusBlock =
                 GetGrapheneMempoolInfo().nTx + pblock->vtx.size() - 1; // exclude coinbase
 
-            uint64_t compatibleBlockVersion = (int)std::min(
-                GRAPHENE_MAX_VERSION_SUPPORTED, pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_VERSION_SUPPORTED));
             CGrapheneBlock grapheneBlock(MakeBlockRef(*pblock), mempoolinfo.nTx, nSenderMempoolPlusBlock,
-                compatibleBlockVersion, NegotiateFastFilterSupport(pfrom));
+                NegotiateGrapheneVersion(pfrom), NegotiateFastFilterSupport(pfrom));
+
+            LOG(GRAPHENE, "Block %s to peer %s using Graphene version %d\n", grapheneBlock.header.GetHash().ToString(),
+                pfrom->GetLogName(), grapheneBlock.version);
+
             pfrom->gr_shorttxidk0 = grapheneBlock.shorttxidk0;
             pfrom->gr_shorttxidk1 = grapheneBlock.shorttxidk1;
             int nSizeBlock = pblock->GetBlockSize();
@@ -1556,4 +1560,20 @@ bool NegotiateFastFilterSupport(CNode *pfrom)
         else
             return false;
     }
+}
+
+uint64_t NegotiateGrapheneVersion(CNode *pfrom)
+{
+    uint64_t peerMin = pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED);
+    uint64_t selfMin = grapheneMinVersionSupported.Value();
+    uint64_t peerMax = pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED);
+    uint64_t selfMax = grapheneMaxVersionSupported.Value();
+
+    uint64_t upper = (uint64_t)std::min(peerMax, selfMax);
+    uint64_t lower = (uint64_t)std::max(peerMin, selfMin);
+
+    if (lower > upper)
+        throw std::runtime_error("Sender and receiver support incompatible Graphene versions");
+
+    return upper;
 }
