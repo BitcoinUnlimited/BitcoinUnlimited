@@ -103,16 +103,30 @@ BOOST_AUTO_TEST_CASE(univalue_typecheck)
 
     UniValue v4;
     BOOST_CHECK(v4.setNumStr("2147483648"));
-    BOOST_CHECK_EQUAL(v4.get_int64(), 2147483648);
+    BOOST_CHECK_EQUAL(v4.get_int64(), (int64_t)2147483648);
+    BOOST_CHECK_EQUAL(v4.get_uint64(), (uint64_t)2147483648);
     BOOST_CHECK_THROW(v4.get_int(), std::runtime_error);
+    BOOST_CHECK_EQUAL(v4.get_uint32(), (uint32_t)2147483648);
+    BOOST_CHECK_THROW(v4.get_uint16(), std::runtime_error);
+    BOOST_CHECK_THROW(v4.get_uint8(), std::runtime_error);
     BOOST_CHECK(v4.setNumStr("1000"));
-    BOOST_CHECK_EQUAL(v4.get_int(), 1000);
+    BOOST_CHECK_EQUAL(v4.get_int(), (int32_t)1000);
+    BOOST_CHECK_EQUAL(v4.get_uint32(), (uint32_t)1000);
+    BOOST_CHECK_EQUAL(v4.get_uint16(), (uint16_t)1000);
+    BOOST_CHECK_THROW(v4.get_uint8(), std::runtime_error);
     BOOST_CHECK_THROW(v4.get_str(), std::runtime_error);
     BOOST_CHECK_EQUAL(v4.get_real(), 1000);
     BOOST_CHECK_THROW(v4.get_array(), std::runtime_error);
     BOOST_CHECK_THROW(v4.getKeys(), std::runtime_error);
     BOOST_CHECK_THROW(v4.getValues(), std::runtime_error);
     BOOST_CHECK_THROW(v4.get_obj(), std::runtime_error);
+    BOOST_CHECK(v4.setNumStr("100"));
+    BOOST_CHECK_EQUAL(v4.get_int64(), (int64_t)100);
+    BOOST_CHECK_EQUAL(v4.get_uint64(), (uint64_t)100);
+    BOOST_CHECK_EQUAL(v4.get_int(), (int32_t)100);
+    BOOST_CHECK_EQUAL(v4.get_uint32(), (uint32_t)100);
+    BOOST_CHECK_EQUAL(v4.get_uint16(), (uint16_t)100);
+    BOOST_CHECK_EQUAL(v4.get_uint8(), (uint8_t)100);
 
     UniValue v5;
     BOOST_CHECK(v5.read("[true, 10]"));
@@ -405,4 +419,3 @@ int main (int argc, char *argv[])
     univalue_readwrite();
     return 0;
 }
-

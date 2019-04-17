@@ -58,6 +58,22 @@ bool ParseInt64(const std::string& str, int64_t *out)
         n <= std::numeric_limits<int64_t>::max();
 }
 
+
+bool ParseUint64(const std::string& str, uint64_t *out)
+{
+    if (!ParsePrechecks(str))
+        return false;
+    char *endp = NULL;
+    errno = 0; // strtoll will not set errno if valid
+    unsigned long long int n = strtoull(str.c_str(), &endp, 10);
+    if(out) *out = (uint64_t)n;
+    // Note that strtoll returns a *long long int*, so even if strtol doesn't report a over/underflow
+    // we still have to check that the returned value is within the range of an *int64_t*.
+    return endp && *endp == 0 && !errno &&
+        n >= std::numeric_limits<uint64_t>::min() &&
+        n <= std::numeric_limits<uint64_t>::max();
+}
+
 bool ParseDouble(const std::string& str, double *out)
 {
     if (!ParsePrechecks(str))
@@ -121,6 +137,55 @@ int64_t UniValue::get_int64() const
     return retval;
 }
 
+uint64_t UniValue::get_uint64() const
+{
+    if (typ != VNUM)
+        throw std::runtime_error("JSON value is not an integer as expected");
+    uint64_t retval;
+    if (!ParseUint64(getValStr(), &retval))
+        throw std::runtime_error("JSON integer out of range");
+    return retval;
+}
+
+uint32_t UniValue::get_uint32() const
+{
+    if (typ != VNUM)
+        throw std::runtime_error("JSON value is not an integer as expected");
+    uint64_t parseval;
+    if (!ParseUint64(getValStr(), &parseval))
+        throw std::runtime_error("JSON integer out of range");
+    if (parseval >= std::numeric_limits<uint32_t>::max())
+        throw std::runtime_error("JSON integer out of range");
+    uint32_t retval = (uint32_t)parseval;
+    return retval;
+}
+
+uint16_t UniValue::get_uint16() const
+{
+    if (typ != VNUM)
+        throw std::runtime_error("JSON value is not an integer as expected");
+    uint64_t parseval;
+    if (!ParseUint64(getValStr(), &parseval))
+        throw std::runtime_error("JSON integer out of range");
+    if (parseval >= std::numeric_limits<uint16_t>::max())
+        throw std::runtime_error("JSON integer out of range");
+    uint16_t retval = (uint16_t)parseval;
+    return retval;
+}
+
+uint8_t UniValue::get_uint8() const
+{
+    if (typ != VNUM)
+        throw std::runtime_error("JSON value is not an integer as expected");
+    uint64_t parseval;
+    if (!ParseUint64(getValStr(), &parseval))
+        throw std::runtime_error("JSON integer out of range");
+    if (parseval >= std::numeric_limits<uint8_t>::max())
+        throw std::runtime_error("JSON integer out of range");
+    uint8_t retval = (uint8_t)parseval;
+    return retval;
+}
+
 double UniValue::get_real() const
 {
     if (typ != VNUM)
@@ -144,4 +209,3 @@ const UniValue& UniValue::get_array() const
         throw std::runtime_error("JSON value is not an array as expected");
     return *this;
 }
-
