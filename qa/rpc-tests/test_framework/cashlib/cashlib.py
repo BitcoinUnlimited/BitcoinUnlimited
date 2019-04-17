@@ -75,6 +75,14 @@ def bin2hex(data):
         return result.value.decode("utf-8")
     raise Error("cashlib bin2hex error")
 
+def signData(data, key):
+    if type(data) == str:
+        data = unhexlify(data)
+    elif type(data) != bytes:
+        data = data.serialize()
+    result = create_string_buffer(100)
+    siglen = cashlib.SignData(data,len(data),key, result, 100)
+    return result.raw[0:siglen]
 
 def signTxInput(tx, inputIdx, inputAmount, prevoutScript, key, sigHashType=SIGHASH_FORKID | SIGHASH_ALL):
     """Signs one input of a transaction.  Signature is returned.  You must use this signature to construct the spend script

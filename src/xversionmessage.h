@@ -8,6 +8,7 @@
 
 #include "protocol.h"
 #include "serialize.h"
+#include "sync.h"
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 #include <string>
@@ -88,7 +89,9 @@ public:
 */
 class CXVersionMessage
 {
+protected:
     // cached values for conversion to uint64 (u64c)
+    mutable CCriticalSection cacheProtector;
     mutable std::unordered_map<uint64_t, uint64_t> cache_u64c;
 
 public:

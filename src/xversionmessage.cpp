@@ -28,6 +28,7 @@ uint64_t CXVersionMessage::as_u64c(const uint64_t k) const
 {
     if (xmap.count(k) == 0)
         return 0;
+    LOCK(cacheProtector);
     if (cache_u64c.count(k) == 0)
     {
         const std::vector<uint8_t> &vec = xmap.at(k);
@@ -55,5 +56,6 @@ void CXVersionMessage::set_u64c(const uint64_t key, const uint64_t val)
     std::vector<uint8_t> vec;
     vec.insert(vec.begin(), s.begin(), s.end());
     xmap[key] = vec;
+    LOCK(cacheProtector);
     cache_u64c[key] = val;
 }

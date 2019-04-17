@@ -107,11 +107,40 @@ SLAPI int GetPubKey(unsigned char *keyData, unsigned char *result, unsigned int 
     return size;
 }
 
+/** Sign data (compatible with OP_CHECKDATASIG) */
+SLAPI int SignData(unsigned char *data,
+    int datalen,
+    unsigned char *keyData,
+    unsigned char *result,
+    unsigned int resultLen)
+{
+    if (!sigInited)
+    {
+        sigInited = true;
+        ECC_Start();
+        verifyContext = new ECCVerifyHandle();
+    }
+
+    CKey key = LoadKey(keyData);
+    uint256 hash;
+    CSHA256().Write(data, datalen).Finalize(hash.begin());
+    std::vector<uint8_t> sig;
+    if (!key.SignECDSA(hash, sig))
+    {
+        return 0;
+    }
+    unsigned int sigSize = sig.size();
+    if (sigSize > resultLen)
+        return 0;
+    std::copy(sig.begin(), sig.end(), result);
+    return sigSize;
+}
 
 /** Sign one input of a transaction
     All buffer arguments should be in binary-serialized data.
     The transaction (txData) must contain the COutPoint (tx hash and vout) of all relevant inputs,
     however, it is not necessary to provide the spend script.
+    Returns length of returned signature.
 */
 SLAPI int SignTx(unsigned char *txData,
     int txbuflen,
