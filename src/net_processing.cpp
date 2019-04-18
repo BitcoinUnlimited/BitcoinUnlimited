@@ -713,7 +713,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     {
         if (pfrom->ThinBlockCapable())
         {
-            vRecv >> pfrom->nXthinBloomfilterSize;
+            uint32_t nSize = 0;
+            vRecv >> nSize;
+            pfrom->nXthinBloomfilterSize.store(nSize);
 
             // As a safeguard don't allow a smaller max bloom filter size than the default max size.
             if (!pfrom->nXthinBloomfilterSize || (pfrom->nXthinBloomfilterSize < SMALLEST_MAX_BLOOM_FILTER_SIZE))

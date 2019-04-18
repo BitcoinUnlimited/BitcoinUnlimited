@@ -1798,8 +1798,8 @@ void ThreadOpenConnections()
         }
     }
 
-    // NOTE: If we are in the block above, then no seeding should occur as "-connect" and "-connect-thinblock"
-    // are intended as "only make outbound connections to the configured nodes".
+    // NOTE: If we are in the block above, then no seeding should occur as "-connect""
+    // is intended as "only make outbound connections to the configured nodes".
 
     // Initiate network connections
     int64_t nStart = GetTime();
@@ -2941,9 +2941,6 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nMinPingUsecTime = std::numeric_limits<int64_t>::max();
 
     // xthinblocks
-    nLocalThinBlockBytes = 0;
-    nSizeThinBlock = 0;
-    thinBlockWaitingForTxns = -1;
     nXthinBloomfilterSize = 0;
     addrFromPort = 0;
 
@@ -3025,8 +3022,6 @@ CNode::~CNode()
         }
     }
 
-    thinBlockWaitingForTxns = -1;
-    thinBlock.SetNull();
     grapheneBlockWaitingForTxns = -1;
     grapheneBlock.SetNull();
 

@@ -46,42 +46,42 @@ BOOST_AUTO_TEST_CASE(test_thinblock_byte_tracking)
     CAddress addr1(ipaddress(0xa0b0c001, 10000));
     CNode dummyNode1(INVALID_SOCKET, addr1, "", true);
 
+    CXThinBlock xthin;
+    std::shared_ptr<CBlockThinRelay> pblock = std::make_shared<CBlockThinRelay>(CBlockThinRelay());
+    pblock->xthinblock = std::make_shared<CXThinBlock>(xthin);
+
     thindata.ResetThinBlockBytes();
     BOOST_CHECK(0 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(0 == dummyNode1.nLocalThinBlockBytes);
+    BOOST_CHECK(0 == pblock->nCurrentBlockSize);
 
-    thindata.AddThinBlockBytes(0, &dummyNode1);
+    thindata.AddThinBlockBytes(0, pblock);
     BOOST_CHECK(0 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(0 == dummyNode1.nLocalThinBlockBytes);
+    BOOST_CHECK(0 == pblock->nCurrentBlockSize);
 
-    thindata.AddThinBlockBytes(1000, &dummyNode1);
+    thindata.AddThinBlockBytes(1000, pblock);
     BOOST_CHECK(1000 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(1000 == dummyNode1.nLocalThinBlockBytes);
+    BOOST_CHECK(1000 == pblock->nCurrentBlockSize);
 
-    thindata.AddThinBlockBytes(449932, &dummyNode1);
+    thindata.AddThinBlockBytes(449932, pblock);
     BOOST_CHECK(450932 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(450932 == dummyNode1.nLocalThinBlockBytes);
+    BOOST_CHECK(450932 == pblock->nCurrentBlockSize);
 
-    thindata.DeleteThinBlockBytes(0, &dummyNode1);
+    thindata.DeleteThinBlockBytes(0);
     BOOST_CHECK(450932 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(450932 == dummyNode1.nLocalThinBlockBytes);
+    BOOST_CHECK(450932 == pblock->nCurrentBlockSize);
 
-    thindata.DeleteThinBlockBytes(1, &dummyNode1);
+    thindata.DeleteThinBlockBytes(1);
     BOOST_CHECK(450931 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(450931 == dummyNode1.nLocalThinBlockBytes);
 
-    thindata.DeleteThinBlockBytes(13939, &dummyNode1);
+    thindata.DeleteThinBlockBytes(13939);
     BOOST_CHECK(436992 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(436992 == dummyNode1.nLocalThinBlockBytes);
 
     // Try to delete more bytes than we already have tracked.  This should not be possible...we don't allow this
     // to happen in the event that we get an incorrect or invalid value returned for the dynamic memory usage of
     // a transaction.  This could then be used in a theoretical attack by resetting total byte usage to zero while
     // continuing to build more thinblocks.
-    thindata.DeleteThinBlockBytes(436993, &dummyNode1);
+    thindata.DeleteThinBlockBytes(436993);
     BOOST_CHECK_MESSAGE(436992 == thindata.GetThinBlockBytes(), "nThinBlockBytes is " << thindata.GetThinBlockBytes());
-    BOOST_CHECK_MESSAGE(
-        436992 == dummyNode1.nLocalThinBlockBytes, "nLocalThinBlockBytes is " << dummyNode1.nLocalThinBlockBytes);
 
 
     /**
@@ -90,25 +90,20 @@ BOOST_AUTO_TEST_CASE(test_thinblock_byte_tracking)
 
     CAddress addr2(ipaddress(0xa0b0c002, 10000));
     CNode dummyNode2(INVALID_SOCKET, addr2, "", true);
+    pblock->SetNull();
 
-    thindata.AddThinBlockBytes(1000, &dummyNode2);
+    thindata.AddThinBlockBytes(1000, pblock);
     BOOST_CHECK(437992 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(436992 == dummyNode1.nLocalThinBlockBytes);
-    BOOST_CHECK(1000 == dummyNode2.nLocalThinBlockBytes);
+    BOOST_CHECK(1000 == pblock->nCurrentBlockSize);
 
-    thindata.DeleteThinBlockBytes(0, &dummyNode2);
+    thindata.DeleteThinBlockBytes(0);
     BOOST_CHECK(437992 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(1000 == dummyNode2.nLocalThinBlockBytes);
 
-    thindata.DeleteThinBlockBytes(1, &dummyNode2);
+    thindata.DeleteThinBlockBytes(1);
     BOOST_CHECK(437991 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(436992 == dummyNode1.nLocalThinBlockBytes);
-    BOOST_CHECK(999 == dummyNode2.nLocalThinBlockBytes);
 
-    thindata.DeleteThinBlockBytes(999, &dummyNode2);
+    thindata.DeleteThinBlockBytes(999);
     BOOST_CHECK(436992 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(436992 == dummyNode1.nLocalThinBlockBytes);
-    BOOST_CHECK(0 == dummyNode2.nLocalThinBlockBytes);
 
     // now finally reset everything
     thindata.ResetThinBlockBytes();

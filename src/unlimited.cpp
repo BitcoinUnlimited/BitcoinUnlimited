@@ -2256,8 +2256,6 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         uint64_t thinBlockSize = ::GetSerializeSize(inode.thinBlock, SER_NETWORK, PROTOCOL_VERSION);
         totalThinBlockSize += thinBlockSize;
         node.pushKV("thinblock.size", thinBlockSize);
-        node.pushKV("thinBlockHashes", (int64_t)inode.thinBlockHashes.size());
-        node.pushKV("xThinBlockHashes", (int64_t)inode.xThinBlockHashes.size());
         node.pushKV("vAddrToSend", (int64_t)inode.vAddrToSend.size());
         node.pushKV("vInventoryToSend", (int64_t)inode.vInventoryToSend.size());
         ret.pushKV(inode.addrName, node);
