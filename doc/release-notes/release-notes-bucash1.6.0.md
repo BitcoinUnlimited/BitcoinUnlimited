@@ -18,8 +18,7 @@ with the Bitcoin Cash specifications you could find here:
 - https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2018-nov-upgrade.md (Nov 15th '18 Protocol Upgrade, bucash 1.5.0.0, 1.5.0.1, 1.5.0.2, 1.5.1.0)
 - https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-upgrade.md (May 15th '19 Protocol Upgrade, bucash 1.6.0.0)
 
-This release is compatible with both [Bitcoin Cash](https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-upgrade.md) and [SV](https://github.com/bitcoin-sv/bitcoin-sv/blob/master/doc/release-notes.md) changes to the consensus rules.
-SV features set is **disabled by default**, the default policy is to activate the set of changes as defined by the bitcoincash.org.
+This release is compatible with [Bitcoin Cash upcoming May 15th, 2019 protocol upgrade](https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-upgrade.md) and [SV](https://github.com/bitcoin-sv/bitcoin-sv/blob/master/doc/release-notes.md) changes to the consensus rules. SV features set is **disabled by default**, the default policy is to activate the set of changes as defined by the bitcoincash.org.
 
 Upgrading
 ---------
@@ -39,6 +38,10 @@ chain after the upgrade. For more detail please look at `reconsidermostworkchain
 
 Main Changes in 1.6.0
 ---------------------
+
+This release will be compatible with the upcoming May, 15th 2019 BCH  protocol upgrade. It [improves](https://github.com/bissias/graphene-experiments/blob/master/jupyter/graphene_v2_interim_report.ipynb)
+Graphene block propagation technique greatly and also implelemt Compact Blocks ( [BIP 152](https://github.com/bitcoin/bips/blob/master/bip-0152.mediawiki) ). This is list of the main changes that have
+been merged in this release:
 
 - Segwit P2SH recovery (May 15th upgrade, https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-segwit-recovery.md)
 - Schnorr signatures (May 15th upgrade, https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-segwit-recovery.md)
@@ -60,8 +63,9 @@ Main Changes in 1.6.0
 - Implement Xversion changeable key
 - Documentation improvements
 
+
 Commit details
--------
+--------------
 
 - `687beecb4` add missing diff for 1589 (Greg-Griffith)
 - `94cf06043` [rpc] Allow passing int for verbose in getblock (Dagur Valberg Johannsson)
