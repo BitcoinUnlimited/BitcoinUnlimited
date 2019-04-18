@@ -52,14 +52,14 @@ been merged in this release:
 - Graphene: use cheap hashes to avoid short id tx collision
 - Graphene: reduce decode failure to 0.5% via IBLT padding
 - Graphene: O(1) heuristic to determine IBLT / BF size for block over 600 txns
-- RPC enhancements
+- RPC enhancements and new commands (getrawblocktransactions, getrawtransactionssince and gettxoutproofs)
 - QA reliability improvemennts
 - Easier gitian build process (docker based)
 - Code restructure around the 3 block propagation techs we currently support (Graphene, CB, Xthin)
 - Move to C++14 and bump lib boost minimum ver to match
 - Update Windows build scripts
 - Simplify and update Xpedited code
-- Refactor Script interpreter as a "virtual machine" encapsulated by a class
+- Refactor Script interpreter as a "virtual machine" encapsulated by a class. This allows the script interpreter to be used outside of bitcoind (for example, its ability to "step" allows use in a script debugger).
 - Implement Xversion changeable key
 - Documentation improvements
 
