@@ -40,23 +40,25 @@ chain after the upgrade. For more detail please look at `reconsidermostworkchain
 Main Changes in 1.6.0
 ---------------------
 
-- Add SCRIPT_ALLOW_SEGWIT_RECOVERY (May 15th upgrade)
-- Schnorr signature scheme (May 15th upgrade)
-- RPC enhancements
-- QA reliability improvemennts
-- Documentation improvements
-- Graphene now use CTOR
-- Graphene could use Fast Filter instead of Bloom Filter
+- Segwit P2SH recovery (May 15th upgrade, https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-segwit-recovery.md)
+- Schnorr signatures (May 15th upgrade, https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-segwit-recovery.md)
+- Compact Block implementations (BIP 152)
+- Graphene: do not send txns oders by leveraging CTOR
+- Graphene: Fast Filter instead of Bloom Filter (optional)
 - Graphene: seeding of IBLT hash function
 - Graphene: use cheap hashes to avoid short id tx collision
-- Compact Block implementations (BIP 152)
+- Graphene: reduce decode failure to 0.5% via IBLT padding
+- Graphene: O(1) heuristic to determine IBLT / BF size for block over 600 txns
+- RPC enhancements
+- QA reliability improvemennts
 - Easier gitian build process (docker based)
 - Code restructure around the 3 block propagation techs we currently support (Graphene, CB, Xthin)
-- Move to C++14 and bump lib boost min ver to match
+- Move to C++14 and bump lib boost minimum ver to match
 - Update Windows build scripts
-- Simplify and update expedited code
+- Simplify and update Xpedited code
 - Refactor Script interpreter as a "virtual machine" encapsulated by a class
-- implement xversion changeable key
+- Implement Xversion changeable key
+- Documentation improvements
 
 Commit details
 -------
@@ -343,6 +345,7 @@ Commit details
 - `9cfb5eb30` Add unit tests for the CuckooCache (Jeremy Rubin)
 - `efa32773c` add cuckoocache.h to .formatted-files (Peter Tschipper)
 - `f0a9be828` Add CuckooCache implementation and replace the sigcache map_type with it (Jeremy Rubin)
+
 Credits
 =======
 
