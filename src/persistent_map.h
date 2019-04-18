@@ -62,7 +62,7 @@ public:
         bool operator!=(const const_iterator& other) const {
             return !(*this == other);
         }
-        const_iterator operator++() { // prefix operator!
+        const_iterator& operator++() { // prefix operator!
             if (todo.empty())
                 throw std::out_of_range("Iteration past end (persistent_map::const_iterator).");
             const persistent_map* node = todo.top();
@@ -79,31 +79,43 @@ public:
     };
 
     //! Empty map
-persistent_map() : _size(0), key(nullptr), value(nullptr), left(nullptr), right(nullptr) {}
+    persistent_map() : _size(0), key(nullptr), value(nullptr), left(nullptr), right(nullptr) {}
 
     //! Map with one new entry
-persistent_map(const key_t& k, const val_t& v) :
-    _size(1),
-        key(new key_t(k)),
-        value(new val_t(v)),
+    persistent_map(std::shared_ptr<key_t> k, std::shared_ptr<val_t> v) :
+        _size(1),
+        key(k),
+        value(v),
         left(nullptr),
         right(nullptr) {}
 
+    persistent_map(const key_t& k, const val_t& v) : persistent_map(
+        std::shared_ptr<key_t>(new key_t(k)),
+        std::shared_ptr<val_t>(new val_t(v))) {}
 
     //! Insert item into map, returning new map.
     persistent_map<key_t, val_t> insert(const key_t& k, const val_t& v) const {
+        return insert(std::shared_ptr<key_t>(new key_t(k)),
+                      std::shared_ptr<val_t>(new val_t(v)));
+    }
+
+    persistent_map<key_t, val_t> insert(const key_t& k, std::shared_ptr<val_t> v) const {
+        return insert(std::shared_ptr<key_t>(new key_t(k)),
+                      v);
+    }
+
+    persistent_map<key_t, val_t> insert(std::shared_ptr<key_t> k,
+                                        std::shared_ptr<val_t> v) const {
         // insert into empty map
         if (key == nullptr) {
             return persistent_map(k, v);
         }
         // duplicate -> replace this key
-        else if (k == *key) {
+        else if (*k == *key) {
             return persistent_map(left,
-                                  right,
-                                  std::shared_ptr<key_t>(new key_t(k)),
-                                  std::shared_ptr<val_t>(new val_t(v)));
+                                  right, k, v);
         }
-        else if (k < *key) {
+        else if (*k < *key) {
             if (left == nullptr)
                 return persistent_map(sptr_pmap(
                                           new persistent_map(k, v)),
@@ -114,7 +126,7 @@ persistent_map(const key_t& k, const val_t& v) :
                                           new persistent_map(left->insert(k, v))),
                                       right,
                                       key, value);
-        } else { // k > *key
+        } else { // *k > *key
             if (right == nullptr)
                 return persistent_map(left,
                                       sptr_pmap(
