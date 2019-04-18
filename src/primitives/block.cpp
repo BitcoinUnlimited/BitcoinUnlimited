@@ -13,6 +13,7 @@
 #include "memusage.h"
 #include "serialize.h"
 #include "streams.h"
+
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 uint256 CBlockHeader::GetHash() const { return SerializeHash(*this); }
@@ -22,7 +23,7 @@ std::string CBlock::ToString() const
     s << strprintf(
         "CBlock(hash=%s, ver=%d, hashPrevBlock=%s, hashMerkleRoot=%s, nTime=%u, nBits=%08x, nNonce=%u, ntx=%u)\n",
         GetHash().ToString(), nVersion, hashPrevBlock.ToString(), hashMerkleRoot.ToString(), nTime, nBits, nNonce,
-        vtx.size());
+        mtx.size());
     for (CTransactionRef txref : *this)
         s << "  " << txref->ToString() << "\n";
     return s.str();
@@ -37,8 +38,8 @@ uint64_t CBlock::GetBlockSize() const
 
 size_t CBlock::RecursiveDynamicUsage() const
 {
-    size_t mem = memusage::DynamicUsage(vtx);
-    for (const auto &tx : vtx)
+    size_t mem = 0; // FIXME! memusage::DynamicUsage(mtx);
+    for (const auto &tx : mtx)
     {
         mem += memusage::DynamicUsage(tx) + ::RecursiveDynamicUsage(*tx);
     }
@@ -52,4 +53,60 @@ public:
 };
 
 
-void CBlock::sortLTOR() { std::sort(vtx.begin() + 1, vtx.end(), NumericallyLessTxHashComparator()); }
+void CBlock::sortLTOR()
+{
+    /* some tests use blocks with duplicate transactions, e.g. txvalidationcache_tests.
+       To not break any tests, just use the old way of sorting (instead of relying on the persistent_map
+       intrinsic order) for now.
+       This method should gain an argument that makes it work using intrinsic sorting for blocks w/o duplicate txn. */
+    std::vector<CTransactionRef> vtx;
+    for (auto iter : *this)
+        vtx.emplace_back(iter);
+    std::sort(vtx.begin() + 1, vtx.end(), NumericallyLessTxHashComparator());
+
+    CPersistentTransactionMap mtxnew;
+    {
+        size_t i = 0;
+        for (auto txref : vtx)
+        {
+            mtxnew = mtxnew.insert(CTransactionSlot(txref, i++), txref);
+        }
+    }
+    mtx = mtxnew;
+}
+
+std::string CTransactionSlot::ToString() const
+{
+    return strprintf("(slot:%d, %s)", idx, tx == nullptr ? "(null)" : tx->GetHash().GetHex());
+}
+
+bool CTransactionSlot::operator<(const CTransactionSlot &other) const
+{
+    // semantics: index overrides hash always. IsCoinbase() takes precedence over Hash value
+    // this means if all slots are set to 'ignore idx' (e.g. -1) the result should be CTOR order.
+    // if tx == nullptr, this takes precedence over IsCoinbase().
+    if (idx < 0)
+    {
+        if (other.idx < 0)
+        {
+            if (tx == nullptr)
+                return other.tx != nullptr;
+            else if (other.tx == nullptr)
+                return false;
+            if (tx->IsCoinBase())
+                return !other.tx->IsCoinBase();
+            else if (other.tx->IsCoinBase())
+                return false;
+            else
+                return tx->GetHash() < other.tx->GetHash();
+        }
+        else
+            return false; // a set idx value is always coming first
+    }
+    else
+    {
+        if (other.idx < 0)
+            return true; // same
+        return idx < other.idx;
+    }
+}
