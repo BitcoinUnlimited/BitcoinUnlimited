@@ -1074,20 +1074,24 @@ def get_bip135_status(node, key):
 # bip135 end
 
 def findBitcoind():
-    """Find the bitcoind executable if you build in typical out-of-source locations (debug or release)"""
-    here = os.path.dirname(os.path.abspath(__file__))
-    objpath = os.path.abspath(here + "/../../../src/bitcoind")
-    if not os.path.exists(objpath):
-        dbg = os.path.abspath(here + "/../../../debug/src/bitcoind")
-        rel = os.path.abspath(here + "/../../../release/src/bitcoind")
-        if os.path.exists(dbg):
-            logging.info("Running from the debug directory (%s)" % dbg)
-            objpath = os.path.dirname(dbg)
-        elif os.path.exists(rel):
-            logging.info("Running from the release directory (%s)" % rel)
-            objpath = os.path.dirname(rel)
+    """Find the bitcoind executable via env var or search in typical out-of-source locations (debug or release)"""
+    env = os.getenv("BITCOIND", None)
+    if env is None:
+        here = os.path.dirname(os.path.abspath(__file__))
+        objpath = os.path.abspath(here + "/../../../src/bitcoind")
+        if not os.path.exists(objpath):
+            dbg = os.path.abspath(here + "/../../../debug/src/bitcoind")
+            rel = os.path.abspath(here + "/../../../release/src/bitcoind")
+            if os.path.exists(dbg):
+                logging.info("Running from the debug directory (%s)" % dbg)
+                objpath = os.path.dirname(dbg)
+            elif os.path.exists(rel):
+                logging.info("Running from the release directory (%s)" % rel)
+                objpath = os.path.dirname(rel)
+        else:
+            objpath = os.path.dirname(objpath)
     else:
-        objpath = os.path.dirname(objpath)
+        objpath = os.path.dirname(env)
     return objpath
 
 def standardFlags():
