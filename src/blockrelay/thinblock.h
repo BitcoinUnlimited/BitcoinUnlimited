@@ -33,7 +33,6 @@ private:
 public:
     // memory only
     mutable unsigned int nWaitingFor; // number of txns we are still needing to recontruct the block
-
     std::map<uint64_t, CTransactionRef> mapMissingTx;
 
 public:
@@ -83,7 +82,6 @@ private:
 public:
     // memory only
     mutable unsigned int nWaitingFor; // number of txns we are still needing to recontruct the block
-    uint64_t nBlockBytes; // the bytes used in re-assembling the block, updated dynamically
     bool collision;
 
     // memory only
@@ -216,9 +214,6 @@ struct ThinBlockQuickStats
 class CThinBlockData
 {
 private:
-    /* The sum total of all bytes for thinblocks currently in process of being reconstructed */
-    std::atomic<uint64_t> nThinBlockBytes{0};
-
     CCriticalSection cs_thinblockstats; // locks everything below this point
 
     CStatHistory<uint64_t> nOriginalSize;
@@ -312,14 +307,7 @@ public:
     std::string ThinBlockToString();
     std::string FullTxToString();
 
-    void ClearThinBlockBytes(std::shared_ptr<CBlockThinRelay> &pblock);
-    void ClearThinBlockData(CNode *pnode, std::shared_ptr<CBlockThinRelay> &pblock);
     void ClearThinBlockStats();
-
-    uint64_t AddThinBlockBytes(uint64_t bytes, std::shared_ptr<CBlockThinRelay> &pblock);
-    void DeleteThinBlockBytes(uint64_t bytes);
-    void ResetThinBlockBytes();
-    uint64_t GetThinBlockBytes();
 
     void FillThinBlockQuickStats(ThinBlockQuickStats &stats);
 };
@@ -327,7 +315,6 @@ extern CThinBlockData thindata; // Singleton class
 
 
 bool IsThinBlocksEnabled();
-bool ClearLargestThinBlockAndDisconnect(CNode *pfrom);
 void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv);
 void RequestThinBlock(CNode *pfrom, const uint256 &hash);
 bool IsThinBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissingTx, const CBlockHeader &header);

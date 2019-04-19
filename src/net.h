@@ -492,15 +492,8 @@ public:
 
     // Compact Blocks : begin
     CCriticalSection cs_compactblock;
-    CBlock compactBlock;
-    std::map<uint64_t, CTransactionRef> mapMissingCompactBlockTx;
-    uint64_t nLocalCompactBlockBytes; // the bytes used in creating this cmpctblock, updated dynamically
-    uint64_t nSizeCompactBlock; // Original on-wire size of the block. Just used for reporting
-    int compactBlockWaitingForTxns; // if -1 then not currently waiting
 
-    std::vector<uint64_t> vShortCompactBlockHashes;
-    std::vector<uint256> vCompactBlockHashes;
-
+    // Store the compactblock salt to be used for this peer
     uint64_t shorttxidk0;
     uint64_t shorttxidk1;
 

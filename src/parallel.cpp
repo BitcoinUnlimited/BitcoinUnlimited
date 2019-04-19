@@ -660,9 +660,8 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
         // just to make sure we don't somehow get growth over time.
         if (thinrelay.TotalBlocksInFlight() == 0)
         {
-            thindata.ResetThinBlockBytes();
+            thinrelay.ResetTotalBlockBytes();
             graphenedata.ResetGrapheneBlockBytes();
-            compactdata.ResetCompactBlockBytes();
         }
 
         // Erase any txns from the orphan cache that are no longer needed

@@ -186,9 +186,21 @@ public:
     mutable uint64_t shorttxidk0, shorttxidk1;
 
 private:
+    // memory only
+    mutable uint64_t nSize; // Serialized thinblock size in bytes
+
     uint64_t nonce;
 
     void FillShortTxIDSelector() const;
+
+public:
+    // memory only
+    mutable unsigned int nWaitingFor; // Number of txns we are still needing to recontruct the block
+
+    // memory only
+    std::vector<uint256> vTxHashes256; // List of all 256 bit transaction hashes in the block
+    std::vector<uint64_t> vTxHashes; // List of all 64 bit transaction hashes in the block
+    std::map<uint64_t, CTransactionRef> mapMissingTx; // Map of transactions that were re-requested
 
 public:
     static const int SHORTTXIDS_LENGTH = 6;
@@ -203,19 +215,26 @@ public:
     CompactBlock(const CBlock &block, const CRollingFastFilter<4 * 1024 * 1024> *inventoryKnown = nullptr);
 
     /**
-     * Handle an incoming thin block.  The block is fully validated, and if any transactions are missing, we fall
-     * back to requesting a full block.
+     * Handle an incoming compactblock.  The block is fully validated, and if any
+     * transactions are missing we re-request them.
      * @param[in] vRecv        The raw binary message
      * @param[in] pFrom        The node the message was from
      * @return True if handling succeeded
      */
     static bool HandleMessage(CDataStream &vRecv, CNode *pfrom);
-    bool process(CNode *pfrom, uint64_t nSizeCompactBlock);
+    bool process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pblock);
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
     uint64_t GetShortID(const uint256 &txhash) const;
 
     size_t BlockTxCount() const { return shorttxids.size() + prefilledtxn.size(); }
     ADD_SERIALIZE_METHODS;
+
+    uint64_t GetSize() const
+    {
+        if (nSize == 0)
+            nSize = ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
+        return nSize;
+    }
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
@@ -285,8 +304,6 @@ struct CompactBlockQuickStats
 class CCompactBlockData
 {
 private:
-    /* The sum total of all bytes for compactblocks currently in process of being reconstructed */
-    std::atomic<uint64_t> nCompactBlockBytes{0};
 
     CCriticalSection cs_compactblockstats; // locks everything below this point
 
@@ -373,14 +390,7 @@ public:
     std::string CompactBlockToString();
     std::string FullTxToString();
 
-    void ClearCompactBlockData(CNode *pfrom);
-    void ClearCompactBlockData(CNode *pfrom, const uint256 &hash);
     void ClearCompactBlockStats();
-
-    uint64_t AddCompactBlockBytes(uint64_t, CNode *pfrom);
-    void DeleteCompactBlockBytes(uint64_t, CNode *pfrom);
-    void ResetCompactBlockBytes();
-    uint64_t GetCompactBlockBytes();
 
     void FillCompactBlockQuickStats(CompactBlockQuickStats &stats);
 };
@@ -388,7 +398,6 @@ extern CCompactBlockData compactdata; // Singleton class
 
 
 bool IsCompactBlocksEnabled();
-bool ClearLargestCompactBlockAndDisconnect(CNode *pfrom);
 void SendCompactBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv);
 bool IsCompactBlockValid(CNode *pfrom, const CompactBlock &cmpctblock);
 

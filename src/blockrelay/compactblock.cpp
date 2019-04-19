@@ -38,7 +38,10 @@
 #include "validation/validation.h"
 
 
-static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount);
+static bool ReconstructBlock(CNode *pfrom,
+    int &missingCount,
+    int &unnecessaryCount,
+    std::shared_ptr<CBlockThinRelay> &pblock);
 
 
 uint64_t GetShortID(const uint64_t &shorttxidk0, const uint64_t &shorttxidk1, const uint256 &txhash)
@@ -50,7 +53,7 @@ uint64_t GetShortID(const uint64_t &shorttxidk0, const uint64_t &shorttxidk1, co
 #define MIN_TRANSACTION_SIZE (::GetSerializeSize(CTransaction(), SER_NETWORK, PROTOCOL_VERSION))
 
 CompactBlock::CompactBlock(const CBlock &block, const CRollingFastFilter<4 * 1024 * 1024> *inventoryKnown)
-    : nonce(GetRand(std::numeric_limits<uint64_t>::max())), header(block)
+    : nSize(0), nonce(GetRand(std::numeric_limits<uint64_t>::max())), nWaitingFor(0), header(block)
 {
     FillShortTxIDSelector();
 
@@ -103,7 +106,8 @@ void validateCompactBlock(const CompactBlock &cmpctblock)
         if (cmpctblock.prefilledtxn[i].tx.IsNull())
             throw std::invalid_argument("null tx in compact block");
 
-        lastprefilledindex += static_cast<uint64_t>(cmpctblock.prefilledtxn[i].index) + 1; // index is a uint32_t, so cant overflow here
+        // index is a uint32_t, so cant overflow here
+        lastprefilledindex += static_cast<uint64_t>(cmpctblock.prefilledtxn[i].index) + 1;
         if (lastprefilledindex > std::numeric_limits<uint32_t>::max())
             throw std::invalid_argument("tx index overflows");
 
@@ -118,15 +122,18 @@ void validateCompactBlock(const CompactBlock &cmpctblock)
 }
 
 /**
- * Handle an incoming compactblock.  The block is fully validated, and if any transactions are missing, we fall
- * back to requesting a full block.
+ * Handle an incoming compactblock.  The block is fully validated, and if any
+ * transactions are missing we re-request them.
  */
-
-
 bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
-    CompactBlock compactBlock;
-    vRecv >> compactBlock;
+    // Deserialize compactblock and store a block to reconstruct
+    CompactBlock tmp;
+    vRecv >> tmp;
+    auto pblock = thinrelay.SetBlockToReconstruct(pfrom, tmp.header.GetHash());
+    pblock->cmpctblock = std::make_shared<CompactBlock>(std::forward<CompactBlock>(tmp));
+
+    CompactBlock &compactBlock = *pblock->cmpctblock;
 
     // Message consistency checking
     IsCompactBlockValid(pfrom, compactBlock);
@@ -147,9 +154,8 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
 
     CInv inv(MSG_BLOCK, compactBlock.header.GetHash());
-    uint64_t nSizeCompactBlock = ::GetSerializeSize(compactBlock, SER_NETWORK, PROTOCOL_VERSION);
     LOG(CMPCT, "received compact block %s from peer %s of %d bytes\n", inv.hash.ToString(), pfrom->GetLogName(),
-        nSizeCompactBlock);
+        compactBlock.GetSize());
 
     // Ban a node for sending unrequested compact blocks
     if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::CMPCTBLOCK))
@@ -162,40 +168,39 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     if (AlreadyHaveBlock(inv))
     {
         requester.AlreadyReceived(pfrom, inv);
-        compactdata.ClearCompactBlockData(pfrom, inv.hash);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
 
         LOG(CMPCT, "Received compactblock but returning because we already have this block %s on disk, peer=%s\n",
             inv.hash.ToString(), pfrom->GetLogName());
         return true;
     }
 
-    return compactBlock.process(pfrom, nSizeCompactBlock);
+    return compactBlock.process(pfrom, pblock);
 }
 
 
-bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
+bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pblock)
 {
-    compactdata.ClearCompactBlockData(pfrom);
-    pfrom->nSizeCompactBlock = nSizeCompactBlock;
+    pblock->nVersion = header.nVersion;
+    pblock->nBits = header.nBits;
+    pblock->nNonce = header.nNonce;
+    pblock->nTime = header.nTime;
+    pblock->hashMerkleRoot = header.hashMerkleRoot;
+    pblock->hashPrevBlock = header.hashPrevBlock;
 
-    pfrom->compactBlock.nVersion = header.nVersion;
-    pfrom->compactBlock.nBits = header.nBits;
-    pfrom->compactBlock.nNonce = header.nNonce;
-    pfrom->compactBlock.nTime = header.nTime;
-    pfrom->compactBlock.hashMerkleRoot = header.hashMerkleRoot;
-    pfrom->compactBlock.hashPrevBlock = header.hashPrevBlock;
+    // Store the salt used by this peer.
     pfrom->shorttxidk0 = shorttxidk0;
     pfrom->shorttxidk1 = shorttxidk1;
 
     // Because the list of shorttxids is not complete (missing the prefilled transaction hashes), we need
     // to first create the full list of compactblock shortid hashes, in proper order.
     //
-    // Also, create the mapMissingCompactBlockTx from all the supplied tx's in the compact block
+    // Also, create the mapMissingTx from all the supplied tx's in the compact block
 
     // Reconstruct the list of shortid's and in the correct order taking into account the prefilled txns.
     if (prefilledtxn.empty())
     {
-        pfrom->vShortCompactBlockHashes = shorttxids;
+        pblock->cmpctblock->vTxHashes = shorttxids;
     }
     else
     {
@@ -206,8 +211,8 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
             if (prefilled.index == 0)
             {
                 uint64_t shorthash = GetShortID(prefilled.tx.GetHash());
-                pfrom->vShortCompactBlockHashes.push_back(shorthash);
-                pfrom->mapMissingCompactBlockTx[shorthash] = MakeTransactionRef(prefilled.tx);
+                pblock->cmpctblock->vTxHashes.push_back(shorthash);
+                pblock->cmpctblock->mapMissingTx[shorthash] = MakeTransactionRef(prefilled.tx);
                 continue;
             }
 
@@ -216,7 +221,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
             {
                 if (iterShortID != shorttxids.end())
                 {
-                    pfrom->vShortCompactBlockHashes.push_back(*iterShortID);
+                    pblock->cmpctblock->vTxHashes.push_back(*iterShortID);
                     iterShortID++;
                 }
                 else
@@ -224,13 +229,13 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
             }
 
             // Add the prefilled txn and then get the next one
-            pfrom->vShortCompactBlockHashes.push_back(GetShortID(prefilled.tx.GetHash()));
-            pfrom->mapMissingCompactBlockTx[GetShortID(prefilled.tx.GetHash())] = MakeTransactionRef(prefilled.tx);
+            pblock->cmpctblock->vTxHashes.push_back(GetShortID(prefilled.tx.GetHash()));
+            pblock->cmpctblock->mapMissingTx[GetShortID(prefilled.tx.GetHash())] = MakeTransactionRef(prefilled.tx);
         }
 
         // Add the remaining shorttxids, if any.
-        std::vector<uint64_t>::iterator it = pfrom->vShortCompactBlockHashes.end();
-        pfrom->vShortCompactBlockHashes.insert(it, iterShortID, shorttxids.end());
+        std::vector<uint64_t>::iterator it = pblock->cmpctblock->vTxHashes.end();
+        pblock->cmpctblock->vTxHashes.insert(it, iterShortID, shorttxids.end());
     }
 
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
@@ -242,6 +247,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
     std::map<uint64_t, uint256> mapPartialTxHash;
     std::vector<uint256> memPoolHashes;
     std::set<uint64_t> setHashesToRequest;
+    unsigned int nWaitingForTxns = pblock->cmpctblock->nWaitingFor;
 
     bool fMerkleRootCorrect = true;
     {
@@ -263,7 +269,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
                 _collision = true;
             mapPartialTxHash[cheapHash] = memPoolHashes[i];
         }
-        for (auto &mi : pfrom->mapMissingCompactBlockTx)
+        for (auto &mi : pblock->cmpctblock->mapMissingTx)
         {
             uint64_t cheapHash = mi.first;
             // Check for cheap hash collision. Only mark as collision if the full hash is not the same,
@@ -287,15 +293,15 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
         {
             // Start gathering the full tx hashes. If some are not available then add them to setHashesToRequest.
             uint256 nullhash;
-            for (const uint64_t &cheapHash : pfrom->vShortCompactBlockHashes)
+            for (const uint64_t &cheapHash : pblock->cmpctblock->vTxHashes)
             {
                 if (mapPartialTxHash.find(cheapHash) != mapPartialTxHash.end())
                 {
-                    pfrom->vCompactBlockHashes.push_back(mapPartialTxHash[cheapHash]);
+                    pblock->cmpctblock->vTxHashes256.push_back(mapPartialTxHash[cheapHash]);
                 }
                 else
                 {
-                    pfrom->vCompactBlockHashes.push_back(nullhash); // placeholder
+                    pblock->cmpctblock->vTxHashes256.push_back(nullhash); // placeholder
                     setHashesToRequest.insert(cheapHash);
 
                     // If there are more hashes to request than available indices then we will not be able to
@@ -303,7 +309,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
                     if (setHashesToRequest.size() > std::numeric_limits<uint16_t>::max())
                     {
                         // Since we can't process this compactblock then clear out the data from memory
-                        compactdata.ClearCompactBlockData(pfrom, header.GetHash());
+                        thinrelay.ClearAllBlockData(pfrom, pblock);
 
                         thinrelay.RequestBlock(pfrom, header.GetHash());
                         return error("Too many re-requested hashes for compactblock: requesting a full block");
@@ -318,20 +324,20 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
             if (setHashesToRequest.empty())
             {
                 bool mutated;
-                uint256 merkleroot = ComputeMerkleRoot(pfrom->vCompactBlockHashes, &mutated);
+                uint256 merkleroot = ComputeMerkleRoot(pblock->cmpctblock->vTxHashes256, &mutated);
                 if (header.hashMerkleRoot != merkleroot || mutated)
                 {
                     fMerkleRootCorrect = false;
                 }
                 else
                 {
-                    if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount))
+                    if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
                         return false;
                 }
             }
         }
     } // End locking orphanpool.cs, mempool.cs
-    LOG(CMPCT, "Total in memory compactblock size is %ld bytes\n", compactdata.GetCompactBlockBytes());
+    LOG(CMPCT, "Total in memory compactblock size is %ld bytes\n", thinrelay.GetTotalBlockBytes());
 
     // These must be checked outside of the mempool.cs lock or deadlock may occur.
     // A merkle root mismatch here does not cause a ban because and expedited node will forward an xthin
@@ -348,26 +354,25 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
             return error(
                 "TX HASH COLLISION for compactblock: re-requesting a full block, peer=%s", pfrom->GetLogName());
 
-        compactdata.ClearCompactBlockData(pfrom, header.GetHash());
+        thinrelay.ClearAllBlockData(pfrom, pblock);
         thinrelay.RequestBlock(pfrom, header.GetHash());
         return true;
     }
 
-    pfrom->compactBlockWaitingForTxns = missingCount;
-    LOG(CMPCT, "compactblock waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n",
-        pfrom->compactBlockWaitingForTxns, unnecessaryCount, pfrom->compactBlock.vtx.size(),
-        pfrom->mapMissingCompactBlockTx.size());
+    nWaitingForTxns = missingCount;
+    LOG(CMPCT, "compactblock waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n", nWaitingForTxns,
+        unnecessaryCount, pblock->vtx.size(), pblock->cmpctblock->mapMissingTx.size());
 
     // If there are any missing hashes or transactions then we request them here.
     // This must be done outside of the mempool.cs lock or may deadlock.
     if (setHashesToRequest.size() > 0)
     {
-        pfrom->compactBlockWaitingForTxns = setHashesToRequest.size();
+        nWaitingForTxns = setHashesToRequest.size();
 
         // find the index in the block associated with the hash
         uint64_t nIndex = 0;
         std::vector<uint32_t> vIndexesToRequest;
-        for (auto cheaphash : pfrom->vShortCompactBlockHashes)
+        for (auto cheaphash : pblock->cmpctblock->vTxHashes)
         {
             if (setHashesToRequest.find(cheaphash) != setHashesToRequest.end())
                 vIndexesToRequest.push_back(nIndex);
@@ -379,7 +384,7 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
         pfrom->PushMessage(NetMsgType::GETBLOCKTXN, compactReRequest);
 
         // Update run-time statistics of compact block bandwidth savings
-        compactdata.UpdateInBoundReRequestedTx(pfrom->compactBlockWaitingForTxns);
+        compactdata.UpdateInBoundReRequestedTx(nWaitingForTxns);
         return true;
     }
 
@@ -388,25 +393,24 @@ bool CompactBlock::process(CNode *pfrom, uint64_t nSizeCompactBlock)
     if (missingCount > 0)
     {
         // Since we can't process this compactblock then clear out the data from memory
-        compactdata.ClearCompactBlockData(pfrom, header.GetHash());
+        thinrelay.ClearAllBlockData(pfrom, pblock);
 
         thinrelay.RequestBlock(pfrom, header.GetHash());
         return error("Still missing transactions for compactblock: re-requesting a full block");
     }
 
     // We now have all the transactions now that are in this block
-    pfrom->compactBlockWaitingForTxns = -1;
-    int blockSize = pfrom->compactBlock.GetBlockSize();
+    int blockSize = pblock->GetBlockSize();
     LOG(CMPCT, "Reassembled compactblock for %s (%d bytes). Message was %d bytes, compression ratio %3.2f, peer=%s\n",
-        pfrom->compactBlock.GetHash().ToString(), blockSize, pfrom->nSizeCompactBlock,
-        ((float)blockSize) / ((float)pfrom->nSizeCompactBlock), pfrom->GetLogName());
+        pblock->GetHash().ToString(), blockSize, this->GetSize(), ((float)blockSize) / ((float)this->GetSize()),
+        pfrom->GetLogName());
 
     // Update run-time statistics of compact block bandwidth savings
-    compactdata.UpdateInBound(pfrom->nSizeCompactBlock, blockSize);
-    LOG(CMPCT, "compact block stats: %s\n", compactdata.ToString().c_str());
+    compactdata.UpdateInBound(this->GetSize(), blockSize);
+    LOG(CMPCT, "compact block stats: %s\n", compactdata.ToString());
 
     // Process the full block
-    PV->HandleBlockMessage(pfrom, NetMsgType::CMPCTBLOCK, MakeBlockRef(pfrom->compactBlock), GetInv());
+    PV->HandleBlockMessage(pfrom, NetMsgType::CMPCTBLOCK, pblock, GetInv());
 
     return true;
 }
@@ -415,7 +419,6 @@ bool CompactReRequest::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
     CompactReRequest compactReRequest;
     vRecv >> compactReRequest;
-
     // Message consistency checking
     if (compactReRequest.indexes.empty() || compactReRequest.blockhash.IsNull())
     {
@@ -464,12 +467,15 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     size_t msgSize = vRecv.size();
     CompactReReqResponse compactReReqResponse;
     vRecv >> compactReReqResponse;
+    auto pblock = thinrelay.GetBlockToReconstruct(pfrom);
+    if (pblock == nullptr)
+        return error("No block available to reconstruct for blocktxn");
 
     // Message consistency checking
     CInv inv(MSG_CMPCT_BLOCK, compactReReqResponse.blockhash);
     if (compactReReqResponse.txn.empty() || compactReReqResponse.blockhash.IsNull())
     {
-        compactdata.ClearCompactBlockData(pfrom, inv.hash);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
 
         dosMan.Misbehaving(pfrom, 100);
         return error(
@@ -492,7 +498,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     if (AlreadyHaveBlock(inv))
     {
         requester.AlreadyReceived(pfrom, inv);
-        compactdata.ClearCompactBlockData(pfrom, inv.hash);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
 
         LOG(CMPCT,
             "Received compactReReqResponse but returning because we already have this block %s on disk, peer=%s\n",
@@ -500,23 +506,24 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         return true;
     }
 
-    // Create the mapMissingCompactBlockTx from all the supplied tx's in the compactblock
+    // Create the mapMissingTx from all the supplied tx's in the compactblock
     for (const CTransaction &tx : compactReReqResponse.txn)
-        pfrom->mapMissingCompactBlockTx[GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, tx.GetHash())] = MakeTransactionRef(tx);
+        pblock->cmpctblock->mapMissingTx[GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, tx.GetHash())] =
+            MakeTransactionRef(tx);
 
     // Get the full hashes from the compactReReqResponse and add them to the compactBlockHashes vector.  These should
     // be all the missing or null hashes that we re-requested.
-    DbgAssert(pfrom->vCompactBlockHashes.size() == pfrom->vShortCompactBlockHashes.size(), return false);
+    DbgAssert(pblock->cmpctblock->vTxHashes256.size() == pblock->cmpctblock->vTxHashes.size(), return false);
     int count = 0;
-    for (size_t i = 0; i < pfrom->vCompactBlockHashes.size(); i++)
+    for (size_t i = 0; i < pblock->cmpctblock->vTxHashes256.size(); i++)
     {
-        if (pfrom->vCompactBlockHashes[i].IsNull())
+        if (pblock->cmpctblock->vTxHashes256[i].IsNull())
         {
             std::map<uint64_t, CTransactionRef>::iterator val =
-                pfrom->mapMissingCompactBlockTx.find(pfrom->vShortCompactBlockHashes[i]);
-            if (val != pfrom->mapMissingCompactBlockTx.end())
+                pblock->cmpctblock->mapMissingTx.find(pblock->cmpctblock->vTxHashes[i]);
+            if (val != pblock->cmpctblock->mapMissingTx.end())
             {
-                pfrom->vCompactBlockHashes[i] = val->second->GetHash();
+                pblock->cmpctblock->vTxHashes256[i] = val->second->GetHash();
             }
             count++;
         }
@@ -529,10 +536,10 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // root in the block header matches the merkleroot calculated from the hashes provided.
     bool mutated;
 
-    uint256 merkleroot = ComputeMerkleRoot(pfrom->vCompactBlockHashes, &mutated);
-    if (pfrom->compactBlock.hashMerkleRoot != merkleroot || mutated)
+    uint256 merkleroot = ComputeMerkleRoot(pblock->cmpctblock->vTxHashes256, &mutated);
+    if (pblock->hashMerkleRoot != merkleroot || mutated)
     {
-        compactdata.ClearCompactBlockData(pfrom, inv.hash);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
 
         dosMan.Misbehaving(pfrom, 100);
         return error("Merkle root for %s does not match computed merkle root, peer=%s", inv.hash.ToString(),
@@ -546,7 +553,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // With compactblocks the vTxHashes contains only the first 8 bytes of the tx hash.
     {
         READLOCK(orphanpool.cs);
-        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount))
+        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
             return false;
     }
 
@@ -556,7 +563,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     if (missingCount > 0)
     {
         // Since we can't process this compactblock then clear out the data from memory
-        compactdata.ClearCompactBlockData(pfrom, inv.hash);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
 
         thinrelay.RequestBlock(pfrom, inv.hash);
         return error("Still missing transactions after reconstructing block, peer=%s: re-requesting a full block",
@@ -568,39 +575,41 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         CInv inv2(CInv(MSG_BLOCK, compactReReqResponse.blockhash));
 
         // for compression statistics, we have to add up the size of compactblock and the re-requested Txns.
-        int nSizeCompactBlockTx = msgSize;
-        int blockSize = pfrom->compactBlock.GetBlockSize();
+        uint64_t nSizeCompactBlockTx = msgSize;
+        uint64_t nBlockSize = pblock->GetBlockSize();
+        uint64_t nCmpctBlkSize = pblock->cmpctblock->GetSize();
         LOG(CMPCT,
             "Reassembled compactReReqResponse for %s (%d bytes). Message was %d bytes (compactblock) and %d bytes "
             "(re-requested tx), compression ratio %3.2f, peer=%s\n",
-            pfrom->compactBlock.GetHash().ToString(), blockSize, pfrom->nSizeCompactBlock, nSizeCompactBlockTx,
-            ((float)blockSize) / ((float)pfrom->nSizeCompactBlock + (float)nSizeCompactBlockTx), pfrom->GetLogName());
+            pblock->GetHash().ToString(), nBlockSize, nCmpctBlkSize, nSizeCompactBlockTx,
+            ((float)nBlockSize) / ((float)nCmpctBlkSize + (float)nSizeCompactBlockTx), pfrom->GetLogName());
 
         // Update run-time statistics of compactblock bandwidth savings.
         // We add the original compactblock size with the size of transactions that were re-requested.
         // This is NOT double counting since we never accounted for the original compactblock due to the re-request.
-        compactdata.UpdateInBound(nSizeCompactBlockTx + pfrom->nSizeCompactBlock, blockSize);
+        compactdata.UpdateInBound(nSizeCompactBlockTx + nCmpctBlkSize, nBlockSize);
         LOG(CMPCT, "compactblock stats: %s\n", compactdata.ToString());
 
-        // create a non-deleting shared pointer to wrap pfrom->compactBlock. We know that compactBlock will outlast the
-        // thread because the thread has a node reference.
-        PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->compactBlock), inv2);
+        PV->HandleBlockMessage(pfrom, strCommand, pblock, inv2);
     }
 
     return true;
 }
 
-static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount)
+static bool ReconstructBlock(CNode *pfrom,
+    int &missingCount,
+    int &unnecessaryCount,
+    std::shared_ptr<CBlockThinRelay> &pblock)
 {
     AssertLockHeld(orphanpool.cs);
 
     // We must have all the full tx hashes by this point.  We first check for any duplicate
     // transaction ids.  This is a possible attack vector and has been used in the past.
     {
-        std::set<uint256> setHashes(pfrom->vCompactBlockHashes.begin(), pfrom->vCompactBlockHashes.end());
-        if (setHashes.size() != pfrom->vCompactBlockHashes.size())
+        std::set<uint256> setHashes(pblock->cmpctblock->vTxHashes256.begin(), pblock->cmpctblock->vTxHashes256.end());
+        if (setHashes.size() != pblock->cmpctblock->vTxHashes256.size())
         {
-            compactdata.ClearCompactBlockData(pfrom, pfrom->compactBlock.GetBlockHeader().GetHash());
+            thinrelay.ClearAllBlockData(pfrom, pblock);
 
             dosMan.Misbehaving(pfrom, 10);
             return error("Duplicate transaction ids, peer=%s", pfrom->GetLogName());
@@ -621,7 +630,7 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
 
     // Look for each transaction in our various pools and buffers.
     // With compactblocks the vTxHashes contains only the first 8 bytes of the tx hash.
-    for (const uint256 &hash : pfrom->vCompactBlockHashes)
+    for (const uint256 &hash : pblock->cmpctblock->vTxHashes256)
     {
         // Replace the truncated hash with the full hash value if it exists
         CTransactionRef ptx = nullptr;
@@ -647,7 +656,7 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
             }
 
             uint64_t nShortId = GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash);
-            bool inMissingTx = pfrom->mapMissingCompactBlockTx.count(nShortId) > 0;
+            bool inMissingTx = pblock->cmpctblock->mapMissingTx.count(nShortId) > 0;
             bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
 
             if (((inMemPool || inCommitQ) && inMissingTx) || (inOrphanCache && inMissingTx))
@@ -656,12 +665,12 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
             if (inOrphanCache)
             {
                 ptx = orphanpool.mapOrphanTransactions[hash].ptx;
-                pfrom->compactBlock.setUnVerifiedTxns.insert(hash);
+                pblock->setUnVerifiedTxns.insert(hash);
             }
             else if (inMissingTx)
             {
-                ptx = pfrom->mapMissingCompactBlockTx[nShortId];
-                pfrom->compactBlock.setUnVerifiedTxns.insert(hash);
+                ptx = pblock->cmpctblock->mapMissingTx[nShortId];
+                pblock->setUnVerifiedTxns.insert(hash);
             }
         }
         if (!ptx)
@@ -669,32 +678,30 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
 
         // In order to prevent a memory exhaustion attack we track transaction bytes used to create Block
         // to see if we've exceeded any limits and if so clear out data and return.
-        if (compactdata.AddCompactBlockBytes(nTxSize, pfrom) > maxAllowedSize)
+        if (thinrelay.AddTotalBlockBytes(nTxSize, pblock) > maxAllowedSize)
         {
-            if (ClearLargestCompactBlockAndDisconnect(pfrom))
+            if (thinrelay.ClearLargestBlockAndDisconnect(pfrom))
             {
                 return error(
                     "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
-                    pfrom->compactBlock.GetHash().ToString(), pfrom->nLocalCompactBlockBytes, maxAllowedSize,
-                    pfrom->GetLogName());
+                    pblock->GetHash().ToString(), pblock->nCurrentBlockSize, maxAllowedSize, pfrom->GetLogName());
             }
         }
-        if (pfrom->nLocalCompactBlockBytes > maxAllowedSize)
+        if (pblock->nCurrentBlockSize > maxAllowedSize)
         {
-            compactdata.ClearCompactBlockData(pfrom, pfrom->compactBlock.GetBlockHeader().GetHash());
+            thinrelay.ClearAllBlockData(pfrom, pblock);
             pfrom->fDisconnect = true;
             return error(
                 "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
-                pfrom->compactBlock.GetHash().ToString(), pfrom->nLocalCompactBlockBytes, maxAllowedSize,
-                pfrom->GetLogName());
+                pblock->GetHash().ToString(), pblock->nCurrentBlockSize, maxAllowedSize, pfrom->GetLogName());
         }
 
         // Add this transaction. If the tx is null we still add it as a placeholder to keep the correct ordering.
-        pfrom->compactBlock.vtx.emplace_back(ptx);
+        pblock->vtx.emplace_back(ptx);
     }
     // Now that we've rebuild the block successfully we can set the XVal flag which is used in
     // ConnectBlock() to determine which if any inputs we can skip the checking of inputs.
-    pfrom->compactBlock.fXVal = true;
+    pblock->fXVal = true;
 
     return true;
 }
@@ -1029,33 +1036,6 @@ std::string CCompactBlockData::FullTxToString()
     return ss.str();
 }
 
-// After a compactblock is finished processing or if for some reason we have to pre-empt the rebuilding
-// of a compactblock then we clear out the compactblock data which can be substantial.
-void CCompactBlockData::ClearCompactBlockData(CNode *pnode)
-{
-    // Remove bytes from counter
-    compactdata.DeleteCompactBlockBytes(pnode->nLocalCompactBlockBytes, pnode);
-    pnode->nLocalCompactBlockBytes = 0;
-
-    // Clear out compactblock data we no longer need
-    pnode->compactBlockWaitingForTxns = -1;
-    pnode->compactBlock.SetNull();
-    pnode->vCompactBlockHashes.clear();
-    pnode->vShortCompactBlockHashes.clear();
-    pnode->mapMissingCompactBlockTx.clear();
-
-    LOG(CMPCT, "Total in memory compactblock size after clearing a compactblock is %ld bytes\n",
-        compactdata.GetCompactBlockBytes());
-}
-
-
-void CCompactBlockData::ClearCompactBlockData(CNode *pnode, const uint256 &hash)
-{
-    // We must make sure to clear the compactblock data first before clearing the compactblock in flight.
-    ClearCompactBlockData(pnode);
-    thinrelay.ClearBlockInFlight(pnode, hash);
-}
-
 void CCompactBlockData::ClearCompactBlockStats()
 {
     LOCK(cs_compactblockstats);
@@ -1077,27 +1057,6 @@ void CCompactBlockData::ClearCompactBlockStats()
     mapFullTx.clear();
 }
 
-uint64_t CCompactBlockData::AddCompactBlockBytes(uint64_t bytes, CNode *pfrom)
-{
-    pfrom->nLocalCompactBlockBytes += bytes;
-    uint64_t ret = nCompactBlockBytes.fetch_add(bytes) + bytes;
-
-    return ret;
-}
-
-void CCompactBlockData::DeleteCompactBlockBytes(uint64_t bytes, CNode *pfrom)
-{
-    if (bytes <= pfrom->nLocalCompactBlockBytes)
-        pfrom->nLocalCompactBlockBytes -= bytes;
-
-    if (bytes <= nCompactBlockBytes)
-    {
-        nCompactBlockBytes.fetch_sub(bytes);
-    }
-}
-
-void CCompactBlockData::ResetCompactBlockBytes() { nCompactBlockBytes.store(0); }
-uint64_t CCompactBlockData::GetCompactBlockBytes() { return nCompactBlockBytes.load(); }
 void CCompactBlockData::FillCompactBlockQuickStats(CompactBlockQuickStats &stats)
 {
     if (!IsCompactBlocksEnabled())
@@ -1121,29 +1080,6 @@ void CCompactBlockData::FillCompactBlockQuickStats(CompactBlockQuickStats &stats
 }
 
 bool IsCompactBlocksEnabled() { return GetBoolArg("-use-compactblocks", true); }
-bool ClearLargestCompactBlockAndDisconnect(CNode *pfrom)
-{
-    CNode *pLargest = nullptr;
-    LOCK(cs_vNodes);
-    for (CNode *pnode : vNodes)
-    {
-        if ((pLargest == nullptr) || (pnode->nLocalCompactBlockBytes > pLargest->nLocalCompactBlockBytes))
-            pLargest = pnode;
-    }
-    if (pLargest != nullptr)
-    {
-        compactdata.ClearCompactBlockData(pLargest, pLargest->compactBlock.GetBlockHeader().GetHash());
-        pLargest->fDisconnect = true;
-
-        // If the our node is currently using up the most compactblock bytes then return true so that we
-        // can stop processing this compactblock and let the disconnection happen.
-        if (pfrom == pLargest)
-            return true;
-    }
-
-    return false;
-}
-
 void SendCompactBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
 {
     if (inv.type == MSG_CMPCT_BLOCK)
@@ -1151,17 +1087,16 @@ void SendCompactBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
         CompactBlock compactBlock;
         compactBlock = CompactBlock(*pblock, &pfrom->filterInventoryKnown);
         uint64_t nSizeBlock = pblock->GetBlockSize();
-        uint64_t nSizeCompactBlock = ::GetSerializeSize(compactBlock, SER_NETWORK, PROTOCOL_VERSION);
 
         // Send a compact block
-        if (nSizeCompactBlock < nSizeBlock)
+        if (compactBlock.GetSize() < nSizeBlock)
         {
-            compactdata.UpdateOutBound(nSizeCompactBlock, nSizeBlock);
+            compactdata.UpdateOutBound(compactBlock.GetSize(), nSizeBlock);
             pfrom->PushMessage(NetMsgType::CMPCTBLOCK, compactBlock);
-            LOG(CMPCT, "Sent compact block - compactblock size: %d vs block size: %d peer: %s\n", nSizeCompactBlock,
-                nSizeBlock, pfrom->GetLogName());
+            LOG(CMPCT, "Sent compact block - compactblock size: %d vs block size: %d peer: %s\n",
+                compactBlock.GetSize(), nSizeBlock, pfrom->GetLogName());
 
-            compactdata.UpdateCompactBlock(nSizeCompactBlock);
+            compactdata.UpdateCompactBlock(compactBlock.GetSize());
             compactdata.UpdateFullTx(::GetSerializeSize(compactBlock.prefilledtxn, SER_NETWORK, PROTOCOL_VERSION));
             pfrom->blocksSent += 1;
         }
@@ -1169,7 +1104,7 @@ void SendCompactBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
         {
             pfrom->PushMessage(NetMsgType::BLOCK, *pblock);
             LOG(CMPCT, "Sent regular block instead - compactblock size: %d vs block size: %d , peer: %s\n",
-                nSizeCompactBlock, nSizeBlock, pfrom->GetLogName());
+                compactBlock.GetSize(), nSizeBlock, pfrom->GetLogName());
         }
     }
 }
