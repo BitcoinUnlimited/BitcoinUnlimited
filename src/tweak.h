@@ -59,14 +59,6 @@ inline void fill(const UniValue &v, int &output)
         output = v.get_int();
 }
 
-inline void fill(const UniValue &v, unsigned int &output)
-{
-    if (v.isStr())
-        output = boost::lexical_cast<unsigned int>(v.get_str());
-    else
-        output = v.get_int();
-}
-
 inline void fill(const UniValue &v, uint64_t &output)
 {
     if (v.isStr())
@@ -81,6 +73,30 @@ inline void fill(const UniValue &v, int64_t &output)
         output = boost::lexical_cast<int64_t>(v.get_str());
     else
         output = v.get_int64();
+}
+
+inline void fill(const UniValue &v, uint32_t &output)
+{
+    if (v.isStr())
+        output = boost::lexical_cast<uint32_t>(v.get_str());
+    else
+        output = (uint32_t)v.get_uint32();
+}
+
+inline void fill(const UniValue &v, uint16_t &output)
+{
+    if (v.isStr())
+        output = boost::lexical_cast<uint16_t>(v.get_str());
+    else
+        output = (uint16_t)v.get_uint16();
+}
+
+inline void fill(const UniValue &v, uint8_t &output)
+{
+    if (v.isStr())
+        output = boost::lexical_cast<uint8_t>(v.get_str());
+    else
+        output = (uint8_t)v.get_uint8();
 }
 
 inline void fill(const UniValue &v, std::string &output) { output = v.get_str(); }
