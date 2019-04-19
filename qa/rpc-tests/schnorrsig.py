@@ -279,6 +279,8 @@ class SchnorrSigTest (BitcoinTestFramework):
         for tx in alltx[:-1]:
             self.nodes[0].enqueuerawtransaction(tx)
         self.nodes[0].enqueuerawtransaction(alltx[-1], "flush")
+        print(self.nodes[0].getmempoolinfo())
+        waitFor(10, lambda: self.nodes[0].getmempoolinfo()["size"] == len(alltx))
         assert self.nodes[0].getmempoolinfo()["size"] == len(alltx)
 
         self.nodes[0].generate(1)
