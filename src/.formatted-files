@@ -72,6 +72,10 @@ dosman.cpp
 dosman.h
 dstencode.cpp
 dstencode.h
+electrum/electrs.cpp
+electrum/electrs.cpp
+electrum/electrumserver.cpp
+electrum/electrumserver.cpp
 expedited.cpp
 expedited.h
 fastfilter.h
@@ -410,6 +414,7 @@ respend/test/respendrelayer_tests.cpp
 rpc/blockchain.cpp
 rpc/client.cpp
 rpc/client.h
+rpc/electrum.cpp
 rpc/mining.cpp
 rpc/misc.cpp
 rpc/net.cpp

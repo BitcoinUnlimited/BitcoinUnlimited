@@ -712,6 +712,16 @@ static void addRpcServerOptions(AllowedArgs &allowedArgs)
         .addDebugArg("rpcconnect=<ip>", requiredStr,
             strprintf(_("Send commands to node running on <ip> (default: %s)"), DEFAULT_RPCCONNECT));
 }
+static void addElectrumOptions(AllowedArgs &allowedArgs)
+{
+    allowedArgs.addHeader(_("Electrum server options:"))
+        .addArg("electrum", optionalBool, "Enable electrum server")
+        .addArg("electrumdir", requiredStr, "Data directory for electrum database")
+        .addArg("electrumport", requiredStr,
+            "Port to listen to for electrum connections (default: mainnet 50001, testnet: 60001")
+        .addDebugArg("electrumexec", requiredStr, "Path to electrum daemon executable")
+        .addDebugArg("electrummonitoringport", requiredStr, "Port to bind minitoring service");
+}
 
 static void addUiOptions(AllowedArgs &allowedArgs)
 {
@@ -773,6 +783,7 @@ static void addAllNodeOptions(AllowedArgs &allowedArgs, HelpMessageMode mode, CT
     addNodeRelayOptions(allowedArgs);
     addBlockCreationOptions(allowedArgs);
     addRpcServerOptions(allowedArgs);
+    addElectrumOptions(allowedArgs);
     if (pTweaks)
         addTweaks(allowedArgs, pTweaks);
     if (mode == HMM_BITCOIN_QT)

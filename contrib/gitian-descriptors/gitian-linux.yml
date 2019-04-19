@@ -20,6 +20,9 @@ packages:
 - "bsdmainutils"
 - "ca-certificates"
 - "python"
+- "python3-git" # building electrs
+- "clang" # for rocksdb in electrs
+- "cmake" # for rocksdb in electrs
 reference_datetime: "2019-04-09 00:00:00"
 remotes:
 - "url": "https://github.com/BitcoinUnlimited/BitcoinUnlimited.git"
@@ -153,6 +156,11 @@ script: |
     mkdir -p ${INSTALLPATH}
     tar --strip-components=1 -xf ../$SOURCEDIST
     CONFIG_SITE=${BASEPREFIX}/${i}/share/config.site ./configure --prefix=/ --disable-ccache --disable-maintainer-mode --disable-dependency-tracking ${CONFIGFLAGS} CFLAGS="${HOST_CFLAGS}" CXXFLAGS="${HOST_CXXFLAGS}" LDFLAGS="${HOST_LDFLAGS}"
+    if [ "$i" = "x86_64-linux-gnu" ]; then
+        # Scope of electrs support is for servers running linux.
+        # We'll support x86_64 only for now.
+        make ${MAKEOPTS} electrs
+    fi
     make -j7 ${MAKEOPTS}
     make ${MAKEOPTS} -C src check-security
     make ${MAKEOPTS} -C src check-symbols
