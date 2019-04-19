@@ -26,7 +26,7 @@ bool recursive_shared_mutex::check_for_write_unlock(const std::thread::id &locki
     {
         if (_shared_while_exclusive_counter == 0)
         {
-#ifdef DEBUG_ASSERTION
+#ifdef RSM_DEBUG_ASSERTION
             throw std::logic_error("can not unlock_shared more times than we locked for shared ownership while holding "
                                    "exclusive ownership");
 #else
@@ -61,7 +61,7 @@ void recursive_shared_mutex::unlock_shared_internal(const std::thread::id &locki
     auto it = _read_owner_ids.find(locking_thread_id);
     if (it == _read_owner_ids.end())
     {
-#ifdef DEBUG_ASSERTION
+#ifdef RSM_DEBUG_ASSERTION
         throw std::logic_error("can not unlock_shared more times than we locked for shared ownership");
 #else
         return;
@@ -161,7 +161,7 @@ void recursive_shared_mutex::unlock()
     // this might be redundant with the mutex being locked
     if (_write_counter == 0 || _write_owner_id != locking_thread_id)
     {
-#ifdef DEBUG_ASSERTION
+#ifdef RSM_DEBUG_ASSERTION
         throw std::logic_error("unlock(standard logic) incorrectly called on a thread with no exclusive lock");
 #else
         return;
@@ -169,7 +169,7 @@ void recursive_shared_mutex::unlock()
     }
     if (_promotion_candidate_id != NON_THREAD_ID && _write_owner_id != _promotion_candidate_id)
     {
-#ifdef DEBUG_ASSERTION
+#ifdef RSM_DEBUG_ASSERTION
         throw std::logic_error("unlock(promotion logic) incorrectly called on a thread with no exclusive lock");
 #else
         return;
@@ -180,7 +180,7 @@ void recursive_shared_mutex::unlock()
         _write_counter--;
         if (_write_counter == 0)
         {
-#ifdef DEBUG_ASSERTION
+#ifdef RSM_DEBUG_ASSERTION
             assert(_shared_while_exclusive_counter == 0);
 #endif
             if (_shared_while_exclusive_counter > 0)
@@ -208,7 +208,7 @@ void recursive_shared_mutex::unlock()
     else
     {
         _write_counter--;
-#ifdef DEBUG_ASSERTION
+#ifdef RSM_DEBUG_ASSERTION
         assert(_write_counter_reserve == 0);
 #endif
         if (end_of_exclusive_ownership())
@@ -281,7 +281,7 @@ void recursive_shared_mutex::unlock_shared()
     }
     if (_read_owner_ids.size() == 0)
     {
-#ifdef DEBUG_ASSERTION
+#ifdef RSM_DEBUG_ASSERTION
         throw std::logic_error("unlock_shared incorrectly called on a thread with no shared lock");
 #else
         return;

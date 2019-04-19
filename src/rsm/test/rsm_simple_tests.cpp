@@ -24,7 +24,7 @@ BOOST_AUTO_TEST_CASE(rsm_lock_unlock)
 // try to unlock_shared an exclusive lock
 // we should error here because exclusive locks can
 // be not be unlocked by shared_ unlock method
-#ifdef DEBUG_ASSERTION
+#ifdef RSM_DEBUG_ASSERTION
     BOOST_CHECK_THROW(rsm.unlock_shared(), std::logic_error);
 #endif
 
@@ -38,7 +38,7 @@ BOOST_AUTO_TEST_CASE(rsm_lock_unlock)
     // try to unlock exclusive lock
     BOOST_CHECK_NO_THROW(rsm.unlock());
 
-#ifdef DEBUG_ASSERTION
+#ifdef RSM_DEBUG_ASSERTION
     // try to unlock exclusive lock more times than we locked
     BOOST_CHECK_THROW(rsm.unlock(), std::logic_error);
 #endif
@@ -52,7 +52,7 @@ BOOST_AUTO_TEST_CASE(rsm_lock_shared_unlock_shared)
     // lock shared
     rsm.lock_shared();
 
-#ifdef DEBUG_ASSERTION
+#ifdef RSM_DEBUG_ASSERTION
     // try to unlock exclusive when we only have shared
     BOOST_CHECK_THROW(rsm.unlock(), std::logic_error);
 #endif
@@ -60,7 +60,7 @@ BOOST_AUTO_TEST_CASE(rsm_lock_shared_unlock_shared)
     // unlock shared
     rsm.unlock_shared();
 
-#ifdef DEBUG_ASSERTION
+#ifdef RSM_DEBUG_ASSERTION
     // we should error here because we are unlocking more times than we locked
     BOOST_CHECK_THROW(rsm.unlock_shared(), std::logic_error);
 #endif
@@ -74,7 +74,7 @@ BOOST_AUTO_TEST_CASE(rsm_try_lock)
     // try lock
     rsm.try_lock();
 
-#ifdef DEBUG_ASSERTION
+#ifdef RSM_DEBUG_ASSERTION
     // try to unlock_shared an exclusive lock
     // we should error here because exclusive locks can
     // be not be unlocked by shared_ unlock method
@@ -90,7 +90,7 @@ BOOST_AUTO_TEST_CASE(rsm_try_lock)
     // try to unlock exclusive lock
     BOOST_CHECK_NO_THROW(rsm.unlock());
 
-#ifdef DEBUG_ASSERTION
+#ifdef RSM_DEBUG_ASSERTION
     // try to unlock exclusive lock more times than we locked
     BOOST_CHECK_THROW(rsm.unlock(), std::logic_error);
 #endif
@@ -104,7 +104,7 @@ BOOST_AUTO_TEST_CASE(rsm_try_lock_shared)
     // try lock shared
     rsm.try_lock_shared();
 
-#ifdef DEBUG_ASSERTION
+#ifdef RSM_DEBUG_ASSERTION
     // unlock exclusive while we have shared lock
     BOOST_CHECK_THROW(rsm.unlock(), std::logic_error);
 #endif
@@ -112,7 +112,7 @@ BOOST_AUTO_TEST_CASE(rsm_try_lock_shared)
     // unlock shared
     BOOST_CHECK_NO_THROW(rsm.unlock_shared());
 
-#ifdef DEBUG_ASSERTION
+#ifdef RSM_DEBUG_ASSERTION
     // we should error here because we are unlocking more times than we locked
     BOOST_CHECK_THROW(rsm.unlock_shared(), std::logic_error);
 #endif
