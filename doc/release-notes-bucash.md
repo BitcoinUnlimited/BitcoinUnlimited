@@ -40,12 +40,13 @@ Main Changes in 1.6.0
 ---------------------
 
 This release will be compatible with the upcoming May, 15th 2019 BCH  protocol upgrade. It [improves](https://github.com/bissias/graphene-experiments/blob/master/jupyter/graphene_v2_interim_report.ipynb)
-Graphene block propagation technique greatly and also implelemt Compact Blocks ( [BIP 152](https://github.com/bitcoin/bips/blob/master/bip-0152.mediawiki) ). This is list of the main changes that have
+Graphene block propagation technique greatly and also implelemt Compact Blocks ([BIP 152](https://github.com/bitcoin/bips/blob/master/bip-0152.mediawiki)). This is list of the main changes that have
 been merged in this release:
 
 - [Segwit P2SH recovery](https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-segwit-recovery.md)
 - [Schnorr signatures](https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-schnorr.md)
-- Compact Block implementations (BIP 152)
+- Compact Block implementations
+- Basic integration with the electrum server [electrs](https://github.com/dagurval/electrs.git) (experimental, off by default), see this [doc](bu-electrum-integration.md) for more info
 - Graphene: do not send txns oders by leveraging CTOR
 - Graphene: Fast Filter instead of Bloom Filter (optional)
 - Graphene: seeding of IBLT hash function
@@ -62,7 +63,6 @@ been merged in this release:
 - Refactor Script interpreter as a "virtual machine" encapsulated by a class. This allows the script interpreter to be used outside of bitcoind (for example, its ability to "step" allows use in a script debugger).
 - Implement Xversion changeable key
 - Documentation improvements
-
 
 Commit details
 --------------
