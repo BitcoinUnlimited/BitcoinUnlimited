@@ -43,8 +43,8 @@ This release will be compatible with the upcoming May, 15th 2019 BCH  protocol u
 Graphene block propagation technique greatly and also implelemt Compact Blocks ( [BIP 152](https://github.com/bitcoin/bips/blob/master/bip-0152.mediawiki) ). This is list of the main changes that have
 been merged in this release:
 
-- Segwit P2SH recovery (May 15th upgrade, https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-segwit-recovery.md)
-- Schnorr signatures (May 15th upgrade, https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-segwit-recovery.md)
+- [Segwit P2SH recovery](https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-segwit-recovery.md)
+- [Schnorr signatures](https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-schnorr.md)
 - Compact Block implementations (BIP 152)
 - Graphene: do not send txns oders by leveraging CTOR
 - Graphene: Fast Filter instead of Bloom Filter (optional)
