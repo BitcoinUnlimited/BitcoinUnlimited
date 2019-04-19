@@ -2227,7 +2227,6 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 
     LOCK(cs_vNodes);
     std::vector<CNode *>::iterator n;
-    uint64_t totalThinBlockSize = 0;
     int disconnected = 0; // watch # of disconnected nodes to ensure they are being cleaned up
     for (std::vector<CNode *>::iterator it = vNodes.begin(); it != vNodes.end(); ++it)
     {
@@ -2252,15 +2251,10 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
                     (int64_t)::GetSerializeSize(*inode.pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION));
             }
         }
-        node.pushKV("thinblock.vtx", (int64_t)inode.thinBlock.vtx.size());
-        uint64_t thinBlockSize = ::GetSerializeSize(inode.thinBlock, SER_NETWORK, PROTOCOL_VERSION);
-        totalThinBlockSize += thinBlockSize;
-        node.pushKV("thinblock.size", thinBlockSize);
         node.pushKV("vAddrToSend", (int64_t)inode.vAddrToSend.size());
         node.pushKV("vInventoryToSend", (int64_t)inode.vInventoryToSend.size());
         ret.pushKV(inode.addrName, node);
     }
-    ret.pushKV("totalThinBlockSize", totalThinBlockSize);
     ret.pushKV("disconnectedNodes", disconnected);
 
     return ret;
