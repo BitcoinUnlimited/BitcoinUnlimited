@@ -353,7 +353,6 @@ bool CParallelValidation::QuitReceived(const boost::thread::id this_id, const bo
 
 bool CParallelValidation::ChainWorkHasChanged(const arith_uint256 &nStartingChainWork)
 {
-    LOCK(cs_main);
     if (chainActive.Tip()->nChainWork != nStartingChainWork)
     {
         LOG(PARALLEL, "Quitting - Chain Work %s is not the same as the starting Chain Work %s\n",
