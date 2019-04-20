@@ -149,6 +149,12 @@ void iterate1_check_for_size(size_t n) {
         pm = pm.insert(x, x+100);
     BOOST_CHECK_THROW(*pm.end(), out_of_range);
 
+    if (n>10) {
+        // crude tests for log scaling of tree depth
+        double expected_height = log2(n);
+        BOOST_CHECK(pm.max_depth() < 10 * expected_height);
+    }
+
     int c=0;
     pm.begin();
     pm.end();

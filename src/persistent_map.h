@@ -221,6 +221,27 @@ public:
 
     const_iterator begin() const { return const_iterator(this, true); }
     const_iterator end() const { return const_iterator(nullptr, false); }
+
+    /*! Measure maximum depth of the persistent map; useful for
+      checking for things like inserts in lexical order and so forth
+      (which would degenerate this into a linear list). Uses an
+      iterative approach to avoid stack overflows in degenerate
+      cases. */
+    int max_depth() const {
+        std::stack<std::pair<int, const persistent_map* > > todo;
+        int max_depth = 0;
+        todo.push(std::pair<int, const persistent_map*>(1, this));
+        while (todo.size()) {
+            auto p = todo.top(); todo.pop();
+            if (p.first > max_depth) max_depth = p.first;
+            if (p.second->left)
+                todo.push(std::pair<int, const persistent_map*>(p.first + 1, p.second->left.get()));
+
+            if (p.second->right)
+                todo.push(std::pair<int, const persistent_map*>(p.first + 1, p.second->right.get()));
+        }
+        return max_depth;
+    }
 private:
     sptr_pmap remove_internal(const key_t& k) const {
         if (key == nullptr)

@@ -34,6 +34,8 @@ public:
     // Respend is interesting enough to trigger full tx validation.
     bool IsInteresting() const;
 
+    static bool likelyKnownRespent(const COutPoint &out);
+
 private:
     std::vector<COutPoint> conflictingOutpoints;
 
