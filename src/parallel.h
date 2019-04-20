@@ -185,6 +185,9 @@ public:
     /* Clear thread data from mapBlockValidationThreads */
     void Erase(const boost::thread::id this_id);
 
+    /* Quit a block validation thread and associated script validation threads */
+    void Quit(std::map<boost::thread::id, CHandleBlockMsgThreads>::iterator iter);
+
     /* Post the semaphore when the thread exits.  */
     void Post() { semThreadCount.post(); }
     /* Was the fQuit flag set to true which causes the PV thread to exit */

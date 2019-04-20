@@ -220,21 +220,8 @@ void CParallelValidation::QuitCompetingThreads(const uint256 &prevBlockHash)
             //                     be a parallel block validation that was happening.
             if ((*mi).first != this_id && (*mi).second.hashPrevBlock == prevBlockHash)
             {
-                if ((*mi).second.pScriptQueue != nullptr)
-                {
-                    LOG(PARALLEL, "Terminating script queue with blockhash %s and previous blockhash %s\n",
-                        (*mi).second.hash.ToString(), prevBlockHash.ToString());
-                    // Send Quit to any other scriptcheckques that were running a parallel validation for the same
-                    // block.
-                    // NOTE: the scriptcheckqueue may or may not have finished, but sending a quit here ensures
-                    // that it breaks from its processing loop in the event that it is still at the control.Wait() step.
-                    // This allows us to end any long running block validations and allow a smaller block to begin
-                    // processing when/if all the queues have been jammed by large blocks during an attack.
-                    LOG(PARALLEL, "Sending Quit() to scriptcheckqueue\n");
-                    (*mi).second.pScriptQueue->Quit();
-                }
-                (*mi).second.fQuit = true; // quit the thread
-                LOG(PARALLEL, "interrupting a thread with blockhash %s and previous blockhash %s\n",
+                Quit(mi);
+                LOG(PARALLEL, "Interruping a PV thread with blockhash %s and previous blockhash %s\n",
                     (*mi).second.hash.ToString(), prevBlockHash.ToString());
             }
         }
@@ -266,9 +253,7 @@ void CParallelValidation::StopAllValidationThreads(const boost::thread::id this_
     {
         if ((*mi).first != this_id) // we don't want to kill our own thread
         {
-            if ((*mi).second.pScriptQueue != nullptr)
-                (*mi).second.pScriptQueue->Quit(); // quit any active script queue threads
-            (*mi).second.fQuit = true; // quit the PV thread
+            Quit(mi);
         }
         mi++;
     }
@@ -288,9 +273,7 @@ void CParallelValidation::StopAllValidationThreads(const uint32_t nChainWork)
         if (((*mi).first != this_id) && (*mi).second.nChainWork <= nChainWork &&
             (*mi).second.nMostWorkOurFork <= nChainWork)
         {
-            if ((*mi).second.pScriptQueue != nullptr)
-                (*mi).second.pScriptQueue->Quit(); // quit any active script queue threads
-            (*mi).second.fQuit = true; // quit the PV thread
+            Quit(mi);
         }
         mi++;
     }
@@ -336,6 +319,19 @@ void CParallelValidation::Erase(const boost::thread::id this_id)
     LOCK(cs_blockvalidationthread);
     if (mapBlockValidationThreads.count(this_id))
         mapBlockValidationThreads.erase(this_id);
+}
+
+void CParallelValidation::Quit(std::map<boost::thread::id, CHandleBlockMsgThreads>::iterator iter)
+{
+    AssertLockHeld(cs_blockvalidationthread);
+    LOG(PARALLEL, "Sending Quit() to PV thread and associated script validation threads\n");
+
+    // Quit script validation threads
+    if (iter->second.pScriptQueue != nullptr)
+        iter->second.pScriptQueue->Quit();
+
+    // Send signal for PV thread to exit
+    iter->second.fQuit = true;
 }
 
 bool CParallelValidation::QuitReceived(const boost::thread::id this_id, const bool fParallel)
