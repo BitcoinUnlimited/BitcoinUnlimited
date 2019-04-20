@@ -2028,7 +2028,19 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
     // Begin Section for Boost Scope Guard
     {
         // Scope guard to make sure cs_main is set and resources released if we encounter an exception.
-        BOOST_SCOPE_EXIT(&fParallel) { PV->SetLocks(fParallel); }
+        BOOST_SCOPE_EXIT(&fParallel, &control)
+        {
+            // As a final check, make sure all the script validation threads have stopped. Sometimes
+            // if a PV thread is terminated early or a block is found to be invalid for some reason
+            // then we'll end up returning without getting to the control.Wait() at the end of this scope.
+            // While in single threaded operation this is not an issue but when PV is in sue we MUST wait
+            // for all threads to terminate before continuing otherwise we can end up trying to access
+            // data which has already been destroyed in the main thread.
+            control.Wait();
+
+            // Make sure locks have set locks correctly on leaving this scope.
+            PV->SetLocks(fParallel);
+        }
         BOOST_SCOPE_EXIT_END
 
 
@@ -2232,7 +2244,19 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     // Begin Section for Boost Scope Guard
     {
         // Scope guard to make sure cs_main is set and resources released if we encounter an exception.
-        BOOST_SCOPE_EXIT(&fParallel) { PV->SetLocks(fParallel); }
+        BOOST_SCOPE_EXIT(&fParallel, &control)
+        {
+            // As a final check, make sure all the script validation threads have stopped. Sometimes
+            // if a PV thread is terminated early or a block is found to be invalid for some reason
+            // then we'll end up returning without getting to the control.Wait() at the end of this scope.
+            // While in single threaded operation this is not an issue but when PV is in sue we MUST wait
+            // for all threads to terminate before continuing otherwise we can end up trying to access
+            // data which has already been destroyed in the main thread.
+            control.Wait();
+
+            // Make sure locks have set locks correctly on leaving this scope.
+            PV->SetLocks(fParallel);
+        }
         BOOST_SCOPE_EXIT_END
 
         // Outputs then Inputs algorithm: add outputs to the coin cache
