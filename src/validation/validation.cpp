@@ -2028,8 +2028,17 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
     // Begin Section for Boost Scope Guard
     {
         // Scope guard to make sure cs_main is set and resources released if we encounter an exception.
-        BOOST_SCOPE_EXIT(&fParallel, &control)
+        BOOST_SCOPE_EXIT(&fParallel, &control, &pScriptQueue)
         {
+            // Typically the script validations would be stopped by issuing a PV->Quit() however under
+            // certain conditions block validation may retur early from some error or if the chain tip has changed
+            // during block validation. So here we make sure to stop the script validation threads. This prevents a
+            // long to validate block from continuing to use resources when it is in fact not even a valid block.
+            //
+            // In the typcial case we will end up issuing the Quit() twice. This is fine because all were doing
+            // is setting a boolean flag.
+            pScriptQueue->Quit();
+
             // As a final check, make sure all the script validation threads have stopped. Sometimes
             // if a PV thread is terminated early or a block is found to be invalid for some reason
             // then we'll end up returning without getting to the control.Wait() at the end of this scope.
@@ -2244,8 +2253,17 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     // Begin Section for Boost Scope Guard
     {
         // Scope guard to make sure cs_main is set and resources released if we encounter an exception.
-        BOOST_SCOPE_EXIT(&fParallel, &control)
+        BOOST_SCOPE_EXIT(&fParallel, &control, &pScriptQueue)
         {
+            // Typically the script validations would be stopped by issuing a PV->Quit() however under
+            // certain conditions block validation may retur early from some error or if the chain tip has changed
+            // during block validation. So here we make sure to stop the script validation threads. This prevents a
+            // long to validate block from continuing to use resources when it is in fact not even a valid block.
+            //
+            // In the typcial case we will end up issuing the Quit() twice. This is fine because all were doing
+            // is setting a boolean flag.
+            pScriptQueue->Quit();
+
             // As a final check, make sure all the script validation threads have stopped. Sometimes
             // if a PV thread is terminated early or a block is found to be invalid for some reason
             // then we'll end up returning without getting to the control.Wait() at the end of this scope.
