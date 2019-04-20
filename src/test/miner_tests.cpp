@@ -124,7 +124,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     std::vector<CTransactionRef> txFirst;
     for (unsigned int i = 0; i < sizeof(blockinfo) / sizeof(*blockinfo); ++i)
     {
-        CBlock *pblock = &pblocktemplate->block; // pointer for convenience
+        CBlockRef pblock = pblocktemplate->block; // pointer for convenience
         pblock->nVersion = 1;
         pblock->nTime = chainActive.Tip()->GetMedianTimePast() + 1;
         CMutableTransaction txCoinbase(*pblock->coinbase());
@@ -141,7 +141,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
         pblock->nNonce = blockinfo[i].nonce;
         CValidationState state;
-        BOOST_CHECK(ProcessNewBlock(state, chainparams, nullptr, pblock, true, nullptr, false));
+        BOOST_CHECK(ProcessNewBlock(state, chainparams, nullptr, pblock.get(), true, nullptr, false));
         BOOST_CHECK(state.IsValid());
         pblock->hashPrevBlock = pblock->GetHash();
     }
@@ -194,9 +194,9 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 
         pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey);
         BOOST_CHECK(pblocktemplate);
-        BOOST_CHECK(pblocktemplate->block.fExcessive == false);
-        BOOST_CHECK(pblocktemplate->block.GetBlockSize() <= maxGeneratedBlock);
-        unsigned int blockSize = ::GetSerializeSize(pblocktemplate->block, SER_NETWORK, CBlock::CURRENT_VERSION);
+        BOOST_CHECK(pblocktemplate->block->fExcessive == false);
+        BOOST_CHECK(pblocktemplate->block->GetBlockSize() <= maxGeneratedBlock);
+        unsigned int blockSize = ::GetSerializeSize(*pblocktemplate->block, SER_NETWORK, CBlock::CURRENT_VERSION);
         BOOST_CHECK(blockSize <= maxGeneratedBlock);
         // printf("%lu %lu <= %lu\n", (long unsigned int) blockSize, (long unsigned int)
         // pblocktemplate->block.GetBlockSize(), (long unsigned int) maxGeneratedBlock);
@@ -216,9 +216,9 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 
         pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey);
         BOOST_CHECK(pblocktemplate);
-        BOOST_CHECK(pblocktemplate->block.fExcessive == false);
-        BOOST_CHECK(pblocktemplate->block.GetBlockSize() <= maxGeneratedBlock - 4);
-        unsigned int blockSize = ::GetSerializeSize(pblocktemplate->block, SER_NETWORK, CBlock::CURRENT_VERSION);
+        BOOST_CHECK(pblocktemplate->block->fExcessive == false);
+        BOOST_CHECK(pblocktemplate->block->GetBlockSize() <= maxGeneratedBlock - 4);
+        unsigned int blockSize = ::GetSerializeSize(*pblocktemplate->block, SER_NETWORK, CBlock::CURRENT_VERSION);
         BOOST_CHECK(blockSize <= maxGeneratedBlock - 4);
         minRoom = std::min(minRoom, maxGeneratedBlock - blockSize);
         // printf("%lu %lu <= %lu\n", (long unsigned int) blockSize, (long unsigned int)
@@ -244,9 +244,9 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         // minerComment = testMinerComment.substr(0,i%100);
         pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey);
         BOOST_CHECK(pblocktemplate);
-        BOOST_CHECK(pblocktemplate->block.fExcessive == false);
-        BOOST_CHECK(pblocktemplate->block.GetBlockSize() <= maxGeneratedBlock - 2);
-        unsigned int blockSize = ::GetSerializeSize(pblocktemplate->block, SER_NETWORK, CBlock::CURRENT_VERSION);
+        BOOST_CHECK(pblocktemplate->block->fExcessive == false);
+        BOOST_CHECK(pblocktemplate->block->GetBlockSize() <= maxGeneratedBlock - 2);
+        unsigned int blockSize = ::GetSerializeSize(*pblocktemplate->block, SER_NETWORK, CBlock::CURRENT_VERSION);
         BOOST_CHECK(blockSize <= maxGeneratedBlock - 2);
         minRoom = std::min(minRoom, maxGeneratedBlock - blockSize);
         // printf("%lu %lu (miner comment is %d) <= %lu\n", (long unsigned int) blockSize, (long unsigned int)
@@ -485,7 +485,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     // it into the template because we still check IsFinalTx in CreateNewBlock,
     // but relative locked txs will if inconsistently added to mempool.
     // For now these will still generate a valid template until BIP68 soft fork
-    BOOST_CHECK_EQUAL(pblocktemplate->block.numTransactions(), 3);
+    BOOST_CHECK_EQUAL(pblocktemplate->block->numTransactions(), 3);
     // However if we advance height by 1 and time by 512, all of them should be mined
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++)
         chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime += 512; // Trick the MedianTimePast
@@ -493,7 +493,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     SetMockTime(chainActive.Tip()->GetMedianTimePast() + 1);
 
     BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
-    BOOST_CHECK_EQUAL(pblocktemplate->block.numTransactions(), 5);
+    BOOST_CHECK_EQUAL(pblocktemplate->block->numTransactions(), 5);
 
     chainActive.Tip()->nHeight--;
     SetMockTime(0);

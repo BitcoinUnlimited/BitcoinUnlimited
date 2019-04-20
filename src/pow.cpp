@@ -142,7 +142,7 @@ uint32_t CalculateNextWorkRequired(const CBlockIndex *pindexLast,
     return bnNew.GetCompact();
 }
 
-bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params &params)
+bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params &params, const bool weak_mode)
 {
     bool fNegative;
     bool fOverflow;
@@ -151,12 +151,26 @@ bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params 
     bnTarget.SetCompact(nBits, &fNegative, &fOverflow);
 
     // Check range
-    if (fNegative || bnTarget == 0 || fOverflow || bnTarget > UintToArith256(params.powLimit))
+    if (fNegative || bnTarget == 0 || fOverflow || (bnTarget > UintToArith256(params.powLimit) && !weak_mode))
+    {
+        if (weak_mode)
+        {
+            LOG(WB, "A POW check failed. fNegative=%d, bnTarget=%s, fOverflow=%d, "
+                    "UintToArith256(params.powLimit)=%s, nBits=%d\n",
+                fNegative, bnTarget.GetHex(), fOverflow, UintToArith256(params.powLimit).GetHex(), nBits);
+        }
         return false;
+    }
 
     // Check proof of work matches claimed amount
     if (UintToArith256(hash) > bnTarget)
+    {
+        if (weak_mode)
+        {
+            LOG(WB, "weak POW target check failed. !( %s > %s)\n", UintToArith256(hash).GetHex(), bnTarget.GetHex());
+        }
         return false;
+    }
 
     return true;
 }

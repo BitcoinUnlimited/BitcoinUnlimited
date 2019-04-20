@@ -63,6 +63,8 @@ const char *SENDCMPCT = "sendcmpct";
 const char *CMPCTBLOCK = "cmpctblock";
 const char *GETBLOCKTXN = "getblocktxn";
 const char *BLOCKTXN = "blocktxn";
+const char *DBMISSTX = "dbmisstx";
+const char *DELTABLOCK = "deltablock";
 };
 
 static const char *ppszTypeName[] = {
@@ -76,17 +78,17 @@ static const char *ppszTypeName[] = {
 /** All known message types. Keep this in the same order as the list of
  * messages above and in protocol.h.
  */
-const static std::string allNetMessageTypes[] = {
-    NetMsgType::VERSION, NetMsgType::VERACK, NetMsgType::ADDR, NetMsgType::INV, NetMsgType::GETDATA,
-    NetMsgType::MERKLEBLOCK, NetMsgType::GETBLOCKS, NetMsgType::GETHEADERS, NetMsgType::TX, NetMsgType::HEADERS,
-    NetMsgType::BLOCK, NetMsgType::GETADDR, NetMsgType::MEMPOOL, NetMsgType::PING, NetMsgType::PONG,
-    NetMsgType::NOTFOUND, NetMsgType::FILTERLOAD, NetMsgType::FILTERADD, NetMsgType::FILTERCLEAR,
+const static std::string allNetMessageTypes[] = {NetMsgType::VERSION, NetMsgType::VERACK, NetMsgType::ADDR,
+    NetMsgType::INV, NetMsgType::GETDATA, NetMsgType::MERKLEBLOCK, NetMsgType::GETBLOCKS, NetMsgType::GETHEADERS,
+    NetMsgType::TX, NetMsgType::HEADERS, NetMsgType::BLOCK, NetMsgType::GETADDR, NetMsgType::MEMPOOL, NetMsgType::PING,
+    NetMsgType::PONG, NetMsgType::NOTFOUND, NetMsgType::FILTERLOAD, NetMsgType::FILTERADD, NetMsgType::FILTERCLEAR,
     NetMsgType::FILTERSIZEXTHIN, NetMsgType::REJECT, NetMsgType::SENDHEADERS, NetMsgType::THINBLOCK,
     NetMsgType::XTHINBLOCK, NetMsgType::XBLOCKTX, NetMsgType::GET_XBLOCKTX, NetMsgType::GET_XTHIN, NetMsgType::GET_THIN,
     NetMsgType::GRAPHENEBLOCK, NetMsgType::GRAPHENETX, NetMsgType::GET_GRAPHENETX, NetMsgType::GET_GRAPHENE,
     NetMsgType::XPEDITEDREQUEST, NetMsgType::XPEDITEDBLK, NetMsgType::XPEDITEDTxn, NetMsgType::BUVERSION,
     NetMsgType::BUVERACK, NetMsgType::XVERSION, NetMsgType::XVERACK, NetMsgType::XUPDATE, NetMsgType::SENDCMPCT,
-    NetMsgType::SENDCMPCT, NetMsgType::CMPCTBLOCK, NetMsgType::GETBLOCKTXN, NetMsgType::BLOCKTXN,
+    NetMsgType::SENDCMPCT, NetMsgType::CMPCTBLOCK, NetMsgType::GETBLOCKTXN, NetMsgType::BLOCKTXN, NetMsgType::DBMISSTX,
+    NetMsgType::DELTABLOCK
 
 };
 const static std::vector<std::string> allNetMessageTypesVec(allNetMessageTypes,

@@ -38,12 +38,14 @@ uint64_t CBlock::GetBlockSize() const
 
 size_t CBlock::RecursiveDynamicUsage() const
 {
+    return 0; // FIXME!!
+    /*
     size_t mem = 0; // FIXME! memusage::DynamicUsage(mtx);
     for (const auto &tx : mtx)
     {
         mem += memusage::DynamicUsage(tx) + ::RecursiveDynamicUsage(*tx);
     }
-    return mem;
+    return mem;*/
 }
 
 struct NumericallyLessTxHashComparator
@@ -53,24 +55,31 @@ public:
 };
 
 
-void CBlock::sortLTOR()
+void CBlock::sortLTOR(const bool no_dups)
 {
-    /* some tests use blocks with duplicate transactions, e.g. txvalidationcache_tests.
-       To not break any tests, just use the old way of sorting (instead of relying on the persistent_map
-       intrinsic order) for now.
-       This method should gain an argument that makes it work using intrinsic sorting for blocks w/o duplicate txn. */
-    std::vector<CTransactionRef> vtx;
-    for (auto iter : *this)
-        vtx.emplace_back(iter);
-    std::sort(vtx.begin() + 1, vtx.end(), NumericallyLessTxHashComparator());
-
     CPersistentTransactionMap mtxnew;
+    if (no_dups)
     {
+        std::vector<CTransactionRef> vtx;
+        for (auto iter : *this)
+            vtx.emplace_back(iter);
+        std::random_shuffle(vtx.begin(), vtx.end());
+        for (auto txref : vtx)
+            mtxnew = mtxnew.insert(CTransactionSlot(txref), txref);
+    }
+    else
+    {
+        /* some tests use blocks with duplicate transactions,
+           e.g. txvalidationcache_tests.  To not break any tests, also support
+           the old way of sorting (instead of relying on the
+           persistent_map intrinsic order) for now. */
+        std::vector<CTransactionRef> vtx;
+        for (auto iter : *this)
+            vtx.emplace_back(iter);
+        std::sort(vtx.begin() + 1, vtx.end(), NumericallyLessTxHashComparator());
         size_t i = 0;
         for (auto txref : vtx)
-        {
             mtxnew = mtxnew.insert(CTransactionSlot(txref, i++), txref);
-        }
     }
     mtx = mtxnew;
 }

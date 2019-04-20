@@ -122,4 +122,9 @@ bool RespendDetector::IsInteresting() const
     return std::any_of(begin(actions), end(actions), [](const RespendActionPtr &a) { return a->IsInteresting(); });
 }
 
+bool RespendDetector::likelyKnownRespent(const COutPoint &out)
+{
+    std::lock_guard<std::mutex> lock(respentBeforeMutex);
+    return respentBefore->contains(out);
+}
 } // ns respend

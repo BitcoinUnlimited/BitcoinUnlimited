@@ -115,13 +115,13 @@ CBlock TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransa
     const CChainParams &chainparams = Params();
     std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
     pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey);
-    CBlockHeader &blockheader = pblocktemplate->block;
+    CBlockHeader &blockheader = *pblocktemplate->block;
 
     CBlock block(blockheader);
     assert(block.empty());
 
     // Replace mempool-selected txns with just coinbase plus passed-in txns:
-    CTransactionRef cb = pblocktemplate->block.coinbase();
+    CTransactionRef cb = pblocktemplate->block->coinbase();
     block.add(cb);
     for (const CMutableTransaction &tx : txns)
         block.add(MakeTransactionRef(tx));

@@ -22,7 +22,7 @@ unsigned int CalculateNextWorkRequired(const CBlockIndex *pindexLast,
     const Consensus::Params &);
 
 /** Check whether a block hash satisfies the proof-of-work requirement specified by nBits */
-bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params &);
+bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params &params, const bool weak_mode = false);
 arith_uint256 GetBlockProof(const CBlockIndex &block);
 
 /** Return the time it would take to redo the work difference between from and to, assuming the current hashrate

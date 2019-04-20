@@ -21,6 +21,7 @@
 #include "policy/policy.h"
 #include "pow.h"
 #include "primitives/transaction.h"
+#include "respend/respenddetector.h"
 #include "script/standard.h"
 #include "timedata.h"
 #include "txmempool.h"
@@ -31,6 +32,7 @@
 #include "validationinterface.h"
 
 #include <boost/tuple/tuple.hpp>
+//#include <coz.h>
 #include <queue>
 #include <thread>
 
@@ -148,6 +150,15 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _n
     tx.vout.resize(1);
     tx.vout[0].scriptPubKey = scriptPubKeyIn;
     tx.vout[0].nValue = nValue;
+
+    // merge with delta template's coinbase if available
+    if (best_delta_template != nullptr)
+    {
+        // LOG(WB, "Delta template available. Constructing coinbase for new block template from delta block.\n");
+        for (auto ancptr_opret : best_delta_template->coinbase()->vout)
+            // _anc estor _poin_t_r _OPRET URN
+            tx.vout.emplace_back(ancptr_opret);
+    }
     tx.vin[0].scriptSig = CScript() << _nHeight << OP_0;
 
     // BU005 add block size settings to the coinbase
@@ -185,8 +196,9 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         tmpl = CreateNewBlock(scriptPubKeyIn, false, coinbaseSize);
 
     // If the block is too small we need to drop back to the 1MB ruleset
-    if ((!tmpl) || (tmpl->block.GetBlockSize() <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
+    if ((!tmpl) || (tmpl->block->GetBlockSize() <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
     {
+        nBlockMaxSize = BLOCKSTREAM_CORE_MAX_BLOCK_SIZE;
         tmpl = CreateNewBlock(scriptPubKeyIn, true, coinbaseSize);
     }
 
@@ -206,24 +218,107 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     bool blockstreamCoreCompatible,
     int64_t coinbaseSize)
 {
+    LOCK(cs_main);
+    CBlockIndex *pindexPrev = chainActive.Tip();
+    assert(pindexPrev); // can't make a new block if we don't even have the previous block
+    const uint256 prevBlockHash = pindexPrev->GetBlockHash();
+
+    best_delta_template =
+        CDeltaBlock::isEnabled(Params(), pindexPrev) ? CDeltaBlock::bestTemplate(prevBlockHash) : nullptr;
+
+    if (best_delta_template == nullptr)
+    {
+        if (CDeltaBlock::isEnabled(Params(), pindexPrev))
+        {
+            LOG(WB, "No matching deltablock for prev block hash %s found. Building regular block.\n",
+                prevBlockHash.GetHex());
+        }
+        else
+        {
+            LOG(WB, "Not building deltablocks (feature disabled).\n");
+        }
+    }
+    else
+    {
+        LOG(WB, "Created delta block template for further extension.\n");
+    }
+
     resetBlock(scriptPubKeyIn, coinbaseSize);
 
     // The constructed block template
     std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
 
-    CBlock *pblock = &pblocktemplate->block;
+    CBlock *pblock = pblocktemplate->block.get();
+
+    // set delta block in template, if available
+    pblocktemplate->delta_block = best_delta_template;
+
+    if (best_delta_template != nullptr)
+    {
+        LOG(WB, "Delta template available, constructing delta block as well.\n");
+    }
 
     // Add dummy coinbase tx as first transaction
-    pblock->add(CTransactionRef(new CTransaction()));
+    // pblock->add(CTransactionRef(new CTransaction()));
     pblocktemplate->vTxFees.push_back(-1); // updated at end
     pblocktemplate->vTxSigOps.push_back(-1); // updated at end
 
-    LOCK(cs_main);
-    CBlockIndex *pindexPrev = chainActive.Tip();
-    assert(pindexPrev); // can't make a new block if we don't even have the genesis block
+    std::vector<const CTxMemPoolEntry *> vtxe;
+    std::vector<std::shared_ptr<CTxMemPoolEntry> > extra_entries;
 
+    /* Now, if this block is based off a delta block, add the
+       transactions that are already in the base block to both the
+       block and the delta block to keep it consistent. FIXME: this
+       sort of duplicate housekeeping can certainly be optimized... */
+    if (pblocktemplate->delta_block != nullptr)
     {
-        READLOCK(mempool.cs);
+        LOG(WB, "Pre-adding %d transactions (and excluding the coinbase) from delta block.\n",
+            best_delta_template->numTransactions() - 1);
+        LOG(WB, "Current delta template delta set size: %d\n", best_delta_template->deltaSet().size());
+        for (auto biter = best_delta_template->begin_past_coinbase(); biter != best_delta_template->end(); ++biter)
+        {
+            auto txr = *biter;
+            bool done = false;
+            {
+                READLOCK(mempool.cs);
+
+                CTxMemPool::txiter txiter = mempool.mapTx.find(txr->GetHash());
+                const bool in_mempool = txiter != mempool.mapTx.end();
+
+                const bool in_block_already = inBlock.count(txr->GetHash()) > 0;
+                DbgAssert(!in_block_already, pblocktemplate->delta_block = nullptr; break;);
+
+                if (in_mempool)
+                {
+                    AddToBlock(&vtxe, txiter);
+                    done = true;
+                }
+            }
+            if (!done)
+            {
+                READLOCK(mempool.cs);
+                CCoinsViewMemPool view(pcoinsTip, mempool);
+                CCoinsViewCache view_cache(&view);
+
+                // FIXME: parts copied from txadmission.cpp
+                /* FIXME: Do the assumptions about the mempool state here hold always? */
+                // LOG(WB, "Transaction %s from delta block not in mempool yet.\n", txr->GetHash().GetHex());
+
+                unsigned nSigOps = GetLegacySigOpCount(txr, STANDARD_SCRIPT_VERIFY_FLAGS);
+                nSigOps += GetP2SHSigOpCount(txr, view_cache, STANDARD_SCRIPT_VERIFY_FLAGS);
+
+                std::shared_ptr<CTxMemPoolEntry> entry(
+                    new CTxMemPoolEntry(txr, 0, GetTime(), 0.0, 0, false, -(1UL << 63) /* dummy */,
+                        false /* dummy spends coinbase*/, nSigOps, LockPoints() /* dummy lockpoints */));
+                extra_entries.emplace_back(entry);
+                AddToBlock(&vtxe, entry.get());
+            }
+            // Note: we don't need to add it to the delta block as this contains the transaction already!
+            // COZ_PROGRESS_NAMED("pre-adding delta block transaction");
+        }
+    }
+    READLOCK(mempool.cs);
+    {
         nHeight = pindexPrev->nHeight + 1;
 
         pblock->nTime = GetAdjustedTime();
@@ -233,11 +328,15 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         if (chainparams.MineBlocksOnDemand())
             pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
 
+        if (pblocktemplate->delta_block != nullptr)
+        {
+            pblocktemplate->delta_block->nTime = pblock->nTime;
+            pblocktemplate->delta_block->nVersion = pblock->nVersion;
+        }
         const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
         nLockTimeCutoff =
             (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : pblock->GetBlockTime();
 
-        std::vector<const CTxMemPoolEntry *> vtxe;
         addPriorityTxs(&vtxe);
         addScoreTxs(&vtxe);
 
@@ -256,22 +355,64 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
             }
         }
 
+        LOG(WB, "Canonical order enabled: %d\n", canonical);
         // sort tx if there are any and the feature is enabled
-        if (canonical)
+        /*if (canonical)
         {
             std::sort(vtxe.begin(), vtxe.end(), NumericallyLessTxHashComparator());
-        }
+            }*/
 
-        for (auto &txe : vtxe)
+        LOG(WB, "Size of vtxe set: %d\n", vtxe.size());
+        size_t i = 0;
+        size_t start_delta_set =
+            (pblocktemplate->delta_block != nullptr ? pblocktemplate->delta_block->numTransactions() - 1 : 0);
+        LOG(WB, "Start of delta set in delta block: %d\n", start_delta_set);
+
+        std::vector<CTransactionRef> add_to_delta;
+
+        for (const auto &txe : vtxe)
         {
-            pblocktemplate->block.add(txe->GetSharedTx());
+            const auto &txref = txe->GetSharedTx();
+            // LOG(WB, "Adding %s, isCoinBase: %d\n", txref->GetHash().GetHex(), txref->IsCoinBase());
+            // pblock->add(txref);
+            if (pblocktemplate->delta_block != nullptr && i >= start_delta_set)
+                add_to_delta.emplace_back(txref);
             pblocktemplate->vTxFees.push_back(txe->GetFee());
             pblocktemplate->vTxSigOps.push_back(txe->GetSigOpCount());
+            i++;
+            // COZ_PROGRESS_NAMED("add to regular from vector");
         }
+        LOG(WB, "Adding: Added vtxe.\n");
+        if (pblocktemplate->delta_block != nullptr)
+        {
+            std::random_shuffle(add_to_delta.begin(), add_to_delta.end());
+            for (auto txref : add_to_delta)
+            {
+                pblocktemplate->delta_block->add(txref);
+                // COZ_PROGRESS_NAMED("add to delta from vector");
+            }
+        }
+        LOG(WB, "Adding: Added to delta block.\n");
+
+        // if (canonical)
+        // pblock->sortLTOR(true);
+        // LOG(WB, "Sorted LTOR.\n");
 
         // Create coinbase transaction.
-        pblock->setCoinbase(
-            coinbaseTx(scriptPubKeyIn, nHeight, nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus())));
+        // LOG(WB, "Block num txn before adding CB: %d\n", pblock->numTransactions());
+
+        CTransactionRef final_cb =
+            coinbaseTx(scriptPubKeyIn, nHeight, nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus()));
+        // pblock->setCoinbase(final_cb);
+        // LOG(WB, "Block num txn after adding CB (%s): %d\n", pblock->coinbase()->GetHash().GetHex(),
+        // pblock->numTransactions());
+        if (pblocktemplate->delta_block != nullptr)
+        {
+            LOG(WB, "Delta block num txn before adding CB: %d\n", pblocktemplate->delta_block->numTransactions());
+            pblocktemplate->delta_block->setCoinbase(final_cb);
+            LOG(WB, "Delta block num txn after adding CB: %d\n", pblocktemplate->delta_block->numTransactions());
+            LOG(WB, "Delta block delta set size: %d\n", pblocktemplate->delta_block->deltaSet().size());
+        }
         pblocktemplate->vTxFees[0] = -nFees;
 
         // Fill in header
@@ -279,7 +420,35 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
         pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
         pblock->nNonce = 0;
-        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->coinbase(), STANDARD_SCRIPT_VERIFY_FLAGS);
+        if (pblocktemplate->delta_block != nullptr)
+        {
+            pblocktemplate->delta_block->hashPrevBlock = pindexPrev->GetBlockHash();
+            UpdateTime(pblocktemplate->delta_block.get(), chainparams.GetConsensus(), pindexPrev);
+            pblocktemplate->delta_block->nBits = pblock->nBits;
+            pblocktemplate->delta_block->nNonce = pblock->nNonce;
+            pblocktemplate->delta_block->setAllTransactionsKnown();
+
+            // sanity check: both blocks should have the same merkle root
+            // uint256 regular_hashMerkleRoot = BlockMerkleRoot(*pblock);
+            // uint256 delta_hashMerkleRoot = BlockMerkleRoot(*pblocktemplate->delta_block);
+
+            /*
+            for (auto txref : *pblock)
+                LOG(WB, "Regular block txhash: %s\n", txref->GetHash().GetHex());
+
+            for (auto txref : *pblocktemplate->delta_block)
+                LOG(WB, "Delta block txhash: %s\n", txref->GetHash().GetHex());
+            */
+            // LOG(WB, "Miner constructed regular block max depth: %d, for size: %d\n", pblock->treeMaxDepth(),
+            // pblock->numTransactions());
+            LOG(WB, "Miner constructed delta block max depth: %d, for size: %d\n",
+                pblocktemplate->delta_block->treeMaxDepth(), pblocktemplate->delta_block->numTransactions());
+
+            // LOG(WB, "Delta block merkle root: %s, regular merkle root: %s\n", delta_hashMerkleRoot.GetHex(),
+            // regular_hashMerkleRoot.GetHex());
+            // DbgAssert(delta_hashMerkleRoot == regular_hashMerkleRoot, pblocktemplate->delta_block = nullptr;);
+        }
+        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(final_cb, STANDARD_SCRIPT_VERIFY_FLAGS);
     }
 
     // All the transactions in this block are from the mempool and therefore we can use XVal to speed
@@ -287,10 +456,19 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     // configured.
     pblock->fXVal = GetBoolArg("-xval", true);
 
+    // COZ_PROGRESS_NAMED("whole block");
     CValidationState state;
+
+    CBlock *testblock = pblock;
+    if (pblocktemplate->delta_block != nullptr)
+    {
+        pblocktemplate->delta_block->fXVal = true;
+        testblock = pblocktemplate->delta_block.get();
+    }
+
     if (blockstreamCoreCompatible)
     {
-        if (!TestConservativeBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
+        if (!TestConservativeBlockValidity(state, chainparams, *testblock, pindexPrev, false, false))
         {
             throw std::runtime_error(
                 strprintf("%s: TestConservativeBlockValidity failed: %s", __func__, FormatStateMessage(state)));
@@ -298,7 +476,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     }
     else
     {
-        if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
+        if (!TestBlockValidity(state, chainparams, *testblock, pindexPrev, false, false))
         {
             throw std::runtime_error(
                 strprintf("%s: TestBlockValidity failed: %s", __func__, FormatStateMessage(state)));
@@ -308,7 +486,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     {
         throw std::runtime_error(strprintf("%s: Excessive block generated: %s", __func__, FormatStateMessage(state)));
     }
-
+    // COZ_PROGRESS;
     return pblocktemplate;
 }
 
@@ -316,7 +494,7 @@ bool BlockAssembler::isStillDependent(CTxMemPool::txiter iter)
 {
     for (CTxMemPool::txiter parent : mempool.GetMemPoolParents(iter))
     {
-        if (!inBlock.count(parent))
+        if (!inBlock.count(parent->GetTx().GetHash()))
         {
             return true;
         }
@@ -395,6 +573,38 @@ bool BlockAssembler::TestForBlock(CTxMemPool::txiter iter)
             return false;
     }
 
+    int64_t micros_now = GetTimeMicros();
+    int64_t micros_tx = iter->GetTimeMicros();
+    if (micros_tx + 1000000 > micros_now)
+    {
+        /*LOG(WB, "Ignoring transaction %s as it is too recent (%d us).\n", iter->GetSharedTx()->GetHash().GetHex(),
+          micros_now - micros_tx);*/
+        return false;
+    }
+    // Last but not least, check that it is not a known doublespend to help working on a a single
+    // delta blocks chain...
+    /*! FIXME: Notice that this probably needs to be changed for a
+      production variant of deltablocks to have low no false positives
+      (asymptotically none so txn don't get stuck forever) and also
+      low false negatives. Currently the respend stuff has up to 0.01 FP rate...*/
+    {
+        const CTransactionRef &tx = iter->GetSharedTx();
+        for (auto inp : tx->vin)
+        {
+            if (respend::RespendDetector::likelyKnownRespent(inp.prevout))
+            {
+                /*LOG(WB, "Transaction %s is likely doublespend, disregarding for block build.\n",
+                  tx->GetHash().GetHex());*/
+                return false;
+            }
+            if (best_delta_template->spendsOutput(inp.prevout))
+            {
+                /*LOG(WB, "Transaction %s would be double-spending one included in delta block template, dropping.\n",
+                  tx->GetHash().GetHex());*/
+                return false;
+            }
+        }
+    }
     return true;
 }
 
@@ -406,7 +616,7 @@ void BlockAssembler::AddToBlock(std::vector<const CTxMemPoolEntry *> *vtxe, CTxM
     ++nBlockTx;
     nBlockSigOps += iter->GetSigOpCount();
     nFees += iter->GetFee();
-    inBlock.insert(iter);
+    inBlock.insert(iter->GetTx().GetHash());
 
     bool fPrintPriority = GetBoolArg("-printpriority", DEFAULT_PRINTPRIORITY);
     if (fPrintPriority)
@@ -418,6 +628,18 @@ void BlockAssembler::AddToBlock(std::vector<const CTxMemPoolEntry *> *vtxe, CTxM
             CFeeRate(iter->GetModifiedFee(), iter->GetTxSize()).ToString().c_str(),
             iter->GetTx().GetHash().ToString().c_str());
     }
+    // COZ_PROGRESS_NAMED("AddToBlock1");
+}
+
+void BlockAssembler::AddToBlock(std::vector<const CTxMemPoolEntry *> *vtxe, CTxMemPoolEntry *entry)
+{
+    vtxe->push_back(entry);
+    nBlockSize += entry->GetTxSize();
+    ++nBlockTx;
+    nBlockSigOps += entry->GetSigOpCount();
+    nFees += entry->GetFee();
+    inBlock.insert(entry->GetTx().GetHash());
+    // COZ_PROGRESS_NAMED("AddToBlock2");
 }
 
 void BlockAssembler::addScoreTxs(std::vector<const CTxMemPoolEntry *> *vtxe)
@@ -445,7 +667,7 @@ void BlockAssembler::addScoreTxs(std::vector<const CTxMemPoolEntry *> *vtxe)
         }
 
         // If tx already in block, skip  (added by addPriorityTxs)
-        if (inBlock.count(iter))
+        if (inBlock.count(iter->GetTx().GetHash()))
         {
             continue;
         }
@@ -516,9 +738,9 @@ void BlockAssembler::addPriorityTxs(std::vector<const CTxMemPoolEntry *> *vtxe)
         vecPriority.pop_back();
 
         // If tx already in block, skip
-        if (inBlock.count(iter))
+        if (inBlock.count(iter->GetTx().GetHash()))
         {
-            DbgAssert(false, ); // shouldn't happen for priority txs
+            // DbgAssert(false, ); // can happen for prio tx if delta block
             continue;
         }
 

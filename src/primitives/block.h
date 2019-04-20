@@ -11,6 +11,7 @@
 #include "primitives/transaction.h"
 #include "serialize.h"
 #include "uint256.h"
+#include "util.h"
 
 const uint32_t BIP_009_MASK = 0x20000000;
 const uint32_t BASE_VERSION = 0x20000000;
@@ -105,22 +106,33 @@ public:
     inline void Unserialize(Stream &is)
     {
         unsigned int nSize = ReadCompactSize(is);
-        std::vector<std::shared_ptr<CTransaction> > v;
+        std::vector<std::pair<unsigned int, std::shared_ptr<CTransaction> > > v;
         v.reserve(nSize);
 
         bool needs_order = false;
+        unsigned i;
 
-        for (unsigned int i = 0; i < nSize; i++)
+        for (i = 0; i < nSize; i++)
         {
             std::shared_ptr<CTransaction> item = std::shared_ptr<CTransaction>(new CTransaction());
             item->Unserialize(is);
-            needs_order |= v.size() > 1 && !(CTransactionSlot(v.back()) < CTransactionSlot(item));
-            v.emplace_back(item);
+            needs_order |= v.size() > 1 && !(CTransactionSlot(v.back().second) < CTransactionSlot(item));
+            v.emplace_back(std::pair<size_t, std::shared_ptr<CTransaction> >(i, item));
         }
         *this = CPersistentTransactionMap();
 
-        for (unsigned i = 0; i < nSize; i++)
-            *this = insert(CTransactionSlot(v[i], needs_order ? i : (i == 0 ? 0 : -1)), v[i]);
+        /*! FIXME: Maybe do something better than random shuffling here? */
+        std::random_shuffle(v.begin(), v.end());
+
+        if (needs_order)
+            for (i = 0; i < nSize; i++)
+                *this = insert(CTransactionSlot(v[i].second, v[i].first), v[i].second);
+        else
+            for (i = 0; i < nSize; i++)
+                *this = insert(CTransactionSlot(v[i].second, (v[i].first == 0 ? 0 : -1)), v[i].second);
+
+        LOG(WB, "Deserialized block transaction tree needs_order: %d, max depth: %d, for size: %d", needs_order,
+            max_depth(), v.size());
     }
     CPersistentTransactionMap &operator=(const persistent_map<CTransactionSlot, const CTransaction> &other)
     {
@@ -200,9 +212,8 @@ public:
     void add(const CTransactionRef &txnref) { mtx = mtx.insert(CTransactionSlot(txnref, mtx.size()), txnref); }
     void setCoinbase(const CTransactionRef &txnref) { mtx = mtx.insert(CTransactionSlot(txnref, 0), txnref); }
     // sort block to be LTOR (leaves coinbase alone)
-    void sortLTOR();
-
-    CTransactionRef by_pos(size_t index) const { return mtx.at_ptr(index); }
+    void sortLTOR(const bool no_dups = false);
+    const CTransactionRef by_pos(size_t index) const { return mtx.by_rank(index).value_ptr(); }
     // memory only
     // 0.11: mutable std::vector<uint256> vMerkleTree;
     mutable bool fChecked;
@@ -274,7 +285,6 @@ public:
     {
         CBlockHeader::SetNull();
         mtx = CPersistentTransactionMap();
-        // vMerkleTree.clear();
         fChecked = false;
         fExcessive = false;
         fXVal = false;
@@ -300,6 +310,10 @@ public:
     uint64_t GetBlockSize() const;
 
     size_t RecursiveDynamicUsage() const;
+
+
+    //! Maximum depth of underlying binary tree to store transaction set
+    size_t treeMaxDepth() const { return mtx.max_depth(); }
 };
 
 /**

@@ -25,7 +25,7 @@
 
 using namespace std;
 CTxMemPoolEntry::CTxMemPoolEntry()
-    : tx(), nFee(), nTime(0), entryPriority(0), entryHeight(0), hadNoDependencies(0), inChainInputValue(0),
+    : tx(), nFee(), nTimeMicros(0), entryPriority(0), entryHeight(0), hadNoDependencies(0), inChainInputValue(0),
       spendsCoinbase(false), sigOpCount(0), lockPoints()
 {
     nModSize = 0;
@@ -37,7 +37,7 @@ CTxMemPoolEntry::CTxMemPoolEntry()
 
 CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef &_tx,
     const CAmount &_nFee,
-    int64_t _nTime,
+    int64_t _nTimeMicros,
     double _entryPriority,
     unsigned int _entryHeight,
     bool poolHasNoInputsOf,
@@ -45,7 +45,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef &_tx,
     bool _spendsCoinbase,
     unsigned int _sigOps,
     LockPoints lp)
-    : tx(_tx), nFee(_nFee), nTime(_nTime), entryPriority(_entryPriority), entryHeight(_entryHeight),
+    : tx(_tx), nFee(_nFee), nTimeMicros(_nTimeMicros), entryPriority(_entryPriority), entryHeight(_entryHeight),
       hadNoDependencies(poolHasNoInputsOf), inChainInputValue(_inChainInputValue), spendsCoinbase(_spendsCoinbase),
       sigOpCount(_sigOps), lockPoints(lp)
 {
@@ -1148,8 +1148,8 @@ CTransactionRef CTxMemPool::get(const uint256 &hash) const
 
 static TxMempoolInfo GetInfo(CTxMemPool::indexed_transaction_set::const_iterator it)
 {
-    return TxMempoolInfo{
-        it->GetSharedTx(), it->GetTime(), CFeeRate(it->GetFee(), it->GetTxSize()), it->GetModifiedFee() - it->GetFee()};
+    return TxMempoolInfo{it->GetSharedTx(), it->GetTimeMicros(), CFeeRate(it->GetFee(), it->GetTxSize()),
+        it->GetModifiedFee() - it->GetFee()};
 }
 
 std::vector<TxMempoolInfo> CTxMemPool::AllTxMempoolInfo() const
@@ -1288,7 +1288,7 @@ int CTxMemPool::Expire(int64_t time, std::vector<COutPoint> &vCoinsToUncache)
     WRITELOCK(cs);
     indexed_transaction_set::index<entry_time>::type::iterator it = mapTx.get<entry_time>().begin();
     setEntries toremove;
-    while (it != mapTx.get<entry_time>().end() && it->GetTime() < time)
+    while (it != mapTx.get<entry_time>().end() && it->GetTimeMicros() < time)
     {
         toremove.insert(mapTx.project<0>(it));
         it++;
@@ -1514,10 +1514,10 @@ bool LoadMempool(void)
         while (num--)
         {
             CTransaction tx;
-            int64_t nTime;
+            int64_t nTimeMicros;
             int64_t nFeeDelta;
             file >> tx;
-            file >> nTime;
+            file >> nTimeMicros;
             file >> nFeeDelta;
 
             CAmount amountdelta = nFeeDelta;
@@ -1525,7 +1525,7 @@ bool LoadMempool(void)
             {
                 mempool.PrioritiseTransaction(tx.GetHash(), tx.GetHash().ToString(), prioritydummy, amountdelta);
             }
-            if (nTime + nExpiryTimeout > nNow)
+            if (nTimeMicros + nExpiryTimeout > nNow)
             {
                 CTxInputData txd;
                 txd.tx = MakeTransactionRef(tx);
@@ -1593,7 +1593,7 @@ bool DumpMempool(void)
         for (const auto &i : vInfo)
         {
             file << *(i.tx);
-            file << (int64_t)i.nTime;
+            file << (int64_t)i.nTimeMicros;
             file << (int64_t)i.feeDelta;
             mapDeltas.erase(i.tx->GetHash());
         }

@@ -7,6 +7,7 @@
 
 #include "base58.h"
 #include "blockrelay/graphene.h"
+#include "blockrelay/netdeltablocks.h"
 #include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
 #include "cashaddrenc.h"
@@ -49,6 +50,7 @@
 
 #include <atomic>
 #include <boost/lexical_cast.hpp>
+//#include <coz.h>
 #include <inttypes.h>
 #include <iomanip>
 #include <limits>
@@ -601,7 +603,7 @@ bool static ScanHash(const CBlockHeader *pblock, uint32_t &nNonce, uint256 *phas
 
 static bool ProcessBlockFound(const CBlock *pblock, const CChainParams &chainparams)
 {
-    LOGA("%s\n", pblock->ToString());
+    // LOGA("%s\n", pblock->ToString());
     LOGA("generated %s\n", FormatMoney(pblock->coinbase()->vout[0].nValue));
 
     // Found a solution
@@ -677,16 +679,36 @@ void static BitcoinMiner(const CChainParams &chainparams)
                 pindexPrev = chainActive.Tip();
             }
 
+            // COZ_BEGIN("CreateNewBlock");
+            int64_t micros_before = GetTimeMicros();
             unique_ptr<CBlockTemplate> pblocktemplate(
                 BlockAssembler(chainparams).CreateNewBlock(coinbaseScript->reserveScript));
+
+            int64_t micros_after = GetTimeMicros();
+            if (pblocktemplate->delta_block != nullptr)
+                LOG(WB, "Time for building and checking delta block template %s with %d txn: %d\n",
+                    pblocktemplate->delta_block->GetHash().GetHex(), pblocktemplate->delta_block->numTransactions(),
+                    micros_after - micros_before);
+
+            // COZ_END("CreateNewBlock");
+
             if (!pblocktemplate.get())
             {
                 LOGA("Error in BitcoinMiner: Keypool ran out, please call keypoolrefill before restarting the "
                      "mining thread\n");
                 return;
             }
-            CBlock *pblock = &pblocktemplate->block;
-            IncrementExtraNonce(pblock, nExtraNonce);
+            CBlockRef pblock;
+            if (pblocktemplate->delta_block != nullptr)
+            {
+                LOG(WB, "Using delta block for mining.\n");
+                pblock = pblocktemplate->delta_block;
+            }
+            else
+            {
+                pblock = pblocktemplate->block;
+            }
+            IncrementExtraNonce(pblock.get(), nExtraNonce);
 
             LOGA("Running BitcoinMiner with %u transactions in block (%u bytes)\n", pblock->numTransactions(),
                 pblock->GetBlockSize());
@@ -695,37 +717,57 @@ void static BitcoinMiner(const CChainParams &chainparams)
             // Search
             //
             int64_t nStart = GetTime();
-            arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
+            arith_uint256 hashStrongTarget = arith_uint256().SetCompact(pblock->nBits);
+            arith_uint256 hashWeakTarget = arith_uint256().SetCompact(weakPOWfromPOW(pblock->nBits));
+
             uint256 hash;
             uint32_t nNonce = 0;
+
+            ConstCDeltaBlockRef latest_delta(CDeltaBlock::latestForStrong(pblock->hashPrevBlock));
             while (true)
             {
                 // Check if something found
-                if (ScanHash(pblock, nNonce, &hash))
+                if (ScanHash(pblock.get(), nNonce, &hash))
                 {
-                    if (UintToArith256(hash) <= hashTarget)
+                    if (UintToArith256(hash) <= hashWeakTarget)
                     {
                         // Found a solution
                         pblock->nNonce = nNonce;
                         assert(hash == pblock->GetHash());
 
-                        SetThreadPriority(THREAD_PRIORITY_NORMAL);
-                        LOGA("BitcoinMiner:\n");
-                        LOGA("proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex(), hashTarget.GetHex());
-                        ProcessBlockFound(pblock, chainparams);
-                        SetThreadPriority(THREAD_PRIORITY_LOWEST);
-                        coinbaseScript->KeepScript();
+                        LOG(WB, "weak proof-of-work found, hash: %s, target: %d\n", hash.GetHex(),
+                            hashWeakTarget.GetHex());
 
-                        // In regression test mode, stop mining after a block is found.
-                        if (chainparams.MineBlocksOnDemand())
-                            throw boost::thread_interrupted();
+                        bool is_strong = UintToArith256(hash) <= hashStrongTarget;
+                        if (pblocktemplate->delta_block != nullptr)
+                        {
+                            CNetDeltaBlock::processNew(pblocktemplate->delta_block, nullptr);
+                        }
+                        if (is_strong)
+                        {
+                            SetThreadPriority(THREAD_PRIORITY_NORMAL);
+                            LOGA("BitcoinMiner:\n");
+                            LOGA("strong proof-of-work found  \n  hash: %s  \ntarget: %s\n", hash.GetHex(),
+                                hashStrongTarget.GetHex());
+                            ProcessBlockFound(pblock.get(), chainparams);
+                            SetThreadPriority(THREAD_PRIORITY_LOWEST);
+                            coinbaseScript->KeepScript();
 
-                        break;
+                            // In regression test mode, stop mining after a block is found.
+                            if (chainparams.MineBlocksOnDemand())
+                                throw boost::thread_interrupted();
+
+                            break;
+                        }
                     }
                 }
 
                 // Check for stop or if block needs to be rebuilt
                 boost::this_thread::interruption_point();
+
+                // rebuild when a new delta block arrived
+                if (CDeltaBlock::latestForStrong(pblock->hashPrevBlock) != latest_delta)
+                    break;
                 // Regtest mode doesn't require peers
                 if (vNodes.empty() && chainparams.MiningRequiresPeers())
                     break;
@@ -740,13 +782,14 @@ void static BitcoinMiner(const CChainParams &chainparams)
                 }
 
                 // Update nTime every few seconds
-                if (UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev) < 0)
+                if (UpdateTime(pblock.get(), chainparams.GetConsensus(), pindexPrev) < 0)
                     break; // Recreate the block if the clock has run backwards,
                 // so that we can use the correct time.
                 if (chainparams.GetConsensus().fPowAllowMinDifficultyBlocks)
                 {
                     // Changing pblock->nTime can change work required on testnet:
-                    hashTarget.SetCompact(pblock->nBits);
+                    hashStrongTarget.SetCompact(pblock->nBits);
+                    hashWeakTarget.SetCompact(weakPOWfromPOW(pblock->nBits));
                 }
             }
         }

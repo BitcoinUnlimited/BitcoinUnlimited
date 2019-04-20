@@ -334,6 +334,18 @@ extern const char *GETBLOCKTXN;
  * @since protocol version 70014 as described by BIP 152
  */
 extern const char *BLOCKTXN;
+
+/**
+ * Contains a CNetDeltaRequestMissing
+ * Sent to request a delta block or re-request a delta block that could not be properly decoded.
+ */
+extern const char *DBMISSTX;
+
+/**
+ * Contains a CNetDeltaBlock
+ * Sent to peers to inform them about new delta blocks. (Which might be strong blocks!)
+ */
+extern const char *DELTABLOCK;
 };
 
 

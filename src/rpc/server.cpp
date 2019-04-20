@@ -83,7 +83,7 @@ static const CRPCConvertParam vRPCConvertParams[] = {{"stop", 0}, {"setmocktime"
     {"estimatefee", 0}, {"estimatepriority", 0}, {"estimatesmartfee", 0}, {"estimatesmartpriority", 0},
     {"prioritisetransaction", 1}, {"prioritisetransaction", 2}, {"setban", 2}, {"setban", 3}, {"rollbackchain", 0},
     {"rollbackchain", 1}, {"reconsidermostworkchain", 0}, {"reconsidermostworkchain", 1}, {"getmempoolancestors", 1},
-    {"getmempooldescendants", 1}, {"getrawtransactionssince", 1}};
+    {"getmempooldescendants", 1}, {"getrawtransactionssince", 1}, {"deltainfo", 1}, {"deltatips", 1}};
 
 class CRPCConvertTable
 {

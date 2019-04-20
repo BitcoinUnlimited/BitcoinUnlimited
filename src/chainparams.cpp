@@ -293,7 +293,7 @@ public:
 
         vFixedSeeds = std::vector<SeedSpec6>();
 
-        fMiningRequiresPeers = true;
+        fMiningRequiresPeers = false;
         fDefaultConsistencyChecks = false;
         fRequireStandard = true;
         fMineBlocksOnDemand = false;
