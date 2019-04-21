@@ -1965,6 +1965,33 @@ bool ConnectBlockPrevalidations(const CBlock &block,
     return true;
 }
 
+/** Ensure that the script validation threads have finished running and locks are set correctly
+ *  before exiting ConnectBlock.
+ */
+static void ConnectBlockScopeExit(bool fParallel,
+    CCheckQueueControl<CScriptCheck> &control,
+    CCheckQueue<CScriptCheck> *pScriptQueue)
+{
+    // Typically the script validations would be stopped by issuing a PV->Quit() however under
+    // certain conditions block validation may retur early from some error or if the chain tip has changed
+    // during block validation. So here we make sure to stop the script validation threads. This prevents a
+    // long to validate block from continuing to use resources when it is in fact not even a valid block.
+    //
+    // In the typcial case we will end up issuing the Quit() twice. This is fine because all were doing
+    // is setting a boolean flag.
+    pScriptQueue->Quit();
+
+    // As a final check, make sure all the script validation threads have stopped. Sometimes
+    // if a PV thread is terminated early or a block is found to be invalid for some reason
+    // then we'll end up returning without getting to the control.Wait() at the end of this scope.
+    // While in single threaded operation this is not an issue but when PV is in sue we MUST wait
+    // for all threads to terminate before continuing otherwise we can end up trying to access
+    // data which has already been destroyed in the main thread.
+    control.Wait();
+
+    // Make sure locks have set locks correctly on leaving this scope.
+    PV->SetLocks(fParallel);
+}
 
 bool ConnectBlockDependencyOrdering(const CBlock &block,
     CValidationState &state,
@@ -2028,7 +2055,10 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
     // Begin Section for Boost Scope Guard
     {
         // Scope guard to make sure cs_main is set and resources released if we encounter an exception.
-        BOOST_SCOPE_EXIT(&fParallel) { PV->SetLocks(fParallel); }
+        BOOST_SCOPE_EXIT(&fParallel, &control, &pScriptQueue)
+        {
+            ConnectBlockScopeExit(fParallel, control, pScriptQueue);
+        }
         BOOST_SCOPE_EXIT_END
 
 
@@ -2232,7 +2262,10 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     // Begin Section for Boost Scope Guard
     {
         // Scope guard to make sure cs_main is set and resources released if we encounter an exception.
-        BOOST_SCOPE_EXIT(&fParallel) { PV->SetLocks(fParallel); }
+        BOOST_SCOPE_EXIT(&fParallel, &control, &pScriptQueue)
+        {
+            ConnectBlockScopeExit(fParallel, control, pScriptQueue);
+        }
         BOOST_SCOPE_EXIT_END
 
         // Outputs then Inputs algorithm: add outputs to the coin cache
