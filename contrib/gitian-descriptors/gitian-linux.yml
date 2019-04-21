@@ -165,6 +165,9 @@ script: |
     make ${MAKEOPTS} -C src check-security
     make ${MAKEOPTS} -C src check-symbols
     make install DESTDIR=${INSTALLPATH}
+    if [ -f src/electrs ]; then
+        cp src/electrs ${INSTALLPATH}/bin/electrs
+    fi
     # BU save the executables with debug symbols
     cp -f src/bitcoind ${OUTDIR}/bitcoind-${i}.debug
     if [ -f src/qt/bitcoin-qt ]
