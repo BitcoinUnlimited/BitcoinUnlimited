@@ -61,7 +61,7 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
     }
 
     // bitcoind data dir (for cookie file)
-    args.push_back("--daemon-dir=" + GetDataDir().string());
+    args.push_back("--daemon-dir=" + GetDataDir(false).string());
 
     // Use rpc interface instead of attempting to parse *blk files
     args.push_back("--jsonrpc-import");
