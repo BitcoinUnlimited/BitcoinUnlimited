@@ -167,7 +167,7 @@ class SchnorrSigTest (BitcoinTestFramework):
         alltx = []
 
         wallets = [self.nodes[0].listunspent(), self.nodes[1].listunspent()]
-        for txcount in range(0, 10):
+        for txcount in range(0, 2):
             inputs = [x[0] for x in wallets]
             for x in wallets:  # Remove this utxo so we don't use it in the next time around
                 del x[0]
@@ -221,7 +221,7 @@ class SchnorrSigTest (BitcoinTestFramework):
 
         FEEINSAT = 5000
         # now spend all the new utxos again
-        for spendLoop in range(0, 3):
+        for spendLoop in range(0, 2):
             incomingWallet = resultWallet
             resultWallet = []
 
