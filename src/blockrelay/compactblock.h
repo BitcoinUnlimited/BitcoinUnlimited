@@ -18,6 +18,11 @@
 #include <memory>
 #include <vector>
 
+static const bool DEFAULT_USE_THINBLOCKS = true;
+static const uint64_t DEFAULT_PREFERENTIAL_TIMER = 1000;
+static const bool DEFAULT_USE_GRAPHENE_BLOCKS = true;
+static const bool DEFAULT_USE_COMPACT_BLOCKS = true;
+
 class CTxMemPool;
 class CDataStream;
 class CNode;

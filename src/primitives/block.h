@@ -171,7 +171,6 @@ public:
     {
         CBlockHeader::SetNull();
         vtx.clear();
-        // vMerkleTree.clear();
         fChecked = false;
         fExcessive = false;
         fXVal = false;
