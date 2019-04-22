@@ -716,11 +716,14 @@ static void addElectrumOptions(AllowedArgs &allowedArgs)
 {
     allowedArgs.addHeader(_("Electrum server options:"))
         .addArg("electrum", optionalBool, "Enable electrum server")
-        .addArg("electrumdir", requiredStr, "Data directory for electrum database")
-        .addArg("electrumport", requiredStr,
-            "Port to listen to for electrum connections (default: mainnet 50001, testnet: 60001")
-        .addDebugArg("electrumexec", requiredStr, "Path to electrum daemon executable")
-        .addDebugArg("electrummonitoringport", requiredStr, "Port to bind minitoring service");
+        .addArg("electrum.dir", requiredStr, "Data directory for electrum database")
+        .addArg("electrum.port", requiredStr, "Port electrum RPC listens on (default: mainnet 50001, testnet: 60001")
+        .addArg("electrum.host", requiredStr, "Host electrum RPC listens on (default: 127.0.0.1)")
+        .addArg("electrum.addr.limit", requiredStr, "Max txs to look up per address (default: 500)")
+        .addDebugArg("electrum.exec", requiredStr, "Path to electrum daemon executable")
+        .addDebugArg("electrum.monitoring.port", requiredStr, "Port to bind monitoring service")
+        .addDebugArg("electrum.monitoring.host", requiredStr, "Host to bind monitoring service")
+        .addDebugArg("electrum.daemon.host", requiredStr, "Host for bitcoind rpc");
 }
 
 static void addUiOptions(AllowedArgs &allowedArgs)
