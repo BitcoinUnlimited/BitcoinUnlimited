@@ -9,7 +9,8 @@
 
 #include <boost/filesystem.hpp>
 
-static std::string monitoring_port() { return GetArg("-electrummonitoringport", "4224"); }
+static std::string monitoring_port() { return GetArg("-electrum.monitoring.port", "4224"); }
+static std::string monitoring_host() { return GetArg("-electrum.monitoring.host", "127.0.0.1"); }
 namespace electrum
 {
 std::string electrs_path()
@@ -19,12 +20,12 @@ std::string electrs_path()
     bitcoind_dir = bitcoind_dir.remove_filename();
 
     auto default_path = bitcoind_dir / "electrs";
-    const std::string path = GetArg("-electrumexec", default_path.string());
+    const std::string path = GetArg("-electrum.exec", default_path.string());
 
     if (path.empty())
     {
         throw std::runtime_error("Path to electrum server executable not found. "
-                                 "You can specify full path with -electrumexec");
+                                 "You can specify full path with -electrum.exec");
     }
     if (!boost::filesystem::exists(path))
     {
@@ -50,14 +51,15 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
     {
         rpcport = GetArg("-rpcport", rpcport);
         std::stringstream ss;
-        ss << "--daemon-rpc-addr=localhost:" << rpcport;
+        ss << "--daemon-rpc-addr=" << GetArg("-electrum.daemon.host", "127.0.0.1") << ":" << rpcport;
         args.push_back(ss.str());
     }
 
-    const std::string electrumport = GetArg("-electrumport", "DEFAULT");
+    const std::string electrumport = GetArg("-electrum.port", "DEFAULT");
     if (electrumport != "DEFAULT")
     {
-        args.push_back("--electrum-rpc-addr=127.0.0.1:" + electrumport);
+        const std::string host = GetArg("-electrum.host", "127.0.0.1");
+        args.push_back("--electrum-rpc-addr=" + host + ":" + electrumport);
     }
 
     // bitcoind data dir (for cookie file)
@@ -80,7 +82,7 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
         throw std::invalid_argument(ss.str());
     }
     args.push_back("--network=" + netmapping.at(network));
-    args.push_back("--monitoring-addr=127.0.0.1:" + monitoring_port());
+    args.push_back("--monitoring-addr=" + monitoring_host() + ":" + monitoring_port());
 
     if (!GetArg("-rpcpassword", "").empty())
     {
@@ -88,7 +90,7 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
     }
 
     // max txs to look up per address
-    args.push_back("--txid-limit=500");
+    args.push_back("--txid-limit=" + GetArg("-electrum.addr.limit", "500"));
 
     return args;
 }
@@ -100,7 +102,7 @@ std::map<std::string, int> fetch_electrs_info()
         throw std::runtime_error("Electrum server is disabled");
     }
 
-    std::stringstream infostream = http_get("127.0.0.1", std::stoi(monitoring_port()), "/");
+    std::stringstream infostream = http_get(monitoring_host(), std::stoi(monitoring_port()), "/");
 
     const std::regex keyval("^([a-z_]+)\\s(\\d+)\\s*$");
     std::map<std::string, int> info;

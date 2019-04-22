@@ -25,8 +25,8 @@ class ElectrumBasicTests(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.num_nodes = 1
         self.extra_args = [["-debug=electrum", "-electrum=1", "-debug=rpc",
-            "-electrumport=" + str(self.electrum_port),
-            "-electrummonitoringport=" + str(self.monitoring_port)]]
+            "-electrum.port=" + str(self.electrum_port),
+            "-electrum.monitoring.port=" + str(self.monitoring_port)]]
 
     def run_test(self):
         n = self.nodes[0]
