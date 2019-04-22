@@ -402,11 +402,11 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pbloc
     // We now have all the transactions now that are in this block
     int blockSize = pblock->GetBlockSize();
     LOG(CMPCT, "Reassembled compactblock for %s (%d bytes). Message was %d bytes, compression ratio %3.2f, peer=%s\n",
-        pblock->GetHash().ToString(), blockSize, this->GetSize(), ((float)blockSize) / ((float)this->GetSize()),
-        pfrom->GetLogName());
+        pblock->GetHash().ToString(), blockSize, pblock->cmpctblock->GetSize(),
+        ((float)blockSize) / ((float)pblock->cmpctblock->GetSize()), pfrom->GetLogName());
 
     // Update run-time statistics of compact block bandwidth savings
-    compactdata.UpdateInBound(this->GetSize(), blockSize);
+    compactdata.UpdateInBound(pblock->cmpctblock->GetSize(), blockSize);
     LOG(CMPCT, "compact block stats: %s\n", compactdata.ToString());
 
     // Process the full block
