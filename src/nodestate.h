@@ -7,13 +7,12 @@
 #ifndef BITCOIN_NODESTATE_H
 #define BITCOIN_NODESTATE_H
 
-#include "main.h" // for cs_main
 #include "net.h" // For NodeId
 #include "requestManager.h"
 
 
 /**
-* Maintain validation-specific state about nodes, protected by cs_main, instead
+* Maintain validation-specific state about nodes, instead
 * of by CNode's own locks. This simplifies asynchronous operation, where
 * processing of incoming data is done after the ProcessMessage call returns,
 * and we're no longer holding the node's locks.
@@ -54,9 +53,9 @@ struct CNodeState
 class CState
 {
 protected:
-    /** Map maintaining per-node state. Requires cs_main. */
-    std::map<NodeId, CNodeState> mapNodeState;
+    /** Map maintaining per-node state. */
     CCriticalSection cs;
+    std::map<NodeId, CNodeState> mapNodeState GUARDED_BY(cs);
     friend class CNodeStateAccessor;
 
 public:
