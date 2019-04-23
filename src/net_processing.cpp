@@ -1161,16 +1161,17 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CTxInputData txd;
         vRecv >> txd.tx;
 
-        // Indicate that the tx was received and is now in the commitQ but not necessarily in the mempool.
-        CInv inv(MSG_TX, txd.tx->GetHash());
-        requester.Processing(inv, pfrom);
+        // Indicate that the tx was received and is about to be processed. Setting the processing flag
+        // prevents us from re-requesting the txn during the time of procesing and before mempool acceptance.
+        requester.ProcessingTxn(txd.tx->GetHash(), pfrom);
 
-        // Enqueue the transaction
+        // Processing begins here where we enqueue the transaction.
         txd.nodeId = pfrom->id;
         txd.nodeName = pfrom->GetLogName();
         txd.whitelisted = pfrom->fWhitelisted;
         EnqueueTxForAdmission(txd);
 
+        CInv inv(MSG_TX, txd.tx->GetHash());
         pfrom->AddInventoryKnown(inv);
         requester.UpdateTxnResponseTime(inv, pfrom);
     }

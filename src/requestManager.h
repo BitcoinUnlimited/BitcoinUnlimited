@@ -187,8 +187,11 @@ public:
     // Update the response time for this transaction request
     void UpdateTxnResponseTime(const CInv &obj, CNode *pfrom);
 
-    // Indicate that we are processing this object.
-    void Processing(const CInv &obj, CNode *pfrom);
+    // Indicate that we are processing this transaction
+    void ProcessingTxn(const uint256 &hash, CNode *pfrom);
+
+    // Indicate that we are processing this block
+    void ProcessingBlock(const uint256 &hash, CNode *pfrom);
 
     // Indicate that we got this object
     void Received(const CInv &obj, CNode *pfrom);

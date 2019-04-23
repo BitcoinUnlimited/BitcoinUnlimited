@@ -289,30 +289,28 @@ void CRequestManager::UpdateTxnResponseTime(const CInv &obj, CNode *pfrom)
     }
 }
 
-// Indicate that we are processing this object.
-void CRequestManager::Processing(const CInv &obj, CNode *pfrom)
+void CRequestManager::ProcessingTxn(const uint256 &hash, CNode *pfrom)
 {
     LOCK(cs_objDownloader);
-    if (obj.type == MSG_TX)
-    {
-        OdMap::iterator item = mapTxnInfo.find(obj.hash);
-        if (item == mapTxnInfo.end())
-            return;
+    OdMap::iterator item = mapTxnInfo.find(hash);
+    if (item == mapTxnInfo.end())
+        return;
 
-        item->second.fProcessing = true;
-        LOG(REQ, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
-            pfrom ? pfrom->GetLogName() : "unknown");
-    }
-    else if (obj.type == MSG_BLOCK || obj.type == MSG_CMPCT_BLOCK || obj.type == MSG_XTHINBLOCK)
-    {
-        OdMap::iterator item = mapBlkInfo.find(obj.hash);
-        if (item == mapBlkInfo.end())
-            return;
+    item->second.fProcessing = true;
+    LOG(REQ, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
+        pfrom ? pfrom->GetLogName() : "unknown");
+}
 
-        item->second.fProcessing = true;
-        LOG(BLK, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
-            pfrom ? pfrom->GetLogName() : "unknown");
-    }
+void CRequestManager::ProcessingBlock(const uint256 &hash, CNode *pfrom)
+{
+    LOCK(cs_objDownloader);
+    OdMap::iterator item = mapBlkInfo.find(hash);
+    if (item == mapBlkInfo.end())
+        return;
+
+    item->second.fProcessing = true;
+    LOG(BLK, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
+        pfrom ? pfrom->GetLogName() : "unknown");
 }
 
 // Indicate that we got this object.
