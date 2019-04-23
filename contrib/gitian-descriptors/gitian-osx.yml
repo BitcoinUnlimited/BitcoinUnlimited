@@ -26,6 +26,7 @@ packages:
 - "python-dev"
 - "python-setuptools"
 - "fonts-tuffy"
+- "ca-certificates"
 reference_datetime: "2019-04-09 00:00:00"
 remotes:
 - "url": "https://github.com/BitcoinUnlimited/BitcoinUnlimited.git"
