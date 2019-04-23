@@ -1162,7 +1162,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         vRecv >> txd.tx;
 
         // Indicate that the tx was received and is about to be processed. Setting the processing flag
-        // prevents us from re-requesting the txn during the time of procesing and before mempool acceptance.
+        // prevents us from re-requesting the txn during the time of processing and before mempool acceptance.
         requester.ProcessingTxn(txd.tx->GetHash(), pfrom);
 
         // Processing begins here where we enqueue the transaction.
