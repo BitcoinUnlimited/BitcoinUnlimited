@@ -1973,11 +1973,11 @@ static void ConnectBlockScopeExit(bool fParallel,
     CCheckQueue<CScriptCheck> *pScriptQueue)
 {
     // Typically the script validations would be stopped by issuing a PV->Quit() however under
-    // certain conditions block validation may retur early from some error or if the chain tip has changed
+    // certain conditions block validation may return early from some error or if the chain tip has changed
     // during block validation. So here we make sure to stop the script validation threads. This prevents a
     // long to validate block from continuing to use resources when it is in fact not even a valid block.
     //
-    // In the typcial case we will end up issuing the Quit() twice. This is fine because all were doing
+    // In the typical case we will end up issuing the Quit() twice. This is fine because all were doing
     // is setting a boolean flag.
     pScriptQueue->Quit();
 
