@@ -105,6 +105,8 @@ public Q_SLOTS:
     /** Set block propagation statistics in the UI */
     void setThinBlockPropagationStats(const ThinBlockQuickStats &thin);
     /** Set block propagation statistics in the UI */
+    void setCompactBlockPropagationStats(const CompactBlockQuickStats &compact);
+    /** Set block propagation statistics in the UI */
     void setGrapheneBlockPropagationStats(const GrapheneQuickStats &graphene);
     /** Go forward or back in history */
     void browseHistory(int offset);

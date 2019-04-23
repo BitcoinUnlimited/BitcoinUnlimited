@@ -52,15 +52,18 @@ bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType)
     {
         return true; // CLTV Freeze are standard enable(disable)
     }
-    else if (whichType == TX_NULL_DATA && (!fAcceptDatacarrier || scriptPubKey.size() > nMaxDatacarrierBytes))
-        return false;
+    else if (whichType == TX_NULL_DATA || whichType == TX_LABELPUBLIC)
+    {
+        if (!fAcceptDatacarrier || scriptPubKey.size() > nMaxDatacarrierBytes)
+            return false;
+    }
 
     return whichType != TX_NONSTANDARD;
 }
 
-bool IsStandardTx(const CTransaction &tx, std::string &reason)
+bool IsStandardTx(const CTransactionRef &tx, std::string &reason)
 {
-    if (tx.nVersion > CTransaction::MAX_STANDARD_VERSION || tx.nVersion < 1)
+    if (tx->nVersion > CTransaction::MAX_STANDARD_VERSION || tx->nVersion < 1)
     {
         reason = "version";
         return false;
@@ -70,13 +73,13 @@ bool IsStandardTx(const CTransaction &tx, std::string &reason)
     // almost as much to process as they cost the sender in fees, because
     // computing signature hashes is O(ninputs*txsize). Limiting transactions
     // to MAX_STANDARD_TX_SIZE mitigates CPU exhaustion attacks.
-    if (tx.GetTxSize() >= MAX_STANDARD_TX_SIZE)
+    if (tx->GetTxSize() >= MAX_STANDARD_TX_SIZE)
     {
         reason = "tx-size";
         return false;
     }
 
-    for (const CTxIn &txin : tx.vin)
+    for (const CTxIn &txin : tx->vin)
     {
         // Biggest 'standard' txin is a 15-of-15 P2SH multisig with compressed
         // keys. (remember the 520 byte limit on redeemScript size) That works
@@ -99,7 +102,7 @@ bool IsStandardTx(const CTransaction &tx, std::string &reason)
 
     unsigned int nDataOut = 0;
     txnouttype whichType;
-    for (const CTxOut &txout : tx.vout)
+    for (const CTxOut &txout : tx->vout)
     {
         if (!::IsStandard(txout.scriptPubKey, whichType))
         {
@@ -107,7 +110,7 @@ bool IsStandardTx(const CTransaction &tx, std::string &reason)
             return false;
         }
 
-        if (whichType == TX_NULL_DATA)
+        if ((whichType == TX_NULL_DATA) || (whichType == TX_LABELPUBLIC))
             nDataOut++;
         else if ((whichType == TX_MULTISIG) && (!fIsBareMultisigStd))
         {
@@ -131,16 +134,16 @@ bool IsStandardTx(const CTransaction &tx, std::string &reason)
     return true;
 }
 
-bool AreInputsStandard(const CTransaction &tx, const CCoinsViewCache &mapInputs)
+bool AreInputsStandard(const CTransactionRef &tx, const CCoinsViewCache &mapInputs)
 {
-    if (tx.IsCoinBase())
+    if (tx->IsCoinBase())
         return true; // Coinbases don't use vin normally
 
-    for (unsigned int i = 0; i < tx.vin.size(); i++)
+    for (unsigned int i = 0; i < tx->vin.size(); i++)
     {
         txnouttype whichType;
         {
-            CoinAccessor coin(mapInputs, tx.vin[i].prevout);
+            CoinAccessor coin(mapInputs, tx->vin[i].prevout);
             const CTxOut &prev = coin->out;
 
             std::vector<std::vector<unsigned char> > vSolutions;
@@ -158,7 +161,7 @@ bool AreInputsStandard(const CTransaction &tx, const CCoinsViewCache &mapInputs)
             // and it matches the P2SH script template, so we know that it won't have any ops, only pushes
             // so pass MAX_OPS_PER_SCRIPT for the max number of ops to match prior behavior exactly
             if (!EvalScript(
-                    stack, tx.vin[i].scriptSig, SCRIPT_VERIFY_NONE, MAX_OPS_PER_SCRIPT, BaseSignatureChecker(), 0))
+                    stack, tx->vin[i].scriptSig, SCRIPT_VERIFY_NONE, MAX_OPS_PER_SCRIPT, BaseSignatureChecker(), 0))
                 return false;
             if (stack.empty())
                 return false;

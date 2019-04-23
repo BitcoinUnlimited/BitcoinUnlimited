@@ -103,16 +103,30 @@ BOOST_AUTO_TEST_CASE(univalue_typecheck)
 
     UniValue v4;
     BOOST_CHECK(v4.setNumStr("2147483648"));
-    BOOST_CHECK_EQUAL(v4.get_int64(), 2147483648);
+    BOOST_CHECK_EQUAL(v4.get_int64(), (int64_t)2147483648);
+    BOOST_CHECK_EQUAL(v4.get_uint64(), (uint64_t)2147483648);
     BOOST_CHECK_THROW(v4.get_int(), std::runtime_error);
+    BOOST_CHECK_EQUAL(v4.get_uint32(), (uint32_t)2147483648);
+    BOOST_CHECK_THROW(v4.get_uint16(), std::runtime_error);
+    BOOST_CHECK_THROW(v4.get_uint8(), std::runtime_error);
     BOOST_CHECK(v4.setNumStr("1000"));
-    BOOST_CHECK_EQUAL(v4.get_int(), 1000);
+    BOOST_CHECK_EQUAL(v4.get_int(), (int32_t)1000);
+    BOOST_CHECK_EQUAL(v4.get_uint32(), (uint32_t)1000);
+    BOOST_CHECK_EQUAL(v4.get_uint16(), (uint16_t)1000);
+    BOOST_CHECK_THROW(v4.get_uint8(), std::runtime_error);
     BOOST_CHECK_THROW(v4.get_str(), std::runtime_error);
     BOOST_CHECK_EQUAL(v4.get_real(), 1000);
     BOOST_CHECK_THROW(v4.get_array(), std::runtime_error);
     BOOST_CHECK_THROW(v4.getKeys(), std::runtime_error);
     BOOST_CHECK_THROW(v4.getValues(), std::runtime_error);
     BOOST_CHECK_THROW(v4.get_obj(), std::runtime_error);
+    BOOST_CHECK(v4.setNumStr("100"));
+    BOOST_CHECK_EQUAL(v4.get_int64(), (int64_t)100);
+    BOOST_CHECK_EQUAL(v4.get_uint64(), (uint64_t)100);
+    BOOST_CHECK_EQUAL(v4.get_int(), (int32_t)100);
+    BOOST_CHECK_EQUAL(v4.get_uint32(), (uint32_t)100);
+    BOOST_CHECK_EQUAL(v4.get_uint16(), (uint16_t)100);
+    BOOST_CHECK_EQUAL(v4.get_uint8(), (uint8_t)100);
 
     UniValue v5;
     BOOST_CHECK(v5.read("[true, 10]"));
@@ -261,6 +275,12 @@ BOOST_AUTO_TEST_CASE(univalue_object)
     strKey = "temperature";
     BOOST_CHECK(obj.pushKV(strKey, (double) 90.012));
 
+    strKey = "moon";
+    BOOST_CHECK(obj.pushKV(strKey, true));
+
+    strKey = "spoon";
+    BOOST_CHECK(obj.pushKV(strKey, false));
+
     UniValue obj2(UniValue::VOBJ);
     BOOST_CHECK(obj2.pushKV("cat1", 9000));
     BOOST_CHECK(obj2.pushKV("cat2", 12345));
@@ -268,7 +288,7 @@ BOOST_AUTO_TEST_CASE(univalue_object)
     BOOST_CHECK(obj.pushKVs(obj2));
 
     BOOST_CHECK_EQUAL(obj.empty(), false);
-    BOOST_CHECK_EQUAL(obj.size(), 9);
+    BOOST_CHECK_EQUAL(obj.size(), 11);
 
     BOOST_CHECK_EQUAL(obj["age"].getValStr(), "100");
     BOOST_CHECK_EQUAL(obj["first"].getValStr(), "John");
@@ -277,6 +297,8 @@ BOOST_AUTO_TEST_CASE(univalue_object)
     BOOST_CHECK_EQUAL(obj["time"].getValStr(), "3600");
     BOOST_CHECK_EQUAL(obj["calories"].getValStr(), "12");
     BOOST_CHECK_EQUAL(obj["temperature"].getValStr(), "90.012");
+    BOOST_CHECK_EQUAL(obj["moon"].getValStr(), "1");
+    BOOST_CHECK_EQUAL(obj["spoon"].getValStr(), "");
     BOOST_CHECK_EQUAL(obj["cat1"].getValStr(), "9000");
     BOOST_CHECK_EQUAL(obj["cat2"].getValStr(), "12345");
 
@@ -289,6 +311,8 @@ BOOST_AUTO_TEST_CASE(univalue_object)
     BOOST_CHECK(obj.exists("time"));
     BOOST_CHECK(obj.exists("calories"));
     BOOST_CHECK(obj.exists("temperature"));
+    BOOST_CHECK(obj.exists("moon"));
+    BOOST_CHECK(obj.exists("spoon"));
     BOOST_CHECK(obj.exists("cat1"));
     BOOST_CHECK(obj.exists("cat2"));
 
@@ -302,6 +326,8 @@ BOOST_AUTO_TEST_CASE(univalue_object)
     objTypes["time"] = UniValue::VNUM;
     objTypes["calories"] = UniValue::VNUM;
     objTypes["temperature"] = UniValue::VNUM;
+    objTypes["moon"] = UniValue::VBOOL;
+    objTypes["spoon"] = UniValue::VBOOL;
     objTypes["cat1"] = UniValue::VNUM;
     objTypes["cat2"] = UniValue::VNUM;
     BOOST_CHECK(obj.checkObject(objTypes));
@@ -393,4 +419,3 @@ int main (int argc, char *argv[])
     univalue_readwrite();
     return 0;
 }
-

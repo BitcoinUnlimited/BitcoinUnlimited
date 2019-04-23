@@ -17,10 +17,10 @@
 #include "script/script_error.h"
 #include "stat.h"
 #include "tweak.h"
-#include "uahf_fork.h"
 #include "univalue/include/univalue.h"
-#include <boost/thread.hpp>
+#include "validation/forks.h"
 #include <list>
+#include <thread>
 #include <vector>
 
 enum
@@ -47,6 +47,9 @@ enum
     // if the blockchain is this far (in seconds) behind the current time, only request headers from a single
     // peer.  This makes IBD more efficient.
     SINGLE_PEER_REQUEST_MODE_AGE = (24 * 60 * 60),
+
+    // How many blocks from tip do we consider than chain to be "nearly" synced.
+    DEFAULT_BLOCKS_FROM_TIP = 2,
 };
 
 class CBlock;
@@ -100,6 +103,9 @@ extern CTweak<uint64_t> checkScriptDays;
 
 // Allow getblocktemplate to succeed even if this node chain tip blocks are old or this node is not connected
 extern CTweak<bool> unsafeGetBlockTemplate;
+
+// Let node operators to use another set of network magic bits
+extern CTweak<uint32_t> netMagic;
 
 // The maximum number of allowed script operations (consensus param)
 extern CTweak<uint64_t> maxScriptOps;
@@ -299,7 +305,6 @@ void InterruptBlockValidationThreads();
 extern CTweakRef<uint64_t> miningForkTime;
 /** This specifies the MTP time of the SV fork */
 extern CTweakRef<uint64_t> miningSvForkTime;
-
 
 // Mining-Candidate start
 /** Return a Merkle root given a Coinbase hash and Merkle proof */

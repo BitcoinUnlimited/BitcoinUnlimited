@@ -1,5 +1,4 @@
-WINDOWS BUILD NOTES
-====================
+# WINDOWS BUILD NOTES
 
 Below are some notes on how to build Bitcoin Unlimited for Windows.
 
@@ -9,8 +8,7 @@ While there are potentially a number of ways to build on Windows, using the Wind
 
 A second alternative way of building on Windows using msys / mingw-w64 is documented in 'build-windows-mingw.md'.
 
-Compiling with Windows Subsystem For Linux
--------------------------------------------
+## Compiling with Windows Subsystem For Linux
 
 With Windows 10, Microsoft has released a new feature named the [Windows Subsystem for Linux](https://msdn.microsoft.com/commandline/wsl/about).  This feature allows you to run a bash shell directly on Windows in an Ubuntu-based environment.  Within this environment you can cross compile for Windows without the need for a separate Linux VM or server.
 
@@ -38,14 +36,15 @@ After the bash shell is active, you can follow the instructions below, starting
 with the "Cross-compilation" section. Compiling the 64-bit version is
 recommended but it is possible to compile the 32-bit version.
 
-Cross-compilation
--------------------
+## Cross-compilation
 
 These steps can be performed on, for example, an Ubuntu VM. The depends system will also work on other Linux distributions, however the commands for installing the toolchain will be different.
 
 First, install the general dependencies:
 
-    sudo apt-get install build-essential libtool autotools-dev automake pkg-config bsdmainutils curl
+```bash
+sudo apt-get install build-essential libtool autotools-dev automake pkg-config bsdmainutils curl
+```
 
 A host toolchain (`build-essential`) is necessary because some dependency
 packages (such as `protobuf`) need to build host utilities that are used in the
@@ -57,40 +56,49 @@ See also: [dependencies.md](dependencies.md).
 
 To build executables for Windows 64-bit, install the following dependencies:
 
-    sudo apt-get install g++-mingw-w64-x86-64 mingw-w64-x86-64-dev
+```bash
+sudo apt-get install g++-mingw-w64-x86-64 mingw-w64-x86-64-dev
+```
 
 Then build using:
 
-    cd depends
-    make HOST=x86_64-w64-mingw32
-    cd ..
-    ./autogen.sh # not required when building from tarball
-    CONFIG_SITE=$PWD/depends/x86_64-w64-mingw32/share/config.site ./configure --prefix=/
-    make
+```bash
+cd depends
+make HOST=x86_64-w64-mingw32
+cd ..
+./autogen.sh # not required when building from tarball
+CONFIG_SITE=$PWD/depends/x86_64-w64-mingw32/share/config.site ./configure --prefix=/
+make
+```
 
 ## Building for 32-bit Windows
 
 To build executables for Windows 32-bit, install the following dependencies:
 
-    sudo apt-get install g++-mingw-w64-i686 mingw-w64-i686-dev 
+```bash
+sudo apt-get install g++-mingw-w64-i686 mingw-w64-i686-dev 
+```
 
 Then build using:
 
-    cd depends
-    make HOST=i686-w64-mingw32
-    cd ..
-    ./autogen.sh # not required when building from tarball
-    CONFIG_SITE=$PWD/depends/i686-w64-mingw32/share/config.site ./configure --prefix=/
-    make
+```bash
+cd depends
+make HOST=i686-w64-mingw32
+cd ..
+./autogen.sh # not required when building from tarball
+CONFIG_SITE=$PWD/depends/i686-w64-mingw32/share/config.site ./configure --prefix=/
+make
+```
 
 For further documentation on the depends system see [README.md](../depends/README.md) in the depends directory.
 
-Installation
--------------
+## Installation
 
 After building using the Windows subsystem it can be useful to copy the compiled
 executables to a directory on the Windows drive in the same directory structure
 as they appear in the release `.zip` archive. This can be done in the following
 way. This will install to `c:\workspace\bitcoin`, for example:
 
-    make install DESTDIR=/mnt/c/workspace/bitcoin
+```bash
+make install DESTDIR=/mnt/c/workspace/bitcoin
+```

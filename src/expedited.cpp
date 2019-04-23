@@ -9,6 +9,7 @@
 #include "dosman.h"
 #include "expedited.h"
 #include "main.h" // Misbehaving, cs_main
+#include "validation/validation.h"
 
 
 #define NUM_XPEDITED_STORE 10
@@ -115,44 +116,65 @@ bool HandleExpeditedBlock(CDataStream &vRecv, CNode *pfrom)
     }
 }
 
-void ActuallySendExpreditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode *skip)
+static void ActuallySendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode *pskip)
 {
     VNodeRefs vNodeRefs(connmgr->ExpeditedBlockNodes());
-
     for (CNodeRef &nodeRef : vNodeRefs)
     {
-        CNode *n = nodeRef.get();
+        CNode *pnode = nodeRef.get();
 
-        if (n->fDisconnect)
+        if (pnode->fDisconnect)
         {
-            connmgr->RemovedNode(n);
+            connmgr->RemovedNode(pnode);
         }
-        else if (n != skip) // Don't send back to the sending node to avoid looping
+        else if (pnode != pskip) // Don't send back to the sending node to avoid looping
         {
-            LOG(THIN, "Sending expedited block %s to %s\n", thinBlock.header.GetHash().ToString(), n->GetLogName());
+            LOG(THIN, "Sending expedited block %s to %s\n", thinBlock.header.GetHash().ToString(), pnode->GetLogName());
 
-            n->PushMessage(NetMsgType::XPEDITEDBLK, (unsigned char)EXPEDITED_MSG_XTHIN, hops, thinBlock);
-            n->blocksSent += 1;
+            pnode->PushMessage(NetMsgType::XPEDITEDBLK, (unsigned char)EXPEDITED_MSG_XTHIN, hops, thinBlock);
+            pnode->blocksSent += 1;
         }
     }
 }
 
-void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, const CNode *skip)
+void SendExpeditedBlock(CXThinBlock &thinBlock, unsigned char hops, CNode *pskip)
 {
+    {
+        LOCK(cs_main);
+
+        // Check we have a valid header with correct timestamp
+        CValidationState state;
+        CBlockIndex *pindex = nullptr;
+        if (!AcceptBlockHeader(thinBlock.header, state, Params(), &pindex))
+        {
+            LOGA("Received an invalid expedited header from peer %s\n", pskip ? pskip->GetLogName() : "none");
+            return;
+        }
+
+        // Validate that the header has enough proof of work to advance the chain or at least be equal
+        // to the current chain tip in case of a re-org.
+        if (!pindex || pindex->nChainWork < chainActive.Tip()->nChainWork)
+        {
+            // Don't print out a log message here. We can sometimes get them during IBD which during
+            // periods where the chain is almost syncd but really isn't. This typically happens in regtest
+            // and is can be confusing to see this in the logs when trying to debug other issues.
+            //
+            // LOGA("Not sending expedited block %s from peer %s, does not extend longest chain\n",
+            //    thinBlock.header.GetHash().ToString(), pskip ? pskip->GetLogName() : "none");
+            return;
+        }
+    }
+
     LOCK(connmgr->cs_expedited);
     if (!IsRecentlyExpeditedAndStore(thinBlock.header.GetHash()))
     {
-        ActuallySendExpreditedBlock(thinBlock, hops, skip);
+        ActuallySendExpeditedBlock(thinBlock, hops, pskip);
     }
+    // else nothing else to do
 }
 
-void SendExpeditedBlock(const CBlock &block, const CNode *skip)
+void SendExpeditedBlock(const CBlock &block, CNode *pskip)
 {
-    LOCK(connmgr->cs_expedited);
-    if (!IsRecentlyExpeditedAndStore(block.GetHash()))
-    {
-        CXThinBlock thinBlock(block);
-        ActuallySendExpreditedBlock(thinBlock, 0, skip);
-    }
-    // else, nothing to do
+    CXThinBlock thinBlock(block);
+    SendExpeditedBlock(thinBlock, 0, pskip);
 }

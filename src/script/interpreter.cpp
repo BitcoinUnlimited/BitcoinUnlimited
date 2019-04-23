@@ -14,8 +14,14 @@
 #include "pubkey.h"
 #include "script/script.h"
 #include "uint256.h"
-
 const std::string strMessageMagic = "Bitcoin Signed Message:\n";
+
+extern uint256 SignatureHashLegacy(const CScript &scriptCode,
+    const CTransaction &txTo,
+    unsigned int nIn,
+    uint32_t nHashType,
+    const CAmount &amount,
+    size_t *nHashedOut);
 
 using namespace std;
 
@@ -487,6 +493,26 @@ static bool CheckSignatureEncodingSigHashChoice(const vector<unsigned char> &vch
     {
         return true;
     }
+
+    if (flags & SCRIPT_ENABLE_SCHNORR)
+    {
+        if (vchSig.size() == 64 + ((check_sighash == true) ? 1 : 0)) // 64 sig length plus 1 sighashtype
+        {
+            // In a generic-signature context, 64-byte signatures are interpreted
+            // as Schnorr signatures (always correctly encoded) when flag set.
+            if (check_sighash && ((flags & SCRIPT_VERIFY_STRICTENC) != 0))
+            {
+                if (!IsDefinedHashtypeSignature(vchSig))
+                    return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
+
+                // schnorr sigs must use forkid sighash if forkid flag set
+                if ((flags & SCRIPT_ENABLE_SIGHASH_FORKID) && ((vchSig[64] & SIGHASH_FORKID) == 0))
+                    return set_error(serror, SCRIPT_ERR_MUST_USE_FORKID);
+            }
+            return true;
+        }
+    }
+
     if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_STRICTENC)) != 0)
     {
         if (check_sighash)
@@ -609,39 +635,109 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
     ScriptError *serror,
     unsigned char *sighashtype)
 {
-    static const CScriptNum bnZero(0);
-    static const CScriptNum bnOne(1);
-    static const CScriptNum bnFalse(0);
-    static const CScriptNum bnTrue(1);
-    static const valtype vchFalse(0);
-    static const valtype vchZero(0);
-    static const valtype vchTrue(1, 1);
-
-    CScript::const_iterator pc = script.begin();
-    CScript::const_iterator pend = script.end();
-    CScript::const_iterator pbegincodehash = script.begin();
-    opcodetype opcode;
-    valtype vchPushValue;
-    vector<bool> vfExec;
-    vector<valtype> altstack;
+    ScriptMachine sm(flags, checker, maxOps);
+    sm.setStack(stack);
+    bool result = sm.Eval(script);
+    stack = sm.getStack();
+    if (serror)
+        *serror = sm.getError();
     if (sighashtype)
-        *sighashtype = 0;
+        *sighashtype = sm.getSigHashType();
+    return result;
+}
 
-    set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
-    if (script.size() > MAX_SCRIPT_SIZE)
-        return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
-    unsigned int nOpCount = 0;
+
+static const CScriptNum bnZero(0);
+static const CScriptNum bnOne(1);
+static const CScriptNum bnFalse(0);
+static const CScriptNum bnTrue(1);
+static const StackDataType vchFalse(0);
+static const StackDataType vchZero(0);
+static const StackDataType vchTrue(1, 1);
+
+// Returns info about the next instruction to be run
+std::tuple<bool, opcodetype, StackDataType, ScriptError> ScriptMachine::Peek()
+{
+    ScriptError err;
+    opcodetype opcode;
+    StackDataType vchPushValue;
+    auto oldpc = pc;
+    if (!script->GetOp(pc, opcode, vchPushValue))
+        set_error(&err, SCRIPT_ERR_BAD_OPCODE);
+    else if (vchPushValue.size() > MAX_SCRIPT_ELEMENT_SIZE)
+        set_error(&err, SCRIPT_ERR_PUSH_SIZE);
+    pc = oldpc;
+    bool fExec = !count(vfExec.begin(), vfExec.end(), false);
+    return std::tuple<bool, opcodetype, StackDataType, ScriptError>(fExec, opcode, vchPushValue, err);
+}
+
+
+bool ScriptMachine::BeginStep(const CScript &_script)
+{
+    script = &_script;
+
+    pc = pbegin = script->begin();
+    pend = script->end();
+    pbegincodehash = pc;
+
+    sighashtype = 0;
+    nOpCount = 0;
+    vfExec.clear();
+
+    set_error(&error, SCRIPT_ERR_UNKNOWN_ERROR);
+    if (script->size() > MAX_SCRIPT_SIZE)
+    {
+        script = nullptr;
+        return set_error(&error, SCRIPT_ERR_SCRIPT_SIZE);
+    }
+    return true;
+}
+
+
+int ScriptMachine::getPos() { return (pc - pbegin); }
+bool ScriptMachine::Eval(const CScript &_script)
+{
+    bool ret;
+
+    if (!(ret = BeginStep(_script)))
+        return ret;
+
+    while (pc < pend)
+    {
+        ret = Step();
+        if (!ret)
+            break;
+    }
+    if (ret)
+        ret = EndStep();
+    script = nullptr; // Ensure that the ScriptMachine does not hold script for longer than this scope
+
+    return ret;
+}
+
+bool ScriptMachine::EndStep()
+{
+    script = nullptr; // let go of our use of the script
+    if (!vfExec.empty())
+        return set_error(&error, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
+    return set_success(&error);
+}
+
+bool ScriptMachine::Step()
+{
     bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
+    opcodetype opcode;
+    StackDataType vchPushValue;
+    ScriptError *serror = &error;
     try
     {
-        while (pc < pend)
         {
             bool fExec = !count(vfExec.begin(), vfExec.end(), false);
 
             //
             // Read instruction
             //
-            if (!script.GetOp(pc, opcode, vchPushValue))
+            if (!script->GetOp(pc, opcode, vchPushValue))
                 return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
             if (vchPushValue.size() > MAX_SCRIPT_ELEMENT_SIZE)
                 return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
@@ -1426,8 +1522,7 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                     // not used.
                     uint32_t nHashType = GetHashType(vchSig);
                     // BU remember the sighashtype so we can use it to choose when to allow this tx
-                    if (sighashtype)
-                        *sighashtype |= nHashType;
+                    sighashtype |= nHashType;
 
                     // Drop the signature, since there's no way for a signature to sign itself
                     scriptCode.FindAndDelete(CScript(vchSig));
@@ -1499,8 +1594,7 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                         // is not used.
                         uint32_t nHashType = GetHashType(vchSig);
                         // BU remember the sighashtype so we can use it to choose when to allow this tx
-                        if (sighashtype)
-                            *sighashtype |= nHashType;
+                        sighashtype |= nHashType;
                         scriptCode.FindAndDelete(CScript(vchSig));
                     }
 
@@ -1509,6 +1603,19 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                     {
                         valtype &vchSig = stacktop(-isig);
                         valtype &vchPubKey = stacktop(-ikey);
+
+                        // If schnorr is enabled, then no signature can be 64 + 1 bytes because multisig does
+                        // not support schnorr, and all 64 byte signatures are assumed to be schnorr.
+                        if (flags & SCRIPT_ENABLE_SCHNORR)
+                        {
+                            if (vchSig.size() == 65) // 64 sig length plus 1 sighashtype
+                            {
+                                // 64-byte signatures are not allowed for ECDSA if schnorr is possible
+                                if (serror)
+                                    *serror = SCRIPT_ERR_SIG_BADLENGTH;
+                                return false;
+                            }
+                        }
 
                         // Note how this makes the exact order of pubkey/signature evaluation
                         // distinguishable by CHECKMULTISIG NOT if the STRICTENC flag is set.
@@ -1603,9 +1710,8 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                         valtype vchHash(32);
                         CSHA256().Write(vchMessage.data(), vchMessage.size()).Finalize(vchHash.data());
                         uint256 messagehash(vchHash);
-
                         CPubKey pubkey(vchPubKey);
-                        fSuccess = pubkey.Verify(messagehash, vchSig);
+                        fSuccess = checker.VerifySignature(vchSig, pubkey, messagehash);
                     }
 
                     if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) && vchSig.size())
@@ -1762,30 +1868,31 @@ bool EvalScript(vector<vector<unsigned char> > &stack,
                 return set_error(serror, SCRIPT_ERR_STACK_SIZE);
         }
     }
+    catch (scriptnum_error &e)
+    {
+        return set_error(serror, e.errNum);
+    }
     catch (...)
     {
         return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
     }
-    if (!vfExec.empty())
-        return set_error(serror, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
 
     return set_success(serror);
 }
 
-bool TransactionSignatureChecker::VerifySignature(const std::vector<unsigned char> &vchSig,
+bool BaseSignatureChecker::VerifySignature(const std::vector<uint8_t> &vchSig,
     const CPubKey &pubkey,
     const uint256 &sighash) const
 {
-    return pubkey.Verify(sighash, vchSig);
+    if ((nFlags & SCRIPT_ENABLE_SCHNORR) && (vchSig.size() == 64))
+    {
+        return pubkey.VerifySchnorr(sighash, vchSig);
+    }
+    else
+    {
+        return pubkey.VerifyECDSA(sighash, vchSig);
+    }
 }
-
-extern uint256 SignatureHashLegacy(const CScript &scriptCode,
-    const CTransaction &txTo,
-    unsigned int nIn,
-    uint32_t nHashType,
-    const CAmount &amount,
-    size_t *nHashedOut);
-
 
 bool TransactionSignatureChecker::CheckSig(const vector<unsigned char> &vchSigIn,
     const vector<unsigned char> &vchPubKey,
@@ -1954,6 +2061,13 @@ bool VerifyScript(const CScript &scriptSig,
         const valtype &pubKeySerialized = stack.back();
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
         popstack(stack);
+
+        // Bail out early if ALLOW_SEGWIT_RECOVERY is set, the redeem script is
+        // a p2sh segwit program and it was the only item pushed into the stack
+        if ((flags & SCRIPT_ALLOW_SEGWIT_RECOVERY) != 0 && stack.empty() && pubKey2.IsWitnessProgram())
+        {
+            return set_success(serror);
+        }
 
         if (!EvalScript(stack, pubKey2, flags, maxOps, checker, serror, sighashtype))
             // serror is set

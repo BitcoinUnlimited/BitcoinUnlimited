@@ -25,6 +25,9 @@
 
 #if defined(QT_STATICPLUGIN)
 #include <QtPlugin>
+#if defined(QT_QPA_PLATFORM_MINIMAL)
+Q_IMPORT_PLUGIN(QMinimalIntegrationPlugin);
+#endif
 #endif
 
 // This is all you need to run all the tests
@@ -32,6 +35,15 @@ int main(int argc, char *argv[])
 {
     SetupEnvironment();
     bool fInvalid = false;
+
+    // Prefer the "minimal" platform for the test instead of the normal default
+    // platform ("xcb", "windows", or "cocoa") so tests can't unintentially
+    // interfere with any background GUIs and don't require extra resources.
+    #if defined(WIN32)
+        _putenv_s("QT_QPA_PLATFORM", "minimal");
+    #else
+        setenv("QT_QPA_PLATFORM", "minimal", 0);
+    #endif
 
     // Don't remove this, it's needed to access
     // QCoreApplication:: in the tests

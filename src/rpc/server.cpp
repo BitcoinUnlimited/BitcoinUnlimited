@@ -25,7 +25,7 @@
 #include <boost/iostreams/stream.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/signals2/signal.hpp>
-#include <boost/thread.hpp>
+#include <thread>
 
 using namespace RPCServer;
 using namespace std;
@@ -138,6 +138,9 @@ uint256 ParseHashV(const UniValue &v, string strName)
         strHex = v.get_str();
     if (!IsHex(strHex)) // Note: IsHex("") is false
         throw JSONRPCError(RPC_INVALID_PARAMETER, strName + " must be hexadecimal string (not '" + strHex + "')");
+    if (64 != strHex.length())
+        throw JSONRPCError(
+            RPC_INVALID_PARAMETER, strprintf("%s must be of length %d (not %d)", strName, 64, strHex.length()));
     uint256 result;
     result.SetHex(strHex);
     return result;

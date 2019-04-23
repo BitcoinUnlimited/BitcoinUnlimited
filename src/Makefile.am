@@ -5,6 +5,7 @@
 DIST_SUBDIRS = secp256k1 univalue
 
 AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS) $(HARDENED_LDFLAGS)
+AM_LIBTOOLFLAGS = --preserve-dup-deps
 if ENABLE_GPERF
 AM_CXXFLAGS = -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free $(HARDENED_CXXFLAGS)
 AM_CPPFLAGS = -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free $(HARDENED_CPPFLAGS)
@@ -35,6 +36,7 @@ BITCOIN_INCLUDES=-I$(builddir) -I$(builddir)/obj $(BDB_CPPFLAGS) $(BOOST_CPPFLAG
 
 BITCOIN_INCLUDES += -I$(srcdir)/secp256k1/include
 BITCOIN_INCLUDES += -I$(srcdir)/univalue/include
+BITCOIN_INCLUDES += -I$(srcdir)/rsm
 
 LIBBITCOIN_SERVER=libbitcoin_server.a
 LIBBITCOIN_COMMON=libbitcoin_common.a
@@ -99,6 +101,7 @@ BITCOIN_CORE_H = \
   bandb.h \
   banentry.h \
   blockrelay/blockrelay_common.h \
+  blockrelay/compactblock.h \
   blockrelay/graphene.h \
   blockrelay/graphene_set.h \
   blockrelay/thinblock.h \
@@ -130,9 +133,12 @@ BITCOIN_CORE_H = \
   consensus/tx_verify.h \
   core_io.h \
   core_memusage.h \
+  cuckoocache.h \
   dosman.h \
   dstencode.h \
   expedited.h \
+  electrum/electrs.h \
+  electrum/electrumserver.h \
   fast-cpp-csv-parser/csv.h \
   fastfilter.h \
   forks_csv.h \
@@ -163,6 +169,8 @@ BITCOIN_CORE_H = \
   pow.h \
   protocol.h \
   random.h \
+  reverse_iterator.h \
+  rsm/recursive_shared_mutex.h \
   reverselock.h \
   rpc/client.h \
   rpc/protocol.h \
@@ -172,7 +180,6 @@ BITCOIN_CORE_H = \
   respend/respendlogger.h \
   respend/respendrelayer.h \
   respend/respenddetector.h \
-  scheduler.h \
   script/sigcache.h \
   script/sign.h \
   script/standard.h \
@@ -183,6 +190,7 @@ BITCOIN_CORE_H = \
   support/cleanse.h \
   support/pagelocker.h \
   sync.h \
+  threadgroup.h \
   threadsafety.h \
   timedata.h \
   torcontrol.h \
@@ -191,9 +199,10 @@ BITCOIN_CORE_H = \
   txmempool.h \
   txorphanpool.h \
   ui_interface.h \
-  uahf_fork.h \
   undo.h \
   unlimited.h \
+  utilhttp.h \
+  utilprocess.h \
   stat.h \
   tweak.h \
   requestManager.h \
@@ -239,6 +248,7 @@ libbitcoin_server_a_SOURCES = \
   banentry.cpp \
   bitnodes.cpp \
   blockrelay/blockrelay_common.cpp \
+  blockrelay/compactblock.cpp \
   blockrelay/graphene.cpp \
   blockrelay/graphene_set.cpp \
   blockrelay/thinblock.cpp \
@@ -252,6 +262,8 @@ libbitcoin_server_a_SOURCES = \
   consensus/tx_verify.cpp \
   dosman.cpp \
   expedited.cpp \
+  electrum/electrs.cpp \
+  electrum/electrumserver.cpp \
   forks_csv.cpp \
   httprpc.cpp \
   httpserver.cpp \
@@ -271,6 +283,7 @@ libbitcoin_server_a_SOURCES = \
   pow.cpp \
   rest.cpp \
   rpc/blockchain.cpp \
+  rpc/electrum.cpp \
   rpc/mining.cpp \
   rpc/misc.cpp \
   rpc/net.cpp \
@@ -288,8 +301,9 @@ libbitcoin_server_a_SOURCES = \
   txmempool.cpp \
   txorphanpool.cpp \
   tweak.cpp \
-  uahf_fork.cpp \
   unlimited.cpp \
+  utilhttp.cpp \
+  utilprocess.cpp \
   requestManager.cpp \
   validation/forks.cpp \
   validation/validation.cpp \
@@ -341,6 +355,10 @@ libbitcoincash_a_SOURCES = \
   pubkey.h \
   random.cpp \
   random.h \
+  script/interpreter.cpp \
+  script/interpreter.h \
+  script/script.cpp \
+  script/script.h \
   support/pagelocker.cpp \
   support/pagelocker.h \
   support/cleanse.cpp \
@@ -433,7 +451,6 @@ libbitcoin_common_a_SOURCES = \
   netaddress.cpp \
   netbase.cpp \
   protocol.cpp \
-  scheduler.cpp \
   script/sign.cpp \
   script/standard.cpp \
   versionbits.cpp \
@@ -455,6 +472,7 @@ libbitcoin_util_a_SOURCES = \
   compat/strnlen.cpp \
   fs.cpp \
   random.cpp \
+  rsm/recursive_shared_mutex.cpp \
   rpc/protocol.cpp \
   support/cleanse.cpp \
   sync.cpp \
@@ -467,6 +485,7 @@ libbitcoin_util_a_SOURCES = \
 
 if GLIBC_BACK_COMPAT
 libbitcoin_util_a_SOURCES += compat/glibc_compat.cpp
+AM_LDFLAGS += $(COMPAT_LDFLAGS)
 endif
 
 # cli: shared between bitcoin-cli and bitcoin-qt

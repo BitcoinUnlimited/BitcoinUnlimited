@@ -31,6 +31,12 @@
 #include <boost/signals2/signal.hpp>
 #include <boost/thread/exceptions.hpp>
 
+// Preface any Shared Library API definition with this macro.  This will ensure that the function is available for
+// external linkage.
+// For example:
+// SLAPI int myExportedFunc(unsigned char *buf, int num);
+#define SLAPI extern "C" __attribute__((visibility("default")))
+
 #ifdef DEBUG
 #define DEBUG_ASSERTION
 #define DEBUG_PAUSE
@@ -111,7 +117,8 @@ int LogPrintStr(const std::string &str);
 // Takes a std::vector of strings and splits individual arguments further up if
 // they contain commas. Also removes space from the output strings.
 // For example, ["a", "b,c", "d"] becomes ["a", "b", "c", "d"]
-extern std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args);
+extern std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args,
+    bool removeDuplicates = false);
 
 // Logging API:
 // Use the two macros
@@ -119,17 +126,6 @@ extern std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<s
 // LOGA(...)
 // located further down.
 // (Do not use the Logging functions directly)
-namespace Logging
-{
-extern uint64_t categoriesEnabled;
-
-/*
-To add a new log category:
-1) Create a unique 1 bit category mask. (Easiest is to 2* the last enum entry.)
-   Put it at the end of enum below.
-2) Add an category/string pair to LOGLABELMAP macro below.
-*/
-
 // Log Categories:
 // 64 Bits: (Define unique bits, not 'normal' numbers)
 enum
@@ -175,8 +171,22 @@ enum
 
     GRAPHENE = 0x10000000,
     RESPEND = 0x20000000,
-    WB = 0x40000000 // weak blocks
+    WB = 0x40000000, // weak blocks
+    CMPCT = 0x80000000, // compact blocks
+
+    ELECTRUM = 0x100000000
 };
+
+namespace Logging
+{
+extern uint64_t categoriesEnabled;
+
+/*
+To add a new log category:
+1) Create a unique 1 bit category mask. (Easiest is to 2* the last enum entry.)
+   Put it at the end of enum below.
+2) Add an category/string pair to LOGLABELMAP macro below.
+*/
 
 // Add corresponding lower case string for the category:
 #define LOGLABELMAP                                                                                             \
@@ -187,7 +197,8 @@ enum
             {MEMPOOLREJ, "mempoolrej"}, {BLK, "blk"}, {EVICT, "evict"}, {PARALLEL, "parallel"}, {RAND, "rand"}, \
             {REQ, "req"}, {BLOOM, "bloom"}, {LCK, "lck"}, {PROXY, "proxy"}, {DBASE, "dbase"},                   \
             {SELECTCOINS, "selectcoins"}, {ESTIMATEFEE, "estimatefee"}, {QT, "qt"}, {IBD, "ibd"},               \
-            {GRAPHENE, "graphene"}, {RESPEND, "respend"}, {WB, "weakblocks"},                                   \
+            {GRAPHENE, "graphene"}, {RESPEND, "respend"}, {WB, "weakblocks"}, {CMPCT, "cmpctblock"},            \
+            {ELECTRUM, "electrum"},                                                                             \
         {                                                                                                       \
             ZMQ, "zmq"                                                                                          \
         }                                                                                                       \
@@ -231,7 +242,7 @@ std::string LogGetLabel(uint64_t category);
  * Formatted for display.
  * returns all categories and states
  */
-std::string LogGetAllString();
+std::string LogGetAllString(bool fEnabled = false);
 
 /**
  * Initialize
@@ -321,11 +332,6 @@ inline void LogWrite(const std::string &str)
 // Flush log file (if you know you are about to abort)
 void LogFlush();
 
-// Log tests:
-UniValue setlog(const UniValue &params, bool fHelp);
-// END logging.
-
-
 /**
  * Translate a boolean string to a bool.
  * Throws an exception if not one of the strings.
@@ -356,12 +362,23 @@ std::string FormatStringFromLogArgs(const char *fmt, const Args &... args)
     return fmt;
 }
 
+
 template <typename... Args>
 bool error(const char *fmt, const Args &... args)
 {
     LogPrintStr("ERROR: " + tfm::format(fmt, args...) + "\n");
     return false;
 }
+
+
+template <typename... Args>
+inline bool error(uint64_t ctgr, const char *fmt, const Args &... args)
+{
+    if (Logging::LogAcceptCategory(ctgr))
+        LogPrintStr("ERROR: " + tfm::format(fmt, args...) + "\n");
+    return false;
+}
+
 
 /**
  Format an amount of bytes with a unit symbol attached, such as MB, KB, GB.
@@ -513,7 +530,7 @@ void TraceThreads(const std::string &name, Callable func)
     }
     catch (...)
     {
-        PrintExceptionContinue(NULL, name.c_str());
+        PrintExceptionContinue(nullptr, name.c_str());
         LogFlush();
         throw;
     }

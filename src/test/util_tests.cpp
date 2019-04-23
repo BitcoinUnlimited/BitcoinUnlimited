@@ -7,6 +7,7 @@
 
 #include "clientversion.h"
 #include "primitives/transaction.h"
+#include "reverse_iterator.h"
 #include "sync.h"
 #include "test/test_bitcoin.h"
 #include "test/test_random.h"
@@ -705,37 +706,6 @@ BOOST_AUTO_TEST_CASE(test_ConvertBits)
         {0x00, 0x04, 0x11, 0x14, 0x0a, 0x19, 0x1c, 0x09, 0x15, 0x0f, 0x06, 0x1e, 0x1e});
 }
 
-// Log tests:
-bool TestSetLog(uint64_t categoriesExpected, const char *arg1, const char *arg2 = NULL)
-{
-    UniValue logargs(UniValue::VARR);
-    bool ret = false;
-    logargs.push_back(arg1);
-    if (arg2 != NULL)
-        logargs.push_back(arg2);
-
-    setlog(logargs, false); // The function to be tested
-
-    if (categoriesExpected == Logging::categoriesEnabled)
-        ret = true;
-
-    // LOGA("TestSetLog %s %s ret: %d\n", arg1, ((arg2 == NULL)?"":arg2),(int)ret);
-    return ret;
-}
-
-bool IsStringTrueBadArgTest(const char *arg1)
-{
-    try
-    {
-        IsStringTrue(arg1);
-    }
-    catch (...)
-    {
-        return true; // If bad arg return true
-    }
-    return false;
-}
-
 BOOST_AUTO_TEST_CASE(util_Logging)
 {
     {
@@ -754,27 +724,25 @@ BOOST_AUTO_TEST_CASE(util_Logging)
         LogToggleCategory(ALL, false);
         BOOST_CHECK_EQUAL(NONE, categoriesEnabled);
         BOOST_CHECK_EQUAL(LogGetLabel(ADDRMAN), "addrman");
-        BOOST_CHECK(TestSetLog(ALL, "all", "on"));
-        BOOST_CHECK(TestSetLog(NONE, "all", "off"));
-        BOOST_CHECK(TestSetLog(NONE, "tor"));
-        BOOST_CHECK(TestSetLog(TOR, "tor", "on"));
-        BOOST_CHECK(TestSetLog(NONE, "tor", "off"));
-        BOOST_CHECK(!TestSetLog(TOR, "tor", "bad-arg"));
-        BOOST_CHECK(TestSetLog(categoriesEnabled, "badcategory", "on"));
         LogToggleCategory(ALL, true);
         LOG(THIN, "missing args %s %d\n");
         LOG(THIN, "wrong order args %s %d\n", 3, "hello");
         LOG(THIN, "null arg %s\n", NULL);
-        BOOST_CHECK(IsStringTrue("true"));
-        BOOST_CHECK(IsStringTrue("enable"));
-        BOOST_CHECK(IsStringTrue("1"));
-        BOOST_CHECK(IsStringTrue("on"));
-        BOOST_CHECK(!IsStringTrue("false"));
-        BOOST_CHECK(!IsStringTrue("disable"));
-        BOOST_CHECK(!IsStringTrue("0"));
-        BOOST_CHECK(!IsStringTrue("off"));
-        BOOST_CHECK(IsStringTrueBadArgTest("bad"));
+        LOG(THIN, "test no CR");
     }
+}
+
+BOOST_AUTO_TEST_CASE(isstringtrue)
+{
+    BOOST_CHECK(IsStringTrue("true"));
+    BOOST_CHECK(IsStringTrue("enable"));
+    BOOST_CHECK(IsStringTrue("1"));
+    BOOST_CHECK(IsStringTrue("on"));
+    BOOST_CHECK(!IsStringTrue("false"));
+    BOOST_CHECK(!IsStringTrue("disable"));
+    BOOST_CHECK(!IsStringTrue("0"));
+    BOOST_CHECK(!IsStringTrue("off"));
+    BOOST_CHECK_THROW(IsStringTrue("bad"), std::invalid_argument);
 }
 
 BOOST_AUTO_TEST_CASE(util_wildmatch)
@@ -810,17 +778,32 @@ BOOST_AUTO_TEST_CASE(splitbycommaandremovespaces)
     const std::vector<std::string> r = splitByCommasAndRemoveSpaces(inp1);
 
     BOOST_CHECK_EQUAL(r.size(), 4);
-    BOOST_CHECK_EQUAL(r[0], "one");
-    BOOST_CHECK_EQUAL(r[1], "two");
-    BOOST_CHECK_EQUAL(r[2], "three");
-    BOOST_CHECK_EQUAL(r[3], "four");
+    BOOST_CHECK_EQUAL(r[3], "one");
+    BOOST_CHECK_EQUAL(r[2], "two");
+    BOOST_CHECK_EQUAL(r[1], "three");
+    BOOST_CHECK_EQUAL(r[0], "four");
 
     const std::vector<std::string> r2 = splitByCommasAndRemoveSpaces(r);
     BOOST_CHECK_EQUAL(r.size(), 4);
-    BOOST_CHECK_EQUAL(r[0], "one");
-    BOOST_CHECK_EQUAL(r[1], "two");
-    BOOST_CHECK_EQUAL(r[2], "three");
-    BOOST_CHECK_EQUAL(r[3], "four");
+    BOOST_CHECK_EQUAL(r[3], "one");
+    BOOST_CHECK_EQUAL(r[2], "two");
+    BOOST_CHECK_EQUAL(r[1], "three");
+    BOOST_CHECK_EQUAL(r[0], "four");
+
+    std::vector<std::string> inp2{"one", "two, two  ", "f o u r"};
+    const std::vector<std::string> r3 = splitByCommasAndRemoveSpaces(inp2, true);
+    BOOST_CHECK_EQUAL(r3.size(), 3);
+    BOOST_CHECK_EQUAL(r3[2], "four");
+    BOOST_CHECK_EQUAL(r3[1], "one");
+    BOOST_CHECK_EQUAL(r3[0], "two");
+
+    std::vector<std::string> inp3{"1", "2", "3", "-4"};
+    const std::vector<std::string> r4 = splitByCommasAndRemoveSpaces(inp3, true);
+    BOOST_CHECK_EQUAL(r4.size(), 4);
+    BOOST_CHECK_EQUAL(r4[0], "3");
+    BOOST_CHECK_EQUAL(r4[1], "2");
+    BOOST_CHECK_EQUAL(r4[2], "1");
+    BOOST_CHECK_EQUAL(r4[3], "-4");
 }
 
 BOOST_AUTO_TEST_CASE(enum_toString)
@@ -838,6 +821,23 @@ BOOST_AUTO_TEST_CASE(enum_toString)
     BOOST_CHECK_EQUAL(toString(6, map2), "TWO | FOUR");
     BOOST_CHECK_EQUAL(toString(7, map1), "ONE | TWO | FOUR");
     BOOST_CHECK_EQUAL(toString(7, map2), "ALL");
+}
+
+BOOST_AUTO_TEST_CASE(reverse_iterator)
+{
+    std::vector<int> v = {5, 4, 3, 2, 1};
+    int cnt = 1;
+    for (auto x : reverse_iterate(v))
+    {
+        BOOST_CHECK_EQUAL(x, cnt);
+        cnt++;
+    }
+
+    v = {}; // check empty vector
+    for (auto x : reverse_iterate(v))
+    {
+        BOOST_CHECK(x == 100); // should never get here but use x to avoid warning
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

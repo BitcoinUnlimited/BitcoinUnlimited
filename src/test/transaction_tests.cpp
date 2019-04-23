@@ -100,7 +100,7 @@ BOOST_AUTO_TEST_CASE(tx_valid)
             stream >> tx;
 
             CValidationState state;
-            BOOST_CHECK_MESSAGE(CheckTransaction(tx, state), strTest);
+            BOOST_CHECK_MESSAGE(CheckTransaction(MakeTransactionRef(CTransaction(tx)), state), strTest);
             BOOST_CHECK(state.IsValid());
 
             for (unsigned int i = 0; i < tx.vin.size(); i++)
@@ -191,7 +191,7 @@ BOOST_AUTO_TEST_CASE(tx_invalid)
             stream >> tx;
 
             CValidationState state;
-            fValid = CheckTransaction(tx, state) && state.IsValid();
+            fValid = CheckTransaction(MakeTransactionRef(CTransaction(tx)), state) && state.IsValid();
 
             for (unsigned int i = 0; i < tx.vin.size() && fValid; i++)
             {
@@ -240,13 +240,13 @@ BOOST_AUTO_TEST_CASE(basic_transaction_tests)
     CMutableTransaction tx;
     stream >> tx;
     CValidationState state;
-    BOOST_CHECK_MESSAGE(
-        CheckTransaction(tx, state) && state.IsValid(), "Simple deserialized transaction should be valid.");
+    BOOST_CHECK_MESSAGE(CheckTransaction(MakeTransactionRef(CTransaction(tx)), state) && state.IsValid(),
+        "Simple deserialized transaction should be valid.");
 
     // Check that duplicate txins fail
     tx.vin.push_back(tx.vin[0]);
-    BOOST_CHECK_MESSAGE(
-        !CheckTransaction(tx, state) || !state.IsValid(), "Transaction with duplicate txins should be invalid.");
+    BOOST_CHECK_MESSAGE(!CheckTransaction(MakeTransactionRef(CTransaction(tx)), state) || !state.IsValid(),
+        "Transaction with duplicate txins should be invalid.");
 }
 
 //
@@ -308,7 +308,7 @@ BOOST_AUTO_TEST_CASE(test_Get)
     t1.vout[0].nValue = 90 * CENT;
     t1.vout[0].scriptPubKey << OP_1;
 
-    BOOST_CHECK(AreInputsStandard(t1, coins));
+    BOOST_CHECK(AreInputsStandard(MakeTransactionRef(CTransaction(t1)), coins));
     BOOST_CHECK_EQUAL(coins.GetValueIn(t1), (50 + 21 + 22) * CENT);
 }
 
@@ -333,29 +333,90 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
 
     string reason;
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     // Check dust with default threshold:
     nDustThreshold.Set(DEFAULT_DUST_THRESHOLD);
     // dust:
     t.vout[0].nValue = nDustThreshold.Value() - 1;
-    BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
     // not dust:
     t.vout[0].nValue = nDustThreshold.Value();
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     // Check dust with odd threshold
     nDustThreshold.Set(1234);
     // dust:
     t.vout[0].nValue = 1234 - 1;
-    BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
     // not dust:
     t.vout[0].nValue = 1234;
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
     nDustThreshold.Set(DEFAULT_DUST_THRESHOLD);
 
     t.vout[0].scriptPubKey = CScript() << OP_1;
-    BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
+    BOOST_CHECK(CTransaction(t).HasData() == false);
+
+    // Check max LabelPublic: MAX_OP_RETURN_RELAY-2 byte TX_NULL_DATA
+    nMaxDatacarrierBytes = MAX_OP_RETURN_RELAY;
+    uint64_t someNumber = 1;
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << CScriptNum(someNumber)
+                                       << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                   "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                   "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                   "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef7105"
+                                                   "2312");
+    BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY, t.vout[0].scriptPubKey.size());
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
+
+    // Check that 2 public labels are not allowed
+    t.vout.resize(2);
+    t.vout[1].scriptPubKey = CScript() << OP_RETURN << CScriptNum(someNumber)
+                                       << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                   "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                   "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                   "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef7105"
+                                                   "2312");
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
+
+    // Check that 1 pub label and 1 normal data is not allowed
+    t.vout[1].scriptPubKey = CScript() << OP_RETURN << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                                "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                                "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                                "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                                "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                                "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                                "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                                "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef7105"
+                                                                "2312");
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
+    t.vout.resize(1);
+
+
+    // Check max LabelPublic: MAX_OP_RETURN_RELAY-byte TX_NULL_DATA
+    // MAX_OP_RETURN_RELAY+1-2 -byte TX_NULL_DATA (non-standard)
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << CScriptNum(someNumber)
+                                       << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                   "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                   "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                   "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef7105"
+                                                   "2312ac");
+    BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY + 1, t.vout[0].scriptPubKey.size());
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
+
 
     // MAX_OP_RETURN_RELAY-byte TX_NULL_DATA (standard)
     nMaxDatacarrierBytes = MAX_OP_RETURN_RELAY;
@@ -369,7 +430,7 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
                                                                 "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef7105"
                                                                 "2312acbd");
     BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY, t.vout[0].scriptPubKey.size());
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     // MAX_OP_RETURN_RELAY+1-byte TX_NULL_DATA (non-standard)
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
@@ -382,50 +443,71 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
                                                                 "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef7105"
                                                                 "2312acbdab");
     BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY + 1, t.vout[0].scriptPubKey.size());
-    BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
+
+    BOOST_CHECK(CTransaction(t).HasData(2969406055) == false); // dataID (first data after op_return) too long
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("678afdb0");
+    BOOST_CHECK(CTransaction(t).HasData() == true);
+    BOOST_CHECK(CTransaction(t).HasData(2969406055) == true);
+    BOOST_CHECK(CTransaction(t).HasData(12345678) == false); // wrong dataID
 
     // Data payload can be encoded in any way...
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("");
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("00") << ParseHex("01");
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
     // OP_RESERVED *is* considered to be a PUSHDATA type opcode by IsPushOnly()!
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << OP_RESERVED << -1 << 0 << ParseHex("01") << 2 << 3 << 4 << 5 << 6
                                        << 7 << 8 << 9 << 10 << 11 << 12 << 13 << 14 << 15 << 16;
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
+    BOOST_CHECK(CTransaction(t).HasData() == true);
+    BOOST_CHECK(CTransaction(t).HasData(1) == false);
+
     t.vout[0].scriptPubKey =
         CScript() << OP_RETURN << 0 << ParseHex("01") << 2
                   << ParseHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     // ...so long as it only contains PUSHDATA's
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << OP_RETURN;
-    BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     // TX_NULL_DATA w/o PUSHDATA
     t.vout.resize(1);
     t.vout[0].scriptPubKey = CScript() << OP_RETURN;
-    BOOST_CHECK(IsStandardTx(t, reason));
+    BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     // Only one TX_NULL_DATA permitted in all cases
     t.vout.resize(2);
     t.vout[0].scriptPubKey =
         CScript() << OP_RETURN
-                  << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38");
+                  << ParseHex("04578afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38");
     t.vout[1].scriptPubKey =
         CScript() << OP_RETURN
                   << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38");
-    BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
+    BOOST_CHECK(CTransaction(t).HasData() == true);
 
     t.vout[0].scriptPubKey =
         CScript() << OP_RETURN
                   << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38");
     t.vout[1].scriptPubKey = CScript() << OP_RETURN;
-    BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     t.vout[0].scriptPubKey = CScript() << OP_RETURN;
     t.vout[1].scriptPubKey = CScript() << OP_RETURN;
-    BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
+    BOOST_CHECK(CTransaction(t).HasData() == true);
+    BOOST_CHECK(CTransaction(t).HasData(1) == false);
+
+    // Check two op_returns... this is nonstandard but we should still find that it has data
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("04578afd");
+    t.vout[1].scriptPubKey = CScript() << OP_RETURN << ParseHex("04678afd");
+
+    BOOST_CHECK(CTransaction(t).HasData() == true);
+    BOOST_CHECK(CTransaction(t).HasData(4253701892) == true); // make sure both vouts are checked
+    BOOST_CHECK(CTransaction(t).HasData(4253705988) == true);
+    BOOST_CHECK(CTransaction(t).HasData(4253705989) == false);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

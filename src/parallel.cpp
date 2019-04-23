@@ -4,6 +4,8 @@
 
 #include "parallel.h"
 
+#include "blockrelay/blockrelay_common.h"
+#include "blockrelay/compactblock.h"
 #include "blockrelay/graphene.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
@@ -218,21 +220,8 @@ void CParallelValidation::QuitCompetingThreads(const uint256 &prevBlockHash)
             //                     be a parallel block validation that was happening.
             if ((*mi).first != this_id && (*mi).second.hashPrevBlock == prevBlockHash)
             {
-                if ((*mi).second.pScriptQueue != nullptr)
-                {
-                    LOG(PARALLEL, "Terminating script queue with blockhash %s and previous blockhash %s\n",
-                        (*mi).second.hash.ToString(), prevBlockHash.ToString());
-                    // Send Quit to any other scriptcheckques that were running a parallel validation for the same
-                    // block.
-                    // NOTE: the scriptcheckqueue may or may not have finished, but sending a quit here ensures
-                    // that it breaks from its processing loop in the event that it is still at the control.Wait() step.
-                    // This allows us to end any long running block validations and allow a smaller block to begin
-                    // processing when/if all the queues have been jammed by large blocks during an attack.
-                    LOG(PARALLEL, "Sending Quit() to scriptcheckqueue\n");
-                    (*mi).second.pScriptQueue->Quit();
-                }
-                (*mi).second.fQuit = true; // quit the thread
-                LOG(PARALLEL, "interrupting a thread with blockhash %s and previous blockhash %s\n",
+                Quit(mi);
+                LOG(PARALLEL, "Interruping a PV thread with blockhash %s and previous blockhash %s\n",
                     (*mi).second.hash.ToString(), prevBlockHash.ToString());
             }
         }
@@ -264,9 +253,7 @@ void CParallelValidation::StopAllValidationThreads(const boost::thread::id this_
     {
         if ((*mi).first != this_id) // we don't want to kill our own thread
         {
-            if ((*mi).second.pScriptQueue != nullptr)
-                (*mi).second.pScriptQueue->Quit(); // quit any active script queue threads
-            (*mi).second.fQuit = true; // quit the PV thread
+            Quit(mi);
         }
         mi++;
     }
@@ -286,9 +273,7 @@ void CParallelValidation::StopAllValidationThreads(const uint32_t nChainWork)
         if (((*mi).first != this_id) && (*mi).second.nChainWork <= nChainWork &&
             (*mi).second.nMostWorkOurFork <= nChainWork)
         {
-            if ((*mi).second.pScriptQueue != nullptr)
-                (*mi).second.pScriptQueue->Quit(); // quit any active script queue threads
-            (*mi).second.fQuit = true; // quit the PV thread
+            Quit(mi);
         }
         mi++;
     }
@@ -336,6 +321,19 @@ void CParallelValidation::Erase(const boost::thread::id this_id)
         mapBlockValidationThreads.erase(this_id);
 }
 
+void CParallelValidation::Quit(std::map<boost::thread::id, CHandleBlockMsgThreads>::iterator iter)
+{
+    AssertLockHeld(cs_blockvalidationthread);
+    LOG(PARALLEL, "Sending Quit() to PV thread and associated script validation threads\n");
+
+    // Quit script validation threads
+    if (iter->second.pScriptQueue != nullptr)
+        iter->second.pScriptQueue->Quit();
+
+    // Send signal for PV thread to exit
+    iter->second.fQuit = true;
+}
+
 bool CParallelValidation::QuitReceived(const boost::thread::id this_id, const bool fParallel)
 {
     if (fParallel)
@@ -355,7 +353,6 @@ bool CParallelValidation::QuitReceived(const boost::thread::id this_id, const bo
 
 bool CParallelValidation::ChainWorkHasChanged(const arith_uint256 &nStartingChainWork)
 {
-    LOCK(cs_main);
     if (chainActive.Tip()->nChainWork != nStartingChainWork)
     {
         LOG(PARALLEL, "Quitting - Chain Work %s is not the same as the starting Chain Work %s\n",
@@ -471,14 +468,13 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
         if (!semThreadCount.try_wait())
         {
             /** The following functionality is for the case when ALL thread queues and grants are in use, meaning
-             * somehow an attacker
-             *  has been able to craft blocks or sustain an attack in such a way as to use up every availabe thread
-             * queue.
+             * somehow an attacker has been able to craft blocks or sustain an attack in such a way as to use up
+             * every available script queue thread.
              *  When/If that should occur, we must assume we are under a sustained attack and we will have to make a
-             * determination
-             *  as to which of the currently running threads we should terminate based on the following critera:
-             *     1) If all queues are in use and another block arrives, then terminate the running thread validating
-             * the largest block
+             * determination as to which of the currently running threads we should terminate based on the
+             * following critera:
+             *     1) If all queues are in use and another block arrives, then terminate the running thread
+             *        which has the largest block
              */
 
             {
@@ -486,6 +482,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
                 if (mapBlockValidationThreads.size() >= nScriptCheckQueues)
                 {
                     uint64_t nLargestBlockSize = 0;
+                    bool fCompeting = false;
                     map<boost::thread::id, CParallelValidation::CHandleBlockMsgThreads>::iterator miLargestBlock =
                         mapBlockValidationThreads.end();
                     map<boost::thread::id, CParallelValidation::CHandleBlockMsgThreads>::iterator iter =
@@ -496,6 +493,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
                         // it's a competitor to to your block.
                         if ((*iter).second.hashPrevBlock == pblock->GetBlockHeader().hashPrevBlock)
                         {
+                            fCompeting = true;
                             if ((*iter).second.nBlockSize > nLargestBlockSize)
                             {
                                 nLargestBlockSize = (*iter).second.nBlockSize;
@@ -505,18 +503,23 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
                         iter++;
                     }
 
-                    // if your block is the biggest or of equal size to the biggest then reject it.
-                    if (nLargestBlockSize <= nBlockSize)
+                    // if the new competing block is the biggest or of equal size to the biggest then reject it.
+                    if (fCompeting && (nLargestBlockSize <= nBlockSize))
                     {
-                        LOG(PARALLEL, "Block validation terminated - Too many blocks currently being validated: %s\n",
+                        LOG(PARALLEL,
+                            "New Block validation terminated - Too many blocks currently being validated: %s\n",
                             pblock->GetHash().ToString());
-                        return; // new block is rejected and does not enter PV
+                        return;
                     }
+                    // Terminate the thread with the largest block.
                     else if (miLargestBlock != mapBlockValidationThreads.end())
-                    { // terminate the chosen PV thread
-                        (*miLargestBlock).second.pScriptQueue->Quit(); // terminate the script queue threads
+                    {
+                        // terminate the script queue thread
+                        (*miLargestBlock).second.pScriptQueue->Quit();
                         LOG(PARALLEL, "Sending Quit() to scriptcheckqueue\n");
-                        (*miLargestBlock).second.fQuit = true; // terminate the PV thread
+
+                        // terminate the PV thread which releases the semaphore grant
+                        (*miLargestBlock).second.fQuit = true;
                         LOG(PARALLEL, "Too many blocks being validated, interrupting thread with blockhash %s "
                                       "and previous blockhash %s\n",
                             (*miLargestBlock).second.hash.ToString(),
@@ -530,7 +533,8 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
         }
     }
     else
-    { // for IBD just wait for the next available
+    {
+        // for IBD just wait for the next available
         semThreadCount.wait();
     }
 
@@ -547,7 +551,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
     if (PV->Enabled())
     {
         boost::thread thread(boost::bind(&HandleBlockMessageThread, pfrom, strCommand, pblock, inv));
-        thread.detach(); // Separate actual thread from the "thread" object so its fine to fall out of scope
+        thread.detach();
     }
     else
     {
@@ -557,189 +561,138 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
 
 void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef pblock, const CInv inv)
 {
-    uint64_t nSizeBlock = pblock->GetBlockSize();
-    int64_t startTime = GetTimeMicros();
-    CValidationState state;
-
-    // Indicate that the block was fully received. At this point we have either a block or a fully reconstructed
-    // graphene
-    // or thinblock but we still need to maintain a map*BlocksInFlight entry so that we don't re-request a full block
-    // from the same node while the block is processing.
-    if (IsThinBlocksEnabled())
-    {
-        LOCK(pfrom->cs_mapthinblocksinflight);
-        if (pfrom->mapThinBlocksInFlight.count(inv.hash))
-            pfrom->mapThinBlocksInFlight[inv.hash].fReceived = true;
-    }
-    else if (IsGrapheneBlockEnabled())
-    {
-        LOCK(pfrom->cs_mapgrapheneblocksinflight);
-        if (pfrom->mapGrapheneBlocksInFlight.count(inv.hash))
-            pfrom->mapGrapheneBlocksInFlight[inv.hash].fReceived = true;
-    }
-
-
     boost::thread::id this_id(boost::this_thread::get_id());
-    PV->InitThread(this_id, pfrom, pblock, inv, nSizeBlock); // initialize the mapBlockValidationThread entries
 
-    // Process all blocks from whitelisted peers, even if not requested,
-    // unless we're still syncing with the network.
-    // Such an unrequested block may still be processed, subject to the
-    // conditions in AcceptBlock().
-    bool forceProcessing = pfrom->fWhitelisted && !IsInitialBlockDownload();
-    const CChainParams &chainparams = Params();
-    if (PV->Enabled())
+    try
     {
-        ProcessNewBlock(state, chainparams, pfrom, pblock.get(), forceProcessing, nullptr, true);
-    }
-    else
-    {
-        LOCK(cs_main); // locking cs_main here prevents any other thread from beginning starting a block validation.
-        ProcessNewBlock(state, chainparams, pfrom, pblock.get(), forceProcessing, nullptr, false);
-    }
+        uint64_t nSizeBlock = pblock->GetBlockSize();
+        int64_t startTime = GetTimeMicros();
+        CValidationState state;
 
-    int nDoS;
-    if (state.IsInvalid(nDoS))
-    {
-        LOGA("Invalid block due to %s\n", state.GetRejectReason().c_str());
-        if (!strCommand.empty())
+        // Indicate that the block was fully received. At this point we have either a block or a fully reconstructed
+        // thin type block but we still need to maintain a map*BlocksInFlight entry so that we don't re-request a
+        // full block from the same node while the block is processing.
+        thinrelay.BlockWasReceived(pfrom, inv.hash);
+
+        PV->InitThread(this_id, pfrom, pblock, inv, nSizeBlock); // initialize the mapBlockValidationThread entries
+
+        // Process all blocks from whitelisted peers, even if not requested,
+        // unless we're still syncing with the network.
+        // Such an unrequested block may still be processed, subject to the
+        // conditions in AcceptBlock().
+        bool forceProcessing = pfrom->fWhitelisted && !IsInitialBlockDownload();
+        const CChainParams &chainparams = Params();
+        if (PV->Enabled())
         {
-            pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
-                state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
-            if (nDoS > 0)
-                dosMan.Misbehaving(pfrom, nDoS);
-        }
-
-        // the current fork is bad due to this block so reset the best header to the best fully-validated block
-        // so we can download another fork of headers (and blocks).
-        LOCK(cs_main);
-        CBlockIndex *mostWork = FindMostWorkChain();
-        CBlockIndex *tip = chainActive.Tip();
-        if (mostWork && tip && (mostWork->nChainWork > tip->nChainWork))
-        {
-            pindexBestHeader = mostWork;
+            ProcessNewBlock(state, chainparams, pfrom, pblock.get(), forceProcessing, nullptr, true);
         }
         else
         {
-            pindexBestHeader = tip;
+            // locking cs_main here prevents any other thread from beginning starting a block validation.
+            LOCK(cs_main);
+            ProcessNewBlock(state, chainparams, pfrom, pblock.get(), forceProcessing, nullptr, false);
         }
-    }
-    else
-    {
-        LargestBlockSeen(nSizeBlock); // update largest block seen
 
-        double nValidationTime = (double)(GetTimeMicros() - startTime) / 1000000.0;
-        if ((strCommand != NetMsgType::BLOCK) && (IsThinBlocksEnabled() || IsGrapheneBlockEnabled()))
+        int nDoS;
+        if (state.IsInvalid(nDoS))
         {
-            LOG(THIN | GRAPHENE, "Processed Block %s reconstructed from (%s) in %.2f seconds, peer=%s\n",
-                inv.hash.ToString(), strCommand, (double)(GetTimeMicros() - startTime) / 1000000.0,
-                pfrom->GetLogName());
+            LOGA("Invalid block due to %s\n", state.GetRejectReason().c_str());
+            if (!strCommand.empty())
+            {
+                pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
+                    state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
+                if (nDoS > 0)
+                    dosMan.Misbehaving(pfrom, nDoS);
+            }
 
-            if (strCommand != NetMsgType::GRAPHENEBLOCK)
-                thindata.UpdateValidationTime(nValidationTime);
+            // the current fork is bad due to this block so reset the best header to the best fully-validated block
+            // so we can download another fork of headers (and blocks).
+            LOCK(cs_main);
+            CBlockIndex *mostWork = FindMostWorkChain();
+            CBlockIndex *tip = chainActive.Tip();
+            if (mostWork && tip && (mostWork->nChainWork > tip->nChainWork))
+            {
+                pindexBestHeader = mostWork;
+            }
             else
-                graphenedata.UpdateValidationTime(nValidationTime);
+            {
+                pindexBestHeader = tip;
+            }
         }
         else
         {
-            LOG(THIN | GRAPHENE, "Processed Regular Block %s in %.2f seconds, peer=%s\n", inv.hash.ToString(),
-                (double)(GetTimeMicros() - startTime) / 1000000.0, pfrom->GetLogName());
+            LargestBlockSeen(nSizeBlock); // update largest block seen
+
+            double nValidationTime = (double)(GetTimeMicros() - startTime) / 1000000.0;
+            if ((strCommand != NetMsgType::BLOCK) && (IsThinBlocksEnabled() || IsGrapheneBlockEnabled()))
+            {
+                LOG(THIN | GRAPHENE, "Processed Block %s reconstructed from (%s) in %.2f seconds, peer=%s\n",
+                    inv.hash.ToString(), strCommand, (double)(GetTimeMicros() - startTime) / 1000000.0,
+                    pfrom->GetLogName());
+
+                if (strCommand != NetMsgType::GRAPHENEBLOCK)
+                    thindata.UpdateValidationTime(nValidationTime);
+                else
+                    graphenedata.UpdateValidationTime(nValidationTime);
+            }
+            else
+            {
+                LOG(THIN | GRAPHENE, "Processed Regular Block %s in %.2f seconds, peer=%s\n", inv.hash.ToString(),
+                    (double)(GetTimeMicros() - startTime) / 1000000.0, pfrom->GetLogName());
+            }
         }
-    }
 
-    // When we request a graphene or thin block we may get back a regular block if it is smaller than
-    // either of the former.  Therefore we have to remove the thin or graphene block in flight if it
-    // exists and we also need to check that the block didn't arrive from some other peer.  This code
-    // ALSO cleans up the graphene or thin block that was passed to us (&block), so do not use it after
-    // this.
-    if (IsThinBlocksEnabled())
-    {
-        int nTotalThinBlocksInFlight = 0;
+        // When we request a thin type block we may get back a regular block if it is smaller than
+        // either of the former.  Therefore we have to remove the thin or graphene block in flight if it
+        // exists and we also need to check that the block didn't arrive from some other peer.
         {
-            LOCK2(cs_vNodes, pfrom->cs_mapthinblocksinflight);
-
-            // Erase this thinblock from the tracking map now that we're done with it.
-            if (pfrom->mapThinBlocksInFlight.count(inv.hash))
-            {
-                // Clear thinblock data and thinblock in flight
-                thindata.ClearThinBlockData(pfrom, inv.hash);
-            }
-
-            // Count up any other remaining nodes with thinblocks in flight.
-            for (CNode *pnode : vNodes)
-            {
-                if (pnode->mapThinBlocksInFlight.size() > 0)
-                    nTotalThinBlocksInFlight++;
-            }
-            pfrom->firstBlock += 1; // update statistics, requires cs_vNodes
+            // Remove thinblock data and thinblock in flight
+            thinrelay.ClearBlockInFlight(pfrom, inv.hash);
+            pfrom->firstBlock += 1;
         }
 
         // When we no longer have any thinblocks in flight then clear our any data
         // just to make sure we don't somehow get growth over time.
-        if (nTotalThinBlocksInFlight == 0)
+        if (thinrelay.TotalBlocksInFlight() == 0)
         {
-            thindata.ResetThinBlockBytes();
-
-            LOCK(cs_xval);
-            setPreVerifiedTxHash.clear();
-            setUnVerifiedOrphanTxHash.clear();
-        }
-    }
-    if (IsGrapheneBlockEnabled())
-    {
-        int nTotalGrapheneBlocksInFlight = 0;
-        {
-            LOCK2(cs_vNodes, pfrom->cs_mapgrapheneblocksinflight);
-
-            // Erase this graphene block from the tracking map now that we're done with it.
-            if (pfrom->mapGrapheneBlocksInFlight.count(inv.hash))
-            {
-                // Clear graphene block data and graphene block in flight
-                graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
-            }
-
-            // Count up any other remaining nodes with graphene blocks in flight.
-            for (CNode *pnode : vNodes)
-            {
-                if (pnode->mapGrapheneBlocksInFlight.size() > 0)
-                    nTotalGrapheneBlocksInFlight++;
-            }
-            pfrom->firstBlock += 1; // update statistics, requires cs_vNodes
-        }
-
-        // When we no longer have any graphene blocks in flight then clear our any data
-        // just to make sure we don't somehow get growth over time.
-        if (nTotalGrapheneBlocksInFlight == 0)
-        {
+            thinrelay.ResetTotalBlockBytes();
             graphenedata.ResetGrapheneBlockBytes();
-
-            LOCK(cs_xval);
-            setPreVerifiedTxHash.clear();
-            setUnVerifiedOrphanTxHash.clear();
         }
+
+        // Erase any txns from the orphan cache that are no longer needed
+        PV->ClearOrphanCache(pblock);
+
+        // If chain is nearly caught up then flush the state after a block is finished processing and the
+        // performance timings have been updated.  This way we don't include the flush time in our time to
+        // process the block advance the tip.
+        if (IsChainNearlySyncd())
+            FlushStateToDisk(state, FLUSH_STATE_ALWAYS);
+    }
+    catch (const std::exception &e)
+    {
+        LOGA("Exception thrown in PV thread: %s\n", e.what());
     }
 
+    // Use a separate try catch block here.  In the event that the upper block throws an exception we'll still be
+    // able to clean up the semaphore, tracking map and node reference.
+    try
+    {
+        // Clear thread data - this must be done before the thread completes or else some other new
+        // thread may grab the same thread id and we would end up deleting the entry for the new thread instead.
+        PV->Erase(this_id);
 
-    // Erase any txns from the orphan cache that are no longer needed
-    PV->ClearOrphanCache(pblock);
+        // release semaphores depending on whether this was IBD or not.  We can not use IsChainNearlySyncd()
+        // because the return value will switch over when IBD is nearly finished and we may end up not releasing
+        // the correct semaphore.
+        PV->Post();
 
-    // Clear thread data - this must be done before the thread completes or else some other new
-    // thread may grab the same thread id and we would end up deleting the entry for the new thread instead.
-    PV->Erase(this_id);
-
-    // release semaphores depending on whether this was IBD or not.  We can not use IsChainNearlySyncd()
-    // because the return value will switch over when IBD is nearly finished and we may end up not releasing
-    // the correct semaphore.
-    PV->Post();
-
-    // Remove the CNode reference we aquired just before we launched this thread.
-    pfrom->Release();
-
-    // If chain is nearly caught up then flush the state after a block is finished processing and the
-    // performance timings have been updated.  This way we don't include the flush time in our time to
-    // process the block advance the tip.
-    if (IsChainNearlySyncd())
-        FlushStateToDisk(state, FLUSH_STATE_ALWAYS);
+        // Remove the CNode reference we aquired just before we launched this thread.
+        pfrom->Release();
+    }
+    catch (const std::exception &e)
+    {
+        LOGA("Exception thrown in PV thread while cleaning up: %s\n", e.what());
+    }
 }
 
 

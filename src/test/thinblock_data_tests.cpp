@@ -4,6 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "blockrelay/thinblock.h"
+#include "blockrelay/blockrelay_common.h"
 #include "net.h"
 #include "test/test_bitcoin.h"
 #include <assert.h>
@@ -46,42 +47,43 @@ BOOST_AUTO_TEST_CASE(test_thinblock_byte_tracking)
     CAddress addr1(ipaddress(0xa0b0c001, 10000));
     CNode dummyNode1(INVALID_SOCKET, addr1, "", true);
 
-    thindata.ResetThinBlockBytes();
-    BOOST_CHECK(0 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(0 == dummyNode1.nLocalThinBlockBytes);
+    CXThinBlock xthin;
+    std::shared_ptr<CBlockThinRelay> pblock = std::make_shared<CBlockThinRelay>(CBlockThinRelay());
+    pblock->xthinblock = std::make_shared<CXThinBlock>(xthin);
 
-    thindata.AddThinBlockBytes(0, &dummyNode1);
-    BOOST_CHECK(0 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(0 == dummyNode1.nLocalThinBlockBytes);
+    thinrelay.ResetTotalBlockBytes();
+    BOOST_CHECK(0 == thinrelay.GetTotalBlockBytes());
+    BOOST_CHECK(0 == pblock->nCurrentBlockSize);
 
-    thindata.AddThinBlockBytes(1000, &dummyNode1);
-    BOOST_CHECK(1000 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(1000 == dummyNode1.nLocalThinBlockBytes);
+    thinrelay.AddTotalBlockBytes(0, pblock);
+    BOOST_CHECK(0 == thinrelay.GetTotalBlockBytes());
+    BOOST_CHECK(0 == pblock->nCurrentBlockSize);
 
-    thindata.AddThinBlockBytes(449932, &dummyNode1);
-    BOOST_CHECK(450932 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(450932 == dummyNode1.nLocalThinBlockBytes);
+    thinrelay.AddTotalBlockBytes(1000, pblock);
+    BOOST_CHECK(1000 == thinrelay.GetTotalBlockBytes());
+    BOOST_CHECK(1000 == pblock->nCurrentBlockSize);
 
-    thindata.DeleteThinBlockBytes(0, &dummyNode1);
-    BOOST_CHECK(450932 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(450932 == dummyNode1.nLocalThinBlockBytes);
+    thinrelay.AddTotalBlockBytes(449932, pblock);
+    BOOST_CHECK(450932 == thinrelay.GetTotalBlockBytes());
+    BOOST_CHECK(450932 == pblock->nCurrentBlockSize);
 
-    thindata.DeleteThinBlockBytes(1, &dummyNode1);
-    BOOST_CHECK(450931 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(450931 == dummyNode1.nLocalThinBlockBytes);
+    thinrelay.DeleteTotalBlockBytes(0);
+    BOOST_CHECK(450932 == thinrelay.GetTotalBlockBytes());
+    BOOST_CHECK(450932 == pblock->nCurrentBlockSize);
 
-    thindata.DeleteThinBlockBytes(13939, &dummyNode1);
-    BOOST_CHECK(436992 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(436992 == dummyNode1.nLocalThinBlockBytes);
+    thinrelay.DeleteTotalBlockBytes(1);
+    BOOST_CHECK(450931 == thinrelay.GetTotalBlockBytes());
+
+    thinrelay.DeleteTotalBlockBytes(13939);
+    BOOST_CHECK(436992 == thinrelay.GetTotalBlockBytes());
 
     // Try to delete more bytes than we already have tracked.  This should not be possible...we don't allow this
     // to happen in the event that we get an incorrect or invalid value returned for the dynamic memory usage of
     // a transaction.  This could then be used in a theoretical attack by resetting total byte usage to zero while
     // continuing to build more thinblocks.
-    thindata.DeleteThinBlockBytes(436993, &dummyNode1);
-    BOOST_CHECK_MESSAGE(436992 == thindata.GetThinBlockBytes(), "nThinBlockBytes is " << thindata.GetThinBlockBytes());
+    thinrelay.DeleteTotalBlockBytes(436993);
     BOOST_CHECK_MESSAGE(
-        436992 == dummyNode1.nLocalThinBlockBytes, "nLocalThinBlockBytes is " << dummyNode1.nLocalThinBlockBytes);
+        436992 == thinrelay.GetTotalBlockBytes(), "nThinBlockBytes is " << thinrelay.GetTotalBlockBytes());
 
 
     /**
@@ -90,29 +92,24 @@ BOOST_AUTO_TEST_CASE(test_thinblock_byte_tracking)
 
     CAddress addr2(ipaddress(0xa0b0c002, 10000));
     CNode dummyNode2(INVALID_SOCKET, addr2, "", true);
+    pblock->SetNull();
 
-    thindata.AddThinBlockBytes(1000, &dummyNode2);
-    BOOST_CHECK(437992 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(436992 == dummyNode1.nLocalThinBlockBytes);
-    BOOST_CHECK(1000 == dummyNode2.nLocalThinBlockBytes);
+    thinrelay.AddTotalBlockBytes(1000, pblock);
+    BOOST_CHECK(437992 == thinrelay.GetTotalBlockBytes());
+    BOOST_CHECK(1000 == pblock->nCurrentBlockSize);
 
-    thindata.DeleteThinBlockBytes(0, &dummyNode2);
-    BOOST_CHECK(437992 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(1000 == dummyNode2.nLocalThinBlockBytes);
+    thinrelay.DeleteTotalBlockBytes(0);
+    BOOST_CHECK(437992 == thinrelay.GetTotalBlockBytes());
 
-    thindata.DeleteThinBlockBytes(1, &dummyNode2);
-    BOOST_CHECK(437991 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(436992 == dummyNode1.nLocalThinBlockBytes);
-    BOOST_CHECK(999 == dummyNode2.nLocalThinBlockBytes);
+    thinrelay.DeleteTotalBlockBytes(1);
+    BOOST_CHECK(437991 == thinrelay.GetTotalBlockBytes());
 
-    thindata.DeleteThinBlockBytes(999, &dummyNode2);
-    BOOST_CHECK(436992 == thindata.GetThinBlockBytes());
-    BOOST_CHECK(436992 == dummyNode1.nLocalThinBlockBytes);
-    BOOST_CHECK(0 == dummyNode2.nLocalThinBlockBytes);
+    thinrelay.DeleteTotalBlockBytes(999);
+    BOOST_CHECK(436992 == thinrelay.GetTotalBlockBytes());
 
     // now finally reset everything
-    thindata.ResetThinBlockBytes();
-    BOOST_CHECK_MESSAGE(0 == thindata.GetThinBlockBytes(), "nThinBlockBytes is " << thindata.GetThinBlockBytes());
+    thinrelay.ResetTotalBlockBytes();
+    BOOST_CHECK_MESSAGE(0 == thinrelay.GetTotalBlockBytes(), "nThinBlockBytes is " << thinrelay.GetTotalBlockBytes());
 }
 
 BOOST_AUTO_TEST_CASE(test_thinblockdata_stats1)
@@ -137,7 +134,6 @@ BOOST_AUTO_TEST_CASE(test_thinblockdata_stats1)
         tbd.ValidationTimeToString();
         tbd.ReRequestedTxToString();
         tbd.MempoolLimiterBytesSavedToString();
-        tbd.GetThinBlockBytes();
     }
 
     {

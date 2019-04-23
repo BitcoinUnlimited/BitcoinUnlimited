@@ -4,6 +4,7 @@
 
 #include "fastfilter.h"
 #include "net.h"
+#include "threadgroup.h"
 #include "txmempool.h"
 #include <queue>
 
@@ -60,6 +61,8 @@ public:
     NodeId nodeId; // hold the id so I don't keep a ref to the node
     bool whitelisted;
     std::string nodeName;
+
+    CTxInputData() : nodeId(-1), whitelisted(false), nodeName("none") {}
 };
 
 // Tracks data about transactions that are ready to be committed to the mempool
@@ -128,7 +131,7 @@ extern std::map<uint256, CTxCommitData> *txCommitQ;
 CTransactionRef CommitQGet(uint256 hash);
 
 /** Start the transaction mempool admission threads */
-void StartTxAdmission(boost::thread_group &threadGroup);
+void StartTxAdmission(thread_group &threadGroup);
 /** Stop the transaction mempool admission threads (assumes that ShutdownRequested() will return true) */
 void StopTxAdmission();
 /** Wait for the currently enqueued transactions to be flushed.  If new tx keep coming in, you may wait a while */

@@ -1,9 +1,9 @@
-How to setup and get the best results with Xthins
-==========================================================
+[Website](https://www.bitcoinunlimited.info)  | [Download](https://www.bitcoinunlimited.info/download) | [Setup](../README.md)  |  [Xthin](bu-xthin.md)  |  [Xpedited](bu-xpedited-forwarding.md)  |   [Miner](miner.md)
+
+# How to setup and get the best results with Xthins
 
 
-1. Turning Thinblocks ON/OFF
----------------------------------
+## Turning Thinblocks ON/OFF
 
 When you run a Bitcoin Unimited node the XTHIN service is turned on by default.  If you wish to turn it off for some reason
 you can use the bitcoin.conf setting (0 = off, 1 = on) as follows:
@@ -11,8 +11,7 @@ you can use the bitcoin.conf setting (0 = off, 1 = on) as follows:
 	use-thinblocks=0
 
 
-2. Using addnode
-----------------
+## Using addnode
 
 Due to the low numbers of nodes that support XTHIN blocks, initially it is a good idea to find a node which is XTHIN capable and
 force a connection using either -addnode or -connect-thinblock.
@@ -37,8 +36,7 @@ a XTHIN to every other peer in the XTHIN capable network.  In such a way we avoi
 the same time maximizing our use of XTHIN technology.
 
 
-3. When to use connect-thinblock
---------------------------------
+## When to use connect-thinblock
 
 the `connect-thinblock` feature is mainly used for the purpose of testing, however in some cases it can be useful for very bandwidth
 constrained nodes that *always* want every downloaded block to be an XTHIN.  In such a case you would substitute the addnode entry
@@ -52,8 +50,8 @@ you have the possibility of not receiving any new blocks until those nodes come 
 caution and always use the full 8 connections if you are unsure whether the peers will be online or not.
 
 
-4. The thinblock mempool limiter
----------------------------------
+## The thinblock mempool limiter
+
 
 In order to keep the size of the XTHIN bloom filters from getting too large, a way to limit the size of mempools was implemented in v0.12.1
 using a simple rate limiting technique.  If the size of the mempool grows to 3X the size of the largest block seen then two things happen,

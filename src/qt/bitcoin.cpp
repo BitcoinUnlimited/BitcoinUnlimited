@@ -30,7 +30,7 @@
 
 #include "init.h"
 #include "rpc/server.h"
-#include "scheduler.h"
+#include "threadgroup.h"
 #include "ui_interface.h"
 #include "util.h"
 
@@ -40,7 +40,7 @@
 
 #include <stdint.h>
 
-#include <boost/thread.hpp>
+#include <thread>
 
 #include <QApplication>
 #include <QDebug>
@@ -144,7 +144,7 @@ void DebugMessageHandler(QtMsgType type, const QMessageLogContext &context, cons
 {
     Q_UNUSED(context);
     // If the type is QtDebugMsg then log in the QT category, otherwise always log
-    uint64_t category = (type == QtDebugMsg) ? Logging::QT : Logging::ALL;
+    uint64_t category = (type == QtDebugMsg) ? QT : ALL;
     LOG(category, "GUI: %s\n", msg.toStdString());
 }
 
@@ -167,8 +167,7 @@ Q_SIGNALS:
     void runawayException(const QString &message);
 
 private:
-    boost::thread_group threadGroup;
-    CScheduler scheduler;
+    thread_group threadGroup;
 
     /// Pass fatal exception message to UI thread
     void handleRunawayException(const std::exception *e);
@@ -251,7 +250,7 @@ void BitcoinCore::initialize(Config *cfg)
     try
     {
         qDebug() << __func__ << ": Running AppInit2 in thread";
-        int rv = AppInit2(config, threadGroup, scheduler);
+        int rv = AppInit2(config, threadGroup);
         Q_EMIT initializeResult(rv);
     }
     catch (const std::exception &e)
@@ -411,6 +410,7 @@ void BitcoinApplication::requestShutdown()
 
     // Show a simple window indicating shutdown status
     ShutdownWindow::showShutdownWindow(window);
+    StartShutdown();
 
     // Request shutdown from core thread
     Q_EMIT requestedShutdown();

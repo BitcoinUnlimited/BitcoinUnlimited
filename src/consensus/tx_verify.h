@@ -17,7 +17,7 @@ class CValidationState;
 /** Transaction validation functions */
 
 /** Context-independent validity checks */
-bool CheckTransaction(const CTransaction &tx, CValidationState &state);
+bool CheckTransaction(const CTransactionRef &tx, CValidationState &state);
 
 namespace Consensus
 {
@@ -26,7 +26,7 @@ namespace Consensus
  * This does not modify the UTXO set. This does not check scripts and sigs.
  * Preconditions: tx.IsCoinBase() is false.
  */
-bool CheckTxInputs(const CTransaction &tx, CValidationState &state, const CCoinsViewCache &inputs);
+bool CheckTxInputs(const CTransactionRef &tx, CValidationState &state, const CCoinsViewCache &inputs);
 } // namespace Consensus
 
 /** Auxiliary functions for transaction validation (ideally should not be exposed) */
@@ -36,7 +36,7 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state, const CCoins
  * @return number of sigops this transaction's outputs will produce when spent
  * @see CTransaction::FetchInputs
  */
-unsigned int GetLegacySigOpCount(const CTransaction &tx, const uint32_t flags);
+unsigned int GetLegacySigOpCount(const CTransactionRef &tx, const uint32_t flags);
 
 /**
  * Count ECDSA signature operations in pay-to-script-hash inputs.
@@ -45,7 +45,7 @@ unsigned int GetLegacySigOpCount(const CTransaction &tx, const uint32_t flags);
  * @return maximum number of sigops required to validate this transaction's inputs
  * @see CTransaction::FetchInputs
  */
-unsigned int GetP2SHSigOpCount(const CTransaction &tx, const CCoinsViewCache &mapInputs, const uint32_t flags);
+unsigned int GetP2SHSigOpCount(const CTransactionRef &tx, const CCoinsViewCache &mapInputs, const uint32_t flags);
 
 /**
  * Check if transaction is final and can be included in a block with the

@@ -19,8 +19,8 @@
 #include <sys/stat.h>
 #endif
 
-#include <boost/thread.hpp>
 #include <boost/version.hpp>
+#include <thread>
 
 using namespace std;
 
@@ -44,7 +44,7 @@ void CDBEnv::EnvShutdown()
     if (ret != 0)
         LOGA("CDBEnv::EnvShutdown: Error %d shutting down database environment: %s\n", ret, DbEnv::strerror(ret));
     if (!fMockDb)
-        DbEnv(0).remove(strPath.c_str(), 0);
+        DbEnv((uint32_t)0).remove(strPath.c_str(), 0);
 }
 
 void CDBEnv::Reset()
@@ -68,6 +68,13 @@ bool CDBEnv::Open(const fs::path &pathIn)
 {
     if (fDbEnvInit)
         return true;
+
+    if (!fs::is_directory(pathIn))
+    {
+        std::stringstream err;
+        err << "CDBEnv::Open: " << pathIn << " is not a directory.";
+        throw std::invalid_argument(err.str());
+    }
 
     boost::this_thread::interruption_point();
 

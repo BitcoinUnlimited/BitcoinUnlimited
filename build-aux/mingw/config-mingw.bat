@@ -93,6 +93,8 @@ REM Install required msys base package (provide access to msys sh shell)
 echo Updating base MinGW
 %MINGW_GET% update
 %MINGW_GET% install msys-base-bin
+REM Install patch utility so we can apply code patches where necessary
+%MINGW_GET% install msys-patch
 
 REM Verify that MSYS was correctly installed and updated by previous steps
 if not exist "%MSYS_SH%" (
@@ -126,6 +128,8 @@ if "%BUILD_32_BIT%" NEQ "" (
 	set "TOOLCHAIN_BIN=%TOOL_CHAIN_ROOT%\mingw32\bin"
 	set "PATH_DEPS=%DEPS_ROOT%\x86"
 	set "BUILD_OUTPUT=%BITCOIN_GIT_ROOT%\build-output\x86"
+	REM For 32-bit builds Boost 1.68 errors if we don't limit address model to 32
+	set "BOOST_BITS=address-model=32"
 	
 	GOTO BUILD_START
 )
@@ -140,6 +144,8 @@ if "%BUILD_64_BIT%" NEQ "" (
 	set "TOOLCHAIN_BIN=%TOOL_CHAIN_ROOT%\mingw64\bin"
 	set "PATH_DEPS=%DEPS_ROOT%\x64"
 	set "BUILD_OUTPUT=%BITCOIN_GIT_ROOT%\build-output\x64"
+	REM For 64-bit builds Boost 1.68 is fine with default address model settings
+	set "BOOST_BITS=address-model=64"
 	
 	set HAS_BUILT_64_BIT=TRUE
 	
@@ -176,7 +182,7 @@ set "PATH=%TOOLCHAIN_BIN%;%BASE_PATH%"
 
 REM Boost
 echo Building Boost...
-cd "%PATH_DEPS%\boost_1_61_0"
+cd "%PATH_DEPS%\boost_1_68_0"
 call bootstrap.bat gcc
 REM Check to see if bootstrap.bat failed
 if %errorlevel% neq 0 (
@@ -184,7 +190,7 @@ if %errorlevel% neq 0 (
 	pause
 	exit /b %errorlevel%
 )
-b2 --build-type=complete --with-chrono --with-filesystem --with-program_options --with-system --with-thread %BOOST_ENABLE_TESTS% toolset=gcc variant=release link=static threading=multi runtime-link=static stage
+b2 --build-type=complete %BOOST_BITS% --with-chrono --with-filesystem --with-program_options --with-system --with-thread %BOOST_ENABLE_TESTS% toolset=gcc variant=release link=static threading=multi runtime-link=static stage
 REM Check to see if b2 failed
 if %errorlevel% neq 0 (
 	echo ERROR: Building Boost failed!
@@ -209,11 +215,11 @@ if %errorlevel% neq 0 (
 )
 
 REM Qt 5
-echo Building Qt 5.3.2...
-cd "%PATH_DEPS%\Qt\5.3.2"
-set "INCLUDE=%PATH_DEPS%\libpng-1.6.16;%PATH_DEPS%\openssl-1.0.1k\include"
-set "LIB=%PATH_DEPS%\libpng-1.6.16\.libs;%PATH_DEPS%\openssl-1.0.1k"
-call configure.bat -release -opensource -confirm-license -static -make libs -no-sql-sqlite -no-opengl -system-zlib -qt-pcre -no-icu -no-gif -system-libpng -no-libjpeg -no-freetype -no-angle -no-vcproj -openssl -no-dbus -no-audio-backend -no-wmf-backend -no-qml-debug
+echo Building Qt 5.7.1...
+cd "%PATH_DEPS%\Qt\5.7.1"
+set "INCLUDE=%PATH_DEPS%\libpng-1.6.36;%PATH_DEPS%\openssl-1.0.2o\include"
+set "LIB=%PATH_DEPS%\libpng-1.6.36\.libs;%PATH_DEPS%\openssl-1.0.2o"
+call configure.bat -release -opensource -confirm-license -static -make libs -nomake tests -nomake examples -no-sql-sqlite -no-opengl -qt-zlib -qt-pcre -no-icu -no-gif -qt-libpng -qt-libjpeg -no-freetype -no-angle -openssl -no-dbus -no-audio-backend -no-wmf-backend -no-qml-debug -I "%PATH_DEPS%\openssl-1.0.2o\include" -L "%PATH_DEPS%\openssl-1.0.2o"
 REM Check to see if configure.bat failed
 if %errorlevel% neq 0 (
 	echo ERROR: Configuring Qt failed!
@@ -229,9 +235,9 @@ if %errorlevel% neq 0 (
 )
 
 echo Building Qt Tools...
-set "PATH=%PATH%;%PATH_DEPS%\Qt\5.3.2\bin"
-set "PATH=%PATH%;%PATH_DEPS%\Qt\qttools-opensource-src-5.3.2"
-cd "%PATH_DEPS%\Qt\qttools-opensource-src-5.3.2"
+set "PATH=%PATH%;%PATH_DEPS%\Qt\5.7.1\bin"
+set "PATH=%PATH%;%PATH_DEPS%\Qt\qttools-opensource-src-5.7.1"
+cd "%PATH_DEPS%\Qt\qttools-opensource-src-5.7.1"
 qmake qttools.pro
 REM Check to see if qmake failed
 if %errorlevel% neq 0 (
@@ -270,6 +276,7 @@ cd "%BITCOIN_GIT_ROOT%\src"
 copy bitcoin-tx.exe "%BUILD_OUTPUT%\bitcoin-tx.exe"
 copy bitcoin-cli.exe "%BUILD_OUTPUT%\bitcoin-cli.exe"
 copy bitcoind.exe "%BUILD_OUTPUT%\bitcoind.exe"
+copy bitcoin-miner.exe "%BUILD_OUTPUT%\bitcoin-miner.exe"
 
 REM cd to src\qt to copy bitcoin-qt.exe
 cd qt

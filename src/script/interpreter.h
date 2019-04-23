@@ -89,6 +89,10 @@ enum
     // See BIP112 for details
     SCRIPT_VERIFY_CHECKSEQUENCEVERIFY = (1U << 10),
 
+    // Require the argument of OP_IF/NOTIF to be exactly 0x01 or empty vector
+    //
+    SCRIPT_VERIFY_MINIMALIF = (1U << 13),
+
     // Signature(s) must be empty vector if an CHECK(MULTI)SIG operation failed
     SCRIPT_VERIFY_NULLFAIL = (1U << 14),
 
@@ -111,8 +115,16 @@ enum
     //
     SCRIPT_ENABLE_CHECKDATASIG = (1U << 18),
 
+    // Are Schnorr signatures enabled for OP_CHECK(DATA)SIG(VERIFY) and
+    // 65-byte signatures banned for OP_CHECKMULTISIG(VERIFY)?
+    //
+    SCRIPT_ENABLE_SCHNORR = (1U << 19),
+
+    // Allows the recovery of coins sent to p2sh segwit addresses
+    SCRIPT_ALLOW_SEGWIT_RECOVERY = (1U << 20),
+
     // Are OP_INVERT, OP_MUL, OP_LSHIFT, OP_RSHIFT enabled?
-    SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES = (1U << 19)
+    SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES = (1U << 21),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);
@@ -141,7 +153,16 @@ uint256 SignatureHash(const CScript &scriptCode,
 
 class BaseSignatureChecker
 {
+protected:
+    unsigned int nFlags = SCRIPT_ENABLE_SIGHASH_FORKID;
+
 public:
+    //! Verifies a signature given the pubkey, signature and sighash
+    virtual bool VerifySignature(const std::vector<uint8_t> &vchSig,
+        const CPubKey &vchPubKey,
+        const uint256 &sighash) const;
+
+    //! Verifies a signature given the pubkey, signature, script, and transaction (member var)
     virtual bool CheckSig(const std::vector<unsigned char> &scriptSig,
         const std::vector<unsigned char> &vchPubKey,
         const CScript &scriptCode) const
@@ -156,26 +177,21 @@ public:
 
 class TransactionSignatureChecker : public BaseSignatureChecker
 {
-private:
+protected:
     const CTransaction *txTo;
     unsigned int nIn;
     const CAmount amount;
     mutable size_t nBytesHashed;
     mutable size_t nSigops;
-    unsigned int nFlags;
-
-protected:
-    virtual bool VerifySignature(const std::vector<unsigned char> &vchSig,
-        const CPubKey &vchPubKey,
-        const uint256 &sighash) const;
 
 public:
     TransactionSignatureChecker(const CTransaction *txToIn,
         unsigned int nInIn,
         const CAmount &amountIn,
         unsigned int flags = SCRIPT_ENABLE_SIGHASH_FORKID)
-        : txTo(txToIn), nIn(nInIn), amount(amountIn), nBytesHashed(0), nSigops(0), nFlags(flags)
+        : txTo(txToIn), nIn(nInIn), amount(amountIn), nBytesHashed(0), nSigops(0)
     {
+        nFlags = flags;
     }
     bool CheckSig(const std::vector<unsigned char> &scriptSig,
         const std::vector<unsigned char> &vchPubKey,
@@ -199,6 +215,124 @@ public:
         : TransactionSignatureChecker(&txTo, nInIn, amountIn, flags), txTo(*txToIn)
     {
     }
+};
+
+typedef std::vector<unsigned char> StackDataType;
+
+class ScriptMachine
+{
+protected:
+    unsigned int flags;
+    std::vector<StackDataType> stack;
+    std::vector<StackDataType> altstack;
+    const CScript *script;
+    const BaseSignatureChecker &checker;
+    ScriptError error;
+
+    unsigned char sighashtype;
+
+    CScript::const_iterator pc;
+    CScript::const_iterator pbegin;
+    CScript::const_iterator pend;
+    CScript::const_iterator pbegincodehash;
+
+    unsigned int nOpCount;
+    unsigned int maxOps;
+
+    std::vector<bool> vfExec;
+
+public:
+    ScriptMachine(const ScriptMachine &from)
+        : checker(from.checker), pc(from.pc), pbegin(from.pbegin), pend(from.pend), pbegincodehash(from.pbegincodehash)
+    {
+        flags = from.flags;
+        stack = from.stack;
+        altstack = from.altstack;
+        script = from.script;
+        error = from.error;
+        sighashtype = from.sighashtype;
+        nOpCount = from.nOpCount;
+        vfExec = from.vfExec;
+        maxOps = from.maxOps;
+        nOpCount = 0;
+    }
+
+    ScriptMachine(unsigned int _flags, const BaseSignatureChecker &_checker, unsigned int maxOpsIn)
+        : flags(_flags), script(nullptr), checker(_checker), pc(CScript().end()), pbegin(CScript().end()),
+          pend(CScript().end()), pbegincodehash(CScript().end()), nOpCount(0), maxOps(maxOpsIn)
+    {
+    }
+
+    // Execute the passed script starting at the current machine state (stack and altstack are not cleared).
+    bool Eval(const CScript &_script);
+
+    // Start a stepwise execution of a script, starting at the current machine state
+    // If BeginStep succeeds, you must keep script alive until EndStep() returns
+    bool BeginStep(const CScript &_script);
+    // Execute the next instruction of a script (you must have previously BeginStep()ed).
+    bool Step();
+    // Do final checks once the script is complete.
+    bool EndStep();
+    // Return true if there are more steps in this script
+    bool isMoreSteps() { return (pc < pend); }
+    // Return the current offset from the beginning of the script. -1 if ended
+    int getPos();
+
+    // Returns info about the next instruction to be run:
+    // first bool is true if the instruction will be executed (false if this is passing across a not-taken branch)
+    std::tuple<bool, opcodetype, StackDataType, ScriptError> Peek();
+
+    // Remove all items from the altstack
+    void ClearAltStack() { altstack.clear(); }
+    // Remove all items from the stack
+    void ClearStack() { stack.clear(); }
+    // clear all state
+    void Reset()
+    {
+        altstack.clear();
+        stack.clear();
+        vfExec.clear();
+        nOpCount = 0;
+    }
+
+    // Set the main stack to the passed data
+    void setStack(std::vector<StackDataType> &stk) { stack = stk; }
+    // Overwrite a stack entry with the passed data.  0 is the stack top, -1 is a special number indicating to push
+    // an item onto the stack top.
+    void setStackItem(int idx, const StackDataType &item)
+    {
+        if (idx == -1)
+            stack.push_back(item);
+        else
+        {
+            stack[stack.size() - idx - 1] = item;
+        }
+    }
+
+    // Overwrite an altstack entry with the passed data.  0 is the stack top, -1 is a special number indicating to push
+    // the item onto the top.
+    void setAltStackItem(int idx, const StackDataType &item)
+    {
+        if (idx == -1)
+            altstack.push_back(item);
+        else
+        {
+            altstack[altstack.size() - idx - 1] = item;
+        }
+    }
+
+    // Set the alt stack to the passed data
+    void setAltStack(std::vector<StackDataType> &stk) { altstack = stk; }
+    // Get the main stack
+    const std::vector<StackDataType> &getStack() { return stack; }
+    // Get the alt stack
+    const std::vector<StackDataType> &getAltStack() { return altstack; }
+    // Get any error that may have occurred
+    const ScriptError &getError() { return error; }
+    // Get the bitwise OR of all sighashtype bytes that occurred in the script
+    unsigned char getSigHashType() { return sighashtype; }
+    // Return the number of instructions executed since the last Reset()
+    unsigned int getOpCount() { return nOpCount; }
 };
 
 bool EvalScript(std::vector<std::vector<unsigned char> > &stack,

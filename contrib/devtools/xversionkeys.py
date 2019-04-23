@@ -7,6 +7,8 @@ import time
 from sys import stdin, stdout
 import shlex
 
+keyTypes = {"i":"initial", "c":"changeable"}
+
 valueTypes = ["u64c", "vector"]
 
 cmdTable = {}
@@ -17,8 +19,8 @@ def readKEY(tokens):
     prefix = int(next(tokens), 0)
     suffix = int(next(tokens), 0)
     valtype = next(tokens)
-    if keytype not in ["i"]:
-        raise RuntimeError("Unknown key type '%s'." % keytype)
+    if keytype not in keyTypes:
+        raise RuntimeError("Unknown key type '%s'." % type)
     if valtype not in valueTypes:
         raise RuntimeError("Unknown value type '%s'." % valtype)
     if prefix<0 or prefix>0xffff:
@@ -26,6 +28,7 @@ def readKEY(tokens):
     if suffix<0 or suffix>0xffff:
         raise RuntimeError("Suffix out of range (%d)." % suffix)
     return name, {
+        "keytype" : keytype,
         "name" : name,
         "prefix" : prefix,
         "suffix" : suffix,
@@ -96,6 +99,19 @@ namespace XVer
         x = table[k]
         print ("    {%40s, %42s }," % (x["name"], "xvt_"+x["valtype"]), file = outfile)
     print("}; // const unordered_map valtype\n\n\n", file = outfile)
+
+    # set key types in enum
+    print("enum keyType {", file = outfile)
+    for x in keyTypes:
+        print ("    "+keyTypes[x]+",", file = outfile)
+    print("}; // enum keyType\n\n\n", file = outfile)
+
+    # map keys to their expected value type
+    print("const std::unordered_map<uint64_t, keyType> mapKeyType = {", file = outfile)
+    for k in sorted(table.keys()):
+        x = table[k]
+        print ("    {%40s, %42s }," % (x["name"], keyTypes[x["keytype"]]), file = outfile)
+    print("}; // const unordered_map keytype\n\n\n", file = outfile)
 
     print(
 """

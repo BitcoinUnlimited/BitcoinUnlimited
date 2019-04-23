@@ -22,8 +22,8 @@
 #endif
 
 #include <boost/lexical_cast.hpp>
-#include <boost/thread.hpp>
 #include <limits>
+#include <thread>
 
 #include <QDataWidgetMapper>
 #include <QDir>

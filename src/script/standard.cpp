@@ -50,27 +50,24 @@ const char *GetTxnOutputType(txnouttype t)
 bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, vector<vector<unsigned char> > &vSolutionsRet)
 {
     // Templates
-    static multimap<txnouttype, CScript> mTemplates;
-    if (mTemplates.empty())
-    {
+    static multimap<txnouttype, CScript> mTemplates = {
+
         // Standard tx, sender provides pubkey, receiver adds signature
-        mTemplates.insert(make_pair(TX_PUBKEY, CScript() << OP_PUBKEY << OP_CHECKSIG));
+        {TX_PUBKEY, CScript() << OP_PUBKEY << OP_CHECKSIG},
 
         // Bitcoin address tx, sender provides hash of pubkey, receiver provides signature and pubkey
-        mTemplates.insert(make_pair(
-            TX_PUBKEYHASH, CScript() << OP_DUP << OP_HASH160 << OP_PUBKEYHASH << OP_EQUALVERIFY << OP_CHECKSIG));
+        {TX_PUBKEYHASH, CScript() << OP_DUP << OP_HASH160 << OP_PUBKEYHASH << OP_EQUALVERIFY << OP_CHECKSIG},
 
         // Sender provides N pubkeys, receivers provides M signatures
-        mTemplates.insert(
-            make_pair(TX_MULTISIG, CScript() << OP_SMALLINTEGER << OP_PUBKEYS << OP_SMALLINTEGER << OP_CHECKMULTISIG));
+        {TX_MULTISIG, CScript() << OP_SMALLINTEGER << OP_PUBKEYS << OP_SMALLINTEGER << OP_CHECKMULTISIG},
 
         // Freeze tx using CLTV ; nFreezeLockTime CLTV DROP (0x21 pubkeys) checksig
-        mTemplates.insert(make_pair(
-            TX_CLTV, CScript() << OP_BIGINTEGER << OP_CHECKLOCKTIMEVERIFY << OP_DROP << OP_PUBKEYS << OP_CHECKSIG));
+        {TX_CLTV, CScript() << OP_BIGINTEGER << OP_CHECKLOCKTIMEVERIFY << OP_DROP << OP_PUBKEYS << OP_CHECKSIG},
 
         // LabelPublc OP_RETURN data size format small
-        mTemplates.insert(make_pair(TX_LABELPUBLIC, CScript() << OP_RETURN << OP_BIGINTEGER << OP_DATA));
-    }
+        {TX_LABELPUBLIC, CScript() << OP_RETURN << OP_BIGINTEGER << OP_DATA}
+
+    };
 
     vSolutionsRet.clear();
     // LOGA("Freeze Solve: %s \n ", ::ScriptToAsmStr(scriptPubKey));
@@ -358,27 +355,11 @@ CScript GetScriptLabelPublic(const string &labelPublic)
     {
         scriptDataPublic = CScript();
     }
-    else if (sizeLabelPublic <= 75)
+    else
     {
         // length byte + data (https://en.bitcoin.it/wiki/Script);
         // scriptDataPublic = bytearray((sizeLabelPublic,))+ labelPublic;
         scriptDataPublic = CScript() << OP_RETURN << CScriptNum(sizeLabelPublic)
-                                     << std::vector<unsigned char>(labelPublic.begin(), labelPublic.end());
-    }
-    else if (sizeLabelPublic <= 256)
-    {
-        // OP_PUSHDATA1 format
-        // scriptDataPublic = "\x4c" + bytearray((metadata_len,)) + labelPublic;
-        scriptDataPublic = CScript() << OP_RETURN << OP_PUSHDATA1 << CScriptNum(sizeLabelPublic)
-                                     << std::vector<unsigned char>(labelPublic.begin(), labelPublic.end());
-    }
-    else
-    {
-        // OP_PUSHDATA2 format
-        // scriptDataPublic = "\x4d"+ bytearray((sizeLabelPublic%256,)) + bytearray((int(sizeLabelPublic/256),)) +
-        // labelPublic;
-        scriptDataPublic = CScript() << OP_RETURN << OP_PUSHDATA2 << CScriptNum(sizeLabelPublic % 256)
-                                     << CScriptNum(int(sizeLabelPublic / 256))
                                      << std::vector<unsigned char>(labelPublic.begin(), labelPublic.end());
     }
     return scriptDataPublic;

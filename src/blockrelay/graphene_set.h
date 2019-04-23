@@ -6,6 +6,7 @@
 #define BITCOIN_GRAPHENE_SET_H
 
 #include "bloom.h"
+#include "fastfilter.h"
 #include "hash.h"
 #include "iblt.h"
 #include "random.h"
@@ -25,6 +26,9 @@ const float FILTER_FPR_MAX = 0.999;
 const uint8_t IBLT_CELL_MINIMUM = 2;
 const std::vector<uint8_t> IBLT_NULL_VALUE = {};
 const unsigned char WORD_BITS = 8;
+const uint16_t APPROX_ITEMS_THRESH = 600;
+const uint8_t APPROX_EXCESS_RATE = 4;
+const float IBLT_DEFAULT_OVERHEAD = 1.5;
 
 
 class CGrapheneSet
@@ -32,9 +36,16 @@ class CGrapheneSet
 private:
     bool ordered;
     uint64_t nReceiverUniverseItems;
+    mutable uint64_t shorttxidk0, shorttxidk1;
+    uint64_t version;
+    uint32_t ibltSalt;
+    bool computeOptimized;
     std::vector<unsigned char> encodedRank;
     CBloomFilter *pSetFilter;
+    CVariableFastFilter *pFastFilter;
     CIblt *pSetIblt;
+
+    static const uint8_t SHORTTXIDS_LENGTH = 8;
 
     std::vector<uint64_t> ArgSort(const std::vector<uint64_t> &items)
     {
@@ -48,15 +59,57 @@ private:
 
 public:
     // The default constructor is for 2-phase construction via deserialization
-    CGrapheneSet() : ordered(false), nReceiverUniverseItems(0), pSetFilter(nullptr), pSetIblt(nullptr) {}
+    CGrapheneSet()
+        : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), version(1), ibltSalt(0),
+          computeOptimized(false), pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr)
+    {
+    }
+    CGrapheneSet(uint64_t _version)
+        : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), version(_version), ibltSalt(0),
+          computeOptimized(false), pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr)
+    {
+    }
+    CGrapheneSet(uint64_t _version, bool _computeOptimized)
+        : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), version(_version), ibltSalt(0),
+          computeOptimized(_computeOptimized), pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr)
+    {
+    }
     CGrapheneSet(size_t _nReceiverUniverseItems,
         uint64_t nSenderUniverseItems,
         const std::vector<uint256> &_itemHashes,
+        uint64_t _shorttxidk0,
+        uint64_t _shorttxidk1,
+        uint64_t _version = 1,
+        uint32_t ibltEntropy = 0,
+        bool _computeOptimized = false,
         bool _ordered = false,
         bool fDeterministic = false);
 
+    // Generate cheap hash from seeds using SipHash
+    uint64_t GetShortID(const uint256 &txhash) const;
+
     /* Optimal symmetric difference between block txs and receiver mempool txs passing
      * though filter to use for IBLT.
+     */
+    double OptimalSymDiff(uint64_t nBlockTxs,
+        uint64_t nReceiverPoolTx,
+        uint64_t nReceiverExcessTxs = 0,
+        uint64_t nReceiverMissingTxs = 1);
+
+    /* Approximation to the optimal symmetric difference between block txs and receiver
+     * mempool txs passing through filter to use for IBLT.
+     *
+     * This method is called by OptimalSymDiff provided that:
+     * 1) nBlockTxs >= APPROX_ITEMS_THRESH
+     * 2) nReceiverExcessTxs >= nBlockTxs / APPROX_EXCESS_RATE
+     *
+     * For details see
+     * https://github.com/bissias/graphene-experiments/blob/master/jupyter/graphene_size_optimization.ipynb
+     */
+    double ApproxOptimalSymDiff(uint64_t nBlockTxs);
+
+    /* Brute force search for optimal symmetric difference between block txs and receiver
+     * mempool txs passing though filter to use for IBLT.
      *
      * Let a be defined as the size of the symmetric difference between items in the
      * sender and receiver IBLTs.
@@ -64,10 +117,10 @@ public:
      * The total size in bytes of a graphene block is given by T(a) = F(a) + L(a) as defined
      * in the code below. (Note that meta parameters for the Bloom Filter and IBLT are ignored).
      */
-    double OptimalSymDiff(uint64_t nBlockTxs,
+    double BruteForceSymDiff(uint64_t nBlockTxs,
         uint64_t nReceiverPoolTx,
-        uint64_t nReceiverExcessTxs = 0,
-        uint64_t nReceiverMissingTxs = 1);
+        uint64_t nReceiverExcessTxs,
+        uint64_t nReceiverMissingTxs);
 
     // Pass the transaction hashes that the local machine has to reconcile with the remote and return a list
     // of cheap hashes in the block in the correct order
@@ -83,11 +136,23 @@ public:
 
     static std::vector<uint64_t> DecodeRank(std::vector<unsigned char> encoded, size_t nItems, uint16_t nBitsPerItem);
 
-    uint64_t GetFilterSerializationSize() { return ::GetSerializeSize(*pSetFilter, SER_NETWORK, PROTOCOL_VERSION); }
+    uint64_t GetFilterSerializationSize()
+    {
+        if (computeOptimized)
+            return ::GetSerializeSize(*pFastFilter, SER_NETWORK, PROTOCOL_VERSION);
+        else
+            return ::GetSerializeSize(*pSetFilter, SER_NETWORK, PROTOCOL_VERSION);
+    }
     uint64_t GetIbltSerializationSize() { return ::GetSerializeSize(*pSetIblt, SER_NETWORK, PROTOCOL_VERSION); }
     uint64_t GetRankSerializationSize() { return ::GetSerializeSize(encodedRank, SER_NETWORK, PROTOCOL_VERSION); }
     ~CGrapheneSet()
     {
+        if (pFastFilter)
+        {
+            delete pFastFilter;
+            pFastFilter = nullptr;
+        }
+
         if (pSetFilter)
         {
             delete pSetFilter;
@@ -110,10 +175,28 @@ public:
         READWRITE(nReceiverUniverseItems);
         if (nReceiverUniverseItems > LARGE_MEM_POOL_SIZE)
             throw std::runtime_error("nReceiverUniverseItems exceeds threshold for excessive mempool size");
+        if (version > 0)
+        {
+            READWRITE(shorttxidk0);
+            READWRITE(shorttxidk1);
+        }
+        if (version >= 2)
+            READWRITE(ibltSalt);
         READWRITE(encodedRank);
-        if (!pSetFilter)
-            pSetFilter = new CBloomFilter();
-        READWRITE(*pSetFilter);
+        if (version >= 3 && computeOptimized)
+        {
+            if (!pFastFilter)
+                pFastFilter = new CVariableFastFilter();
+
+            READWRITE(*pFastFilter);
+        }
+        else
+        {
+            if (!pSetFilter)
+                pSetFilter = new CBloomFilter();
+
+            READWRITE(*pSetFilter);
+        }
         if (!pSetIblt)
             pSetIblt = new CIblt();
         READWRITE(*pSetIblt);

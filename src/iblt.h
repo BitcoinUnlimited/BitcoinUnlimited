@@ -71,9 +71,12 @@ class CIblt
 public:
     // Default constructor builds a 0 size IBLT, so is meant for two-phase construction.  Call resize() before use
     CIblt();
+    CIblt(uint64_t version);
     // Pass the expected number of entries in the IBLT table. If the number of entries exceeds
     // the expected, then the decode failure rate will increase dramatically.
-    CIblt(size_t _expectedNumEntries);
+    CIblt(size_t _expectedNumEntries, uint64_t _version);
+    // The salt value is used to create a distinct hash seed for each hash function.
+    CIblt(size_t _expectedNumEntries, uint32_t salt, uint64_t _version);
     // Copy constructor
     CIblt(const CIblt &other);
     ~CIblt();
@@ -83,6 +86,7 @@ public:
     // Returns the size in bytes of the IBLT.  This is NOT the count of inserted entries
     uint64_t size();
     void resize(size_t _expectedNumEntries);
+    uint32_t saltedHashValue(size_t hashFuncIdx, const std::vector<uint8_t> &kvec) const;
     void insert(uint64_t k, const std::vector<uint8_t> &v);
     void erase(uint64_t k, const std::vector<uint8_t> &v);
 
@@ -108,6 +112,8 @@ public:
     // Returns the optimal ratio of memory cells to expected entries.
     // OptimalOverhead()*expectedNumEntries <= allocated memory cells
     static float OptimalOverhead(size_t expectedNumEntries);
+    // Returns the maximum number of hash functions for any number of entries.
+    static uint8_t MaxNHash();
 
     // For debugging:
     std::string DumpTable() const;
@@ -118,8 +124,15 @@ public:
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
         READWRITE(COMPACTSIZE(version));
-        if (ser_action.ForRead() && version != 0)
-            throw std::ios_base::failure("Only IBLT version zero is currently known.");
+
+        if (version > 0)
+        {
+            READWRITE(mapHashIdxSeeds);
+            READWRITE(salt);
+        }
+
+        if (ser_action.ForRead() && version > 1)
+            throw std::ios_base::failure("No IBLT version exceeding 1 is currently known.");
 
         READWRITE(n_hash);
         if (ser_action.ForRead() && n_hash == 0)
@@ -135,11 +148,15 @@ public:
 protected:
     void _insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> &v);
 
+    // This salt is used to seed the IBLT hash functions. When its value (passed in via constructor)
+    // is derived from a pseudo-random value, the IBLT hash functions themselves become randomized.
+    uint32_t salt;
     uint64_t version;
     uint8_t n_hash;
     bool is_modified;
 
     std::vector<HashTableEntry> hashTable;
+    std::map<uint8_t, uint32_t> mapHashIdxSeeds;
 };
 
 #endif /* CIblt_H */

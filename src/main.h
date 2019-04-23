@@ -142,15 +142,15 @@ static const bool DEFAULT_PERMIT_BAREMULTISIG = true;
 static const unsigned int DEFAULT_BYTES_PER_SIGOP = 20;
 static const bool DEFAULT_CHECKPOINTS_ENABLED = true;
 
+/** Default -persistmempool */
+static const bool DEFAULT_PERSIST_MEMPOOL = true;
+
 static const bool DEFAULT_TESTSAFEMODE = false;
 
 /** Maximum number of headers to announce when relaying blocks with headers message.*/
 static const unsigned int MAX_BLOCKS_TO_ANNOUNCE = 8;
 
 static const bool DEFAULT_PEERBLOOMFILTERS = true;
-static const bool DEFAULT_USE_THINBLOCKS = true;
-static const uint64_t DEFAULT_PREFERENTIAL_TIMER = 1000;
-static const bool DEFAULT_USE_GRAPHENE_BLOCKS = true;
 
 static const bool DEFAULT_REINDEX = false;
 static const bool DEFAULT_DISCOVER = true;
@@ -158,7 +158,7 @@ static const bool DEFAULT_PRINTTOCONSOLE = false;
 
 // BU - Xtreme Thinblocks Auto Mempool Limiter - begin section
 /** The default value for -minrelaytxfee in sat/byte */
-static const double DEFAULT_MINLIMITERTXFEE = 0.0;
+static const double DEFAULT_MINLIMITERTXFEE = (double)DEFAULT_MIN_RELAY_TX_FEE / 1000;
 /** The default value for -maxrelaytxfee in sat/byte */
 static const double DEFAULT_MAXLIMITERTXFEE = (double)DEFAULT_MIN_RELAY_TX_FEE / 1000;
 /** The number of block heights to gradually choke spam transactions over */
@@ -223,6 +223,8 @@ extern uint64_t nDBUsedSpace;
 extern uint32_t nXthinBloomFilterSize;
 /** Block files containing a block-height within MIN_BLOCKS_TO_KEEP of chainActive.Tip() will not be pruned. */
 static const unsigned int MIN_BLOCKS_TO_KEEP = 288;
+/** Minimum blocks required to signal NODE_NETWORK_LIMITED */
+static const unsigned int NODE_NETWORK_LIMITED_MIN_BLOCKS = 288;
 
 static const signed int DEFAULT_CHECKBLOCKS = 6;
 static const unsigned int DEFAULT_CHECKLEVEL = 3;
@@ -270,7 +272,8 @@ bool GetTransaction(const uint256 &hash,
     CTransactionRef &tx,
     const Consensus::Params &params,
     uint256 &hashBlock,
-    bool fAllowSlow = false);
+    bool fAllowSlow = false,
+    const CBlockIndex *blockIndex = nullptr);
 
 /** Get statistics from node state */
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats);
@@ -351,6 +354,5 @@ public:
     ~CMainCleanup();
 };
 #endif
-
 
 #endif // BITCOIN_MAIN_H

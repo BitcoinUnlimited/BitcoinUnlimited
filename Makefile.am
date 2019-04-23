@@ -4,7 +4,7 @@
 
 ACLOCAL_AMFLAGS = -I build-aux/m4
 SUBDIRS = src
-.PHONY: deploy FORCE
+.PHONY: deploy FORCE electrs
 
 GZIP_ENV="-9n"
 export PYTHONPATH
@@ -79,7 +79,7 @@ $(OSX_APP)/Contents/PkgInfo:
 
 $(OSX_APP)/Contents/Resources/empty.lproj:
 	$(MKDIR_P) $(@D)
-	@touch $@ 
+	@touch $@
 
 $(OSX_APP)/Contents/Info.plist: $(OSX_PLIST)
 	$(MKDIR_P) $(@D)
@@ -218,9 +218,12 @@ endif
 check-formatting:
 	$(MAKE) -C src $@
 
+electrs:
+	$(top_srcdir)/contrib/electrs/build_electrs.py --dst=${PWD}/src --target=$(host)
+
 dist_noinst_SCRIPTS = autogen.sh
 
-EXTRA_DIST = $(top_srcdir)/share/genbuild.sh qa/pull-tester/rpc-tests.py qa/pull-tester/test_classes.py qa/rpc-tests $(DIST_DOCS) $(WINDOWS_PACKAGING) $(OSX_PACKAGING) $(BIN_CHECKS)
+EXTRA_DIST = $(top_srcdir)/share/genbuild.sh qa/pull-tester/rpc-tests.py qa/pull-tester/test_classes.py qa/rpc-tests $(DIST_DOCS) $(WINDOWS_PACKAGING) $(OSX_PACKAGING) $(BIN_CHECKS) $(top_srcdir)/contrib/electrs/build_electrs.py
 
 CLEANFILES = $(OSX_DMG) $(BITCOIN_WIN_INSTALLER)
 

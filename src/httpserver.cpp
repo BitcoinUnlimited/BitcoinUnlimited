@@ -389,12 +389,21 @@ static void HTTPWorkQueueRun(WorkQueue<HTTPClosure> *queue)
 }
 
 /** libevent event log callback */
-static void libevent_log_cb(int severity, const char *msg)
+static void libevent_log_cb(int severity, const char *_msg)
 {
 #ifndef EVENT_LOG_WARN
 // EVENT_LOG_WARN was added in 2.0.19; but before then _EVENT_LOG_WARN existed.
 #define EVENT_LOG_WARN _EVENT_LOG_WARN
 #endif
+    std::string msg(_msg);
+    if (msg.empty())
+        return;
+
+    // messages to this call back sometimes seem to have an
+    // extra newline that can be removed.
+    if (msg[msg.size() - 1] == '\n')
+        msg = msg.substr(0, msg.size() - 1);
+
     if (severity >= EVENT_LOG_WARN) // Log warn messages and higher without debug category
         LOGA("libevent: %s\n", msg);
     else
@@ -414,7 +423,7 @@ bool InitHTTPServer()
 #if LIBEVENT_VERSION_NUMBER >= 0x02010100
     // If -debug=libevent, set full libevent debugging.
     // Otherwise, disable all libevent debugging.
-    if (LogAcceptCategory(Logging::LIBEVENT))
+    if (Logging::LogAcceptCategory(LIBEVENT))
         event_enable_debug_logging(EVENT_DBG_ALL);
     else
         event_enable_debug_logging(EVENT_DBG_NONE);

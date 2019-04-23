@@ -8,12 +8,12 @@
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/bind.hpp>
-#include <boost/thread.hpp>
 #include <iostream>
 #include <istream>
 #include <ostream>
 #include <stdint.h>
 #include <string>
+#include <thread>
 #include <univalue.h>
 
 using namespace std;
@@ -73,8 +73,11 @@ public:
                 GENERAL_NAME *generalName = sk_GENERAL_NAME_value(altNames, i);
                 if ((generalName->type == GEN_URI) || (generalName->type == GEN_DNS))
                 {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#define ASN1_STRING_get0_data ASN1_STRING_data
+#endif
                     std::string san = std::string(
-                        reinterpret_cast<char *>(ASN1_STRING_data(generalName->d.uniformResourceIdentifier)),
+                        reinterpret_cast<const char *>(ASN1_STRING_get0_data(generalName->d.uniformResourceIdentifier)),
                         ASN1_STRING_length(generalName->d.uniformResourceIdentifier));
                     if (san.find(cert_hostname_) != std::string::npos)
                     {
@@ -238,7 +241,7 @@ private:
     boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket_;
     boost::asio::streambuf response_;
     std::string content_;
-    boost::scoped_ptr<boost::asio::deadline_timer> timer_;
+    std::unique_ptr<boost::asio::deadline_timer> timer_;
     std::string url_path_;
     std::string url_host_;
     std::string cert_hostname_;

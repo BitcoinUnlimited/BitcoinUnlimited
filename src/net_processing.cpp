@@ -7,6 +7,8 @@
 #include "net_processing.h"
 
 #include "addrman.h"
+#include "blockrelay/blockrelay_common.h"
+#include "blockrelay/compactblock.h"
 #include "blockrelay/graphene.h"
 #include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
@@ -21,6 +23,7 @@
 #include "txadmission.h"
 #include "validation/validation.h"
 #include "validationinterface.h"
+#include "version.h"
 #include "xversionkeys.h"
 
 extern std::atomic<int64_t> nTimeBestReceived;
@@ -28,6 +31,9 @@ extern std::atomic<int> nPreferredDownload;
 extern int nSyncStarted;
 extern std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders;
 extern CTweak<unsigned int> maxBlocksInTransitPerPeer;
+extern CTweak<uint64_t> grapheneMinVersionSupported;
+extern CTweak<uint64_t> grapheneMaxVersionSupported;
+extern CTweak<uint64_t> grapheneFastFilterCompatibility;
 
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
@@ -65,10 +71,8 @@ bool PeerHasHeader(const CNodeState *state, CBlockIndex *pindex)
     return false;
 }
 
-bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParams, std::deque<CInv> &vInv)
+void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParams, std::deque<CInv> &vInv)
 {
-    bool gotWorkDone = false;
-
     std::vector<CInv> vNotFound;
 
     while (!vInv.empty())
@@ -83,9 +87,12 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
         const CInv inv = vInv.front();
         vInv.pop_front();
         {
-            boost::this_thread::interruption_point();
-            gotWorkDone = true;
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK)
+            if (shutdown_threads.load() == true)
+            {
+                return;
+            }
+            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK ||
+                inv.type == MSG_CMPCT_BLOCK)
             {
                 bool fSend = false;
                 auto *mi = LookupBlockIndex(inv.hash);
@@ -108,16 +115,17 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                                      *pindexBestHeader, *mi, *pindexBestHeader, consensusParams) < nOneMonth);
                         if (!fSend)
                         {
-                            LOGA("%s: ignoring request from peer=%s for old block that isn't in the main chain\n",
+                            LOG(NET, "%s: ignoring request from peer=%s for old block that isn't in the main chain\n",
                                 __func__, pfrom->GetLogName());
                         }
                         else
-                        { // BU: don't relay excessive blocks that are not on the active chain
+                        {
+                            // BU: don't relay excessive blocks that are not on the active chain
                             if (mi->nStatus & BLOCK_EXCESSIVE)
                                 fSend = false;
                             if (!fSend)
-                                LOGA("%s: ignoring request from peer=%s for excessive block of height %d not on "
-                                     "the main chain\n",
+                                LOG(NET, "%s: ignoring request from peer=%s for excessive block of height %d not on "
+                                         "the main chain\n",
                                     __func__, pfrom->GetLogName(), mi->nHeight);
                         }
                         // BU: in the future we can throttle old block requests by setting send=false if we are out of
@@ -136,6 +144,21 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     LOG(NET, "historical block serving limit reached, disconnect peer %s\n", pfrom->GetLogName());
 
                     // disconnect node
+                    pfrom->fDisconnect = true;
+                    fSend = false;
+                }
+                // Avoid leaking prune-height by never sending blocks below the
+                // NODE_NETWORK_LIMITED threshold.
+                // Add two blocks buffer extension for possible races
+                if (fSend && !pfrom->fWhitelisted &&
+                    ((((nLocalServices & NODE_NETWORK_LIMITED) == NODE_NETWORK_LIMITED) &&
+                        ((nLocalServices & NODE_NETWORK) != NODE_NETWORK) &&
+                        (chainActive.Tip()->nHeight - mi->nHeight > (int)NODE_NETWORK_LIMITED_MIN_BLOCKS + 2))))
+                {
+                    LOG(NET, "Ignore block request below NODE_NETWORK_LIMITED threshold from peer=%d\n",
+                        pfrom->GetId());
+                    // disconnect node and prevent it from stalling (would
+                    // otherwise wait for the missing block)
                     pfrom->fDisconnect = true;
                     fSend = false;
                 }
@@ -159,10 +182,18 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                             pfrom->blocksSent += 1;
                             pfrom->PushMessage(NetMsgType::BLOCK, block);
                         }
-                        else if (inv.type == MSG_THINBLOCK)
+                        else if (inv.type == MSG_THINBLOCK && pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) < 2 &&
+                                 pfrom->ThinBlockCapable())
                         {
-                            LOG(THIN, "Sending thinblock by INV queue getdata message\n");
+                            // TODO: This code path enables backward compatibility for older BU nodes
+                            // and can be removed in the future.
+                            LOG(THIN, "Sending thinblock via getdata message\n");
                             SendXThinBlock(MakeBlockRef(block), pfrom, inv);
+                        }
+                        else if (inv.type == MSG_CMPCT_BLOCK)
+                        {
+                            LOG(CMPCT, "Sending compactblock via getdata message\n");
+                            SendCompactBlock(MakeBlockRef(block), pfrom, inv);
                         }
                         else // MSG_FILTERED_BLOCK)
                         {
@@ -259,7 +290,7 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             // priority messages and we don't want to sit here processing a large number of messages
             // while we hold the cs_main lock, but rather allow these messages to be sent first and
             // process the return message before potentially reading from the queue again.
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK)
+            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
                 break;
         }
     }
@@ -275,44 +306,7 @@ bool static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
         // having to download the entire memory pool.
         pfrom->PushMessage(NetMsgType::NOTFOUND, vNotFound);
     }
-    return gotWorkDone;
 }
-
-
-static bool BasicThinblockChecks(CNode *pfrom, const CChainParams &chainparams)
-{
-    if (!pfrom->ThinBlockCapable())
-    {
-        dosMan.Misbehaving(pfrom, 100);
-        return error("Thinblock message received from a non thinblock node, peer=%d", pfrom->GetId());
-    }
-
-    // Check for Misbehaving and DOS
-    // If they make more than 20 requests in 10 minutes then disconnect them
-    if (Params().NetworkIDString() != "regtest")
-    {
-        uint64_t nNow = GetTime();
-        if (pfrom->nGetXthinLastTime <= 0)
-            pfrom->nGetXthinLastTime = nNow;
-        double tmp = pfrom->nGetXthinCount;
-        while (!pfrom->nGetXthinCount.compare_exchange_weak(
-            tmp, (tmp * std::pow(1.0 - 1.0 / 600.0, (double)(nNow - pfrom->nGetXthinLastTime)) + 1)))
-            ;
-        pfrom->nGetXthinLastTime = nNow;
-        LOG(THIN, "nGetXthinCount is %f\n", pfrom->nGetXthinCount);
-        if (chainparams.NetworkIDString() == "main") // other networks have variable mining rates
-        {
-            if (pfrom->nGetXthinCount >= 20)
-            {
-                dosMan.Misbehaving(pfrom, 50); // If they exceed the limit then disconnect them
-                return error("requesting too many getdata thinblocks");
-            }
-        }
-    }
-
-    return true;
-}
-
 
 static bool ensureConnectionState(const std::string msg,
     const ConnectionStateIncoming &expected_incoming,
@@ -355,8 +349,8 @@ static void handleAddressAfterInit(CNode *pfrom)
             }
         }
         // Get recent addresses
-        pfrom->PushMessage(NetMsgType::GETADDR);
         pfrom->fGetAddr = true;
+        pfrom->PushMessage(NetMsgType::GETADDR);
         addrman.Good(pfrom->addr);
     }
     else
@@ -379,21 +373,15 @@ static void enableSendHeaders(CNode *pfrom)
         pfrom->PushMessage(NetMsgType::SENDHEADERS);
 }
 
-static bool CheckForDownloadTimeout(CNode *pto, bool fReceived, int64_t &nRequestTime)
+static void enableCompactBlocks(CNode *pfrom)
 {
-    // Use a timeout of 6 times the retry inverval before disconnecting.  This way only a max of 6
-    // re-requested thinblocks or graphene blocks could be in memory at any one time.
-    if (!fReceived && (GetTime() - nRequestTime) > 6 * blkReqRetryInterval / 1000000)
+    // Tell our peer that we support compact blocks
+    if (IsCompactBlocksEnabled())
     {
-        if (!pto->fWhitelisted && Params().NetworkIDString() != "regtest")
-        {
-            LOG(THIN, "ERROR: Disconnecting peer %s due to thinblock download timeout exceeded (%d secs)\n",
-                pto->GetLogName(), (GetTime() - nRequestTime));
-            pto->fDisconnect = true;
-            return true;
-        }
+        bool fHighBandwidth = false;
+        uint64_t nVersion = 1;
+        pfrom->PushMessage(NetMsgType::SENDCMPCT, fHighBandwidth, nVersion);
     }
-    return false;
 }
 
 bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived)
@@ -427,6 +415,17 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
     }
 
+    bool grapheneVersionCompatible = true;
+    try
+    {
+        NegotiateGrapheneVersion(pfrom);
+        NegotiateFastFilterSupport(pfrom);
+    }
+    catch (const std::runtime_error &e)
+    {
+        grapheneVersionCompatible = false;
+    }
+
     /* Special handling for xversion messages, as they are optional but still
      have to be properly sequenced to be at the beginning of a connection. So
      if anything but an xversion comes in whilst in
@@ -442,6 +441,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->state_incoming = ConnectionStateIncoming::READY;
         handleAddressAfterInit(pfrom);
         enableSendHeaders(pfrom);
+        enableCompactBlocks(pfrom);
     }
     // ------------------------- BEGIN INITIAL COMMAND SET PROCESSING
     if (strCommand == NetMsgType::VERSION)
@@ -454,6 +454,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CAddress addrMe;
         uint64_t nNonce = 1;
         vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
+
+        // Update thin type peer counters. This should be at the top here before we have any
+        // potential disconnects, because on disconnect the counters will then get decremented.
+        thinrelay.AddPeers(pfrom);
 
         if (pfrom->nVersion < MIN_PEER_PROTO_VERSION)
         {
@@ -497,7 +501,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (pfrom->fInbound)
             pfrom->PushVersion();
 
-        pfrom->fClient = !(pfrom->nServices & NODE_NETWORK);
+
+        // set nodes not relaying blocks and tx and not serving (parts) of the historical blockchain as "clients"
+        pfrom->fClient = (!(pfrom->nServices & NODE_NETWORK) && !(pfrom->nServices & NODE_NETWORK_LIMITED));
+
+        // set nodes not capable of serving the complete blockchain history as "limited nodes"
+        pfrom->m_limited_node = (!(pfrom->nServices & NODE_NETWORK) && (pfrom->nServices & NODE_NETWORK_LIMITED));
 
         // Potentially mark this peer as a preferred download peer.
         UpdatePreferredDownload(pfrom);
@@ -558,6 +567,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CXVersionMessage xver;
         xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
         xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
+        xver.set_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED, grapheneMaxVersionSupported.Value());
+        xver.set_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED, grapheneMinVersionSupported.Value());
+        xver.set_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF, grapheneFastFilterCompatibility.Value());
+        xver.set_u64c(XVer::BU_XTHIN_VERSION, 2); // xthin version
         pfrom->PushMessage(NetMsgType::XVERSION, xver);
 
 
@@ -646,10 +659,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                      "setting. peer=%s version=%s\n",
                 pfrom->GetLogName(), pfrom->cleanSubVer);
         }
+
         pfrom->PushMessage(NetMsgType::XVERACK);
         pfrom->state_incoming = ConnectionStateIncoming::READY;
         handleAddressAfterInit(pfrom);
         enableSendHeaders(pfrom);
+        enableCompactBlocks(pfrom);
     }
     else if (strCommand == NetMsgType::XVERACK)
     {
@@ -658,6 +673,25 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         // This step done after final handshake
         CheckAndRequestExpeditedBlocks(pfrom);
+    }
+    else if (strCommand == NetMsgType::XUPDATE)
+    {
+        CXVersionMessage xUpdate;
+        vRecv >> xUpdate;
+        // check for peer trying to change non-changeable key
+        for (auto entry : xUpdate.xmap)
+        {
+            auto iter = XVer::mapKeyType.find(entry.first);
+            if (iter == XVer::mapKeyType.end())
+            {
+                continue;
+            }
+            else if (iter->second == XVer::keyType::changeable)
+            {
+                LOCK(pfrom->cs_xversion);
+                pfrom->xVersion.xmap[entry.first] = xUpdate.xmap[entry.first];
+            }
+        }
     }
 
     // XVERSION NOTICE: If you read this code as a reference to implement
@@ -679,7 +713,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     {
         if (pfrom->ThinBlockCapable())
         {
-            vRecv >> pfrom->nXthinBloomfilterSize;
+            uint32_t nSize = 0;
+            vRecv >> nSize;
+            pfrom->nXthinBloomfilterSize.store(nSize);
 
             // As a safeguard don't allow a smaller max bloom filter size than the default max size.
             if (!pfrom->nXthinBloomfilterSize || (pfrom->nXthinBloomfilterSize < SMALLEST_MAX_BLOOM_FILTER_SIZE))
@@ -747,6 +783,44 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             return error("message addr size() = %u", vAddr.size());
         }
 
+        // To avoid malicious flooding of our address table, only allow unsolicited ADDR messages to
+        // insert the connecting IP.  We need to allow this IP to be inserted, or there is no way for that node
+        // to tell the network about itself if its behind a NAT.
+
+        // Digression about how things work behind a NAT:
+        //     Node A periodically ADDRs node B with the address that B reported to A as A's own
+        //     address (in the VERSION message).
+        //
+        // The purpose of using exchange here is to atomically set to false and also get whether I asked for an addr
+        if (!pfrom->fGetAddr.exchange(0) && pfrom->fInbound)
+        {
+            bool reportedOwnAddr = false;
+            CAddress ownAddr;
+            for (CAddress &addr : vAddr)
+            {
+                // server listen port will be different.  We want to compare IPs and then use provided port
+                if ((CNetAddr)addr == (CNetAddr)pfrom->addr)
+                {
+                    ownAddr = addr;
+                    reportedOwnAddr = true;
+                    break;
+                }
+            }
+            if (reportedOwnAddr)
+            {
+                vAddr.resize(1); // Get rid of every address the remote node tried to inject except itself.
+                vAddr[0] = ownAddr;
+            }
+            else
+            {
+                // Today unsolicited ADDRs are not illegal, but we should consider misbehaving on this (if we add logic
+                // to unmisbehaving over time), because a few unsolicited ADDRs are ok from a DOS perspective but lots
+                // are not.
+                // dosMan.Misbehaving(pfrom, 1);
+                return true; // We don't want to process any other addresses, but giving them is not an error
+            }
+        }
+
         // Store the new addresses
         std::vector<CAddress> vAddrOk;
         int64_t nNow = GetAdjustedTime();
@@ -754,13 +828,16 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         FastRandomContext insecure_rand;
         for (CAddress &addr : vAddr)
         {
-            boost::this_thread::interruption_point();
+            if (shutdown_threads.load() == true)
+            {
+                return false;
+            }
 
             if (addr.nTime <= 100000000 || addr.nTime > nNow + 10 * 60)
                 addr.nTime = nNow - 5 * 24 * 60 * 60;
             pfrom->AddAddressKnown(addr);
             bool fReachable = IsReachable(addr);
-            if (addr.nTime > nSince && !pfrom->fGetAddr && vAddr.size() <= 10 && addr.IsRoutable())
+            if (addr.nTime > nSince && vAddr.size() <= 10 && addr.IsRoutable())
             {
                 // Relay to a limited number of other nodes
                 {
@@ -794,8 +871,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 vAddrOk.push_back(addr);
         }
         addrman.Add(vAddrOk, pfrom->addr, 2 * 60 * 60);
-        if (vAddr.size() < 1000)
-            pfrom->fGetAddr = false;
         if (pfrom->fOneShot)
         {
             LOG(NET, "Disconnecting %s: one shot\n", pfrom->GetLogName());
@@ -803,9 +878,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
     }
 
-    // Processing this message type for statistics purposes only, BU currently doesn't support CB protocol
     // Ignore this message if sent from a node advertising a version earlier than the first CB release (70014)
-    else if (strCommand == NetMsgType::SENDCMPCT && pfrom->nVersion >= 70014)
+    else if (strCommand == NetMsgType::SENDCMPCT && pfrom->nVersion >= COMPACTBLOCKS_VERSION)
     {
         bool fHighBandwidth = false;
         uint64_t nVersion = 0;
@@ -814,6 +888,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // BCH network currently only supports version 1 (v2 is segwit support on BTC)
         // May need to be updated in the future if other clients deploy a new version
         pfrom->fSupportsCompactBlocks = nVersion == 1;
+
+        // Increment compact block peer counter.
+        thinrelay.AddCompactBlockPeer(pfrom);
     }
 
     else if (strCommand == NetMsgType::INV)
@@ -842,7 +919,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         for (unsigned int nInv = 0; nInv < vInv.size(); nInv++)
         {
-            boost::this_thread::interruption_point();
+            if (shutdown_threads.load() == true)
+            {
+                return false;
+            }
 
             const CInv &inv = vInv[nInv];
             if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK)) || inv.hash.IsNull())
@@ -937,18 +1017,19 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         {
             const CInv &inv = vInv[nInv];
             if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK) || (inv.type == MSG_FILTERED_BLOCK) ||
-                    (inv.type == MSG_THINBLOCK)))
+                    (inv.type == MSG_CMPCT_BLOCK) || (inv.type == MSG_THINBLOCK)))
             {
                 dosMan.Misbehaving(pfrom, 20);
                 return error("message inv invalid type = %u", inv.type);
             }
 
             // Make basic checks
-            if (inv.type == MSG_THINBLOCK)
+            if (inv.type == MSG_CMPCT_BLOCK || inv.type == MSG_THINBLOCK)
             {
-                if (!BasicThinblockChecks(pfrom, chainparams))
+                if (!requester.CheckForRequestDOS(pfrom, chainparams))
                     return false;
             }
+
             invDeque.push_back(inv);
         }
 
@@ -1270,7 +1351,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
             // During the process of IBD we need to update block availability for every connected peer. To do that we
             // request, from each NODE_NETWORK peer, a header that matches the last blockhash found in this recent set
-            // of headers. Once the reqeusted header is received then the block availability for this peer will get
+            // of headers. Once the requested header is received then the block availability for this peer will get
             // updated.
             if (IsInitialBlockDownload())
             {
@@ -1400,23 +1481,18 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CheckBlockIndex(chainparams.GetConsensus());
     }
 
-    // BUIP010 Xtreme Thinblocks: begin section
+    // Handle Xthinblocks and Thinblocks
     else if (strCommand == NetMsgType::GET_XTHIN && !fImporting && !fReindex && IsThinBlocksEnabled())
     {
-        if (!BasicThinblockChecks(pfrom, chainparams))
+        if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
         CBloomFilter filterMemPool;
         CInv inv;
         vRecv >> inv >> filterMemPool;
-        if (!((inv.type == MSG_XTHINBLOCK) || (inv.type == MSG_THINBLOCK)))
-        {
-            dosMan.Misbehaving(pfrom, 100);
-            return error("message inv invalid type = %u", inv.type);
-        }
 
         // Message consistency checking
-        if (!((inv.type == MSG_XTHINBLOCK) || (inv.type == MSG_THINBLOCK)) || inv.hash.IsNull())
+        if (inv.type != MSG_XTHINBLOCK || inv.hash.IsNull())
         {
             dosMan.Misbehaving(pfrom, 100);
             return error("invalid get_xthin type=%u hash=%s", inv.type, inv.hash.ToString());
@@ -1447,8 +1523,40 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
         }
     }
+    else if (strCommand == NetMsgType::GET_THIN && !fImporting && !fReindex && IsThinBlocksEnabled())
+    {
+        if (!requester.CheckForRequestDOS(pfrom, chainparams))
+            return false;
 
+        CInv inv;
+        vRecv >> inv;
 
+        // Message consistency checking
+        if (inv.type != MSG_THINBLOCK || inv.hash.IsNull())
+        {
+            dosMan.Misbehaving(pfrom, 100);
+            return error("invalid get_thin type=%u hash=%s", inv.type, inv.hash.ToString());
+        }
+
+        auto *invIndex = LookupBlockIndex(inv.hash);
+        if (!invIndex)
+        {
+            dosMan.Misbehaving(pfrom, 100);
+            return error("Peer %srequested nonexistent block %s", pfrom->GetLogName(), inv.hash.ToString());
+        }
+
+        CBlock block;
+        const Consensus::Params &consensusParams = Params().GetConsensus();
+        if (!ReadBlockFromDisk(block, invIndex, consensusParams))
+        {
+            // We don't have the block yet, although we know about it.
+            return error("Peer %s requested block %s that cannot be read", pfrom->GetLogName(), inv.hash.ToString());
+        }
+        else
+        {
+            SendXThinBlock(MakeBlockRef(block), pfrom, inv);
+        }
+    }
     else if (strCommand == NetMsgType::XPEDITEDREQUEST)
     {
         return HandleExpeditedRequest(vRecv, pfrom);
@@ -1458,17 +1566,16 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // ignore the expedited message unless we are at the chain tip...
         if (!fImporting && !fReindex && !IsInitialBlockDownload())
         {
+            LOCK(pfrom->cs_xthinblock);
             if (!HandleExpeditedBlock(vRecv, pfrom))
-            {
-                dosMan.Misbehaving(pfrom, 5);
                 return false;
-            }
         }
     }
 
     else if (strCommand == NetMsgType::XTHINBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsThinBlocksEnabled())
     {
+        LOCK(pfrom->cs_xthinblock);
         return CXThinBlock::HandleMessage(vRecv, pfrom, strCommand, 0);
     }
 
@@ -1476,6 +1583,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::THINBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsThinBlocksEnabled())
     {
+        LOCK(pfrom->cs_xthinblock);
         return CThinBlock::HandleMessage(vRecv, pfrom);
     }
 
@@ -1483,6 +1591,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::GET_XBLOCKTX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsThinBlocksEnabled())
     {
+        if (!requester.CheckForRequestDOS(pfrom, chainparams))
+            return false;
+
+        LOCK(pfrom->cs_xthinblock);
         return CXRequestThinBlockTx::HandleMessage(vRecv, pfrom);
     }
 
@@ -1490,19 +1602,23 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::XBLOCKTX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsThinBlocksEnabled())
     {
+        LOCK(pfrom->cs_xthinblock);
         return CXThinBlockTx::HandleMessage(vRecv, pfrom);
     }
-    // BUIP010 Xtreme Thinblocks: end section
 
-    // BUIPXXX Graphene blocks: begin section
-    else if (strCommand == NetMsgType::GET_GRAPHENE && !fImporting && !fReindex && IsGrapheneBlockEnabled())
+    // Handle Graphene blocks
+    else if (strCommand == NetMsgType::GET_GRAPHENE && !fImporting && !fReindex && IsGrapheneBlockEnabled() &&
+             grapheneVersionCompatible)
     {
+        if (!requester.CheckForRequestDOS(pfrom, chainparams))
+            return false;
+
         LOCK(pfrom->cs_graphene);
         return HandleGrapheneBlockRequest(vRecv, pfrom, chainparams);
     }
 
     else if (strCommand == NetMsgType::GRAPHENEBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
-             IsGrapheneBlockEnabled())
+             IsGrapheneBlockEnabled() && grapheneVersionCompatible)
     {
         LOCK(pfrom->cs_graphene);
         return CGrapheneBlock::HandleMessage(vRecv, pfrom, strCommand, 0);
@@ -1510,22 +1626,47 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
 
     else if (strCommand == NetMsgType::GET_GRAPHENETX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
-             IsGrapheneBlockEnabled())
+             IsGrapheneBlockEnabled() && grapheneVersionCompatible)
     {
+        if (!requester.CheckForRequestDOS(pfrom, chainparams))
+            return false;
+
         LOCK(pfrom->cs_graphene);
         return CRequestGrapheneBlockTx::HandleMessage(vRecv, pfrom);
     }
 
 
     else if (strCommand == NetMsgType::GRAPHENETX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
-             IsGrapheneBlockEnabled())
+             IsGrapheneBlockEnabled() && grapheneVersionCompatible)
     {
         LOCK(pfrom->cs_graphene);
         return CGrapheneBlockTx::HandleMessage(vRecv, pfrom);
     }
-    // BUIPXXX Graphene blocks: end section
 
+    // Handle Compact Blocks
+    else if (strCommand == NetMsgType::CMPCTBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
+             IsCompactBlocksEnabled())
+    {
+        LOCK(pfrom->cs_compactblock);
+        return CompactBlock::HandleMessage(vRecv, pfrom);
+    }
+    else if (strCommand == NetMsgType::GETBLOCKTXN && !fImporting && !fReindex && !IsInitialBlockDownload() &&
+             IsCompactBlocksEnabled())
+    {
+        if (!requester.CheckForRequestDOS(pfrom, chainparams))
+            return false;
 
+        LOCK(pfrom->cs_compactblock);
+        return CompactReRequest::HandleMessage(vRecv, pfrom);
+    }
+    else if (strCommand == NetMsgType::BLOCKTXN && !fImporting && !fReindex && !IsInitialBlockDownload() &&
+             IsCompactBlocksEnabled())
+    {
+        LOCK(pfrom->cs_compactblock);
+        return CompactReReqResponse::HandleMessage(vRecv, pfrom);
+    }
+
+    // Handle full blocks
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) // Ignore blocks received while importing
     {
         CBlockRef pblock(new CBlock());
@@ -1626,7 +1767,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     continue; // another thread removed since queryHashes, maybe...
 
                 LOCK(pfrom->cs_filter);
-                if (!pfrom->pfilter->IsRelevantAndUpdate(*ptx))
+                if (!pfrom->pfilter->IsRelevantAndUpdate(ptx))
                     continue;
             }
             vInv.push_back(inv);
@@ -1837,19 +1978,18 @@ bool ProcessMessages(CNode *pfrom)
     //  (x) data
     //
     bool fOk = true;
-    bool gotWorkDone = false;
 
     {
         TRY_LOCK(pfrom->csRecvGetData, locked);
         if (locked && !pfrom->vRecvGetData.empty())
         {
-            gotWorkDone |= ProcessGetData(pfrom, chainparams.GetConsensus(), pfrom->vRecvGetData);
+            ProcessGetData(pfrom, chainparams.GetConsensus(), pfrom->vRecvGetData);
         }
     }
 
     int msgsProcessed = 0;
     // Don't bother if send buffer is too full to respond anyway
-    while ((!pfrom->fDisconnect) && (pfrom->nSendSize < SendBufferSize()))
+    while ((!pfrom->fDisconnect) && (pfrom->nSendSize < SendBufferSize()) && (shutdown_threads.load() == false))
     {
         READLOCK(pfrom->csMsgSerializer);
         CNetMessage msg;
@@ -1872,7 +2012,6 @@ bool ProcessMessages(CNode *pfrom)
             pfrom->vRecvMsg.pop_front();
             pfrom->currentRecvMsgSize -= msg.size();
             msgsProcessed++;
-            gotWorkDone = true;
         }
 
         // if (fDebug)
@@ -1897,8 +2036,8 @@ bool ProcessMessages(CNode *pfrom)
         CMessageHeader &hdr = msg.hdr;
         if (!hdr.IsValid(pfrom->GetMagic(chainparams)))
         {
-            LOGA(
-                "PROCESSMESSAGE: ERRORS IN HEADER %s peer=%s\n", SanitizeString(hdr.GetCommand()), pfrom->GetLogName());
+            LOG(NET, "PROCESSMESSAGE: ERRORS IN HEADER %s peer=%s\n", SanitizeString(hdr.GetCommand()),
+                pfrom->GetLogName());
             continue;
         }
         std::string strCommand = hdr.GetCommand();
@@ -1908,26 +2047,32 @@ bool ProcessMessages(CNode *pfrom)
 
         CDataStream &vRecv = msg.vRecv;
 
-        // Checksum
-        // For optimization a 0 checksum means no checksum calculated -- TCP already has one.
+#if 0 // Do not waste my CPU calculating a checksum provided by an untrusted node
+      // TCP already has one that is sufficient for network errors.  The checksum does not increase security since
+      // an attacker can always provide a bad message with a good checksum.
+      // This code is removed by comment so it is clear that it is a deliberate omission.
         if (hdr.nChecksum != 0)
         {
             uint256 hash = Hash(vRecv.begin(), vRecv.begin() + nMessageSize);
             unsigned int nChecksum = ReadLE32((unsigned char *)&hash);
             if (nChecksum != hdr.nChecksum)
             {
-                LOGA("%s(%s, %u bytes): CHECKSUM ERROR nChecksum=%08x hdr.nChecksum=%08x\n", __func__,
+                LOG(NET, "%s(%s, %u bytes): CHECKSUM ERROR nChecksum=%08x hdr.nChecksum=%08x\n", __func__,
                     SanitizeString(strCommand), nMessageSize, nChecksum, hdr.nChecksum);
                 continue;
             }
         }
+#endif
 
         // Process message
         bool fRet = false;
         try
         {
             fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime);
-            boost::this_thread::interruption_point();
+            if (shutdown_threads.load() == true)
+            {
+                return false;
+            }
         }
         catch (const std::ios_base::failure &e)
         {
@@ -1935,15 +2080,15 @@ bool ProcessMessages(CNode *pfrom)
             if (strstr(e.what(), "end of data"))
             {
                 // Allow exceptions from under-length message on vRecv
-                LOGA("%s(%s, %u bytes): Exception '%s' caught, normally caused by a message being shorter than "
-                     "its stated length\n",
+                LOG(NET, "%s(%s, %u bytes): Exception '%s' caught, normally caused by a message being shorter than "
+                         "its stated length\n",
                     __func__, SanitizeString(strCommand), nMessageSize, e.what());
             }
             else if (strstr(e.what(), "size too large"))
             {
                 // Allow exceptions from over-long size
-                LOGA("%s(%s, %u bytes): Exception '%s' caught\n", __func__, SanitizeString(strCommand), nMessageSize,
-                    e.what());
+                LOG(NET, "%s(%s, %u bytes): Exception '%s' caught\n", __func__, SanitizeString(strCommand),
+                    nMessageSize, e.what());
             }
             else
             {
@@ -1960,11 +2105,11 @@ bool ProcessMessages(CNode *pfrom)
         }
         catch (...)
         {
-            PrintExceptionContinue(NULL, "ProcessMessages()");
+            PrintExceptionContinue(nullptr, "ProcessMessages()");
         }
 
         if (!fRet)
-            LOGA("%s(%s, %u bytes) FAILED peer %s\n", __func__, SanitizeString(strCommand), nMessageSize,
+            LOG(NET, "%s(%s, %u bytes) FAILED peer %s\n", __func__, SanitizeString(strCommand), nMessageSize,
                 pfrom->GetLogName());
 
         if (msgsProcessed > 2000)
@@ -2028,32 +2173,11 @@ bool SendMessages(CNode *pto)
             pto->PushMessage(NetMsgType::PING, nonce);
         }
 
-        // Check to see if there are any thinblocks or graphene blocks in flight that have gone beyond the
-        // timeout interval. If so then we need to disconnect them so that the thinblock data is nullified.
+        // Check to see if there are any thin type blocks in flight that have gone beyond the
+        // timeout interval. If so then we need to disconnect them so that the thintype data is nullified.
         // We could null the associated data here but that would possibly cause a node to be banned later if
-        // the thinblock or graphene block finally did show up, so instead we just disconnect this slow node.
-        {
-            LOCK(pto->cs_mapthinblocksinflight);
-            if (!pto->mapThinBlocksInFlight.empty())
-            {
-                for (auto &item : pto->mapThinBlocksInFlight)
-                {
-                    if (CheckForDownloadTimeout(pto, item.second.fReceived, item.second.nRequestTime))
-                        break;
-                }
-            }
-        }
-        {
-            LOCK(pto->cs_mapgrapheneblocksinflight);
-            if (!pto->mapGrapheneBlocksInFlight.empty())
-            {
-                for (auto &item : pto->mapGrapheneBlocksInFlight)
-                {
-                    if (CheckForDownloadTimeout(pto, item.second.fReceived, item.second.nRequestTime))
-                        break;
-                }
-            }
-        }
+        // the thin type block finally did show up, so instead we just disconnect this slow node.
+        thinrelay.CheckForDownloadTimeout(pto);
 
         // Check for block download timeout and disconnect node if necessary. Does not require cs_main.
         int64_t nNow = GetTimeMicros();
@@ -2089,9 +2213,9 @@ bool SendMessages(CNode *pto)
                     }
                 }
             }
-            pto->vAddrToSend.clear();
             if (!vAddr.empty())
                 pto->PushMessage(NetMsgType::ADDR, vAddr);
+            pto->vAddrToSend.clear();
         }
 
         CNodeState statem(CAddress(), "");
@@ -2403,6 +2527,8 @@ bool SendMessages(CNode *pto)
             }
         }
 
+        // If the chain is not entirely sync'd then look for new blocks to download.
+        if (!IsChainSyncd())
         {
             TRY_LOCK(cs_main, locked);
             if (locked)

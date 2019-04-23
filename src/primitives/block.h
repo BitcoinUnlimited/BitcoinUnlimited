@@ -17,6 +17,10 @@ const uint32_t BASE_VERSION = 0x20000000;
 const uint32_t FORK_BIT_2MB = 0x10000000; // Vote for 2MB fork
 const bool DEFAULT_2MB_VOTE = false;
 
+class CXThinBlock;
+class CThinBlock;
+class CompactBlock;
+
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
  * requirements.  When they solve the proof-of-work, they broadcast the block
@@ -74,13 +78,22 @@ private:
     mutable uint64_t nBlockSize; // Serialized block size in bytes
 
 public:
+    // Xpress Validation: (memory only)
+    //! Orphans, or Missing transactions that have been re-requested, are stored here.
+    std::set<uint256> setUnVerifiedTxns;
+
+    // Xpress Validation: (memory only)
+    //! A flag which when true indicates that Xpress validation is enabled for this block.
+    bool fXVal;
+
+public:
     // network and disk
     std::vector<CTransactionRef> vtx;
 
     // memory only
     // 0.11: mutable std::vector<uint256> vMerkleTree;
     mutable bool fChecked;
-    mutable bool fExcessive; // BU: is the block "excessive" (bigger than this node prefers to accept)
+    mutable bool fExcessive; // Is the block "excessive"
 
     CBlock() { SetNull(); }
     CBlock(const CBlockHeader &header)
@@ -158,9 +171,9 @@ public:
     {
         CBlockHeader::SetNull();
         vtx.clear();
-        // vMerkleTree.clear();
         fChecked = false;
         fExcessive = false;
+        fXVal = false;
         nBlockSize = 0;
     }
 
@@ -183,6 +196,32 @@ public:
     uint64_t GetBlockSize() const;
 };
 
+/**
+ * Used for thin type blocks that we want to reconstruct into a full block. All the data
+ * necessary to recreate the block are held within the thinrelay objects which are subsequently
+ * stored within this class as smart pointers.
+ */
+class CBlockThinRelay : public CBlock
+{
+public:
+    //! thinrelay block types: (memory only)
+    std::shared_ptr<CThinBlock> thinblock;
+    std::shared_ptr<CXThinBlock> xthinblock;
+    std::shared_ptr<CompactBlock> cmpctblock;
+
+    //! Track the current block size during reconstruction: (memory only)
+    uint64_t nCurrentBlockSize;
+
+    CBlockThinRelay() { SetNull(); }
+    void SetNull()
+    {
+        CBlock::SetNull();
+        nCurrentBlockSize = 0;
+        thinblock = nullptr;
+        xthinblock = nullptr;
+        cmpctblock = nullptr;
+    }
+};
 
 /** Describes a place in the block chain to another node such that if the
  * other node doesn't have the same branch, it can find a recent common trunk.

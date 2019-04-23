@@ -7,28 +7,23 @@
 #ifndef BITCOIN_INIT_H
 #define BITCOIN_INIT_H
 
+#include "threadgroup.h"
 #include "tweak.h"
 #include <string>
 
 class Config;
-class CScheduler;
 class CWallet;
-
-namespace boost
-{
-class thread_group;
-} // namespace boost
 
 void StartShutdown();
 bool ShutdownRequested();
 /** Interrupt threads */
-void Interrupt(boost::thread_group &threadGroup);
+void Interrupt(thread_group &threadGroup);
 void Shutdown();
 //! Initialize the logging infrastructure
 void InitLogging();
 //! Parameter interaction: change current parameters depending on various rules
 void InitParameterInteraction();
-bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &scheduler);
+bool AppInit2(Config &config, thread_group &threadGroup);
 
 void MainCleanup();
 void NetCleanup();

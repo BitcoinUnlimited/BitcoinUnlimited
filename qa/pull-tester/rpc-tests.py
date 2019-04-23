@@ -180,13 +180,15 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
+    Disabled('schnorr-activation', 'Need to be updated to work with BU'),
+    'schnorrsig',
+    Disabled('segwit-recovery-activation','Need to be updated to work with BU'),
     'bip135basic',
     'ctor',
     'mining_ctor',
     Disabled('nov152018_forkactivation','Nov 2018 already activated'),
      Disabled('blockstorage','fixme'),
     'miningtest',
-    'grapheneblocks',
     'cashlibtest',
     'tweak',
     'notify',
@@ -211,6 +213,7 @@ testScripts = [ RpcTest(t) for t in [
     'mempool_spendcoinbase',
     'mempool_reorg',
     'mempool_limit',
+    'mempool_persist',
     'httpbasics',
     'multi_rpc',
     'zapwallettxes',
@@ -232,10 +235,17 @@ testScripts = [ RpcTest(t) for t in [
     'abandonconflict',
     'p2p-versionbits-warning',
     'importprunedfunds',
+    'compactblocks_1',
+    'compactblocks_2',
+    'graphene_optimized',
+    'graphene_versions',
     'thinblocks',
-    'checkdatasig_activation',
+    Disabled('checkdatasig_activation', "CDSV has been already succesfully activated, keep test around as a template for other OP activation"),
     'xversion',
-    'sighashmatch'
+    'sighashmatch',
+    'getlogcategories',
+    'getrawtransaction',
+    Disabled('electrum_basics', "Needs to be skipped if electrs is not built")
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
@@ -246,7 +256,6 @@ testScriptsExt = [ RpcTest(t) for t in [
     'txPerf',
     'excessive --extensive',
     'parallel --extensive',
-    'bip9-softforks',
     'bip65-cltv',
     'bip68-sequence',
     Disabled('bipdersig-p2p', "keep as an example of testing fork activation"),
@@ -262,7 +271,7 @@ testScriptsExt = [ RpcTest(t) for t in [
     'invalidateblock',
     Disabled('rpcbind_test', "temporary, bug in libevent, see #6655"),
     'smartfees',
-    'maxblocksinflight',
+    Disabled('maxblocksinflight', "needs a rewrite and is already somewhat tested in sendheaders.py"),
     'p2p-acceptblock',
     'mempool_packages',
     'maxuploadtarget'
@@ -508,7 +517,7 @@ class RPCTestHandler:
 
                 if proc.poll() is not None:
                     if not got_outputs[0]:
-                        comms(30)
+                        comms(50)
                     log_stdout.seek(0), log_stderr.seek(0)
                     stdout = log_stdout.read()
                     stderr = log_stderr.read()
@@ -519,11 +528,13 @@ class RPCTestHandler:
                     stderr_filtered = stderr.replace("Error: Unable to start HTTP server. See debug log for details.", "")
                     stderr_filtered = re.sub(r"Error: Unable to bind to 0.0.0.0:[0-9]+ on this computer\. Bitcoin Unlimited Cash Edition is probably already running\.",
                                              "", stderr_filtered)
+                    invalid_index = re.compile(r'.*?\n.*?EXCEPTION.*?\n.*?invalid index for tx.*?\n.*?ProcessMessages.*?\n', re.MULTILINE)
+                    stderr_filtered = invalid_index.sub("", stderr_filtered)
+
                     stderr_filtered = stderr_filtered.replace("Error: Failed to listen on any port. Use -listen=0 if you want this.", "")
                     stderr_filtered = stderr_filtered.replace("Error: Failed to listen on all P2P ports. Failing as requested by -bindallorfail.", "")
                     stderr_filtered = stderr_filtered.replace(" ", "")
                     stderr_filtered = stderr_filtered.replace("\n", "")
-
                     passed = stderr_filtered == "" and proc.returncode == 0
                     self.num_running -= 1
                     self.jobs.remove(j)

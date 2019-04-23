@@ -77,7 +77,7 @@ class GetBlockTemplateProposalTest(BitcoinTestFramework):
         tmpl = node.getblocktemplate()
         if 'coinbasetxn' not in tmpl:
             rawcoinbase = encodeUNum(tmpl['height'])
-            rawcoinbase += b'\x01-'
+            rawcoinbase += b'\x01-waste_a_lot_of_space_here_so_coinbase_is_big'
             hexcoinbase = b2x(rawcoinbase)
             hexoutval = b2x(pack('<Q', tmpl['coinbasevalue']))
             tmpl['coinbasetxn'] = {'data': '01000000' + '01' + '0000000000000000000000000000000000000000000000000000000000000000ffffffff' + ('%02x' % (len(rawcoinbase),)) + hexcoinbase + 'fffffffe' + '01' + hexoutval + '00' + '00000000'}

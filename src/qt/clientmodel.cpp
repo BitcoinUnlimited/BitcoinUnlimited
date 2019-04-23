@@ -113,6 +113,9 @@ void ClientModel::updateTimer2()
     thindata.FillThinBlockQuickStats(thinStats);
     Q_EMIT thinBlockPropagationStatsChanged(thinStats);
 
+    compactdata.FillCompactBlockQuickStats(compactStats);
+    Q_EMIT compactBlockPropagationStatsChanged(compactStats);
+
     graphenedata.FillGrapheneQuickStats(grapheneStats);
     Q_EMIT grapheneBlockPropagationStatsChanged(grapheneStats);
 

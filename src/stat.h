@@ -8,7 +8,6 @@
 #include <boost/asio.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/bind.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include <chrono>
 // c++11 #include <type_traits>
 #include "univalue/include/univalue.h"
@@ -632,9 +631,9 @@ public:
     operator UniValue() const
     {
         UniValue ret(UniValue::VOBJ);
-        ret.push_back(Pair("min", (UniValue)min));
-        ret.push_back(Pair("val", (UniValue)val));
-        ret.push_back(Pair("max", (UniValue)max));
+        ret.pushKV("min", (UniValue)min);
+        ret.pushKV("val", (UniValue)val);
+        ret.pushKV("max", (UniValue)max);
         return ret;
     }
 };

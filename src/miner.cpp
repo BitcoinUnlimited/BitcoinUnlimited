@@ -30,9 +30,9 @@
 #include "validation/validation.h"
 #include "validationinterface.h"
 
-#include <boost/thread.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <queue>
+#include <thread>
 
 using namespace std;
 
@@ -50,8 +50,6 @@ using namespace std;
 uint64_t nLastBlockTx = 0;
 uint64_t nLastBlockSize = 0;
 
-/** Coinbase transactions we create: */
-CScript COINBASE_FLAGS;
 
 class ScoreCompare
 {
@@ -156,20 +154,23 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _n
     std::string cbmsg = FormatCoinbaseMessage(BUComments, minerComment);
     const char *cbcstr = cbmsg.c_str();
     vector<unsigned char> vec(cbcstr, cbcstr + cbmsg.size());
-    COINBASE_FLAGS = CScript() << vec;
-    // Chop off any extra data in the COINBASE_FLAGS so the sig does not exceed the max.
-    // we can do this because the coinbase is not a "real" script...
-    if (tx.vin[0].scriptSig.size() + COINBASE_FLAGS.size() > MAX_COINBASE_SCRIPTSIG_SIZE)
     {
-        COINBASE_FLAGS.resize(MAX_COINBASE_SCRIPTSIG_SIZE - tx.vin[0].scriptSig.size());
-    }
+        LOCK(cs_coinbaseFlags);
+        COINBASE_FLAGS = CScript() << vec;
+        // Chop off any extra data in the COINBASE_FLAGS so the sig does not exceed the max.
+        // we can do this because the coinbase is not a "real" script...
+        if (tx.vin[0].scriptSig.size() + COINBASE_FLAGS.size() > MAX_COINBASE_SCRIPTSIG_SIZE)
+        {
+            COINBASE_FLAGS.resize(MAX_COINBASE_SCRIPTSIG_SIZE - tx.vin[0].scriptSig.size());
+        }
 
-    tx.vin[0].scriptSig = tx.vin[0].scriptSig + COINBASE_FLAGS;
+        tx.vin[0].scriptSig = tx.vin[0].scriptSig + COINBASE_FLAGS;
+    }
 
     // Make sure the coinbase is big enough.
     uint64_t nCoinbaseSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-    if (nCoinbaseSize < MIN_TX_SIZE && IsNov152018Scheduled() &&
-        IsNov152018Enabled(Params().GetConsensus(), chainActive.Tip()))
+    if (nCoinbaseSize < MIN_TX_SIZE && AreWeOnBCHChain() &&
+        IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()))
     {
         tx.vin[0].scriptSig << std::vector<uint8_t>(MIN_TX_SIZE - nCoinbaseSize - 1);
     }
@@ -247,15 +248,12 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
             nBlockSigOps);
 
         bool canonical = enableCanonicalTxOrder.Value();
-        if (IsNov152018Scheduled())
+        // On BCH always allow overwite of enableCanonicalTxOrder but not for regtest
+        if (AreWeOnBCHChain() && IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()))
         {
-            if (IsNov152018Enabled(chainparams.GetConsensus(), pindexPrev))
+            if (chainparams.NetworkIDString() != "regtest")
             {
                 canonical = true;
-            }
-            else
-            {
-                canonical = false;
             }
         }
 
@@ -282,7 +280,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
         pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
         pblock->nNonce = 0;
-        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(*pblock->vtx[0], STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0], STANDARD_CHECKDATASIG_VERIFY_FLAGS);
     }
 
     CValidationState state;
@@ -385,8 +383,9 @@ bool BlockAssembler::TestForBlock(CTxMemPool::txiter iter)
     if (!IsFinalTx(iter->GetSharedTx(), nHeight, nLockTimeCutoff))
         return false;
 
-    // Make sure tx size is acceptable after Nov 15, 2018 fork
-    if (IsNov152018Scheduled() && IsNov152018Enabled(Params().GetConsensus(), chainActive.Tip()))
+    // On BCH if Nov 15th 2019 has been activaterd make sure tx size
+    // is greater or equal than 100 bytes
+    if (AreWeOnBCHChain() && IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()))
     {
         if (iter->GetTxSize() < MIN_TX_SIZE)
             return false;
@@ -569,17 +568,22 @@ void IncrementExtraNonce(CBlock *pblock, unsigned int &nExtraNonce)
     CMutableTransaction txCoinbase(*pblock->vtx[0]);
 
     CScript script = (CScript() << nHeight << CScriptNum(nExtraNonce));
-    if (script.size() + COINBASE_FLAGS.size() > MAX_COINBASE_SCRIPTSIG_SIZE)
+    CScript cbFlags;
     {
-        COINBASE_FLAGS.resize(MAX_COINBASE_SCRIPTSIG_SIZE - script.size());
+        LOCK(cs_coinbaseFlags);
+        cbFlags = COINBASE_FLAGS;
     }
-    txCoinbase.vin[0].scriptSig = script + COINBASE_FLAGS;
+    if (script.size() + cbFlags.size() > MAX_COINBASE_SCRIPTSIG_SIZE)
+    {
+        cbFlags.resize(MAX_COINBASE_SCRIPTSIG_SIZE - script.size());
+    }
+    txCoinbase.vin[0].scriptSig = script + cbFlags;
     assert(txCoinbase.vin[0].scriptSig.size() <= MAX_COINBASE_SCRIPTSIG_SIZE);
 
-    // Make sure the coinbase is big enough
+    // On BCH if Nov15th 2018 has been activated make sure the coinbase is big enough
     uint64_t nCoinbaseSize = ::GetSerializeSize(txCoinbase, SER_NETWORK, PROTOCOL_VERSION);
-    if (nCoinbaseSize < MIN_TX_SIZE && IsNov152018Scheduled() &&
-        IsNov152018Enabled(Params().GetConsensus(), chainActive.Tip()))
+    if (nCoinbaseSize < MIN_TX_SIZE && AreWeOnBCHChain() &&
+        IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()))
     {
         txCoinbase.vin[0].scriptSig << std::vector<uint8_t>(MIN_TX_SIZE - nCoinbaseSize - 1);
     }

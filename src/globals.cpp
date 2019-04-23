@@ -9,6 +9,8 @@
 // purposes.
 
 #include "addrman.h"
+#include "blockrelay/blockrelay_common.h"
+#include "blockrelay/compactblock.h"
 #include "blockrelay/graphene.h"
 #include "blockrelay/thinblock.h"
 #include "chain.h"
@@ -45,11 +47,12 @@
 
 #include <atomic>
 #include <boost/lexical_cast.hpp>
-#include <boost/thread.hpp>
+#include <boost/thread/tss.hpp> // for boost::thread_specific_ptr
 #include <inttypes.h>
 #include <iomanip>
 #include <list>
 #include <queue>
+#include <thread>
 
 using namespace std;
 
@@ -71,9 +74,10 @@ int64_t nTimeOffset = 0;
 
 CCriticalSection cs_rpcWarmup;
 
-CCriticalSection cs_main;
 CSharedCriticalSection cs_mapBlockIndex;
-BlockMap mapBlockIndex GUARDED_BY(cs_main);
+BlockMap mapBlockIndex GUARDED_BY(cs_mapBlockIndex);
+
+CCriticalSection cs_main;
 CChain chainActive GUARDED_BY(cs_main); // however, chainActive.Tip() is lock free
 // BU variables moved to globals.cpp
 // - moved CCriticalSection cs_main;
@@ -102,6 +106,10 @@ std::map<uint256, NodeId> mapBlockSource GUARDED_BY(cs_main);
 std::set<int> setDirtyFileInfo GUARDED_BY(cs_main);
 /** Dirty block index entries. */
 std::set<CBlockIndex *> setDirtyBlockIndex GUARDED_BY(cs_main);
+
+/** Flags for coinbase transactions we create */
+CCriticalSection cs_coinbaseFlags;
+CScript COINBASE_FLAGS;
 
 /**
  * Filter for transactions that were recently rejected by
@@ -145,10 +153,6 @@ proxyType proxyInfo[NET_MAX];
 proxyType nameProxy;
 CCriticalSection cs_proxyInfos;
 
-CCriticalSection cs_xval;
-set<uint256> setPreVerifiedTxHash GUARDED_BY(cs_xval);
-set<uint256> setUnVerifiedOrphanTxHash GUARDED_BY(cs_xval);
-
 CCriticalSection cs_vNodes;
 CCriticalSection cs_mapLocalHost;
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
@@ -181,7 +185,7 @@ std::string minerComment;
 
 CLeakyBucket receiveShaper(DEFAULT_MAX_RECV_BURST, DEFAULT_AVE_RECV);
 CLeakyBucket sendShaper(DEFAULT_MAX_SEND_BURST, DEFAULT_AVE_SEND);
-boost::chrono::steady_clock CLeakyBucket::clock;
+std::chrono::steady_clock CLeakyBucket::clock;
 
 // Variables for statistics tracking, must be before the "requester" singleton instantiation
 const char *sampleNames[] = {"sec10", "min5", "hourly", "daily", "monthly"};
@@ -252,6 +256,8 @@ CTweak<uint64_t> pruneIntervalTweak("prune.pruneInterval",
     "How much block data (in MiB) is written to disk before trying to prune our block storage",
     DEFAULT_PRUNE_INTERVAL);
 
+CTweak<uint32_t> netMagic("net.magic", "network prefix override. If 0 use the default", 0);
+
 CTweakRef<uint64_t> ebTweak("net.excessiveBlock",
     "Excessive block size in bytes",
     &excessiveBlockSize,
@@ -278,17 +284,18 @@ CTweakRef<unsigned int> maxDataCarrierTweak("mining.dataCarrierSize",
     &nMaxDatacarrierBytes,
     &MaxDataCarrierValidator);
 
-CTweakRef<uint64_t> miningForkTime("consensus.forkNov2018Time",
-    "Time in seconds since the epoch to initiate the Bitcoin ABC hard fork scheduled on 15th Nov 2018.  A setting of 1 "
+CTweakRef<uint64_t> miningForkTime("consensus.forkMay2019Time",
+    "Time in seconds since the epoch to initiate the Bitcoin Cash hard fork scheduled on 15th May 2019.  A setting of "
+    "1 "
     "will turn on the fork at the appropriate time.",
     &nMiningForkTime,
-    &ForkTimeValidator); // Thu Nov 15 17:40:00 CET 2018
+    &ForkTimeValidator); // Thu May 15 12:00:00 UTC 2019
 
 CTweakRef<uint64_t> miningSvForkTime("consensus.svForkNov2018Time",
     "Time in seconds since the epoch to initiate the Bitcoin SV defined hard fork scheduled on 15th Nov 2018.  A "
     "setting of 1 will turn on the fork at the appropriate time.",
     &nMiningSvForkTime,
-    &ForkTimeValidatorSV); // Thu Nov 15 17:40:00 CET 2018
+    &ForkTimeValidatorSV); // Thu Nov 15 15:40:00 UTC 2018
 
 CTweak<uint64_t> maxScriptOps("consensus.maxScriptOps",
     "Maximum number of script operations allowed.  Stack pushes are excepted.",
@@ -351,6 +358,33 @@ CTweak<unsigned int> blockDownloadWindow("net.blockDownloadWindow",
     "How far ahead of our current height do we fetch? 0 means use algorithm.",
     0);
 
+/** This setting specifies the minimum supported Graphene version (inclusive).
+ *  The actual version used will be negotiated between sender and receiver.
+ */
+std::string grMinVerStr =
+    "Minimum Graphene version supported (default: " + std::to_string(GRAPHENE_MIN_VERSION_SUPPORTED) + ")";
+CTweak<uint64_t> grapheneMinVersionSupported("net.grapheneMinVersionSupported",
+    grMinVerStr,
+    GRAPHENE_MIN_VERSION_SUPPORTED);
+
+/** This setting specifies the maximum supported Graphene version (inclusive).
+ *  The actual version used will be negotiated between sender and receiver.
+ */
+std::string grMaxVerStr =
+    "Maximum Graphene version supported (default: " + std::to_string(GRAPHENE_MAX_VERSION_SUPPORTED) + ")";
+CTweak<uint64_t> grapheneMaxVersionSupported("net.grapheneMaxVersionSupported",
+    grMaxVerStr,
+    GRAPHENE_MAX_VERSION_SUPPORTED);
+
+/** This setting dictates the peer's Bloom filter compatibility when sending and
+ * receiving Graphene blocks. In this implementation, either regular or fast Bloom
+ * filters are supported. However, other (or future) implementations may elect to
+ * drop support for one or the other.
+ */
+CTweak<uint64_t> grapheneFastFilterCompatibility("net.grapheneFastFilterCompatibility",
+    "Support fast Bloom filter: 0 - either, 1 - fast only, 2 - regular only (default: either)",
+    GRAPHENE_FAST_FILTER_SUPPORT);
+
 /** This is the initial size of CFileBuffer's RAM buffer during reindex.  A
 larger size will result in a tiny bit better performance if blocks are that
 size.
@@ -399,12 +433,17 @@ CStatHistory<uint64_t> nTxValidationTime("txValidationTime", STAT_OP_MAX | STAT_
 CCriticalSection cs_blockvalidationtime;
 CStatHistory<uint64_t> nBlockValidationTime("blockValidationTime", STAT_OP_MAX | STAT_INDIVIDUAL);
 
-CThinBlockData thindata; // Singleton class
-CGrapheneBlockData graphenedata; // Singleton class
+// Single classes for gather thin type block relay statistics
+CThinBlockData thindata;
+CGrapheneBlockData graphenedata;
+CCompactBlockData compactdata;
+ThinTypeRelay thinrelay;
 
 uint256 bitcoinCashForkBlockHash = uint256S("000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec");
 
 map<int64_t, CMiningCandidate> miningCandidatesMap GUARDED_BY(cs_main);
+
+std::atomic<bool> shutdown_threads{false};
 
 #ifdef ENABLE_MUTRACE
 class CPrintSomePointers
@@ -420,7 +459,6 @@ public:
         printf("cs_main %p\n", &cs_main);
         printf("csBestBlock %p\n", &csBestBlock);
         printf("cs_proxyInfos %p\n", &cs_proxyInfos);
-        printf("cs_xval %p\n", &cs_xval);
         printf("cs_vNodes %p\n", &cs_vNodes);
         printf("cs_mapLocalHost %p\n", &cs_mapLocalHost);
         printf("CNode::cs_totalBytesRecv %p\n", &CNode::cs_totalBytesRecv);

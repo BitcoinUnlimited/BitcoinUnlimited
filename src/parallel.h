@@ -16,7 +16,7 @@
 #include "util.h"
 #include <vector>
 
-#include <boost/thread.hpp>
+#include <thread>
 
 /**
  * Class that keeps track of number of signature operations
@@ -111,16 +111,16 @@ public:
 class CParallelValidation
 {
 private:
-    // txn hashes that are in the previous block
+    /** txn hashes that are in the previous block */
     CCriticalSection cs_previousblock;
     std::vector<uint256> vPreviousBlock;
-    // Vector of script check queues
+    /** Vector of script check queues */
     std::vector<CCheckQueue<CScriptCheck> *> vQueues;
-    // Number of threads
+    /** Number of threads */
     unsigned int nThreads;
-    // All threads currently running
+    /** All threads currently running */
     boost::thread_group threadGroup;
-    // The semaphore limits the number of parallel validation threads
+    /** The semaphore limits the number of parallel validation threads */
     CSemaphore semThreadCount;
 
     struct CHandleBlockMsgThreads
@@ -153,71 +153,75 @@ public:
 
     ~CParallelValidation();
 
-    /* Initialize mapBlockValidationThreads*/
+    /** Initialize mapBlockValidationThreads */
     void InitThread(const boost::thread::id this_id,
         const CNode *pfrom,
         CBlockRef pblock,
         const CInv &inv,
         uint64_t blockSize);
 
-    /* Initialize a PV session */
+    /** Initialize a PV session */
     bool Initialize(const boost::thread::id this_id, const CBlockIndex *pindex, const bool fParallel);
 
-    /* Cleanup PV threads after one has finished and won the validation race */
+    /** Cleanup PV threads after one has finished and won the validation race */
     void Cleanup(const CBlock &block, CBlockIndex *pindex);
 
-    /* Send quit to competing threads */
+    /** Send quit to competing threads */
     void QuitCompetingThreads(const uint256 &prevBlockHash);
 
-    /* Is this block already running a validation thread? */
+    /** Is this block already running a validation thread? */
     bool IsAlreadyValidating(const NodeId id);
 
-    /* Terminate all currently running Block Validation threads, except the passed thread */
+    /** Terminate all currently running Block Validation threads, except the passed thread */
     void StopAllValidationThreads(const boost::thread::id this_id = boost::thread::id());
-    /* Terminate all currently running Block Validation threads whose chainWork is <= the passed parameter, except the
-     * calling thread  */
+    /** Terminate all currently running Block Validation threads whose chainWork is <= the passed parameter, except the
+     * calling thread
+     */
     void StopAllValidationThreads(const uint32_t nChainWork);
     void WaitForAllValidationThreadsToStop();
 
-    /* Has parallel block validation been turned on via the config settings */
+    /** Has parallel block validation been turned on via the config settings */
     bool Enabled();
 
-    /* Clear thread data from mapBlockValidationThreads */
+    /** Clear thread data from mapBlockValidationThreads */
     void Erase(const boost::thread::id this_id);
 
-    /* Post the semaphore when the thread exits.  */
+    /** Quit a block validation thread and associated script validation threads */
+    void Quit(std::map<boost::thread::id, CHandleBlockMsgThreads>::iterator iter);
+
+    /** Post the semaphore when the thread exits.  */
     void Post() { semThreadCount.post(); }
-    /* Was the fQuit flag set to true which causes the PV thread to exit */
+    /** Was the fQuit flag set to true which causes the PV thread to exit */
     bool QuitReceived(const boost::thread::id this_id, const bool fParallel);
 
-    /* Used to determine if another thread has already updated the utxo and advance the chain tip */
+    /** Used to determine if another thread has already updated the utxo and advance the chain tip */
     bool ChainWorkHasChanged(const arith_uint256 &nStartingChainWork);
 
-    /* Set the correct locks and locking order before returning from a PV session */
+    /** Set the correct locks and locking order before returning from a PV session */
     void SetLocks(const bool fParallel);
 
-    /* Is there a re-org in progress */
+    /** Is there a re-org in progress */
     void IsReorgInProgress(const boost::thread::id this_id, const bool fReorg, const bool fParallel);
     bool IsReorgInProgress();
 
-    /* Update the nMostWorkOurFork when a new header arrives */
+    /** Update the nMostWorkOurFork when a new header arrives */
     void UpdateMostWorkOurFork(const CBlockHeader &header);
 
-    /* Update the nMostWorkOurFork when a new header arrives */
+    /** Update the nMostWorkOurFork when a new header arrives */
     uint32_t MaxWorkChainBeingProcessed();
 
-    /* Clear orphans from the orphan cache that are no longer needed*/
+    /** Clear orphans from the orphan cache that are no longer needed */
     void ClearOrphanCache(const CBlockRef pblock);
 
-    /* Process a block message */
+    /** Process a block message */
     void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, CBlockRef pblock, const CInv &inv);
 
-    // The number of script validation threads
+    /** The number of script validation threads */
     unsigned int ThreadCount() { return nThreads; }
-    // The number of script check queues
+    /** The number of script check queues */
     unsigned int QueueCount();
 
-    // For newly mined block validation, return the first queue not in use.
+    /** For newly mined block validation, return the first queue not in use. */
     CCheckQueue<CScriptCheck> *GetScriptCheckQueue();
 };
 

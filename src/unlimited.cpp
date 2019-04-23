@@ -48,11 +48,11 @@
 
 #include <atomic>
 #include <boost/lexical_cast.hpp>
-#include <boost/thread.hpp>
 #include <inttypes.h>
 #include <iomanip>
 #include <limits>
 #include <queue>
+#include <thread>
 
 using namespace std;
 
@@ -237,7 +237,7 @@ std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool valida
     {
         if (*item == 1)
         {
-            *item = Params().GetConsensus().nov2018ActivationTime;
+            *item = Params().GetConsensus().may2019ActivationTime;
         }
         settingsToUserAgentString();
     }
@@ -261,7 +261,10 @@ std::string ForkTimeValidatorSV(const uint64_t &value, uint64_t *item, bool vali
     {
         if (*item == 1)
         {
-            *item = Params().GetConsensus().nov2018ActivationTime;
+            // Since SV there's no other fork upcoming we going to use nov2018ActivationTime
+            // but since we removed the variable from src/chainparams.cpp we are going to use
+            // a literal integer here 1542300000 (Nov 15, 2019 15:40:00 UTC)
+            *item = 1542300000;
         }
         settingsToUserAgentString();
     }
@@ -428,7 +431,7 @@ void UnlimitedPushTxns(CNode *dest)
         ptx = mempool.get(hash);
         if (ptx == nullptr)
             continue; // another thread removed since queryHashes, maybe...
-        if ((dest->pfilter && dest->pfilter->IsRelevantAndUpdate(*ptx)) || (!dest->pfilter))
+        if ((dest->pfilter && dest->pfilter->IsRelevantAndUpdate(ptx)) || (!dest->pfilter))
             vInv.push_back(inv);
         if (vInv.size() == MAX_INV_SZ)
         {
@@ -476,9 +479,9 @@ void UnlimitedSetup(void)
 
     // If the user configures it to 1, assume this means default
     if (miningForkTime.Value() == 1)
-        miningForkTime = Params().GetConsensus().nov2018ActivationTime;
+        miningForkTime = Params().GetConsensus().may2019ActivationTime;
     if (miningSvForkTime.Value() == 1)
-        miningSvForkTime = Params().GetConsensus().nov2018ActivationTime;
+        miningSvForkTime = 1542300000;
 
     if (miningForkTime.Value() != 0 && miningSvForkTime.Value() != 0)
     {
@@ -1067,8 +1070,8 @@ UniValue getexcessiveblock(const UniValue &params, bool fHelp)
                             HelpExampleCli("getexcessiveblock", "") + HelpExampleRpc("getexcessiveblock", ""));
 
     UniValue ret(UniValue::VOBJ);
-    ret.push_back(Pair("excessiveBlockSize", (uint64_t)excessiveBlockSize));
-    ret.push_back(Pair("excessiveAcceptDepth", (uint64_t)excessiveAcceptDepth));
+    ret.pushKV("excessiveBlockSize", (uint64_t)excessiveBlockSize);
+    ret.pushKV("excessiveAcceptDepth", (uint64_t)excessiveAcceptDepth);
     return ret;
 }
 
@@ -1269,14 +1272,14 @@ UniValue gettrafficshaping(const UniValue &params, bool fHelp)
     sendShaper.get(&max, &avg);
     if (avg != std::numeric_limits<long long>::max() || max != std::numeric_limits<long long>::max())
     {
-        ret.push_back(Pair("sendBurst", max / 1024));
-        ret.push_back(Pair("sendAve", avg / 1024));
+        ret.pushKV("sendBurst", max / 1024);
+        ret.pushKV("sendAve", avg / 1024);
     }
     receiveShaper.get(&max, &avg);
     if (avg != std::numeric_limits<long long>::max() || max != std::numeric_limits<long long>::max())
     {
-        ret.push_back(Pair("recvBurst", max / 1024));
-        ret.push_back(Pair("recvAve", avg / 1024));
+        ret.pushKV("recvBurst", max / 1024);
+        ret.pushKV("recvAve", avg / 1024);
     }
     return ret;
 }
@@ -1416,7 +1419,7 @@ void IsChainNearlySyncdInit()
     }
     else
     {
-        if (chainActive.Height() < pindexBestHeader.load()->nHeight - 2)
+        if (chainActive.Height() < pindexBestHeader.load()->nHeight - DEFAULT_BLOCKS_FROM_TIP)
             fIsChainNearlySyncd.store(false);
         else
             fIsChainNearlySyncd.store(true);
@@ -1639,11 +1642,11 @@ UniValue getstat(const UniValue &params, bool fHelp)
         UniValue ustat(UniValue::VOBJ);
         if (seriesStr == "now")
         {
-            ustat.push_back(Pair("now", base->GetNow()));
+            ustat.pushKV("now", base->GetNow());
         }
         else if (seriesStr == "total")
         {
-            ustat.push_back(Pair("total", base->GetTotal()));
+            ustat.pushKV("total", base->GetTotal());
         }
         else
         {
@@ -1656,14 +1659,14 @@ UniValue getstat(const UniValue &params, bool fHelp)
                 UniValue metaData(UniValue::VARR);
                 metaData.push_back("Series:" + seriesStr);
                 metaData.push_back("SampleSize:" + boost::lexical_cast<std::string>(count));
-                ustat.push_back(Pair(metaStr, metaData));
-                ustat.push_back(Pair(seriesStr, series[0]));
-                ustat.push_back(Pair("timestamp", series[1]));
+                ustat.pushKV(metaStr, metaData);
+                ustat.pushKV(seriesStr, series[0]);
+                ustat.pushKV("timestamp", series[1]);
             }
             else
             {
                 series = base->GetSeries(seriesStr, count);
-                ustat.push_back(Pair(seriesStr, series));
+                ustat.pushKV(seriesStr, series);
             }
         }
 
@@ -1679,71 +1682,57 @@ UniValue setlog(const UniValue &params, bool fHelp)
     // Don't use them in other places.
 
     UniValue ret = UniValue("");
-    uint64_t catg = Logging::NONE;
+    uint64_t catg = NONE;
     int nparm = params.size();
     bool action = false;
 
-    if (fHelp || nparm < 1 || nparm > 2)
+    if (fHelp || nparm > 2)
     {
         throw runtime_error(
             "log \"category|all\" \"on|off\""
             "\nTurn categories on or off\n"
+            "\nWith no arguments it returns a list of currently on log categories\n"
             "\nArguments:\n"
             "1. \"category|all\" (string, required) Category or all categories\n"
             "2. \"on\"           (string, optional) Turn a category, or all categories, on\n"
             "2. \"off\"          (string, optional) Turn a category, or all categories, off\n"
             "2.                (string, optional) No argument. Show a category, or all categories, state: on|off\n" +
             HelpExampleCli("log", "\"NET\" on") + HelpExampleCli("log", "\"all\" off") +
-            HelpExampleCli("log", "\"tor\" ") + HelpExampleCli("log", "\"ALL\" "));
+            HelpExampleCli("log", "\"tor\" ") + HelpExampleCli("log", "\"ALL\" ") + HelpExampleCli("log", " "));
     }
 
-    // LOGA("LOG: Before mask: 0x%llx\n", Logging::categoriesEnabled);
+    if (nparm == 0)
+        ret = UniValue(Logging::LogGetAllString(true));
 
-    try
+    if (nparm > 0)
     {
-        if (nparm > 0)
+        std::string category;
+        std::string data = params[0].get_str();
+        std::transform(data.begin(), data.end(), std::back_inserter(category), ::tolower);
+        catg = Logging::LogFindCategory(category);
+        if (catg == NONE)
         {
-            std::string category;
-            std::string data = params[0].get_str();
-            std::transform(data.begin(), data.end(), std::back_inserter(category), ::tolower);
-            catg = Logging::LogFindCategory(category);
-            if (catg == Logging::NONE)
-                return UniValue("Category not found: " + params[0].get_str()); // quit
-        }
-
-        switch (nparm)
-        {
-        case 1:
-            if (catg == Logging::ALL)
-                ret = UniValue(Logging::LogGetAllString());
-            else
-                ret = UniValue(Logging::LogAcceptCategory(catg) ? "on" : "off");
-            break;
-
-        case 2:
-            try
-            {
-                action = IsStringTrue(params[1].get_str());
-            }
-            catch (...)
-            {
-                ret = UniValue("Please pass on|off as last argument.");
-                break; // quit
-            }
-
-            Logging::LogToggleCategory(catg, action);
-
-        default:
-            break;
+            throw std::invalid_argument("Category not found: " + params[0].get_str());
         }
     }
-    catch (...)
-    {
-        LOG(ALL, "LOG: Something went wrong in setlog function \n");
-        ret = UniValue("Something went wrong. That is all we know.");
-    }
 
-    // LOGA("LOG: After  mask: 0x%llx\n", Logging::categoriesEnabled);
+    switch (nparm)
+    {
+    case 1:
+        if (catg == ALL)
+            ret = UniValue(Logging::LogGetAllString());
+        else
+            ret = UniValue(Logging::LogAcceptCategory(catg) ? "on" : "off");
+        break;
+
+    case 2:
+        action = IsStringTrue(params[1].get_str());
+
+        Logging::LogToggleCategory(catg, action);
+
+    default:
+        break;
+    }
 
     return ret;
 }
@@ -1813,18 +1802,18 @@ static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
     // Save candidate so can be looked up:
     id++;
     AddMiningCandidate(candid, id);
-    ret.push_back(Pair("id", id));
+    ret.pushKV("id", id);
 
-    ret.push_back(Pair("prevhash", block.hashPrevBlock.GetHex()));
+    ret.pushKV("prevhash", block.hashPrevBlock.GetHex());
 
     {
         const CTransaction *tran = block.vtx[0].get();
-        ret.push_back(Pair("coinbase", EncodeHexTx(*tran)));
+        ret.pushKV("coinbase", EncodeHexTx(*tran));
     }
 
-    ret.push_back(Pair("version", block.nVersion));
-    ret.push_back(Pair("nBits", strprintf("%08x", block.nBits)));
-    ret.push_back(Pair("time", block.GetBlockTime()));
+    ret.pushKV("version", block.nVersion);
+    ret.pushKV("nBits", strprintf("%08x", block.nBits));
+    ret.pushKV("time", block.GetBlockTime());
 
     // merkleProof:
     {
@@ -1834,7 +1823,7 @@ static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
         {
             merkleProof.push_back(i.GetHex());
         }
-        ret.push_back(Pair("merkleProof", merkleProof));
+        ret.pushKV("merkleProof", merkleProof);
 
         // merklePath parameter:
         // If the coinbase is ever allowed to be anywhere in the hash tree via a hard fork, we will need to communicate
@@ -1844,7 +1833,7 @@ static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
         // Hash256(concatentate(running hash, next hash in proof)), if the bit is 1, the proof calculates
         // Hash256(concatentate(next hash in proof, running hash))
 
-        // ret.push_back(Pair("merklePath", 0));
+        // ret.pushKV("merklePath", 0);
     }
 
     return ret;
@@ -2176,9 +2165,9 @@ extern std::queue<CTxInputData> txInQ;
 extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 {
     UniValue ret(UniValue::VOBJ);
-    ret.push_back(Pair("time", GetTime()));
-    ret.push_back(Pair("requester.mapTxnInfo", (uint64_t)requester.mapTxnInfo.size()));
-    ret.push_back(Pair("requester.mapBlkInfo", (uint64_t)requester.mapBlkInfo.size()));
+    ret.pushKV("time", GetTime());
+    ret.pushKV("requester.mapTxnInfo", (uint64_t)requester.mapTxnInfo.size());
+    ret.pushKV("requester.mapBlkInfo", (uint64_t)requester.mapBlkInfo.size());
     unsigned long int max = 0;
     unsigned long int size = 0;
     for (CRequestManager::OdMap::iterator i = requester.mapTxnInfo.begin(); i != requester.mapTxnInfo.end(); i++)
@@ -2188,8 +2177,8 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         if (max < temp)
             max = temp;
     }
-    ret.push_back(Pair("requester.mapTxnInfo.maxobj", max));
-    ret.push_back(Pair("requester.mapTxnInfo.totobj", size));
+    ret.pushKV("requester.mapTxnInfo.maxobj", (uint64_t)max);
+    ret.pushKV("requester.mapTxnInfo.totobj", (uint64_t)size);
 
     max = 0;
     size = 0;
@@ -2200,50 +2189,44 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         if (max < temp)
             max = temp;
     }
-    ret.push_back(Pair("requester.mapBlkInfo.maxobj", max));
-    ret.push_back(Pair("requester.mapBlkInfo.totobj", size));
+    ret.pushKV("requester.mapBlkInfo.maxobj", (uint64_t)max);
+    ret.pushKV("requester.mapBlkInfo.totobj", (uint64_t)size);
 
-    ret.push_back(Pair("mapBlockIndex", (int64_t)mapBlockIndex.size()));
+    ret.pushKV("mapBlockIndex", (int64_t)mapBlockIndex.size());
     // CChain
-    {
-        LOCK(cs_xval);
-        ret.push_back(Pair("setPreVerifiedTxHash", (int64_t)setPreVerifiedTxHash.size()));
-        ret.push_back(Pair("setUnVerifiedOrphanTxHash", (int64_t)setUnVerifiedOrphanTxHash.size()));
-    }
-    ret.push_back(Pair("mapLocalHost", (int64_t)mapLocalHost.size()));
-    ret.push_back(Pair("CDoSManager::vWhitelistedRange", (int64_t)dosMan.vWhitelistedRange.size()));
-    ret.push_back(Pair("mapInboundConnectionTracker", (int64_t)mapInboundConnectionTracker.size()));
-    ret.push_back(Pair("vUseDNSSeeds", (int64_t)vUseDNSSeeds.size()));
-    ret.push_back(Pair("vAddedNodes", (int64_t)vAddedNodes.size()));
-    ret.push_back(Pair("setservAddNodeAddresses", (int64_t)setservAddNodeAddresses.size()));
-    ret.push_back(Pair("statistics", (int64_t)statistics.size()));
-    ret.push_back(Pair("tweaks", (int64_t)tweaks.size()));
-    ret.push_back(Pair("mapRelay", (int64_t)mapRelay.size()));
-    ret.push_back(Pair("vRelayExpiration", (int64_t)vRelayExpiration.size()));
-    ret.push_back(Pair("vNodes", (int64_t)vNodes.size()));
-    ret.push_back(Pair("vNodesDisconnected", (int64_t)vNodesDisconnected.size()));
+    ret.pushKV("mapLocalHost", (int64_t)mapLocalHost.size());
+    ret.pushKV("CDoSManager::vWhitelistedRange", (int64_t)dosMan.vWhitelistedRange.size());
+    ret.pushKV("mapInboundConnectionTracker", (int64_t)mapInboundConnectionTracker.size());
+    ret.pushKV("vUseDNSSeeds", (int64_t)vUseDNSSeeds.size());
+    ret.pushKV("vAddedNodes", (int64_t)vAddedNodes.size());
+    ret.pushKV("setservAddNodeAddresses", (int64_t)setservAddNodeAddresses.size());
+    ret.pushKV("statistics", (int64_t)statistics.size());
+    ret.pushKV("tweaks", (int64_t)tweaks.size());
+    ret.pushKV("mapRelay", (int64_t)mapRelay.size());
+    ret.pushKV("vRelayExpiration", (int64_t)vRelayExpiration.size());
+    ret.pushKV("vNodes", (int64_t)vNodes.size());
+    ret.pushKV("vNodesDisconnected", (int64_t)vNodesDisconnected.size());
     // CAddrMan
-    ret.push_back(Pair("mapOrphanTransactions", (int64_t)orphanpool.mapOrphanTransactions.size()));
-    ret.push_back(Pair("mapOrphanTransactionsByPrev", (int64_t)orphanpool.mapOrphanTransactionsByPrev.size()));
+    ret.pushKV("mapOrphanTransactions", (int64_t)orphanpool.mapOrphanTransactions.size());
+    ret.pushKV("mapOrphanTransactionsByPrev", (int64_t)orphanpool.mapOrphanTransactionsByPrev.size());
 
     uint32_t nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream;
     connmgr->ExpeditedNodeCounts(nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream);
-    ret.push_back(Pair("xpeditedBlk", (uint64_t)nExpeditedBlocks));
-    ret.push_back(Pair("xpeditedBlkUp", (uint64_t)nExpeditedUpstream));
-    ret.push_back(Pair("xpeditedTxn", (uint64_t)nExpeditedTxs));
+    ret.pushKV("xpeditedBlk", (uint64_t)nExpeditedBlocks);
+    ret.pushKV("xpeditedBlkUp", (uint64_t)nExpeditedUpstream);
+    ret.pushKV("xpeditedTxn", (uint64_t)nExpeditedTxs);
 
     if (txCommitQ)
-        ret.push_back(Pair("txCommitQ", (uint64_t)txCommitQ->size()));
-    ret.push_back(Pair("txInQ", (uint64_t)txInQ.size()));
-    ret.push_back(Pair("txDeferQ", (uint64_t)txDeferQ.size()));
+        ret.pushKV("txCommitQ", (uint64_t)txCommitQ->size());
+    ret.pushKV("txInQ", (uint64_t)txInQ.size());
+    ret.pushKV("txDeferQ", (uint64_t)txDeferQ.size());
 
 #ifdef DEBUG_LOCKORDER
-    ret.push_back(Pair("lockorders", (uint64_t)lockorders.size()));
+    ret.pushKV("lockorders", (uint64_t)lockorders.size());
 #endif
 
     LOCK(cs_vNodes);
     std::vector<CNode *>::iterator n;
-    uint64_t totalThinBlockSize = 0;
     int disconnected = 0; // watch # of disconnected nodes to ensure they are being cleaned up
     for (std::vector<CNode *>::iterator it = vNodes.begin(); it != vNodes.end(); ++it)
     {
@@ -2253,34 +2236,26 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         UniValue node(UniValue::VOBJ);
         disconnected += (inode.fDisconnect) ? 1 : 0;
 
-        node.push_back(Pair("vSendMsg", (int64_t)inode.vSendMsg.size()));
-        node.push_back(Pair("vRecvGetData", (int64_t)inode.vRecvGetData.size()));
-        node.push_back(Pair("vRecvMsg", (int64_t)inode.vRecvMsg.size()));
+        node.pushKV("vSendMsg", (int64_t)inode.vSendMsg.size());
+        node.pushKV("vRecvGetData", (int64_t)inode.vRecvGetData.size());
+        node.pushKV("vRecvMsg", (int64_t)inode.vRecvMsg.size());
         {
             LOCK(inode.cs_filter);
             if (inode.pfilter)
             {
-                node.push_back(
-                    Pair("pfilter", (int64_t)::GetSerializeSize(*inode.pfilter, SER_NETWORK, PROTOCOL_VERSION)));
+                node.pushKV("pfilter", (int64_t)::GetSerializeSize(*inode.pfilter, SER_NETWORK, PROTOCOL_VERSION));
             }
             if (inode.pThinBlockFilter)
             {
-                node.push_back(Pair("pThinBlockFilter",
-                    (int64_t)::GetSerializeSize(*inode.pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION)));
+                node.pushKV("pThinBlockFilter",
+                    (int64_t)::GetSerializeSize(*inode.pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION));
             }
         }
-        node.push_back(Pair("thinblock.vtx", (int64_t)inode.thinBlock.vtx.size()));
-        uint64_t thinBlockSize = ::GetSerializeSize(inode.thinBlock, SER_NETWORK, PROTOCOL_VERSION);
-        totalThinBlockSize += thinBlockSize;
-        node.push_back(Pair("thinblock.size", thinBlockSize));
-        node.push_back(Pair("thinBlockHashes", (int64_t)inode.thinBlockHashes.size()));
-        node.push_back(Pair("xThinBlockHashes", (int64_t)inode.xThinBlockHashes.size()));
-        node.push_back(Pair("vAddrToSend", (int64_t)inode.vAddrToSend.size()));
-        node.push_back(Pair("vInventoryToSend", (int64_t)inode.vInventoryToSend.size()));
-        ret.push_back(Pair(inode.addrName, node));
+        node.pushKV("vAddrToSend", (int64_t)inode.vAddrToSend.size());
+        node.pushKV("vInventoryToSend", (int64_t)inode.vInventoryToSend.size());
+        ret.pushKV(inode.addrName, node);
     }
-    ret.push_back(Pair("totalThinBlockSize", totalThinBlockSize));
-    ret.push_back(Pair("disconnectedNodes", disconnected));
+    ret.pushKV("disconnectedNodes", disconnected);
 
     return ret;
 }
@@ -2387,9 +2362,9 @@ UniValue getaddressforms(const UniValue &params, bool fHelp)
     std::string bitpayAddr = EncodeBitpayAddr(dest);
 
     UniValue node(UniValue::VOBJ);
-    node.push_back(Pair("legacy", legacyAddr));
-    node.push_back(Pair("bitcoincash", cashAddr));
-    node.push_back(Pair("bitpay", bitpayAddr));
+    node.pushKV("legacy", legacyAddr);
+    node.pushKV("bitcoincash", cashAddr);
+    node.pushKV("bitpay", bitpayAddr);
     return node;
 }
 

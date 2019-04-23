@@ -6,6 +6,7 @@
 
 #include "validation.h"
 
+#include "blockrelay/blockrelay_common.h"
 #include "blockstorage/blockstorage.h"
 #include "blockstorage/sequential_files.h"
 #include "checkpoints.h"
@@ -174,7 +175,7 @@ bool AcceptBlockHeader(const CBlockHeader &block,
     AssertLockHeld(cs_main);
     // Check for duplicate
     uint256 hash = block.GetHash();
-    CBlockIndex *pindex = NULL;
+    CBlockIndex *pindex = nullptr;
     if (hash != chainparams.GetConsensus().hashGenesisBlock)
     {
         pindex = LookupBlockIndex(hash);
@@ -212,7 +213,7 @@ bool AcceptBlockHeader(const CBlockHeader &block,
         if (!ContextualCheckBlockHeader(block, state, pindexPrev))
             return false;
     }
-    if (pindex == NULL)
+    if (pindex == nullptr)
         pindex = AddToBlockIndex(block);
 
     // If the block belongs to the set of check-pointed blocks but it has a mismatched hash,
@@ -359,7 +360,10 @@ bool LoadBlockIndexDB()
         LOG(PRUNE, "%s \n", e.code().message());
     }
 
-    boost::this_thread::interruption_point();
+    if (shutdown_threads.load() == true)
+    {
+        return false;
+    }
 
     // Gather data necessary to perform the following checks
     std::vector<std::pair<int, CBlockIndex *> > vSortedByHeight;
@@ -506,6 +510,10 @@ void UnloadBlockIndex()
     }
 
     nPreferredDownload.store(0);
+    nodestate.Clear();
+    requester.MapBlocksInFlightClear();
+    requester.MapNodestateClear();
+    mempool.clear();
 
     {
         LOCK(cs_main);
@@ -517,14 +525,11 @@ void UnloadBlockIndex()
         chainActive.SetTip(nullptr);
         pindexBestInvalid = nullptr;
         pindexBestHeader = nullptr;
-        mempool.clear();
         mapBlocksUnlinked.clear();
         vinfoBlockFile.clear();
         mapBlockSource.clear();
-        requester.MapBlocksInFlightClear();
         setDirtyBlockIndex.clear();
         setDirtyFileInfo.clear();
-        nodestate.Clear();
         versionbitscache.Clear();
         for (int b = 0; b < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; b++)
         {
@@ -543,7 +548,6 @@ void UnloadBlockIndex()
     }
 
     fHavePruned = false;
-
     recentRejects.reset();
 }
 
@@ -886,7 +890,7 @@ void CheckBlockIndex(const Consensus::Params &consensusParams)
 // Transactions
 //
 
-bool CheckInputs(const CTransaction &tx,
+bool CheckInputs(const CTransactionRef &tx,
     CValidationState &state,
     const CCoinsViewCache &inputs,
     bool fScriptChecks,
@@ -897,12 +901,12 @@ bool CheckInputs(const CTransaction &tx,
     std::vector<CScriptCheck> *pvChecks,
     unsigned char *sighashType)
 {
-    if (!tx.IsCoinBase())
+    if (!tx->IsCoinBase())
     {
         if (!Consensus::CheckTxInputs(tx, state, inputs))
             return false;
         if (pvChecks)
-            pvChecks->reserve(tx.vin.size());
+            pvChecks->reserve(tx->vin.size());
 
         // The first loop above does all the inexpensive checks.
         // Only if ALL inputs pass do we perform expensive ECDSA signature checks.
@@ -916,9 +920,9 @@ bool CheckInputs(const CTransaction &tx,
         // this optimisation would allow an invalid chain to be accepted.
         if (fScriptChecks)
         {
-            for (unsigned int i = 0; i < tx.vin.size(); i++)
+            for (unsigned int i = 0; i < tx->vin.size(); i++)
             {
-                const COutPoint &prevout = tx.vin[i].prevout;
+                const COutPoint &prevout = tx->vin[i].prevout;
                 CoinAccessor coin(inputs, prevout);
 
                 if (coin->IsSpent())
@@ -936,7 +940,7 @@ bool CheckInputs(const CTransaction &tx,
                 const CAmount amount = coin->out.nValue;
 
                 // Verify signature
-                CScriptCheck check(resourceTracker, scriptPubKey, amount, tx, i, flags, maxOps, cacheStore);
+                CScriptCheck check(resourceTracker, scriptPubKey, amount, *tx, i, flags, maxOps, cacheStore);
                 if (pvChecks)
                 {
                     pvChecks->push_back(CScriptCheck());
@@ -944,8 +948,17 @@ bool CheckInputs(const CTransaction &tx,
                 }
                 else if (!check())
                 {
-                    const bool hasNonMandatoryFlags = (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
-                    if (hasNonMandatoryFlags)
+                    // Compute flags without the optional standardness flags.
+                    // This differs from MANDATORY_SCRIPT_VERIFY_FLAGS as it contains
+                    // additional upgrade flags (see ParallelAcceptToMemoryPool variable
+                    // featureFlags).
+                    // Even though it is not a mandatory flag,SCRIPT_ALLOW_SEGWIT_RECOVERY
+                    // is strictly more permissive than the set of standard flags.
+                    // It therefore needs to be added in order to check if we need to penalize
+                    // the peer that sent us the transaction or not.
+                    uint32_t mandatoryFlags =
+                        (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS) | SCRIPT_ALLOW_SEGWIT_RECOVERY;
+                    if (flags != mandatoryFlags)
                     {
                         // Check whether the failure was caused by a
                         // non-mandatory script verification check, such as
@@ -953,13 +966,29 @@ bool CheckInputs(const CTransaction &tx,
                         // arguments; if so, don't trigger DoS protection to
                         // avoid splitting the network between upgraded and
                         // non-upgraded nodes.
-                        CScriptCheck check2(nullptr, scriptPubKey, amount, tx, i,
-                            (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS), maxOps, cacheStore);
+                        CScriptCheck check2(nullptr, scriptPubKey, amount, *tx, i, mandatoryFlags, maxOps, cacheStore);
                         if (check2())
                             return state.Invalid(
                                 false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)",
                                                                ScriptErrorString(check.GetScriptError())));
                     }
+
+                    // We also, regardless, need to check whether the transaction would
+                    // be valid on the other side of the upgrade, so as to avoid
+                    // splitting the network between upgraded and non-upgraded nodes.
+                    // Note that this will create strange error messages like
+                    // "upgrade-conditional-script-failure (Non-canonical DER ...)"
+                    // -- the tx was refused entry due to STRICTENC, a mandatory flag,
+                    // but after the upgrade the signature would have been interpreted
+                    // as valid Schnorr and thus STRICTENC would not happen.
+                    CScriptCheck check3(nullptr, scriptPubKey, amount, *tx, i, mandatoryFlags ^ SCRIPT_ENABLE_SCHNORR,
+                        maxOps, cacheStore);
+                    if (check3())
+                    {
+                        return state.Invalid(false, REJECT_INVALID, strprintf("upgrade-conditional-script-failure (%s)",
+                                                                        ScriptErrorString(check.GetScriptError())));
+                    }
+
                     // Failures of other flags indicate a transaction that is
                     // invalid in new blocks, e.g. a invalid P2SH. We DoS ban
                     // such nodes as they are not following the protocol. That
@@ -1363,8 +1392,8 @@ bool ContextualCheckBlock(const CBlock &block,
                 10, error("%s: contains a non-final transaction", __func__), REJECT_INVALID, "bad-txns-nonfinal");
         }
 
-        // Make sure tx size is acceptable after Nov 15, 2018 fork
-        if (IsNov152018Scheduled() && IsNov152018Enabled(consensusParams, chainActive.Tip()))
+        // Make sure tx size is equal or higher to 100 bytes if we are on the BCH chain and Nov 15th 2018 activated
+        if (AreWeOnBCHChain() && IsNov2018Activated(consensusParams, chainActive.Tip()))
         {
             if (tx->GetTxSize() < MIN_TX_SIZE)
             {
@@ -1404,24 +1433,6 @@ bool ContextualCheckBlock(const CBlock &block,
         }
     }
 
-    // UAHF enforce that the fork block is > 1MB
-    // (note subsequent blocks can be <= 1MB...)
-    // An exception is added -- if the fork block is block 1 then it can be <= 1MB.  This allows test chains to
-    // fork without having to create a large block so long as the fork time is in the past.
-    // TODO: check if we can remove the second conditions since on regtest uahHeight is 0
-    if (pindexPrev && UAHFforkAtNextBlock(pindexPrev->nHeight) && (pindexPrev->nHeight > 1))
-    {
-        DbgAssert(block.GetBlockSize(), );
-        if (block.GetBlockSize() <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
-        {
-            uint256 hash = block.GetHash();
-            return state.DoS(100,
-                error("%s: UAHF fork block (%s, height %d) must exceed %d, but this block is %d bytes", __func__,
-                                 hash.ToString(), nHeight, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE, block.GetBlockSize()),
-                REJECT_INVALID, "bad-blk-too-small");
-        }
-    }
-
     CBlockIndex indexDummy(block);
     indexDummy.pprev = pindexPrev;
     indexDummy.nHeight = pindexPrev == nullptr ? 1 : pindexPrev->nHeight + 1;
@@ -1438,7 +1449,7 @@ bool ContextualCheckBlock(const CBlock &block,
     {
         nTx++;
 
-        nSigOps += GetLegacySigOpCount(*tx, flags);
+        nSigOps += GetLegacySigOpCount(tx, flags);
         if (tx->GetTxSize() > nLargestTx)
             nLargestTx = tx->GetTxSize();
     }
@@ -1500,7 +1511,7 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
 
     // Check transactions
     for (const auto &tx : block.vtx)
-        if (!CheckTransaction(*tx, state))
+        if (!CheckTransaction(tx, state))
             return error("CheckBlock(): CheckTransaction of %s failed with %s", tx->GetHash().ToString(),
                 FormatStateMessage(state));
 
@@ -1717,16 +1728,29 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
 
-    // The Nov 15, 2018 HF enable sig push only and atrt enforcing also
-    // clean stack rules (see  BIP 62 for more details)
-    if (IsNov152018Scheduled() && IsNov152018Enabled(consensusparams, pindex->pprev))
+    // Since Nov 15, 2018 HF activates sig push only, clean stack rules
+    // are enforced and CHECKDATASIG has been introduced on the BCH chain
+    // (see  BIP 62 and CHECKDATASIG specification or more details)
+    if (AreWeOnBCHChain() && IsNov2018Activated(consensusparams, chainActive.Tip()))
     {
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
         flags |= SCRIPT_VERIFY_CLEANSTACK;
         flags |= SCRIPT_ENABLE_CHECKDATASIG;
     }
+
+    // if May 15th, 2019 protocol upgrade is activated we start accepting transactions
+    // recovering coins sent to segwit addresses. We also start accepting
+    // 65/64-byte Schnorr signatures in CHECKSIG and CHECKDATASIG respectively,
+    // and their verify variants. We also stop accepting 65 byte signatures in
+    // CHECKMULTISIG and its verify variant.
+    if (AreWeOnBCHChain() && IsMay2019Enabled(consensusparams, pindex->pprev))
+    {
+        flags |= SCRIPT_ALLOW_SEGWIT_RECOVERY;
+        flags |= SCRIPT_ENABLE_SCHNORR;
+    }
+
     // The SV Nov 15, 2018 HF rules
-    if (IsSv2018Scheduled() && IsSv2018Enabled(consensusparams, pindex->pprev))
+    if (AreWeOnSVChain() && IsSv2018Activated(consensusparams, chainActive.Tip()))
     {
         flags |= SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES;
     }
@@ -1941,6 +1965,33 @@ bool ConnectBlockPrevalidations(const CBlock &block,
     return true;
 }
 
+/** Ensure that the script validation threads have finished running and locks are set correctly
+ *  before exiting ConnectBlock.
+ */
+static void ConnectBlockScopeExit(bool fParallel,
+    CCheckQueueControl<CScriptCheck> &control,
+    CCheckQueue<CScriptCheck> *pScriptQueue)
+{
+    // Typically the script validations would be stopped by issuing a PV->Quit() however under
+    // certain conditions block validation may return early from some error or if the chain tip has changed
+    // during block validation. So here we make sure to stop the script validation threads. This prevents a
+    // long to validate block from continuing to use resources when it is in fact not even a valid block.
+    //
+    // In the typical case we will end up issuing the Quit() twice. This is fine because all were doing
+    // is setting a boolean flag.
+    pScriptQueue->Quit();
+
+    // As a final check, make sure all the script validation threads have stopped. Sometimes
+    // if a PV thread is terminated early or a block is found to be invalid for some reason
+    // then we'll end up returning without getting to the control.Wait() at the end of this scope.
+    // While in single threaded operation this is not an issue but when PV is in sue we MUST wait
+    // for all threads to terminate before continuing otherwise we can end up trying to access
+    // data which has already been destroyed in the main thread.
+    control.Wait();
+
+    // Make sure locks have set locks correctly on leaving this scope.
+    PV->SetLocks(fParallel);
+}
 
 bool ConnectBlockDependencyOrdering(const CBlock &block,
     CValidationState &state,
@@ -1952,8 +2003,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
     bool fScriptChecks,
     CAmount &nFees,
     CBlockUndo &blockundo,
-    std::vector<std::pair<uint256, CDiskTxPos> > &vPos,
-    std::vector<uint256> &vHashesToDelete)
+    std::vector<std::pair<uint256, CDiskTxPos> > &vPos)
 {
     nFees = 0;
     int64_t nTime2 = GetTimeMicros();
@@ -1978,7 +2028,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
     CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
     int nChecked = 0;
-    int nOrphansChecked = 0;
+    int nUnVerifiedChecked = 0;
     const arith_uint256 nStartingChainWork = chainActive.Tip()->nChainWork;
 
     // Section for boost scoped lock on the scriptcheck_mutex
@@ -2005,13 +2055,14 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
     // Begin Section for Boost Scope Guard
     {
         // Scope guard to make sure cs_main is set and resources released if we encounter an exception.
-        BOOST_SCOPE_EXIT(&fParallel) { PV->SetLocks(fParallel); }
+        BOOST_SCOPE_EXIT(&fParallel, &control, &pScriptQueue)
+        {
+            ConnectBlockScopeExit(fParallel, control, pScriptQueue);
+        }
         BOOST_SCOPE_EXIT_END
 
 
         // Start checking Inputs
-        bool inOrphanCache;
-        bool inVerifiedCache;
         // When in parallel mode then unlock cs_main for this loop to give any other threads
         // a chance to process in parallel. This is crucial for parallel validation to work.
         // NOTE: the only place where cs_main is needed is if we hit PV->ChainWorkHasChanged, which
@@ -2022,7 +2073,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
             const CTransactionRef &txref = block.vtx[i];
 
             nInputs += tx.vin.size();
-            nSigOps += GetLegacySigOpCount(tx, flags);
+            nSigOps += GetLegacySigOpCount(txref, flags);
             // if (nSigOps > MAX_BLOCK_SIGOPS)
             //    return state.DoS(100, error("ConnectBlock(): too many sigops"),
             //                    REJECT_INVALID, "bad-blk-sigops");
@@ -2068,31 +2119,25 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                     // Add in sigops done by pay-to-script-hash inputs;
                     // this is to prevent a "rogue miner" from creating
                     // an incredibly-expensive-to-validate block.
-                    nSigOps += GetP2SHSigOpCount(tx, view, flags);
+                    nSigOps += GetP2SHSigOpCount(txref, view, flags);
                 }
 
                 nFees += view.GetValueIn(tx) - tx.GetValueOut();
 
-                // Only check inputs when the tx hash in not in the setPreVerifiedTxHash as would only
-                // happen if this were a regular block or when a tx is found within the returning XThinblock.
                 uint256 hash = tx.GetHash();
                 {
+                    // If XVal is not on then check all inputs, otherwise only check
+                    // transactions that were not previously verified in the mempool.
+                    bool fUnVerified = block.setUnVerifiedTxns.count(hash);
+                    if (fUnVerified || !block.fXVal)
                     {
-                        LOCK(cs_xval);
-                        inOrphanCache = setUnVerifiedOrphanTxHash.count(hash);
-                        inVerifiedCache = setPreVerifiedTxHash.count(hash);
-                    } /* We don't want to hold the lock while inputs are being checked or we'll slow down the competing
-                         thread, if there is one */
-
-                    if ((inOrphanCache) || (!inVerifiedCache && !inOrphanCache))
-                    {
-                        if (inOrphanCache)
-                            nOrphansChecked++;
+                        if (fUnVerified)
+                            nUnVerifiedChecked++;
 
                         std::vector<CScriptCheck> vChecks;
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
                                                             (still consult the cache, though) */
-                        if (!CheckInputs(tx, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
+                        if (!CheckInputs(txref, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
                                 &resourceTracker, PV->ThreadCount() ? &vChecks : NULL))
                         {
                             return error("%s: block %s CheckInputs on %s failed with %s", __func__,
@@ -2100,10 +2145,6 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                         }
                         control.Add(vChecks);
                         nChecked++;
-                    }
-                    else
-                    {
-                        vHashesToDelete.push_back(hash);
                     }
                 }
             }
@@ -2127,7 +2168,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
             if (GetArg("-pvtest", false))
                 MilliSleep(1000);
         }
-        LOG(THIN, "Number of CheckInputs() performed: %d  Orphan count: %d\n", nChecked, nOrphansChecked);
+        LOG(THIN, "Number of CheckInputs() performed: %d  Unverified count: %d\n", nChecked, nUnVerifiedChecked);
 
 
         // Wait for all sig check threads to finish before updating utxo
@@ -2169,8 +2210,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     bool fScriptChecks,
     CAmount &nFees,
     CBlockUndo &blockundo,
-    std::vector<std::pair<uint256, CDiskTxPos> > &vPos,
-    std::vector<uint256> &vHashesToDelete)
+    std::vector<std::pair<uint256, CDiskTxPos> > &vPos)
 {
     nFees = 0;
     int64_t nTime2 = GetTimeMicros();
@@ -2195,7 +2235,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
     int nChecked = 0;
-    int nOrphansChecked = 0;
+    int nUnVerifiedChecked = 0;
     const arith_uint256 nStartingChainWork = chainActive.Tip()->nChainWork;
 
     // Section for boost scoped lock on the scriptcheck_mutex
@@ -2222,7 +2262,10 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     // Begin Section for Boost Scope Guard
     {
         // Scope guard to make sure cs_main is set and resources released if we encounter an exception.
-        BOOST_SCOPE_EXIT(&fParallel) { PV->SetLocks(fParallel); }
+        BOOST_SCOPE_EXIT(&fParallel, &control, &pScriptQueue)
+        {
+            ConnectBlockScopeExit(fParallel, control, pScriptQueue);
+        }
         BOOST_SCOPE_EXIT_END
 
         // Outputs then Inputs algorithm: add outputs to the coin cache
@@ -2261,8 +2304,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
         }
 
         // Start checking Inputs
-        bool inOrphanCache;
-        bool inVerifiedCache;
         // When in parallel mode then unlock cs_main for this loop to give any other threads
         // a chance to process in parallel. This is crucial for parallel validation to work.
         // NOTE: the only place where cs_main is needed is if we hit PV->ChainWorkHasChanged, which
@@ -2273,7 +2314,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             const CTransactionRef &txref = block.vtx[i];
 
             nInputs += tx.vin.size();
-            nSigOps += GetLegacySigOpCount(tx, flags);
+            nSigOps += GetLegacySigOpCount(txref, flags);
 
             if (!tx.IsCoinBase())
             {
@@ -2316,31 +2357,25 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                     // Add in sigops done by pay-to-script-hash inputs;
                     // this is to prevent a "rogue miner" from creating
                     // an incredibly-expensive-to-validate block.
-                    nSigOps += GetP2SHSigOpCount(tx, view, flags);
+                    nSigOps += GetP2SHSigOpCount(txref, view, flags);
                 }
 
                 nFees += view.GetValueIn(tx) - tx.GetValueOut();
 
-                // Only check inputs when the tx hash in not in the setPreVerifiedTxHash as would only
-                // happen if this were a regular block or when a tx is found within the returning XThinblock.
                 uint256 hash = tx.GetHash();
                 {
+                    // If XVal is not on then check all inputs, otherwise only check
+                    // transactions that were not previously verified in the mempool.
+                    bool fUnVerified = block.setUnVerifiedTxns.count(hash);
+                    if (fUnVerified || !block.fXVal)
                     {
-                        LOCK(cs_xval);
-                        inOrphanCache = setUnVerifiedOrphanTxHash.count(hash);
-                        inVerifiedCache = setPreVerifiedTxHash.count(hash);
-                    } /* We don't want to hold the lock while inputs are being checked or we'll slow down the competing
-                         thread, if there is one */
-
-                    if ((inOrphanCache) || (!inVerifiedCache && !inOrphanCache))
-                    {
-                        if (inOrphanCache)
-                            nOrphansChecked++;
+                        if (fUnVerified)
+                            nUnVerifiedChecked++;
 
                         std::vector<CScriptCheck> vChecks;
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
                                                             (still consult the cache, though) */
-                        if (!CheckInputs(tx, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
+                        if (!CheckInputs(txref, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
                                 &resourceTracker, PV->ThreadCount() ? &vChecks : nullptr))
                         {
                             return error("%s: block %s CheckInputs on %s failed with %s", __func__,
@@ -2348,10 +2383,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                         }
                         control.Add(vChecks);
                         nChecked++;
-                    }
-                    else
-                    {
-                        vHashesToDelete.push_back(hash);
                     }
                 }
             }
@@ -2377,7 +2408,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             if (GetArg("-pvtest", false))
                 MilliSleep(1000);
         }
-        LOG(THIN, "Number of CheckInputs() performed: %d  Orphan count: %d\n", nChecked, nOrphansChecked);
+        LOG(THIN, "Number of CheckInputs() performed: %d  Unverified count: %d\n", nChecked, nUnVerifiedChecked);
 
 
         // Wait for all sig check threads to finish before updating utxo
@@ -2460,10 +2491,6 @@ bool ConnectBlock(const CBlock &block,
                 (uint32_t)pindex->nHeight > pindexBestHeader.load()->nHeight - (144 * checkScriptDays.Value());
     }
 
-    // Create a vector for storing hashes that will be deleted from the unverified and perverified txn sets.
-    // We will delete these hashes only if and when this block is the one that is accepted saving us the unnecessary
-    // repeated locking and unlocking of cs_xval.
-    std::vector<uint256> vHashesToDelete;
     CAmount nFees = 0;
     CBlockUndo blockundo;
     std::vector<std::pair<uint256, CDiskTxPos> > vPos;
@@ -2471,29 +2498,25 @@ bool ConnectBlock(const CBlock &block,
 
     // Discover how to handle this block
     bool canonical = enableCanonicalTxOrder.Value();
-    if (IsNov152018Scheduled())
+    // Always allow overwite of enableCanonicalTxOrder but for regtest on BCH
+    if (AreWeOnBCHChain() && IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip()))
     {
-        // pindex-pprev != null because pindex is not genesis block (or fn would have returned above)
-        if (IsNov152018Enabled(chainparams.GetConsensus(), pindex->pprev))
+        if (!(chainparams.NetworkIDString() == "regtest"))
         {
             canonical = true;
-        }
-        else
-        {
-            canonical = false;
         }
     }
 
     if (canonical)
     {
-        if (!ConnectBlockCanonicalOrdering(block, state, pindex, view, chainparams, fJustCheck, fParallel,
-                fScriptChecks, nFees, blockundo, vPos, vHashesToDelete))
+        if (!ConnectBlockCanonicalOrdering(
+                block, state, pindex, view, chainparams, fJustCheck, fParallel, fScriptChecks, nFees, blockundo, vPos))
             return false;
     }
     else
     {
-        if (!ConnectBlockDependencyOrdering(block, state, pindex, view, chainparams, fJustCheck, fParallel,
-                fScriptChecks, nFees, blockundo, vPos, vHashesToDelete))
+        if (!ConnectBlockDependencyOrdering(
+                block, state, pindex, view, chainparams, fJustCheck, fParallel, fScriptChecks, nFees, blockundo, vPos))
             return false;
     }
 
@@ -2574,15 +2597,6 @@ bool ConnectBlock(const CBlock &block,
         txRecentlyInBlock.insert(ptx->GetHash());
     }
 
-    // Delete hashes from unverified and preverified sets that will no longer be needed after the block is accepted.
-    {
-        LOCK(cs_xval);
-        for (const uint256 &hash : vHashesToDelete)
-        {
-            setPreVerifiedTxHash.erase(hash);
-            setUnVerifiedOrphanTxHash.erase(hash);
-        }
-    }
     return true;
 }
 
@@ -2742,6 +2756,16 @@ void CheckAndAlertUnknownVersionbits(const CChainParams &chainParams, const CBlo
             fWarned = true;
         }
     }
+    else
+    {
+        strMiscWarning = _("");
+        // Clear message when conditions have returned to normal
+        if (fWarned)
+        {
+            AlertNotify(strMiscWarning);
+            fWarned = false;
+        }
+    }
 }
 // bip135 end
 
@@ -2777,20 +2801,19 @@ void UpdateTip(CBlockIndex *pindexNew)
         CheckAndAlertUnknownVersionbits(chainParams, chainActive.Tip());
     }
 
-    if (IsNov152018Scheduled()) // Set the global variables based on the fork state of the NEXT block
+    // Set the global variables based on the fork state of the NEXT block
+    // Always allow overwite of enableCanonicalTxOrder but for regtest)
+    if (AreWeOnBCHChain() && IsNov2018Activated(chainParams.GetConsensus(), chainActive.Tip()))
     {
-        if (IsNov152018Enabled(chainParams.GetConsensus(), pindexNew))
+        if (chainParams.NetworkIDString() != "regtest")
         {
             enableCanonicalTxOrder = true;
         }
-        else
-        {
-            enableCanonicalTxOrder = false;
-        }
     }
-    if (IsSv2018Scheduled())
+
+    if (AreWeOnSVChain())
     {
-        if (IsSv2018Enabled(chainParams.GetConsensus(), pindexNew))
+        if (IsSv2018Activated(chainParams.GetConsensus(), chainActive.Tip()))
         {
             maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
             excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
@@ -2829,20 +2852,12 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
 
-    // If this block enabled the nov152018 protocol upgrade, then we need to clear the mempool of any transaction using
+    // If this block enabled the may152019 protocol upgrade, then we need to clear the mempool of any transaction using
     // not previously avaiable features (e.g. OP_CHECKDATASIGVERIFY).
-    if (IsNov152018Scheduled())
+
+    if (AreWeOnBCHChain() && IsNov2018Activated(consensusParams, chainActive.Tip()))
     {
-        if (IsNov152018Enabled(consensusParams, pindexDelete) &&
-            !IsNov152018Enabled(consensusParams, pindexDelete->pprev))
-        {
-            mempool.clear();
-        }
-    }
-    // Same if we undid the SV hard fork
-    if (IsSv2018Scheduled())
-    {
-        if (IsSv2018Enabled(consensusParams, pindexDelete) && !IsSv2018Enabled(consensusParams, pindexDelete->pprev))
+        if (IsMay2019Enabled(consensusParams, pindexDelete) && !IsMay2019Enabled(consensusParams, pindexDelete->pprev))
         {
             mempool.clear();
         }
@@ -2873,9 +2888,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
             {
                 CTxInputData txd;
                 txd.tx = ptx;
-                txd.nodeId = -1;
                 txd.nodeName = "rollback";
-                txd.whitelisted = false;
                 EnqueueTxForAdmission(txd);
             }
         }
@@ -3263,7 +3276,10 @@ bool ActivateBestChain(CValidationState &returnedState,
     bool fOneDone = false;
     do
     {
-        boost::this_thread::interruption_point();
+        if (shutdown_threads.load() == true)
+        {
+            return false;
+        }
         if (ShutdownRequested())
         {
             return false;
@@ -3311,7 +3327,7 @@ bool ActivateBestChain(CValidationState &returnedState,
                 pindexMostWork = LookupBlockIndex(pblock->GetHash());
                 if (!pindexMostWork)
                 {
-                    LOGA("Could not find block in mapBlockIndex: %s\n", pblock->GetHash().ToString());
+                    LOG(BLK, "Could not find block in mapBlockIndex: %s\n", pblock->GetHash().ToString());
                     return false;
                 }
 
@@ -3446,7 +3462,7 @@ bool ProcessNewBlock(CValidationState &state,
 
     int64_t end = GetTimeMicros();
 
-    if (Logging::LogAcceptCategory(Logging::BENCH))
+    if (Logging::LogAcceptCategory(BENCH))
     {
         uint64_t maxTxSizeLocal = 0;
         uint64_t maxVin = 0;

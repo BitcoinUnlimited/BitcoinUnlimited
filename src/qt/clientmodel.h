@@ -6,6 +6,7 @@
 #ifndef BITCOIN_QT_CLIENTMODEL_H
 #define BITCOIN_QT_CLIENTMODEL_H
 
+#include "blockrelay/compactblock.h"
 #include "blockrelay/graphene.h"
 #include "blockrelay/thinblock.h"
 
@@ -102,6 +103,7 @@ private:
     BanTableModel *banTableModel;
 
     ThinBlockQuickStats thinStats;
+    CompactBlockQuickStats compactStats;
     GrapheneQuickStats grapheneStats;
 
     QTimer *pollTimer1;
@@ -120,6 +122,7 @@ Q_SIGNALS:
     void bytesChanged(quint64 totalBytesIn, quint64 totalBytesOut);
     void transactionsPerSecondChanged(double tansactionsPerSecond); // BU:
     void thinBlockPropagationStatsChanged(const ThinBlockQuickStats &thin);
+    void compactBlockPropagationStatsChanged(const CompactBlockQuickStats &compact);
     void grapheneBlockPropagationStatsChanged(const GrapheneQuickStats &graphene);
 
     //! Fired when a message should be reported to the user

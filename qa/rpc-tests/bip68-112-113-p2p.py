@@ -6,7 +6,7 @@
 import test_framework.loginit
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import *
-from test_framework.mininode import ToHex, CTransaction, NetworkThread
+from test_framework.mininode import COIN, ToHex, CTransaction, NetworkThread
 from test_framework.blocktools import create_coinbase, create_block
 from test_framework.comptool import TestInstance, TestManager
 from test_framework.script import *
@@ -100,8 +100,11 @@ class BIP68_112_113Test(ComparisonTestFramework):
     def setup_network(self):
         # Must set the blockversion for this test
         self.nodes = start_nodes(1, self.options.tmpdir,
-                                 extra_args=[['-debug', '-whitelist=127.0.0.1', '-blockversion=4']],
+                                 extra_args=[['-debug=net', '-debug=bench', '-debug=thin', '-debug=parallel', '-whitelist=127.0.0.1', '-blockversion=4', '-parallel=0',"-net.msgHandlerThreads=1",]],
                                  binary=[self.options.testbinary])
+
+
+        self.nodes[0].set("consensus.enableCanonicalTxOrder=1")
 
     def run_test(self):
         test = TestManager(self, self.options.tmpdir)
@@ -120,9 +123,24 @@ class BIP68_112_113Test(ComparisonTestFramework):
         return CTransaction().deserialize(rawtx)
 
     def sign_transaction(self, node, unsignedtx):
+        txsize = len(unsignedtx.serialize())
+        if (txsize < 100):
+            padding_len = 100 - txsize
+            padding = random.randrange(1 << 8 * padding_len -2, 1 << 8 * padding_len -1)
+            unsignedtx.vout.append(CTxOut(0, CScript([OP_RETURN, padding])))
+            unsignedtx.rehash()
+
         rawtx = ToHex(unsignedtx)
         signresult = node.signrawtransaction(rawtx)
         return CTransaction().deserialize(signresult['hex'])
+
+    def spend_tx(self, node, prev_tx):
+        spendtx = self.create_transaction(
+            node, prev_tx.hash, self.nodeaddress, (prev_tx.vout[0].nValue - 1000) / COIN)
+        spendtx.nVersion = prev_tx.nVersion
+        spendtx.rehash()
+        signedtx = self.sign_transaction(node, spendtx)
+        return signedtx
 
     def generate_blocks(self, number, version, test_blocks = []):
         for i in range(number):
@@ -137,6 +155,16 @@ class BIP68_112_113Test(ComparisonTestFramework):
         block = create_block(self.tip, create_coinbase(self.tipheight + 1), self.last_block_time + 600)
         block.nVersion = version
         block.vtx.extend(txs)
+        block.vtx = [block.vtx[0]] + sorted(block.vtx[1:], key = lambda tx : tx.getHash())
+        block.hashMerkleRoot = block.calc_merkle_root()
+        block.rehash()
+        block.solve()
+        return block
+
+    def create_test_block_spend_utxos(self, node, txs, version = 536870912):
+        block = self.create_test_block(txs, version)
+        block.vtx.extend([self.spend_tx(node, tx) for tx in txs])
+        block.vtx = [block.vtx[0]] + sorted(block.vtx[1:], key = lambda tx : tx.getHash())
         block.hashMerkleRoot = block.calc_merkle_root()
         block.rehash()
         block.solve()
@@ -166,8 +194,9 @@ class BIP68_112_113Test(ComparisonTestFramework):
     def create_bip112special(self, input, txversion):
         tx = self.create_transaction(self.nodes[0], input, self.nodeaddress, Decimal("49.98"))
         tx.nVersion = txversion
+        tx.vout[0].scriptPubKey = CScript([-1, OP_CHECKSEQUENCEVERIFY, OP_DROP, OP_TRUE])
+        tx.rehash()
         signtx = self.sign_transaction(self.nodes[0], tx)
-        signtx.vin[0].scriptSig = CScript([-1, OP_CHECKSEQUENCEVERIFY, OP_DROP] + list(CScript(signtx.vin[0].scriptSig)))
         return signtx
 
     def create_bip112txs(self, bip112inputs, varyOP_CSV, txversion, locktime_delta = 0):
@@ -188,11 +217,12 @@ class BIP68_112_113Test(ComparisonTestFramework):
                         else: # vary nSequence instead, OP_CSV is fixed
                             tx.vin[0].nSequence = relative_locktimes[b31][b25][b22][b18] + locktime_delta
                         tx.nVersion = txversion
-                        signtx = self.sign_transaction(self.nodes[0], tx)
                         if (varyOP_CSV):
-                            signtx.vin[0].scriptSig = CScript([relative_locktimes[b31][b25][b22][b18], OP_CHECKSEQUENCEVERIFY, OP_DROP] + list(CScript(signtx.vin[0].scriptSig)))
+                            tx.vout[0].scriptPubKey = CScript([relative_locktimes[b31][b25][b22][b18], OP_CHECKSEQUENCEVERIFY, OP_DROP, OP_TRUE])
                         else:
-                            signtx.vin[0].scriptSig = CScript([base_relative_locktime, OP_CHECKSEQUENCEVERIFY, OP_DROP] + list(CScript(signtx.vin[0].scriptSig)))
+                            tx.vout[0].scriptPubKey = CScript([base_relative_locktime, OP_CHECKSEQUENCEVERIFY, OP_DROP, OP_TRUE])
+                        tx.rehash()
+                        signtx = self.sign_transaction(self.nodes[0], tx)
                         b18txs.append(signtx)
                     b22txs.append(b18txs)
                 b25txs.append(b22txs)
@@ -425,7 +455,8 @@ class BIP68_112_113Test(ComparisonTestFramework):
         ### BIP 112 ###
         ### Version 1 txs ###
         # -1 OP_CSV tx should fail
-        yield TestInstance([[self.create_test_block([bip112tx_special_v1]), False]]) #32
+        yield TestInstance([[self.create_test_block_spend_utxos(self.nodes[0], [bip112tx_special_v1]), False]]) #32
+    #    self.nodes[0].invalidateblock(self.nodes[0].getbestblockhash())
         # If SEQUENCE_LOCKTIME_DISABLE_FLAG is set in argument to OP_CSV, version 1 txs should still pass
         success_txs = []
         for b25 in range(2):
@@ -447,11 +478,11 @@ class BIP68_112_113Test(ComparisonTestFramework):
                     fail_txs.append(bip112txs_vary_OP_CSV_9_v1[0][b25][b22][b18])
 
         for tx in fail_txs:
-            yield TestInstance([[self.create_test_block([tx]), False]]) # 34 - 81
+            yield TestInstance([[self.create_test_block_spend_utxos(self.nodes[0], [tx]), False]]) # 34 - 81
 
         ### Version 2 txs ###
         # -1 OP_CSV tx should fail
-        yield TestInstance([[self.create_test_block([bip112tx_special_v2]), False]]) #82
+        yield TestInstance([[self.create_test_block_spend_utxos(self.nodes[0], [bip112tx_special_v2]), False]]) #82
 
         # If SEQUENCE_LOCKTIME_DISABLE_FLAG is set in argument to OP_CSV, version 2 txs should pass (all sequence locks are met)
         success_txs = []
@@ -460,8 +491,7 @@ class BIP68_112_113Test(ComparisonTestFramework):
                 for b18 in range(2):
                     success_txs.append(bip112txs_vary_OP_CSV_v2[1][b25][b22][b18]) # 8/16 of vary_OP_CSV
                     success_txs.append(bip112txs_vary_OP_CSV_9_v2[1][b25][b22][b18]) # 8/16 of vary_OP_CSV_9
-
-        yield TestInstance([[self.create_test_block(success_txs), True]]) # 83
+        yield TestInstance([[self.create_test_block_spend_utxos(self.nodes[0], success_txs), True]]) # 83
         self.nodes[0].invalidateblock(self.nodes[0].getbestblockhash())
 
         ## SEQUENCE_LOCKTIME_DISABLE_FLAG is unset in argument to OP_CSV for all remaining txs ##
@@ -474,7 +504,7 @@ class BIP68_112_113Test(ComparisonTestFramework):
                     fail_txs.append(bip112txs_vary_OP_CSV_9_v2[0][b25][b22][b18]) # 16/16 of vary_OP_CSV_9
 
         for tx in fail_txs:
-            yield TestInstance([[self.create_test_block([tx]), False]]) # 84 - 107
+            yield TestInstance([[self.create_test_block_spend_utxos(self.nodes[0], [tx]), False]]) # 84 - 107
 
         # If SEQUENCE_LOCKTIME_DISABLE_FLAG is set in nSequence, tx should fail
         fail_txs = []
@@ -483,7 +513,7 @@ class BIP68_112_113Test(ComparisonTestFramework):
                 for b18 in range(2):
                     fail_txs.append(bip112txs_vary_nSequence_v2[1][b25][b22][b18]) # 8/16 of vary_nSequence
         for tx in fail_txs:
-            yield TestInstance([[self.create_test_block([tx]), False]]) # 108-115
+            yield TestInstance([[self.create_test_block_spend_utxos(self.nodes[0], [tx]), False]]) # 108-115
 
         # If sequencelock types mismatch, tx should fail
         fail_txs = []
@@ -492,7 +522,7 @@ class BIP68_112_113Test(ComparisonTestFramework):
                 fail_txs.append(bip112txs_vary_nSequence_v2[0][b25][1][b18]) # 12/16 of vary_nSequence
                 fail_txs.append(bip112txs_vary_OP_CSV_v2[0][b25][1][b18]) # 12/16 of vary_OP_CSV
         for tx in fail_txs:
-            yield TestInstance([[self.create_test_block([tx]), False]]) # 116-123
+            yield TestInstance([[self.create_test_block_spend_utxos(self.nodes[0], [tx]), False]]) # 116-123
 
         # Remaining txs should pass, just test masking works properly
         success_txs = []

@@ -379,7 +379,8 @@ def Test():
 
 if __name__ == '__main__':
     bitcoinConf = {
-        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"]
+        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
+        "consensus.enableCanonicalTxOrder": "1",
     }
     args = sys.argv
     if "--no-ipv6-rpc-listen":

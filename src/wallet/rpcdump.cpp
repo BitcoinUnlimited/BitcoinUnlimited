@@ -101,9 +101,10 @@ UniValue importprivkey(const UniValue &params, bool fHelp)
             "\nExamples:\n"
             "\nDump a private key\n" +
             HelpExampleCli("dumpprivkey", "\"myaddress\"") + "\nImport the private key with rescan\n" +
-            HelpExampleCli("importprivkey", "\"mykey\"") + "\nImport using a label and without rescan\n" +
-            HelpExampleCli("importprivkey", "\"mykey\" \"testing\" false") + "\nAs a JSON-RPC call\n" +
-            HelpExampleRpc("importprivkey", "\"mykey\", \"testing\", false"));
+            HelpExampleCli("importprivkey", "\"mykey\"") + "\nImport using rescan and label\n" +
+            HelpExampleCli("importprivkey", "\"mykey\" \"mylabel\"") + "\nImport without rescan (must use a label)\n" +
+            HelpExampleCli("importprivkey", "\"mykey\" \"mylabel\" false") + "\nAs a JSON-RPC call\n" +
+            HelpExampleRpc("importprivkey", "\"mykey\", \"mylabel\", false"));
 
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
@@ -118,7 +119,7 @@ UniValue importprivkey(const UniValue &params, bool fHelp)
     // Whether to perform rescan after import
     bool fRescanLocal = true;
     if (params.size() > 2)
-        fRescan = params[2].get_bool();
+        fRescanLocal = params[2].get_bool();
 
     if (fRescanLocal && fPruneMode)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
@@ -747,19 +748,39 @@ UniValue dumpwallet(const UniValue &params, bool fHelp)
         return NullUniValue;
 
     if (fHelp || params.size() != 1)
-        throw runtime_error("dumpwallet \"filename\"\n"
-                            "\nDumps all wallet keys in a human-readable format.\n"
-                            "\nArguments:\n"
-                            "1. \"filename\"    (string, required) The filename\n"
-                            "\nExamples:\n" +
-                            HelpExampleCli("dumpwallet", "\"test\"") + HelpExampleRpc("dumpwallet", "\"test\""));
+        throw std::runtime_error(
+            "dumpwallet \"filename\"\n"
+            "\nDumps all wallet keys in a human-readable format to a server-side file. This does not allow overwriting "
+            "existing files.\n"
+            "\nArguments:\n"
+            "1. \"filename\"    (string, required) The filename with path (either absolute or relative to bitcoind)\n"
+            "\nResult:\n"
+            "{                           (json object)\n"
+            "  \"filename\" : {        (string) The filename with full absolute path\n"
+            "}\n"
+            "\nExamples:\n" +
+            HelpExampleCli("dumpwallet", "\"test\"") + HelpExampleRpc("dumpwallet", "\"test\""));
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
 
     EnsureWalletIsUnlocked();
 
-    ofstream file;
-    file.open(params[0].get_str().c_str());
+    boost::filesystem::path filepath = params[0].get_str();
+    filepath = boost::filesystem::absolute(filepath);
+
+    /* Prevent arbitrary files from being overwritten. There have been reports
+     * that users have overwritten wallet files this way:
+     * https://github.com/bitcoin/bitcoin/issues/9934
+     * It may also avoid other security issues.
+     */
+    if (boost::filesystem::exists(filepath))
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER,
+            filepath.string() + " already exists. If you are sure this is what you want, move it out of the way first");
+    }
+
+    std::ofstream file;
+    file.open(filepath.string().c_str());
     if (!file.is_open())
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Cannot open wallet dump file");
 

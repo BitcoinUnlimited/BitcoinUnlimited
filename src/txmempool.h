@@ -36,6 +36,12 @@ inline bool AllowFree(double dPriority)
 /** Fake height value used in Coin to signify they are only in the memory pool (since 0.8) */
 static const uint32_t MEMPOOL_HEIGHT = 0x7FFFFFFF;
 
+/** Dump the mempool to disk. */
+bool DumpMempool();
+
+/** Load the mempool from disk. */
+bool LoadMempool();
+
 struct LockPoints
 {
     // Will be set to the blockchain height and median time past
@@ -702,7 +708,7 @@ public:
     CTransactionRef get(const uint256 &hash) const;
     CTransactionRef _get(const uint256 &hash) const;
     TxMempoolInfo info(const uint256 &hash) const;
-    std::vector<TxMempoolInfo> infoAll() const;
+    std::vector<TxMempoolInfo> AllTxMempoolInfo() const;
 
     /** Estimate fee rate needed to get into the next nBlocks
      *  If no answer can be given at nBlocks, return an estimate

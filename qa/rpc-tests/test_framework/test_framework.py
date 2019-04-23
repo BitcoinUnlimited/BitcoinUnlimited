@@ -22,6 +22,7 @@ from sys import argv
 
 from .util import (
     initialize_chain,
+    initialize_chain_clean,
     assert_equal,
     start_nodes,
     connect_nodes_bi,
@@ -43,6 +44,9 @@ from .authproxy import JSONRPCException
 class BitcoinTestFramework(object):
     drop_to_pdb = os.getenv("DROP_TO_PDB", "")
     bins = None
+    setup_clean_chain = False
+    num_nodes = 4
+    extra_args = None
     # These may be over-ridden by subclasses:
     def run_test(self):
         for node in self.nodes:
@@ -64,13 +68,22 @@ class BitcoinTestFramework(object):
         before starting the node.
         """
         logging.info("Initializing test directory %s Bitcoin conf: %s walletfiles: %s" % (self.options.tmpdir, str(bitcoinConfDict), wallets))
-        initialize_chain(self.options.tmpdir,bitcoinConfDict, wallets, self.bins)
+        if self.setup_clean_chain:
+            initialize_chain_clean(self.options.tmpdir, self.num_nodes, bitcoinConfDict, wallets)
+        else:
+            initialize_chain(self.options.tmpdir,bitcoinConfDict, wallets, self.bins)
 
     def setup_nodes(self):
-        return start_nodes(4, self.options.tmpdir)
+        return start_nodes(self.num_nodes, self.options.tmpdir, extra_args = self.extra_args)
 
     def setup_network(self, split = False):
         self.nodes = self.setup_nodes()
+
+        if self.num_nodes == 1:
+            return
+
+        if self.num_nodes != 4:
+            raise Exception("Default setup_network for %d nodes NYI" % self.num_nodes)
 
         # Connect the nodes as a "chain".  This allows us
         # to split the network between nodes 1 and 2 to get

@@ -29,7 +29,7 @@ static std::vector<unsigned char> Serialize(const CScript &s)
 
 uint64_t GetTransactionSigOpCount(const CTransaction &tx, const CCoinsViewCache &coins, const uint32_t flags)
 {
-    return GetLegacySigOpCount(tx, flags) + GetP2SHSigOpCount(tx, coins, flags);
+    return GetLegacySigOpCount(MakeTransactionRef(tx), flags) + GetP2SHSigOpCount(MakeTransactionRef(tx), coins, flags);
 }
 
 // FIXME: This should be properly factored out of unlimited.cpp as well
@@ -242,7 +242,7 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx)
 
     {
         CValidationState state;
-        BOOST_CHECK(CheckTransaction(CTransaction(tx), state));
+        BOOST_CHECK(CheckTransaction(MakeTransactionRef(CTransaction(tx)), state));
     }
 
     // Get just before the limit.
@@ -253,7 +253,7 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx)
 
     {
         CValidationState state;
-        BOOST_CHECK(CheckTransaction(CTransaction(tx), state));
+        BOOST_CHECK(CheckTransaction(MakeTransactionRef(CTransaction(tx)), state));
     }
 
     // And go over.
@@ -261,7 +261,7 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx)
 
     {
         CValidationState state;
-        BOOST_CHECK(!CheckTransaction(CTransaction(tx), state));
+        BOOST_CHECK(!CheckTransaction(MakeTransactionRef(CTransaction(tx)), state));
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txns-too-many-sigops");
     }
 }

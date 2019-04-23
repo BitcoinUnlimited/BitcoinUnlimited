@@ -305,6 +305,9 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
 #ifndef WIN32
         .addArg("pid=<file>", requiredStr, strprintf(_("Specify pid file (default: %s)"), BITCOIN_PID_FILENAME))
 #endif
+        .addArg("persistmempool={true,false,0,1}", optionalBool,
+            strprintf(_("Whether to save the mempool on shutdown and load on restart (default: %u)"),
+                    DEFAULT_PERSIST_MEMPOOL))
         .addArg("prune=<n>", requiredInt,
             strprintf(_("Reduce storage requirements by pruning (deleting) old blocks. This mode is incompatible with "
                         "-txindex and -rescan. "
@@ -651,11 +654,16 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
                     SMALLEST_MAX_BLOOM_FILTER_SIZE))
         .addArg("use-bloom-filter-targeting", optionalBool,
             _("Enable thin block bloom filter targeting which helps to keep the size of bloom filters to a minumum "
-              "although it can impact performance. (default: 0)"))
+              "although it can impact performance. (default: %d)"),
+            DEFAULT_BLOOM_FILTER_TARGETING)
         .addArg("use-grapheneblocks", optionalBool,
             strprintf(_("Enable graphene to speed up the relay of blocks (default: %d)"), DEFAULT_USE_GRAPHENE_BLOCKS))
+        .addArg("use-compactblocks", optionalBool,
+            strprintf(_("Enable compact blocks to speed up the relay of blocks (default: %d)"),
+                    DEFAULT_USE_COMPACT_BLOCKS))
         .addArg("preferential-timer=<millisec>", requiredInt,
-            strprintf(_("Set graphene and thinblock preferential timer duration (default: %u). Use 0 to disable it."),
+            strprintf(_("Set graphene, thinblock and compactblock preferential timer duration (default: %u). Use 0 to "
+                        "disable it."),
                     DEFAULT_PREFERENTIAL_TIMER));
 }
 
@@ -703,6 +711,19 @@ static void addRpcServerOptions(AllowedArgs &allowedArgs)
         // Although a node does not use rpcconnect it must be allowed because BitcoinCli also uses the same config file
         .addDebugArg("rpcconnect=<ip>", requiredStr,
             strprintf(_("Send commands to node running on <ip> (default: %s)"), DEFAULT_RPCCONNECT));
+}
+static void addElectrumOptions(AllowedArgs &allowedArgs)
+{
+    allowedArgs.addHeader(_("Electrum server options:"))
+        .addArg("electrum", optionalBool, "Enable electrum server")
+        .addArg("electrum.dir", requiredStr, "Data directory for electrum database")
+        .addArg("electrum.port", requiredStr, "Port electrum RPC listens on (default: mainnet 50001, testnet: 60001")
+        .addArg("electrum.host", requiredStr, "Host electrum RPC listens on (default: 127.0.0.1)")
+        .addArg("electrum.addr.limit", requiredStr, "Max txs to look up per address (default: 500)")
+        .addDebugArg("electrum.exec", requiredStr, "Path to electrum daemon executable")
+        .addDebugArg("electrum.monitoring.port", requiredStr, "Port to bind monitoring service")
+        .addDebugArg("electrum.monitoring.host", requiredStr, "Host to bind monitoring service")
+        .addDebugArg("electrum.daemon.host", requiredStr, "Host for bitcoind rpc");
 }
 
 static void addUiOptions(AllowedArgs &allowedArgs)
@@ -765,6 +786,7 @@ static void addAllNodeOptions(AllowedArgs &allowedArgs, HelpMessageMode mode, CT
     addNodeRelayOptions(allowedArgs);
     addBlockCreationOptions(allowedArgs);
     addRpcServerOptions(allowedArgs);
+    addElectrumOptions(allowedArgs);
     if (pTweaks)
         addTweaks(allowedArgs, pTweaks);
     if (mode == HMM_BITCOIN_QT)

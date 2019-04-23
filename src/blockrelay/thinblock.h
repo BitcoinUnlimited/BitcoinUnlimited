@@ -16,19 +16,33 @@
 #include <atomic>
 #include <vector>
 
+// Bloom filter targeting attempts to reduce the size of the xthin bloom filters by
+// prediciting which transactions are likely to get included in the the block. This is
+// only useful when the memory pool is consistently much larger than the mined block size.
+static const bool DEFAULT_BLOOM_FILTER_TARGETING = true;
+
 class CDataStream;
 class CNode;
 
 class CThinBlock
 {
+private:
+    // memory only
+    mutable uint64_t nSize; // Serialized thinblock size in bytes
+
+public:
+    // memory only
+    mutable unsigned int nWaitingFor; // number of txns we are still needing to recontruct the block
+    std::map<uint64_t, CTransactionRef> mapMissingTx;
+
 public:
     CBlockHeader header;
-    std::vector<uint256> vTxHashes; // List of all transaction ids in the block
+    std::vector<uint256> vTxHashes; // List of all 256 bit transaction ids in the block
     std::vector<CTransaction> vMissingTx; // vector of transactions that did not match the bloom filter
 
 public:
     CThinBlock(const CBlock &block, const CBloomFilter &filter);
-    CThinBlock() {}
+    CThinBlock() : nSize(0), nWaitingFor(0) {}
     /**
      * Handle an incoming thin block.  The block is fully validated, and if any transactions are missing, we fall
      * back to requesting a full block.
@@ -49,22 +63,41 @@ public:
     }
 
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
-    bool process(CNode *pfrom, int nSizeThinBlock);
+    bool process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pblock);
+
+    uint64_t GetSize() const
+    {
+        if (nSize == 0)
+            nSize = ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
+        return nSize;
+    }
 };
 
 class CXThinBlock
 {
+private:
+    // memory only
+    mutable uint64_t nSize; // Serialized thinblock size in bytes
+
+public:
+    // memory only
+    mutable unsigned int nWaitingFor; // number of txns we are still needing to recontruct the block
+    bool collision;
+
+    // memory only
+    std::vector<uint256> vTxHashes256; // List of all 256 bit transaction hashes in the block
+    std::map<uint64_t, CTransactionRef> mapMissingTx;
+
 public:
     CBlockHeader header;
     std::vector<uint64_t> vTxHashes; // List of all transaction ids in the block
     std::vector<CTransaction> vMissingTx; // vector of transactions that did not match the bloom filter
-    bool collision;
 
 public:
     // Use the filter to determine which txns the client has
     CXThinBlock(const CBlock &block, const CBloomFilter *filter);
     CXThinBlock(const CBlock &block); // Assume client has all of the transactions (except coinbase)
-    CXThinBlock() {}
+    CXThinBlock() : nSize(0), nWaitingFor(0), collision(false) {}
     /**
      * Handle an incoming Xthin or Xpedited block
      * Once the block is validated apart from the Merkle root, forward the Xpedited block with a hop count of nHops.
@@ -88,8 +121,15 @@ public:
         READWRITE(vMissingTx);
     }
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
-    bool process(CNode *pfrom, int nSizeThinbBlock, std::string strCommand);
+    bool process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> &pblock);
     bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state);
+
+    uint64_t GetSize() const
+    {
+        if (nSize == 0)
+            nSize = ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
+        return nSize;
+    }
 };
 
 // This class is used to respond to requests for missing transactions after sending an XThin block.
@@ -174,12 +214,6 @@ struct ThinBlockQuickStats
 class CThinBlockData
 {
 private:
-    /* The sum total of all bytes for thinblocks currently in process of being reconstructed */
-    std::atomic<uint64_t> nThinBlockBytes{0};
-
-    CCriticalSection cs_mapThinBlockTimer; // locks mapThinBlockTimer
-    std::map<uint256, std::pair<uint64_t, bool> > mapThinBlockTimer;
-
     CCriticalSection cs_thinblockstats; // locks everything below this point
 
     CStatHistory<uint64_t> nOriginalSize;
@@ -273,48 +307,21 @@ public:
     std::string ThinBlockToString();
     std::string FullTxToString();
 
-    bool CheckThinblockTimer(const uint256 &hash);
-    void ClearThinBlockTimer(const uint256 &hash);
-
-    void ClearThinBlockData(CNode *pfrom);
-    void ClearThinBlockData(CNode *pfrom, const uint256 &hash);
     void ClearThinBlockStats();
-
-    uint64_t AddThinBlockBytes(uint64_t, CNode *pfrom);
-    void DeleteThinBlockBytes(uint64_t, CNode *pfrom);
-    void ResetThinBlockBytes();
-    uint64_t GetThinBlockBytes();
 
     void FillThinBlockQuickStats(ThinBlockQuickStats &stats);
 };
 extern CThinBlockData thindata; // Singleton class
 
 
-bool HaveThinblockNodes();
 bool IsThinBlocksEnabled();
-bool CanThinBlockBeDownloaded(CNode *pto);
-bool ClearLargestThinBlockAndDisconnect(CNode *pfrom);
-void ClearThinBlockInFlight(CNode *pfrom, const uint256 &hash);
-void AddThinBlockInFlight(CNode *pfrom, const uint256 &hash);
 void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv);
+void RequestThinBlock(CNode *pfrom, const uint256 &hash);
 bool IsThinBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissingTx, const CBlockHeader &header);
 void BuildSeededBloomFilter(CBloomFilter &memPoolFilter,
     std::vector<uint256> &vOrphanHashes,
     uint256 hash,
     CNode *pfrom,
     bool fDeterministic = false);
-
-// Xpress Validation: begin
-// Transactions that have already been accepted into the memory pool do not need to be
-// re-verified and can avoid having to do a second and expensive CheckInputs() when
-// processing a new block.  (Protected by cs_xval)
-extern std::set<uint256> setPreVerifiedTxHash;
-
-// Orphans that are added to the thinblock must be verifed since they have never been
-// accepted into the memory pool.  (Protected by cs_xval)
-extern std::set<uint256> setUnVerifiedOrphanTxHash;
-
-extern CCriticalSection cs_xval;
-// Xpress Validation: end
 
 #endif // BITCOIN_THINBLOCK_H

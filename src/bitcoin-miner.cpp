@@ -20,8 +20,6 @@
 #include "util.h"
 #include "utilstrencodings.h"
 
-#include <boost/thread.hpp>
-
 #include <cstdlib>
 #include <stdio.h>
 
@@ -34,11 +32,14 @@
 
 using namespace std;
 
-// BU add lockstack stuff here for bitcoin-miner, because I need to carefully
+#ifdef DEBUG_LOCKORDER
+#include <boost/thread/tss.hpp>
+// BU add lockstack stuff here for bitcoin-cli, because I need to carefully
 // order it in globals.cpp for bitcoind and bitcoin-qt
 boost::mutex dd_mutex;
 std::map<std::pair<void *, void *>, LockStack> lockorders;
 boost::thread_specific_ptr<LockStack> lockstack;
+#endif
 
 // Internal miner
 //
@@ -280,11 +281,11 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
     printf("Solution! Checked %d possibilities\n", header.nNonce - startNonce);
 
     tmpstr = HexStr(coinbaseBytes.begin(), coinbaseBytes.end());
-    tmp.push_back(Pair("coinbase", tmpstr));
-    tmp.push_back(Pair("id", params["id"]));
-    tmp.push_back(Pair("time", UniValue(header.nTime))); // Optional. We have changed so must send.
-    tmp.push_back(Pair("nonce", UniValue(header.nNonce)));
-    tmp.push_back(Pair("version", UniValue(header.nVersion))); // Optional. We may have changed so sending.
+    tmp.pushKV("coinbase", tmpstr);
+    tmp.pushKV("id", params["id"]);
+    tmp.pushKV("time", UniValue(header.nTime)); // Optional. We have changed so must send.
+    tmp.pushKV("nonce", UniValue(header.nNonce));
+    tmp.pushKV("version", UniValue(header.nVersion)); // Optional. We may have changed so sending.
     ret.push_back(tmp);
 
     return ret;

@@ -73,9 +73,11 @@ BITCOIN_TESTS =\
   test/cashaddr_tests.cpp \
   test/cashaddrenc_tests.cpp \
   test/coins_tests.cpp \
+  test/compactblocks_tests.cpp \
   test/compress_tests.cpp \
   test/core_io_tests.cpp \
   test/crypto_tests.cpp \
+  test/cuckoocache_tests.cpp \
   test/DoS_tests.cpp \
   test/dstencode_tests.cpp \
   test/exploit_tests.cpp \
@@ -86,6 +88,8 @@ BITCOIN_TESTS =\
   test/hash_tests.cpp \
   test/iblt_tests.cpp \
   test/key_tests.cpp \
+  test/lcg_tests.cpp \
+  test/lcg.h \
   test/limitedmap_tests.cpp \
   test/dbwrapper_tests.cpp \
   test/main_tests.cpp \
@@ -104,7 +108,7 @@ BITCOIN_TESTS =\
   test/reverselock_tests.cpp \
   test/rpc_tests.cpp \
   test/sanity_tests.cpp \
-  test/scheduler_tests.cpp \
+  test/schnorr_tests.cpp \
   test/script_P2SH_tests.cpp \
   test/script_tests.cpp \
   test/scriptnum_tests.cpp \
@@ -126,7 +130,15 @@ BITCOIN_TESTS =\
   test/uint256_tests.cpp \
   test/univalue_tests.cpp \
   test/util_tests.cpp \
+  test/utilhttp_tests.cpp \
+  test/utilprocess_tests.cpp \
   test/xversionmessage_tests.cpp
+
+# recursive shared mutex tests #
+BITCOIN_TESTS += \
+  rsm/test/rsm_promotion_tests.cpp \
+  rsm/test/rsm_simple_tests.cpp \
+  rsm/test/rsm_starvation_tests.cpp
 
 if ENABLE_WALLET
 BITCOIN_TESTS += \

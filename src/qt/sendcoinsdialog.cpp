@@ -578,6 +578,13 @@ void SendCoinsDialog::processSendCoinsReturn(const WalletModel::SendCoinsReturn 
         msgParams.first = tr("Payment request expired.");
         msgParams.second = CClientUIInterface::MSG_ERROR;
         break;
+    case WalletModel::LabelPublicExceedsLimits:
+        msgParams.first = tr("Public Label exeeds limit of ");
+        // append max byte size. Byte size will be 7 bytes less than max data carrier
+        // to account for the other op codes within the scriptPubKey
+        msgParams.first.append(QString::number(nMaxDatacarrierBytes - 7) + " bytes");
+        msgParams.second = CClientUIInterface::MSG_ERROR;
+        break;
     // included to prevent a compiler warning.
     case WalletModel::OK:
     default:

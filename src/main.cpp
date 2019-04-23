@@ -8,6 +8,7 @@
 
 #include "addrman.h"
 #include "arith_uint256.h"
+#include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene.h"
 #include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
@@ -43,7 +44,6 @@
 #include "txdb.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
-#include "uahf_fork.h"
 #include "ui_interface.h"
 #include "undo.h"
 #include "util.h"
@@ -62,8 +62,8 @@
 #include <boost/filesystem/fstream.hpp>
 #include <boost/math/distributions/poisson.hpp>
 #include <boost/scope_exit.hpp>
-#include <boost/thread.hpp>
 #include <sstream>
+#include <thread>
 
 #if defined(NDEBUG)
 #error "Bitcoin cannot be compiled without assertions."
@@ -144,6 +144,10 @@ void InitializeNode(const CNode *pnode)
 
 void FinalizeNode(NodeId nodeid)
 {
+    // Decrement thin type peer counters
+    thinrelay.RemovePeers(connmgr->FindNodeFromId(nodeid).get());
+
+    // Update block sync counters
     {
         CNodeStateAccessor state(nodestate, nodeid);
         DbgAssert(state != nullptr, return );
@@ -154,26 +158,8 @@ void FinalizeNode(NodeId nodeid)
         nPreferredDownload.fetch_sub(state->fPreferredDownload);
     }
 
-    LOCK(cs_main);
-    std::vector<uint256> vBlocksInFlight;
-    requester.GetBlocksInFlight(vBlocksInFlight, nodeid);
-    for (const uint256 &hash : vBlocksInFlight)
-    {
-        // Erase mapblocksinflight entries for this node.
-        requester.MapBlocksInFlightErase(hash, nodeid);
-
-        // Reset all requests times to zero so that we can immediately re-request these blocks
-        requester.ResetLastBlockRequestTime(hash);
-    }
-
+    // Remove nodestate tracking
     nodestate.RemoveNodeState(nodeid);
-    requester.RemoveNodeState(nodeid);
-    if (nodestate.Empty())
-    {
-        // Do a consistency check after the last peer is removed.  Force consistent state if production code
-        DbgAssert(requester.MapBlocksInFlightEmpty(), requester.MapBlocksInFlightClear());
-        DbgAssert(nPreferredDownload.load() == 0, nPreferredDownload.store(0));
-    }
 }
 
 } // anon namespace
@@ -289,51 +275,55 @@ bool GetTransaction(const uint256 &hash,
     CTransactionRef &txOut,
     const Consensus::Params &consensusParams,
     uint256 &hashBlock,
-    bool fAllowSlow)
+    bool fAllowSlow,
+    const CBlockIndex *blockIndex)
 {
-    CBlockIndex *pindexSlow = nullptr;
+    const CBlockIndex *pindexSlow = blockIndex;
 
     LOCK(cs_main);
 
-    CTransactionRef ptx = mempool.get(hash);
-    if (ptx)
+    if (blockIndex == nullptr)
     {
-        txOut = ptx;
-        return true;
-    }
-
-    if (fTxIndex)
-    {
-        CDiskTxPos postx;
-        if (pblocktree->ReadTxIndex(hash, postx))
+        CTransactionRef ptx = mempool.get(hash);
+        if (ptx)
         {
-            CAutoFile file(OpenBlockFile(postx, true), SER_DISK, CLIENT_VERSION);
-            if (file.IsNull())
-                return error("%s: OpenBlockFile failed", __func__);
-            CBlockHeader header;
-            try
-            {
-                file >> header;
-                fseek(file.Get(), postx.nTxOffset, SEEK_CUR);
-                file >> txOut;
-            }
-            catch (const std::exception &e)
-            {
-                return error("%s: Deserialize or I/O error - %s", __func__, e.what());
-            }
-            hashBlock = header.GetHash();
-            if (txOut->GetHash() != hash)
-                return error("%s: txid mismatch", __func__);
+            txOut = ptx;
             return true;
         }
-    }
 
-    // use coin database to locate block that contains transaction, and scan it
-    if (fAllowSlow)
-    {
-        CoinAccessor coin(*pcoinsTip, hash);
-        if (!coin->IsSpent())
-            pindexSlow = chainActive[coin->nHeight];
+        if (fTxIndex)
+        {
+            CDiskTxPos postx;
+            if (pblocktree->ReadTxIndex(hash, postx))
+            {
+                CAutoFile file(OpenBlockFile(postx, true), SER_DISK, CLIENT_VERSION);
+                if (file.IsNull())
+                    return error("%s: OpenBlockFile failed", __func__);
+                CBlockHeader header;
+                try
+                {
+                    file >> header;
+                    fseek(file.Get(), postx.nTxOffset, SEEK_CUR);
+                    file >> txOut;
+                }
+                catch (const std::exception &e)
+                {
+                    return error("%s: Deserialize or I/O error - %s", __func__, e.what());
+                }
+                hashBlock = header.GetHash();
+                if (txOut->GetHash() != hash)
+                    return error("%s: txid mismatch", __func__);
+                return true;
+            }
+        }
+
+        // use coin database to locate block that contains transaction, and scan it
+        if (fAllowSlow)
+        {
+            CoinAccessor coin(*pcoinsTip, hash);
+            if (!coin->IsSpent())
+                pindexSlow = chainActive[coin->nHeight];
+        }
     }
 
     if (pindexSlow)
@@ -514,7 +504,10 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
         uint64_t nRewind = blkdat.GetPos();
         while (!blkdat.eof())
         {
-            boost::this_thread::interruption_point();
+            if (shutdown_threads.load() == true)
+            {
+                return false;
+            }
 
             blkdat.SetPos(nRewind);
             nRewind++; // start one byte further next time, in case of failure
@@ -714,7 +707,6 @@ void MainCleanup()
 {
     {
         WRITELOCK(cs_mapBlockIndex); // BU apply the appropriate lock so no contention during destruction
-        // block headers
         BlockMap::iterator it1 = mapBlockIndex.begin();
         for (; it1 != mapBlockIndex.end(); it1++)
             delete (*it1).second;
@@ -722,8 +714,8 @@ void MainCleanup()
     }
 
     {
-        WRITELOCK(orphanpool.cs); // BU apply the appropriate lock so no contention during destruction
         // orphan transactions
+        WRITELOCK(orphanpool.cs);
         orphanpool.mapOrphanTransactions.clear();
         orphanpool.mapOrphanTransactionsByPrev.clear();
     }

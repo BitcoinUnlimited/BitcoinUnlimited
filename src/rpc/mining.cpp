@@ -275,17 +275,17 @@ UniValue getmininginfo(const UniValue &params, bool fHelp)
     LOCK(cs_main);
 
     UniValue obj(UniValue::VOBJ);
-    obj.push_back(Pair("blocks", (int)chainActive.Height()));
-    obj.push_back(Pair("currentblocksize", (uint64_t)nLastBlockSize));
-    obj.push_back(Pair("currentblocktx", (uint64_t)nLastBlockTx));
-    obj.push_back(Pair("difficulty", (double)GetDifficulty()));
-    obj.push_back(Pair("errors", GetWarnings("statusbar")));
-    obj.push_back(Pair("genproclimit", (int)GetArg("-genproclimit", DEFAULT_GENERATE_THREADS)));
-    obj.push_back(Pair("networkhashps", getnetworkhashps(params, false)));
-    obj.push_back(Pair("pooledtx", (uint64_t)mempool.size()));
-    obj.push_back(Pair("testnet", Params().TestnetToBeDeprecatedFieldRPC()));
-    obj.push_back(Pair("chain", Params().NetworkIDString()));
-    obj.push_back(Pair("generate", getgenerate(params, false)));
+    obj.pushKV("blocks", (int)chainActive.Height());
+    obj.pushKV("currentblocksize", (uint64_t)nLastBlockSize);
+    obj.pushKV("currentblocktx", (uint64_t)nLastBlockTx);
+    obj.pushKV("difficulty", (double)GetDifficulty());
+    obj.pushKV("errors", GetWarnings("statusbar"));
+    obj.pushKV("genproclimit", (int)GetArg("-genproclimit", DEFAULT_GENERATE_THREADS));
+    obj.pushKV("networkhashps", getnetworkhashps(params, false));
+    obj.pushKV("pooledtx", (uint64_t)mempool.size());
+    obj.pushKV("testnet", Params().TestnetToBeDeprecatedFieldRPC());
+    obj.pushKV("chain", Params().NetworkIDString());
+    obj.pushKV("generate", getgenerate(params, false));
     return obj;
 }
 
@@ -382,7 +382,7 @@ static int32_t UtilMkBlockTmplVersionBits(int32_t version,
             const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
             if (pvbavailable != nullptr)
             {
-                pvbavailable->push_back(Pair(gbt_vb_name(pos), consensusParams.vDeployments[pos].bit));
+                pvbavailable->pushKV(gbt_vb_name(pos), consensusParams.vDeployments[pos].bit);
             }
             if (setClientRules.find(vbinfo.name) == setClientRules.end())
             {
@@ -448,9 +448,9 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
 
         UniValue entry(UniValue::VOBJ);
 
-        entry.push_back(Pair("data", EncodeHexTx(tx)));
+        entry.pushKV("data", EncodeHexTx(tx));
 
-        entry.push_back(Pair("hash", txHash.GetHex()));
+        entry.pushKV("hash", txHash.GetHex());
 
         UniValue deps(UniValue::VARR);
         for (const CTxIn &in : tx.vin)
@@ -458,11 +458,11 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
             if (setTxIndex.count(in.prevout.hash))
                 deps.push_back(setTxIndex[in.prevout.hash]);
         }
-        entry.push_back(Pair("depends", deps));
+        entry.pushKV("depends", deps);
 
         int index_in_template = i - 1;
-        entry.push_back(Pair("fee", pblocktemplate->vTxFees[index_in_template]));
-        entry.push_back(Pair("sigops", pblocktemplate->vTxSigOps[index_in_template]));
+        entry.pushKV("fee", pblocktemplate->vTxFees[index_in_template]);
+        entry.pushKV("sigops", pblocktemplate->vTxSigOps[index_in_template]);
 
         transactions.push_back(entry);
     }
@@ -474,7 +474,10 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
 
     UniValue aux(UniValue::VOBJ);
     // COINBASE_FLAGS were assigned in CreateNewBlock() in the steps above.  Now we can use it here.
-    aux.push_back(Pair("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end())));
+    {
+        LOCK(cs_coinbaseFlags);
+        aux.pushKV("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end()));
+    }
 
     arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
 
@@ -484,11 +487,11 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
     aMutable.push_back("prevblock");
 
     UniValue result(UniValue::VOBJ);
-    result.push_back(Pair("capabilities", aCaps));
-    result.push_back(Pair("version", pblock->nVersion));
-    result.push_back(Pair("rules", aRules));
-    result.push_back(Pair("vbavailable", vbavailable));
-    result.push_back(Pair("vbrequired", int(0)));
+    result.pushKV("capabilities", aCaps);
+    result.pushKV("version", pblock->nVersion);
+    result.pushKV("rules", aRules);
+    result.pushKV("vbavailable", vbavailable);
+    result.pushKV("vbrequired", int(0));
 
     if (nMaxVersionPreVB >= 2)
     {
@@ -502,22 +505,21 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
         aMutable.push_back("version/force");
     }
 
-    result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
-    result.push_back(Pair("transactions", transactions));
-    result.push_back(Pair("coinbaseaux", aux));
-    result.push_back(Pair("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue));
-    result.push_back(
-        Pair("longpollid", chainActive.Tip()->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast)));
-    result.push_back(Pair("target", hashTarget.GetHex()));
-    result.push_back(Pair("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1));
-    result.push_back(Pair("mutable", aMutable));
-    result.push_back(Pair("noncerange", "00000000ffffffff"));
-    result.push_back(Pair("sigoplimit", (int64_t)BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS));
-    result.push_back(Pair("sizelimit", (int64_t)maxGeneratedBlock));
-    result.push_back(Pair("curtime", pblock->GetBlockTime()));
-    result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
+    result.pushKV("previousblockhash", pblock->hashPrevBlock.GetHex());
+    result.pushKV("transactions", transactions);
+    result.pushKV("coinbaseaux", aux);
+    result.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue);
+    result.pushKV("longpollid", chainActive.Tip()->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast));
+    result.pushKV("target", hashTarget.GetHex());
+    result.pushKV("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1);
+    result.pushKV("mutable", aMutable);
+    result.pushKV("noncerange", "00000000ffffffff");
+    result.pushKV("sigoplimit", (int64_t)BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
+    result.pushKV("sizelimit", (int64_t)maxGeneratedBlock);
+    result.pushKV("curtime", pblock->GetBlockTime());
+    result.pushKV("bits", strprintf("%08x", pblock->nBits));
     // BU get the height directly from the block because pindexPrev could change if another block has come in.
-    result.push_back(Pair("height", (int64_t)(pblock->GetHeight())));
+    result.pushKV("height", (int64_t)(pblock->GetHeight()));
 
     return result;
 }
@@ -999,8 +1001,8 @@ UniValue estimatesmartfee(const UniValue &params, bool fHelp)
     UniValue result(UniValue::VOBJ);
     int answerFound;
     CFeeRate feeRate = mempool.estimateSmartFee(nBlocks, &answerFound);
-    result.push_back(Pair("feerate", feeRate == CFeeRate(0) ? -1.0 : ValueFromAmount(feeRate.GetFeePerK())));
-    result.push_back(Pair("blocks", answerFound));
+    result.pushKV("feerate", feeRate == CFeeRate(0) ? -1.0 : ValueFromAmount(feeRate.GetFeePerK()));
+    result.pushKV("blocks", answerFound);
     return result;
 }
 
@@ -1033,8 +1035,8 @@ UniValue estimatesmartpriority(const UniValue &params, bool fHelp)
     UniValue result(UniValue::VOBJ);
     int answerFound;
     double priority = mempool.estimateSmartPriority(nBlocks, &answerFound);
-    result.push_back(Pair("priority", priority));
-    result.push_back(Pair("blocks", answerFound));
+    result.pushKV("priority", priority);
+    result.pushKV("blocks", answerFound);
     return result;
 }
 

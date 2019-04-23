@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 
+#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/thread/thread.hpp>
 
 using namespace std;
@@ -61,7 +62,7 @@ static inline uint256 IncomingConflictHash(const COutPoint &prevout)
     return hash;
 }
 
-void StartTxAdmission(boost::thread_group &threadGroup)
+void StartTxAdmission(thread_group &threadGroup)
 {
     if (txCommitQ == nullptr)
         txCommitQ = new std::map<uint256, CTxCommitData>();
@@ -71,11 +72,11 @@ void StartTxAdmission(boost::thread_group &threadGroup)
     // Start incoming transaction processing threads
     for (unsigned int i = 0; i < numTxAdmissionThreads.Value(); i++)
     {
-        threadGroup.create_thread(boost::bind(&TraceThreads<void (*)()>, strprintf("tx%d", i), &ThreadTxAdmission));
+        threadGroup.create_thread(&ThreadTxAdmission);
     }
 
     // Start tx commitment thread
-    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "txcommit", &ThreadCommitToMempool));
+    threadGroup.create_thread(&ThreadCommitToMempool);
 }
 
 void StopTxAdmission()
@@ -188,22 +189,28 @@ unsigned int TxAlreadyHave(const CInv &inv)
 
 void ThreadCommitToMempool()
 {
-    while (!ShutdownRequested())
+    while (shutdown_threads.load() == false)
     {
         {
             boost::unique_lock<boost::mutex> lock(csCommitQ);
             do
             {
                 cvCommitQ.timed_wait(lock, boost::posix_time::milliseconds(2000));
+                if (shutdown_threads.load() == true)
+                {
+                    return;
+                }
             } while (txCommitQ->empty() && txDeferQ.empty());
         }
 
         {
-            boost::this_thread::interruption_point();
+            if (shutdown_threads.load() == true)
+            {
+                return;
+            }
 
             CORRAL(txProcessingCorral, CORRAL_TX_COMMITMENT);
             {
-                LOCK(cs_main);
                 CommitTxToMempool();
                 LOG(MEMPOOL, "MemoryPool sz %u txn, %u kB\n", mempool.size(), mempool.DynamicMemoryUsage() / 1000);
                 LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
@@ -354,10 +361,13 @@ void ThreadTxAdmission()
     // Process at most this many transactions before letting the commit thread take over
     const int maxTxPerRound = 200;
 
-    while (!ShutdownRequested())
+    while (shutdown_threads.load() == false)
     {
         bool acceptedSomething = false;
-        boost::this_thread::interruption_point();
+        if (shutdown_threads.load() == true)
+        {
+            return;
+        }
 
         bool fMissingInputs = false;
         CValidationState state;
@@ -366,13 +376,18 @@ void ThreadTxAdmission()
 
         {
             CCriticalBlock lock(csTxInQ, "csTxInQ", __FILE__, __LINE__);
-            while (txInQ.empty() && !ShutdownRequested())
+            while (txInQ.empty() && shutdown_threads.load() == false)
             {
+                if (shutdown_threads.load() == true)
+                {
+                    return;
+                }
                 cvTxInQ.wait(csTxInQ);
-                boost::this_thread::interruption_point();
             }
-            if (ShutdownRequested())
-                break;
+            if (shutdown_threads.load() == true)
+            {
+                return;
+            }
         }
 
         {
@@ -582,15 +597,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
     const CChainParams &chainparams = Params();
 
-    const uint32_t cds_flag =
-        IsNov152018Enabled(chainparams.GetConsensus(), chainActive.Tip()) ? SCRIPT_ENABLE_CHECKDATASIG : 0;
-    const uint32_t svflag =
-        IsSv2018Enabled(chainparams.GetConsensus(), chainActive.Tip()) ? SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES : 0;
-    const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | cds_flag | svflag;
-
-    // LOG(MEMPOOL, "Mempool: Considering Tx %s\n", tx->GetHash().ToString());
-
-    if (!CheckTransaction(*tx, state))
+    if (!CheckTransaction(tx, state))
     {
         if (state.GetDebugMessage() == "")
             state.SetDebugMessage("CheckTransaction failed");
@@ -610,11 +617,27 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         fRequireStandard = true;
     else if (allowedTx == TransactionClass::NONSTANDARD)
         fRequireStandard = false;
-    if (fRequireStandard && !IsStandardTx(*tx, reason))
+    if (fRequireStandard && !IsStandardTx(tx, reason))
     {
         state.SetDebugMessage("IsStandardTx failed");
         return state.DoS(0, false, REJECT_NONSTANDARD, reason);
     }
+
+    const uint32_t cds_flag = (AreWeOnBCHChain() && IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip())) ?
+                                  SCRIPT_ENABLE_CHECKDATASIG :
+                                  0;
+    const uint32_t schnorrflag =
+        (AreWeOnBCHChain() && IsMay2019Enabled(chainparams.GetConsensus(), chainActive.Tip())) ? SCRIPT_ENABLE_SCHNORR :
+                                                                                                 0;
+    const uint32_t segwit_flag =
+        (AreWeOnBCHChain() && IsMay2019Enabled(chainparams.GetConsensus(), chainActive.Tip()) && !fRequireStandard) ?
+            SCRIPT_ALLOW_SEGWIT_RECOVERY :
+            0;
+    const uint32_t svflag = (AreWeOnSVChain() && IsSv2018Activated(chainparams.GetConsensus(), chainActive.Tip())) ?
+                                SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES :
+                                0;
+    const uint32_t featureFlags = cds_flag | schnorrflag | segwit_flag | svflag;
+    const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;
 
     // Don't relay version 2 transactions until CSV is active, and we can be
     // sure that such transactions will be mined (unless we're on
@@ -637,7 +660,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     }
 
     // Make sure tx size is acceptable after Nov 15, 2018 fork
-    if (IsNov152018Scheduled() && IsNov152018Enabled(chainparams.GetConsensus(), chainActive.Tip()))
+    if (AreWeOnBCHChain() && IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip()))
     {
         if (tx->GetTxSize() < MIN_TX_SIZE)
             return state.DoS(0, false, REJECT_INVALID, "txn-undersize");
@@ -724,11 +747,11 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         }
 
         // Check for non-standard pay-to-script-hash in inputs
-        if (fRequireStandard && !AreInputsStandard(*tx, view))
+        if (fRequireStandard && !AreInputsStandard(tx, view))
             return state.Invalid(false, REJECT_NONSTANDARD, "bad-txns-nonstandard-inputs");
 
-        nSigOps = GetLegacySigOpCount(*tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
-        nSigOps += GetP2SHSigOpCount(*tx, view, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+        nSigOps = GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+        nSigOps += GetP2SHSigOpCount(tx, view, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
 
         CAmount nValueOut = tx->GetValueOut();
         CAmount nFees = nValueIn - nValueOut;
@@ -909,7 +932,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         unsigned char sighashType = 0;
         if (!CheckInputs(
-                *tx, state, view, true, flags, maxScriptOps.Value(), true, &resourceTracker, nullptr, &sighashType))
+                tx, state, view, true, flags, maxScriptOps.Value(), true, &resourceTracker, nullptr, &sighashType))
         {
             LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", tx->GetHash().ToString().c_str());
             if (state.GetDebugMessage() == "")
@@ -928,8 +951,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
         unsigned char sighashType2 = 0;
-        if (!CheckInputs(*tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | cds_flag | svflag,
-                maxScriptOps.Value(), true, nullptr, nullptr, &sighashType2))
+        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | featureFlags, maxScriptOps.Value(),
+                true, nullptr, nullptr, &sighashType2))
         {
             if (state.GetDebugMessage() == "")
                 state.SetDebugMessage("CheckInputs failed against mandatory but not standard flags");
@@ -942,7 +965,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         entry.sighashType = sighashType | sighashType2;
 
         // This code denies old style tx from entering the mempool as soon as we fork
-        if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight) && !IsTxUAHFOnly(entry))
+        if (!IsTxUAHFOnly(entry))
         {
             return state.Invalid(false, REJECT_WRONG_FORK, "txn-uses-old-sighash-algorithm");
         }
@@ -1045,7 +1068,6 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
                     txd.tx = orphanTx;
                     txd.nodeId = fromPeer;
                     txd.nodeName = "orphan";
-                    txd.whitelisted = false;
                     LOG(MEMPOOL, "Resubmitting orphan tx: %s\n", orphanTx->GetHash().ToString().c_str());
                     EnqueueTxForAdmission(txd);
                 }
@@ -1069,7 +1091,14 @@ void Snapshot::Load(void)
     LOCK(cs);
     tipHeight = chainActive.Height();
     tip = chainActive.Tip();
-    tipMedianTimePast = tip->GetMedianTimePast();
+    if (tip)
+    {
+        tipMedianTimePast = tip->GetMedianTimePast();
+    }
+    else
+    {
+        tipMedianTimePast = 0; // MTP does not matter, we are in IBD
+    }
     adjustedTime = GetAdjustedTime();
     coins = pcoinsTip; // TODO pcoinsTip can change
     if (cvMempool)

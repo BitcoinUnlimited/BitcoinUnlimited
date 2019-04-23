@@ -14,15 +14,25 @@
 
 #parsing marker (KEY for now)
 #   key name
-#    type of key ('i'nitial or 'c'hangeable?) (only i supported for now)
+#    type of key ('i'nitial or 'c'hangeable)
 #                                             16 bit prefix (currently)
 #                                                                      16 bit suffix  <value type>
 
 # this is the listening
 KEY i BU_LISTEN_PORT                            0x0002                   0x0000         u64c
-KEY i BU_GRAPHENE_VERSION_SUPPORTED             0x0002                   0x0001         u64c
+KEY i BU_GRAPHENE_MAX_VERSION_SUPPORTED         0x0002                   0x0001         u64c
+
 # BU_MSG_CHECKSUM: if 0, use the standard checksum.  If 1, you may send this client messages with the checksum field==0 and the checksum won't be checked (TCP has a checksum)
 KEY i BU_MSG_IGNORE_CHECKSUM                    0x0002                   0x0002         u64c
+
+# XTHIN version
+KEY i BU_XTHIN_VERSION                          0x0002                   0x0003         u64c
+
+# Graphene Fast Filter Preference
+KEY i BU_GRAPHENE_FAST_FILTER_PREF              0x0002                   0x0004         u64c
+# Graphene high / low (inclusive) version numbers
+KEY i BU_GRAPHENE_MIN_VERSION_SUPPORTED         0x0002                   0x0005         u64c
+
 # KEY i ABC_...                                0x0000                   ...
 # KEY i XT_DOUBLESPEND_FORWARDING_SCHEME       0x0003                   ...            vector
 # ...

@@ -23,7 +23,7 @@ std::vector<RespendActionPtr> CreateDefaultActions()
     std::vector<RespendActionPtr> actions;
 
     actions.push_back(RespendActionPtr(new RespendRelayer{}));
-    if (LogAcceptCategory(Logging::RESPEND))
+    if (Logging::LogAcceptCategory(RESPEND))
     {
         actions.push_back(RespendActionPtr(new RespendLogger{}));
     }

@@ -41,6 +41,10 @@ import traceback
 from .nodemessages import *
 from .bumessages import *
 
+import math
+from .siphash import siphash256
+
+
 MAX_INV_SZ = 50000
 MAX_BLOCK_SIZE = 1000000
 
@@ -158,6 +162,16 @@ class NodeConnCB(object):
 
     def on_pong(self, conn, message): pass
 
+    def on_sendheaders(self, conn, message): pass
+
+    def on_sendcmpct(self, conn, message): pass
+
+    def on_cmpctblock(self, conn, message): pass
+
+    def on_getblocktxn(self, conn, message): pass
+
+    def on_blocktxn(self, conn, message): pass
+
     def on_xverack(self, conn, message):
         self.xverack_received = True
         conn.send_message(msg_xverack())
@@ -182,6 +196,10 @@ class SingleNodeConnCB(NodeConnCB):
     # Wrapper for the NodeConn's send_message function
     def send_message(self, message, pushbuf = False):
         self.connection.send_message(message, pushbuf)
+
+    def send_and_ping(self, message):
+        self.send_message(message)
+        self.sync_with_ping()
 
     def on_pong(self, conn, message):
         self.last_pong = message
@@ -235,7 +253,12 @@ class NodeConn(asyncore.dispatcher):
         b"mempool": msg_mempool,
         b"sendheaders": msg_sendheaders,
         b"xversion" : msg_xversion,
-        b"xverack" : msg_xverack
+        b"xverack" : msg_xverack,
+        b"xupdate" : msg_xupdate,
+        b"sendcmpct": msg_sendcmpct,
+        b"cmpctblock": msg_cmpctblock,
+        b"getblocktxn": msg_getblocktxn,
+        b"blocktxn": msg_blocktxn
     }, bumessagemap)
 
     BTC_MAGIC_BYTES = {
@@ -272,6 +295,7 @@ class NodeConn(asyncore.dispatcher):
         self.disconnect = False
         self.curIndex = 0
         self.allow0Checksum = False
+        self.produce0Checksum = False
         self.num0Checksums = 0
         if send_initial_version:
             # stuff version msg into sendbuf
@@ -289,6 +313,7 @@ class NodeConn(asyncore.dispatcher):
         except:
             self.handle_close()
         self.rpc = rpc
+        self.exceptions = []
 
     def show_debug_msg(self, msg):
         self.log.debug(msg)
@@ -403,6 +428,7 @@ class NodeConn(asyncore.dispatcher):
                     # pdb.set_trace()
         except Exception as e:
             print('got_data:', repr(e))
+            self.exceptions.append(e)
             #import traceback
             #traceback.print_tb(sys.exc_info()[2])
             #pdb.post_mortem(e.__traceback__)
@@ -418,9 +444,12 @@ class NodeConn(asyncore.dispatcher):
         tmsg += b"\x00" * (12 - len(command))
         tmsg += struct.pack("<I", len(data))
         if self.ver_send >= 209:
-            th = sha256(data)
-            h = sha256(th)
-            tmsg += h[:4]
+            if self.produce0Checksum:
+                tmsg += b"\x00" * 4
+            else:
+                th = sha256(data)
+                h = sha256(th)
+                tmsg += h[:4]
         tmsg += data
         with mininode_lock:
             self.sendbuf += tmsg

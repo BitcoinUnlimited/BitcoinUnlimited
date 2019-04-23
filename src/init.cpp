@@ -22,6 +22,7 @@
 #include "connmgr.h"
 #include "consensus/validation.h"
 #include "dosman.h"
+#include "electrum/electrumserver.h"
 #include "forks_csv.h"
 #include "fs.h"
 #include "httprpc.h"
@@ -35,9 +36,9 @@
 #include "policy/policy.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
-#include "scheduler.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
+#include "threadgroup.h"
 #include "torcontrol.h"
 #include "txadmission.h"
 #include "txdb.h"
@@ -70,8 +71,8 @@
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
-#include <boost/thread.hpp>
 #include <openssl/crypto.h>
+#include <thread>
 
 #if ENABLE_ZMQ
 #include "zmq/zmqnotificationinterface.h"
@@ -135,7 +136,8 @@ static const char *FEE_ESTIMATES_FILENAME = "fee_estimates.dat";
 // shutdown thing.
 //
 
-volatile bool fRequestShutdown = false;
+std::atomic<bool> fRequestShutdown{false};
+std::atomic<bool> fDumpMempoolLater{false};
 
 void StartShutdown() { fRequestShutdown = true; }
 bool ShutdownRequested() { return fRequestShutdown; }
@@ -165,9 +167,9 @@ public:
 };
 
 static CCoinsViewErrorCatcher *pcoinscatcher = NULL;
-static boost::scoped_ptr<ECCVerifyHandle> globalVerifyHandle;
+static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
 
-void Interrupt(boost::thread_group &threadGroup)
+void Interrupt(thread_group &threadGroup)
 {
     // Interrupt Parallel Block Validation threads if there are any running.
     if (PV)
@@ -182,6 +184,9 @@ void Interrupt(boost::thread_group &threadGroup)
     InterruptREST();
     InterruptTorControl();
     threadGroup.interrupt_all();
+    // stop TxAdmission needs to be done before threadGroup tries to join_all
+    // we only join_all after Interrupt so call StopTxAdmission here
+    StopTxAdmission();
 }
 
 void Shutdown()
@@ -213,6 +218,7 @@ void Shutdown()
     StopREST();
     StopRPC();
     StopHTTPServer();
+    electrum::ElectrumServer::Instance().Stop();
 #ifdef ENABLE_WALLET
     if (pwalletMain)
         pwalletMain->Flush(false);
@@ -222,6 +228,10 @@ void Shutdown()
     StopNode();
     StopTorControl();
     UnregisterNodeSignals(GetNodeSignals());
+    if (fDumpMempoolLater && GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
+    {
+        DumpMempool();
+    }
 
     if (fFeeEstimatesInitialized)
     {
@@ -463,6 +473,12 @@ void ThreadImport(std::vector<fs::path> vImportFiles)
         LOGA("Stopping after block import\n");
         StartShutdown();
     }
+
+    if (GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
+    {
+        LoadMempool();
+        fDumpMempoolLater = !fRequestShutdown;
+    }
 }
 
 /** Sanity checks
@@ -482,7 +498,7 @@ bool InitSanityCheck(void)
     return true;
 }
 
-bool AppInitServers(boost::thread_group &threadGroup)
+bool AppInitServers(thread_group &threadGroup, int rpcport, const std::string &network)
 {
     RPCServer::OnStopped(&OnRPCStopped);
     RPCServer::OnPreCommand(&OnRPCPreCommand);
@@ -496,6 +512,10 @@ bool AppInitServers(boost::thread_group &threadGroup)
         return false;
     if (!StartHTTPServer())
         return false;
+    if (!electrum::ElectrumServer::Instance().Start(rpcport, network))
+    {
+        return false;
+    }
     return true;
 }
 
@@ -604,7 +624,7 @@ void InitLogging()
 /** Initialize bitcoin.
  *  @pre Parameters should be parsed and config file should be read.
  */
-bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &scheduler)
+bool AppInit2(Config &config, thread_group &threadGroup)
 {
     // ********************************************************* Step 1: setup
 
@@ -828,7 +848,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         nLocalServices |= NODE_GRAPHENE;
     // BUIPXXX Graphene Blocks: end section
 
-    // UAHF - BitcoinCash service bit
+    // BitcoinCash service bit
     nLocalServices |= NODE_BITCOIN_CASH;
 
     nMaxTipAge = GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);
@@ -956,23 +976,22 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         // Set the number of threads to half the available Cores.
         int nThreads = std::max(GetNumCores() / 2, 1);
         numMsgHandlerThreads.Set(nThreads);
-        LOGA("Using %d message handler threads\n", numMsgHandlerThreads.Value());
     }
+    LOGA("Using %d message handler threads\n", numMsgHandlerThreads.Value());
+
     // Setup the number of transaction mempool admission threads
     if (numTxAdmissionThreads.Value() == 0)
     {
         // Set the number of threads to half the available Cores.
         int nThreads = std::max(GetNumCores() / 2, 1);
         numTxAdmissionThreads.Set(nThreads);
-        LOGA("Using %d transaction admission threads\n", numTxAdmissionThreads.Value());
     }
+    LOGA("Using %d transaction admission threads\n", numTxAdmissionThreads.Value());
+
+    InitSignatureCache();
 
     // Create the parallel block validator
     PV.reset(new CParallelValidation());
-
-    // Start the lightweight task scheduler thread
-    CScheduler::Function serviceLoop = boost::bind(&CScheduler::serviceQueue, &scheduler);
-    threadGroup.create_thread(boost::bind(&TraceThread<CScheduler::Function>, "scheduler", serviceLoop));
 
     /* Start the RPC server already.  It will be started in "warmup" mode
      * and not really process calls already (but it will signify connections
@@ -982,8 +1001,10 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     if (fServer)
     {
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
-        if (!AppInitServers(threadGroup))
-            return InitError(_("Unable to start HTTP server. See debug log for details."));
+        if (!AppInitServers(threadGroup, BaseParams().RPCPort(), chainparams.NetworkIDString()))
+        {
+            return InitError(_("Unable to start RPC services. See debug log for details."));
+        }
     }
 
     int64_t nStart;
@@ -1222,23 +1243,19 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     fFeeEstimatesInitialized = true;
 
     // Set EB and MAX_OPS_PER_SCRIPT for the SV chain
-    if (IsSv2018Scheduled())
+    if (AreWeOnSVChain() && IsSv2018Activated(Params().GetConsensus(), chainActive.Tip()))
     {
-        if (IsSv2018Enabled(Params().GetConsensus(), chainActive.Tip()))
-        {
-            maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
-            excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
-            settingsToUserAgentString();
-        }
+        maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
+        excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
+        settingsToUserAgentString();
+        enableCanonicalTxOrder = false;
     }
 
     // Set enableCanonicalTxOrder for the BCH early in the bootstrap phase
-    if (IsNov152018Scheduled())
+    if (AreWeOnBCHChain() && IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()) &&
+        chainparams.NetworkIDString() != "regtest")
     {
-        if (IsNov152018Enabled(Params().GetConsensus(), chainActive.Tip()))
-        {
-            enableCanonicalTxOrder = true;
-        }
+        enableCanonicalTxOrder = true;
     }
 
 
@@ -1273,6 +1290,8 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
     {
         LOGA("Unsetting NODE_NETWORK on prune mode\n");
         nLocalServices &= ~NODE_NETWORK;
+        LOGA("Setting NODE_NETWORK_LIMITED on prune mode\n");
+        nLocalServices |= NODE_NETWORK_LIMITED;
         if (!fReindex)
         {
             uiInterface.InitMessage(_("Pruning blockstore..."));
@@ -1443,7 +1462,8 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         {
             struct in_addr inaddr_any;
             inaddr_any.s_addr = INADDR_ANY;
-            bool bound = Bind(CService(in6addr_any, GetListenPort()), BF_NONE);
+            struct in6_addr inaddr6_any = IN6ADDR_ANY_INIT;
+            bool bound = Bind(CService(inaddr6_any, GetListenPort()), BF_NONE);
             fBindFailure |= !bound;
             fBound |= bound;
 
@@ -1511,9 +1531,9 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
 #endif
 
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
-        StartTorControl(threadGroup, scheduler);
+        StartTorControl(threadGroup);
 
-    StartNode(threadGroup, scheduler);
+    StartNode(threadGroup);
 
 // Monitor the chain, and alert if we get blocks much quicker or slower than expected
 // The "bad chain alert" scheduler has been disabled because the current system gives far
@@ -1538,7 +1558,7 @@ bool AppInit2(Config &config, boost::thread_group &threadGroup, CScheduler &sche
         pwalletMain->ReacceptWalletTransactions();
 
         // Run a thread to flush wallet periodically
-        threadGroup.create_thread(boost::bind(&ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile)));
+        threadGroup.create_thread(&ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile));
     }
 #endif
 

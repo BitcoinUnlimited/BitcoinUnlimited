@@ -17,14 +17,17 @@
 CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     uint64_t nSenderUniverseItems,
     const std::vector<uint256> &_itemHashes,
+    uint64_t _shorttxidk0,
+    uint64_t _shorttxidk1,
+    uint64_t _version,
+    uint32_t ibltEntropy,
+    bool _computeOptimized,
     bool _ordered,
     bool fDeterministic)
+    : ordered(_ordered), nReceiverUniverseItems(_nReceiverUniverseItems), shorttxidk0(_shorttxidk0),
+      shorttxidk1(_shorttxidk1), version(_version), ibltSalt(ibltEntropy), computeOptimized(_computeOptimized),
+      pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr)
 {
-    ordered = _ordered;
-
-    // Below is the parameter "m" from the graphene paper
-    nReceiverUniverseItems = _nReceiverUniverseItems;
-
     // Below is the parameter "n" from the graphene paper
     uint64_t nItems = _itemHashes.size();
 
@@ -66,22 +69,38 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     optSymDiff += nReceiverMissingItems;
 
     // Construct Bloom filter
-    pSetFilter = new CBloomFilter(
-        nItems, fpr, insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
+    if (computeOptimized)
+    {
+        LOG(GRAPHENE, "using compute-optimized Bloom filter\n");
+        pFastFilter = new CVariableFastFilter(nItems, fpr);
+    }
+    else
+    {
+        LOG(GRAPHENE, "using regular Bloom filter\n");
+        pSetFilter = new CBloomFilter(
+            nItems, fpr, insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
+    }
     LOG(GRAPHENE, "fp rate: %f Num elements in bloom filter: %d\n", fpr, nItems);
 
     // Construct IBLT
     uint64_t nIbltCells = std::max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
-    pSetIblt = new CIblt(nIbltCells);
+    pSetIblt = new CIblt(nIbltCells, ibltSalt, version >= 2);
     std::map<uint64_t, uint256> mapCheapHashes;
 
     LOG(GRAPHENE, "constructed IBLT with %d cells\n", nIbltCells);
 
     for (const uint256 &itemHash : _itemHashes)
     {
-        uint64_t cheapHash = itemHash.GetCheapHash();
+        uint64_t cheapHash = GetShortID(itemHash);
 
-        pSetFilter->insert(itemHash);
+        if (computeOptimized)
+        {
+            pFastFilter->insert(itemHash);
+        }
+        else
+        {
+            pSetFilter->insert(itemHash);
+        }
 
         if (mapCheapHashes.count(cheapHash))
             throw std::runtime_error("Cheap hash collision while encoding graphene set");
@@ -111,6 +130,16 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
 }
 
 
+uint64_t CGrapheneSet::GetShortID(const uint256 &txhash) const
+{
+    if (version == 0)
+        return txhash.GetCheapHash();
+
+    static_assert(SHORTTXIDS_LENGTH == 8, "shorttxids calculation assumes 8-byte shorttxids");
+    return SipHashUint256(shorttxidk0, shorttxidk1, txhash) & 0xffffffffffffffL;
+}
+
+
 double CGrapheneSet::OptimalSymDiff(uint64_t nBlockTxs,
     uint64_t nReceiverPoolTx,
     uint64_t nReceiverExcessTxs,
@@ -118,6 +147,40 @@ double CGrapheneSet::OptimalSymDiff(uint64_t nBlockTxs,
 {
     /* Optimal symmetric difference between block txs and receiver mempool txs passing
      * though filter to use for IBLT.
+     */
+    if (nBlockTxs >= APPROX_ITEMS_THRESH && nReceiverExcessTxs >= nBlockTxs / APPROX_EXCESS_RATE)
+        return ApproxOptimalSymDiff(nBlockTxs);
+    else
+        return BruteForceSymDiff(nBlockTxs, nReceiverPoolTx, nReceiverExcessTxs, nReceiverMissingTxs);
+}
+
+
+double CGrapheneSet::ApproxOptimalSymDiff(uint64_t nBlockTxs)
+{
+    /* Approximation to the optimal symmetric difference between block txs and receiver
+     * mempool txs passing through filter to use for IBLT.
+     *
+     * This method is called by OptimalSymDiff provided that:
+     * 1) nBlockTxs >= APPROX_ITEMS_THRESH
+     * 2) nReceiverExcessTxs >= nBlockTxs / APPROX_EXCESS_RATE
+     *
+     * For details see
+     * https://github.com/bissias/graphene-experiments/blob/master/jupyter/graphene_size_optimization.ipynb
+     */
+    assert(nBlockTxs >= APPROX_ITEMS_THRESH);
+
+    return std::max(
+        1.0, std::round(FILTER_CELL_SIZE * nBlockTxs / (8 * IBLT_CELL_SIZE * IBLT_DEFAULT_OVERHEAD * LN2SQUARED)));
+}
+
+
+double CGrapheneSet::BruteForceSymDiff(uint64_t nBlockTxs,
+    uint64_t nReceiverPoolTx,
+    uint64_t nReceiverExcessTxs,
+    uint64_t nReceiverMissingTxs)
+{
+    /* Brute force search for optimal symmetric difference between block txs and receiver
+     * mempool txs passing though filter to use for IBLT.
      *
      * Let a be defined as the size of the symmetric difference between items in the
      * sender and receiver IBLTs.
@@ -181,7 +244,7 @@ std::vector<uint64_t> CGrapheneSet::Reconcile(const std::vector<uint256> &receiv
     int passedFilter = 0;
     for (const uint256 &itemHash : receiverItemHashes)
     {
-        uint64_t cheapHash = itemHash.GetCheapHash();
+        uint64_t cheapHash = GetShortID(itemHash);
 
         auto ir = mapCheapHashes.insert(std::make_pair(cheapHash, itemHash));
         if (!ir.second)
@@ -189,7 +252,8 @@ std::vector<uint64_t> CGrapheneSet::Reconcile(const std::vector<uint256> &receiv
             throw std::runtime_error("Cheap hash collision while decoding graphene set");
         }
 
-        if ((*pSetFilter).contains(itemHash))
+        if ((computeOptimized && pFastFilter->contains(itemHash)) ||
+            (!computeOptimized && pSetFilter->contains(itemHash)))
         {
             receiverSet.insert(cheapHash);
             localIblt.insert(cheapHash, IBLT_NULL_VALUE);
@@ -212,7 +276,8 @@ std::vector<uint64_t> CGrapheneSet::Reconcile(const std::map<uint64_t, uint256> 
 
     for (const auto &entry : mapCheapHashes)
     {
-        if ((*pSetFilter).contains(entry.second))
+        if ((computeOptimized && pFastFilter->contains(entry.second)) ||
+            (!computeOptimized && pSetFilter->contains(entry.second)))
         {
             receiverSet.insert(entry.first);
             localIblt.insert(entry.first, IBLT_NULL_VALUE);

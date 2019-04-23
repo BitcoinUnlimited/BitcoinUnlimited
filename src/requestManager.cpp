@@ -3,6 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "requestManager.h"
+#include "blockrelay/blockrelay_common.h"
+#include "blockrelay/compactblock.h"
 #include "blockrelay/graphene.h"
 #include "blockrelay/thinblock.h"
 #include "chain.h"
@@ -10,6 +12,7 @@
 #include "consensus/consensus.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
+#include "dosman.h"
 #include "leakybucket.h"
 #include "main.h"
 #include "net.h"
@@ -32,8 +35,8 @@
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/thread.hpp>
 #include <inttypes.h>
+#include <thread>
 
 
 using namespace std;
@@ -86,6 +89,8 @@ CRequestManagerNodeState::CRequestManagerNodeState()
 {
     nDownloadingSince = 0;
     nBlocksInFlight = 0;
+    nNumRequests = 0;
+    nLastRequest = 0;
 }
 
 CRequestManager::CRequestManager()
@@ -173,7 +178,7 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
         // Got the data, now add the node as a source
         data.AddSource(from);
     }
-    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_THINBLOCK) || (obj.type == MSG_XTHINBLOCK))
+    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_CMPCT_BLOCK) || (obj.type == MSG_XTHINBLOCK))
     {
         uint256 temp = obj.hash;
         OdMap::value_type v(temp, CUnknownObj());
@@ -211,26 +216,36 @@ void CRequestManager::AskFor(const std::vector<CInv> &objArray, CNode *from, uns
 
 void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *from, unsigned int priority)
 {
-    // must maintain correct locking order:  cs_main, then cs_objDownloader, then cs_vNodes.
-    LOCK(cs_main);
-
     // This is block and peer that was selected in FindNextBlocksToDownload() so we want to add it as a block
     // source first so that it gets requested first.
-    LOCK(cs_objDownloader);
     if (from)
         AskFor(objArray, from, priority);
 
+    // We can't hold cs_vNodes in the for loop below because it is out of order with cs_objDownloader which is
+    // taken in ProcessBlockAvailability.  We can't take cs_objDownloader earlier because it deadlocks with the
+    // CNodeStateAccessor. So make a copy of vNodes here
+    std::vector<CNode *> vNodesCopy;
+
+    {
+        LOCK(cs_vNodes);
+        vNodesCopy = vNodes;
+        for (CNode *pnode : vNodesCopy)
+        {
+            pnode->AddRef();
+        }
+    }
+
+
     // Add the other peers as potential sources in the event the RequestManager needs to make a re-request
     // for this block. Only add NETWORK nodes that have block availability.
-    LOCK(cs_vNodes);
-    for (CNode *pnode : vNodes)
+    for (CNode *pnode : vNodesCopy)
     {
-        // skip the peer we added above
-        if (pnode == from)
+        // skip the peer we added above and skip non NETWORK nodes
+        if ((pnode == from) || (pnode->fClient))
+        {
+            pnode->Release();
             continue;
-        // skip non NETWORK nodes
-        if (pnode->fClient)
-            continue;
+        }
 
         // Make sure pindexBestKnownBlock is up to date.
         ProcessBlockAvailability(pnode->id);
@@ -245,6 +260,7 @@ void CRequestManager::AskForDuringIBD(const std::vector<CInv> &objArray, CNode *
                 AskFor(objArray, pnode, priority);
             }
         }
+        pnode->Release(); // Release the refs we took
     }
 }
 
@@ -287,7 +303,7 @@ void CRequestManager::Processing(const CInv &obj, CNode *pfrom)
         LOG(REQ, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
             pfrom ? pfrom->GetLogName() : "unknown");
     }
-    else if (obj.type == MSG_BLOCK || obj.type == MSG_THINBLOCK || obj.type == MSG_XTHINBLOCK)
+    else if (obj.type == MSG_BLOCK || obj.type == MSG_CMPCT_BLOCK || obj.type == MSG_XTHINBLOCK)
     {
         OdMap::iterator item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
@@ -312,7 +328,7 @@ void CRequestManager::Received(const CInv &obj, CNode *pfrom)
         LOG(REQ, "ReqMgr: TX received for %s.\n", item->second.obj.ToString().c_str());
         cleanup(item);
     }
-    else if (obj.type == MSG_BLOCK || obj.type == MSG_THINBLOCK || obj.type == MSG_XTHINBLOCK)
+    else if (obj.type == MSG_BLOCK || obj.type == MSG_CMPCT_BLOCK || obj.type == MSG_XTHINBLOCK)
     {
         OdMap::iterator item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
@@ -365,7 +381,7 @@ void CRequestManager::Rejected(const CInv &obj, CNode *from, unsigned char reaso
 
         rejectedTxns += 1;
     }
-    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_THINBLOCK) || (obj.type == MSG_XTHINBLOCK))
+    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_CMPCT_BLOCK) || (obj.type == MSG_XTHINBLOCK))
     {
         item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
@@ -483,17 +499,19 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
 {
     CInv inv2(obj);
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-    CBloomFilter filterMemPool;
 
-    // Ask for Graphene blocks
-    if (IsChainNearlySyncd() && IsGrapheneBlockEnabled() && HaveGrapheneNodes())
+    if (IsChainNearlySyncd() &&
+        (!thinrelay.HasBlockRelayTimerExpired(obj.hash) || !thinrelay.IsBlockRelayTimerEnabled()))
     {
-        if (graphenedata.CheckGrapheneBlockTimer(obj.hash))
+        // Ask for Graphene blocks
+        // Must download a graphene block from a graphene enabled peer.
+        if (IsGrapheneBlockEnabled() && pfrom->GrapheneCapable())
         {
-            // Must download a graphene block from a graphene enabled peer.
-            // We can only request one graphene block per peer at a time.
-            if (CanGrapheneBlockBeDownloaded(pfrom))
+            // We can only request one thin type block per peer at a time.
+            if (thinrelay.AddBlockInFlight(pfrom, inv2.hash, NetMsgType::GRAPHENEBLOCK))
             {
+                MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
+
                 // Instead of building a bloom filter here as we would for an xthin, we actually
                 // just need to fill in CMempoolInfo
                 inv2.type = MSG_GRAPHENEBLOCK;
@@ -503,121 +521,61 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                 graphenedata.UpdateOutBoundMemPoolInfo(
                     ::GetSerializeSize(receiverMemPoolInfo, SER_NETWORK, PROTOCOL_VERSION));
 
-                MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
-                AddGrapheneBlockInFlight(pfrom, inv2.hash);
                 pfrom->PushMessage(NetMsgType::GET_GRAPHENE, ss);
                 LOG(GRAPHENE, "Requesting graphene block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
                 return true;
             }
         }
-        else
+
+
+        // Ask for an xthin if Graphene is not possible.
+        // Must download an xthinblock from a xthin peer.
+        if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable())
         {
-            // Try to download a graphene block if possible otherwise just download a regular block.
-            // We can only request one graphene block per peer at a time.
-            if (CanGrapheneBlockBeDownloaded(pfrom))
+            // We can only request one thin type block per peer at a time.
+            if (thinrelay.AddBlockInFlight(pfrom, inv2.hash, NetMsgType::XTHINBLOCK))
             {
-                // Instead of building a bloom filter here as we would for an xthin, we actually
-                // just need to fill in CMempoolInfo.
-                inv2.type = MSG_GRAPHENEBLOCK;
+                MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
+
+                CBloomFilter filterMemPool;
+                inv2.type = MSG_XTHINBLOCK;
+                std::vector<uint256> vOrphanHashes;
+                {
+                    READLOCK(orphanpool.cs);
+                    for (auto &mi : orphanpool.mapOrphanTransactions)
+                        vOrphanHashes.emplace_back(mi.first);
+                }
+                BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
                 ss << inv2;
-                ss << GetGrapheneMempoolInfo();
+                ss << filterMemPool;
 
-                MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
-                AddGrapheneBlockInFlight(pfrom, inv2.hash);
-                pfrom->PushMessage(NetMsgType::GET_GRAPHENE, ss);
-                LOG(GRAPHENE, "Requesting graphene block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
-                return true;
-            }
-            else if (!IsThinBlocksEnabled())
-            {
-                LOG(GRAPHENE, "Requesting regular block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
-                std::vector<CInv> vToFetch;
-                inv2.type = MSG_BLOCK;
-                vToFetch.push_back(inv2);
-
-                MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
-                pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
+                pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
+                LOG(THIN, "Requesting xthinblock %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
                 return true;
             }
         }
-    }
 
-
-    // Ask for XTHIN's if Graphene is not enabled, or, ask for XTHIN's if graphene is enabled
-    // but the grapheneblock timer has lapsed.
-    if (IsChainNearlySyncd() && IsThinBlocksEnabled() && HaveThinblockNodes())
-    {
-        if (!IsGrapheneBlockEnabled() || !graphenedata.CheckGrapheneBlockTimer(obj.hash))
+        // Ask for a compact block if Graphene or xthin is not possible.
+        // Must download an xthinblock from a xthin peer.
+        if (IsCompactBlocksEnabled() && pfrom->CompactBlockCapable())
         {
-            if (thindata.CheckThinblockTimer(obj.hash))
+            // We can only request one thin type block per peer at a time.
+            if (thinrelay.AddBlockInFlight(pfrom, inv2.hash, NetMsgType::CMPCTBLOCK))
             {
-                // Must download an xthinblock from a XTHIN peer.
-                // We can only request one xthinblock per peer at a time.
-                if (CanThinBlockBeDownloaded(pfrom))
-                {
-                    inv2.type = MSG_XTHINBLOCK;
-                    std::vector<uint256> vOrphanHashes;
-                    {
-                        READLOCK(orphanpool.cs);
-                        for (auto &mi : orphanpool.mapOrphanTransactions)
-                            vOrphanHashes.emplace_back(mi.first);
-                    }
-                    BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
-                    ss << inv2;
-                    ss << filterMemPool;
+                MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
 
-                    MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
-                    AddThinBlockInFlight(pfrom, inv2.hash);
-                    pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
-                    LOG(THIN, "Requesting xthinblock %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
-                    return true;
-                }
-            }
-            else
-            {
-                // Try to download a thinblock if possible otherwise just download a regular block.
-                // We can only request one xthinblock per peer at a time.
-                if (CanThinBlockBeDownloaded(pfrom))
-                {
-                    inv2.type = MSG_XTHINBLOCK;
-                    std::vector<uint256> vOrphanHashes;
-                    {
-                        READLOCK(orphanpool.cs);
-                        for (auto &mi : orphanpool.mapOrphanTransactions)
-                            vOrphanHashes.emplace_back(mi.first);
-                    }
-                    BuildSeededBloomFilter(filterMemPool, vOrphanHashes, inv2.hash, pfrom);
-                    ss << inv2;
-                    ss << filterMemPool;
-
-                    MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
-                    AddThinBlockInFlight(pfrom, inv2.hash);
-                    pfrom->PushMessage(NetMsgType::GET_XTHIN, ss);
-                    LOG(THIN, "Requesting xthinblock %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
-                    return true;
-                }
-                else
-                {
-                    std::vector<CInv> vToFetch;
-                    inv2.type = MSG_BLOCK;
-                    vToFetch.push_back(inv2);
-
-                    MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
-                    pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
-                    LOG(THIN, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
-                    return true;
-                }
+                std::vector<CInv> vGetData;
+                inv2.type = MSG_CMPCT_BLOCK;
+                vGetData.push_back(inv2);
+                pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
+                LOG(CMPCT, "Requesting compact block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
+                return true;
             }
         }
     }
 
-    // Request a full block if graphene and thinblocks is turned off.  Also we must request a full block
-    // if we've fallen behind from the state of being fully syncd, furthermore, this is crucial for initial
-    // sync to function as this is the only way we request full blocks near the end of the initial sync process.
-    if (!IsChainNearlySyncd() || (!IsGrapheneBlockEnabled() && !IsThinBlocksEnabled()) ||
-        (!HaveThinblockNodes() && !HaveGrapheneNodes()) ||
-        (!IsGrapheneBlockEnabled() && HaveGrapheneNodes() && IsThinBlocksEnabled() && !HaveThinblockNodes()) ||
-        (IsGrapheneBlockEnabled() && !HaveGrapheneNodes() && !IsThinBlocksEnabled() && HaveThinblockNodes()))
+    // Request a full block if the BlockRelayTimer has expired.
+    if (!IsChainNearlySyncd() || thinrelay.HasBlockRelayTimerExpired(obj.hash) || !thinrelay.IsBlockRelayTimerEnabled())
     {
         std::vector<CInv> vToFetch;
         inv2.type = MSG_BLOCK;
@@ -625,7 +583,8 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
 
         MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
         pfrom->PushMessage(NetMsgType::GETDATA, vToFetch);
-        LOG(THIN | GRAPHENE, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(), pfrom->GetLogName());
+        LOG(THIN | GRAPHENE | CMPCT, "Requesting Regular Block %s from peer %s\n", inv2.hash.ToString(),
+            pfrom->GetLogName());
         return true;
     }
     return false; // no block was requested
@@ -671,7 +630,7 @@ void CRequestManager::SendRequests()
     bool fBatchBlockRequests = IsInitialBlockDownload();
     std::map<CNode *, std::vector<CInv> > mapBatchBlockRequests;
 
-    // Batch any transaction reqeusts when possible. The process of batching and requesting batched transactions
+    // Batch any transaction requests when possible. The process of batching and requesting batched transactions
     // is simlilar to batched block requests, however, we don't make the distinction of whether we're in the process
     // of syncing the chain, as we do with block requests.
     std::map<CNode *, std::vector<CInv> > mapBatchTxnRequests;
@@ -967,6 +926,36 @@ void CRequestManager::SendRequests()
     }
 }
 
+bool CRequestManager::CheckForRequestDOS(CNode *pfrom, const CChainParams &chainparams)
+{
+    LOCK(cs_objDownloader);
+
+    // Check for Misbehaving and DOS
+    // If they make more than MAX_THINTYPE_OBJECT_REQUESTS requests in 10 minutes then disconnect them
+    if (chainparams.NetworkIDString() != "regtest")
+    {
+        std::map<NodeId, CRequestManagerNodeState>::iterator it = mapRequestManagerNodeState.find(pfrom->GetId());
+        DbgAssert(it != mapRequestManagerNodeState.end(), return false);
+        CRequestManagerNodeState *state = &it->second;
+
+        uint64_t nNow = GetTime();
+        state->nNumRequests = std::pow(1.0 - 1.0 / 600.0, (double)(nNow - state->nLastRequest)) + 1;
+        state->nLastRequest = nNow;
+        LOG(THIN | GRAPHENE | CMPCT, "Number of thin object requests is %f\n", state->nNumRequests);
+
+        // Other networks have variable mining rates, so only apply these rules to mainnet.
+        if (chainparams.NetworkIDString() == "main")
+        {
+            if (state->nNumRequests >= MAX_THINTYPE_OBJECT_REQUESTS)
+            {
+                dosMan.Misbehaving(pfrom, 50);
+                return error("%s is misbehaving. Making too many thin type requests.", pfrom->GetLogName());
+            }
+        }
+    }
+    return true;
+}
+
 // Check whether the last unknown block a peer advertised is not yet known.
 void CRequestManager::ProcessBlockAvailability(NodeId nodeid)
 {
@@ -1014,7 +1003,13 @@ void CRequestManager::UpdateBlockAvailability(NodeId nodeid, const uint256 &hash
 
 void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
 {
-    int nBlocksInFlight = mapRequestManagerNodeState[pto->GetId()].nBlocksInFlight;
+    AssertLockHeld(cs_main);
+
+    int nBlocksInFlight = 0;
+    {
+        LOCK(cs_objDownloader);
+        nBlocksInFlight = mapRequestManagerNodeState[pto->GetId()].nBlocksInFlight;
+    }
     if (!pto->fDisconnectRequest && !pto->fDisconnect && !pto->fClient &&
         nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
     {
@@ -1149,8 +1144,7 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
 void CRequestManager::MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash)
 {
     // If started then clear the timers used for preferential downloading
-    thindata.ClearThinBlockTimer(hash);
-    graphenedata.ClearGrapheneBlockTimer(hash);
+    thinrelay.ClearBlockRelayTimer(hash);
 
     // Add to inflight, if it hasn't already been marked inflight for this node id.
     LOCK(cs_objDownloader);
@@ -1309,33 +1303,23 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         LOG(THIN | BLK, "BLOCK_DOWNLOAD_WINDOW is %d nMaxBlocksInTransit is %d\n", BLOCK_DOWNLOAD_WINDOW.load(),
             pnode->nMaxBlocksInTransit.load());
 
+        // Update the appropriate response time based on the type of block received.
         if (IsChainNearlySyncd())
         {
-            // Update the appropriate response time based on the type of block received.
-            LOCK(cs_vNodes);
-            for (CNode *_pnode : vNodes)
+            // Update Thinblock stats
+            if (thinrelay.IsBlockInFlight(pnode, NetMsgType::XTHINBLOCK))
             {
-                // Update Thinblock stats
-                if (IsThinBlocksEnabled())
-                {
-                    LOCK(_pnode->cs_mapthinblocksinflight);
-                    if (_pnode->mapThinBlocksInFlight.count(hash))
-                    {
-                        thindata.UpdateResponseTime(nResponseTime);
-                        break;
-                    }
-                }
-
-                // Update Graphene stats
-                if (IsGrapheneBlockEnabled())
-                {
-                    LOCK(_pnode->cs_mapgrapheneblocksinflight);
-                    if (_pnode->mapGrapheneBlocksInFlight.count(hash))
-                    {
-                        graphenedata.UpdateResponseTime(nResponseTime);
-                        break;
-                    }
-                }
+                thindata.UpdateResponseTime(nResponseTime);
+            }
+            // Update Graphene stats
+            if (thinrelay.IsBlockInFlight(pnode, NetMsgType::GRAPHENEBLOCK))
+            {
+                graphenedata.UpdateResponseTime(nResponseTime);
+            }
+            // Update CompactBlock stats
+            if (thinrelay.IsBlockInFlight(pnode, NetMsgType::CMPCTBLOCK))
+            {
+                compactdata.UpdateResponseTime(nResponseTime);
             }
         }
 
@@ -1394,6 +1378,22 @@ int CRequestManager::GetNumBlocksInFlight(NodeId nodeid)
 {
     LOCK(cs_objDownloader);
     return mapRequestManagerNodeState[nodeid].nBlocksInFlight;
+}
+
+void CRequestManager::RemoveNodeState(NodeId nodeid)
+{
+    LOCK(cs_objDownloader);
+    std::vector<uint256> vBlocksInFlight;
+    GetBlocksInFlight(vBlocksInFlight, nodeid);
+    for (const uint256 &hash : vBlocksInFlight)
+    {
+        // Erase mapblocksinflight entries for this node.
+        MapBlocksInFlightErase(hash, nodeid);
+
+        // Reset all requests times to zero so that we can immediately re-request these blocks
+        ResetLastBlockRequestTime(hash);
+    }
+    mapRequestManagerNodeState.erase(nodeid);
 }
 
 void CRequestManager::DisconnectOnDownloadTimeout(CNode *pnode, const Consensus::Params &consensusParams, int64_t nNow)

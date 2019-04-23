@@ -13,9 +13,13 @@ import logging
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 
-FORK_CFG="consensus.forkNov2018Time"
+def thereExists(lst, fn):
+    for l in lst:
+        if fn(l):
+            return True
+    return False
 
-class MyTest (BitcoinTestFramework):
+class CtorTest (BitcoinTestFramework):
 
     def setup_chain(self,bitcoinConfDict=None, wallets=None):
         print("Initializing test directory "+self.options.tmpdir)
@@ -33,20 +37,15 @@ class MyTest (BitcoinTestFramework):
     def run_test (self):
         decimal.getcontext().prec = 16  # 8 digits to get to 21million, and each bitcoin is 100 million satoshis
 
-        # turn off automated forking so we can force CTOR on node 2,3
-        self.nodes[0].set(FORK_CFG + "=0", "consensus.enableCanonicalTxOrder=0")
-        self.nodes[1].set(FORK_CFG + "=0", "consensus.enableCanonicalTxOrder=0")
-
         self.nodes[0].generate(101)
         self.sync_blocks()
         assert_equal(self.nodes[0].getbalance(), 50)
 
         # create an alternate node that we'll use to test rollback across the fork point
         rollbackNode = start_node(6, self.options.tmpdir)
-        rollbackNode.set(FORK_CFG + "=0", "consensus.enableCanonicalTxOrder=0")
         connect_nodes(rollbackNode,0)
         rollbackAddr = rollbackNode.getnewaddress()
-        waitFor(20, lambda: rollbackNode.getblockcount() >= 101)
+        waitFor(20, lambda: rollbackNode.getblockcount() == 101)
 
         # make a chain of dependent transactions
         addr = [ x.getnewaddress() for x in self.nodes]
@@ -68,9 +67,9 @@ class MyTest (BitcoinTestFramework):
         # now isolate it for the rollback test at the end
         disconnect_all(rollbackNode)
 
-        # turn off automated forking so we can force CTOR on node 2,3
-        self.nodes[2].set(FORK_CFG + "=0", "consensus.enableCanonicalTxOrder=1")
-        self.nodes[3].set(FORK_CFG + "=0", "consensus.enableCanonicalTxOrder=1")
+        # force CTOR on node 2,3
+        self.nodes[2].set("consensus.enableCanonicalTxOrder=1")
+        self.nodes[3].set("consensus.enableCanonicalTxOrder=1")
 
         waitFor(30, lambda: self.nodes[2].getmempoolinfo()["size"] >= 20)
 
@@ -78,13 +77,18 @@ class MyTest (BitcoinTestFramework):
         # generate a non-ctor block.  The chance that the 40 generated tx happen to be in order is 1/40! (factorial not bang)
         dtorBlock = self.nodes[0].generate(1)[0]
         sync_blocks(self.nodes[0:2])
+        # verify that n1 which is in DTOR mode accept the just generated block
         assert_equal(self.nodes[1].getblockcount(), 102)
 
         # check that a CTOR node rejected the block
         ct = self.nodes[2].getchaintips()
         tip = next(x for x in ct if x["status"] == "active")
         assert_equal(tip["height"], 101)
-        invalid = next(x for x in ct if x["status"] == "invalid")
+        try:
+            invalid = next(x for x in ct if x["status"] == "invalid")
+        except Exception as e:
+            pdb.set_trace()
+            print(str(e))
         assert_equal(invalid["height"], 102)
 
         # Now generate a CTOR block
@@ -97,7 +101,7 @@ class MyTest (BitcoinTestFramework):
         # we need to generate another block so the CTOR chain exceeds the DTOR
         self.nodes[2].generate(1)
         sync_blocks_to(103, self.nodes[2:])
-        waitFor(10, lambda: self.nodes[0].getbestblockhash() == dtorBlock)
+        waitFor(10, lambda: thereExists(self.nodes[0].getchaintips(), lambda x: x["height"] == 103 and x["status"] != "headers-only"))
         ct = self.nodes[0].getchaintips()
         tip = next(x for x in ct if x["status"] == "active")
         assert_equal(tip["height"], 102)
@@ -119,15 +123,20 @@ class MyTest (BitcoinTestFramework):
         # dtor rollback test
         disconnect_all(self.nodes[1])
         disconnect_all(self.nodes[0])
+
         for j in range(5):
             for i in range(3):
                 self.nodes[1].sendtoaddress(addr[1], 4-i)
             self.nodes[1].generate(1)
 
+        connect_nodes_bi(self.nodes,0,1)
+
+        # make n0 send coin to itself 4*3 times
         for j in range(4):
             for i in range(3):
                 self.nodes[0].sendtoaddress(addr[0], 4-i)
             self.nodes[0].generate(1)
+
         connect_nodes_bi(self.nodes,0,1)
 
         waitFor(10, lambda: self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
@@ -139,17 +148,18 @@ class MyTest (BitcoinTestFramework):
                 self.nodes[3].sendtoaddress(addr[3], 4-i)
             self.nodes[3].generate(1)
 
+        connect_nodes_bi(self.nodes,2,3)
+
         for j in range(4):
             for i in range(3):
                 self.nodes[2].sendtoaddress(addr[2], 4-i)
             self.nodes[2].generate(1)
+
         connect_nodes_bi(self.nodes,2,3)
-        #print(self.nodes[2].getbestblockhash())
-        #print(self.nodes[3].getbestblockhash())
-        #print(self.nodes[2].getchaintips())
+
         waitFor(10, lambda: self.nodes[2].getbestblockhash() == self.nodes[3].getbestblockhash())
 
-        # push the dtor chain beyond ctor
+        # push the dtor chain beyond ctor by 29 blocks
         for i in range(0,30):
             self.nodes[0].sendtoaddress(addr[0], 1)
             self.nodes[0].generate(1)
@@ -161,24 +171,26 @@ class MyTest (BitcoinTestFramework):
         dtorTipHeight = self.nodes[0].getblockcount()
 
         self.nodes.append(start_node(4, self.options.tmpdir))
-        self.nodes[4].set(FORK_CFG + "=0", "consensus.enableCanonicalTxOrder=1")
+        self.nodes[4].set("consensus.enableCanonicalTxOrder=1")
         for i in range(5):
             connect_nodes_bi(self.nodes,4,i)
 
         self.nodes.append(start_node(5, self.options.tmpdir))
+        self.nodes[5].set("consensus.enableCanonicalTxOrder=0")
         # node 5 is non-ctor
         for i in range(5):
             connect_nodes_bi(self.nodes,5,i)
 
-        waitFor(15, lambda: self.nodes[4].getblockcount() >= ctorTipHeight)
+        waitFor(15, lambda: self.nodes[4].getblockcount() == ctorTipHeight)
         assert_equal(self.nodes[4].getbestblockhash(), ctorTip)
-        waitFor(15, lambda: self.nodes[5].getblockcount() >= dtorTipHeight)
+        waitFor(15, lambda: self.nodes[5].getblockcount() == dtorTipHeight)
         assert_equal(self.nodes[5].getbestblockhash(), dtorTip)
 
         # Now run the rollback across fork test
 
         # first generate a competing ctor fork on our isolated node that is longer than the current fork
 
+        rollbackNode.set("consensus.enableCanonicalTxOrder=1")
         # make the new fork longer than current
         for n in range(10):
             time.sleep(.1)
@@ -186,7 +198,7 @@ class MyTest (BitcoinTestFramework):
 
         preFork = rollbackNode.generate(1)[0] # will be a dtor block
         preForkBlock = rollbackNode.getblock(preFork)
-        rollbackNode.set("consensus.enableCanonicalTxOrder=1")
+
         # now send tx to myself that will reuse coins.  This creates an block incompatible with dtor
         bal = rollbackNode.getbalance()
         for i in range(1,20):
@@ -196,11 +208,12 @@ class MyTest (BitcoinTestFramework):
         ctorForkTipHash = rollbackNode.getbestblockhash()
         ctorForkTipCount = rollbackNode.getblockcount()
 
-        # enable Nov 15 fork time
-        self.nodes[2].set("%s=%d" % (FORK_CFG, preForkBlock["mediantime"]-1))
-        self.nodes[3].set("%s=%d" % (FORK_CFG, preForkBlock["mediantime"]-1))
+        # enable ctor
         # now when 2 and 3 see the other fork, they should switch to it.
         disconnect_all(self.nodes[2])
+        disconnect_all(self.nodes[3])
+        self.nodes[2].set("consensus.enableCanonicalTxOrder=1")
+        self.nodes[3].set("consensus.enableCanonicalTxOrder=1")
         connect_nodes(rollbackNode,2)
         connect_nodes(rollbackNode,3)
 
@@ -212,16 +225,18 @@ class MyTest (BitcoinTestFramework):
 
 
 if __name__ == '__main__':
-    MyTest ().main (bitcoinConfDict={"limitdescendantsize": 50,FORK_CFG: 0})
+    CtorTest().main (bitcoinConfDict={"limitdescendantsize": 50,
+                                     "use-thinblocks": 1,
+                                     "use-grapheneblocks": 0,
+                                     "consensus.enableCanonicalTxOrder" : 0})
 
 # Create a convenient function for an interactive python debugging session
 def Test():
-    t = MyTest()
+    t = CtorTest()
     t.drop_to_pdb=True
     bitcoinConf = {
         "debug": ["all", "net", "blk", "thin", "mempool", "req", "bench", "evict"],
-        "limitdescendantsize": 50, # allow lots of child tx so we can tease apart ctor vs dependent order
-        FORK_CFG: 0 # start with automatic fork off
+        "limitdescendantsize": 50 # allow lots of child tx so we can tease apart ctor vs dependent order
     }
 
     flags = standardFlags()

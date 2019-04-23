@@ -21,6 +21,7 @@
 #include "utiltime.h"
 
 #include <condition_variable>
+#include <iomanip>
 #include <mutex>
 #include <sstream>
 #include <stdarg.h>
@@ -88,13 +89,20 @@
 #include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
 #include <boost/program_options/detail/config_file.hpp>
 #include <boost/program_options/parsers.hpp>
-#include <boost/thread.hpp>
+#include <list>
+#include <map>
 #include <openssl/conf.h>
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
+#include <set>
 #include <thread>
+#include <thread>
+#include <vector>
+// std::scopted_lock not available until c++17, use boost for now
+#include <boost/thread/mutex.hpp>
 
-std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args)
+std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::string> &args,
+    bool removeDuplicates /* false */)
 {
     std::vector<std::string> result;
     for (std::string arg : args)
@@ -111,6 +119,14 @@ std::vector<std::string> splitByCommasAndRemoveSpaces(const std::vector<std::str
                 arg_nospace += c;
         result.push_back(arg_nospace);
     }
+
+    // remove duplicates from the list of debug categories
+    if (removeDuplicates)
+    {
+        std::sort(result.begin(), result.end());
+        result.erase(std::unique(result.begin(), result.end()), result.end());
+    }
+    std::reverse(result.begin(), result.end());
     return result;
 }
 
@@ -128,14 +144,12 @@ std::string to_internal(const std::string &);
 
 } // namespace boost
 
-using namespace std;
-
 namespace Logging
 {
 // Globals defined here because link fails if in globals.cpp.
 // Keep at top of file so init first:
 uint64_t categoriesEnabled = 0; // 64 bit log id mask.
-static map<uint64_t, std::string> logLabelMap = LOGLABELMAP; // Lookup log label from log id.
+static std::map<uint64_t, std::string> logLabelMap = LOGLABELMAP; // Lookup log label from log id.
 
 
 uint64_t LogFindCategory(const std::string label)
@@ -150,56 +164,83 @@ uint64_t LogFindCategory(const std::string label)
 
 std::string LogGetLabel(uint64_t category)
 {
-    string label = "none";
+    std::string label = "none";
     if (logLabelMap.count(category) != 0)
         label = logLabelMap[category];
 
     return label;
 }
-
-std::string LogGetAllString()
+// Return a string rapresentation of all debug categories and their current status,
+// one category per line. If enabled is true it returns only the list of enabled
+// debug categories concatenated in a single line.
+std::string LogGetAllString(bool fEnabled)
 {
-    string ret = "";
+    std::string allCategories = "";
+    std::string enabledCategories = "";
     for (auto &x : logLabelMap)
     {
         if (x.first == ALL || x.first == NONE)
             continue;
 
-        // ret += (std::string)x.second;
         if (LogAcceptCategory(x.first))
-            ret += "on ";
+        {
+            allCategories += "on ";
+            if (fEnabled)
+                enabledCategories += (std::string)x.second + " ";
+        }
         else
-            ret += "   ";
+            allCategories += "   ";
 
-        ret += (std::string)x.second;
-        ret += "\n";
+        allCategories += (std::string)x.second + "\n";
     }
+    // strip last char from enabledCategories if it is eqaul to a blank space
+    if (enabledCategories.length() > 0)
+        enabledCategories.pop_back();
 
-    return ret;
+    return fEnabled ? enabledCategories : allCategories;
 }
 
 void LogInit()
 {
-    string category = "";
-    uint64_t catg = Logging::NONE;
-    const vector<string> categories = splitByCommasAndRemoveSpaces(mapMultiArgs["-debug"]);
+    std::string category = "";
+    uint64_t catg = NONE;
+    const std::vector<std::string> categories = splitByCommasAndRemoveSpaces(mapMultiArgs["-debug"], true);
 
     // enable all when given -debug=1 or -debug
     if (categories.size() == 1 && (categories[0] == "" || categories[0] == "1"))
     {
-        Logging::LogToggleCategory(Logging::ALL, true);
-        return;
+        LogToggleCategory(ALL, true);
     }
-    for (string const &cat : categories)
+    else
     {
-        category = boost::algorithm::to_lower_copy(cat);
-        catg = LogFindCategory(category);
+        for (std::string const &cat : categories)
+        {
+            category = boost::algorithm::to_lower_copy(cat);
 
-        if (catg == NONE) // Not a valid category
-            continue;
+            // remove the category from the list of enables one
+            // if label is suffixed with a dash
+            bool toggle_flag = true;
 
-        LogToggleCategory(catg, true);
+            if (category.length() > 0 && category.at(0) == '-')
+            {
+                toggle_flag = false;
+                category.erase(0, 1);
+            }
+
+            if (category == "" || category == "1")
+            {
+                category = "all";
+            }
+
+            catg = LogFindCategory(category);
+
+            if (catg == NONE) // Not a valid category
+                continue;
+
+            LogToggleCategory(catg, toggle_flag);
+        }
     }
+    LOGA("List of enabled categories: %s\n", LogGetAllString(true));
 }
 }
 
@@ -207,20 +248,22 @@ const char *const BITCOIN_CONF_FILENAME = "bitcoin.conf";
 const char *const BITCOIN_PID_FILENAME = "bitcoind.pid";
 const char *const FORKS_CSV_FILENAME = "forks.csv"; // bip135 added
 
-map<string, string> mapArgs;
-map<string, vector<string> > mapMultiArgs;
+std::map<std::string, std::string> mapArgs;
+std::map<std::string, std::vector<std::string> > mapMultiArgs;
 bool fDebug = false;
 bool fPrintToConsole = false;
 bool fPrintToDebugLog = true;
 bool fDaemon = false;
 bool fServer = false;
-string strMiscWarning;
+std::string strMiscWarning;
 bool fLogTimestamps = DEFAULT_LOGTIMESTAMPS;
 bool fLogTimeMicros = DEFAULT_LOGTIMEMICROS;
 bool fLogIPs = DEFAULT_LOGIPS;
 volatile bool fReopenDebugLog = false;
 CTranslationInterface translationInterface;
 
+// None of this is needed with OpenSSL 1.1.0
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 /** Init OpenSSL library multithreading support */
 static CCriticalSection **ppmutexOpenSSL;
 void locking_callback(int mode, int i, const char *file, int line) NO_THREAD_SAFETY_ANALYSIS
@@ -234,6 +277,7 @@ void locking_callback(int mode, int i, const char *file, int line) NO_THREAD_SAF
         LEAVE_CRITICAL_SECTION(*ppmutexOpenSSL[i]);
     }
 }
+#endif
 
 // Init
 class CInit
@@ -241,6 +285,7 @@ class CInit
 public:
     CInit()
     {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
         // Init OpenSSL library multithreading support
         ppmutexOpenSSL = (CCriticalSection **)OPENSSL_malloc(CRYPTO_num_locks() * sizeof(CCriticalSection *));
         for (int i = 0; i < CRYPTO_num_locks(); i++)
@@ -253,6 +298,9 @@ public:
         // or corrupt. Explicitly tell OpenSSL not to try to load the file. The result for our libs will be
         // that the config appears to have been loaded and there are no modules/engines available.
         OPENSSL_no_config();
+#else
+        OPENSSL_init_crypto(OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS, nullptr);
+#endif
 
 #ifdef WIN32
         // Seed OpenSSL PRNG with current contents of the screen
@@ -264,6 +312,7 @@ public:
     }
     ~CInit()
     {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
         // Securely erase the memory used by the PRNG
         RAND_cleanup();
         // Shutdown OpenSSL library multithreading support
@@ -271,6 +320,14 @@ public:
         for (int i = 0; i < CRYPTO_num_locks(); i++)
             delete ppmutexOpenSSL[i];
         OPENSSL_free(ppmutexOpenSSL);
+#else
+        // Adding this on the side of caution, perhaps unnecessary according to OpenSSL 1.1 docs:
+        // "Deinitialises OpenSSL (both libcrypto and libssl). All resources allocated by OpenSSL are freed.
+        // Typically there should be no need to call this function directly as it is initiated automatically on
+        // application exit. This is done via the standard C library atexit() function."
+        // https://www.openssl.org/docs/man1.1.1/man3/OPENSSL_cleanup.html
+        OPENSSL_cleanup();
+#endif
     }
 } instance_of_cinit;
 
@@ -285,7 +342,7 @@ public:
  * the mutex).
  */
 
-static boost::once_flag debugPrintInitFlag = BOOST_ONCE_INIT;
+std::once_flag debugPrintInitFlag;
 
 /**
  * We use boost::call_once() to make sure mutexDebugLog and
@@ -298,19 +355,19 @@ static boost::once_flag debugPrintInitFlag = BOOST_ONCE_INIT;
  */
 static FILE *fileout = NULL;
 static boost::mutex *mutexDebugLog = NULL;
-static list<string> *vMsgsBeforeOpenLog;
+static std::list<std::string> *vMsgsBeforeOpenLog;
 
 static int FileWriteStr(const std::string &str, FILE *fp) { return fwrite(str.data(), 1, str.size(), fp); }
 static void DebugPrintInit()
 {
     assert(mutexDebugLog == NULL);
     mutexDebugLog = new boost::mutex();
-    vMsgsBeforeOpenLog = new list<string>;
+    vMsgsBeforeOpenLog = new std::list<std::string>;
 }
 
 void OpenDebugLog()
 {
-    boost::call_once(&DebugPrintInit, debugPrintInitFlag);
+    std::call_once(debugPrintInitFlag, &DebugPrintInit);
     boost::mutex::scoped_lock scoped_lock(*mutexDebugLog);
 
     assert(fileout == NULL);
@@ -332,35 +389,35 @@ void OpenDebugLog()
     vMsgsBeforeOpenLog = NULL;
 }
 
-/**
- * fStartedNewLine is a state variable held by the calling context that will
- * suppress printing of the timestamp when multiple calls are made that don't
- * end in a newline. Initialize it to true, and hold it, in the calling context.
+/** All logs are automatically CR terminated.  If you want to construct a single-line log out of multiple calls, don't.
+    Make your own temporary.  You can make a multi-line log by adding \n in your temporary.
  */
-static std::string LogTimestampStr(const std::string &str, bool *fStartedNewLine)
+static std::string LogTimestampStr(const std::string &str, std::string &logbuf)
 {
-    string strStamped;
-
-    if (!fLogTimestamps)
-        return str;
-
-    if (*fStartedNewLine)
+    if (!logbuf.size())
     {
         int64_t nTimeMicros = GetLogTimeMicros();
-        strStamped = DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nTimeMicros / 1000000);
-        if (fLogTimeMicros)
-            strStamped += strprintf(".%06d", nTimeMicros % 1000000);
-        strStamped += ' ' + str;
+        if (fLogTimestamps)
+        {
+            logbuf = DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nTimeMicros / 1000000);
+            if (fLogTimeMicros)
+                logbuf += strprintf(".%06d", nTimeMicros % 1000000);
+        }
+        logbuf += ' ' + str;
     }
     else
-        strStamped = str;
+    {
+        logbuf += str;
+    }
 
-    if (!str.empty() && str[str.size() - 1] == '\n')
-        *fStartedNewLine = true;
-    else
-        *fStartedNewLine = false;
+    if (logbuf.size() && logbuf[logbuf.size() - 1] != '\n')
+    {
+        logbuf += '\n';
+    }
 
-    return strStamped;
+    std::string result = logbuf;
+    logbuf.clear();
+    return result;
 }
 
 static void MonitorLogfile()
@@ -389,9 +446,11 @@ void LogFlush()
 int LogPrintStr(const std::string &str)
 {
     int ret = 0; // Returns total number of characters written
-    static bool fStartedNewLine = true;
+    std::string logbuf;
+    std::string strTimestamped = LogTimestampStr(str, logbuf);
 
-    string strTimestamped = LogTimestampStr(str, &fStartedNewLine);
+    if (!strTimestamped.size())
+        return 0;
 
     if (fPrintToConsole)
     {
@@ -401,7 +460,7 @@ int LogPrintStr(const std::string &str)
     }
     else if (fPrintToDebugLog)
     {
-        boost::call_once(&DebugPrintInit, debugPrintInitFlag);
+        std::call_once(debugPrintInitFlag, &DebugPrintInit);
         boost::mutex::scoped_lock scoped_lock(*mutexDebugLog);
 
         // buffer if we haven't opened the log yet
@@ -440,8 +499,8 @@ std::string formatInfoUnit(double value)
         i++;
     }
 
-    ostringstream ss;
-    ss << fixed << setprecision(2);
+    std::ostringstream ss;
+    ss << std::fixed << std::setprecision(2);
     ss << value << units[i];
     return ss.str();
 }
@@ -609,8 +668,9 @@ const fs::path &GetDataDir(bool fNetSpecific)
         path = fs::system_complete(mapArgs["-datadir"]);
         if (!fs::is_directory(path))
         {
-            path = "";
-            return path;
+            std::stringstream err;
+            err << "datadir path " << path << " is not a directory";
+            throw std::invalid_argument(err.str());
         }
     }
     else
@@ -662,22 +722,22 @@ fs::path GetForksCsvFile()
     return pathCsvFile;
 }
 
-void ReadConfigFile(map<string, string> &mapSettingsRet,
-    map<string, vector<string> > &mapMultiSettingsRet,
+void ReadConfigFile(std::map<std::string, std::string> &mapSettingsRet,
+    std::map<std::string, std::vector<std::string> > &mapMultiSettingsRet,
     const AllowedArgs::AllowedArgs &allowedArgs)
 {
     fs::ifstream streamConfig(GetConfigFile(GetArg("-conf", BITCOIN_CONF_FILENAME)));
     if (!streamConfig.good())
         return; // No bitcoin.conf file is OK
 
-    set<string> setOptions;
+    std::set<std::string> setOptions;
     setOptions.insert("*");
 
     for (boost::program_options::detail::config_file_iterator it(streamConfig, setOptions), end; it != end; ++it)
     {
         // Don't overwrite existing settings so command line settings override bitcoin.conf
-        string strKey = string("-") + it->string_key;
-        string strValue = it->value[0];
+        std::string strKey = std::string("-") + it->string_key;
+        std::string strValue = it->value[0];
         InterpretNegativeSetting(strKey, strValue);
         allowedArgs.checkArg(strKey.substr(1), strValue);
         if (mapSettingsRet.count(strKey) == 0)
@@ -964,25 +1024,26 @@ std::string CopyrightHolders(const std::string &strPrefix)
 
 bool IsStringTrue(const std::string &str)
 {
-    const std::set<std::string> strOn = {"enable", "1", "true", "on"};
-    const std::set<std::string> strOff = {"disable", "0", "false", "off"};
-    const std::string lowstr = boost::algorithm::to_lower_copy(str);
+    static const std::set<std::string> strOn = {"enable", "1", "true", "True", "on"};
+    static const std::set<std::string> strOff = {"disable", "0", "false", "False", "off"};
 
-    if (strOn.count(lowstr))
+    if (strOn.count(str))
         return true;
 
-    if (strOff.count(lowstr))
+    if (strOff.count(str))
         return false;
 
-    // If not found:
-    throw std::string("IsStringTrue() was passed an Invalid string");
-
-    return false;
+    std::ostringstream err;
+    err << "invalid argument '" << str << "', expected any of: ";
+    std::copy(begin(strOn), end(strOn), std::ostream_iterator<std::string>(err, ", "));
+    std::copy(begin(strOff), end(strOff), std::ostream_iterator<std::string>(err, ", "));
+    // substr to chop off last ', '
+    throw std::invalid_argument(err.str().substr(0, err.str().size() - 2));
 }
 
 static const int wildmatch_max_length = 1024;
 
-bool wildmatch(string pattern, string test)
+bool wildmatch(std::string pattern, std::string test)
 {
     // stack overflow prevention
     if (test.size() > wildmatch_max_length || pattern.size() > wildmatch_max_length)

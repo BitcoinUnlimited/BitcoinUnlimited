@@ -160,6 +160,10 @@ extern const char *GET_XBLOCKTX;
  */
 extern const char *GET_XTHIN;
 /**
+ * The get_thin message is a request for a thinblock with the full 256 bit tx hashes.
+ */
+extern const char *GET_THIN;
+/**
  * The grapheneblock message transmits a single serialized graphene block.
  */
 extern const char *GRAPHENEBLOCK;
@@ -309,6 +313,27 @@ extern const char *XVERSION;
  * @since protocol version FIXME.
  */
 extern const char *XVERACK;
+
+extern const char *XUPDATE;
+
+/**
+ * Contains a CBlockHeaderAndShortTxIDs object - providing a header and
+ * list of "short txids".
+ * @since protocol version 70014 as described by BIP 152
+ */
+extern const char *CMPCTBLOCK;
+/**
+ * Contains a BlockTransactionsRequest
+ * Peer should respond with "blocktxn" message.
+ * @since protocol version 70014 as described by BIP 152
+ */
+extern const char *GETBLOCKTXN;
+/**
+ * Contains a BlockTransactions.
+ * Sent in response to a "getblocktxn" message.
+ * @since protocol version 70014 as described by BIP 152
+ */
+extern const char *BLOCKTXN;
 };
 
 
@@ -318,7 +343,7 @@ const std::vector<std::string> &getAllNetMessageTypes();
 /** nServices flags */
 enum
 {
-    // NODE_NETWORK means that the node is capable of serving the block chain. It is currently
+    // NODE_NETWORK means that the node is capable of serving the complete block chain. It is currently
     // set by all Bitcoin Unlimited nodes, and is unset by SPV clients or other peers that just want
     // network services but don't provide them.
     NODE_NETWORK = (1 << 0),
@@ -341,11 +366,9 @@ enum
     // make xthin requests
     NODE_XTHIN = (1 << 4),
 
-    // UAHF
-    // NODE_BITCOIN_CASH means the node supports the UAHF hard fork.  This is intended to be just
-    // a temporary service bit until the fork actually happens.  After the for it can be
-    // removed.
-    // If this is turned off then the node will not follow the UAHF hardfork
+    // NODE_BITCOIN_CASH means the node supports the BCH chain.  This is intended to be just
+    // a temporary service bit until the fork actually happens.  Once the split between BTC
+    // and BCH chain is stable it can be removed.
     NODE_BITCOIN_CASH = (1 << 5),
 
     // NODE_GRAPHENE means the node supports Graphene blocks
@@ -364,7 +387,12 @@ enum
     NODE_WEAKBLOCKS = (1 << 7),
 
     // NODE_CF indicates the node is capable of serving compact block filters to SPV clients.
-    NODE_CF = (1 << 8)
+    NODE_CF = (1 << 8),
+
+    // NODE_NETWORK_LIMITED means the same as NODE_NETWORK with the limitation
+    // of only serving a small subset of the blockchain
+    // See BIP159 for details on how this is implemented.
+    NODE_NETWORK_LIMITED = (1 << 10),
 };
 
 /** A CService with information about it as peer */
@@ -434,12 +462,12 @@ enum
 {
     MSG_TX = 1,
     MSG_BLOCK,
-    // Nodes may always request a MSG_FILTERED_BLOCK in a getdata, however,
-    // MSG_FILTERED_BLOCK should not appear in any invs except as a part of getdata.
+    // Nodes may always request a MSG_FILTERED_BLOCK/MSG_CMPCT_BLOCK in a getdata, however,
+    // MSG_FILTERED_BLOCK/MSG_CMPCT_BLOCK should not appear in any invs except as a part of getdata.
     MSG_FILTERED_BLOCK,
-    // BUIP010 Xtreme Thinblocks: a thin block contains all the transactions hashes in a block
-    // and also provides the missing transactions that are needed at the other end to reconstruct the block
-    MSG_THINBLOCK,
+    // BitcoinCore had chosen the same enum for compact blocks as thinblocks. As a result we had to
+    // bump MSG_THINBLOCK to a higher value (see below).
+    MSG_CMPCT_BLOCK,
     // BUIP010 Xtreme Thinblocks: an Xtreme thin block contains the first 8 bytes of all the tx hashes
     // and also provides the missing transactions that are needed at the other end to reconstruct the block
     MSG_XTHINBLOCK,
@@ -447,6 +475,12 @@ enum
     // hashes in a block and also provides the missing transaction ids that are needed at the other end to
     // reconstruct the block
     MSG_GRAPHENEBLOCK,
+    // BUIP010 Xtreme Thinblocks: a thin block contains all the transactions hashes in a block
+    // and also provides the missing transactions that are needed at the other end to reconstruct the block.
+    //
+    // With the introduction of compact block, this is being deprecated in favor of using the get_thin p2p
+    // message, which solves the conflict with MSG_THINBLOCK and MSG_CMPCT_BLOCK.
+    MSG_THINBLOCK = MSG_CMPCT_BLOCK,
 };
 
 #endif // BITCOIN_PROTOCOL_H

@@ -27,7 +27,6 @@
 #include "timedata.h"
 #include "txadmission.h"
 #include "txmempool.h"
-#include "uahf_fork.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -36,7 +35,7 @@
 #include <assert.h>
 
 #include <boost/algorithm/string/replace.hpp>
-#include <boost/thread.hpp>
+#include <thread>
 
 using namespace std;
 

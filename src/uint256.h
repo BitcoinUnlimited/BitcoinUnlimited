@@ -32,7 +32,11 @@ public:
         static_assert((BITS & 7) == 0, "Number of bits must fit in byte boundaries");
         memset(data, 0, sizeof(data));
     }
+    //! Construct from a std::vector by copying bytes directly
     explicit base_blob(const std::vector<unsigned char> &vch);
+    //! Construct from a byte buffer by copying bytes directly.  Note that the caller must ensure that bch is
+    //  the proper size.
+    explicit base_blob(const uint8_t *vch);
 
     bool IsNull() const
     {
@@ -132,9 +136,12 @@ public:
 class uint256 : public base_blob<256>
 {
 public:
-    uint256() {}
+    uint256() : base_blob<256>() {}
     uint256(const base_blob<256> &b) : base_blob<256>(b) {}
+    //! construct by copying from a buffer
     explicit uint256(const std::vector<unsigned char> &vch) : base_blob<256>(vch) {}
+    //! construct by copying from a buffer
+    explicit uint256(const uint8_t *vch) : base_blob<256>(vch) {}
     /** A cheap hash function that just returns 64 bits from the result, it can be
      * used when the contents are considered uniformly random. It is not appropriate
      * when the value can easily be influenced from outside as e.g. a network adversary could

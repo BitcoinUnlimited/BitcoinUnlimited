@@ -88,10 +88,10 @@ bench_sign_SOURCES = src/bench_sign.c
 bench_sign_LDADD = libsecp256k1.la $(SECP_LIBS) $(SECP_TEST_LIBS) $(COMMON_LIB)
 bench_internal_SOURCES = src/bench_internal.c
 bench_internal_LDADD = $(SECP_LIBS) $(COMMON_LIB)
-bench_internal_CPPFLAGS = -DSECP256K1_BUILD $(SECP_INCLUDES)
+bench_internal_CPPFLAGS = -DSECP256K1_BUILD -I$(top_srcdir)/src $(SECP_INCLUDES)
 bench_ecmult_SOURCES = src/bench_ecmult.c
 bench_ecmult_LDADD = $(SECP_LIBS) $(COMMON_LIB)
-bench_ecmult_CPPFLAGS = -DSECP256K1_BUILD $(SECP_INCLUDES)
+bench_ecmult_CPPFLAGS = -DSECP256K1_BUILD -I$(top_srcdir)/src $(SECP_INCLUDES)
 endif
 
 TESTS =
@@ -150,7 +150,7 @@ endif
 endif
 
 if USE_ECMULT_STATIC_PRECOMPUTATION
-CPPFLAGS_FOR_BUILD +=-I$(top_srcdir)
+CPPFLAGS_FOR_BUILD +=-I$(top_srcdir) -I$(top_srcdir)/src
 CFLAGS_FOR_BUILD += -Wall -Wextra -Wno-unused-function
 
 gen_context_OBJECTS = gen_context.o
@@ -180,4 +180,8 @@ endif
 
 if ENABLE_MODULE_RECOVERY
 include src/modules/recovery/Makefile.am.include
+endif
+
+if ENABLE_MODULE_SCHNORR
+include src/modules/schnorr/Makefile.am.include
 endif

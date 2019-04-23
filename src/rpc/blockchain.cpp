@@ -47,9 +47,9 @@ double GetDifficulty(const CBlockIndex *blockindex)
 {
     // Floating point number that is a multiple of the minimum difficulty,
     // minimum difficulty = 1.0.
-    if (blockindex == NULL)
+    if (blockindex == nullptr)
     {
-        if (chainActive.Tip() == NULL)
+        if (chainActive.Tip() == nullptr)
             return 1.0;
         else
             blockindex = chainActive.Tip();
@@ -76,45 +76,45 @@ double GetDifficulty(const CBlockIndex *blockindex)
 UniValue blockheaderToJSON(const CBlockIndex *blockindex)
 {
     UniValue result(UniValue::VOBJ);
-    result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
+    result.pushKV("hash", blockindex->GetBlockHash().GetHex());
     int confirmations = -1;
     // Only report confirmations if the block is on the main chain
     if (chainActive.Contains(blockindex))
         confirmations = chainActive.Height() - blockindex->nHeight + 1;
-    result.push_back(Pair("confirmations", confirmations));
-    result.push_back(Pair("height", blockindex->nHeight));
-    result.push_back(Pair("version", blockindex->nVersion));
-    result.push_back(Pair("versionHex", strprintf("%08x", blockindex->nVersion)));
-    result.push_back(Pair("merkleroot", blockindex->hashMerkleRoot.GetHex()));
-    result.push_back(Pair("time", (int64_t)blockindex->nTime));
-    result.push_back(Pair("mediantime", (int64_t)blockindex->GetMedianTimePast()));
-    result.push_back(Pair("nonce", (uint64_t)blockindex->nNonce));
-    result.push_back(Pair("bits", strprintf("%08x", blockindex->nBits)));
-    result.push_back(Pair("difficulty", GetDifficulty(blockindex)));
-    result.push_back(Pair("chainwork", blockindex->nChainWork.GetHex()));
+    result.pushKV("confirmations", confirmations);
+    result.pushKV("height", blockindex->nHeight);
+    result.pushKV("version", blockindex->nVersion);
+    result.pushKV("versionHex", strprintf("%08x", blockindex->nVersion));
+    result.pushKV("merkleroot", blockindex->hashMerkleRoot.GetHex());
+    result.pushKV("time", (int64_t)blockindex->nTime);
+    result.pushKV("mediantime", (int64_t)blockindex->GetMedianTimePast());
+    result.pushKV("nonce", (uint64_t)blockindex->nNonce);
+    result.pushKV("bits", strprintf("%08x", blockindex->nBits));
+    result.pushKV("difficulty", GetDifficulty(blockindex));
+    result.pushKV("chainwork", blockindex->nChainWork.GetHex());
 
     if (blockindex->pprev)
-        result.push_back(Pair("previousblockhash", blockindex->pprev->GetBlockHash().GetHex()));
+        result.pushKV("previousblockhash", blockindex->pprev->GetBlockHash().GetHex());
     CBlockIndex *pnext = chainActive.Next(blockindex);
     if (pnext)
-        result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
+        result.pushKV("nextblockhash", pnext->GetBlockHash().GetHex());
     return result;
 }
 
 UniValue blockToJSON(const CBlock &block, const CBlockIndex *blockindex, bool txDetails = false, bool listTxns = true)
 {
     UniValue result(UniValue::VOBJ);
-    result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
+    result.pushKV("hash", blockindex->GetBlockHash().GetHex());
     int confirmations = -1;
     // Only report confirmations if the block is on the main chain
     if (chainActive.Contains(blockindex))
         confirmations = chainActive.Height() - blockindex->nHeight + 1;
-    result.push_back(Pair("confirmations", confirmations));
-    result.push_back(Pair("size", (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION)));
-    result.push_back(Pair("height", blockindex->nHeight));
-    result.push_back(Pair("version", block.nVersion));
-    result.push_back(Pair("versionHex", strprintf("%08x", block.nVersion)));
-    result.push_back(Pair("merkleroot", block.hashMerkleRoot.GetHex()));
+    result.pushKV("confirmations", confirmations);
+    result.pushKV("size", (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION));
+    result.pushKV("height", blockindex->nHeight);
+    result.pushKV("version", block.nVersion);
+    result.pushKV("versionHex", strprintf("%08x", block.nVersion));
+    result.pushKV("merkleroot", block.hashMerkleRoot.GetHex());
     UniValue txs(UniValue::VARR);
     if (listTxns)
     {
@@ -131,24 +131,24 @@ UniValue blockToJSON(const CBlock &block, const CBlockIndex *blockindex, bool tx
                 txs.push_back(tx->GetHash().GetHex());
             }
         }
-        result.push_back(Pair("tx", txs));
+        result.pushKV("tx", txs);
     }
     else
     {
-        result.push_back(Pair("txcount", (uint64_t)block.vtx.size()));
+        result.pushKV("txcount", (uint64_t)block.vtx.size());
     }
-    result.push_back(Pair("time", block.GetBlockTime()));
-    result.push_back(Pair("mediantime", (int64_t)blockindex->GetMedianTimePast()));
-    result.push_back(Pair("nonce", (uint64_t)block.nNonce));
-    result.push_back(Pair("bits", strprintf("%08x", block.nBits)));
-    result.push_back(Pair("difficulty", GetDifficulty(blockindex)));
-    result.push_back(Pair("chainwork", blockindex->nChainWork.GetHex()));
+    result.pushKV("time", block.GetBlockTime());
+    result.pushKV("mediantime", (int64_t)blockindex->GetMedianTimePast());
+    result.pushKV("nonce", (uint64_t)block.nNonce);
+    result.pushKV("bits", strprintf("%08x", block.nBits));
+    result.pushKV("difficulty", GetDifficulty(blockindex));
+    result.pushKV("chainwork", blockindex->nChainWork.GetHex());
 
     if (blockindex->pprev)
-        result.push_back(Pair("previousblockhash", blockindex->pprev->GetBlockHash().GetHex()));
+        result.pushKV("previousblockhash", blockindex->pprev->GetBlockHash().GetHex());
     CBlockIndex *pnext = chainActive.Next(blockindex);
     if (pnext)
-        result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
+        result.pushKV("nextblockhash", pnext->GetBlockHash().GetHex());
     return result;
 }
 
@@ -161,7 +161,6 @@ UniValue getblockcount(const UniValue &params, bool fHelp)
                             "n    (numeric) The current block count\n"
                             "\nExamples:\n" +
                             HelpExampleCli("getblockcount", "") + HelpExampleRpc("getblockcount", ""));
-    LOCK(cs_main);
     return chainActive.Height();
 }
 
@@ -175,7 +174,6 @@ UniValue getbestblockhash(const UniValue &params, bool fHelp)
                             "\nExamples\n" +
                             HelpExampleCli("getbestblockhash", "") + HelpExampleRpc("getbestblockhash", ""));
 
-    LOCK(cs_main);
     return chainActive.Tip()->GetBlockHash().GetHex();
 }
 
@@ -190,7 +188,6 @@ UniValue getdifficulty(const UniValue &params, bool fHelp)
             "\nExamples:\n" +
             HelpExampleCli("getdifficulty", "") + HelpExampleRpc("getdifficulty", ""));
 
-    LOCK(cs_main);
     return GetDifficulty();
 }
 
@@ -227,19 +224,19 @@ void entryToJSON(UniValue &info, const CTxMemPoolEntry &e)
 {
     AssertLockHeld(mempool.cs);
 
-    info.push_back(Pair("size", (int)e.GetTxSize()));
-    info.push_back(Pair("fee", ValueFromAmount(e.GetFee())));
-    info.push_back(Pair("modifiedfee", ValueFromAmount(e.GetModifiedFee())));
-    info.push_back(Pair("time", e.GetTime()));
-    info.push_back(Pair("height", (int)e.GetHeight()));
-    info.push_back(Pair("startingpriority", e.GetPriority(e.GetHeight())));
-    info.push_back(Pair("currentpriority", e.GetPriority(chainActive.Height())));
-    info.push_back(Pair("descendantcount", e.GetCountWithDescendants()));
-    info.push_back(Pair("descendantsize", e.GetSizeWithDescendants()));
-    info.push_back(Pair("descendantfees", e.GetModFeesWithDescendants()));
-    info.push_back(Pair("ancestorcount", e.GetCountWithAncestors()));
-    info.push_back(Pair("ancestorsize", e.GetSizeWithAncestors()));
-    info.push_back(Pair("ancestorfees", e.GetModFeesWithAncestors()));
+    info.pushKV("size", (int)e.GetTxSize());
+    info.pushKV("fee", ValueFromAmount(e.GetFee()));
+    info.pushKV("modifiedfee", ValueFromAmount(e.GetModifiedFee()));
+    info.pushKV("time", e.GetTime());
+    info.pushKV("height", (int)e.GetHeight());
+    info.pushKV("startingpriority", e.GetPriority(e.GetHeight()));
+    info.pushKV("currentpriority", e.GetPriority(chainActive.Height()));
+    info.pushKV("descendantcount", e.GetCountWithDescendants());
+    info.pushKV("descendantsize", e.GetSizeWithDescendants());
+    info.pushKV("descendantfees", e.GetModFeesWithDescendants());
+    info.pushKV("ancestorcount", e.GetCountWithAncestors());
+    info.pushKV("ancestorsize", e.GetSizeWithAncestors());
+    info.pushKV("ancestorfees", e.GetModFeesWithAncestors());
     const CTransaction &tx = e.GetTx();
     set<string> setDepends;
     for (const CTxIn &txin : tx.vin)
@@ -253,7 +250,7 @@ void entryToJSON(UniValue &info, const CTxMemPoolEntry &e)
     {
         depends.push_back(dep);
     }
-    info.push_back(Pair("depends", depends));
+    info.pushKV("depends", depends);
 
     UniValue spent(UniValue::VARR);
     const CTxMemPool::txiter &it = mempool.mapTx.find(tx.GetHash());
@@ -262,7 +259,7 @@ void entryToJSON(UniValue &info, const CTxMemPoolEntry &e)
     {
         spent.push_back(childiter->GetTx().GetHash().ToString());
     }
-    info.push_back(Pair("spentby", spent));
+    info.pushKV("spentby", spent);
 }
 
 UniValue mempoolToJSON(bool fVerbose = false)
@@ -276,7 +273,7 @@ UniValue mempoolToJSON(bool fVerbose = false)
             const uint256 &hash = e.GetTx().GetHash();
             UniValue info(UniValue::VOBJ);
             entryToJSON(info, e);
-            o.push_back(Pair(hash.ToString(), info));
+            o.pushKV(hash.ToString(), info);
         }
         return o;
     }
@@ -414,7 +411,7 @@ UniValue getmempoolancestors(const UniValue &params, bool fHelp)
             const uint256 &hash = e.GetTx().GetHash();
             UniValue info(UniValue::VOBJ);
             entryToJSON(info, e);
-            o.push_back(Pair(hash.ToString(), info));
+            o.pushKV(hash.ToString(), info);
         }
         return o;
     }
@@ -484,7 +481,7 @@ UniValue getmempooldescendants(const UniValue &params, bool fHelp)
             const uint256 &hash = e.GetTx().GetHash();
             UniValue info(UniValue::VOBJ);
             entryToJSON(info, e);
-            o.push_back(Pair(hash.ToString(), info));
+            o.pushKV(hash.ToString(), info);
         }
         return o;
     }
@@ -602,6 +599,16 @@ UniValue getblockheader(const UniValue &params, bool fHelp)
     return blockheaderToJSON(pblockindex);
 }
 
+// Allows passing int instead of bool
+static bool is_param_trueish(const UniValue &param)
+{
+    if (param.isNum())
+    {
+        return static_cast<bool>(param.get_int());
+    }
+    return param.get_bool();
+}
+
 UniValue getblock(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 3)
@@ -653,9 +660,13 @@ UniValue getblock(const UniValue &params, bool fHelp)
     bool fVerbose = true;
     bool fListTxns = true;
     if (params.size() > 1)
-        fVerbose = params[1].get_bool();
+    {
+        fVerbose = is_param_trueish(params[1]);
+    }
     if (params.size() == 3)
-        fListTxns = params[2].get_bool();
+    {
+        fListTxns = is_param_trueish(params[2]);
+    }
 
     CBlockIndex *pblockindex = LookupBlockIndex(hash);
     if (!pblockindex)
@@ -783,13 +794,13 @@ UniValue gettxoutsetinfo(const UniValue &params, bool fHelp)
     FlushStateToDisk();
     if (GetUTXOStats(pcoinsdbview, stats))
     {
-        ret.push_back(Pair("height", (int64_t)stats.nHeight));
-        ret.push_back(Pair("bestblock", stats.hashBlock.GetHex()));
-        ret.push_back(Pair("transactions", (int64_t)stats.nTransactions));
-        ret.push_back(Pair("txouts", (int64_t)stats.nTransactionOutputs));
-        ret.push_back(Pair("hash_serialized_2", stats.hashSerialized.GetHex()));
-        ret.push_back(Pair("disk_size", stats.nDiskSize));
-        ret.push_back(Pair("total_amount", ValueFromAmount(stats.nTotalAmount)));
+        ret.pushKV("height", (int64_t)stats.nHeight);
+        ret.pushKV("bestblock", stats.hashBlock.GetHex());
+        ret.pushKV("transactions", (int64_t)stats.nTransactions);
+        ret.pushKV("txouts", (int64_t)stats.nTransactionOutputs);
+        ret.pushKV("hash_serialized_2", stats.hashSerialized.GetHex());
+        ret.pushKV("disk_size", stats.nDiskSize);
+        ret.pushKV("total_amount", ValueFromAmount(stats.nTotalAmount));
     }
     return ret;
 }
@@ -861,20 +872,20 @@ UniValue gettxout(const UniValue &params, bool fHelp)
     }
 
     CBlockIndex *pindex = LookupBlockIndex(pcoinsTip->GetBestBlock());
-    ret.push_back(Pair("bestblock", pindex->GetBlockHash().GetHex()));
+    ret.pushKV("bestblock", pindex->GetBlockHash().GetHex());
     if (coin.nHeight == MEMPOOL_HEIGHT)
     {
-        ret.push_back(Pair("confirmations", 0));
+        ret.pushKV("confirmations", 0);
     }
     else
     {
-        ret.push_back(Pair("confirmations", (int64_t)(pindex->nHeight - coin.nHeight + 1)));
+        ret.pushKV("confirmations", (int64_t)(pindex->nHeight - coin.nHeight + 1));
     }
-    ret.push_back(Pair("value", ValueFromAmount(coin.out.nValue)));
+    ret.pushKV("value", ValueFromAmount(coin.out.nValue));
     UniValue o(UniValue::VOBJ);
     ScriptPubKeyToJSON(coin.out.scriptPubKey, o, true);
-    ret.push_back(Pair("scriptPubKey", o));
-    ret.push_back(Pair("coinbase", (bool)coin.fCoinBase));
+    ret.pushKV("scriptPubKey", o);
+    ret.pushKV("coinbase", (bool)coin.fCoinBase);
 
     return ret;
 }
@@ -923,7 +934,7 @@ static UniValue SoftForkMajorityDesc(int version, CBlockIndex *pindex, const Con
         activated = pindex->nHeight >= consensusParams.BIP65Height;
         break;
     }
-    rv.push_back(Pair("status", activated));
+    rv.pushKV("status", activated);
     return rv;
 }
 
@@ -933,40 +944,55 @@ static UniValue SoftForkDesc(const std::string &name,
     const Consensus::Params &consensusParams)
 {
     UniValue rv(UniValue::VOBJ);
-    rv.push_back(Pair("id", name));
-    rv.push_back(Pair("version", version));
-    rv.push_back(Pair("reject", SoftForkMajorityDesc(version, pindex, consensusParams)));
+    rv.pushKV("id", name);
+    rv.pushKV("version", version);
+    rv.pushKV("reject", SoftForkMajorityDesc(version, pindex, consensusParams));
     return rv;
+}
+
+
+static void pushBackThresholdStatus(UniValue &rv,
+    const Consensus::Params &consensusParams,
+    const ThresholdState thresholdState,
+    Consensus::DeploymentPos id,
+    VersionBitBIP versionBitBIP)
+{
+    if (versionBitBIP == BIP_135)
+    {
+        rv.pushKV("bit", (int)id);
+    }
+    switch (thresholdState)
+    {
+    case THRESHOLD_DEFINED:
+        rv.pushKV("status", "defined");
+        break;
+    case THRESHOLD_STARTED:
+        rv.pushKV("status", "started");
+        break;
+    case THRESHOLD_LOCKED_IN:
+        rv.pushKV("status", "locked_in");
+        break;
+    case THRESHOLD_ACTIVE:
+        rv.pushKV("status", "active");
+        break;
+    case THRESHOLD_FAILED:
+        rv.pushKV("status", "failed");
+        break;
+    }
+    if (versionBitBIP == BIP_009 && THRESHOLD_STARTED == thresholdState)
+    {
+        rv.pushKV("bit", consensusParams.vDeployments[id].bit);
+    }
+    rv.pushKV("startTime", consensusParams.vDeployments[id].nStartTime);
+    rv.pushKV("timeout", consensusParams.vDeployments[id].nTimeout);
 }
 
 static UniValue BIP9SoftForkDesc(const Consensus::Params &consensusParams, Consensus::DeploymentPos id)
 {
     UniValue rv(UniValue::VOBJ);
     const ThresholdState thresholdState = VersionBitsTipState(consensusParams, id);
-    switch (thresholdState)
-    {
-    case THRESHOLD_DEFINED:
-        rv.push_back(Pair("status", "defined"));
-        break;
-    case THRESHOLD_STARTED:
-        rv.push_back(Pair("status", "started"));
-        break;
-    case THRESHOLD_LOCKED_IN:
-        rv.push_back(Pair("status", "locked_in"));
-        break;
-    case THRESHOLD_ACTIVE:
-        rv.push_back(Pair("status", "active"));
-        break;
-    case THRESHOLD_FAILED:
-        rv.push_back(Pair("status", "failed"));
-        break;
-    }
-    if (THRESHOLD_STARTED == thresholdState)
-    {
-        rv.push_back(Pair("bit", consensusParams.vDeployments[id].bit));
-    }
-    rv.push_back(Pair("startTime", consensusParams.vDeployments[id].nStartTime));
-    rv.push_back(Pair("timeout", consensusParams.vDeployments[id].nTimeout));
+    pushBackThresholdStatus(rv, consensusParams, thresholdState, id, BIP_009);
+
     return rv;
 }
 
@@ -974,32 +1000,12 @@ static UniValue BIP9SoftForkDesc(const Consensus::Params &consensusParams, Conse
 static UniValue BIP135ForkDesc(const Consensus::Params &consensusParams, Consensus::DeploymentPos id)
 {
     UniValue rv(UniValue::VOBJ);
-    rv.push_back(Pair("bit", (int)id));
     const ThresholdState thresholdState = VersionBitsTipState(consensusParams, id);
-    switch (thresholdState)
-    {
-    case THRESHOLD_DEFINED:
-        rv.push_back(Pair("status", "defined"));
-        break;
-    case THRESHOLD_STARTED:
-        rv.push_back(Pair("status", "started"));
-        break;
-    case THRESHOLD_LOCKED_IN:
-        rv.push_back(Pair("status", "locked_in"));
-        break;
-    case THRESHOLD_ACTIVE:
-        rv.push_back(Pair("status", "active"));
-        break;
-    case THRESHOLD_FAILED:
-        rv.push_back(Pair("status", "failed"));
-        break;
-    }
-    rv.push_back(Pair("startTime", consensusParams.vDeployments[id].nStartTime));
-    rv.push_back(Pair("timeout", consensusParams.vDeployments[id].nTimeout));
-    rv.push_back(Pair("windowsize", consensusParams.vDeployments[id].windowsize));
-    rv.push_back(Pair("threshold", consensusParams.vDeployments[id].threshold));
-    rv.push_back(Pair("minlockedblocks", consensusParams.vDeployments[id].minlockedblocks));
-    rv.push_back(Pair("minlockedtime", consensusParams.vDeployments[id].minlockedtime));
+    pushBackThresholdStatus(rv, consensusParams, thresholdState, id, BIP_135);
+    rv.pushKV("windowsize", consensusParams.vDeployments[id].windowsize);
+    rv.pushKV("threshold", consensusParams.vDeployments[id].threshold);
+    rv.pushKV("minlockedblocks", consensusParams.vDeployments[id].minlockedblocks);
+    rv.pushKV("minlockedtime", consensusParams.vDeployments[id].minlockedtime);
     return rv;
 }
 // bip135 end
@@ -1019,6 +1025,8 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
             "  \"difficulty\": xxxxxx,     (numeric) the current difficulty\n"
             "  \"mediantime\": xxxxxx,     (numeric) median time for the current best block\n"
             "  \"verificationprogress\": xxxx, (numeric) estimate of verification progress [0..1]\n"
+            "  \"initialblockdownload\": xxxx, (bool) (debug information) estimate of whether this node is in Initial "
+            "Block Download mode.\n"
             "  \"chainwork\": \"xxxx\"     (string) total amount of work in active chain, in hexadecimal\n"
             "  \"pruned\": xx,             (boolean) if the blocks are subject to pruning\n"
             "  \"pruneheight\": xxxxxx,    (numeric) lowest-height complete block stored\n"
@@ -1069,16 +1077,17 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
     LOCK(cs_main);
 
     UniValue obj(UniValue::VOBJ);
-    obj.push_back(Pair("chain", Params().NetworkIDString()));
-    obj.push_back(Pair("blocks", (int)chainActive.Height()));
-    obj.push_back(Pair("headers", pindexBestHeader ? pindexBestHeader.load()->nHeight : -1));
-    obj.push_back(Pair("bestblockhash", chainActive.Tip()->GetBlockHash().GetHex()));
-    obj.push_back(Pair("difficulty", (double)GetDifficulty()));
-    obj.push_back(Pair("mediantime", (int64_t)chainActive.Tip()->GetMedianTimePast()));
-    obj.push_back(Pair(
-        "verificationprogress", Checkpoints::GuessVerificationProgress(Params().Checkpoints(), chainActive.Tip())));
-    obj.push_back(Pair("chainwork", chainActive.Tip()->nChainWork.GetHex()));
-    obj.push_back(Pair("pruned", fPruneMode));
+    obj.pushKV("chain", Params().NetworkIDString());
+    obj.pushKV("blocks", (int)chainActive.Height());
+    obj.pushKV("headers", pindexBestHeader ? pindexBestHeader.load()->nHeight : -1);
+    obj.pushKV("bestblockhash", chainActive.Tip()->GetBlockHash().GetHex());
+    obj.pushKV("difficulty", (double)GetDifficulty());
+    obj.pushKV("mediantime", (int64_t)chainActive.Tip()->GetMedianTimePast());
+    obj.pushKV(
+        "verificationprogress", Checkpoints::GuessVerificationProgress(Params().Checkpoints(), chainActive.Tip()));
+    obj.pushKV("initialblockdownload", IsInitialBlockDownload());
+    obj.pushKV("chainwork", chainActive.Tip()->nChainWork.GetHex());
+    obj.pushKV("pruned", fPruneMode);
 
     const Consensus::Params &consensusParams = Params().GetConsensus();
     CBlockIndex *tip = chainActive.Tip();
@@ -1095,15 +1104,15 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
         const struct ForkDeploymentInfo &vbinfo = VersionBitsDeploymentInfo[bit];
         if (IsConfiguredDeployment(consensusParams, bit))
         {
-            bip9_softforks.push_back(Pair(vbinfo.name, BIP9SoftForkDesc(consensusParams, bit)));
-            bip135_forks.push_back(Pair(vbinfo.name, BIP135ForkDesc(consensusParams, bit)));
+            bip9_softforks.pushKV(vbinfo.name, BIP9SoftForkDesc(consensusParams, bit));
+            bip135_forks.pushKV(vbinfo.name, BIP135ForkDesc(consensusParams, bit));
         }
     }
 
-    obj.push_back(Pair("softforks", softforks));
-    obj.push_back(Pair("bip9_softforks", bip9_softforks));
+    obj.pushKV("softforks", softforks);
+    obj.pushKV("bip9_softforks", bip9_softforks);
     // to maintain backward compat initially, we introduce a new list for the full BIP135 data
-    obj.push_back(Pair("bip135_forks", bip135_forks));
+    obj.pushKV("bip135_forks", bip135_forks);
     // bip135 end
 
     if (fPruneMode)
@@ -1113,7 +1122,7 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
             block = block->pprev;
 
         if (block != nullptr)
-            obj.push_back(Pair("pruneheight", block->nHeight));
+            obj.pushKV("pruneheight", block->nHeight);
     }
     return obj;
 }
@@ -1214,12 +1223,12 @@ UniValue getchaintips(const UniValue &params, bool fHelp)
     for (const CBlockIndex *block : setTips)
     {
         UniValue obj(UniValue::VOBJ);
-        obj.push_back(Pair("height", block->nHeight));
-        obj.push_back(Pair("chainwork", block->nChainWork.GetHex()));
-        obj.push_back(Pair("hash", block->phashBlock->GetHex()));
+        obj.pushKV("height", block->nHeight);
+        obj.pushKV("chainwork", block->nChainWork.GetHex());
+        obj.pushKV("hash", block->phashBlock->GetHex());
 
         const int branchLen = block->nHeight - chainActive.FindFork(block)->nHeight;
-        obj.push_back(Pair("branchlen", branchLen));
+        obj.pushKV("branchlen", branchLen);
 
         string status;
         if (chainActive.Contains(block))
@@ -1254,7 +1263,7 @@ UniValue getchaintips(const UniValue &params, bool fHelp)
             // No clue.
             status = "unknown";
         }
-        obj.push_back(Pair("status", status));
+        obj.pushKV("status", status);
 
         res.push_back(obj);
     }
@@ -1265,19 +1274,19 @@ UniValue getchaintips(const UniValue &params, bool fHelp)
 UniValue mempoolInfoToJSON()
 {
     UniValue ret(UniValue::VOBJ);
-    ret.push_back(Pair("size", (int64_t)mempool.size()));
-    ret.push_back(Pair("bytes", (int64_t)mempool.GetTotalTxSize()));
-    ret.push_back(Pair("usage", (int64_t)mempool.DynamicMemoryUsage()));
+    ret.pushKV("size", (int64_t)mempool.size());
+    ret.pushKV("bytes", (int64_t)mempool.GetTotalTxSize());
+    ret.pushKV("usage", (int64_t)mempool.DynamicMemoryUsage());
     size_t maxmempool = GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
-    ret.push_back(Pair("maxmempool", (int64_t)maxmempool));
-    ret.push_back(Pair("mempoolminfee", ValueFromAmount(mempool.GetMinFee(maxmempool).GetFeePerK())));
+    ret.pushKV("maxmempool", (int64_t)maxmempool);
+    ret.pushKV("mempoolminfee", ValueFromAmount(mempool.GetMinFee(maxmempool).GetFeePerK()));
     try
     {
-        ret.push_back(Pair("tps", boost::lexical_cast<double>(strprintf("%.2f", mempool.TransactionsPerSecond()))));
+        ret.pushKV("tps", boost::lexical_cast<double>(strprintf("%.2f", mempool.TransactionsPerSecond())));
     }
     catch (boost::bad_lexical_cast &)
     {
-        ret.push_back(Pair("tps", "N/A"));
+        ret.pushKV("tps", "N/A");
     }
 
     return ret;
@@ -1306,8 +1315,8 @@ UniValue getmempoolinfo(const UniValue &params, bool fHelp)
 UniValue orphanpoolInfoToJSON()
 {
     UniValue ret(UniValue::VOBJ);
-    ret.push_back(Pair("size", (int64_t)orphanpool.GetOrphanPoolSize()));
-    ret.push_back(Pair("bytes", (int64_t)orphanpool.GetOrphanPoolBytes()));
+    ret.pushKV("size", (int64_t)orphanpool.GetOrphanPoolSize());
+    ret.pushKV("bytes", (int64_t)orphanpool.GetOrphanPoolBytes());
 
     return ret;
 }
@@ -1525,6 +1534,24 @@ UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
     return NullUniValue;
 }
 
+UniValue savemempool(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+    {
+        throw std::runtime_error("savemempool\n"
+                                 "\nDumps the mempool to disk.\n"
+                                 "\nExamples:\n" +
+                                 HelpExampleCli("savemempool", "") + HelpExampleRpc("savemempool", ""));
+    }
+
+    if (!DumpMempool())
+    {
+        throw JSONRPCError(RPC_MISC_ERROR, "Unable to dump mempool to disk");
+    }
+
+    return NullUniValue;
+}
+
 static const CRPCCommand commands[] = {
     //  category              name                      actor (function)         okSafeMode
     //  --------------------- ------------------------  -----------------------  ----------
@@ -1539,7 +1566,7 @@ static const CRPCCommand commands[] = {
     {"blockchain", "getorphanpoolinfo", &getorphanpoolinfo, true},
     {"blockchain", "getrawmempool", &getrawmempool, true}, {"blockchain", "getraworphanpool", &getraworphanpool, true},
     {"blockchain", "gettxout", &gettxout, true}, {"blockchain", "gettxoutsetinfo", &gettxoutsetinfo, true},
-    {"blockchain", "verifychain", &verifychain, true},
+    {"blockchain", "savemempool", &savemempool, true}, {"blockchain", "verifychain", &verifychain, true},
 
     /* Not shown in help */
     {"hidden", "invalidateblock", &invalidateblock, true}, {"hidden", "reconsiderblock", &reconsiderblock, true},
