@@ -16,7 +16,7 @@ lines to your `bitcoin.conf`:
 
 ```
 electrum=1 # to start the electrum server
-electrumexec=path/to/bin/electrs # optional path to your electrum server binary
+electrum.exec=path/to/bin/electrs # optional path to your electrum server binary
 debug=electrum
 ```
 
