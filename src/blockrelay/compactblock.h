@@ -216,7 +216,7 @@ public:
     CBlockHeader header;
 
     // Dummy for deserialization
-    CompactBlock() {}
+    CompactBlock() : nSize(0), nWaitingFor(0) {}
     CompactBlock(const CBlock &block, const CRollingFastFilter<4 * 1024 * 1024> *inventoryKnown = nullptr);
 
     /**
