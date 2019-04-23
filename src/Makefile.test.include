@@ -80,6 +80,7 @@ BITCOIN_TESTS =\
   test/cuckoocache_tests.cpp \
   test/DoS_tests.cpp \
   test/dstencode_tests.cpp \
+  test/electrumrpcinfo_tests.cpp \
   test/electrumserver_tests.cpp \
   test/exploit_tests.cpp \
   test/fastfilter_tests.cpp \
