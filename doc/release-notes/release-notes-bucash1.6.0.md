@@ -67,7 +67,22 @@ been merged in this release:
 Commit details
 --------------
 
-
+- `135f0f995` Two more nits (#1687) (Peter Tschipper)
+- `442c1bd8d` [electrum] More electrum configuration options (#1684) (dagurval)
+- `3aab9b5db` a couple of little nits (#1685) (Peter Tschipper)
+- `390a9e7f2` Add BUCash 1.6.0 release notes (#1671) (Andrea Suisani)
+- `71834506f` Fix compact block compression data in getnetworkinfo (#1683) (Peter Tschipper)
+- `065620eaa` [electum] Fix cookie dir path (#1682) (dagurval)
+- `6106ed769` release thread handles when group is destructed (#1680) (Andrew Stone)
+- `6d628bf06` Make sure to wait for all script validation threads to finish (#1678) (Peter Tschipper)
+- `72153d295` make schnorrsig.py issue many fewer tx (#1681) (Andrew Stone)
+- `228a3b553` Add electrs to gitian output (Dagur Valberg Johannsson)
+- `65aa16c44` Update Rust from v1.28.0 to v1.32.0. (Taylor Hornby)
+- `f95e83765` Introduce Rust to depends system. (Sean Bowe)
+- `737b96eda` Build cashlib on travis so that we could run tests based on that on x… (#1662) (Andrea Suisani)
+- `319ef6a40` [Builds on 1611]  Refactor compact blocks out of CNode (#1623) (Peter Tschipper)
+- `16e2daf9f` use rsm_debug_assertion in configure instead of debug_assertion in util (#1676) (Griffith)
+- `3ede8fd7b` add unsigned integer types to tweakbase (#1674) (Griffith)
 - `5cd24e256` Basic integration with the electrum server electrs (#1633) (dagurval)
 - `325df3651` Refactor Xthin data out of CNode (#1611) (Peter Tschipper)
 - `a2de59cf7` add schnorr activation test, expand cashlib with datasig, fix lock on xversion (#1672) (Andrew Stone)
