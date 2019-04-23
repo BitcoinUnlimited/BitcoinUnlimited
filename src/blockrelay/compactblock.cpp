@@ -1085,7 +1085,10 @@ void SendCompactBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
     if (inv.type == MSG_CMPCT_BLOCK)
     {
         CompactBlock compactBlock;
-        compactBlock = CompactBlock(*pblock, &pfrom->filterInventoryKnown);
+        {
+            LOCK(pfrom->cs_inventory);
+            compactBlock = CompactBlock(*pblock, &pfrom->filterInventoryKnown);
+        }
         uint64_t nSizeBlock = pblock->GetBlockSize();
 
         // Send a compact block
