@@ -61,6 +61,10 @@ private:
     // Entropy used for SipHash secret key; this is distinct from the block nonce
     uint64_t sipHashNonce;
 
+private:
+    // memory only
+    mutable uint64_t nSize; // Serialized thinblock size in bytes
+
 public:
     // These describe, in two parts, the 128-bit secret key used for SipHash
     // Note that they are populated by FillShortTxIDSelector, which uses header and sipHashNonce
@@ -78,13 +82,17 @@ public:
         uint64_t nSenderMempoolPlusBlock,
         uint64_t _version,
         bool _computeOptimized);
-    CGrapheneBlock() : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(2), computeOptimized(false) {}
+    CGrapheneBlock()
+        : nSize(0), shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(2), computeOptimized(false)
+    {
+    }
     CGrapheneBlock(uint64_t _version)
-        : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(_version), computeOptimized(false)
+        : nSize(0), shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(_version), computeOptimized(false)
     {
     }
     CGrapheneBlock(uint64_t _version, bool _computeOptimized)
-        : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(_version), computeOptimized(_computeOptimized)
+        : nSize(0), shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(_version),
+          computeOptimized(_computeOptimized)
     {
     }
     ~CGrapheneBlock();
@@ -137,8 +145,16 @@ public:
     {
         return ::GetSerializeSize(vAdditionalTxs, SER_NETWORK, PROTOCOL_VERSION);
     }
+
+    uint64_t GetSize() const
+    {
+        if (nSize == 0)
+            nSize = ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
+        return nSize;
+    }
+
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
-    bool process(CNode *pfrom, int nSizeGrapheneBlock, std::string strCommand);
+    bool process(CNode *pfrom, std::string strCommand);
     bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state);
 };
 

@@ -40,7 +40,7 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     : // Use cryptographically strong pseudorandom number because
       // we will extract SipHash secret key from this
       sipHashNonce(GetRand(std::numeric_limits<uint64_t>::max())),
-      shorttxidk0(0), shorttxidk1(0), version(_version), computeOptimized(_computeOptimized)
+      nSize(0), shorttxidk0(0), shorttxidk1(0), version(_version), computeOptimized(_computeOptimized)
 {
     header = pblock->GetBlockHeader();
     nBlockTxs = pblock->vtx.size();
@@ -108,6 +108,9 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     size_t msgSize = vRecv.size();
     CGrapheneBlockTx grapheneBlockTx;
     vRecv >> grapheneBlockTx;
+
+    auto pblock = thinrelay.GetBlockToReconstruct(pfrom);
+    CGrapheneBlock &grapheneBlock = *pblock->grapheneblock;
 
     // Message consistency checking
     CInv inv(MSG_GRAPHENEBLOCK, grapheneBlockTx.blockhash);
@@ -232,20 +235,20 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         CInv inv2(MSG_BLOCK, grapheneBlockTx.blockhash);
 
         // for compression statistics, we have to add up the size of grapheneblock and the re-requested grapheneBlockTx.
-        int nSizeGrapheneBlockTx = msgSize;
-        int blockSize = pfrom->grapheneBlock.GetBlockSize();
+        uint64_t nSizeGrapheneBlockTx = msgSize;
+        uint64_t blockSize = pfrom->grapheneBlock.GetBlockSize();
         float nCompressionRatio = 0.0;
-        if (pfrom->nSizeGrapheneBlock + nSizeGrapheneBlockTx > 0)
-            nCompressionRatio = (float)blockSize / ((float)pfrom->nSizeGrapheneBlock + (float)nSizeGrapheneBlockTx);
+        if (grapheneBlock.GetSize() + nSizeGrapheneBlockTx > 0)
+            nCompressionRatio = (float)blockSize / ((float)grapheneBlock.GetSize() + (float)nSizeGrapheneBlockTx);
         LOG(GRAPHENE, "Reassembled grblktx for %s (%d bytes). Message was %d bytes (graphene block) and %d bytes "
                       "(re-requested tx), compression ratio %3.2f, peer=%s\n",
-            pfrom->grapheneBlock.GetHash().ToString(), blockSize, pfrom->nSizeGrapheneBlock, nSizeGrapheneBlockTx,
+            pfrom->grapheneBlock.GetHash().ToString(), blockSize, grapheneBlock.GetSize(), nSizeGrapheneBlockTx,
             nCompressionRatio, pfrom->GetLogName());
 
         // Update run-time statistics of graphene block bandwidth savings.
         // We add the original graphene block size with the size of transactions that were re-requested.
         // This is NOT double counting since we never accounted for the original graphene block due to the re-request.
-        graphenedata.UpdateInBound(nSizeGrapheneBlockTx + pfrom->nSizeGrapheneBlock, blockSize);
+        graphenedata.UpdateInBound(nSizeGrapheneBlockTx + grapheneBlock.GetSize(), blockSize);
         LOG(GRAPHENE, "Graphene block stats: %s\n", graphenedata.ToString());
 
         PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->grapheneBlock), inv2);
@@ -337,7 +340,6 @@ bool CGrapheneBlock::CheckBlockHeader(const CBlockHeader &block, CValidationStat
  */
 bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string strCommand, unsigned nHops)
 {
-    int nSizeGrapheneBlock = vRecv.size();
     CInv inv(MSG_BLOCK, uint256());
 
     CGrapheneBlock grapheneBlock(NegotiateGrapheneVersion(pfrom), NegotiateFastFilterSupport(pfrom));
@@ -402,7 +404,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
             graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
             LOG(GRAPHENE, "Received grapheneblock but returning because we already have block data %s from peer %s hop"
                           " %d size %d bytes\n",
-                inv.hash.ToString(), pfrom->GetLogName(), nHops, nSizeGrapheneBlock);
+                inv.hash.ToString(), pfrom->GetLogName(), nHops, grapheneBlock.GetSize());
             return true;
         }
 
@@ -419,7 +421,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
 
         {
             LOG(GRAPHENE, "Received %s %s from peer %s. Size %d bytes.\n", strCommand, inv.hash.ToString(),
-                pfrom->GetLogName(), nSizeGrapheneBlock);
+                pfrom->GetLogName(), grapheneBlock.GetSize());
 
             // Do not process unrequested grapheneblocks.
             if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::GRAPHENEBLOCK))
@@ -431,13 +433,12 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
         }
     }
 
-    bool result = grapheneBlock.process(pfrom, nSizeGrapheneBlock, strCommand);
+    bool result = grapheneBlock.process(pfrom, strCommand);
 
     return result;
 }
 
 bool CGrapheneBlock::process(CNode *pfrom,
-    int nSizeGrapheneBlock,
     std::string strCommand) // TODO: request from the "best" txn source not necessarily from the block source
 {
     // In PV we must prevent two graphene blocks from simulaneously processing from that were recieved from the
@@ -447,7 +448,6 @@ bool CGrapheneBlock::process(CNode *pfrom,
         return false;
 
     graphenedata.ClearGrapheneBlockData(pfrom);
-    pfrom->nSizeGrapheneBlock = nSizeGrapheneBlock;
 
     uint256 nullhash;
     pfrom->grapheneBlock.nVersion = header.nVersion;
@@ -525,7 +525,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
             }
         }
 
-        if (coinbase == NULL)
+        if (coinbase == nullptr)
         {
             LOG(GRAPHENE, "Error: No coinbase transaction found in graphene block, peer=%s", pfrom->GetLogName());
             return false;
@@ -673,15 +673,14 @@ bool CGrapheneBlock::process(CNode *pfrom,
     pfrom->grapheneBlockWaitingForTxns = -1;
     int blockSize = pfrom->grapheneBlock.GetBlockSize();
     float nCompressionRatio = 0.0;
-    if (pfrom->nSizeGrapheneBlock > 0)
-        nCompressionRatio = (float)blockSize / (float)pfrom->nSizeGrapheneBlock;
+    if (this->GetSize() > 0)
+        nCompressionRatio = (float)blockSize / (float)this->GetSize();
     LOG(GRAPHENE,
         "Reassembled graphene block for %s (%d bytes). Message was %d bytes, compression ratio %3.2f, peer=%s\n",
-        pfrom->grapheneBlock.GetHash().ToString(), blockSize, pfrom->nSizeGrapheneBlock, nCompressionRatio,
-        pfrom->GetLogName());
+        pfrom->grapheneBlock.GetHash().ToString(), blockSize, this->GetSize(), nCompressionRatio, pfrom->GetLogName());
 
     // Update run-time statistics of graphene block bandwidth savings
-    graphenedata.UpdateInBound(pfrom->nSizeGrapheneBlock, blockSize);
+    graphenedata.UpdateInBound(this->GetSize(), blockSize);
     LOG(GRAPHENE, "Graphene block stats: %s\n", graphenedata.ToString().c_str());
 
     // Process the full block
@@ -1363,8 +1362,8 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
 
             pfrom->gr_shorttxidk0 = grapheneBlock.shorttxidk0;
             pfrom->gr_shorttxidk1 = grapheneBlock.shorttxidk1;
-            int nSizeBlock = pblock->GetBlockSize();
-            int nSizeGrapheneBlock = ::GetSerializeSize(grapheneBlock, SER_NETWORK, PROTOCOL_VERSION);
+            uint64_t nSizeBlock = pblock->GetBlockSize();
+            uint64_t nSizeGrapheneBlock = grapheneBlock.GetSize();
 
             // If graphene block is larger than a regular block then send a regular block instead
             if (nSizeGrapheneBlock > nSizeBlock)
