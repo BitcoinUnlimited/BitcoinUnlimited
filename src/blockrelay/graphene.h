@@ -69,6 +69,11 @@ public:
     // memory only
     mutable unsigned int nWaitingFor; // Number of txns we are still needing to recontruct the block
 
+    // memory only
+    std::vector<uint256> vTxHashes256; // List of all 256 bit transaction hashes in the block
+    std::vector<uint64_t> vTxHashes; // List of all 64 bit transaction hashes in the block
+    std::map<uint64_t, CTransactionRef> mapMissingTx; // Map of transactions that were re-requested
+
 public:
     // These describe, in two parts, the 128-bit secret key used for SipHash
     // Note that they are populated by FillShortTxIDSelector, which uses header and sipHashNonce
@@ -160,7 +165,7 @@ public:
     }
 
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
-    bool process(CNode *pfrom, std::string strCommand);
+    bool process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> &pblock);
     bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state);
 };
 

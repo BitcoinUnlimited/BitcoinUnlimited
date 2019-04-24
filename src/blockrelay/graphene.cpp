@@ -25,7 +25,10 @@
 #include "xversionkeys.h"
 
 #include <iomanip>
-static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount);
+static bool ReconstructBlock(CNode *pfrom,
+    int &missingCount,
+    int &unnecessaryCount,
+    std::shared_ptr<CBlockThinRelay> &pblock);
 extern CTweak<uint64_t> grapheneMinVersionSupported;
 extern CTweak<uint64_t> grapheneMaxVersionSupported;
 extern CTweak<uint64_t> grapheneFastFilterCompatibility;
@@ -115,7 +118,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // Message consistency checking
     CInv inv(MSG_GRAPHENEBLOCK, grapheneBlockTx.blockhash);
     if (grapheneBlockTx.vMissingTx.empty() || grapheneBlockTx.blockhash.IsNull() ||
-        pfrom->grapheneBlockHashes.size() < grapheneBlockTx.vMissingTx.size())
+        grapheneBlock.vTxHashes256.size() < grapheneBlockTx.vMissingTx.size())
     {
         graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
 
@@ -158,14 +161,14 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
             pfrom->GetLogName());
     }
 
-    // If canonical ordering is activated, locate empty indexes in pfrom->grapheneBlockHashes to be used in sorting
+    // If canonical ordering is activated, locate empty indexes in vTxHashes256 to be used in sorting
     std::vector<size_t> missingTxIdxs;
     if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
     {
         uint256 nullhash;
-        for (size_t idx = 0; idx < pfrom->grapheneBlockHashes.size(); idx++)
+        for (size_t idx = 0; idx < grapheneBlock.vTxHashes256.size(); idx++)
         {
-            if (pfrom->grapheneBlockHashes[idx] == nullhash)
+            if (grapheneBlock.vTxHashes256[idx] == nullhash)
                 missingTxIdxs.push_back(idx);
         }
     }
@@ -182,16 +185,16 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
         // Insert in arbitrary order if canonical ordering is enabled and xversion is recent enough
         if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
-            pfrom->grapheneBlockHashes[missingTxIdxs[idx++]] = hash;
+            grapheneBlock.vTxHashes256[missingTxIdxs[idx++]] = hash;
         // Otherwise, use ordering information
         else
-            pfrom->grapheneBlockHashes[pfrom->grapheneMapHashOrderIndex[cheapHash]] = hash;
+            grapheneBlock.vTxHashes256[pfrom->grapheneMapHashOrderIndex[cheapHash]] = hash;
     }
     // Sort order transactions if canonical ordering is enabled and xversion is recent enough
     if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
     {
         // coinbase is always first
-        std::sort(pfrom->grapheneBlockHashes.begin() + 1, pfrom->grapheneBlockHashes.end());
+        std::sort(grapheneBlock.vTxHashes256.begin() + 1, grapheneBlock.vTxHashes256.end());
         LOG(GRAPHENE, "Using canonical order for block from peer=%s\n", pfrom->GetLogName());
     }
 
@@ -200,7 +203,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // At this point we should have all the full hashes in the block. Check that the merkle
     // root in the block header matches the merkel root calculated from the hashes provided.
     bool mutated;
-    uint256 merkleroot = ComputeMerkleRoot(pfrom->grapheneBlockHashes, &mutated);
+    uint256 merkleroot = ComputeMerkleRoot(grapheneBlock.vTxHashes256, &mutated);
     if (pfrom->grapheneBlock.hashMerkleRoot != merkleroot || mutated)
     {
         graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
@@ -216,7 +219,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // With grapheneBlocks recovered txs contains only the first 8 bytes of the tx hash.
     {
         READLOCK(orphanpool.cs);
-        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount))
+        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
             return false;
     }
 
@@ -340,10 +343,13 @@ bool CGrapheneBlock::CheckBlockHeader(const CBlockHeader &block, CValidationStat
  */
 bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string strCommand, unsigned nHops)
 {
-    CInv inv(MSG_BLOCK, uint256());
+    // Deserialize grapheneblock and store a block to reconstruct
+    CGrapheneBlock tmp(NegotiateGrapheneVersion(pfrom), NegotiateFastFilterSupport(pfrom));
+    vRecv >> tmp;
+    auto pblock = thinrelay.SetBlockToReconstruct(pfrom, tmp.header.GetHash());
+    pblock->grapheneblock = std::make_shared<CGrapheneBlock>(std::forward<CGrapheneBlock>(tmp));
 
-    CGrapheneBlock grapheneBlock(NegotiateGrapheneVersion(pfrom), NegotiateFastFilterSupport(pfrom));
-    vRecv >> grapheneBlock;
+    CGrapheneBlock &grapheneBlock = *pblock->grapheneblock;
 
     LOG(GRAPHENE, "Block %s from peer %s using Graphene version %d\n", grapheneBlock.header.GetHash().ToString(),
         pfrom->GetLogName(), grapheneBlock.version);
@@ -367,7 +373,6 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
 
     {
         LOCK(cs_main);
-
         CValidationState state;
         CBlockIndex *pIndex = nullptr;
         if (!AcceptBlockHeader(grapheneBlock.header, state, Params(), &pIndex))
@@ -392,7 +397,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
             return true;
         }
 
-        inv.hash = pIndex->GetBlockHash();
+        CInv inv(MSG_BLOCK, pIndex->GetBlockHash());
         requester.UpdateBlockAvailability(pfrom->GetId(), inv.hash);
 
         // Return early if we already have the block data
@@ -433,13 +438,12 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
         }
     }
 
-    bool result = grapheneBlock.process(pfrom, strCommand);
+    bool result = grapheneBlock.process(pfrom, strCommand, pblock);
 
     return result;
 }
 
-bool CGrapheneBlock::process(CNode *pfrom,
-    std::string strCommand) // TODO: request from the "best" txn source not necessarily from the block source
+bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> &pblock)
 {
     // In PV we must prevent two graphene blocks from simulaneously processing from that were recieved from the
     // same peer. This would only happen as in the example of an expedited block coming in
@@ -447,7 +451,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
     if (PV->IsAlreadyValidating(pfrom->id))
         return false;
 
-    graphenedata.ClearGrapheneBlockData(pfrom);
+    CGrapheneBlock &grapheneBlock = *pblock->grapheneblock;
 
     uint256 nullhash;
     pfrom->grapheneBlock.nVersion = header.nVersion;
@@ -570,13 +574,13 @@ bool CGrapheneBlock::process(CNode *pfrom,
                     const auto &elem = mapPartialTxHash.find(cheapHash);
                     if (elem != mapPartialTxHash.end())
                     {
-                        pfrom->grapheneBlockHashes.push_back(elem->second);
+                        grapheneBlock.vTxHashes256.push_back(elem->second);
 
                         nGrapheneTxsPossessed++;
                     }
                     else
                     {
-                        pfrom->grapheneBlockHashes.push_back(nullhash);
+                        grapheneBlock.vTxHashes256.push_back(nullhash);
                         setHashesToRequest.insert(cheapHash);
                     }
                 }
@@ -585,7 +589,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
                 if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
                 {
                     // coinbase is always first
-                    std::sort(pfrom->grapheneBlockHashes.begin() + 1, pfrom->grapheneBlockHashes.end());
+                    std::sort(grapheneBlock.vTxHashes256.begin() + 1, grapheneBlock.vTxHashes256.end());
                     LOG(GRAPHENE, "Using canonical order for block from peer=%s\n", pfrom->GetLogName());
                 }
 
@@ -604,12 +608,12 @@ bool CGrapheneBlock::process(CNode *pfrom,
             if (setHashesToRequest.empty() && !fRequestFailover)
             {
                 bool mutated;
-                uint256 merkleroot = ComputeMerkleRoot(pfrom->grapheneBlockHashes, &mutated);
+                uint256 merkleroot = ComputeMerkleRoot(grapheneBlock.vTxHashes256, &mutated);
                 if (header.hashMerkleRoot != merkleroot || mutated)
                     fMerkleRootCorrect = false;
                 else
                 {
-                    if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount))
+                    if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
                         return false;
                 }
             }
@@ -688,15 +692,19 @@ bool CGrapheneBlock::process(CNode *pfrom,
     return true;
 }
 
-static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount)
+static bool ReconstructBlock(CNode *pfrom,
+    int &missingCount,
+    int &unnecessaryCount,
+    std::shared_ptr<CBlockThinRelay> &pblock)
 {
     AssertLockHeld(orphanpool.cs);
+    CGrapheneBlock &grapheneBlock = *pblock->grapheneblock;
 
     // We must have all the full tx hashes by this point.  We first check for any repeating
     // sequences in transaction id's.  This is a possible attack vector and has been used in the past.
     {
-        std::set<uint256> setHashes(pfrom->grapheneBlockHashes.begin(), pfrom->grapheneBlockHashes.end());
-        if (setHashes.size() != pfrom->grapheneBlockHashes.size())
+        std::set<uint256> setHashes(grapheneBlock.vTxHashes256.begin(), grapheneBlock.vTxHashes256.end());
+        if (setHashes.size() != grapheneBlock.vTxHashes256.size())
         {
             graphenedata.ClearGrapheneBlockData(pfrom, pfrom->grapheneBlock.GetBlockHeader().GetHash());
 
@@ -727,7 +735,7 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
 
     // Look for each transaction in our various pools and buffers.
     // With grapheneBlocks recovered txs contains only the first 8 bytes of the tx hash.
-    for (const uint256 &hash : pfrom->grapheneBlockHashes)
+    for (const uint256 &hash : grapheneBlock.vTxHashes256)
     {
         // Replace the truncated hash with the full hash value if it exists
         CTransactionRef ptx = nullptr;
@@ -1231,7 +1239,6 @@ void CGrapheneBlockData::ClearGrapheneBlockData(CNode *pnode)
 
     // Clear out graphene block data we no longer need
     pnode->grapheneBlock.SetNull();
-    pnode->grapheneBlockHashes.clear();
     pnode->grapheneMapHashOrderIndex.clear();
     pnode->mapGrapheneMissingTx.clear();
 

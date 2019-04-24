@@ -478,7 +478,6 @@ public:
     // BUIPXXX Graphene blocks: begin section
     CCriticalSection cs_graphene;
     CBlockThinRelay grapheneBlock;
-    std::vector<uint256> grapheneBlockHashes;
     std::map<uint64_t, uint32_t> grapheneMapHashOrderIndex;
     std::map<uint64_t, CTransactionRef> mapGrapheneMissingTx;
     CCriticalSection cs_grapheneadditionaltxs; // lock grapheneAdditionalTxs
