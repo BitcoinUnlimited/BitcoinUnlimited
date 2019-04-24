@@ -479,8 +479,6 @@ public:
     CCriticalSection cs_graphene;
     CBlockThinRelay grapheneBlock;
     std::map<uint64_t, uint32_t> grapheneMapHashOrderIndex;
-    CCriticalSection cs_grapheneadditionaltxs; // lock grapheneAdditionalTxs
-    std::vector<CTransactionRef> grapheneAdditionalTxs; // entire transactions included in graphene block
     uint64_t gr_shorttxidk0;
     uint64_t gr_shorttxidk1;
     // BUIPXXX Graphene blocks: end section

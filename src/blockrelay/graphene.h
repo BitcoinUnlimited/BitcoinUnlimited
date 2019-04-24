@@ -72,13 +72,13 @@ public:
     // memory only
     std::vector<uint256> vTxHashes256; // List of all 256 bit transaction hashes in the block
     std::map<uint64_t, CTransactionRef> mapMissingTx; // Map of transactions that were re-requested
+    std::vector<CTransactionRef> vAdditionalTxs; // vector of transactions receiver probably does not have
 
 public:
     // These describe, in two parts, the 128-bit secret key used for SipHash
     // Note that they are populated by FillShortTxIDSelector, which uses header and sipHashNonce
     uint64_t shorttxidk0, shorttxidk1;
     CBlockHeader header;
-    std::vector<CTransactionRef> vAdditionalTxs; // vector of transactions receiver probably does not have
     uint64_t nBlockTxs;
     CGrapheneSet *pGrapheneSet;
     uint64_t version;

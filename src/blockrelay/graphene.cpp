@@ -463,14 +463,6 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     pfrom->gr_shorttxidk0 = shorttxidk0;
     pfrom->gr_shorttxidk1 = shorttxidk1;
 
-    {
-        LOCK(pfrom->cs_grapheneadditionaltxs);
-
-        pfrom->grapheneAdditionalTxs.clear();
-        for (auto tx : vAdditionalTxs)
-            pfrom->grapheneAdditionalTxs.push_back(tx);
-    }
-
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
     // We need to check all transaction sources (orphan list, mempool, and new (incoming) transactions in this block)
     // for a collision.
@@ -727,9 +719,7 @@ static bool ReconstructBlock(CNode *pfrom,
 
     std::map<uint256, CTransactionRef> mapAdditionalTxs;
     {
-        LOCK(pfrom->cs_grapheneadditionaltxs);
-
-        for (auto tx : pfrom->grapheneAdditionalTxs)
+        for (auto tx : grapheneBlock.vAdditionalTxs)
             mapAdditionalTxs[tx->GetHash()] = tx;
     }
 
