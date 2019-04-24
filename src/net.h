@@ -475,13 +475,14 @@ public:
     CCriticalSection cs_xthinblock;
     // BUIP010 Xtreme Thinblocks: end section
 
-    // BUIPXXX Graphene blocks: begin section
+    // Graphene blocks: begin section
     CCriticalSection cs_graphene;
     CBlockThinRelay grapheneBlock;
-    std::map<uint64_t, uint32_t> grapheneMapHashOrderIndex;
+
+    // Store the grapheneblock salt to be used for this peer
     uint64_t gr_shorttxidk0;
     uint64_t gr_shorttxidk1;
-    // BUIPXXX Graphene blocks: end section
+    // Graphene blocks: end section
 
     // Compact Blocks : begin
     CCriticalSection cs_compactblock;

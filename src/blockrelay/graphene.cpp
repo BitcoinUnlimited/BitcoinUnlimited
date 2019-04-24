@@ -188,7 +188,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
             grapheneBlock.vTxHashes256[missingTxIdxs[idx++]] = hash;
         // Otherwise, use ordering information
         else
-            grapheneBlock.vTxHashes256[pfrom->grapheneMapHashOrderIndex[cheapHash]] = hash;
+            grapheneBlock.vTxHashes256[grapheneBlock.mapHashOrderIndex[cheapHash]] = hash;
     }
     // Sort order transactions if canonical ordering is enabled and xversion is recent enough
     if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
@@ -561,7 +561,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
                     // If canonical order is not enabled or xversion is less than 1, update mapHashOrderIndex so
                     // it is available if we later receive missing txs
                     if (!enableCanonicalTxOrder.Value() || NegotiateGrapheneVersion(pfrom) < 1)
-                        pfrom->grapheneMapHashOrderIndex[cheapHash] = i;
+                        grapheneBlock.mapHashOrderIndex[cheapHash] = i;
 
                     const auto &elem = mapPartialTxHash.find(cheapHash);
                     if (elem != mapPartialTxHash.end())
@@ -1229,7 +1229,6 @@ void CGrapheneBlockData::ClearGrapheneBlockData(CNode *pnode)
 
     // Clear out graphene block data we no longer need
     pnode->grapheneBlock.SetNull();
-    pnode->grapheneMapHashOrderIndex.clear();
 
     LOG(GRAPHENE, "Total in-memory graphene bytes size after clearing a graphene block is %ld bytes\n",
         graphenedata.GetGrapheneBlockBytes());

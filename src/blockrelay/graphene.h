@@ -63,7 +63,7 @@ private:
 
 private:
     // memory only
-    mutable uint64_t nSize; // Serialized thinblock size in bytes
+    mutable uint64_t nSize; // Serialized grapheneblock size in bytes
 
 public:
     // memory only
@@ -73,6 +73,7 @@ public:
     std::vector<uint256> vTxHashes256; // List of all 256 bit transaction hashes in the block
     std::map<uint64_t, CTransactionRef> mapMissingTx; // Map of transactions that were re-requested
     std::vector<CTransactionRef> vAdditionalTxs; // vector of transactions receiver probably does not have
+    std::map<uint64_t, uint32_t> mapHashOrderIndex;
 
 public:
     // These describe, in two parts, the 128-bit secret key used for SipHash
