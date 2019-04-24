@@ -66,6 +66,10 @@ private:
     mutable uint64_t nSize; // Serialized thinblock size in bytes
 
 public:
+    // memory only
+    mutable unsigned int nWaitingFor; // Number of txns we are still needing to recontruct the block
+
+public:
     // These describe, in two parts, the 128-bit secret key used for SipHash
     // Note that they are populated by FillShortTxIDSelector, which uses header and sipHashNonce
     uint64_t shorttxidk0, shorttxidk1;
@@ -83,15 +87,17 @@ public:
         uint64_t _version,
         bool _computeOptimized);
     CGrapheneBlock()
-        : nSize(0), shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(2), computeOptimized(false)
+        : nSize(0), nWaitingFor(0), shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(2),
+          computeOptimized(false)
     {
     }
     CGrapheneBlock(uint64_t _version)
-        : nSize(0), shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(_version), computeOptimized(false)
+        : nSize(0), nWaitingFor(0), shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(_version),
+          computeOptimized(false)
     {
     }
     CGrapheneBlock(uint64_t _version, bool _computeOptimized)
-        : nSize(0), shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(_version),
+        : nSize(0), nWaitingFor(0), shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(_version),
           computeOptimized(_computeOptimized)
     {
     }

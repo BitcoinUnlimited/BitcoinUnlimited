@@ -40,7 +40,7 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     : // Use cryptographically strong pseudorandom number because
       // we will extract SipHash secret key from this
       sipHashNonce(GetRand(std::numeric_limits<uint64_t>::max())),
-      nSize(0), shorttxidk0(0), shorttxidk1(0), version(_version), computeOptimized(_computeOptimized)
+      nSize(0), nWaitingFor(0), shorttxidk0(0), shorttxidk1(0), version(_version), computeOptimized(_computeOptimized)
 {
     header = pblock->GetBlockHeader();
     nBlockTxs = pblock->vtx.size();
@@ -151,7 +151,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // it. In that case, the number of missing txs returned will be fewer than the number
     // needed. Because the graphene block will be incomplete without the missing txs, we
     // request a failover block instead.
-    if ((int)grapheneBlockTx.vMissingTx.size() < pfrom->grapheneBlockWaitingForTxns)
+    if (grapheneBlockTx.vMissingTx.size() < grapheneBlock.nWaitingFor)
     {
         RequestFailoverBlock(pfrom, grapheneBlockTx.blockhash);
         return error("Still missing transactions from those returned by sender, peer=%s: re-requesting failover block",
@@ -642,21 +642,20 @@ bool CGrapheneBlock::process(CNode *pfrom,
             return error("TX HASH COLLISION for grapheneblock: requesting a full block, peer=%s", pfrom->GetLogName());
     }
 
-    pfrom->grapheneBlockWaitingForTxns = missingCount;
+    this->nWaitingFor = missingCount;
     LOG(GRAPHENE, "Graphene block waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n",
-        pfrom->grapheneBlockWaitingForTxns, unnecessaryCount, pfrom->grapheneBlock.vtx.size(),
-        pfrom->mapGrapheneMissingTx.size());
+        this->nWaitingFor, unnecessaryCount, pfrom->grapheneBlock.vtx.size(), pfrom->mapGrapheneMissingTx.size());
 
     // If there are any missing hashes or transactions then we request them here.
     // This must be done outside of the mempool.cs lock or may deadlock.
     if (setHashesToRequest.size() > 0)
     {
-        pfrom->grapheneBlockWaitingForTxns = setHashesToRequest.size();
+        this->nWaitingFor = setHashesToRequest.size();
         CRequestGrapheneBlockTx grapheneBlockTx(header.GetHash(), setHashesToRequest);
         pfrom->PushMessage(NetMsgType::GET_GRAPHENETX, grapheneBlockTx);
 
         // Update run-time statistics of graphene block bandwidth savings
-        graphenedata.UpdateInBoundReRequestedTx(pfrom->grapheneBlockWaitingForTxns);
+        graphenedata.UpdateInBoundReRequestedTx(this->nWaitingFor);
 
         return true;
     }
@@ -670,7 +669,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
     }
 
     // We now have all the transactions that are in this block
-    pfrom->grapheneBlockWaitingForTxns = -1;
+    this->nWaitingFor = 0;
     int blockSize = pfrom->grapheneBlock.GetBlockSize();
     float nCompressionRatio = 0.0;
     if (this->GetSize() > 0)
@@ -1232,7 +1231,6 @@ void CGrapheneBlockData::ClearGrapheneBlockData(CNode *pnode)
     pnode->nLocalGrapheneBlockBytes = 0;
 
     // Clear out graphene block data we no longer need
-    pnode->grapheneBlockWaitingForTxns = -1;
     pnode->grapheneBlock.SetNull();
     pnode->grapheneBlockHashes.clear();
     pnode->grapheneMapHashOrderIndex.clear();

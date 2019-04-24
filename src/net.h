@@ -482,7 +482,6 @@ public:
     std::map<uint64_t, uint32_t> grapheneMapHashOrderIndex;
     std::map<uint64_t, CTransactionRef> mapGrapheneMissingTx;
     uint64_t nLocalGrapheneBlockBytes; // the bytes used in creating this graphene block, updated dynamically
-    int grapheneBlockWaitingForTxns; // if -1 then not currently waiting
     CCriticalSection cs_grapheneadditionaltxs; // lock grapheneAdditionalTxs
     std::vector<CTransactionRef> grapheneAdditionalTxs; // entire transactions included in graphene block
     uint64_t gr_shorttxidk0;
