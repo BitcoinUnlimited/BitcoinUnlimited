@@ -2945,7 +2945,8 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     addrFromPort = 0;
 
     // graphene
-    nLocalGrapheneBlockBytes = 0;
+    gr_shorttxidk0 = 0;
+    gr_shorttxidk1 = 0;
 
     // compact blocks
     shorttxidk0 = 0;

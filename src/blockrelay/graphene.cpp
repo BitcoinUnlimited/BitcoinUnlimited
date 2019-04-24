@@ -784,21 +784,21 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
         // to see if we've exceeded any limits and if so clear out data and return.
         if (graphenedata.AddGrapheneBlockBytes(nTxSize, pfrom) > maxAllowedSize)
         {
-            if (ClearLargestGrapheneBlockAndDisconnect(pfrom))
+            if (thinrelay.ClearLargestBlockAndDisconnect(pfrom))
             {
                 return error(
                     "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
-                    pfrom->grapheneBlock.GetHash().ToString(), pfrom->nLocalGrapheneBlockBytes, maxAllowedSize,
+                    pfrom->grapheneBlock.GetHash().ToString(), pfrom->grapheneBlock.nCurrentBlockSize, maxAllowedSize,
                     pfrom->GetLogName());
             }
         }
-        if (pfrom->nLocalGrapheneBlockBytes > maxAllowedSize)
+        if (pfrom->grapheneBlock.nCurrentBlockSize > maxAllowedSize)
         {
             graphenedata.ClearGrapheneBlockData(pfrom, pfrom->grapheneBlock.GetBlockHeader().GetHash());
             pfrom->fDisconnect = true;
             return error(
                 "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
-                pfrom->grapheneBlock.GetHash().ToString(), pfrom->nLocalGrapheneBlockBytes, maxAllowedSize,
+                pfrom->grapheneBlock.GetHash().ToString(), pfrom->grapheneBlock.nCurrentBlockSize, maxAllowedSize,
                 pfrom->GetLogName());
         }
 
@@ -1227,8 +1227,7 @@ void CGrapheneBlockData::ClearGrapheneBlockData(CNode *pnode)
     LOCK(pnode->cs_graphene);
 
     // Remove bytes from counter
-    graphenedata.DeleteGrapheneBlockBytes(pnode->nLocalGrapheneBlockBytes, pnode);
-    pnode->nLocalGrapheneBlockBytes = 0;
+    graphenedata.DeleteGrapheneBlockBytes(pnode->grapheneBlock.nCurrentBlockSize, pnode);
 
     // Clear out graphene block data we no longer need
     pnode->grapheneBlock.SetNull();
@@ -1277,7 +1276,7 @@ void CGrapheneBlockData::ClearGrapheneBlockStats()
 
 uint64_t CGrapheneBlockData::AddGrapheneBlockBytes(uint64_t bytes, CNode *pfrom)
 {
-    pfrom->nLocalGrapheneBlockBytes += bytes;
+    pfrom->grapheneBlock.nCurrentBlockSize += bytes;
     uint64_t ret = nGrapheneBlockBytes.fetch_add(bytes) + bytes;
 
     return ret;
@@ -1285,8 +1284,8 @@ uint64_t CGrapheneBlockData::AddGrapheneBlockBytes(uint64_t bytes, CNode *pfrom)
 
 void CGrapheneBlockData::DeleteGrapheneBlockBytes(uint64_t bytes, CNode *pfrom)
 {
-    if (bytes <= pfrom->nLocalGrapheneBlockBytes)
-        pfrom->nLocalGrapheneBlockBytes -= bytes;
+    if (bytes <= pfrom->grapheneBlock.nCurrentBlockSize)
+        pfrom->grapheneBlock.nCurrentBlockSize -= bytes;
 
     if (bytes <= nGrapheneBlockBytes)
         nGrapheneBlockBytes.fetch_sub(bytes);
@@ -1320,29 +1319,6 @@ void CGrapheneBlockData::FillGrapheneQuickStats(GrapheneQuickStats &stats)
 }
 
 bool IsGrapheneBlockEnabled() { return GetBoolArg("-use-grapheneblocks", DEFAULT_USE_GRAPHENE_BLOCKS); }
-bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom)
-{
-    CNode *pLargest = nullptr;
-    LOCK(cs_vNodes);
-    for (CNode *pnode : vNodes)
-    {
-        if ((pLargest == nullptr) || (pnode->nLocalGrapheneBlockBytes > pLargest->nLocalGrapheneBlockBytes))
-            pLargest = pnode;
-    }
-    if (pLargest != nullptr)
-    {
-        graphenedata.ClearGrapheneBlockData(pLargest, pLargest->grapheneBlock.GetBlockHeader().GetHash());
-        pLargest->fDisconnect = true;
-
-        // If the our node is currently using up the most graphene block bytes then return true so that we
-        // can stop processing this graphene block and let the disconnection happen.
-        if (pfrom == pLargest)
-            return true;
-    }
-
-    return false;
-}
-
 void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CMemPoolInfo &mempoolinfo)
 {
     if (inv.type == MSG_GRAPHENEBLOCK)

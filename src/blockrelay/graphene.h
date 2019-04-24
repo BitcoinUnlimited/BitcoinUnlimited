@@ -369,7 +369,6 @@ extern CGrapheneBlockData graphenedata; // Singleton class
 
 
 bool IsGrapheneBlockEnabled();
-bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom);
 void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CMemPoolInfo &mempoolinfo);
 bool IsGrapheneBlockValid(CNode *pfrom, const CBlockHeader &header);
 bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams);
