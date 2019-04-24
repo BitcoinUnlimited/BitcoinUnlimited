@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "blockrelay/blockrelay_common.h"
+#include "blockrelay/graphene.h"
 #include "net.h"
 #include "random.h"
 #include "requestManager.h"
@@ -261,6 +262,7 @@ std::shared_ptr<CBlockThinRelay> ThinTypeRelay::SetBlockToReconstruct(CNode *pfr
     pblock->thinblock = std::make_shared<CThinBlock>(CThinBlock());
     pblock->xthinblock = std::make_shared<CXThinBlock>(CXThinBlock());
     pblock->cmpctblock = std::make_shared<CompactBlock>(CompactBlock());
+    pblock->grapheneblock = std::make_shared<CGrapheneBlock>(CGrapheneBlock());
 
     mapBlocksReconstruct.insert(
         std::make_pair(pfrom->GetId(), std::make_pair(pblock->GetBlockHeader().GetHash(), pblock)));

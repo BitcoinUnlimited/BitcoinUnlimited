@@ -19,6 +19,7 @@ const bool DEFAULT_2MB_VOTE = false;
 class CXThinBlock;
 class CThinBlock;
 class CompactBlock;
+class CGrapheneBlock;
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
@@ -179,6 +180,7 @@ public:
     std::shared_ptr<CThinBlock> thinblock;
     std::shared_ptr<CXThinBlock> xthinblock;
     std::shared_ptr<CompactBlock> cmpctblock;
+    std::shared_ptr<CGrapheneBlock> grapheneblock;
 
     //! Track the current block size during reconstruction: (memory only)
     uint64_t nCurrentBlockSize;
@@ -191,6 +193,7 @@ public:
         thinblock = nullptr;
         xthinblock = nullptr;
         cmpctblock = nullptr;
+        grapheneblock = nullptr;
     }
 };
 
