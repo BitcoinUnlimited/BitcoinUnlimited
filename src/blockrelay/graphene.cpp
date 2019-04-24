@@ -176,7 +176,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     size_t idx = 0;
     for (const CTransaction &tx : grapheneBlockTx.vMissingTx)
     {
-        pfrom->mapGrapheneMissingTx[GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, tx.GetHash(),
+        grapheneBlock.mapMissingTx[GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, tx.GetHash(),
             NegotiateGrapheneVersion(pfrom))] = MakeTransactionRef(tx);
 
         uint256 hash = tx.GetHash();
@@ -648,7 +648,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
 
     this->nWaitingFor = missingCount;
     LOG(GRAPHENE, "Graphene block waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n",
-        this->nWaitingFor, unnecessaryCount, pfrom->grapheneBlock.vtx.size(), pfrom->mapGrapheneMissingTx.size());
+        this->nWaitingFor, unnecessaryCount, pfrom->grapheneBlock.vtx.size(), grapheneBlock.mapMissingTx.size());
 
     // If there are any missing hashes or transactions then we request them here.
     // This must be done outside of the mempool.cs lock or may deadlock.
@@ -760,8 +760,8 @@ static bool ReconstructBlock(CNode *pfrom,
                     inMemPool = true;
             }
 
-            bool inMissingTx = pfrom->mapGrapheneMissingTx.count(GetShortID(pfrom->gr_shorttxidk0,
-                                   pfrom->gr_shorttxidk1, hash, NegotiateGrapheneVersion(pfrom))) > 0;
+            bool inMissingTx = grapheneBlock.mapMissingTx.count(GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1,
+                                   hash, NegotiateGrapheneVersion(pfrom))) > 0;
             bool inAdditionalTxs = mapAdditionalTxs.count(hash) > 0;
             bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
 
@@ -780,7 +780,7 @@ static bool ReconstructBlock(CNode *pfrom,
             }
             else if (inMissingTx)
             {
-                ptx = pfrom->mapGrapheneMissingTx[GetShortID(
+                ptx = grapheneBlock.mapMissingTx[GetShortID(
                     pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash, NegotiateGrapheneVersion(pfrom))];
                 pfrom->grapheneBlock.setUnVerifiedTxns.insert(hash);
             }
@@ -1240,7 +1240,6 @@ void CGrapheneBlockData::ClearGrapheneBlockData(CNode *pnode)
     // Clear out graphene block data we no longer need
     pnode->grapheneBlock.SetNull();
     pnode->grapheneMapHashOrderIndex.clear();
-    pnode->mapGrapheneMissingTx.clear();
 
     LOG(GRAPHENE, "Total in-memory graphene bytes size after clearing a graphene block is %ld bytes\n",
         graphenedata.GetGrapheneBlockBytes());

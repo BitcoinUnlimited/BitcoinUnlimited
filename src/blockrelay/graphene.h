@@ -71,7 +71,6 @@ public:
 
     // memory only
     std::vector<uint256> vTxHashes256; // List of all 256 bit transaction hashes in the block
-    std::vector<uint64_t> vTxHashes; // List of all 64 bit transaction hashes in the block
     std::map<uint64_t, CTransactionRef> mapMissingTx; // Map of transactions that were re-requested
 
 public:
