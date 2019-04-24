@@ -24,6 +24,8 @@
 
 #include "prevector.h"
 
+// BIP101 : The MAX_SIZE limit needs to be periodicaly adjusted to account for growing
+// block sizes under this bip
 static const unsigned int MAX_SIZE = 0x02000000 * 8; // BU Allow 256MB JSON encodings
 
 /**

@@ -985,8 +985,8 @@ const uint64_t BLOCK_SIZE_START = 32000000; // 32 MB
 const uint64_t ARBITRARY_START_HEIGHT = 10;
 // number of blocks in 2 years assuming 10 min block time; 6 x 24 x 365 x 2
 const uint64_t BLOCK_ADJUSTMENT_INTERVAL = 1050120;
-// the highest multiplier, right now it has an arbitrary value of 10
-const uint64_t MAX_INTERVAL = 10;
+// the highest multiplier, at 30 intervals the block size caps at ~ 34,359,738,368 MB or ~ 34.4 PB
+const uint64_t MAX_INTERVAL = 30;
 
 // we do not consider leap years
 void EnforceBIP101BlockSize(const int &nHeight)
