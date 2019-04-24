@@ -477,7 +477,6 @@ public:
 
     // Graphene blocks: begin section
     CCriticalSection cs_graphene;
-    CBlockThinRelay grapheneBlock;
 
     // Store the grapheneblock salt to be used for this peer
     uint64_t gr_shorttxidk0;

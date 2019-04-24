@@ -359,8 +359,6 @@ public:
     std::string ValidationTimeToString();
     std::string ReRequestedTxToString();
 
-    void ClearGrapheneBlockData(CNode *pfrom);
-    void ClearGrapheneBlockData(CNode *pfrom, const uint256 &hash);
     void ClearGrapheneBlockStats();
 
     uint64_t AddGrapheneBlockBytes(uint64_t, CNode *pfrom);
@@ -378,7 +376,7 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
 bool IsGrapheneBlockValid(CNode *pfrom, const CBlockHeader &header);
 bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams);
 CMemPoolInfo GetGrapheneMempoolInfo();
-void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash);
+void RequestFailoverBlock(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pblock);
 // Generate cheap hash from seeds using SipHash
 uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256 &txhash, uint64_t grapheneVersion);
 // This method decides on the value of computeOptimized depending on what modes are supported
