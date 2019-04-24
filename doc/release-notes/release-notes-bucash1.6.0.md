@@ -46,7 +46,7 @@ been merged in this release:
 - [Segwit P2SH recovery](https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-segwit-recovery.md)
 - [Schnorr signatures](https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-schnorr.md)
 - Compact Block implementations
-- Basic integration with the electrum server [electrs](https://github.com/dagurval/electrs.git) (experimental, off by default), see this [doc](bu-electrum-integration.md) for more info
+- Basic integration with the electrum server [electrs](https://github.com/dagurval/electrs.git) (experimental, off by default), see this [doc](../bu-electrum-integration.md) for more info
 - Graphene: do not send txns oders by leveraging CTOR
 - Graphene: Fast Filter instead of Bloom Filter (optional)
 - Graphene: seeding of IBLT hash function
