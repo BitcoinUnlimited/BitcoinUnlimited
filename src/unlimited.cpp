@@ -978,6 +978,36 @@ int isChainExcessive(const CBlockIndex *blk, unsigned int goBack)
     return (recentExcessive && !oldExcessive);
 }
 
+
+// some arbitrary start height that will be determined later
+const uint64_t BLOCK_SIZE_START = 32000000; // 32 MB
+// the start height is the block we want to be the first block size double (when it goes to 64MB)
+const uint64_t ARBITRARY_START_HEIGHT = 10;
+// number of blocks in 2 years assuming 10 min block time; 6 x 24 x 365 x 2
+const uint64_t BLOCK_ADJUSTMENT_INTERVAL = 1050120;
+// the highest multiplier, right now it has an arbitrary value of 10
+const uint64_t MAX_INTERVAL = 10;
+
+// we do not consider leap years
+void EnforceBIP101BlockSize(const int &nHeight)
+{
+    if(nHeight < ARBITRARY_START_HEIGHT)
+        return;
+    uint64_t heightPastStart = nHeight - ARBITRARY_START_HEIGHT;
+    // we want to round down, using ints will drop any remainder for us
+    uint64_t interval = heightPastStart / BLOCK_ADJUSTMENT_INTERVAL;
+    // some stop internval to cap the max block size
+    if (interval > MAX_INTERVAL)
+    {
+        interval = MAX_INTERVAL;
+    }
+    uint64_t minExcessiveBlockSize = (BLOCK_SIZE_START * (2 * (interval + 1)));
+    if (excessiveBlockSize < minExcessiveBlockSize)
+    {
+        excessiveBlockSize = minExcessiveBlockSize;
+    }
+}
+
 bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, uint64_t nTx, uint64_t largestTx)
 {
     if (blockSize > excessiveBlockSize)

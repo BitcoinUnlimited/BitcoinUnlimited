@@ -150,6 +150,9 @@ extern bool TestConservativeBlockValidity(CValidationState &state,
     bool fCheckPOW,
     bool fCheckMerkleRoot);
 
+// Check that our excessive block size is at least the network upgrade schedule
+void EnforceBIP101BlockSize(const int &nHeight);
+
 // Check whether this block is bigger in some metric than we really want to accept
 extern bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, uint64_t nTx, uint64_t largestTx);
 

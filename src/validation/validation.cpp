@@ -1458,6 +1458,9 @@ bool ContextualCheckBlock(const CBlock &block,
     if (fConservative && (nSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS))
         return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"), REJECT_INVALID, "bad-blk-sigops", true);
 
+    // BU: Before we check for excessive size, check our current excessive size to ensure it is at least on schedule
+    EnforceBIP101BlockSize(nHeight);
+
     // BU: Check whether this block exceeds what we want to relay.
     block.fExcessive = CheckExcessive(block, block.GetBlockSize(), nSigOps, nTx, nLargestTx);
 
