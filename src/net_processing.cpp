@@ -376,7 +376,7 @@ static void enableSendHeaders(CNode *pfrom)
 static void enableCompactBlocks(CNode *pfrom)
 {
     // Tell our peer that we support compact blocks
-    if (IsCompactBlocksEnabled())
+    if (IsCompactBlocksEnabled() && (pfrom->nVersion >= COMPACTBLOCKS_VERSION))
     {
         bool fHighBandwidth = false;
         uint64_t nVersion = 1;
