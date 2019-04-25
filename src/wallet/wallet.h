@@ -263,7 +263,7 @@ public:
     mutable CAmount nAvailableWatchCreditCached;
     mutable CAmount nChangeCached;
 
-    CWalletTx() { Init(NULL); }
+    CWalletTx() { Init(nullptr); }
     CWalletTx(const CWallet *pwalletIn) { Init(pwalletIn); }
     CWalletTx(const CWallet *pwalletIn, const CMerkleTx &txIn) : CMerkleTx(txIn) { Init(pwalletIn); }
     CWalletTx(const CWallet *pwalletIn, const CTransaction &txIn) : CMerkleTx(txIn) { Init(pwalletIn); }
@@ -304,7 +304,7 @@ public:
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
         if (ser_action.ForRead())
-            Init(NULL);
+            Init(nullptr);
         char fSpent = false;
 
         if (!ser_action.ForRead())
@@ -542,7 +542,7 @@ private:
     bool SelectCoins(const CAmount &nTargetValue,
         std::set<std::pair<const CWalletTx *, unsigned int> > &setCoinsRet,
         CAmount &nValueRet,
-        const CCoinControl *coinControl = NULL) const;
+        const CCoinControl *coinControl = nullptr) const;
 
     CWalletDB *pwalletdbEncryption;
 
@@ -607,7 +607,7 @@ public:
     ~CWallet()
     {
         delete pwalletdbEncryption;
-        pwalletdbEncryption = NULL;
+        pwalletdbEncryption = nullptr;
     }
 
     void SetNull()
@@ -616,7 +616,7 @@ public:
         nWalletMaxVersion = FEATURE_BASE;
         fFileBacked = false;
         nMasterKeyMaxID = 0;
-        pwalletdbEncryption = NULL;
+        pwalletdbEncryption = nullptr;
         nOrderPosNext = 0;
         nNextResend = 0;
         nLastResend = 0;
@@ -656,7 +656,7 @@ public:
      */
     void AvailableCoins(std::vector<COutput> &vCoins,
         bool fOnlyConfirmed = true,
-        const CCoinControl *coinControl = NULL,
+        const CCoinControl *coinControl = nullptr,
         bool fIncludeZeroValue = false) const;
 
     /**
@@ -771,7 +771,7 @@ public:
         CAmount &nFeeRet,
         int &nChangePosRet,
         std::string &strFailReason,
-        const CCoinControl *coinControl = NULL,
+        const CCoinControl *coinControl = nullptr,
         bool sign = true);
     bool CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey);
 
@@ -858,7 +858,7 @@ public:
 
     //! signify that a particular wallet feature is now used. this may change nWalletVersion and nWalletMaxVersion if
     //! those are lower
-    bool SetMinVersion(enum WalletFeature, CWalletDB *pwalletdbIn = NULL, bool fExplicit = false);
+    bool SetMinVersion(enum WalletFeature, CWalletDB *pwalletdbIn = nullptr, bool fExplicit = false);
 
     //! change which version we're allowed to upgrade to (note that this does not immediately imply upgrading to that
     //! format)

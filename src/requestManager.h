@@ -55,7 +55,7 @@ public:
     CNode *node;
     CNodeRequestData(CNode *);
 
-    CNodeRequestData() : requestCount(0), desirability(0), node(NULL) {}
+    CNodeRequestData() : requestCount(0), desirability(0), node(nullptr) {}
     void clear(void)
     {
         requestCount = 0;

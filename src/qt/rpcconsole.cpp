@@ -56,7 +56,7 @@ const struct
     const char *url;
     const char *source;
 } ICON_MAPPING[] = {{"cmd-request", ":/icons/tx_input"}, {"cmd-reply", ":/icons/tx_output"},
-    {"cmd-error", ":/icons/tx_output"}, {"misc", ":/icons/tx_inout"}, {NULL, NULL}};
+    {"cmd-error", ":/icons/tx_output"}, {"misc", ":/icons/tx_inout"}, {nullptr, nullptr}};
 
 /* Object for executing console RPC commands in a separate thread.
 */
@@ -384,7 +384,7 @@ void RPCConsole::setClientModel(ClientModel *model)
         setNumConnections(model->getNumConnections());
         connect(model, SIGNAL(numConnectionsChanged(int)), this, SLOT(setNumConnections(int)));
 
-        setNumBlocks(model->getNumBlocks(), model->getLastBlockDate(), model->getVerificationProgress(NULL));
+        setNumBlocks(model->getNumBlocks(), model->getLastBlockDate(), model->getVerificationProgress(nullptr));
         connect(
             model, SIGNAL(numBlocksChanged(int, QDateTime, double)), this, SLOT(setNumBlocks(int, QDateTime, double)));
         connect(model, SIGNAL(timeSinceLastBlockChanged(qint64)), this, SLOT(updateTimeSinceLastBlock(qint64)));
@@ -875,7 +875,7 @@ void RPCConsole::peerLayoutChanged()
     if (!clientModel || !clientModel->getPeerTableModel())
         return;
 
-    const CNodeCombinedStats *stats = NULL;
+    const CNodeCombinedStats *stats = nullptr;
     bool fUnselect = false;
     bool fReselect = false;
 

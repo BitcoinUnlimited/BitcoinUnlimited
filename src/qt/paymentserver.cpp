@@ -53,13 +53,13 @@ const char *BIP71_MIMETYPE_PAYMENT = "application/bitcoincash-payment";
 const char *BIP71_MIMETYPE_PAYMENTACK = "application/bitcoincash-paymentack";
 const char *BIP71_MIMETYPE_PAYMENTREQUEST = "application/bitcoincash-paymentrequest";
 
-X509_STORE *PaymentServer::certStore = NULL;
+X509_STORE *PaymentServer::certStore = nullptr;
 void PaymentServer::freeCertStore()
 {
-    if (PaymentServer::certStore != NULL)
+    if (PaymentServer::certStore != nullptr)
     {
         X509_STORE_free(PaymentServer::certStore);
-        PaymentServer::certStore = NULL;
+        PaymentServer::certStore = nullptr;
     }
 }
 
@@ -101,7 +101,7 @@ static void ReportInvalidCertificate(const QSslCertificate &cert)
 //
 void PaymentServer::LoadRootCAs(X509_STORE *_store)
 {
-    if (PaymentServer::certStore == NULL)
+    if (PaymentServer::certStore == nullptr)
         atexit(PaymentServer::freeCertStore);
     else
         freeCertStore();
@@ -146,7 +146,7 @@ void PaymentServer::LoadRootCAs(X509_STORE *_store)
 
     Q_FOREACH (const QSslCertificate &cert, certList)
     {
-        // Don't log NULL certificates
+        // Don't log nullptr certificates
         if (cert.isNull())
             continue;
 
@@ -323,7 +323,7 @@ bool PaymentServer::ipcSendCommandLine()
         if (!socket->waitForConnected(BITCOIN_IPC_CONNECT_TIMEOUT))
         {
             delete socket;
-            socket = NULL;
+            socket = nullptr;
             return false;
         }
 
@@ -339,7 +339,7 @@ bool PaymentServer::ipcSendCommandLine()
         socket->disconnectFromServer();
 
         delete socket;
-        socket = NULL;
+        socket = nullptr;
         fResult = true;
     }
 
@@ -408,7 +408,7 @@ void PaymentServer::initNetManager()
 {
     if (!optionsModel)
         return;
-    if (netManager != NULL)
+    if (netManager != nullptr)
         delete netManager;
 
     // netManager is used to fetch paymentrequests given in bitcoincash: URIs

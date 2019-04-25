@@ -80,7 +80,7 @@ BOOST_AUTO_TEST_CASE(GetBlockProofEquivalentTime_test)
     std::vector<CBlockIndex> blocks(10000);
     for (int i = 0; i < 10000; i++)
     {
-        blocks[i].pprev = i ? &blocks[i - 1] : NULL;
+        blocks[i].pprev = i ? &blocks[i - 1] : nullptr;
         blocks[i].nHeight = i;
         blocks[i].nTime = 1269211443 + i * params.nPowTargetSpacing;
         blocks[i].nBits = 0x207fffff; /* target 0x7fffff000... */

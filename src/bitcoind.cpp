@@ -257,7 +257,7 @@ bool AppInit(int argc, char *argv[])
     }
     catch (...)
     {
-        PrintExceptionContinue(NULL, "AppInit()");
+        PrintExceptionContinue(nullptr, "AppInit()");
     }
 
     if (!fRet)

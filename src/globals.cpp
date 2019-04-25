@@ -208,8 +208,8 @@ CCriticalSection cs_mapRelay;
 
 vector<CNode *> vNodes;
 list<CNode *> vNodesDisconnected;
-CSemaphore *semOutbound = NULL;
-CSemaphore *semOutboundAddNode = NULL; // BU: separate semaphore for -addnodes
+CSemaphore *semOutbound = nullptr;
+CSemaphore *semOutboundAddNode = nullptr; // BU: separate semaphore for -addnodes
 CNodeSignals g_signals;
 CAddrMan addrman;
 CDoSManager dosMan;

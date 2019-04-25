@@ -27,10 +27,10 @@ public:
         if (nSize > m_remaining)
             throw std::ios_base::failure(std::string(__func__) + ": end of data");
 
-        if (pch == NULL)
+        if (pch == nullptr)
             throw std::ios_base::failure(std::string(__func__) + ": bad destination buffer");
 
-        if (m_data == NULL)
+        if (m_data == nullptr)
             throw std::ios_base::failure(std::string(__func__) + ": bad source buffer");
 
         memcpy(pch, m_data, nSize);
@@ -93,7 +93,7 @@ static int verify_script(const unsigned char *scriptPubKey,
         set_error(err, bitcoinconsensus_ERR_OK);
 
         return VerifyScript(tx.vin[nIn].scriptSig, CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), flags, maxOps,
-            TransactionSignatureChecker(&tx, nIn, amount, flags), NULL);
+            TransactionSignatureChecker(&tx, nIn, amount, flags), nullptr);
     }
     catch (const std::exception &)
     {

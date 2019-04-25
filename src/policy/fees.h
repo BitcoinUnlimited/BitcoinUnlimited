@@ -276,7 +276,7 @@ private:
         TxConfirmStats *stats;
         unsigned int blockHeight;
         unsigned int bucketIndex;
-        TxStatsInfo() : stats(NULL), blockHeight(0), bucketIndex(0) {}
+        TxStatsInfo() : stats(nullptr), blockHeight(0), bucketIndex(0) {}
     };
 
     // map of txids to information about that transaction

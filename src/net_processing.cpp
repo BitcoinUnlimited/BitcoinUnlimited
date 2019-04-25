@@ -1144,7 +1144,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     break;
             }
         }
-        // pindex can be NULL either if we sent chainActive.Tip() OR
+        // pindex can be nullptr either if we sent chainActive.Tip() OR
         // if our peer has chainActive.Tip() (and thus we are sending an empty
         // headers message). In both cases it's safe to update
         // pindexBestHeaderSent to be our tip.
@@ -2391,7 +2391,7 @@ bool SendMessages(CNode *pto)
                     {
                         continue; // keep looking for the first new block
                     }
-                    else if (pindex->pprev == NULL || PeerHasHeader(state, pindex->pprev))
+                    else if (pindex->pprev == nullptr || PeerHasHeader(state, pindex->pprev))
                     {
                         // Peer doesn't have this header but they do have the prior one.
                         // Start sending headers.

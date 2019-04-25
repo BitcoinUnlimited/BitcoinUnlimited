@@ -26,7 +26,7 @@ class LessThanValidator : public QIntValidator
 
 public:
     LessThanValidator(int minimum, int maximum, QObject *parent = 0)
-        : QIntValidator(minimum, maximum, parent), other(NULL), errorDisplay(NULL)
+        : QIntValidator(minimum, maximum, parent), other(nullptr), errorDisplay(nullptr)
     {
     }
 

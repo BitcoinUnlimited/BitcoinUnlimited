@@ -365,10 +365,10 @@ public:
     void Compact() const
     {
         // workaround for google/leveldb#227
-        // NULL batch means just wait for earlier writes to be done
+        // nullptr batch means just wait for earlier writes to be done
         leveldb::WriteBatch b;
         pdb->Write(writeoptions, &b);
-        pdb->CompactRange(NULL, NULL);
+        pdb->CompactRange(nullptr, nullptr);
     }
 
     /**
