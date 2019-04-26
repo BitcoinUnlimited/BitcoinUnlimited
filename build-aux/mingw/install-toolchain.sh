@@ -28,7 +28,7 @@ mingw-get install msys-autoconf-bin
 mingw-get install msys-automake-bin
 mingw-get install msys-libtool-bin
 # NOTE: This is a very old version of wget (v1.12) and does not support TLSv1.2
-#       so we will only use this version to download the latest version v1.19.2
+#       so we will only use this version to download the latest version v1.20.3
 mingw-get install msys-wget-bin
 
 
@@ -36,25 +36,26 @@ mingw-get install msys-wget-bin
 mkdir -p "$DEPS_ROOT"
 cd "$DEPS_ROOT"
 
-# Use the v1.12 wget client to download & install the v1.19 version
+# Use the v1.12 wget client to download & install the v1.20 version
 # don't download if already downloaded
-if [ ! -e wget-1.19.4-win32.zip ]
+if [ ! -e wget-1.20.3-win32.zip ]
 then
-	wget --no-check-certificate https://eternallybored.org/misc/wget/releases/wget-1.19.4-win32.zip -O "$DEPS_ROOT/wget-1.19.4-win32.zip"
+	wget --no-check-certificate https://eternallybored.org/misc/wget/releases/wget-1.20.3-win32.zip -O "$DEPS_ROOT/wget-1.20.3-win32.zip"
 	# Verify downloaded file's hash
 	# NOTE: This hash was self computed as it was not provided by the author
 	# v1.19.4 win32 sha256=b1a7e4ba4ab7f78e588c1186f2a5d7e1726628a5a66c645e41f8105b7cf5f61c
-	check_hash b1a7e4ba4ab7f78e588c1186f2a5d7e1726628a5a66c645e41f8105b7cf5f61c "$DEPS_ROOT/wget-1.19.4-win32.zip"
+	# v1.20.3 win32 sha256=021F547BACA74FCA939D50951CE967502D160A7502F02FAB706F9293E1475FB8
+	check_hash 021F547BACA74FCA939D50951CE967502D160A7502F02FAB706F9293E1475FB8 "$DEPS_ROOT/wget-1.20.3-win32.zip"
 fi
 # don't extract if already extracted
-if [ ! -d wget-1.19.4-win32 ]
+if [ ! -d wget-1.20.3-win32 ]
 then
-	"$CMD_7ZIP" x wget-1.19.4-win32.zip -aoa -o"$DEPS_ROOT/wget-1.19.4-win32"
-	cd "$DEPS_ROOT/wget-1.19.4-win32"
+	"$CMD_7ZIP" x wget-1.20.3-win32.zip -aoa -o"$DEPS_ROOT/wget-1.20.3-win32"
+	cd "$DEPS_ROOT/wget-1.20.3-win32"
 	cp wget.exe "$MSYS_BIN/wget.exe"
 fi
 #pause for debugging purposes
-#read -rsp $'Press any key to continue...\n' -n 1 key
+read -rsp $'Press any key to continue...\n' -n 1 key
 
 
 
