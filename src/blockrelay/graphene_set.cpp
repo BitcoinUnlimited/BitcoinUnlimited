@@ -72,19 +72,19 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     if (computeOptimized)
     {
         LOG(GRAPHENE, "using compute-optimized Bloom filter\n");
-        pFastFilter = new CVariableFastFilter(nItems, fpr);
+        pFastFilter = std::make_shared<CVariableFastFilter>(CVariableFastFilter(nItems, fpr));
     }
     else
     {
         LOG(GRAPHENE, "using regular Bloom filter\n");
-        pSetFilter = new CBloomFilter(
-            nItems, fpr, insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
+        pSetFilter = std::make_shared<CBloomFilter>(CBloomFilter(
+            nItems, fpr, insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max()));
     }
     LOG(GRAPHENE, "fp rate: %f Num elements in bloom filter: %d\n", fpr, nItems);
 
     // Construct IBLT
     uint64_t nIbltCells = std::max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
-    pSetIblt = new CIblt(nIbltCells, ibltSalt, version >= 2);
+    pSetIblt = std::make_shared<CIblt>(CIblt(nIbltCells, ibltSalt, version >= 2));
     std::map<uint64_t, uint256> mapCheapHashes;
 
     LOG(GRAPHENE, "constructed IBLT with %d cells\n", nIbltCells);

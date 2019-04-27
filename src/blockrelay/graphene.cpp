@@ -71,22 +71,15 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     }
 
     if (enableCanonicalTxOrder.Value())
-        pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, shorttxidk0,
-            shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, computeOptimized, false);
+        pGrapheneSet =
+            std::make_shared<CGrapheneSet>(CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes,
+                shorttxidk0, shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, computeOptimized, false));
     else
-        pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, shorttxidk0,
-            shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, computeOptimized, true);
+        pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock,
+            blockHashes, shorttxidk0, shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, computeOptimized, true));
 }
 
-CGrapheneBlock::~CGrapheneBlock()
-{
-    if (pGrapheneSet)
-    {
-        delete pGrapheneSet;
-        pGrapheneSet = nullptr;
-    }
-}
-
+CGrapheneBlock::~CGrapheneBlock() { pGrapheneSet = nullptr; }
 void CGrapheneBlock::FillShortTxIDSelector()
 {
     CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);

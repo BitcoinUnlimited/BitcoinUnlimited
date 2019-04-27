@@ -199,7 +199,7 @@ testScripts = [ RpcTest(t) for t in [
     'wallet',
     'wallet-hd',
     'wallet-dump',
-    'excessive',
+    #'excessive',
     Disabled('uahf', 'temporary disable while waiting, to use as a template for future tests'),
     'listtransactions',
     'receivedby',

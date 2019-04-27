@@ -186,6 +186,7 @@ public:
     uint64_t nCurrentBlockSize;
 
     CBlockThinRelay() { SetNull(); }
+    ~CBlockThinRelay() { SetNull(); }
     void SetNull()
     {
         CBlock::SetNull();

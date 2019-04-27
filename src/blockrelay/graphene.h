@@ -81,7 +81,7 @@ public:
     uint64_t shorttxidk0, shorttxidk1;
     CBlockHeader header;
     uint64_t nBlockTxs;
-    CGrapheneSet *pGrapheneSet;
+    std::shared_ptr<CGrapheneSet> pGrapheneSet;
     uint64_t version;
     bool computeOptimized;
 
@@ -142,13 +142,13 @@ public:
         if (!pGrapheneSet)
         {
             if (version > 3)
-                pGrapheneSet = new CGrapheneSet(3, computeOptimized);
+                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(3, computeOptimized));
             else if (version == 3)
-                pGrapheneSet = new CGrapheneSet(2);
+                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(2));
             else if (version == 2)
-                pGrapheneSet = new CGrapheneSet(1);
+                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(1));
             else
-                pGrapheneSet = new CGrapheneSet(0);
+                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(0));
         }
         READWRITE(*pGrapheneSet);
     }
