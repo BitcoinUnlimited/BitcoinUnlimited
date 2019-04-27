@@ -325,7 +325,7 @@ bool ThinTypeRelay::ClearLargestBlockAndDisconnect(CNode *pfrom)
     return false;
 }
 
-uint64_t ThinTypeRelay::AddTotalBlockBytes(uint64_t bytes, std::shared_ptr<CBlockThinRelay> &pblock)
+uint64_t ThinTypeRelay::AddTotalBlockBytes(uint64_t bytes, std::shared_ptr<CBlockThinRelay> pblock)
 {
     pblock->nCurrentBlockSize += bytes;
     uint64_t ret = nTotalBlockBytes.fetch_add(bytes) + bytes;
@@ -343,7 +343,7 @@ void ThinTypeRelay::DeleteTotalBlockBytes(uint64_t bytes)
 
 // After a thintype block is finished processing or if for some reason we have to pre-empt the rebuilding
 // of a thintype block then we clear out the thinblock bytes from the total.
-void ThinTypeRelay::ClearBlockBytes(std::shared_ptr<CBlockThinRelay> &pblock)
+void ThinTypeRelay::ClearBlockBytes(std::shared_ptr<CBlockThinRelay> pblock)
 {
     // Remove bytes from counter
     if (pblock != nullptr)
@@ -353,7 +353,7 @@ void ThinTypeRelay::ClearBlockBytes(std::shared_ptr<CBlockThinRelay> &pblock)
         GetTotalBlockBytes());
 }
 
-void ThinTypeRelay::ClearAllBlockData(CNode *pnode, std::shared_ptr<CBlockThinRelay> &pblock)
+void ThinTypeRelay::ClearAllBlockData(CNode *pnode, std::shared_ptr<CBlockThinRelay> pblock)
 {
     // We must make sure to clear the block data first before clearing the thinblock in flight.
     uint256 hash = pblock->GetBlockHeader().GetHash();

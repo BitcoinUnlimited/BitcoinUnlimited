@@ -78,10 +78,10 @@ public:
 
     // Accessor methods for tracking total block bytes for all blocks currently in the process
     // of being reconstructed.
-    uint64_t AddTotalBlockBytes(uint64_t, std::shared_ptr<CBlockThinRelay> &pblock);
+    uint64_t AddTotalBlockBytes(uint64_t, std::shared_ptr<CBlockThinRelay> pblock);
     void DeleteTotalBlockBytes(uint64_t bytes);
-    void ClearBlockBytes(std::shared_ptr<CBlockThinRelay> &pblock);
-    void ClearAllBlockData(CNode *pnode, std::shared_ptr<CBlockThinRelay> &pblock);
+    void ClearBlockBytes(std::shared_ptr<CBlockThinRelay> pblock);
+    void ClearAllBlockData(CNode *pnode, std::shared_ptr<CBlockThinRelay> pblock);
     void ResetTotalBlockBytes();
     uint64_t GetTotalBlockBytes();
 };

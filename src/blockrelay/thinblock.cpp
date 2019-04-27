@@ -35,7 +35,7 @@ static bool ReconstructBlock(CNode *pfrom,
     int &missingCount,
     int &unnecessaryCount,
     const std::vector<uint256> &vHashes,
-    std::shared_ptr<CBlockThinRelay> &pblock);
+    std::shared_ptr<CBlockThinRelay> pblock);
 
 CThinBlock::CThinBlock(const CBlock &block, const CBloomFilter &filter) : nSize(0), nWaitingFor(0)
 {
@@ -69,23 +69,23 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     auto pblock = thinrelay.SetBlockToReconstruct(pfrom, tmp.header.GetHash());
     pblock->thinblock = std::make_shared<CThinBlock>(std::forward<CThinBlock>(tmp));
 
-    CThinBlock &thinBlock = *pblock->thinblock;
+    std::shared_ptr<CThinBlock> thinBlock = pblock->thinblock;
 
     // Message consistency checking
-    if (!IsThinBlockValid(pfrom, thinBlock.vMissingTx, thinBlock.header))
+    if (!IsThinBlockValid(pfrom, thinBlock->vMissingTx, thinBlock->header))
     {
         dosMan.Misbehaving(pfrom, 100);
         return error("Invalid thinblock received");
     }
 
     // Is there a previous block or header to connect with?
-    CBlockIndex *pprev = LookupBlockIndex(thinBlock.header.hashPrevBlock);
+    CBlockIndex *pprev = LookupBlockIndex(thinBlock->header.hashPrevBlock);
     if (!pprev)
         return error("thinblock from peer %s will not connect, unknown previous block %s", pfrom->GetLogName(),
-            thinBlock.header.hashPrevBlock.ToString());
+            thinBlock->header.hashPrevBlock.ToString());
 
     CValidationState state;
-    if (!ContextualCheckBlockHeader(thinBlock.header, state, pprev))
+    if (!ContextualCheckBlockHeader(thinBlock->header, state, pprev))
     {
         // Thin block does not fit within our blockchain
         dosMan.Misbehaving(pfrom, 100);
@@ -93,9 +93,9 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
             "thinblock from peer %s contextual error: %s", pfrom->GetLogName(), state.GetRejectReason().c_str());
     }
 
-    CInv inv(MSG_BLOCK, thinBlock.header.GetHash());
+    CInv inv(MSG_BLOCK, thinBlock->header.GetHash());
     LOG(THIN, "received thinblock %s from peer %s of %d bytes\n", inv.hash.ToString(), pfrom->GetLogName(),
-        thinBlock.GetSize());
+        thinBlock->GetSize());
 
     // Ban a node for sending unrequested thinblocks unless from an expedited node.
     {
@@ -117,10 +117,10 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         return true;
     }
 
-    return thinBlock.process(pfrom, pblock);
+    return thinBlock->process(pfrom, pblock);
 }
 
-bool CThinBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pblock)
+bool CThinBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
 {
     pblock->nVersion = header.nVersion;
     pblock->nBits = header.nBits;
@@ -485,11 +485,11 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
     auto pblock = thinrelay.SetBlockToReconstruct(pfrom, tmp.header.GetHash());
     pblock->xthinblock = std::make_shared<CXThinBlock>(std::forward<CXThinBlock>(tmp));
 
-    CXThinBlock &thinBlock = *pblock->xthinblock;
-    CInv inv(MSG_BLOCK, thinBlock.header.GetHash());
+    std::shared_ptr<CXThinBlock> thinBlock = pblock->xthinblock;
+    CInv inv(MSG_BLOCK, thinBlock->header.GetHash());
     {
         // Message consistency checking (FIXME: some redundancy here with AcceptBlockHeader)
-        if (!IsThinBlockValid(pfrom, thinBlock.vMissingTx, thinBlock.header))
+        if (!IsThinBlockValid(pfrom, thinBlock->vMissingTx, thinBlock->header))
         {
             dosMan.Misbehaving(pfrom, 100);
             LOGA("Received an invalid %s from peer %s\n", strCommand, pfrom->GetLogName());
@@ -499,16 +499,16 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
         }
 
         // Is there a previous block or header to connect with?
-        if (!LookupBlockIndex(thinBlock.header.hashPrevBlock))
+        if (!LookupBlockIndex(thinBlock->header.hashPrevBlock))
         {
             return error("xthinblock from peer %s will not connect, unknown previous block %s", pfrom->GetLogName(),
-                thinBlock.header.hashPrevBlock.ToString());
+                thinBlock->header.hashPrevBlock.ToString());
         }
 
         LOCK(cs_main);
         CValidationState state;
         CBlockIndex *pIndex = nullptr;
-        if (!AcceptBlockHeader(thinBlock.header, state, Params(), &pIndex))
+        if (!AcceptBlockHeader(thinBlock->header, state, Params(), &pIndex))
         {
             thinrelay.ClearAllBlockData(pfrom, pblock);
             LOGA("Received an invalid %s header from peer %s\n", strCommand, pfrom->GetLogName());
@@ -535,14 +535,14 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
             thinrelay.ClearAllBlockData(pfrom, pblock);
             LOG(THIN, "Received xthinblock but returning because we already have block data %s from peer %s hop"
                       " %d size %d bytes\n",
-                inv.hash.ToString(), pfrom->GetLogName(), nHops, thinBlock.GetSize());
+                inv.hash.ToString(), pfrom->GetLogName(), nHops, thinBlock->GetSize());
             return true;
         }
 
         // Request full block if it isn't extending the best chain
         if (pIndex->nChainWork <= chainActive.Tip()->nChainWork)
         {
-            thinrelay.RequestBlock(pfrom, thinBlock.header.GetHash());
+            thinrelay.RequestBlock(pfrom, thinBlock->header.GetHash());
             thinrelay.ClearAllBlockData(pfrom, pblock);
             LOGA("%s %s from peer %s received but does not extend longest chain; requesting full block\n", strCommand,
                 inv.hash.ToString(), pfrom->GetLogName());
@@ -557,12 +557,12 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
                 return true;
 
             LOG(THIN, "Received new expedited %s %s from peer %s hop %d size %d bytes\n", strCommand,
-                inv.hash.ToString(), pfrom->GetLogName(), nHops, thinBlock.GetSize());
+                inv.hash.ToString(), pfrom->GetLogName(), nHops, thinBlock->GetSize());
         }
         else
         {
             LOG(THIN, "Received %s %s from peer %s. Size %d bytes.\n", strCommand, inv.hash.ToString(),
-                pfrom->GetLogName(), thinBlock.GetSize());
+                pfrom->GetLogName(), thinBlock->GetSize());
 
             // Do not process unrequested xthinblocks unless from an expedited node.
             if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::XTHINBLOCK) && !connmgr->IsExpeditedUpstream(pfrom))
@@ -575,12 +575,12 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
     }
 
     // Send expedited block without checking merkle root.
-    SendExpeditedBlock(thinBlock, nHops, pfrom);
+    SendExpeditedBlock(*thinBlock, nHops, pfrom);
 
-    return thinBlock.process(pfrom, strCommand, pblock);
+    return thinBlock->process(pfrom, strCommand, pblock);
 }
 
-bool CXThinBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> &pblock)
+bool CXThinBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> pblock)
 // TODO: request from the "best" txn source not necessarily from the block source
 {
     // In PV we must prevent two thinblocks from simulaneously processing from that were recieved from the
@@ -757,7 +757,7 @@ static bool ReconstructBlock(CNode *pfrom,
     int &missingCount,
     int &unnecessaryCount,
     const std::vector<uint256> &vHashes,
-    std::shared_ptr<CBlockThinRelay> &pblock)
+    std::shared_ptr<CBlockThinRelay> pblock)
 {
     AssertLockHeld(orphanpool.cs);
 

@@ -227,7 +227,7 @@ public:
      * @return True if handling succeeded
      */
     static bool HandleMessage(CDataStream &vRecv, CNode *pfrom);
-    bool process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pblock);
+    bool process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock);
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
     uint64_t GetShortID(const uint256 &txhash) const;
 

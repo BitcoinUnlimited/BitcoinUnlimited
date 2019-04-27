@@ -63,7 +63,7 @@ public:
     }
 
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
-    bool process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pblock);
+    bool process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock);
 
     uint64_t GetSize() const
     {
@@ -121,7 +121,7 @@ public:
         READWRITE(vMissingTx);
     }
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
-    bool process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> &pblock);
+    bool process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> pblock);
     bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state);
 
     uint64_t GetSize() const

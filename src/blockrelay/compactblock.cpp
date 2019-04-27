@@ -41,7 +41,7 @@
 static bool ReconstructBlock(CNode *pfrom,
     int &missingCount,
     int &unnecessaryCount,
-    std::shared_ptr<CBlockThinRelay> &pblock);
+    std::shared_ptr<CBlockThinRelay> pblock);
 
 
 uint64_t GetShortID(const uint64_t &shorttxidk0, const uint64_t &shorttxidk1, const uint256 &txhash)
@@ -133,19 +133,19 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     auto pblock = thinrelay.SetBlockToReconstruct(pfrom, tmp.header.GetHash());
     pblock->cmpctblock = std::make_shared<CompactBlock>(std::forward<CompactBlock>(tmp));
 
-    CompactBlock &compactBlock = *pblock->cmpctblock;
+    std::shared_ptr<CompactBlock> compactBlock = pblock->cmpctblock;
 
     // Message consistency checking
-    IsCompactBlockValid(pfrom, compactBlock);
+    IsCompactBlockValid(pfrom, *compactBlock);
 
     // Is there a previous block or header to connect with?
-    CBlockIndex *pprev = LookupBlockIndex(compactBlock.header.hashPrevBlock);
+    CBlockIndex *pprev = LookupBlockIndex(compactBlock->header.hashPrevBlock);
     if (!pprev)
         return error("compact block from peer %s will not connect, unknown previous block %s", pfrom->GetLogName(),
-            compactBlock.header.hashPrevBlock.ToString());
+            compactBlock->header.hashPrevBlock.ToString());
 
     CValidationState state;
-    if (!ContextualCheckBlockHeader(compactBlock.header, state, pprev))
+    if (!ContextualCheckBlockHeader(compactBlock->header, state, pprev))
     {
         // compact block does not fit within our blockchain
         dosMan.Misbehaving(pfrom, 100);
@@ -153,9 +153,9 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
             "compact block from peer %s contextual error: %s", pfrom->GetLogName(), state.GetRejectReason().c_str());
     }
 
-    CInv inv(MSG_BLOCK, compactBlock.header.GetHash());
+    CInv inv(MSG_BLOCK, compactBlock->header.GetHash());
     LOG(CMPCT, "received compact block %s from peer %s of %d bytes\n", inv.hash.ToString(), pfrom->GetLogName(),
-        compactBlock.GetSize());
+        compactBlock->GetSize());
 
     // Ban a node for sending unrequested compact blocks
     if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::CMPCTBLOCK))
@@ -175,11 +175,11 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         return true;
     }
 
-    return compactBlock.process(pfrom, pblock);
+    return compactBlock->process(pfrom, pblock);
 }
 
 
-bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pblock)
+bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
 {
     pblock->nVersion = header.nVersion;
     pblock->nBits = header.nBits;
@@ -599,7 +599,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 static bool ReconstructBlock(CNode *pfrom,
     int &missingCount,
     int &unnecessaryCount,
-    std::shared_ptr<CBlockThinRelay> &pblock)
+    std::shared_ptr<CBlockThinRelay> pblock)
 {
     AssertLockHeld(orphanpool.cs);
 

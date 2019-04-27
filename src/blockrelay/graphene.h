@@ -165,7 +165,7 @@ public:
     }
 
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
-    bool process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> &pblock);
+    bool process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> pblock);
     bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state);
 };
 
@@ -376,7 +376,7 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
 bool IsGrapheneBlockValid(CNode *pfrom, const CBlockHeader &header);
 bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams);
 CMemPoolInfo GetGrapheneMempoolInfo();
-void RequestFailoverBlock(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pblock);
+void RequestFailoverBlock(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock);
 // Generate cheap hash from seeds using SipHash
 uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256 &txhash, uint64_t grapheneVersion);
 // This method decides on the value of computeOptimized depending on what modes are supported

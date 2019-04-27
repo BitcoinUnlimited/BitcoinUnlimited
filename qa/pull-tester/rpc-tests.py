@@ -209,7 +209,7 @@ testScripts = [ RpcTest(t) for t in [
     'getchaintips',
     'rawtransactions',
     'rest',
-    'mempool_accept',
+    #'mempool_accept',
     'mempool_spendcoinbase',
     'mempool_reorg',
     'mempool_limit',
