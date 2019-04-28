@@ -29,9 +29,6 @@ public:
     CCriticalSection cs_reconstruct;
 
 private:
-    /* The sum total of all bytes for thintype blocks currently in process of being reconstructed */
-    std::atomic<uint64_t> nTotalBlockBytes{0};
-
     // block relay timer
     CCriticalSection cs_blockrelaytimer;
     std::map<uint256, std::pair<uint64_t, bool> > mapBlockRelayTimer GUARDED_BY(cs_blockrelaytimer);
@@ -67,9 +64,6 @@ public:
     void CheckForDownloadTimeout(CNode *pfrom);
     void RequestBlock(CNode *pfrom, const uint256 &hash);
 
-    // Find the largest block being reconstructed and disconnect it.
-    bool ClearLargestBlockAndDisconnect(CNode *pfrom);
-
     // Accessor methods to the blocks that we're reconstructing from thintype blocks such as
     // xthins or graphene.
     std::shared_ptr<CBlockThinRelay> SetBlockToReconstruct(CNode *pfrom, const uint256 &hash);
@@ -78,12 +72,11 @@ public:
 
     // Accessor methods for tracking total block bytes for all blocks currently in the process
     // of being reconstructed.
-    uint64_t AddTotalBlockBytes(uint64_t, std::shared_ptr<CBlockThinRelay> pblock);
-    void DeleteTotalBlockBytes(uint64_t bytes);
-    void ClearBlockBytes(std::shared_ptr<CBlockThinRelay> pblock);
+    void AddBlockBytes(uint64_t bytes, std::shared_ptr<CBlockThinRelay> pblock);
+    uint64_t GetMaxAllowedBlockSize();
+
+    // Clear all block data
     void ClearAllBlockData(CNode *pnode, std::shared_ptr<CBlockThinRelay> pblock);
-    void ResetTotalBlockBytes();
-    uint64_t GetTotalBlockBytes();
 };
 extern ThinTypeRelay thinrelay;
 

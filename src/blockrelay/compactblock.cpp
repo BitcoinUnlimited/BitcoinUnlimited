@@ -337,7 +337,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock
             }
         }
     } // End locking orphanpool.cs, mempool.cs
-    LOG(CMPCT, "Total in memory compactblock size is %ld bytes\n", thinrelay.GetTotalBlockBytes());
+    LOG(CMPCT, "Current in memory compactblock size is %ld bytes\n", pblock->nCurrentBlockSize);
 
     // These must be checked outside of the mempool.cs lock or deadlock may occur.
     // A merkle root mismatch here does not cause a ban because and expedited node will forward an xthin
@@ -616,17 +616,8 @@ static bool ReconstructBlock(CNode *pfrom,
         }
     }
 
-    // The total maximum bytes that we can use to create a compactblock. We use shared pointers for
-    // the transactions in the compactblock so we don't need to make as much memory available as we did in
-    // the past. We caluculate the max memory allowed by using the largest block size possible, which is the
-    // (maxMessageSizeMultiplier * excessiveBlockSize), then divide that by the smallest transaction possible
-    // which is 158 bytes on a 32bit system.  That gives us the largest number of transactions possible in a block.
-    // Then we multiply number of possible transactions by the size of a shared pointer.
-    // NOTE * The 158 byte smallest txn possible was found by getting the smallest serialized size of a txn directly
-    //        from the blockchain, on a 32bit system.
-    CTransactionRef dummyptx = nullptr;
-    uint32_t nTxSize = sizeof(dummyptx);
-    uint64_t maxAllowedSize = nTxSize * maxMessageSizeMultiplier * excessiveBlockSize / 158;
+    // Add the header size to the current size being tracked
+    thinrelay.AddBlockBytes(::GetSerializeSize(pblock->GetBlockHeader(), SER_NETWORK, PROTOCOL_VERSION), pblock);
 
     // Look for each transaction in our various pools and buffers.
     // With compactblocks the vTxHashes contains only the first 8 bytes of the tx hash.
@@ -676,24 +667,17 @@ static bool ReconstructBlock(CNode *pfrom,
         if (!ptx)
             missingCount++;
 
-        // In order to prevent a memory exhaustion attack we track transaction bytes used to create Block
-        // to see if we've exceeded any limits and if so clear out data and return.
-        if (thinrelay.AddTotalBlockBytes(nTxSize, pblock) > maxAllowedSize)
+        // In order to prevent a memory exhaustion attack we track transaction bytes used to recreate the block
+        // in order to see if we've exceeded any limits and if so clear out data and return.
+        thinrelay.AddBlockBytes(ptx->GetTxSize(), pblock);
+        if (pblock->nCurrentBlockSize > thinrelay.GetMaxAllowedBlockSize())
         {
-            if (thinrelay.ClearLargestBlockAndDisconnect(pfrom))
-            {
-                return error(
-                    "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
-                    pblock->GetHash().ToString(), pblock->nCurrentBlockSize, maxAllowedSize, pfrom->GetLogName());
-            }
-        }
-        if (pblock->nCurrentBlockSize > maxAllowedSize)
-        {
+            uint64_t nBlockBytes = pblock->nCurrentBlockSize;
             thinrelay.ClearAllBlockData(pfrom, pblock);
             pfrom->fDisconnect = true;
             return error(
                 "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
-                pblock->GetHash().ToString(), pblock->nCurrentBlockSize, maxAllowedSize, pfrom->GetLogName());
+                pblock->GetHash().ToString(), nBlockBytes, thinrelay.GetMaxAllowedBlockSize(), pfrom->GetLogName());
         }
 
         // Add this transaction. If the tx is null we still add it as a placeholder to keep the correct ordering.

@@ -577,8 +577,6 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
                     std::sort(grapheneBlock->vTxHashes256.begin() + 1, grapheneBlock->vTxHashes256.end());
                     LOG(GRAPHENE, "Using canonical order for block from peer=%s\n", pfrom->GetLogName());
                 }
-
-                thinrelay.AddTotalBlockBytes(nGrapheneTxsPossessed * sizeof(uint64_t), pblock);
             }
             catch (const std::runtime_error &e)
             {
@@ -604,7 +602,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
             }
         }
     } // End locking cs_orphancache, mempool.cs
-    LOG(GRAPHENE, "Total in-memory graphene bytes size is %ld bytes\n", graphenedata.GetGrapheneBlockBytes());
+    LOG(GRAPHENE, "Current in-memory graphene bytes size is %ld bytes\n", pblock->nCurrentBlockSize);
 
     // This must be checked outside of the above section or deadlock may occur.
     if (fRequestFailover)
@@ -698,23 +696,14 @@ static bool ReconstructBlock(CNode *pfrom,
         }
     }
 
-    // The total maximum bytes that we can use to create a graphene block. We use shared pointers for
-    // the transactions in the graphene block so we don't need to make as much memory available as we did in
-    // the past. We caluculate the max memory allowed by using the largest block size possible, which is the
-    // (maxMessageSizeMultiplier * excessiveBlockSize), then divide that by the smallest transaction possible
-    // which is 158 bytes on a 32bit system.  That gives us the largest number of transactions possible in a block.
-    // Then we multiply number of possible transactions by the size of a shared pointer.
-    // NOTE * The 158 byte smallest txn possible was found by getting the smallest serialized size of a txn directly
-    //        from the blockchain, on a 32bit system.
-    CTransactionRef dummyptx = nullptr;
-    uint32_t nTxSize = sizeof(dummyptx);
-    uint64_t maxAllowedSize = nTxSize * maxMessageSizeMultiplier * excessiveBlockSize / 158;
-
     std::map<uint256, CTransactionRef> mapAdditionalTxs;
     {
         for (auto tx : grapheneBlock->vAdditionalTxs)
             mapAdditionalTxs[tx->GetHash()] = tx;
     }
+
+    // Add the header size to the current size being tracked
+    thinrelay.AddBlockBytes(::GetSerializeSize(pblock->GetBlockHeader(), SER_NETWORK, PROTOCOL_VERSION), pblock);
 
     // Look for each transaction in our various pools and buffers.
     // With grapheneBlocks recovered txs contains only the first 8 bytes of the tx hash.
@@ -771,24 +760,17 @@ static bool ReconstructBlock(CNode *pfrom,
         if (!ptx)
             missingCount++;
 
-        // In order to prevent a memory exhaustion attack we track transaction bytes used to create Block
-        // to see if we've exceeded any limits and if so clear out data and return.
-        if (thinrelay.AddTotalBlockBytes(nTxSize, pblock) > maxAllowedSize)
+        // In order to prevent a memory exhaustion attack we track transaction bytes used to recreate the block
+        // in order to see if we've exceeded any limits and if so clear out data and return.
+        thinrelay.AddBlockBytes(ptx->GetTxSize(), pblock);
+        if (pblock->nCurrentBlockSize > thinrelay.GetMaxAllowedBlockSize())
         {
-            if (thinrelay.ClearLargestBlockAndDisconnect(pfrom))
-            {
-                return error(
-                    "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
-                    pblock->GetHash().ToString(), pblock->nCurrentBlockSize, maxAllowedSize, pfrom->GetLogName());
-            }
-        }
-        if (pblock->nCurrentBlockSize > maxAllowedSize)
-        {
+            uint64_t nBlockBytes = pblock->nCurrentBlockSize;
             thinrelay.ClearAllBlockData(pfrom, pblock);
             pfrom->fDisconnect = true;
             return error(
                 "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
-                pblock->GetHash().ToString(), pblock->nCurrentBlockSize, maxAllowedSize, pfrom->GetLogName());
+                pblock->GetHash().ToString(), nBlockBytes, thinrelay.GetMaxAllowedBlockSize(), pfrom->GetLogName());
         }
 
         // Add this transaction. If the tx is null we still add it as a placeholder to keep the correct ordering.
@@ -1237,8 +1219,6 @@ void CGrapheneBlockData::ClearGrapheneBlockStats()
     mapGrapheneBlocksInBoundReRequestedTx.clear();
 }
 
-void CGrapheneBlockData::ResetGrapheneBlockBytes() { nGrapheneBlockBytes.store(0); }
-uint64_t CGrapheneBlockData::GetGrapheneBlockBytes() { return nGrapheneBlockBytes.load(); }
 void CGrapheneBlockData::FillGrapheneQuickStats(GrapheneQuickStats &stats)
 {
     if (!IsGrapheneBlockEnabled())

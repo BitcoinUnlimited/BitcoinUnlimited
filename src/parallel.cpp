@@ -657,14 +657,6 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
             pfrom->firstBlock += 1;
         }
 
-        // When we no longer have any thinblocks in flight then clear our any data
-        // just to make sure we don't somehow get growth over time.
-        if (thinrelay.TotalBlocksInFlight() == 0)
-        {
-            thinrelay.ResetTotalBlockBytes();
-            graphenedata.ResetGrapheneBlockBytes();
-        }
-
         // Erase any txns from the orphan cache that are no longer needed
         PV->ClearOrphanCache(pblock);
 

@@ -135,9 +135,10 @@ public:
         READWRITE(header);
         READWRITE(vAdditionalTxs);
         READWRITE(nBlockTxs);
-        // This logic assumes a smallest transaction size of 100 bytes.  This is optimistic for realistic transactions
-        // and the downside for pathological blocks is just that graphene won't work so we fall back to xthin
-        if (nBlockTxs > (excessiveBlockSize * maxMessageSizeMultiplier / 100))
+        // This logic assumes a smallest transaction size of MIN_TX_SIZE bytes.  This is optimistic for realistic
+        // transactions and the downside for pathological blocks is just that graphene won't work so we fall back
+        // to xthin
+        if (nBlockTxs > (excessiveBlockSize * maxMessageSizeMultiplier / MIN_TX_SIZE))
             throw std::runtime_error("nBlockTxs exceeds threshold for excessive block txs");
         if (!pGrapheneSet)
         {
@@ -360,11 +361,6 @@ public:
     std::string ReRequestedTxToString();
 
     void ClearGrapheneBlockStats();
-
-    uint64_t AddGrapheneBlockBytes(uint64_t, CNode *pfrom);
-    void DeleteGrapheneBlockBytes(uint64_t, CNode *pfrom);
-    void ResetGrapheneBlockBytes();
-    uint64_t GetGrapheneBlockBytes();
 
     void FillGrapheneQuickStats(GrapheneQuickStats &stats);
 };
