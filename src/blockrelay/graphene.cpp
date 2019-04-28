@@ -1389,19 +1389,21 @@ CMemPoolInfo GetGrapheneMempoolInfo()
 void RequestFailoverBlock(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
 {
     // Since we were unable process this graphene block then clear out the data and the graphene
-    // block in flight.
+    // block in flight making sure to get the blockhash before you clear all the data.
     //
     // This must be done before we request the failover block otherwise it will still appear
     // as though we have a graphene block in flight, which could prevent us from receiving
     // the new thinblock or compactblock, if such is requested.
-    thinrelay.ClearAllBlockData(pfrom, pblock);
     uint256 blockhash = pblock->GetHash();
+    thinrelay.ClearAllBlockData(pfrom, pblock);
+
     if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable())
     {
         if (!thinrelay.AddBlockInFlight(pfrom, blockhash, NetMsgType::XTHINBLOCK))
             return;
 
-        LOG(GRAPHENE | THIN, "Requesting xthin block as failover from peer %s\n", pfrom->GetLogName());
+        LOG(GRAPHENE | THIN, "Requesting xthinblock %s as failover from peer %s\n", blockhash.ToString(),
+            pfrom->GetLogName());
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         CBloomFilter filterMemPool;
         CInv inv(MSG_XTHINBLOCK, blockhash);
@@ -1422,7 +1424,8 @@ void RequestFailoverBlock(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
         if (!thinrelay.AddBlockInFlight(pfrom, blockhash, NetMsgType::CMPCTBLOCK))
             return;
 
-        LOG(GRAPHENE | CMPCT, "Requesting a compact block as failover from peer %s\n", pfrom->GetLogName());
+        LOG(GRAPHENE | CMPCT, "Requesting a compactblock %s as failover from peer %s\n", blockhash.ToString(),
+            pfrom->GetLogName());
         CInv inv(MSG_CMPCT_BLOCK, blockhash);
         std::vector<CInv> vGetData;
         vGetData.push_back(inv);
@@ -1430,7 +1433,7 @@ void RequestFailoverBlock(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
     }
     else
     {
-        LOG(GRAPHENE, "Requesting full block as failover from peer %s\n", pfrom->GetLogName());
+        LOG(GRAPHENE, "Requesting full block %s as failover from peer %s\n", blockhash.ToString(), pfrom->GetLogName());
         thinrelay.RequestBlock(pfrom, blockhash);
     }
 }
