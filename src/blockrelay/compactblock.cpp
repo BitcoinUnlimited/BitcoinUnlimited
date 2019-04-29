@@ -252,14 +252,14 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock
 
     bool fMerkleRootCorrect = true;
     {
-        // Do the orphans first before taking the mempool.cs lock, so that we maintain correct locking order.
-        READLOCK(orphanpool.cs);
-        for (auto &mi : orphanpool.mapOrphanTransactions)
         {
-            uint64_t cheapHash = GetShortID(mi.first);
-            mapPartialTxHash[cheapHash] = mi.first;
+            READLOCK(orphanpool.cs);
+            for (auto &mi : orphanpool.mapOrphanTransactions)
+            {
+                uint64_t cheapHash = GetShortID(mi.first);
+                mapPartialTxHash[cheapHash] = mi.first;
+            }
         }
-
         mempool.queryHashes(memPoolHashes);
         for (uint64_t i = 0; i < memPoolHashes.size(); i++)
         {
@@ -269,7 +269,6 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock
         for (auto &mi : cmpctBlock->mapMissingTx)
         {
             uint64_t cheapHash = mi.first;
-            // Check if we already have the cheap hash
             mapPartialTxHash[cheapHash] = mi.second->GetHash();
         }
 
@@ -527,7 +526,6 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // Look for each transaction in our various pools and buffers.
     // With compactblocks the vTxHashes contains only the first 8 bytes of the tx hash.
     {
-        READLOCK(orphanpool.cs);
         if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
             return false;
     }
@@ -576,8 +574,6 @@ static bool ReconstructBlock(CNode *pfrom,
     int &unnecessaryCount,
     std::shared_ptr<CBlockThinRelay> pblock)
 {
-    AssertLockHeld(orphanpool.cs);
-
     // We must have all the full tx hashes by this point.  We first check for any duplicate
     // transaction ids.  This is a possible attack vector and has been used in the past.
     {
@@ -621,26 +617,35 @@ static bool ReconstructBlock(CNode *pfrom,
                     inMemPool = true;
             }
 
-            uint64_t nShortId = GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash);
-            bool inMissingTx = pblock->cmpctblock->mapMissingTx.count(nShortId) > 0;
-            bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
-
+            // Continue checking if we still don't have the txn
+            bool inMissingTx = false;
+            bool inOrphanCache = false;
+            if (!ptx)
+            {
+                uint64_t nShortId = GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash);
+                if (pblock->cmpctblock->mapMissingTx.count(nShortId))
+                {
+                    inMissingTx = true;
+                    ptx = pblock->cmpctblock->mapMissingTx[nShortId];
+                    pblock->setUnVerifiedTxns.insert(hash);
+                }
+                if (!ptx)
+                {
+                    READLOCK(orphanpool.cs);
+                    if (orphanpool.mapOrphanTransactions.count(hash))
+                    {
+                        inOrphanCache = true;
+                        ptx = orphanpool.mapOrphanTransactions[hash].ptx;
+                        pblock->setUnVerifiedTxns.insert(hash);
+                    }
+                }
+            }
             if (((inMemPool || inCommitQ) && inMissingTx) || (inOrphanCache && inMissingTx))
                 unnecessaryCount++;
-
-            if (inOrphanCache)
-            {
-                ptx = orphanpool.mapOrphanTransactions[hash].ptx;
-                pblock->setUnVerifiedTxns.insert(hash);
-            }
-            else if (inMissingTx)
-            {
-                ptx = pblock->cmpctblock->mapMissingTx[nShortId];
-                pblock->setUnVerifiedTxns.insert(hash);
-            }
         }
         if (!ptx)
             missingCount++;
+
 
         // In order to prevent a memory exhaustion attack we track transaction bytes used to recreate the block
         // in order to see if we've exceeded any limits and if so clear out data and return.
@@ -651,15 +656,16 @@ static bool ReconstructBlock(CNode *pfrom,
             uint64_t nBlockBytes = pblock->nCurrentBlockSize;
             thinrelay.ClearAllBlockData(pfrom, pblock);
             pfrom->fDisconnect = true;
-            return error(
-                "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
+            return error("Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be "
+                         "exceeded, peer=%s",
                 pblock->GetHash().ToString(), nBlockBytes, thinrelay.GetMaxAllowedBlockSize(), pfrom->GetLogName());
         }
 
-        // Add this transaction. If the tx is null we still add it as a placeholder to keep the correct ordering.
+        // Add this transaction. If the tx is null we still add it as a placeholder to keep the correct
+        // ordering.
         pblock->vtx.emplace_back(ptx);
     }
-    // Now that we've rebuild the block successfully we can set the XVal flag which is used in
+    // Now that we've rebuilt the block successfully we can set the XVal flag which is used in
     // ConnectBlock() to determine which if any inputs we can skip the checking of inputs.
     pblock->fXVal = true;
 

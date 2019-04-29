@@ -214,7 +214,6 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // Look for each transaction in our various pools and buffers.
     // With grapheneBlocks recovered txs contains only the first 8 bytes of the tx hash.
     {
-        READLOCK(orphanpool.cs);
         if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
             return false;
     }
@@ -473,12 +472,13 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
 
     bool fMerkleRootCorrect = true;
     {
-        // Do the orphans first before taking the mempool.cs lock, so that we maintain correct locking order.
-        READLOCK(orphanpool.cs);
-        for (auto &kv : orphanpool.mapOrphanTransactions)
         {
-            uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, kv.first, version);
-            mapPartialTxHash.insert(std::make_pair(cheapHash, kv.first));
+            READLOCK(orphanpool.cs);
+            for (auto &kv : orphanpool.mapOrphanTransactions)
+            {
+                uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, kv.first, version);
+                mapPartialTxHash.insert(std::make_pair(cheapHash, kv.first));
+            }
         }
 
         // We don't have to keep the lock on mempool.cs here to do mempool.queryHashes
@@ -658,7 +658,6 @@ static bool ReconstructBlock(CNode *pfrom,
     int &unnecessaryCount,
     std::shared_ptr<CBlockThinRelay> pblock)
 {
-    AssertLockHeld(orphanpool.cs);
     std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
 
     // We must have all the full tx hashes by this point.  We first check for any repeating
@@ -710,30 +709,41 @@ static bool ReconstructBlock(CNode *pfrom,
                     inMemPool = true;
             }
 
-            bool inMissingTx = grapheneBlock->mapMissingTx.count(GetShortID(pfrom->gr_shorttxidk0,
-                                   pfrom->gr_shorttxidk1, hash, NegotiateGrapheneVersion(pfrom))) > 0;
-            bool inAdditionalTxs = mapAdditionalTxs.count(hash) > 0;
-            bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
+            // Continue checking if we still don't have the txn
+            bool inMissingTx = false;
+            bool inAdditionalTxs = false;
+            bool inOrphanCache = false;
+            if (!ptx)
+            {
+                uint64_t nShortId =
+                    GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash, NegotiateGrapheneVersion(pfrom));
 
+                if (mapAdditionalTxs.count(hash))
+                {
+                    inAdditionalTxs = true;
+                    ptx = mapAdditionalTxs[hash];
+                }
+                else if (grapheneBlock->mapMissingTx.count(nShortId))
+                {
+                    inMissingTx = true;
+                    ptx = grapheneBlock->mapMissingTx[nShortId];
+                    pblock->setUnVerifiedTxns.insert(hash);
+                }
+
+                if (!ptx)
+                {
+                    READLOCK(orphanpool.cs);
+                    if (orphanpool.mapOrphanTransactions.count(hash))
+                    {
+                        inOrphanCache = true;
+                        ptx = orphanpool.mapOrphanTransactions[hash].ptx;
+                        pblock->setUnVerifiedTxns.insert(hash);
+                    }
+                }
+            }
             if (((inMemPool || inCommitQ) && inMissingTx) || (inOrphanCache && inMissingTx) ||
                 (inAdditionalTxs && inMissingTx))
                 unnecessaryCount++;
-
-            if (inAdditionalTxs)
-            {
-                ptx = mapAdditionalTxs[hash];
-            }
-            else if (inOrphanCache)
-            {
-                ptx = orphanpool.mapOrphanTransactions[hash].ptx;
-                pblock->setUnVerifiedTxns.insert(hash);
-            }
-            else if (inMissingTx)
-            {
-                ptx = grapheneBlock->mapMissingTx[GetShortID(
-                    pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash, NegotiateGrapheneVersion(pfrom))];
-                pblock->setUnVerifiedTxns.insert(hash);
-            }
         }
         if (!ptx)
             missingCount++;
