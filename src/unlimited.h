@@ -30,13 +30,6 @@ enum
     // lucky, and potentially drive a block that the rest of the network sees as
     // "excessive" onto the blockchain.
 
-    // per May, 15 '18 upgrade specification the min value for min value for max accepted block size, i.e. EB, is 32 MB
-    // (github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/may-2018-hardfork.md#summary)
-    MIN_EXCESSIVE_BLOCK_SIZE = 32000000,
-    MIN_EXCESSIVE_BLOCK_SIZE_REGTEST = 1000,
-    SV_EXCESSIVE_BLOCK_SIZE = 128000000,
-    DEFAULT_EXCESSIVE_BLOCK_SIZE = MIN_EXCESSIVE_BLOCK_SIZE,
-    DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER = 2, // Allowed messages lengths will be this * the excessive block size
     DEFAULT_COINBASE_RESERVE_SIZE = 1000,
     MAX_COINBASE_SCRIPTSIG_SIZE = 100,
     EXCESSIVE_BLOCK_CHAIN_RESET = 6 * 24, // After 1 day of non-excessive blocks, reset the checker
