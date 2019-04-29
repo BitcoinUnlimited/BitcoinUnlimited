@@ -2206,9 +2206,12 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     ret.pushKV("vRelayExpiration", (int64_t)vRelayExpiration.size());
     ret.pushKV("vNodes", (int64_t)vNodes.size());
     ret.pushKV("vNodesDisconnected", (int64_t)vNodesDisconnected.size());
+    {
+        READLOCK(orphanpool.cs);
+        ret.pushKV("mapOrphanTransactions", (int64_t)orphanpool.mapOrphanTransactions.size());
+        ret.pushKV("mapOrphanTransactionsByPrev", (int64_t)orphanpool.mapOrphanTransactionsByPrev.size());
+    }
     // CAddrMan
-    ret.pushKV("mapOrphanTransactions", (int64_t)orphanpool.mapOrphanTransactions.size());
-    ret.pushKV("mapOrphanTransactionsByPrev", (int64_t)orphanpool.mapOrphanTransactionsByPrev.size());
 
     uint32_t nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream;
     connmgr->ExpeditedNodeCounts(nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream);
