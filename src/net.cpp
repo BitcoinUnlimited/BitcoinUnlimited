@@ -587,6 +587,17 @@ void CNode::copyStats(CNodeStats &stats)
 }
 #undef X
 
+static bool IsMessageOversized(CNetMessage &msg)
+{
+    if (maxMessageSizeMultiplier && msg.in_data && (msg.hdr.nMessageSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE) &&
+        (msg.hdr.nMessageSize > (maxMessageSizeMultiplier * excessiveBlockSize)))
+    {
+        // TODO: warn if too many nodes are doing this
+        return true;
+    }
+    return false;
+}
+
 bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 {
     AssertLockHeld(cs_vRecvMsg);
@@ -608,14 +619,10 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
         if (handled < 0)
             return false;
 
-        // BU: only reject the message if it is some multiple of the excessive
-        // block size.  Since traffic shaping will keep the bandwidth in check
-        // this basically eliminates nodes that are deliberately trying to screw us up.
-        if (maxMessageSizeMultiplier && msg.in_data && (msg.hdr.nMessageSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE) &&
-            (msg.hdr.nMessageSize > (maxMessageSizeMultiplier * excessiveBlockSize)))
+        if (IsMessageOversized(msg))
         {
+            fDisconnect = true;
             LOG(NET, "Oversized message from peer=%i, disconnecting\n", GetId());
-            // BU: TODO warn if too many nodes are doing this
             return false;
         }
 
