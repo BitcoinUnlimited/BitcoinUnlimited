@@ -32,6 +32,18 @@ static const unsigned int SMALLEST_MAX_BLOOM_FILTER_SIZE = 36000; // bytes
 /** Coinbase transaction outputs can only be spent after this number of new blocks (network rule) */
 static const int COINBASE_MATURITY = 100;
 
+/** per May, 15 '18 upgrade specification the min value for min value for max accepted block size, i.e. EB, is 32 MB
+ * (github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/may-2018-hardfork.md#summary)
+ */
+static const unsigned int MIN_EXCESSIVE_BLOCK_SIZE = 32000000;
+static const unsigned int MIN_EXCESSIVE_BLOCK_SIZE_REGTEST = 1000;
+static const unsigned int SV_EXCESSIVE_BLOCK_SIZE = 128000000;
+static const unsigned int DEFAULT_EXCESSIVE_BLOCK_SIZE = MIN_EXCESSIVE_BLOCK_SIZE;
+
+/** Allowed messages lengths will be this * the excessive block size */
+static const unsigned int DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER = 2;
+
+
 /** Flags for nSequence and nLockTime locks */
 enum
 {
