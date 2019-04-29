@@ -465,7 +465,6 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     // for a collision.
     int missingCount = 0;
     int unnecessaryCount = 0;
-    bool collision = false;
     bool fRequestFailover = false;
     std::set<uint256> passingTxHashes;
     std::map<uint64_t, uint256> mapPartialTxHash;
@@ -479,43 +478,29 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
         for (auto &kv : orphanpool.mapOrphanTransactions)
         {
             uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, kv.first, version);
-            auto ir = mapPartialTxHash.insert(std::make_pair(cheapHash, kv.first));
-            if (!ir.second)
-                collision = true; // insert returns false if no insertion
+            mapPartialTxHash.insert(std::make_pair(cheapHash, kv.first));
         }
 
         // We don't have to keep the lock on mempool.cs here to do mempool.queryHashes
         // but we take the lock anyway so we don't have to re-lock again later.
-        if (!collision)
+        mempool.queryHashes(memPoolHashes);
+
+        for (const uint256 &hash : memPoolHashes)
         {
-            mempool.queryHashes(memPoolHashes);
-
-            for (const uint256 &hash : memPoolHashes)
-            {
-                uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, hash, version);
-
-                auto ir = mapPartialTxHash.insert(std::make_pair(cheapHash, hash));
-                if (!ir.second)
-                    collision = true;
-            }
+            uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, hash, version);
+            mapPartialTxHash.insert(std::make_pair(cheapHash, hash));
         }
 
         // Add full transactions included in the block
         CTransactionRef coinbase = nullptr;
-        if (!collision)
+        for (auto &tx : vAdditionalTxs)
         {
-            for (auto &tx : vAdditionalTxs)
-            {
-                const uint256 &hash = tx->GetHash();
-                uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, hash, version);
+            const uint256 &hash = tx->GetHash();
+            uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, hash, version);
+            mapPartialTxHash.insert(std::make_pair(cheapHash, hash));
 
-                if (tx->IsCoinBase())
-                    coinbase = tx;
-
-                auto ir = mapPartialTxHash.insert(std::make_pair(cheapHash, hash));
-                if (!ir.second)
-                    collision = true;
-            }
+            if (tx->IsCoinBase())
+                coinbase = tx;
         }
 
         if (coinbase == nullptr)
@@ -524,87 +509,83 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
             return false;
         }
 
-        if (!collision)
+        try
         {
-            try
+            std::vector<uint64_t> blockCheapHashes = pGrapheneSet->Reconcile(mapPartialTxHash);
+
+            // Ensure coinbase is first
+            if (blockCheapHashes[0] != GetShortID(shorttxidk0, shorttxidk1, coinbase->GetHash(), version))
             {
-                std::vector<uint64_t> blockCheapHashes = pGrapheneSet->Reconcile(mapPartialTxHash);
+                auto it = std::find(blockCheapHashes.begin(), blockCheapHashes.end(),
+                    GetShortID(shorttxidk0, shorttxidk1, coinbase->GetHash(), version));
 
-                // Ensure coinbase is first
-                if (blockCheapHashes[0] != GetShortID(shorttxidk0, shorttxidk1, coinbase->GetHash(), version))
+                if (it == blockCheapHashes.end())
                 {
-                    auto it = std::find(blockCheapHashes.begin(), blockCheapHashes.end(),
-                        GetShortID(shorttxidk0, shorttxidk1, coinbase->GetHash(), version));
-
-                    if (it == blockCheapHashes.end())
-                    {
-                        LOG(GRAPHENE, "Error: No coinbase transaction found in graphene block, peer=%s",
-                            pfrom->GetLogName());
-                        return false;
-                    }
-
-                    auto idx = std::distance(blockCheapHashes.begin(), it);
-
-                    blockCheapHashes[idx] = blockCheapHashes[0];
-                    blockCheapHashes[0] = GetShortID(shorttxidk0, shorttxidk1, coinbase->GetHash(), version);
+                    LOG(GRAPHENE, "Error: No coinbase transaction found in graphene block, peer=%s",
+                        pfrom->GetLogName());
+                    return false;
                 }
 
-                // Sort out what hashes we have from the complete set of cheapHashes
-                uint64_t nGrapheneTxsPossessed = 0;
-                for (size_t i = 0; i < blockCheapHashes.size(); i++)
-                {
-                    uint64_t cheapHash = blockCheapHashes[i];
+                auto idx = std::distance(blockCheapHashes.begin(), it);
 
-                    // If canonical order is not enabled or xversion is less than 1, update mapHashOrderIndex so
-                    // it is available if we later receive missing txs
-                    if (!enableCanonicalTxOrder.Value() || NegotiateGrapheneVersion(pfrom) < 1)
-                        grapheneBlock->mapHashOrderIndex[cheapHash] = i;
-
-                    const auto &elem = mapPartialTxHash.find(cheapHash);
-                    if (elem != mapPartialTxHash.end())
-                    {
-                        grapheneBlock->vTxHashes256.push_back(elem->second);
-
-                        nGrapheneTxsPossessed++;
-                    }
-                    else
-                    {
-                        grapheneBlock->vTxHashes256.push_back(nullhash);
-                        setHashesToRequest.insert(cheapHash);
-                    }
-                }
-
-                // Sort order transactions if canonical order is enabled and graphene version is late enough
-                if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
-                {
-                    // coinbase is always first
-                    std::sort(grapheneBlock->vTxHashes256.begin() + 1, grapheneBlock->vTxHashes256.end());
-                    LOG(GRAPHENE, "Using canonical order for block from peer=%s\n", pfrom->GetLogName());
-                }
-            }
-            catch (const std::runtime_error &e)
-            {
-                fRequestFailover = true;
-                LOG(GRAPHENE, "Graphene set could not be reconciled; requesting failover for peer %s: %s\n",
-                    pfrom->GetLogName(), e.what());
-
-                graphenedata.IncrementDecodeFailures();
+                blockCheapHashes[idx] = blockCheapHashes[0];
+                blockCheapHashes[0] = GetShortID(shorttxidk0, shorttxidk1, coinbase->GetHash(), version);
             }
 
-            // Reconstruct the block if there are no hashes to re-request
-            if (setHashesToRequest.empty() && !fRequestFailover)
+            // Sort out what hashes we have from the complete set of cheapHashes
+            uint64_t nGrapheneTxsPossessed = 0;
+            for (size_t i = 0; i < blockCheapHashes.size(); i++)
             {
-                bool mutated;
-                uint256 merkleroot = ComputeMerkleRoot(grapheneBlock->vTxHashes256, &mutated);
-                if (header.hashMerkleRoot != merkleroot || mutated)
-                    fMerkleRootCorrect = false;
+                uint64_t cheapHash = blockCheapHashes[i];
+
+                // If canonical order is not enabled or xversion is less than 1, update mapHashOrderIndex so
+                // it is available if we later receive missing txs
+                if (!enableCanonicalTxOrder.Value() || NegotiateGrapheneVersion(pfrom) < 1)
+                    grapheneBlock->mapHashOrderIndex[cheapHash] = i;
+
+                const auto &elem = mapPartialTxHash.find(cheapHash);
+                if (elem != mapPartialTxHash.end())
+                {
+                    grapheneBlock->vTxHashes256.push_back(elem->second);
+                    nGrapheneTxsPossessed++;
+                }
                 else
                 {
-                    if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
-                        return false;
+                    grapheneBlock->vTxHashes256.push_back(nullhash);
+                    setHashesToRequest.insert(cheapHash);
                 }
             }
+
+            // Sort order transactions if canonical order is enabled and graphene version is late enough
+            if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
+            {
+                // coinbase is always first
+                std::sort(grapheneBlock->vTxHashes256.begin() + 1, grapheneBlock->vTxHashes256.end());
+                LOG(GRAPHENE, "Using canonical order for block from peer=%s\n", pfrom->GetLogName());
+            }
         }
+        catch (const std::runtime_error &e)
+        {
+            fRequestFailover = true;
+            graphenedata.IncrementDecodeFailures();
+            LOG(GRAPHENE, "Graphene set could not be reconciled; requesting failover for peer %s: %s\n",
+                pfrom->GetLogName(), e.what());
+        }
+
+        // Reconstruct the block if there are no hashes to re-request
+        if (setHashesToRequest.empty() && !fRequestFailover)
+        {
+            bool mutated;
+            uint256 merkleroot = ComputeMerkleRoot(grapheneBlock->vTxHashes256, &mutated);
+            if (header.hashMerkleRoot != merkleroot || mutated)
+                fMerkleRootCorrect = false;
+            else
+            {
+                if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
+                    return false;
+            }
+        }
+
     } // End locking cs_orphancache, mempool.cs
     LOG(GRAPHENE, "Current in-memory graphene bytes size is %ld bytes\n", pblock->nCurrentBlockSize);
 
@@ -619,18 +600,11 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     // A merkle root mismatch here does not cause a ban because and expedited node will forward an graphene
     // without checking the merkle root, therefore we don't want to ban our expedited nodes. Just request
     // a failover block if a mismatch occurs.
-    // Also, there is a remote possiblity of a Tx hash collision therefore if it occurs we request a failover
-    // block. Note in the event that the failover block is XThin, we expect a collision there as well. However,
-    // the XThin block will itself failover to a thinblock, which will not have a collision.
-    if (collision || !fMerkleRootCorrect)
+    if (!fMerkleRootCorrect)
     {
         RequestFailoverBlock(pfrom, pblock);
-
-        if (!fMerkleRootCorrect)
-            return error(
-                "Mismatched merkle root on grapheneblock: requesting failover block, peer=%s", pfrom->GetLogName());
-        else
-            return error("TX HASH COLLISION for grapheneblock: requesting a full block, peer=%s", pfrom->GetLogName());
+        return error(
+            "Mismatched merkle root on grapheneblock: requesting failover block, peer=%s", pfrom->GetLogName());
     }
 
     this->nWaitingFor = missingCount;
@@ -1147,11 +1121,9 @@ std::string CGrapheneBlockData::ResponseTimeToString()
 std::string CGrapheneBlockData::ValidationTimeToString()
 {
     LOCK(cs_graphenestats);
-
     expireStats(mapGrapheneBlockValidationTime);
 
     std::vector<double> vValidationTime;
-
     double nValidationTimeAverage = 0;
     double nPercentile = 0;
     double nTotalValidationTime = 0;
@@ -1183,7 +1155,6 @@ std::string CGrapheneBlockData::ValidationTimeToString()
 std::string CGrapheneBlockData::ReRequestedTxToString()
 {
     LOCK(cs_graphenestats);
-
     double nReRequestRate = compute24hInboundRerequestTxPercentInternal();
 
     // NOTE: Potential gotcha, compute24hInboundRerequestTxPercentInternal has a side-effect of calling
@@ -1230,7 +1201,6 @@ void CGrapheneBlockData::FillGrapheneQuickStats(GrapheneQuickStats &stats)
         return;
 
     LOCK(cs_graphenestats);
-
     stats.nTotalInbound = nInBoundBlocks();
     stats.nTotalOutbound = nOutBoundBlocks();
     stats.nTotalDecodeFailures = nDecodeFailures();
