@@ -2253,7 +2253,12 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
                     (int64_t)::GetSerializeSize(*inode.pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION));
             }
         }
-        node.pushKV("vAddrToSend", (int64_t)inode.vAddrToSend.size());
+
+        {
+            LOCK(inode.cs_vSend);
+            node.pushKV("vAddrToSend", (int64_t)inode.vAddrToSend.size());
+        }
+
         node.pushKV("vInventoryToSend", (int64_t)inode.vInventoryToSend.size());
         ret.pushKV(inode.addrName, node);
     }
