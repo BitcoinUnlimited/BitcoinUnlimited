@@ -140,6 +140,9 @@ bool CThinBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
     {
         thinrelay.ClearAllBlockData(pfrom, pblock);
 
+        // This is the only place where we ban a peer for having the incorrect merkelroot because the
+        // hashes provided in this thinblock must be the correct ones. (In other thintype block relay there
+        // may be instances where collisions are possibly a false positive and so we don't ban in those cases.)
         dosMan.Misbehaving(pfrom, 100);
         return error("Thinblock merkle root does not match computed merkle root, peer=%s", pfrom->GetLogName());
     }
@@ -774,8 +777,6 @@ static bool ReconstructBlock(CNode *pfrom,
         if (setHashes.size() != vHashes.size())
         {
             thinrelay.ClearAllBlockData(pfrom, pblock);
-
-            dosMan.Misbehaving(pfrom, 10);
             return error("Duplicate transaction ids, peer=%s", pfrom->GetLogName());
         }
     }
