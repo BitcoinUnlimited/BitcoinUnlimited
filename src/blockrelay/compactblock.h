@@ -284,7 +284,7 @@ public:
     }
 };
 
-void validateCompactBlock(const CompactBlock &cmpctblock);
+void validateCompactBlock(std::shared_ptr<CompactBlock> cmpctblock);
 
 
 // This struct is so we can obtain a quick summar of stats for UI display purposes
@@ -404,7 +404,7 @@ extern CCompactBlockData compactdata; // Singleton class
 
 bool IsCompactBlocksEnabled();
 void SendCompactBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv);
-bool IsCompactBlockValid(CNode *pfrom, const CompactBlock &cmpctblock);
+bool IsCompactBlockValid(CNode *pfrom, std::shared_ptr<CompactBlock> compactBlock);
 
 // Xpress Validation: begin
 // Transactions that have already been accepted into the memory pool do not need to be

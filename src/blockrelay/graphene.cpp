@@ -3,7 +3,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "blockrelay/graphene.h"
-#include "blockrelay/blockrelay_common.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "connmgr.h"
@@ -353,10 +352,8 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
     if (!IsGrapheneBlockValid(pfrom, grapheneBlock->header))
     {
         dosMan.Misbehaving(pfrom, 100);
-        LOGA("Received an invalid %s from peer %s\n", strCommand, pfrom->GetLogName());
-
         thinrelay.ClearAllBlockData(pfrom, pblock);
-        return false;
+        return error("Received an invalid %s from peer %s\n", strCommand, pfrom->GetLogName());
     }
 
     // Is there a previous block or header to connect with?
@@ -461,8 +458,6 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     pfrom->gr_shorttxidk1 = shorttxidk1;
 
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
-    // We need to check all transaction sources (orphan list, mempool, and new (incoming) transactions in this block)
-    // for a collision.
     int missingCount = 0;
     int unnecessaryCount = 0;
     bool collision = false;

@@ -32,7 +32,8 @@ struct RegtestingSetup : public TestingSetup
 
 BOOST_FIXTURE_TEST_SUITE(blockencodings_tests, RegtestingSetup)
 
-static CBlock TestBlock() {
+static CBlock TestBlock()
+{
     CBlock block;
     CMutableTransaction tx;
     tx.vin.resize(1);
@@ -51,7 +52,8 @@ static CBlock TestBlock() {
     block.vtx[1] = MakeTransactionRef(tx);
 
     tx.vin.resize(10);
-    for (size_t i = 0; i < tx.vin.size(); i++) {
+    for (size_t i = 0; i < tx.vin.size(); i++)
+    {
         tx.vin[i].prevout.hash = GetRandHash();
         tx.vin[i].prevout.n = 0;
     }
@@ -60,7 +62,8 @@ static CBlock TestBlock() {
     bool mutated;
     block.hashMerkleRoot = BlockMerkleRoot(block, &mutated);
     assert(!mutated);
-    while (!CheckProofOfWork(block.GetHash(), block.nBits, Params().GetConsensus())) ++block.nNonce;
+    while (!CheckProofOfWork(block.GetHash(), block.nBits, Params().GetConsensus()))
+        ++block.nNonce;
     return block;
 }
 
@@ -92,18 +95,18 @@ BOOST_AUTO_TEST_CASE(validate_compact_block)
 {
     CBlock block = TestBlock(); // valid block
     CompactBlock a(block);
-    BOOST_CHECK_NO_THROW(validateCompactBlock(a));
+    BOOST_CHECK_NO_THROW(validateCompactBlock(std::make_shared<CompactBlock>(a)));
 
     // invalid header
     CompactBlock b = a;
     b.header.SetNull();
     BOOST_ASSERT(b.header.IsNull());
-    BOOST_CHECK_THROW(validateCompactBlock(b), std::invalid_argument);
+    BOOST_CHECK_THROW(validateCompactBlock(std::make_shared<CompactBlock>(b)), std::invalid_argument);
 
     // null tx in prefilled
     CompactBlock c = a;
     c.prefilledtxn.at(0).tx = CTransaction();
-    BOOST_CHECK_THROW(validateCompactBlock(c), std::invalid_argument);
+    BOOST_CHECK_THROW(validateCompactBlock(std::make_shared<CompactBlock>(c)), std::invalid_argument);
 
     // overflowing index
     CompactBlock d = a;
@@ -111,20 +114,20 @@ BOOST_AUTO_TEST_CASE(validate_compact_block)
     assert(d.prefilledtxn.size() == size_t(2));
     d.prefilledtxn.at(0).index = 1;
     d.prefilledtxn.at(1).index = std::numeric_limits<uint32_t>::max();
-    BOOST_CHECK_EXCEPTION(
-        validateCompactBlock(d), std::invalid_argument, HasReason("tx index overflows"));
+    BOOST_CHECK_EXCEPTION(validateCompactBlock(std::make_shared<CompactBlock>(d)), std::invalid_argument,
+        HasReason("tx index overflows"));
 
     // too high index
     CompactBlock e = a;
     e.prefilledtxn.at(0).index = std::numeric_limits<uint32_t>::max() / 2;
-    BOOST_CHECK_EXCEPTION(
-        validateCompactBlock(e), std::invalid_argument, HasReason("invalid index for tx"));
+    BOOST_CHECK_EXCEPTION(validateCompactBlock(std::make_shared<CompactBlock>(e)), std::invalid_argument,
+        HasReason("invalid index for tx"));
 
     // no transactions
     CompactBlock f = a;
     f.shorttxids.clear();
     f.prefilledtxn.clear();
-    BOOST_CHECK_THROW(validateCompactBlock(f), std::invalid_argument);
+    BOOST_CHECK_THROW(validateCompactBlock(std::make_shared<CompactBlock>(f)), std::invalid_argument);
 }
 
 
