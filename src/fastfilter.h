@@ -37,8 +37,7 @@ public:
     uint32_t nFilterBytes;
     uint64_t nFilterItems;
 
-    CVariableFastFilter() : nHashFuncs(2), nFilterItems(2){};
-
+    CVariableFastFilter() : nHashFuncs(MIN_N_HASH_FUNC), nFilterBytes(1), nFilterItems(8) { vData.resize(1); }
     CVariableFastFilter(uint64_t nElements, double nFPRate)
     {
         if (nElements == 0)

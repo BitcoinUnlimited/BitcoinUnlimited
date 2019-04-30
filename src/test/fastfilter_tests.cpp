@@ -54,6 +54,16 @@ void TestVariableFastFilter(CVariableFastFilter filt, int buffer, int n, double 
 
 BOOST_FIXTURE_TEST_SUITE(fastfilter_tests, BasicTestingSetup)
 
+BOOST_AUTO_TEST_CASE(variablefastfilter_dummy_constructor)
+{
+    CVariableFastFilter filt;
+
+    uint256 t = ArithToUint256(1);
+    uint256 tmp = Hash(t.begin(), t.end());
+    filt.insert(tmp);
+    BOOST_CHECK(filt.contains(tmp));
+}
+
 BOOST_AUTO_TEST_CASE(variablefastfilter_many_hash_funcs)
 {
     int n = 4 * 1024 * 1024;
