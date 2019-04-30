@@ -62,7 +62,12 @@ int CommandLineRPC(int argc, char *argv[])
         if (args.size() < 1)
             throw runtime_error("too few parameters (need at least command)");
         std::string strMethod = args[0];
-        UniValue params = RPCConvertValues(strMethod, std::vector<std::string>(args.begin() + 1, args.end()));
+        UniValue params(UniValue::VARR);
+        for (unsigned int idx = 1; idx < args.size(); idx++)
+        {
+            const std::string &strVal = args[idx];
+            params.push_back(strVal);
+        }
 
         // Execute and handle connection failures with -rpcwait
         const bool fWait = GetBoolArg("-rpcwait", false);

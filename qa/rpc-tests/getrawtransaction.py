@@ -55,6 +55,8 @@ class GetRawTransactionTest (BitcoinTestFramework):
 
         # intentionally ask for more blocks than can be returned for testing
         rawtransactionssince = self.nodes[1].getrawtransactionssince(startinghash[0], 10)
+        rawtransactionssince2 = self.nodes[1].getrawtransactionssince(startinghash[0], "10")
+        assert_equal(rawtransactionssince, rawtransactionssince2)
         for hash ,txs in blockTxids.items():
             assert_not_equal(rawtransactionssince.get(hash, False), False)
             for txid in txs:
