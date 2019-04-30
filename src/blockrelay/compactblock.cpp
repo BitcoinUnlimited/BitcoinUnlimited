@@ -623,22 +623,28 @@ static bool ReconstructBlock(CNode *pfrom,
             if (!ptx)
             {
                 uint64_t nShortId = GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash);
-                if (pblock->cmpctblock->mapMissingTx.count(nShortId))
+                std::map<uint64_t, CTransactionRef>::iterator iter1 = pblock->cmpctblock->mapMissingTx.find(nShortId);
+                if (iter1 != pblock->cmpctblock->mapMissingTx.end())
                 {
                     inMissingTx = true;
-                    ptx = pblock->cmpctblock->mapMissingTx[nShortId];
-                    pblock->setUnVerifiedTxns.insert(hash);
+                    ptx = iter1->second;
                 }
-                if (!ptx)
+                else
                 {
                     READLOCK(orphanpool.cs);
-                    if (orphanpool.mapOrphanTransactions.count(hash))
+                    std::map<uint256, CTxOrphanPool::COrphanTx>::iterator iter2 =
+                        orphanpool.mapOrphanTransactions.find(hash);
+                    if (iter2 != orphanpool.mapOrphanTransactions.end())
                     {
                         inOrphanCache = true;
-                        ptx = orphanpool.mapOrphanTransactions[hash].ptx;
-                        pblock->setUnVerifiedTxns.insert(hash);
+                        ptx = iter2->second.ptx;
                     }
                 }
+
+                // XVal: these transactions still need to be verified since they were not in the mempool
+                // or CommitQ.
+                if (ptx)
+                    pblock->setUnVerifiedTxns.insert(hash);
             }
             if (((inMemPool || inCommitQ) && inMissingTx) || (inOrphanCache && inMissingTx))
                 unnecessaryCount++;

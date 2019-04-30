@@ -151,7 +151,8 @@ bool CThinBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
         int missingCount = 0;
         int unnecessaryCount = 0;
 
-        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock->thinblock->vTxHashes, pblock))
+        if (!ReconstructBlock(
+                pfrom, missingCount, unnecessaryCount, pblock->thinblock->vTxHashes, pblock))
             return false;
 
         nWaitingForTxns = missingCount;
@@ -822,21 +823,28 @@ static bool ReconstructBlock(CNode *pfrom,
             bool inOrphanCache = false;
             if (!ptx)
             {
-                if (mapMissing.count(hash.GetCheapHash()))
+                std::map<uint64_t, CTransactionRef>::iterator iter1 = mapMissing.find(hash.GetCheapHash());
+                if (iter1 != mapMissing.end())
                 {
-                    ptx = mapMissing[hash.GetCheapHash()];
-                    pblock->setUnVerifiedTxns.insert(hash);
+                    inMissingTx = true;
+                    ptx = iter1->second;
                 }
-
-                if (!ptx)
+                else
                 {
                     READLOCK(orphanpool.cs);
-                    if (orphanpool.mapOrphanTransactions.count(hash))
+                    std::map<uint256, CTxOrphanPool::COrphanTx>::iterator iter2 =
+                        orphanpool.mapOrphanTransactions.find(hash);
+                    if (iter2 != orphanpool.mapOrphanTransactions.end())
                     {
-                        ptx = orphanpool.mapOrphanTransactions[hash].ptx;
-                        pblock->setUnVerifiedTxns.insert(hash);
+                        inOrphanCache = true;
+                        ptx = iter2->second.ptx;
                     }
                 }
+
+                // XVal: these transactions still need to be verified since they were not in the mempool
+                // or CommitQ.
+                if (ptx)
+                    pblock->setUnVerifiedTxns.insert(hash);
             }
             if (((inMemPool || inCommitQ) && inMissingTx) || (inOrphanCache && inMissingTx))
                 unnecessaryCount++;

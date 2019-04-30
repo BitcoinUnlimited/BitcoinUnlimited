@@ -718,28 +718,37 @@ static bool ReconstructBlock(CNode *pfrom,
                 uint64_t nShortId =
                     GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash, NegotiateGrapheneVersion(pfrom));
 
-                if (mapAdditionalTxs.count(hash))
+                std::map<uint256, CTransactionRef>::iterator iter1 = mapAdditionalTxs.find(hash);
+                if (iter1 != mapAdditionalTxs.end())
                 {
                     inAdditionalTxs = true;
-                    ptx = mapAdditionalTxs[hash];
+                    ptx = iter1->second;
                 }
-                else if (grapheneBlock->mapMissingTx.count(nShortId))
+                else
                 {
-                    inMissingTx = true;
-                    ptx = grapheneBlock->mapMissingTx[nShortId];
-                    pblock->setUnVerifiedTxns.insert(hash);
-                }
-
-                if (!ptx)
-                {
-                    READLOCK(orphanpool.cs);
-                    if (orphanpool.mapOrphanTransactions.count(hash))
+                    std::map<uint64_t, CTransactionRef>::iterator iter2 = grapheneBlock->mapMissingTx.find(nShortId);
+                    if (iter2 != grapheneBlock->mapMissingTx.end())
                     {
-                        inOrphanCache = true;
-                        ptx = orphanpool.mapOrphanTransactions[hash].ptx;
-                        pblock->setUnVerifiedTxns.insert(hash);
+                        inMissingTx = true;
+                        ptx = iter2->second;
+                    }
+                    else
+                    {
+                        READLOCK(orphanpool.cs);
+                        std::map<uint256, CTxOrphanPool::COrphanTx>::iterator iter3 =
+                            orphanpool.mapOrphanTransactions.find(hash);
+                        if (iter3 != orphanpool.mapOrphanTransactions.end())
+                        {
+                            inOrphanCache = true;
+                            ptx = iter3->second.ptx;
+                        }
                     }
                 }
+
+                // XVal: these transactions still need to be verified since they were not in the mempool
+                // or CommitQ.
+                if (ptx)
+                    pblock->setUnVerifiedTxns.insert(hash);
             }
             if (((inMemPool || inCommitQ) && inMissingTx) || (inOrphanCache && inMissingTx) ||
                 (inAdditionalTxs && inMissingTx))
