@@ -171,7 +171,8 @@ enum
 
     GRAPHENE = 0x10000000,
     RESPEND = 0x20000000,
-    WB = 0x40000000, // weak blocks
+
+    WB = 0x40000000, // weak / delta blocks
     CMPCT = 0x80000000, // compact blocks
 
     ELECTRUM = 0x100000000
