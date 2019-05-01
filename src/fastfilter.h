@@ -24,7 +24,7 @@ class uint256;
  * If nHashFuncs is 16 and nFilterItems is >= 64k all bits in the uint256 input data will be used to set bits in
  * the filter.
  *
- * nHashFuncs may range from 2 to 32 inclusive.
+ * nHashFuncs may range from 1 to 32 inclusive.
  */
 class CVariableFastFilter
 {
