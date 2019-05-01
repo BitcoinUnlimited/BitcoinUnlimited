@@ -1556,6 +1556,7 @@ bool ReceivedBlockTransactions(const CBlock &block,
             queue.pop_front();
             pindex->nChainTx = (pindex->pprev ? pindex->pprev->nChainTx : 0) + pindex->nTx;
             {
+                WRITELOCK(cs_mapBlockIndex);
                 pindex->nSequenceId = ++nBlockSequenceId;
             }
             if (chainActive.Tip() == NULL || !setBlockIndexCandidates.value_comp()(pindex, chainActive.Tip()))
@@ -3297,6 +3298,7 @@ bool ActivateBestChain(CValidationState &returnedState,
         // nSequenceId
         if (fParallel && pblock)
         {
+            READLOCK(cs_mapBlockIndex);
             std::set<CBlockIndex *, CBlockIndexWorkComparator>::reverse_iterator it = setBlockIndexCandidates.rbegin();
             while (it != setBlockIndexCandidates.rend())
             {
