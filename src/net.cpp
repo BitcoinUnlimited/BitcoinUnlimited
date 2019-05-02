@@ -15,6 +15,7 @@
 #include "net.h"
 
 #include "addrman.h"
+#include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene.h"
 #include "chainparams.h"
 #include "connmgr.h"
@@ -3026,6 +3027,9 @@ CNode::~CNode()
     // Update addrman timestamp
     if (nMisbehavior == 0 && successfullyConnected())
         addrman.Connected(addr);
+
+    // Decrement thintype peer counters
+    thinrelay.RemovePeers(this);
 
     GetNodeSignals().FinalizeNode(GetId());
 }

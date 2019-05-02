@@ -69,13 +69,43 @@ class NodeHandlingTest (BitcoinTestFramework):
         time.sleep(2) #disconnecting a node needs a little bit of time
         for node in self.nodes[0].getpeerinfo():
             assert(node['addr'] != url.hostname+":"+str(p2p_port(1)))
-
         connect_nodes_bi(self.nodes,0,1) #reconnect the node
         found = False
         for node in self.nodes[0].getpeerinfo():
             if node['addr'] == url.hostname+":"+str(p2p_port(1)):
                 found = True
         assert(found)
+
+
+        #############################
+        # Test thintype peer tracking
+        #############################
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+        self.node_args = [['-debug=net'], ['-debug=net'], ['-debug=net'], ['-debug=net']]
+        self.nodes = start_nodes(3, self.options.tmpdir, self.node_args)
+        for node in self.nodes:
+            node.clearbanned();
+        connect_nodes(self.nodes[0], 1)
+        connect_nodes(self.nodes[0], 2)
+        connect_nodes(self.nodes[1], 2)
+        # Each node should have two each of xthin/graph/cmpct peers connected
+        for node in self.nodes:
+            waitFor(10, lambda: node.getinfo()["peers_graph"] == 2)
+            waitFor(10, lambda: node.getinfo()["peers_xthin"] == 2)
+            waitFor(10, lambda: node.getinfo()["peers_cmpct"] == 2)
+        
+        disconnect_nodes(self.nodes[0], 1)
+        # node0 and node1 should now only have 1 each of xthin/graph/cmpct peers but node2 should have 2 of each.
+        waitFor(10, lambda: self.nodes[0].getinfo()["peers_graph"] == 1)
+        waitFor(10, lambda: self.nodes[0].getinfo()["peers_xthin"] == 1)
+        waitFor(10, lambda: self.nodes[0].getinfo()["peers_cmpct"] == 1)
+        waitFor(10, lambda: self.nodes[1].getinfo()["peers_graph"] == 1)
+        waitFor(10, lambda: self.nodes[1].getinfo()["peers_xthin"] == 1)
+        waitFor(10, lambda: self.nodes[1].getinfo()["peers_cmpct"] == 1)
+        waitFor(10, lambda: self.nodes[2].getinfo()["peers_graph"] == 2)
+        waitFor(10, lambda: self.nodes[2].getinfo()["peers_xthin"] == 2)
+        waitFor(10, lambda: self.nodes[2].getinfo()["peers_cmpct"] == 2)
 
 if __name__ == '__main__':
     NodeHandlingTest ().main ()
