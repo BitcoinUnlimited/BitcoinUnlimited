@@ -939,6 +939,8 @@ UniValue setgenerate(const UniValue &params, bool fHelp)
 
 int chainContainsExcessive(const CBlockIndex *blk, unsigned int goBack)
 {
+    AssertLockHeld(cs_mapBlockIndex);
+
     if (goBack == 0)
         goBack = excessiveAcceptDepth + EXCESSIVE_BLOCK_CHAIN_RESET;
     for (unsigned int i = 0; i < goBack; i++, blk = blk->pprev)
@@ -953,6 +955,8 @@ int chainContainsExcessive(const CBlockIndex *blk, unsigned int goBack)
 
 int isChainExcessive(const CBlockIndex *blk, unsigned int goBack)
 {
+    AssertLockHeld(cs_mapBlockIndex);
+
     if (goBack == 0)
         goBack = excessiveAcceptDepth;
     bool recentExcessive = false;
@@ -2053,6 +2057,7 @@ UniValue validatechainhistory(const UniValue &params, bool fHelp)
     while (pos && !failedChain)
     {
         // LOGA("validate %d %s\n", pos->nHeight, pos->phashBlock->ToString());
+        READLOCK(cs_mapBlockIndex);
         failedChain = pos->nStatus & BLOCK_FAILED_MASK;
         if (!failedChain)
         {
@@ -2068,6 +2073,7 @@ UniValue validatechainhistory(const UniValue &params, bool fHelp)
             pos = stk.top();
             if (pos)
             {
+                WRITELOCK(cs_mapBlockIndex);
                 pos->nStatus |= BLOCK_FAILED_CHILD;
             }
             setDirtyBlockIndex.insert(pos);
@@ -2279,6 +2285,7 @@ struct CompareBlocksByHeight
 void MarkAllContainingChainsInvalid(CBlockIndex *invalidBlock)
 {
     LOCK(cs_main);
+    READLOCK(cs_mapBlockIndex);
 
     bool dirty = false;
     DbgAssert(invalidBlock->nStatus & BLOCK_FAILED_MASK, return );

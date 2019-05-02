@@ -502,6 +502,7 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
         CBufferedFile blkdat(fileIn, 2 * (reindexTypicalBlockSize.Value() + MESSAGE_START_SIZE + sizeof(unsigned int)),
             reindexTypicalBlockSize.Value() + MESSAGE_START_SIZE + sizeof(unsigned int), SER_DISK, CLIENT_VERSION);
         uint64_t nRewind = blkdat.GetPos();
+
         while (!blkdat.eof())
         {
             if (shutdown_threads.load() == true)
@@ -572,7 +573,13 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
 
                 // process in case the block isn't known yet
                 auto *pindex = LookupBlockIndex(hash);
-                if (pindex == nullptr || (pindex->nStatus & BLOCK_HAVE_DATA) == 0)
+                bool fHaveData = false;
+                if (pindex)
+                {
+                    READLOCK(cs_mapBlockIndex);
+                    fHaveData = (pindex->nStatus & BLOCK_HAVE_DATA);
+                }
+                if (pindex == nullptr || !fHaveData)
                 {
                     CValidationState state;
                     if (ProcessNewBlock(state, chainparams, NULL, &block, true, dbp, false))

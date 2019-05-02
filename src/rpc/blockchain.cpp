@@ -686,8 +686,11 @@ UniValue getblock(const UniValue &params, bool fHelp)
 
     CBlock block;
 
-    if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Block not available (pruned data)");
+    {
+        READLOCK(cs_mapBlockIndex);
+        if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Block not available (pruned data)");
+    }
 
     if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
@@ -1118,8 +1121,11 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
     if (fPruneMode)
     {
         CBlockIndex *block = chainActive.Tip();
-        while (block && block->pprev && (block->pprev->nStatus & BLOCK_HAVE_DATA))
-            block = block->pprev;
+        {
+            READLOCK(cs_mapBlockIndex);
+            while (block && block->pprev && (block->pprev->nStatus & BLOCK_HAVE_DATA))
+                block = block->pprev;
+        }
 
         if (block != nullptr)
             obj.pushKV("pruneheight", block->nHeight);
@@ -1158,7 +1164,7 @@ static std::set<CBlockIndex *, CompareBlocksByHeight> GetChainTips()
     std::set<CBlockIndex *> setPrevs;
 
     AssertLockHeld(cs_main); // for chainActive
-    READLOCK(cs_mapBlockIndex);
+    AssertLockHeld(cs_mapBlockIndex);
     for (const std::pair<const uint256, CBlockIndex *> &item : mapBlockIndex)
     {
         if (!chainActive.Contains(item.second))
@@ -1213,6 +1219,7 @@ UniValue getchaintips(const UniValue &params, bool fHelp)
             HelpExampleCli("getchaintips", "") + HelpExampleRpc("getchaintips", ""));
 
     LOCK(cs_main);
+    READLOCK(cs_mapBlockIndex);
 
     // Get the set of chaintips
     std::set<CBlockIndex *, CompareBlocksByHeight> setTips;

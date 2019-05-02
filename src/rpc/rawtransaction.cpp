@@ -221,6 +221,7 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
         uint256 blockhash = ParseHashV(params[2], "parameter 3");
         if (!blockhash.IsNull())
         {
+            READLOCK(cs_mapBlockIndex);
             BlockMap::iterator it = mapBlockIndex.find(blockhash);
             if (it == mapBlockIndex.end())
             {
@@ -238,6 +239,7 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
         std::string errmsg;
         if (blockindex)
         {
+            READLOCK(cs_mapBlockIndex);
             if (!(blockindex->nStatus & BLOCK_HAVE_DATA))
             {
                 throw JSONRPCError(RPC_MISC_ERROR, "Block not available");

@@ -105,6 +105,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     }
                     else
                     {
+                        READLOCK(cs_mapBlockIndex);
                         static const int nOneMonth = 30 * 24 * 60 * 60;
                         // To prevent fingerprinting attacks, only send blocks outside of the active
                         // chain if they are valid, and no more than a month older (both in time, and in
@@ -164,7 +165,12 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                 }
                 // Pruned nodes may have deleted the block, so check whether
                 // it's available before trying to send.
-                if (fSend && (mi->nStatus & BLOCK_HAVE_DATA))
+                bool fHaveData = false;
+                {
+                    READLOCK(cs_mapBlockIndex);
+                    fHaveData = mi->nStatus & BLOCK_HAVE_DATA;
+                }
+                if (fSend && fHaveData)
                 {
                     // Send block from disk
                     CBlock block;
@@ -1078,12 +1084,15 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             // for some reasonable time window (1 hour) that block relay might require.
             const int nPrunedBlocksLikelyToHave =
                 MIN_BLOCKS_TO_KEEP - 3600 / chainparams.GetConsensus().nPowTargetSpacing;
-            if (fPruneMode && (!(pindex->nStatus & BLOCK_HAVE_DATA) ||
-                                  pindex->nHeight <= chainActive.Tip()->nHeight - nPrunedBlocksLikelyToHave))
             {
-                LOG(NET, " getblocks stopping, pruned or too old block at %d %s\n", pindex->nHeight,
-                    pindex->GetBlockHash().ToString());
-                break;
+                READLOCK(cs_mapBlockIndex); // for nStatus
+                if (fPruneMode && (!(pindex->nStatus & BLOCK_HAVE_DATA) ||
+                                      pindex->nHeight <= chainActive.Tip()->nHeight - nPrunedBlocksLikelyToHave))
+                {
+                    LOG(NET, " getblocks stopping, pruned or too old block at %d %s\n", pindex->nHeight,
+                        pindex->GetBlockHash().ToString());
+                    break;
+                }
             }
             pfrom->PushInventory(CInv(MSG_BLOCK, pindex->GetBlockHash()));
             if (--nLimit <= 0)

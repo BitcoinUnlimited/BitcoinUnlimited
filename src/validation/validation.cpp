@@ -136,6 +136,7 @@ bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state, bool f
     return true;
 }
 
+
 bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex *const pindexPrev)
 {
     const Consensus::Params &consensusParams = Params().GetConsensus();
@@ -184,10 +185,13 @@ bool AcceptBlockHeader(const CBlockHeader &block,
             // Block header is already known.
             if (ppindex)
                 *ppindex = pindex;
-            if (pindex->nStatus & BLOCK_FAILED_MASK)
-                return state.Invalid(
-                    error("%s: block %s height %d is marked invalid", __func__, hash.ToString(), pindex->nHeight), 0,
-                    "duplicate");
+            {
+                READLOCK(cs_mapBlockIndex);
+                if (pindex->nStatus & BLOCK_FAILED_MASK)
+                    return state.Invalid(
+                        error("%s: block %s height %d is marked invalid", __func__, hash.ToString(), pindex->nHeight),
+                        0, "duplicate");
+            }
             return true;
         }
 
@@ -200,10 +204,13 @@ bool AcceptBlockHeader(const CBlockHeader &block,
             return state.DoS(10, error("%s: previous block %s not found while accepting %s", __func__,
                                      block.hashPrevBlock.ToString(), hash.ToString()),
                 0, "bad-prevblk");
-        if (pindexPrev->nStatus & BLOCK_FAILED_MASK)
-            return state.DoS(100,
-                error("%s: previous block %s is invalid", __func__, pindexPrev->GetBlockHash().GetHex().c_str()),
-                REJECT_INVALID, "bad-prevblk");
+        {
+            READLOCK(cs_mapBlockIndex);
+            if (pindexPrev->nStatus & BLOCK_FAILED_MASK)
+                return state.DoS(100,
+                    error("%s: previous block %s is invalid", __func__, pindexPrev->GetBlockHash().GetHex().c_str()),
+                    REJECT_INVALID, "bad-prevblk");
+        }
 
         // If the parent block belongs to the set of checkpointed blocks but it has a mismatched hash,
         // then we are on the wrong fork so ignore
@@ -220,6 +227,7 @@ bool AcceptBlockHeader(const CBlockHeader &block,
     // then we are on the wrong fork so ignore
     if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindex->nHeight, *pindex->phashBlock, chainparams))
     {
+        WRITELOCK(cs_mapBlockIndex);
         pindex->nStatus |= BLOCK_FAILED_VALID; // block doesn't match checkpoints so invalid
         pindex->nStatus &= ~BLOCK_VALID_CHAIN;
     }
@@ -620,8 +628,8 @@ void CheckBlockIndex(const Consensus::Params &consensusParams)
     }
 
     LOCK(cs_main);
-
     READLOCK(cs_mapBlockIndex);
+
     // During a reindex, we read the genesis block and call CheckBlockIndex before ActivateBestChain,
     // so we have the genesis block in mapBlockIndex but no active chain.  (A few of the tests when
     // iterating the block tree require that chainActive has been initialized.)
@@ -1145,6 +1153,8 @@ int32_t UnlimitedComputeBlockVersion(const CBlockIndex *pindexPrev, const Consen
 CBlockIndex *FindMostWorkChain()
 {
     AssertLockHeld(cs_main);
+    WRITELOCK(cs_mapBlockIndex);
+
     do
     {
         CBlockIndex *pindexNew = NULL;
@@ -1262,22 +1272,26 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
     AssertLockHeld(cs_main);
 
     // Mark the block itself as invalid.
-    pindex->nStatus |= BLOCK_FAILED_VALID;
-    setDirtyBlockIndex.insert(pindex);
-    setBlockIndexCandidates.erase(pindex);
-
-    while (chainActive.Contains(pindex))
     {
-        CBlockIndex *pindexWalk = chainActive.Tip();
-        pindexWalk->nStatus |= BLOCK_FAILED_CHILD;
-        setDirtyBlockIndex.insert(pindexWalk);
-        setBlockIndexCandidates.erase(pindexWalk);
-        // ActivateBestChain considers blocks already in chainActive
-        // unconditionally valid already, so force disconnect away from it.
-        if (!DisconnectTip(state, consensusParams))
+        WRITELOCK(cs_mapBlockIndex);
+        pindex->nStatus |= BLOCK_FAILED_VALID;
+
+        setDirtyBlockIndex.insert(pindex);
+        setBlockIndexCandidates.erase(pindex);
+
+        while (chainActive.Contains(pindex))
         {
-            mempool.removeForReorg(pcoinsTip, chainActive.Tip()->nHeight + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
-            return false;
+            CBlockIndex *pindexWalk = chainActive.Tip();
+            pindexWalk->nStatus |= BLOCK_FAILED_CHILD;
+            setDirtyBlockIndex.insert(pindexWalk);
+            setBlockIndexCandidates.erase(pindexWalk);
+            // ActivateBestChain considers blocks already in chainActive
+            // unconditionally valid already, so force disconnect away from it.
+            if (!DisconnectTip(state, consensusParams))
+            {
+                mempool.removeForReorg(pcoinsTip, chainActive.Tip()->nHeight + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
+                return false;
+            }
         }
     }
 
@@ -1527,7 +1541,9 @@ bool ReceivedBlockTransactions(const CBlock &block,
     CBlockIndex *pindexNew,
     const CDiskBlockPos &pos)
 {
-    AssertLockHeld(cs_main); // for setBlockIndexCandidates use
+    AssertLockHeld(cs_main); // for setBlockIndexCandidates
+    WRITELOCK(cs_mapBlockIndex); // for nStatus and nSequenceId
+
     pindexNew->nTx = block.vtx.size();
     pindexNew->nChainTx = 0;
     pindexNew->nFile = pos.nFile;
@@ -1555,10 +1571,7 @@ bool ReceivedBlockTransactions(const CBlock &block,
             CBlockIndex *pindex = queue.front();
             queue.pop_front();
             pindex->nChainTx = (pindex->pprev ? pindex->pprev->nChainTx : 0) + pindex->nTx;
-            {
-                WRITELOCK(cs_mapBlockIndex);
-                pindex->nSequenceId = ++nBlockSequenceId;
-            }
+            pindex->nSequenceId = ++nBlockSequenceId;
             if (chainActive.Tip() == NULL || !setBlockIndexCandidates.value_comp()(pindex, chainActive.Tip()))
             {
                 setBlockIndexCandidates.insert(pindex);
@@ -1609,7 +1622,11 @@ bool AcceptBlock(const CBlock &block,
     // Try to process all requested blocks that we don't have, but only
     // process an unrequested block if it's new and has enough work to
     // advance our tip, and isn't too many blocks ahead.
-    bool fAlreadyHave = pindex->nStatus & BLOCK_HAVE_DATA;
+    bool fAlreadyHave = false;
+    {
+        READLOCK(cs_mapBlockIndex);
+        fAlreadyHave = pindex->nStatus & BLOCK_HAVE_DATA;
+    }
     bool fHasMoreWork = (chainActive.Tip() ? pindex->nChainWork > chainActive.Tip()->nChainWork : true);
     // Blocks that are too out-of-order needlessly limit the effectiveness of
     // pruning, because pruning will not delete block files that contain any
@@ -1637,6 +1654,7 @@ bool AcceptBlock(const CBlock &block,
     {
         if (state.IsInvalid() && !state.CorruptionPossible())
         {
+            WRITELOCK(cs_mapBlockIndex);
             pindex->nStatus |= BLOCK_FAILED_VALID;
             setDirtyBlockIndex.insert(pindex);
             // Now mark every block index on every chain that contains pindex as child of invalid
@@ -2549,24 +2567,28 @@ bool ConnectBlock(const CBlock &block,
     PV->QuitCompetingThreads(block.GetBlockHeader().hashPrevBlock);
 
     // Write undo information to disk
-    if (pindex->GetUndoPos().IsNull() || !pindex->IsValid(BLOCK_VALID_SCRIPTS))
     {
-        if (pindex->GetUndoPos().IsNull())
+        WRITELOCK(cs_mapBlockIndex);
+        if (pindex->GetUndoPos().IsNull() || !pindex->IsValid(BLOCK_VALID_SCRIPTS))
         {
-            CDiskBlockPos _pos;
-            if (!FindUndoPos(state, pindex->nFile, _pos, ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) + 40))
-                return error("ConnectBlock(): FindUndoPos failed");
+            if (pindex->GetUndoPos().IsNull())
+            {
+                CDiskBlockPos _pos;
+                if (!FindUndoPos(
+                        state, pindex->nFile, _pos, ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) + 40))
+                    return error("ConnectBlock(): FindUndoPos failed");
 
-            if (!WriteUndoToDisk(blockundo, _pos, pindex->pprev, chainparams.MessageStart()))
-                return AbortNode(state, "Failed to write undo data");
+                if (!WriteUndoToDisk(blockundo, _pos, pindex->pprev, chainparams.MessageStart()))
+                    return AbortNode(state, "Failed to write undo data");
 
-            // update nUndoPos in block index
-            pindex->nUndoPos = _pos.nPos;
-            pindex->nStatus |= BLOCK_HAVE_UNDO;
+                // update nUndoPos in block index
+                pindex->nUndoPos = _pos.nPos;
+                pindex->nStatus |= BLOCK_HAVE_UNDO;
+            }
+
+            pindex->RaiseValidity(BLOCK_VALID_SCRIPTS);
+            setDirtyBlockIndex.insert(pindex);
         }
-
-        pindex->RaiseValidity(BLOCK_VALID_SCRIPTS);
-        setDirtyBlockIndex.insert(pindex);
     }
 
     if (fTxIndex)
@@ -2626,7 +2648,10 @@ void InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state)
     }
     if (!state.CorruptionPossible())
     {
-        pindex->nStatus |= BLOCK_FAILED_VALID;
+        {
+            WRITELOCK(cs_mapBlockIndex);
+            pindex->nStatus |= BLOCK_FAILED_VALID;
+        }
         setDirtyBlockIndex.insert(pindex);
         setBlockIndexCandidates.erase(pindex);
         InvalidChainFound(pindex);

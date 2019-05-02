@@ -394,7 +394,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
         requester.UpdateBlockAvailability(pfrom->GetId(), inv.hash);
 
         // Return early if we already have the block data
-        if (pIndex->nStatus & BLOCK_HAVE_DATA)
+        if (AlreadyHaveBlock(inv))
         {
             // Tell the Request Manager we received this block
             requester.AlreadyReceived(pfrom, inv);
