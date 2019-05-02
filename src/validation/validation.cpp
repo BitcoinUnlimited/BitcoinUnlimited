@@ -1273,16 +1273,20 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
 
     // Mark the block itself as invalid.
     {
-        WRITELOCK(cs_mapBlockIndex);
-        pindex->nStatus |= BLOCK_FAILED_VALID;
-
+        {
+            WRITELOCK(cs_mapBlockIndex);
+            pindex->nStatus |= BLOCK_FAILED_VALID;
+        }
         setDirtyBlockIndex.insert(pindex);
         setBlockIndexCandidates.erase(pindex);
 
         while (chainActive.Contains(pindex))
         {
             CBlockIndex *pindexWalk = chainActive.Tip();
-            pindexWalk->nStatus |= BLOCK_FAILED_CHILD;
+            {
+                WRITELOCK(cs_mapBlockIndex);
+                pindexWalk->nStatus |= BLOCK_FAILED_CHILD;
+            }
             setDirtyBlockIndex.insert(pindexWalk);
             setBlockIndexCandidates.erase(pindexWalk);
             // ActivateBestChain considers blocks already in chainActive
