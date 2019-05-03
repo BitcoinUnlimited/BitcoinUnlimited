@@ -5,7 +5,7 @@ These are the dependencies currently used by Bitcoin Unlimited. You can find ins
 | Dependency | Version used | Minimum required | CVEs | Shared | [Bundled Qt library](https://doc.qt.io/qt-5/configure-options.html) |
 | --- | --- | --- | --- | --- | --- |
 | Berkeley DB | [4.8.30](http://www.oracle.com/technetwork/database/database-technologies/berkeleydb/downloads/index.html) | 4.8.x | No |  |  |
-| Boost | [1.64.0](http://www.boost.org/users/download/) | [1.55.0](https://github.com/BitcoinUnlimited/BitcoinUnlimited/pull/1562) | No |  |  |
+| Boost | [1.70.0](http://www.boost.org/users/download/) | [1.55.0](https://github.com/BitcoinUnlimited/BitcoinUnlimited/pull/1562) | No |  |  |
 | ccache | [3.4.2](https://ccache.samba.org/download.html) |  | No |  |  |
 | Clang |  | [3.4+](http://llvm.org/releases/download.html) (C++14 support) |  |  |  |
 | D-Bus | [1.10.19](https://cgit.freedesktop.org/dbus/dbus/tree/NEWS?h=dbus-1.10) |  | No | Yes |  |
