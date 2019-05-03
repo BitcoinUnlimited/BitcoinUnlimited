@@ -9,7 +9,6 @@
 
 #include "primitives/transaction.h"
 #include "serialize.h"
-#include "sync.h"
 #include "uint256.h"
 
 const uint32_t BIP_009_MASK = 0x20000000;
@@ -100,34 +99,6 @@ public:
     {
         SetNull();
         *((CBlockHeader *)this) = header;
-    }
-
-    // return the index of the transaction in this block.  Return -1 if tx is not in this block
-    int find(uint256 hash) const
-    {
-        int nIndex;
-        for (nIndex = 0; nIndex < (int)vtx.size(); nIndex++)
-            if (vtx[nIndex] == *(CTransactionRef *)this)
-                break;
-        if (nIndex == (int)vtx.size())
-        {
-            nIndex = -1;
-        }
-        return nIndex;
-
-#if 0 // efficient but unnecessary
-        LOCK(csBlockHashToIdx);
-        // If the hash to idx map is empty, then fill it up
-        if (hashToIdx.empty()&& (!vtx.empty()))
-        {
-            for (int nIndex = 0; nIndex < (int)vtx.size(); nIndex++)
-                hashToIdx[vtx[nIndex].GetHash()] = nIndex;
-        }
-        // find the hash and return the idx
-        auto pos = hashToIdx.find(hash);
-        if (pos == hashToIdx.end()) return -1;
-        return pos->second;
-#endif
     }
 
     static bool VersionKnown(int32_t nVersion, int32_t voteBits)

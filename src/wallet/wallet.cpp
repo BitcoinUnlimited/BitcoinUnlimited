@@ -3582,27 +3582,14 @@ CWalletKey::CWalletKey(int64_t nExpires)
 int CMerkleTx::SetMerkleBranch(const CBlock &block, int txIdx)
 {
     AssertLockHeld(cs_main); // for chainActive
-    // if a bad txIdx is passed, then in release builds set the tx index to "I don't know". In debug builds assert.
-    DbgAssert(txIdx >= -1, txIdx = -1);
+    // txIdx never == -1 since the caller already know txIdx
+    assert(txIdx >= 0);
     CBlock blockTmp;
 
     // Update the tx's hashBlock
     hashBlock = block.GetHash();
-
-    if (txIdx != -1)
-    {
-        nIndex = txIdx;
-    }
-    else
-    {
-        // Locate the transaction
-        nIndex = block.find(((CTransactionRef) this)->GetHash());
-        if (nIndex == -1)
-        {
-            LOGA("ERROR: SetMerkleBranch(): couldn't find tx in block\n");
-            return 0;
-        }
-    }
+    // Set the position of the transaction in the block
+    nIndex = txIdx;
 
     // Is the tx in a block that's in the main chain
     const CBlockIndex *pindex = LookupBlockIndex(hashBlock);
