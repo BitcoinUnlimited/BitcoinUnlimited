@@ -62,7 +62,7 @@ class KeyPoolTest(BitcoinTestFramework):
         nodes[0].walletpassphrase('test', 1)
         nodes[0].keypoolrefill(3)
         # test walletpassphrase timeout
-        time.sleep(1.1)
+        waitFor(20, lambda: nodes[0].getwalletinfo()["unlocked_until"] == 0)
         assert_equal(nodes[0].getwalletinfo()["unlocked_until"], 0)
 
         # drain them by mining
