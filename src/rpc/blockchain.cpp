@@ -1164,7 +1164,7 @@ static std::set<CBlockIndex *, CompareBlocksByHeight> GetChainTips()
     std::set<CBlockIndex *> setPrevs;
 
     AssertLockHeld(cs_main); // for chainActive
-    AssertLockHeld(cs_mapBlockIndex);
+    READLOCK(cs_mapBlockIndex);
     for (const std::pair<const uint256, CBlockIndex *> &item : mapBlockIndex)
     {
         if (!chainActive.Contains(item.second))
@@ -1219,13 +1219,13 @@ UniValue getchaintips(const UniValue &params, bool fHelp)
             HelpExampleCli("getchaintips", "") + HelpExampleRpc("getchaintips", ""));
 
     LOCK(cs_main);
-    READLOCK(cs_mapBlockIndex);
 
     // Get the set of chaintips
     std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
     setTips = GetChainTips();
 
     /* Construct the output array.  */
+    WRITELOCK(cs_mapBlockIndex); // for nStatus
     UniValue res(UniValue::VARR);
     for (const CBlockIndex *block : setTips)
     {
