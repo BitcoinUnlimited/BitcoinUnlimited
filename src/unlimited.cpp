@@ -2206,9 +2206,12 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     ret.pushKV("vRelayExpiration", (int64_t)vRelayExpiration.size());
     ret.pushKV("vNodes", (int64_t)vNodes.size());
     ret.pushKV("vNodesDisconnected", (int64_t)vNodesDisconnected.size());
+    {
+        READLOCK(orphanpool.cs);
+        ret.pushKV("mapOrphanTransactions", (int64_t)orphanpool.mapOrphanTransactions.size());
+        ret.pushKV("mapOrphanTransactionsByPrev", (int64_t)orphanpool.mapOrphanTransactionsByPrev.size());
+    }
     // CAddrMan
-    ret.pushKV("mapOrphanTransactions", (int64_t)orphanpool.mapOrphanTransactions.size());
-    ret.pushKV("mapOrphanTransactionsByPrev", (int64_t)orphanpool.mapOrphanTransactionsByPrev.size());
 
     uint32_t nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream;
     connmgr->ExpeditedNodeCounts(nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream);
@@ -2226,7 +2229,6 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 #endif
 
     LOCK(cs_vNodes);
-    std::vector<CNode *>::iterator n;
     int disconnected = 0; // watch # of disconnected nodes to ensure they are being cleaned up
     for (std::vector<CNode *>::iterator it = vNodes.begin(); it != vNodes.end(); ++it)
     {
@@ -2251,7 +2253,12 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
                     (int64_t)::GetSerializeSize(*inode.pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION));
             }
         }
-        node.pushKV("vAddrToSend", (int64_t)inode.vAddrToSend.size());
+
+        {
+            LOCK(inode.cs_vSend);
+            node.pushKV("vAddrToSend", (int64_t)inode.vAddrToSend.size());
+        }
+
         node.pushKV("vInventoryToSend", (int64_t)inode.vInventoryToSend.size());
         ret.pushKV(inode.addrName, node);
     }
