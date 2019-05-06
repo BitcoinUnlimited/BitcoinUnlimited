@@ -624,21 +624,24 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
             LargestBlockSeen(nSizeBlock); // update largest block seen
 
             double nValidationTime = (double)(GetTimeMicros() - startTime) / 1000000.0;
-            if ((strCommand != NetMsgType::BLOCK) && (IsThinBlocksEnabled() || IsGrapheneBlockEnabled()))
+            if ((strCommand != NetMsgType::BLOCK) &&
+                (IsThinBlocksEnabled() || IsGrapheneBlockEnabled() || IsCompactBlocksEnabled()))
             {
-                LOG(THIN | GRAPHENE, "Processed Block %s reconstructed from (%s) in %.2f seconds, peer=%s\n",
+                LOG(THIN | GRAPHENE | CMPCT, "Processed Block %s reconstructed from (%s) in %.2f seconds, peer=%s\n",
                     inv.hash.ToString(), strCommand, (double)(GetTimeMicros() - startTime) / 1000000.0,
                     pfrom->GetLogName());
 
-                if (strCommand != NetMsgType::GRAPHENEBLOCK)
-                    thindata.UpdateValidationTime(nValidationTime);
-                else
+                if (strCommand == NetMsgType::GRAPHENEBLOCK)
                     graphenedata.UpdateValidationTime(nValidationTime);
+                else if (strCommand == NetMsgType::CMPCTBLOCK)
+                    compactdata.UpdateValidationTime(nValidationTime);
+                else
+                    thindata.UpdateValidationTime(nValidationTime);
             }
             else
             {
-                LOG(THIN | GRAPHENE, "Processed Regular Block %s in %.2f seconds, peer=%s\n", inv.hash.ToString(),
-                    (double)(GetTimeMicros() - startTime) / 1000000.0, pfrom->GetLogName());
+                LOG(THIN | GRAPHENE | CMPCT, "Processed Regular Block %s in %.2f seconds, peer=%s\n",
+                    inv.hash.ToString(), (double)(GetTimeMicros() - startTime) / 1000000.0, pfrom->GetLogName());
             }
         }
 
