@@ -207,7 +207,8 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
                 // if BlockOnly mode is turned on, these coins will be used, whereas, once the chain is
                 // syncd we only need the coins that have come from accepting txns into the memory pool.
                 bool fBlocksOnly = GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY);
-                if (IsChainNearlySyncd() && !fImporting && !fReindex && !fBlocksOnly)
+                if (IsChainNearlySyncd() && !fImporting && !fReindex && !fBlocksOnly &&
+                    (nCoinCacheMaxSize < DEFAULT_HIGH_PERF_MEM_CUTOFF))
                 {
                     // Update the usage of the child cache before deleting the entry in the child cache
                     nChildCachedCoinsUsage -= nUsage;
@@ -239,8 +240,9 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
         _WriteBestBlock(hashBlock);
 
     bool ret = db.WriteBatch(batch);
-    LOG(COINDB, "Committing %u changed transactions (out of %u) to coin database with %u batch writes...\n",
+    LOG(COINDB, "Committing1 %u changed transactions (out of %u) to coin database with %u batch writes...\n",
         (unsigned int)changed, (unsigned int)count, (unsigned int)nBatchWrites);
+
     return ret;
 }
 
