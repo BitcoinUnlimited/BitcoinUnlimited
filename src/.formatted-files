@@ -127,11 +127,6 @@ pubkey.cpp
 pubkey.h
 random.cpp
 random.h
-rsm/recursive_shared_mutex.cpp
-rsm/recursive_shared_mutex.h
-rsm/test/rsm_promotion_tests.cpp
-rsm/test/rsm_simple_tests.cpp
-rsm/test/rsm_starvation_tests.cpp
 requestManager.cpp
 requestManager.h
 rest.cpp

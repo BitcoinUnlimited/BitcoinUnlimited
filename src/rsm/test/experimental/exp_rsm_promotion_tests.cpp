@@ -3,15 +3,15 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "recursive_shared_mutex.h"
+#include "exp_recursive_shared_mutex.h"
 #include "test_cxx_rsm.h"
 #include "timer.h"
 
 #include <boost/test/unit_test.hpp>
 
-BOOST_FIXTURE_TEST_SUITE(rsm_promotion_tests, TestSetup)
+BOOST_FIXTURE_TEST_SUITE(exp_rsm_promotion_tests, TestSetup)
 
-recursive_shared_mutex rsm;
+exp_recursive_shared_mutex rsm;
 std::vector<int> rsm_guarded_vector;
 
 void helper_fail() { BOOST_CHECK_EQUAL(rsm.try_lock(), false); }
