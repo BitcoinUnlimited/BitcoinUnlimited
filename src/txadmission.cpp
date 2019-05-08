@@ -619,20 +619,16 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         return state.DoS(0, false, REJECT_NONSTANDARD, reason);
     }
 
-    const uint32_t cds_flag = (AreWeOnBCHChain() && IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip())) ?
-                                  SCRIPT_ENABLE_CHECKDATASIG :
-                                  0;
+    const uint32_t cds_flag =
+        (IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip())) ? SCRIPT_ENABLE_CHECKDATASIG : 0;
     const uint32_t schnorrflag =
-        (AreWeOnBCHChain() && IsMay2019Enabled(chainparams.GetConsensus(), chainActive.Tip())) ? SCRIPT_ENABLE_SCHNORR :
-                                                                                                 0;
+        (IsMay2019Enabled(chainparams.GetConsensus(), chainActive.Tip())) ? SCRIPT_ENABLE_SCHNORR : 0;
     const uint32_t segwit_flag =
-        (AreWeOnBCHChain() && IsMay2019Enabled(chainparams.GetConsensus(), chainActive.Tip()) && !fRequireStandard) ?
+        (IsMay2019Enabled(chainparams.GetConsensus(), chainActive.Tip()) && !fRequireStandard) ?
             SCRIPT_ALLOW_SEGWIT_RECOVERY :
             0;
-    const uint32_t svflag = (AreWeOnSVChain() && IsSv2018Activated(chainparams.GetConsensus(), chainActive.Tip())) ?
-                                SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES :
-                                0;
-    const uint32_t featureFlags = cds_flag | schnorrflag | segwit_flag | svflag;
+
+    const uint32_t featureFlags = cds_flag | schnorrflag | segwit_flag;
     const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;
 
     // Only accept nLockTime-using transactions that can be mined in the next
@@ -647,7 +643,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     }
 
     // Make sure tx size is acceptable after Nov 15, 2018 fork
-    if (AreWeOnBCHChain() && IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip()))
+    if (IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip()))
     {
         if (tx->GetTxSize() < MIN_TX_SIZE)
             return state.DoS(0, false, REJECT_INVALID, "txn-undersize");

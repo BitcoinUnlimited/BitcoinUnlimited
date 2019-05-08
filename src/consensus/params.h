@@ -153,8 +153,6 @@ struct Params
     int nov2018Height;
     /** May 15, 2019 actication time will be 12:00:00 UTC */
     int may2019ActivationTime;
-    /** Nov 15, 2018 SV activation height */
-    int sv2018Height;
 };
 } // namespace Consensus
 

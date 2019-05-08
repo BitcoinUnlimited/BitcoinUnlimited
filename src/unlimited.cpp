@@ -227,12 +227,6 @@ std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool valida
 {
     if (validate)
     {
-        if (value != 0 && miningSvForkTime.Value() != 0)
-        {
-            std::ostringstream ret;
-            ret << "Only one fork can be enabled at a time";
-            return ret.str();
-        }
     }
     else // If it was just turned "on" then set to the default activation time.
     {
@@ -245,32 +239,6 @@ std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool valida
     return std::string();
 }
 
-// Ensure that only one fork can be active at a time, update the UA string, and convert values of 1 to the
-// fork time default.
-std::string ForkTimeValidatorSV(const uint64_t &value, uint64_t *item, bool validate)
-{
-    if (validate)
-    {
-        if (value != 0 && miningForkTime.Value() != 0)
-        {
-            std::ostringstream ret;
-            ret << "Only one fork can be enabled at a time";
-            return ret.str();
-        }
-    }
-    else // If it was just turned "on" then set to the default activation time.
-    {
-        if (*item == 1)
-        {
-            // Since SV there's no other fork upcoming we going to use nov2018ActivationTime
-            // but since we removed the variable from src/chainparams.cpp we are going to use
-            // a literal integer here 1542300000 (Nov 15, 2019 15:40:00 UTC)
-            *item = 1542300000;
-        }
-        settingsToUserAgentString();
-    }
-    return std::string();
-}
 // Push all transactions in the mempool to another node
 void UnlimitedPushTxns(CNode *dest);
 
@@ -449,8 +417,6 @@ void settingsToUserAgentString()
     BUComments.clear();
 
     std::string flavor;
-    if (miningSvForkTime.Value() != 0)
-        BUComments.push_back("SV");
 
     std::stringstream ebss;
     ebss << (excessiveBlockSize / 100000);
@@ -481,15 +447,6 @@ void UnlimitedSetup(void)
     // If the user configures it to 1, assume this means default
     if (miningForkTime.Value() == 1)
         miningForkTime = Params().GetConsensus().may2019ActivationTime;
-    if (miningSvForkTime.Value() == 1)
-        miningSvForkTime = 1542300000;
-
-    if (miningForkTime.Value() != 0 && miningSvForkTime.Value() != 0)
-    {
-        LOGA("Both the SV and ABC forks are enabled.  You must choose one.");
-        printf("Both the SV and ABC forks are enabled.  You must choose one.\n");
-        exit(1);
-    }
 
     if (maxGeneratedBlock > excessiveBlockSize)
     {
@@ -554,40 +511,15 @@ void UnlimitedSetup(void)
     if (Params().NetworkIDString() == "main")
     {
         CCheckpointData &checkpoints = ModifiableParams().ModifiableCheckpoints();
-        if (nMiningSvForkTime == 0)
-        {
-            // Nov 15th 2018 activate LTOR, DSV op_code
-            checkpoints.mapCheckpoints[556767] =
-                uint256S("0000000000000000004626ff6e3b936941d341c5932ece4357eeccac44e6d56c");
-            // * UNIX timestamp of last checkpoint block
-            checkpoints.nTimeLastCheckpoint = 1542304936;
-            // * total number of transactions between genesis and last checkpoint
-            checkpoints.nTransactionsLastCheckpoint = 265567564;
-            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
-            checkpoints.fTransactionsPerDay = 280000.0;
-        }
-        else if (nMiningSvForkTime != 0)
-        {
-            // Nov 15th 2018 SV fork, 128MB blocks, re-enable bitcoin 0.1.0 op_codes
-            checkpoints.mapCheckpoints[556767] =
-                uint256S("000000000000000001d956714215d96ffc00e0afda4cd0a96c96f8d802b1662b");
-            // * UNIX timestamp of last checkpoint block
-            checkpoints.nTimeLastCheckpoint = 1542305817;
-            // * total number of transactions between genesis and last checkpoint
-            checkpoints.nTransactionsLastCheckpoint = 265615408;
-            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
-            checkpoints.fTransactionsPerDay = 280000.0;
-        }
-        else
-        {
-            // unknown scenario, dont update these values or add a new checkpoint
-            // * UNIX timestamp of last checkpoint block
-            checkpoints.nTimeLastCheckpoint = 1526410186;
-            // * total number of transactions between genesis and last checkpoint
-            checkpoints.nTransactionsLastCheckpoint = 249416375;
-            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
-            checkpoints.fTransactionsPerDay = 280000.0;
-        }
+        // Nov 15th 2018 activate LTOR, DSV op_code
+        checkpoints.mapCheckpoints[556767] =
+            uint256S("0000000000000000004626ff6e3b936941d341c5932ece4357eeccac44e6d56c");
+        // * UNIX timestamp of last checkpoint block
+        checkpoints.nTimeLastCheckpoint = 1542304936;
+        // * total number of transactions between genesis and last checkpoint
+        checkpoints.nTransactionsLastCheckpoint = 265567564;
+        // * estimated number of transactions per day after checkpoint (~3.5 TPS)
+        checkpoints.fTransactionsPerDay = 280000.0;
     }
 }
 
