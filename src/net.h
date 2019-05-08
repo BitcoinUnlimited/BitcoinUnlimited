@@ -47,13 +47,20 @@ class CAddrMan;
 class CSubNet;
 class CNode;
 class CNodeRef;
+class CNetMessage;
 
 namespace boost
 {
 class thread_group;
 } // namespace boost
 
+extern CCriticalSection cs_PriorityRecvQ;
+extern CCriticalSection cs_PrioritySendQ;
 extern CTweak<unsigned int> numMsgHandlerThreads;
+extern std::deque<std::pair<CNodeRef, CNetMessage> > vPriorityRecvQ;
+extern std::deque<CNodeRef> vPrioritySendQ;
+extern std::atomic<bool> fPriorityRecvMsg;
+extern std::atomic<bool> fPrioritySendMsg;
 
 /** Time between pings automatically sent out for latency probing and keepalive (in seconds). */
 static const int PING_INTERVAL = 2 * 60;
@@ -127,7 +134,7 @@ unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string &strError, bool fWhitelisted = false);
 void StartNode(thread_group &threadGroup);
 bool StopNode();
-int SocketSendData(CNode *pnode);
+int SocketSendData(CNode *pnode, bool fSendTwo = false);
 
 struct CombinerAll
 {

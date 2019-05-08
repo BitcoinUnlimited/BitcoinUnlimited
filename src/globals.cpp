@@ -219,6 +219,14 @@ CNodeSignals g_signals;
 CAddrMan addrman;
 CDoSManager dosMan;
 
+// A message queue used for priority messages such as graheneblocks or other thintype block messages
+std::atomic<bool> fPriorityRecvMsg{false};
+std::atomic<bool> fPrioritySendMsg{false};
+CCriticalSection cs_PriorityRecvQ;
+CCriticalSection cs_PrioritySendQ;
+deque<pair<CNodeRef, CNetMessage> > vPriorityRecvQ GUARDED_BY(cs_PriorityRecvQ);
+deque<CNodeRef> vPrioritySendQ GUARDED_BY(cs_PrioritySendQ);
+
 // Transaction mempool admission globals
 
 // Transactions that are available to be added to the mempool, and protection

@@ -525,6 +525,20 @@ void CNode::CloseSocketDisconnect()
         CloseSocket(hSocket);
     }
 
+    // Purge any noderef's in the priority message queue relating to this peer. If we don't
+    // remove the node references here then we won't be able to complete the disconnection.
+    {
+        LOCK(cs_PrioritySendQ);
+        auto it = vPrioritySendQ.begin();
+        while (it != vPrioritySendQ.end())
+        {
+            if (this == it->get())
+                it = vPrioritySendQ.erase(it);
+            else
+                it++;
+        }
+    }
+
     // in case this fails, we'll empty the recv buffer when the CNode is deleted
     TRY_LOCK(cs_vRecvMsg, lockRecv);
     if (lockRecv)
@@ -616,6 +630,34 @@ static bool IsMessageOversized(CNetMessage &msg)
     return false;
 }
 
+static bool IsPriorityMsg(std::string strCommand)
+{
+    if (!IsChainNearlySyncd())
+        return false;
+
+    // Various messages types that are considered priority.
+    // NOTE: The absence of BLOCK is not by accident. Full BLOCK messages are problematic for priority queuing.
+    //       as it is difficult to know the state of the peer in terms of whether they are sync'd to the chain.
+    //       We for instance don't want to be sending BLOCK's as priority messages if the peer is only in the process
+    //       of initial sync. Also, BLOCK's can be quite large and we don't want them to be dominating our priority
+    //       sending process. We prefer small objects that can be forwarded with one SockeSendData() attempt.
+    if (strCommand == NetMsgType::HEADERS || strCommand == NetMsgType::GRAPHENEBLOCK ||
+        strCommand == NetMsgType::GET_GRAPHENE || strCommand == NetMsgType::GRAPHENETX ||
+        strCommand == NetMsgType::GET_GRAPHENETX || strCommand == NetMsgType::GET_XTHIN ||
+        strCommand == NetMsgType::GET_THIN || strCommand == NetMsgType::XTHINBLOCK ||
+        strCommand == NetMsgType::THINBLOCK || strCommand == NetMsgType::XBLOCKTX ||
+        strCommand == NetMsgType::GET_XBLOCKTX || strCommand == NetMsgType::XPEDITEDREQUEST ||
+        strCommand == NetMsgType::XPEDITEDBLK || strCommand == NetMsgType::XPEDITEDTXN ||
+        strCommand == NetMsgType::CMPCTBLOCK || strCommand == NetMsgType::GETBLOCKTXN ||
+        strCommand == NetMsgType::BLOCKTXN)
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
 bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 {
     AssertLockHeld(cs_vRecvMsg);
@@ -658,26 +700,36 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
             {
                 nActivityBytes += msg.hdr.nMessageSize;
 
-                // If the message is a priority message then move from the back to the front of the deque.
-                //
-                // NOTE: for GET_XTHIN we don't jump the queue on test environments because the GET_XTHIN can get ahead
-                // of a previous GET_XTHIN/HEADER requests and result in a DOS if the block returns out of order and
-                // with no headers in the block index or the setblockindexcandidates.
-                if ((strCommand == NetMsgType::GET_XTHIN && Params().NetworkIDString() == "main") ||
-                    strCommand == NetMsgType::GET_THIN || strCommand == NetMsgType::XTHINBLOCK ||
-                    strCommand == NetMsgType::THINBLOCK || strCommand == NetMsgType::XBLOCKTX ||
-                    strCommand == NetMsgType::GET_XBLOCKTX || strCommand == NetMsgType::GET_GRAPHENE ||
-                    strCommand == NetMsgType::GRAPHENEBLOCK || strCommand == NetMsgType::GRAPHENETX ||
-                    strCommand == NetMsgType::GET_GRAPHENETX)
+                // If the message is a priority message then move it into the priority queue.
+                if (IsPriorityMsg(strCommand))
                 {
-                    LOG(THIN | GRAPHENE, "ReceiveMsgBytes %s\n", strCommand);
+                    LOCK(cs_PriorityRecvQ);
+                    // As a safeguard on some peer trying to dominate our networking
+                    // don't allow unlimited simultaneous priority messages. There should in general only be
+                    // one priority message at any one time with the exception of block HEADERS announcements
+                    // which can come relatively close together in time.
+                    if (vPriorityRecvQ.size() <= 5)
+                    {
+                        // Move the this message to the priority queue.
+                        CNetMessage priority;
+                        std::swap(priority, msg);
+                        vRecvMsg.pop_back();
+                        vPriorityRecvQ.push_back(
+                            std::make_pair<CNodeRef, CNetMessage>(CNodeRef(this), std::move(priority)));
 
-                    // Move the this message to the front of the queue.
-                    std::rotate(vRecvMsg.begin(), vRecvMsg.end() - 1, vRecvMsg.end());
+                        // Check we moved the message
+                        std::string strFirstMsgCommand = vPriorityRecvQ.back().second.hdr.GetCommand();
+                        DbgAssert(strFirstMsgCommand == strCommand, );
+                        LOG(THIN | GRAPHENE | CMPCT,
+                            "Receive Queue: pushed %s to the front of the queue, %d bytes, peer(%d)\n",
+                            strFirstMsgCommand, vPriorityRecvQ.back().second.hdr.nMessageSize, this->GetId());
 
-                    std::string strFirstMsgCommand = vRecvMsg[0].hdr.GetCommand();
-                    DbgAssert(strFirstMsgCommand == strCommand, );
-                    LOG(THIN | GRAPHENE, "Receive Queue: pushed %s to the front of the queue\n", strFirstMsgCommand);
+                        // Set msg.nTime
+                        vPriorityRecvQ.back().second.nTime = GetTimeMicros();
+                        fPriorityRecvMsg.store(true);
+                        messageHandlerCondition.notify_one();
+                        continue;
+                    }
                 }
             }
             msg.nStopwatch = GetStopwatchMicros();
@@ -742,13 +794,13 @@ int CNetMessage::readData(const char *pch, unsigned int nBytes)
 
 
 // requires LOCK(cs_vSend), BU: returns > 0 if any data was sent, 0 if nothing accomplished.
-int SocketSendData(CNode *pnode)
+int SocketSendData(CNode *pnode, bool fSendTwo)
 {
     // BU This variable is incremented if something happens.  If it is zero at the bottom of the loop, we delay.  This
     // solves spin loop issues where the select does not block but no bytes can be transferred (traffic shaping limited,
     // for example).
     int progress = 0;
-
+    uint32_t nMsgSent = 0;
     // Make sure we haven't already been asked to disconnect
     if (pnode->fDisconnect)
         return progress;
@@ -764,7 +816,7 @@ int SocketSendData(CNode *pnode)
                 data.size(), pnode->nSendOffset, pnode->nSendSize);
             continue;
         }
-        // assert(data.size() > pnode->nSendOffset);
+        DbgAssert(data.size() > pnode->nSendOffset, );
 
         int amt2Send = min((int64_t)(data.size() - pnode->nSendOffset), sendShaper.available(SEND_SHAPER_MIN_FRAG));
         if (amt2Send == 0)
@@ -789,6 +841,11 @@ int SocketSendData(CNode *pnode)
                 pnode->nSendOffset = 0;
                 pnode->nSendSize.fetch_sub(data.size());
                 it++;
+
+                // If this is a priority send then just send two messages, then stop sending more.
+                nMsgSent++;
+                if (fSendTwo && nMsgSent >= 2)
+                    break;
             }
             else
             {
@@ -820,8 +877,8 @@ int SocketSendData(CNode *pnode)
         if (pnode->nSendOffset != 0 || pnode->nSendSize != 0)
             LOGA("ERROR: One or more values were not Zero - nSendOffset was %d nSendSize was %d\n", pnode->nSendOffset,
                 pnode->nSendSize);
-        // assert(pnode->nSendOffset == 0);
-        // assert(pnode->nSendSize == 0);
+        DbgAssert(pnode->nSendOffset == 0, );
+        DbgAssert(pnode->nSendSize == 0, );
     }
     pnode->vSendMsg.erase(pnode->vSendMsg.begin(), it);
     return progress;
@@ -1407,6 +1464,75 @@ void ThreadSocketHandler()
                 continue;
             if (FD_ISSET(hSocket, &fdsetSend))
             {
+                // Send priority messages if there any regardless of which peer, taking care to maintain
+                // locking orders.
+                //
+                // Only send two messages, the first two in the send queue by setting the fSendTwo flag, since the
+                // priority message will be the first or second one in the queue. If there happen to be multiple
+                // priority messages stacked in the same queue then we will loop around sending one message each time.
+                // This way we don't end up draining each queue for a peer before being able to send another priority
+                // message from another peer which would happen in the case of block announcements.
+                //
+                // The following presents a more difficult issue in maintaining locking orders. cs_vSend must be
+                // taken before cs_PrioritySendQ and hence the following blocks of code needed to preserve that order.
+                while (fPrioritySendMsg)
+                {
+                    // Check if anything is really in queue and pop the noderef. If we're empty then set the
+                    // priority flag to false. Do it here so we don't have to check at the end again and take a lock
+                    // twice.
+                    CNodeRef noderef;
+                    {
+                        LOCK(cs_PrioritySendQ);
+                        if (!vPrioritySendQ.empty())
+                        {
+                            noderef = vPrioritySendQ.front();
+                            vPrioritySendQ.pop_front();
+                        }
+                        else
+                        {
+                            fPrioritySendMsg = false;
+                            break;
+                        }
+                    }
+
+                    // Send the first two messages in the send queue. We send two because
+                    // the first message may be a partial message and as a result may not be
+                    // a priority message; the priorty message may be the one behind this partial message.
+                    {
+                        bool fEmpty = false;
+                        CNode *pfrom = noderef.get();
+                        TRY_LOCK(pfrom->cs_vSend, lock_sendtwo);
+                        if (lock_sendtwo)
+                        {
+                            if (!pfrom->vSendMsg.empty())
+                            {
+                                bool fSendTwo = true;
+                                progress += SocketSendData(pfrom, fSendTwo);
+                            }
+                            else
+                                fEmpty = true;
+                        }
+
+                        if (!noderef.get()->fDisconnect && !lock_sendtwo)
+                        {
+                            // Only if we failed to lock, then push to the back of the queue an try later.
+                            //
+                            // NOTE: If priority messages failed to send or are not sent in their entirety then do "NOT"
+                            //       try again, just let the normal queuing take care of sending the rest. We don't want
+                            //       to start a possible infinite loop where a socket could be hung or network could
+                            //       be backed up. The remainder of the message is at the front of the queue so
+                            //       it will get sent (if it can) at some point.
+                            LOCK(cs_PrioritySendQ);
+                            vPrioritySendQ.push_back(noderef);
+                            fPrioritySendMsg = true;
+                            break;
+                        }
+                        else if (fEmpty)
+                            break;
+                    }
+                }
+
+                // Send messages from this pnode's send queue
                 TRY_LOCK(pnode->cs_vSend, lockSend);
                 if (lockSend && sendShaper.try_leak(0))
                 {
@@ -3205,30 +3331,76 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
         strcmp(strCommand, NetMsgType::VERACK) != 0 && strcmp(strCommand, NetMsgType::INV) != 0)
     {
         nActivityBytes += nSize;
+    }
 
-        // If the message is a priority message then move to the front of the deque
-        if (strcmp(strCommand, NetMsgType::GET_XTHIN) == 0 || strcmp(strCommand, NetMsgType::XTHINBLOCK) == 0 ||
-            strcmp(strCommand, NetMsgType::GET_THIN) == 0 || strcmp(strCommand, NetMsgType::THINBLOCK) == 0 ||
-            strcmp(strCommand, NetMsgType::XBLOCKTX) == 0 || strcmp(strCommand, NetMsgType::GET_XBLOCKTX) == 0 ||
-            strcmp(strCommand, NetMsgType::GET_GRAPHENE) == 0 || strcmp(strCommand, NetMsgType::GRAPHENEBLOCK) == 0 ||
-            strcmp(strCommand, NetMsgType::GRAPHENETX) == 0 || strcmp(strCommand, NetMsgType::GET_GRAPHENETX) == 0)
+
+    // If the message is a priority message then move to the front of the deque and add
+    // a CNodeRef entry into the vPrioritySendQ. Now that that message is at the front of the queue
+    // all we have to do is emtpy this first item from the vSendMsg queue when we SendMessages().
+    if (IsPriorityMsg(strCommand))
+    {
+        it = vSendMsg.insert(vSendMsg.begin(), CSerializeData());
+
+        // Do this here because we may swap the iterator later.
+        ssSend.GetAndClear(*it);
+        nSendSize.fetch_add((*it).size());
+
+        // Add to the priority queue and position the message by swapping the iterators.
         {
-            it = vSendMsg.insert(vSendMsg.begin(), CSerializeData());
-            LOG(THIN, "Send Queue: pushed %s to the front of the queue\n", strCommand);
+            LOCK(cs_PrioritySendQ);
+            vPrioritySendQ.push_back(CNodeRef(this));
+
+            // if there are more priority messages than the one we just added then find out how many
+            // are currently from this peer so we can order them by time of entry.
+            uint32_t nItemsPriority = 0;
+            if (vPrioritySendQ.size() >= 2)
+            {
+                for (auto &noderef : vPrioritySendQ)
+                {
+                    if (noderef.get() == this)
+                        nItemsPriority++;
+                }
+            }
+            else
+                nItemsPriority = 1;
+
+            // Move the range of priority msg's forward and place the new priority message (pri3) at the
+            // end of the range of priority msg's but still prior to non-priority msg's. This way we
+            // maintain the time based order of arrival of messages.
+            //
+            // Note that we sometimes keep the first message "msg1" at the beginning. This is in case part of msg1
+            // may have already been sent. The following examples show the relative locations of the messages
+            // after a new message arrives and then again after the iterator swap.
+            //
+            //   ** after a new priority message "pri3" is added to the front of the queue **
+            // Front of queue => *pri3* pri1 pri2 msg1 msg2 msg3 msg4 ...
+            //   or, in the case where msg1 has already been partially sent (nSendOffset != 0)
+            // Front of queue => *pri3* msg1 pri1 pri2 msg2 msg3 msg4 ...
+            //
+            //   **after iterator swap, becomes **
+            // Front of queue => pri1 pri2 *pri3* msg1, msg2 msg3 msg4 ...
+            //   or, in the case where msg1 has already been partially sent (nSendOffset != 0)
+            // Front of queue => msg1 pri1 pri2 *pri3* msg2 msg3 msg4 ...
+            uint32_t nCutoff = 2;
+            if (nSendOffset != 0)
+                nCutoff = 1;
+            if (nItemsPriority >= nCutoff && vSendMsg.size() >= 2)
+            {
+                for (size_t i = 0; i < nItemsPriority && i < vSendMsg.size() - 1; i++)
+                    std::iter_swap(vSendMsg.begin() + i, vSendMsg.begin() + i + 1);
+            }
         }
-        else
-            it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
+        fPrioritySendMsg = true;
+        LOG(THIN | GRAPHENE | CMPCT, "Send Queue: pushed %s to the front of the queue, peer(%d)\n", strCommand,
+            this->GetId());
     }
     else
+    {
         it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
-    // BU: end
+        ssSend.GetAndClear(*it);
+        nSendSize.fetch_add((*it).size());
+    }
 
-    ssSend.GetAndClear(*it);
-    nSendSize.fetch_add((*it).size());
-
-    // If write queue empty, attempt "optimistic write"
-    if (it == vSendMsg.begin())
-        SocketSendData(this);
 
     LEAVE_CRITICAL_SECTION(cs_vSend);
 }
