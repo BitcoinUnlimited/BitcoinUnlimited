@@ -94,7 +94,6 @@ public:
     const std::string &CashAddrPrefix() const { return cashaddrPrefix; }
     const std::vector<SeedSpec6> &FixedSeeds() const { return vFixedSeeds; }
     const CCheckpointData &Checkpoints() const { return checkpointData; }
-    CCheckpointData &ModifiableCheckpoints() { return checkpointData; }
 protected:
     CChainParams() {}
     Consensus::Params consensus;

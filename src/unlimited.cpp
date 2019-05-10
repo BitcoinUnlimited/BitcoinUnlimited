@@ -505,22 +505,6 @@ void UnlimitedSetup(void)
     // Start Internal CPU miner
     // Generate coins in the background
     GenerateBitcoins(GetBoolArg("-gen", DEFAULT_GENERATE), GetArg("-genproclimit", DEFAULT_GENERATE_THREADS), Params());
-
-
-    // Modify checkpoints depending on whether BCH or SV fork
-    if (Params().NetworkIDString() == "main")
-    {
-        CCheckpointData &checkpoints = ModifiableParams().ModifiableCheckpoints();
-        // Nov 15th 2018 activate LTOR, DSV op_code
-        checkpoints.mapCheckpoints[556767] =
-            uint256S("0000000000000000004626ff6e3b936941d341c5932ece4357eeccac44e6d56c");
-        // * UNIX timestamp of last checkpoint block
-        checkpoints.nTimeLastCheckpoint = 1542304936;
-        // * total number of transactions between genesis and last checkpoint
-        checkpoints.nTransactionsLastCheckpoint = 265567564;
-        // * estimated number of transactions per day after checkpoint (~3.5 TPS)
-        checkpoints.fTransactionsPerDay = 280000.0;
-    }
 }
 
 FILE *blockReceiptLog = nullptr;

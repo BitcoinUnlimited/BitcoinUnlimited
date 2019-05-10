@@ -208,8 +208,17 @@ public:
         checkpoints[504031] = uint256S("0x0000000000000000011ebf65b60d0a3de80b8175be709d653b4c1a1beeb6ab9c");
         // May 15th 2018 re-enable op_codes and 32 MB max block size
         checkpoints[530359] = uint256S("0x0000000000000000011ada8bd08f46074f44a8f155396f43e38acf9501c49103");
+        // Nov 15th 2018 activate LTOR, DSV op_code
+        checkpoints[556767] = uint256S("0000000000000000004626ff6e3b936941d341c5932ece4357eeccac44e6d56c");
+
 
         // clang-format on
+        // * UNIX timestamp of last checkpoint block
+        checkpointData.nTimeLastCheckpoint = 1542304936;
+        // * total number of transactions between genesis and last checkpoint
+        checkpointData.nTransactionsLastCheckpoint = 265567564;
+        // * estimated number of transactions per day after checkpoint (~3.5 TPS)
+        checkpointData.fTransactionsPerDay = 280000.0;
     }
 };
 
