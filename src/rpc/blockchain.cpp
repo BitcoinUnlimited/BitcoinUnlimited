@@ -13,7 +13,6 @@
 #include "coins.h"
 #include "consensus/validation.h"
 #include "hashwrapper.h"
-#include "index/txindex.h"
 #include "main.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
@@ -26,6 +25,7 @@
 #include "txmempool.h"
 #include "txorphanpool.h"
 #include "ui_interface.h"
+#include "undo.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation/validation.h"
@@ -612,6 +612,8 @@ static bool is_param_trueish(const UniValue &param)
     return param.get_bool();
 }
 
+// Return the block data that corresponds to a given header.  If the block data does not exist, then throw an
+// exception that's compatible with our RPC interface.
 static CBlock GetBlockChecked(const CBlockIndex *pblockindex)
 {
     if (IsBlockPruned(pblockindex))
@@ -628,6 +630,23 @@ static CBlock GetBlockChecked(const CBlockIndex *pblockindex)
         throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
     }
     return block;
+}
+
+static CBlockUndo GetUndoChecked(const CBlockIndex *pblockindex)
+{
+    DbgAssert(pblockindex, throw std::runtime_error(__func__));
+    CBlockUndo blockUndo;
+    if (IsBlockPruned(pblockindex))
+    {
+        throw JSONRPCError(RPC_MISC_ERROR, "Undo data not available (pruned data)");
+    }
+
+    if (!ReadUndoFromDisk(blockUndo, pblockindex->GetUndoPos(), pblockindex->pprev))
+    {
+        throw JSONRPCError(RPC_MISC_ERROR, "Can't read undo data from disk");
+    }
+
+    return blockUndo;
 }
 
 static UniValue getblock(const UniValue &params, bool fHelp)
@@ -1657,7 +1676,6 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
             "getblockstats hash_or_height ( stats )\n"
             "\nCompute per block statistics for a given window. All amounts are in satoshis.\n"
             "It won't work for some heights with pruning.\n"
-            "It won't work without -txindex for utxo_size_inc, *fee or *feerate stats.\n"
             "\nArguments:\n"
             "1. \"hash_or_height\"     (string or numeric, required) The block hash or height of the target block\n"
             "2. \"stats\"              (array,  optional) Values to plot, by default all values (see result below)\n"
@@ -1763,7 +1781,9 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
             throw JSONRPCError(
                 RPC_INVALID_PARAMETER, strprintf("Target block height %d after current tip %d", height, current_tip));
         }
+        LOG(RPC, "%s for height %d (tip is at %d)", __func__, height, current_tip);
         pindex = chainActive[height];
+        DbgAssert(pindex && pindex->nHeight == height, throw std::runtime_error(__func__));
     }
 
     DbgAssert(pindex != nullptr, throw std::runtime_error(__func__));
@@ -1780,6 +1800,10 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
     }
 
     const CBlock block = GetBlockChecked(pindex);
+    const CBlockUndo blockUndo = GetUndoChecked(pindex);
+    // This property is required in the for loop below (and ofc every tx should have undo data)
+    DbgAssert(blockUndo.vtxundo.size() >= block.vtx.size() - 1,
+        throw JSONRPCError(RPC_DATABASE_ERROR, "Block undo data is corrupt"));
 
     const bool do_all = stats.size() == 0; // Calculate everything if nothing selected (default)
     const bool do_mediantxsize = do_all || stats.count("mediantxsize") != 0;
@@ -1809,8 +1833,9 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
     std::vector<std::pair<CAmount, int64_t> > feerate_array;
     std::vector<int64_t> txsize_array;
 
-    for (const auto &tx : block.vtx)
+    for (size_t i = 0; i < block.vtx.size(); ++i)
     {
+        const auto &tx = block.vtx.at(i);
         outputs += tx->vout.size();
 
         CAmount tx_total_out = 0;
@@ -1846,23 +1871,11 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
 
         if (loop_inputs)
         {
-            if (!g_txindex)
-            {
-                throw JSONRPCError(
-                    RPC_INVALID_PARAMETER, "One or more of the selected stats requires -txindex enabled");
-            }
             CAmount tx_total_in = 0;
-            for (const CTxIn &in : tx->vin)
+            const auto &txundo = blockUndo.vtxundo.at(i - 1);
+            for (const Coin &coin : txundo.vprevout)
             {
-                CTransactionRef tx_in;
-                uint256 hashBlock;
-                if (!GetTransaction(in.prevout.hash, tx_in, Params().GetConsensus(), hashBlock, false))
-                {
-                    throw JSONRPCError(
-                        RPC_INTERNAL_ERROR, std::string("Unexpected internal error (tx index seems corrupt)"));
-                }
-
-                CTxOut prevoutput = tx_in->vout[in.prevout.n];
+                const CTxOut &prevoutput = coin.out;
 
                 tx_total_in += prevoutput.nValue;
                 utxo_size_inc -= GetSerializeSize(prevoutput, SER_NETWORK, PROTOCOL_VERSION) + PER_UTXO_OVERHEAD;

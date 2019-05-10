@@ -13,7 +13,6 @@ from test_framework.util import (
 )
 import json
 import os
-import time
 import logging
 
 TESTSDIR = os.path.dirname(os.path.realpath(__file__))
@@ -22,18 +21,6 @@ class GetblockstatsTest(BitcoinTestFramework):
 
     start_height = 101
     max_stat_pos = 2
-    STATS_NEED_TXINDEX = [
-        'avgfee',
-        'avgfeerate',
-        'maxfee',
-        'maxfeerate',
-        'medianfee',
-        'feerate_percentiles',
-        'minfee',
-        'minfeerate',
-        'totalfee',
-        'utxo_size_inc',
-    ]
 
 
     def __init__(self):
@@ -50,27 +37,33 @@ class GetblockstatsTest(BitcoinTestFramework):
                           help='Test data file')
 
     def set_test_params(self):
-        self.num_nodes = 2
-        self.extra_args = [['-txindex'], ['-paytxfee=0.003']]
+        self.num_nodes = 1
         self.setup_clean_chain = True
+        self.extra_args = [['-debug=rpc']]
 
     def get_stats(self):
-        return [self.nodes[0].getblockstats(self.start_height + i) for i in range(self.max_stat_pos+1)]
+        stats = [ ]
+        for i in range(self.max_stat_pos + 1):
+            stats.append(self.nodes[0].getblockstats(self.start_height + i))
+
+        return stats
 
     def generate_test_data(self, filename):
-        mocktime = time.time()
+        mocktime = 1525107225
+        self.nodes[0].setmocktime(mocktime)
         self.nodes[0].generate(101)
 
         subtractfeefromamount = True
-        self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 10, "", "", subtractfeefromamount)
+        self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 10, "", "", subtractfeefromamount)
         self.nodes[0].generate(1)
         self.sync_all()
 
         self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 10, "", "", subtractfeefromamount)
         subtractfeefromamount = False
         self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 10, "", "", subtractfeefromamount)
+        self.nodes[0].settxfee(0.003)
         subtractfeefromamount = True
-        self.nodes[1].sendtoaddress(self.nodes[0].getnewaddress(), 1, "", "", subtractfeefromamount)
+        self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 1, "", "", subtractfeefromamount)
         self.sync_all()
         self.nodes[0].generate(1)
 
@@ -102,10 +95,11 @@ class GetblockstatsTest(BitcoinTestFramework):
 
         # Set the timestamps from the file so that the nodes can get out of Initial Block Download
         self.nodes[0].setmocktime(mocktime)
-        self.nodes[1].setmocktime(mocktime)
+        self.sync_all()
 
         for b in blocks:
             self.nodes[0].submitblock(b)
+
 
     def run_test(self):
         test_data = os.path.join(TESTSDIR, self.options.test_data)
@@ -116,9 +110,6 @@ class GetblockstatsTest(BitcoinTestFramework):
 
         self.sync_all()
         stats = self.get_stats()
-        expected_stats_noindex = []
-        for stat_row in stats:
-            expected_stats_noindex.append({k: v for k, v in stat_row.items() if k not in self.STATS_NEED_TXINDEX})
 
         # Make sure all valid statistics are included but nothing else is
         expected_keys = self.expected_stats[0].keys()
@@ -135,10 +126,6 @@ class GetblockstatsTest(BitcoinTestFramework):
             blockhash = self.expected_stats[i]['blockhash']
             stats_by_hash = self.nodes[0].getblockstats(blockhash)
             assert_equal(stats_by_hash, self.expected_stats[i])
-
-            # Check with the node that has no txindex
-            stats_no_txindex = self.nodes[1].getblockstats(blockhash, list(expected_stats_noindex[i].keys()))
-            assert_equal(stats_no_txindex, expected_stats_noindex[i])
 
         # Make sure each stat can be queried on its own
         for stat in expected_keys:
@@ -176,10 +163,7 @@ class GetblockstatsTest(BitcoinTestFramework):
 
         # Make sure we aren't always returning inv_sel_stat as the culprit stat
         assert_raises_rpc_error(-8, 'Invalid selected statistic aaa%s' % inv_sel_stat,
-                                self.nodes[0].getblockstats, 1, ['minfee' , 'aaa%s' % inv_sel_stat])
-
-        assert_raises_rpc_error(-8, 'One or more of the selected stats requires -txindex enabled',
-                                self.nodes[1].getblockstats, self.start_height + self.max_stat_pos)
+                self.nodes[0].getblockstats, 1, ['minfee' , 'aaa%s' % inv_sel_stat])
 
         # Mainchain's genesis block shouldn't be found on regtest
         assert_raises_rpc_error(-5, 'Block not found', self.nodes[0].getblockstats,
