@@ -80,6 +80,7 @@ class BitcoinTestFramework(object):
         self.nodes = self.setup_nodes()
 
         if self.num_nodes == 1:
+            self.is_network_split = False
             return
 
         if self.num_nodes == 2:
