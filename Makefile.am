@@ -219,7 +219,7 @@ check-formatting:
 	$(MAKE) -C src $@
 
 electrs:
-	$(top_srcdir)/contrib/electrs/build_electrs.py --dst=${PWD}/src --target=$(host)
+	$(top_srcdir)/contrib/electrs/build_electrs.py --dst=$(top_srcdir)/src --target=$(host)
 
 dist_noinst_SCRIPTS = autogen.sh
 
