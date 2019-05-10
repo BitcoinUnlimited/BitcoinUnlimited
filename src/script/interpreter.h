@@ -122,9 +122,6 @@ enum
 
     // Allows the recovery of coins sent to p2sh segwit addresses
     SCRIPT_ALLOW_SEGWIT_RECOVERY = (1U << 20),
-
-    // Are OP_INVERT, OP_MUL, OP_LSHIFT, OP_RSHIFT enabled?
-    SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES = (1U << 21),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);

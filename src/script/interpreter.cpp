@@ -615,11 +615,7 @@ static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags)
     case OP_MUL:
     case OP_LSHIFT:
     case OP_RSHIFT:
-        if ((flags & SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES) == 0)
-        {
-            return true;
-        }
-        break;
+        return true;
     default:
         break;
     }
