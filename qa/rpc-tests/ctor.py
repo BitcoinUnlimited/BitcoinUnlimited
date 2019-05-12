@@ -130,15 +130,16 @@ class CtorTest (BitcoinTestFramework):
             self.nodes[1].generate(1)
 
         connect_nodes_bi(self.nodes,0,1)
+        sync_blocks(self.nodes[0:2])
 
         # make n0 send coin to itself 4*3 times
         for j in range(4):
             for i in range(3):
                 self.nodes[0].sendtoaddress(addr[0], 4-i)
             self.nodes[0].generate(1)
-
+ 
         connect_nodes_bi(self.nodes,0,1)
-
+        sync_blocks(self.nodes[0:2])
         waitFor(10, lambda: self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
         # ctor rollback test
@@ -147,16 +148,17 @@ class CtorTest (BitcoinTestFramework):
             for i in range(3):
                 self.nodes[3].sendtoaddress(addr[3], 4-i)
             self.nodes[3].generate(1)
-
+ 
         connect_nodes_bi(self.nodes,2,3)
-
+        sync_blocks(self.nodes[2:])
+ 
         for j in range(4):
             for i in range(3):
                 self.nodes[2].sendtoaddress(addr[2], 4-i)
             self.nodes[2].generate(1)
-
+ 
         connect_nodes_bi(self.nodes,2,3)
-
+        sync_blocks(self.nodes[2:])
         waitFor(10, lambda: self.nodes[2].getbestblockhash() == self.nodes[3].getbestblockhash())
 
         # push the dtor chain beyond ctor by 29 blocks
@@ -170,6 +172,7 @@ class CtorTest (BitcoinTestFramework):
         dtorTip = self.nodes[0].getbestblockhash()
         dtorTipHeight = self.nodes[0].getblockcount()
 
+ 
         self.nodes.append(start_node(4, self.options.tmpdir))
         self.nodes[4].set("consensus.enableCanonicalTxOrder=1")
         for i in range(5):
@@ -190,6 +193,7 @@ class CtorTest (BitcoinTestFramework):
 
         # first generate a competing ctor fork on our isolated node that is longer than the current fork
 
+ 
         rollbackNode.set("consensus.enableCanonicalTxOrder=1")
         # make the new fork longer than current
         for n in range(10):
@@ -208,6 +212,7 @@ class CtorTest (BitcoinTestFramework):
         ctorForkTipHash = rollbackNode.getbestblockhash()
         ctorForkTipCount = rollbackNode.getblockcount()
 
+ 
         # enable ctor
         # now when 2 and 3 see the other fork, they should switch to it.
         disconnect_all(self.nodes[2])
