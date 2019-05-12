@@ -521,9 +521,41 @@ std::string JSONPrettyPrint(const UniValue &univalue)
     }
     return ret;
 }
+
+void UpdateJSONTests(std::vector<TestBuilder> &tests)
+{
+    std::set<std::string> tests_set;
+    {
+        UniValue json_tests = read_json(
+            std::string(json_tests::script_tests, json_tests::script_tests + sizeof(json_tests::script_tests)));
+
+        for (unsigned int idx = 0; idx < json_tests.size(); idx++)
+        {
+            const UniValue &tv = json_tests[idx];
+            tests_set.insert(JSONPrettyPrint(tv.get_array()));
+        }
+    }
+
+    std::string strGen;
+
+    for (TestBuilder &test : tests)
+    {
+        test.Test();
+        std::string str = JSONPrettyPrint(test.GetJSON());
+#ifndef UPDATE_JSON_TESTS
+        if (tests_set.count(str) == 0)
+        {
+            BOOST_CHECK_MESSAGE(false, "Missing auto script_valid test: " + test.GetComment());
+        }
+#endif
+        strGen += str + ",\n";
+    }
+
+    return;
+}
 }
 
-BOOST_AUTO_TEST_CASE(script_build)
+BOOST_AUTO_TEST_CASE(script_build_1)
 {
     const KeyData keys;
 
@@ -1295,6 +1327,17 @@ BOOST_AUTO_TEST_CASE(script_build)
                         .Num(0)
                         .ScriptError(SCRIPT_ERR_PUBKEYTYPE));
 
+    // Update tests
+    UpdateJSONTests(tests);
+}
+
+BOOST_AUTO_TEST_CASE(script_build_2)
+{
+    const KeyData keys;
+
+    std::vector<TestBuilder> tests;
+
+
     // Test all six CHECK*SIG* opcodes with Schnorr signatures.
     // - Schnorr/ECDSA signatures with varying flags SCHNORR / STRICTENC.
     // - test with different key / mismatching key
@@ -1745,39 +1788,8 @@ BOOST_AUTO_TEST_CASE(script_build)
             .PushRedeem()
             .ScriptError(SCRIPT_ERR_CLEANSTACK));
 
-    std::set<std::string> tests_set;
-
-    {
-        UniValue json_tests = read_json(
-            std::string(json_tests::script_tests, json_tests::script_tests + sizeof(json_tests::script_tests)));
-
-        for (unsigned int idx = 0; idx < json_tests.size(); idx++)
-        {
-            const UniValue &tv = json_tests[idx];
-            tests_set.insert(JSONPrettyPrint(tv.get_array()));
-        }
-    }
-
-    std::string strGen;
-
-    for (TestBuilder &test : tests)
-    {
-        test.Test();
-        std::string str = JSONPrettyPrint(test.GetJSON());
-#ifndef UPDATE_JSON_TESTS
-        if (tests_set.count(str) == 0)
-        {
-            BOOST_CHECK_MESSAGE(false, "Missing auto script_valid test: " + test.GetComment());
-        }
-#endif
-        strGen += str + ",\n";
-    }
-
-#ifdef UPDATE_JSON_TESTS
-    FILE *file = fopen("script_tests.json.gen", "w");
-    fputs(strGen.c_str(), file);
-    fclose(file);
-#endif
+    // Update tests
+    UpdateJSONTests(tests);
 }
 
 BOOST_AUTO_TEST_CASE(script_json_test)
