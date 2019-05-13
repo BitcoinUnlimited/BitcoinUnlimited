@@ -928,17 +928,19 @@ void CRequestManager::SendRequests()
 
 bool CRequestManager::CheckForRequestDOS(CNode *pfrom, const CChainParams &chainparams)
 {
-    LOCK(cs_objDownloader);
-
     // Check for Misbehaving and DOS
-    // If they make more than MAX_THINTYPE_OBJECT_REQUESTS requests in 10 minutes then disconnect them
-    if (chainparams.NetworkIDString() != "regtest")
+    // If they make more than MAX_THINTYPE_OBJECT_REQUESTS requests in 10 minutes then assign misbehavior points.
+    //
+    // Other networks have variable mining rates, so only apply these rules to mainnet only.
+    if (chainparams.NetworkIDString() == "main")
     {
+        LOCK(cs_objDownloader);
+
         std::map<NodeId, CRequestManagerNodeState>::iterator it = mapRequestManagerNodeState.find(pfrom->GetId());
         DbgAssert(it != mapRequestManagerNodeState.end(), return false);
         CRequestManagerNodeState *state = &it->second;
 
-        // First decay the previuos value
+        // First decay the previous value
         uint64_t nNow = GetTime();
         state->nNumRequests = std::pow(1.0 - 1.0 / 600.0, (double)(nNow - state->nLastRequest));
 
@@ -947,14 +949,10 @@ bool CRequestManager::CheckForRequestDOS(CNode *pfrom, const CChainParams &chain
         state->nLastRequest = nNow;
         LOG(THIN | GRAPHENE | CMPCT, "Number of thin object requests is %f\n", state->nNumRequests);
 
-        // Other networks have variable mining rates, so only apply these rules to mainnet.
-        if (chainparams.NetworkIDString() == "main")
+        if (state->nNumRequests >= MAX_THINTYPE_OBJECT_REQUESTS)
         {
-            if (state->nNumRequests >= MAX_THINTYPE_OBJECT_REQUESTS)
-            {
-                dosMan.Misbehaving(pfrom, 50);
-                return error("%s is misbehaving. Making too many thin type requests.", pfrom->GetLogName());
-            }
+            dosMan.Misbehaving(pfrom, 50);
+            return error("%s is misbehaving. Making too many thin type requests.", pfrom->GetLogName());
         }
     }
     return true;
