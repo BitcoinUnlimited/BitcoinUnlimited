@@ -182,6 +182,7 @@ bool CBloomFilter::IsWithinSizeConstraints() const
     return vData.size() <= SMALLEST_MAX_BLOOM_FILTER_SIZE && nHashFuncs <= MAX_HASH_FUNCS;
 }
 
+#ifndef ANDROID // We do not want to pull "Solver" into the Android cashlib compile
 bool CBloomFilter::MatchAndInsertOutputs(const CTransactionRef &tx)
 {
     bool fFound = false;
@@ -255,6 +256,7 @@ bool CBloomFilter::MatchInputs(const CTransactionRef &tx)
 
     return false;
 }
+#endif
 
 void CBloomFilter::UpdateEmptyFull()
 {
@@ -370,7 +372,9 @@ bool CRollingBloomFilter::contains(const uint256 &hash) const
 bool CRollingBloomFilter::contains(const COutPoint &outpoint) const { return contains(ToVector(outpoint)); }
 void CRollingBloomFilter::reset()
 {
+#ifndef ANDROID // On Android don't pick a new tweak value because we don't have GetRand
     nTweak = GetRand(std::numeric_limits<unsigned int>::max());
+#endif
     nEntriesThisGeneration = 0;
     nGeneration = 1;
     for (std::vector<uint64_t>::iterator it = data.begin(); it != data.end(); it++)

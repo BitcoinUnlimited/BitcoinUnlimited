@@ -6,6 +6,7 @@
 #include "hashwrapper.h"
 #include "crypto/common.h"
 #include "crypto/hmac_sha512.h"
+#include "hashwrapper.h"
 #include "pubkey.h"
 
 

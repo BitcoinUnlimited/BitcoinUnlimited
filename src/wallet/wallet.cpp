@@ -47,7 +47,6 @@ bool bSpendZeroConfChange = DEFAULT_SPEND_ZEROCONF_CHANGE;
 bool fSendFreeTransactions = DEFAULT_SEND_FREE_TRANSACTIONS;
 
 const char *DEFAULT_WALLET_DAT = "wallet.dat";
-const uint32_t BIP32_HARDENED_KEY_LIMIT = 0x80000000;
 
 /**
  * Fees smaller than this (in satoshi) are considered zero fee (for transaction creation)
@@ -930,13 +929,17 @@ bool CWallet::AbandonTransaction(const uint256 &hashTx)
     std::set<uint256> todo;
     std::set<uint256> done;
 
-    // Can't mark abandoned if confirmed or in mempool
+    // Can't mark abandoned if confirmed
     assert(mapWallet.count(hashTx));
     CWalletTx &origtx = mapWallet[hashTx];
-    if (origtx.GetDepthInMainChain() > 0 || origtx.InMempool())
+    if (origtx.GetDepthInMainChain() > 0)
     {
         return false;
     }
+
+    // Remove this tx from the mempool before it is abandoned by the wallet.
+    // But there is no guarantee that other nodes don't still hold this transaction, so it could still be committed
+    mempool.Remove(origtx.GetHash());
 
     todo.insert(hashTx);
 

@@ -28,8 +28,46 @@
 #include <string>
 #include <vector>
 
+#ifndef ANDROID
 #include <boost/signals2/signal.hpp>
-#include <boost/thread/exceptions.hpp>
+#include <boost/thread.hpp>
+
+/** Signals for translation. */
+class CTranslationInterface
+{
+public:
+    /** Translate a message to the native language of the user. */
+    boost::signals2::signal<std::string(const char *psz)> Translate;
+};
+extern CTranslationInterface translationInterface;
+
+/**
+ * Translation function: Call Translate signal on UI interface, which returns a boost::optional result.
+ * If no translation slot is registered, nothing is returned, and simply return the input.
+ */
+inline std::string _(const char *psz)
+{
+    boost::optional<std::string> rv = translationInterface.Translate(psz);
+    return rv ? (*rv) : psz;
+}
+
+#else
+
+class CTranslationInterface
+{
+public:
+    std::string Translate(const char *psz);
+};
+extern CTranslationInterface translationInterface;
+
+inline std::string _(const char *psz)
+{
+    std::string rv = translationInterface.Translate(psz);
+    if (rv.empty())
+        return std::string(psz);
+    return rv;
+}
+#endif
 
 // Preface any Shared Library API definition with this macro.  This will ensure that the function is available for
 // external linkage.
@@ -86,14 +124,6 @@ static const bool DEFAULT_LOGTIMESTAMPS = true;
 extern const char DEFAULT_RPCCONNECT[];
 static const int DEFAULT_HTTP_CLIENT_TIMEOUT = 900;
 
-/** Signals for translation. */
-class CTranslationInterface
-{
-public:
-    /** Translate a message to the native language of the user. */
-    boost::signals2::signal<std::string(const char *psz)> Translate;
-};
-
 extern std::map<std::string, std::string> mapArgs;
 extern std::map<std::string, std::vector<std::string> > mapMultiArgs;
 extern bool fDebug;
@@ -105,7 +135,6 @@ extern bool fLogTimestamps;
 extern bool fLogTimeMicros;
 extern bool fLogIPs;
 extern volatile bool fReopenDebugLog;
-extern CTranslationInterface translationInterface;
 
 extern const char *const BITCOIN_CONF_FILENAME;
 extern const char *const BITCOIN_PID_FILENAME;
@@ -341,15 +370,6 @@ void LogFlush();
  */
 bool IsStringTrue(const std::string &str);
 
-/**
- * Translation function: Call Translate signal on UI interface, which returns a boost::optional result.
- * If no translation slot is registered, nothing is returned, and simply return the input.
- */
-inline std::string _(const char *psz)
-{
-    boost::optional<std::string> rv = translationInterface.Translate(psz);
-    return rv ? (*rv) : psz;
-}
 
 void SetupEnvironment();
 bool SetupNetworking();
@@ -402,23 +422,11 @@ void FileCommit(FILE *fileout);
 bool TruncateFile(FILE *file, unsigned int length);
 int RaiseFileDescriptorLimit(int nMinFD);
 void AllocateFileRange(FILE *file, unsigned int offset, unsigned int length);
-bool RenameOver(fs::path src, fs::path dest);
-bool TryCreateDirectories(const fs::path &p);
-fs::path GetDefaultDataDir();
-const fs::path &GetDataDir(bool fNetSpecific = true);
-void ClearDatadirCache();
-fs::path GetConfigFile(const std::string &confPath);
 fs::path GetForksCsvFile(); // bip135 added
-#ifndef WIN32
-fs::path GetPidFile();
-void CreatePidFile(const fs::path &path, pid_t pid);
-#endif
 void ReadConfigFile(std::map<std::string, std::string> &mapSettingsRet,
     std::map<std::string, std::vector<std::string> > &mapMultiSettingsRet,
     const AllowedArgs::AllowedArgs &allowedArgs);
-#ifdef WIN32
-fs::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
-#endif
+
 void OpenDebugLog();
 void ShrinkDebugFile();
 void runCommand(const std::string &strCommand);
@@ -521,11 +529,13 @@ void TraceThreads(const std::string &name, Callable func)
         func();
         LOGA("%s thread exit\n", name);
     }
+#ifndef ANDROID
     catch (const boost::thread_interrupted &)
     {
         LOGA("%s thread interrupt\n", name);
         throw;
     }
+#endif
     catch (const std::exception &e)
     {
         PrintExceptionContinue(&e, name.c_str());

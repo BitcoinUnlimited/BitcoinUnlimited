@@ -28,8 +28,11 @@ AM_CXXFLAGS += -O0 -g -rdynamic
 AM_CPPFLAGS += -O0 -g -rdynamic
 AM_LDFLAGS  += -O0 -g -rdynamic
 endif
+if ENABLE_JAVACASHLIB
+JNI_CXXFLAGS = -I$(JAVA_HOME)/include/linux -I$(JAVA_HOME)/include -DJAVA
+endif
+
 EXTRA_LIBRARIES =
-# libtcmalloc.a
 
 BITCOIN_CONFIG_INCLUDES=-I$(builddir)/config
 BITCOIN_INCLUDES=-I$(builddir) -I$(builddir)/obj $(BDB_CPPFLAGS) $(BOOST_CPPFLAGS) $(LEVELDB_CPPFLAGS) $(CRYPTO_CFLAGS) $(SSL_CFLAGS)
@@ -350,11 +353,17 @@ libbitcoincash_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 
 libbitcoincash_a_SOURCES = \
   cashlib/cashlib.cpp \
+  chainparams.cpp \
+  chainparams.h \
+  chainparamsbase.cpp \
+  chainparamsbase.h \
   script/sigcommon.cpp \
   hashwrapper.cpp \
   hashwrapper.h \
   key.cpp \
   key.h \
+  primitives/block.cpp \
+  primitives/block.h \
   primitives/transaction.cpp \
   primitives/transaction.h \
   pubkey.cpp \
@@ -363,8 +372,12 @@ libbitcoincash_a_SOURCES = \
   random.h \
   script/interpreter.cpp \
   script/interpreter.h \
+  script/standard.cpp \
+  script/standard.h \
   script/script.cpp \
   script/script.h \
+  script/sign.cpp \
+  script/sign.h \
   support/pagelocker.cpp \
   support/pagelocker.h \
   support/cleanse.cpp \
@@ -373,8 +386,19 @@ libbitcoincash_a_SOURCES = \
   uint256.h \
   utilstrencodings.cpp \
   utilstrencodings.h \
+  cashaddrenc.cpp \
+  cashaddrenc.h \
+  cashaddr.cpp \
+  cashaddr.h \
   utiltime.cpp \
-  utiltime.h
+  utiltime.h \
+  consensus/merkle.cpp \
+  arith_uint256.cpp \
+  arith_uint256.h \
+  bloom.cpp \
+  bloom.h \
+  streams.h
+
 
 # crypto primitives library
 crypto_libbitcoin_crypto_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_CONFIG_INCLUDES)
@@ -607,7 +631,7 @@ endif
 
 libbitcoincash_la_LDFLAGS = $(AM_LDFLAGS) $(SSL_LIBS) $(CRYPTO_LIBS) $(BOOST_LIBS) -no-undefined $(RELDFLAGS)
 libbitcoincash_la_LIBADD = $(LIBSECP256K1)
-libbitcoincash_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(BOOST_CPPFLAGS) -I$(builddir)/obj -I$(srcdir)/secp256k1/include -DBUILD_BITCOIN_INTERNAL
+libbitcoincash_la_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) -I$(BOOST_CPPFLAGS) -I$(builddir)/obj -I$(srcdir)/secp256k1/include $(JNI_CXXFLAGS) -DBUILD_BITCOIN_INTERNAL
 libbitcoincash_la_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 
 endif

@@ -15,7 +15,75 @@
 #include <secp256k1_recovery.h>
 #include <secp256k1_schnorr.h>
 
+const uint32_t BIP32_HARDENED_KEY_LIMIT = 0x80000000;
+
 static secp256k1_context *secp256k1_context_sign = nullptr;
+
+// key: master key seed (256bit)
+int Hd32DeriveChildKey(CKey key, int externalChainCounter, CKey &secret, std::string *keypath)
+{
+    CExtKey masterKey; // hd master key
+    CExtKey accountKey; // key at m/0'
+    CExtKey externalChainChildKey; // key at m/0'/0'
+    CExtKey childKey; // key at m/0'/0'/<n>'
+
+    masterKey.SetMaster(key.begin(), key.size());
+
+    // derive m/0'
+    // use hardened derivation (child keys >= 0x80000000 are hardened after bip32)
+    masterKey.Derive(accountKey, BIP32_HARDENED_KEY_LIMIT);
+
+    // derive m/0'/0'
+    accountKey.Derive(externalChainChildKey, BIP32_HARDENED_KEY_LIMIT);
+
+    // always derive hardened keys
+    // childIndex | BIP32_HARDENED_KEY_LIMIT = derive childIndex in hardened child-index-range
+    // example: 1 | BIP32_HARDENED_KEY_LIMIT == 0x80000001 == 2147483649
+    externalChainChildKey.Derive(childKey, externalChainCounter | BIP32_HARDENED_KEY_LIMIT);
+
+    if (keypath)
+        *keypath = "m/0'/0'/" + std::to_string(externalChainCounter) + "'";
+    secret = childKey.key;
+
+    // increment childkey index
+    return externalChainCounter + 1;
+}
+
+int Hd44DeriveChildKey(CKey key,
+    int purpose,
+    int coinType,
+    int account,
+    bool change,
+    int index,
+    CKey &secret,
+    std::string *keypath)
+{
+    CExtKey masterKey; // hd master key
+    CExtKey purposeKey; // key at m/purpose'
+    CExtKey coinTypeKey; // key at m/purpose'/coinType'
+    CExtKey accountKey; // key at m/purpose'/coinType'/account'
+    CExtKey changeKey; // key at m/purpose'/coinType'/account'/change
+    CExtKey childKey; // key at m/purpose'/coinType'/account'/change/index
+
+    masterKey.SetMaster(key.begin(), key.size());
+
+    // use hardened derivation (child keys >= 0x80000000 are hardened after bip32)
+    masterKey.Derive(purposeKey, purpose + BIP32_HARDENED_KEY_LIMIT);
+    purposeKey.Derive(coinTypeKey, coinType + BIP32_HARDENED_KEY_LIMIT);
+    coinTypeKey.Derive(accountKey, account + BIP32_HARDENED_KEY_LIMIT);
+    accountKey.Derive(changeKey, change);
+    changeKey.Derive(childKey, index);
+
+    // Fill the return values
+    if (keypath)
+        *keypath = "m/" + std::to_string(purpose) + "'/" + std::to_string(coinType) + "'/" + std::to_string(account) +
+                   "'/" + std::to_string(change) + "/" + std::to_string(index);
+    secret = childKey.key;
+
+    // increment childkey index
+    return index + 1;
+}
+
 
 /** These functions are taken from the libsecp256k1 distribution and are very ugly. */
 static int ec_privkey_import_der(const secp256k1_context *ctx,

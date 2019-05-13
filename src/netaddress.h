@@ -23,7 +23,9 @@ extern const unsigned char pchIPv4[12];
 enum
 {
     IPV6_ADDR_SCOPE_RESERVED = 0x0,
+#ifndef IPV6_ADDR_SCOPE_GLOBAL // Already defined on Android platforms
     IPV6_ADDR_SCOPE_GLOBAL = 0x0e,
+#endif
 };
 
 enum Network

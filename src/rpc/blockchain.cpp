@@ -808,6 +808,24 @@ UniValue gettxoutsetinfo(const UniValue &params, bool fHelp)
     return ret;
 }
 
+UniValue evicttransaction(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1)
+        throw runtime_error(
+            "evicttransaction \"txid\"\n"
+            "\nRemove transaction from mempool.  Note that it could be readded quickly if relayed by another node\n"
+            "\nArguments:\n"
+            "1. \"txid\"       (string, required) The transaction id\n"
+            "\nResult:\n"
+            "\nExamples:\n" +
+            HelpExampleCli("evicttransaction", "\"txid\"") + HelpExampleRpc("evicttransaction", "\"txid\""));
+
+    std::string strHash = params[0].get_str();
+    uint256 hash(uint256S(strHash));
+    mempool.Remove(hash);
+    return UniValue();
+}
+
 UniValue gettxout(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 3)
@@ -1580,9 +1598,10 @@ static const CRPCCommand commands[] = {
     {"blockchain", "getmempooldescendants", &getmempooldescendants, true},
     {"blockchain", "getmempoolentry", &getmempoolentry, true}, {"blockchain", "getmempoolinfo", &getmempoolinfo, true},
     {"blockchain", "getorphanpoolinfo", &getorphanpoolinfo, true},
-    {"blockchain", "getrawmempool", &getrawmempool, true}, {"blockchain", "getraworphanpool", &getraworphanpool, true},
-    {"blockchain", "gettxout", &gettxout, true}, {"blockchain", "gettxoutsetinfo", &gettxoutsetinfo, true},
-    {"blockchain", "savemempool", &savemempool, true}, {"blockchain", "verifychain", &verifychain, true},
+    {"blockchain", "evicttransaction", &evicttransaction, true}, {"blockchain", "getrawmempool", &getrawmempool, true},
+    {"blockchain", "getraworphanpool", &getraworphanpool, true}, {"blockchain", "gettxout", &gettxout, true},
+    {"blockchain", "gettxoutsetinfo", &gettxoutsetinfo, true}, {"blockchain", "savemempool", &savemempool, true},
+    {"blockchain", "verifychain", &verifychain, true},
 
     /* Not shown in help */
     {"hidden", "invalidateblock", &invalidateblock, true}, {"hidden", "reconsiderblock", &reconsiderblock, true},
