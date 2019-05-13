@@ -8,9 +8,11 @@ from test_framework.util import waitFor, assert_equal
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.loginit import logging
 
-def compare(node, key, expected):
+def compare(node, key, expected, is_debug_data = False):
     info = node.getelectruminfo()
     logging.debug("expecting %s == %s from %s", key, expected, info)
+    if is_debug_data:
+        info = info['debuginfo']
     if key not in info:
         return False
     return info[key] == expected
@@ -37,19 +39,19 @@ class ElectrumBasicTests(BitcoinTestFramework):
         # waitFor throws on timeout, failing the test
 
         waitFor(10, lambda: compare(n, "index_height", n.getblockcount()))
-        waitFor(10, lambda: compare(n, "index_txns", n.getblockcount() + 1)) # +1 is genesis tx
-        waitFor(10, lambda: compare(n, "mempool_count", 0))
+        waitFor(10, lambda: compare(n, "index_txns", n.getblockcount() + 1, True)) # +1 is genesis tx
+        waitFor(10, lambda: compare(n, "mempool_count", 0, True))
 
         logging.info("Check that mempool is communicated")
         n.sendtoaddress(n.getnewaddress(), 1)
         assert_equal(1, len(n.getrawmempool()))
-        waitFor(10, lambda: compare(n, "mempool_count", 1))
+        waitFor(10, lambda: compare(n, "mempool_count", 1, True))
 
         n.generate(1)
         assert_equal(0, len(n.getrawmempool()))
         waitFor(10, lambda: compare(n, "index_height", n.getblockcount()))
-        waitFor(10, lambda: compare(n, "mempool_count", 0))
-        waitFor(10, lambda: compare(n, "index_txns", n.getblockcount() + 2))
+        waitFor(10, lambda: compare(n, "mempool_count", 0, True))
+        waitFor(10, lambda: compare(n, "index_txns", n.getblockcount() + 2, True))
 
 
     def setup_network(self, dummy = None):
