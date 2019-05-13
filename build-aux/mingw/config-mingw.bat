@@ -112,6 +112,13 @@ set "PATH=%MSYS_BIN%;%BASE_PATH%"
 REM Install toolchain components for the specified architecture(s) (download and unpack)
 echo Installing toolchain...
 %MSYS_SH% "%INST_DIR%\install-toolchain.sh"
+REM Check to see if install-toolchain.sh failed (possibly due to missing dependencies)
+if %errorlevel% neq 0 (
+	REM Assume that whatever caused the error also wrote an output so we
+	REM don't need to write an output here
+	pause
+	exit /b %errorlevel%
+)
 
 REM "Installs" utilities (creates wrapper scripts to alias installed python and git)
 echo Installing utilities...
