@@ -938,8 +938,12 @@ bool CRequestManager::CheckForRequestDOS(CNode *pfrom, const CChainParams &chain
         DbgAssert(it != mapRequestManagerNodeState.end(), return false);
         CRequestManagerNodeState *state = &it->second;
 
+        // First decay the previuos value
         uint64_t nNow = GetTime();
-        state->nNumRequests = std::pow(1.0 - 1.0 / 600.0, (double)(nNow - state->nLastRequest)) + 1;
+        state->nNumRequests = std::pow(1.0 - 1.0 / 600.0, (double)(nNow - state->nLastRequest));
+
+        // Now add one request and update the time
+        state->nNumRequests++;
         state->nLastRequest = nNow;
         LOG(THIN | GRAPHENE | CMPCT, "Number of thin object requests is %f\n", state->nNumRequests);
 
