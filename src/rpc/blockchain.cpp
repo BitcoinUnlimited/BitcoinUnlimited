@@ -11,7 +11,7 @@
 #include "checkpoints.h"
 #include "coins.h"
 #include "consensus/validation.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "main.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"

@@ -21,7 +21,7 @@
 #include "consensus/consensus.h"
 #include "crypto/common.h"
 #include "dosman.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "iblt.h"
 #include "primitives/transaction.h"
 #include "requestManager.h"

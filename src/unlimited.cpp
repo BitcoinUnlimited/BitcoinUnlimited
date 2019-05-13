@@ -21,7 +21,7 @@
 #include "dosman.h"
 #include "dstencode.h"
 #include "expedited.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "leakybucket.h"
 #include "miner.h"
 #include "net.h"

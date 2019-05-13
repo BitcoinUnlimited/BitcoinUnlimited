@@ -5,7 +5,7 @@
 
 #include "blockleveldb.h"
 #include "blockstorage.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "main.h"
 
 CBlockLevelDB::CBlockLevelDB(size_t nCacheSizeBlock, size_t nCacheSizeUndo, bool fMemory, bool fWipe, bool obfuscate)

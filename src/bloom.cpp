@@ -5,7 +5,7 @@
 
 #include "bloom.h"
 
-#include "hash.h"
+#include "hashwrapper.h"
 #include "primitives/transaction.h"
 #include "random.h"
 #include "script/script.h"

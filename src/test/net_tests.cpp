@@ -4,7 +4,7 @@
 #include "net.h"
 #include "addrman.h"
 #include "chainparams.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "serialize.h"
 #include "streams.h"
 #include "test/test_bitcoin.h"

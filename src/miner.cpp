@@ -14,7 +14,7 @@
 #include "consensus/merkle.h"
 #include "consensus/tx_verify.h"
 #include "consensus/validation.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "main.h"
 #include "net.h"
 #include "parallel.h"

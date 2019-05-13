@@ -7,7 +7,7 @@
 #include "txdb.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "pow.h"
 #include "ui_interface.h"
 #include "uint256.h"

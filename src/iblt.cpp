@@ -21,7 +21,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 #include "iblt.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "iblt_params.h"
 #include <cassert>
 #include <iostream>

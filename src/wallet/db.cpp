@@ -8,7 +8,7 @@
 
 #include "addrman.h"
 #include "fs.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "protocol.h"
 #include "util.h"
 #include "utilstrencodings.h"

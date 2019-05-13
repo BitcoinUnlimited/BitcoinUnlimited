@@ -6,7 +6,7 @@
 #include "consensus/tx_verify.h"
 #include "consensus/validation.h"
 #include "data/sighash.json.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "main.h" // For CheckTransaction
 #include "script/interpreter.h"
 #include "script/script.h"

@@ -11,7 +11,7 @@
 #include "arith_uint256.h"
 #include "chainparamsbase.h"
 #include "fs.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "primitives/block.h"
 #include "rpc/client.h"
 #include "rpc/protocol.h"

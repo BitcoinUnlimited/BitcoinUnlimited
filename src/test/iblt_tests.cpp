@@ -2,7 +2,7 @@
 #include <cassert>
 #include <iostream>
 
-#include "hash.h"
+#include "hashwrapper.h"
 #include "iblt.h"
 #include "test/test_bitcoin.h"
 #include "utilstrencodings.h"

@@ -5,7 +5,7 @@
 
 #include "base58.h"
 
-#include "hash.h"
+#include "hashwrapper.h"
 #include "script/script.h"
 #include "uint256.h"
 

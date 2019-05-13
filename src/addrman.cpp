@@ -4,7 +4,7 @@
 
 #include "addrman.h"
 
-#include "hash.h"
+#include "hashwrapper.h"
 #include "serialize.h"
 #include "streams.h"
 

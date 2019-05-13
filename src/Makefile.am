@@ -348,7 +348,7 @@ libbitcoincash_a_SOURCES = \
   cashlib/cashlib.cpp \
   script/sigcommon.cpp \
   hash.cpp \
-  hash.h \
+  hashwrapper.h \
   key.cpp \
   key.h \
   primitives/transaction.cpp \

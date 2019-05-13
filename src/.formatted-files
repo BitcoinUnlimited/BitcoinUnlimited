@@ -83,7 +83,7 @@ expedited.h
 fastfilter.h
 globals.cpp
 hash.cpp
-hash.h
+hashwrapper.h
 httprpc.cpp
 httprpc.h
 httpserver.cpp
