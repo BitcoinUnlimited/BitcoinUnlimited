@@ -947,12 +947,12 @@ bool CRequestManager::CheckForRequestDOS(CNode *pfrom, const CChainParams &chain
         // Now add one request and update the time
         state->nNumRequests++;
         state->nLastRequest = nNow;
-        LOG(THIN | GRAPHENE | CMPCT, "Number of thin object requests is %f\n", state->nNumRequests);
 
         if (state->nNumRequests >= MAX_THINTYPE_OBJECT_REQUESTS)
         {
-            dosMan.Misbehaving(pfrom, 50);
-            return error("%s is misbehaving. Making too many thin type requests.", pfrom->GetLogName());
+            pfrom->fDisconnect = true;
+            return error("Disconnecting  %s. Making too many (%f) thin object requests.", pfrom->GetLogName(),
+                state->nNumRequests);
         }
     }
     return true;

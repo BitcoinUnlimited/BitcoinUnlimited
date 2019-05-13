@@ -34,7 +34,7 @@ successful receipt, "requester.Rejected(...)" to indicate a bad object (request 
 #include <atomic>
 
 // Max requests allowed in a 10 minute window
-static const uint8_t MAX_THINTYPE_OBJECT_REQUESTS = 40;
+static const uint8_t MAX_THINTYPE_OBJECT_REQUESTS = 100;
 
 // When should I request a tx from someone else (in microseconds). cmdline/bitcoin.conf: -txretryinterval
 extern unsigned int txReqRetryInterval;
