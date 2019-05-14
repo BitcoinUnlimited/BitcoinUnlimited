@@ -11,8 +11,6 @@
 
 namespace electrum
 {
-static constexpr const char *INDEX_HEIGHT_KEY = "index_height";
-
 static int64_t get_index_height(const std::map<std::string, int> &info)
 {
     auto height_it = info.find(INDEX_HEIGHT_KEY);

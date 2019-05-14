@@ -9,7 +9,9 @@
 #include <map>
 #include <string>
 
-class ElectrumRPCInfoMOC : public electrum::ElectrumRPCInfo
+using namespace electrum;
+
+class ElectrumRPCInfoMOC : public ElectrumRPCInfo
 {
 public:
     bool ibd = false;
@@ -25,7 +27,7 @@ public:
 
 BOOST_FIXTURE_TEST_SUITE(electrumrpcinfo_tests, BasicTestingSetup)
 
-BOOST_AUTO_TEST_CASE(help_throws) { BOOST_CHECK_THROW(electrum::ElectrumRPCInfo::ThrowHelp(), std::invalid_argument); }
+BOOST_AUTO_TEST_CASE(help_throws) { BOOST_CHECK_THROW(ElectrumRPCInfo::ThrowHelp(), std::invalid_argument); }
 BOOST_AUTO_TEST_CASE(info_status)
 {
     ElectrumRPCInfoMOC rpc;
@@ -47,12 +49,12 @@ BOOST_AUTO_TEST_CASE(info_status)
     BOOST_CHECK_EQUAL("initializing", status["status"].get_str());
 
     rpc.height = 100;
-    rpc.info = {{"index_height", 99}};
+    rpc.info = {{INDEX_HEIGHT_KEY, 99}};
     status = rpc.GetElectrumInfo();
     BOOST_CHECK_EQUAL("indexing", status["status"].get_str());
 
     rpc.height = 100;
-    rpc.info = {{"index_height", 100}};
+    rpc.info = {{INDEX_HEIGHT_KEY, 100}};
     status = rpc.GetElectrumInfo();
     BOOST_CHECK_EQUAL("ok", status["status"].get_str());
 }
@@ -61,7 +63,7 @@ BOOST_AUTO_TEST_CASE(info_progress)
 {
     ElectrumRPCInfoMOC rpc;
     rpc.height = 100;
-    rpc.info = {{"index_height", 99}};
+    rpc.info = {{INDEX_HEIGHT_KEY, 99}};
     UniValue status = rpc.GetElectrumInfo();
     BOOST_CHECK_EQUAL(99., status["index_progress"].get_real());
 
@@ -78,7 +80,7 @@ BOOST_AUTO_TEST_CASE(info_indexheight)
     UniValue status = rpc.GetElectrumInfo();
     BOOST_CHECK_EQUAL(-1, status["index_height"].get_int());
 
-    rpc.info = {{"index_height", 100}};
+    rpc.info = {{INDEX_HEIGHT_KEY, 100}};
     status = rpc.GetElectrumInfo();
     BOOST_CHECK_EQUAL(100, status["index_height"].get_int());
 }

@@ -5,8 +5,8 @@ import os
 import sys
 import shutil
 GIT_REPO = "https://github.com/dagurval/electrs.git"
-GIT_BRANCH = "v0.5.0bu"
-EXPECT_HEAD = "84d449ed283296dfc266433a6919ffcb3ca55344"
+GIT_BRANCH = "v0.6.1bu"
+EXPECT_HEAD = "175c1d161b5d30c60a20b5b9922e65fd05e6b59c"
 
 ROOT_DIR = os.path.realpath(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))

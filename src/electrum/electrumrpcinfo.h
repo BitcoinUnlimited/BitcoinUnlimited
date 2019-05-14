@@ -4,12 +4,12 @@
 #ifndef BITCOIN_ELECTRUM_ELECTRUMRPCINFO_H
 #define BITCOIN_ELECTRUM_ELECTRUMRPCINFO_H
 
-#include "electrum/electrs.h"
 #include <string>
 #include <univalue.h>
 
 namespace electrum
 {
+static constexpr const char *INDEX_HEIGHT_KEY = "electrs_index_height";
 class ElectrumRPCInfo
 {
 public:
