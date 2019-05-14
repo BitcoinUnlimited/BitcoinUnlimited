@@ -600,7 +600,7 @@ void TorController::protocolinfo_cb(TorControlConnection &_conn, const TorContro
         std::string cookiefile;
         /*
          * 250-AUTH METHODS=COOKIE,SAFECOOKIE COOKIEFILE="/home/x/.tor/control_auth_cookie"
-         * 250-AUTH METHODS=nullptr
+         * 250-AUTH METHODS=NULL
          * 250-AUTH METHODS=HASHEDPASSWORD
          */
         for (const std::string &s : reply.lines)
@@ -629,15 +629,15 @@ void TorController::protocolinfo_cb(TorControlConnection &_conn, const TorContro
         {
             LOG(TOR, "tor: Supported authentication method: %s\n", s);
         }
-        // Prefer nullptr, otherwise SAFECOOKIE. If a password is provided, use HASHEDPASSWORD
+        // Prefer NULL, otherwise SAFECOOKIE. If a password is provided, use HASHEDPASSWORD
         /* Authentication:
          *   cookie:   hex-encoded ~/.tor/control_auth_cookie
          *   password: "password"
          */
         std::string torpassword = GetArg("-torpassword", "");
-        if (methods.count("nullptr"))
+        if (methods.count("NULL"))
         {
-            LOG(TOR, "tor: Using nullptr authentication\n");
+            LOG(TOR, "tor: Using NULL authentication\n");
             _conn.Command("AUTHENTICATE", boost::bind(&TorController::auth_cb, this, _1, _2));
         }
         else if (methods.count("SAFECOOKIE"))
