@@ -7,6 +7,7 @@
 #ifndef BITCOIN_SYNC_H
 #define BITCOIN_SYNC_H
 
+#include "recursive_shared_mutex.h"
 #include "threadsafety.h"
 #include "util.h"
 #include "utiltime.h"
@@ -110,7 +111,7 @@ public:
     };
 
     std::mutex setlock;
-    std::map<uint64_t, std::vector<LockInfo>> sharedowners;
+    std::map<uint64_t, std::vector<LockInfo> > sharedowners;
     const char *name;
     uint64_t exclusiveOwner;
     uint64_t exclusiveOwnerCount;
@@ -267,11 +268,15 @@ void static inline AssertLockNotHeldInternal(const char *pszName, const char *ps
 void static inline AssertWriteLockHeldInternal(const char *pszName,
     const char *pszFile,
     unsigned int nLine,
-    CSharedCriticalSection *cs) {}
+    CSharedCriticalSection *cs)
+{
+}
 void static inline AssertRecursiveWriteLockHeldinternal(const char *pszName,
     const char *pszFile,
     unsigned int nLine,
-    CRecursiveSharedCriticalSection *cs) {}
+    CRecursiveSharedCriticalSection *cs)
+{
+}
 #endif
 #define AssertLockHeld(cs) AssertLockHeldInternal(#cs, __FILE__, __LINE__, &cs)
 #define AssertLockNotHeld(cs) AssertLockNotHeldInternal(#cs, __FILE__, __LINE__, &cs)
@@ -502,8 +507,9 @@ typedef CMutexLock<CRecursiveSharedCriticalSection> CRecursiveWriteBlock;
 
 #define RECURSIVEREADLOCK(cs) CRecursiveReadBlock UNIQUIFY(recursivereadblock)(cs, #cs, __FILE__, __LINE__)
 #define RECURSIVEWRITELOCK(cs) CRecursiveWriteBlock UNIQUIFY(writeblock)(cs, #cs, __FILE__, __LINE__)
-#define RECURSIVEREADLOCK2(cs1, cs2) \
-    CReadBlock UNIQUIFY(recursivereadblock1)(cs1, #cs1, __FILE__, __LINE__), UNIQUIFY(recursivereadblock2)(cs2, #cs2, __FILE__, __LINE__)
+#define RECURSIVEREADLOCK2(cs1, cs2)                                         \
+    CReadBlock UNIQUIFY(recursivereadblock1)(cs1, #cs1, __FILE__, __LINE__), \
+        UNIQUIFY(recursivereadblock2)(cs2, #cs2, __FILE__, __LINE__)
 #define TRY_RECURSIVE_READ_LOCK(cs, name) CRecursiveReadBlock name(cs, #cs, __FILE__, __LINE__, true)
 
 typedef CMutexReadLock<CSharedCriticalSection> CReadBlock;

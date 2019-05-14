@@ -401,8 +401,8 @@ bool CSharedCriticalSection::try_lock()
 }
 
 
-
-// BU normally CRecursiveSharedCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical
+// BU normally CRecursiveSharedCriticalSection is a typedef, but when lockorder debugging is on we need to delete the
+// critical
 // section from the lockorder map
 #ifdef DEBUG_LOCKORDER
 CRecursiveSharedCriticalSection::CRecursiveSharedCriticalSection() : name(NULL), exclusiveOwner(0) {}
