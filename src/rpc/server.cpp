@@ -512,6 +512,7 @@ UniValue CRPCTable::execute(const std::string &strMethod, const UniValue &prepar
             if (preparams[i].isStr() != true)
             {
                 needsConvert = false;
+                params = preparams;
                 break;
             }
         }
