@@ -86,6 +86,48 @@ public:
 #endif
 
 #ifndef DEBUG_LOCKORDER
+typedef AnnotatedMixin<boost::shared_mutex> CRecursiveSharedCriticalSection;
+/** Define a named, shared critical section that is named in debug builds.
+    Named critical sections are useful in conjunction with a lock analyzer to discover bottlenecks. */
+#define RSCRITSEC(x) CRecursiveSharedCriticalSection x
+#else
+
+/** A shared critical section allows multiple entities to recursively take the critical section in a "shared" mode,
+    but only one entity to recursively take the critical section exclusively.
+
+    A RecursiveSharedCriticalSection IS recursive.
+*/
+class CRecursiveSharedCriticalSection : public AnnotatedMixin<recursive_shared_mutex>
+{
+public:
+    class LockInfo
+    {
+    public:
+        const char *file;
+        unsigned int line;
+        LockInfo() : file(""), line(0) {}
+        LockInfo(const char *f, unsigned int l) : file(f), line(l) {}
+    };
+
+    std::mutex setlock;
+    std::map<uint64_t, std::vector<LockInfo>> sharedowners;
+    const char *name;
+    uint64_t exclusiveOwner;
+    uint64_t exclusiveOwnerCount;
+    CRecursiveSharedCriticalSection(const char *name);
+    CRecursiveSharedCriticalSection();
+    ~CRecursiveSharedCriticalSection();
+    void lock_shared();
+    bool try_lock_shared();
+    void unlock_shared();
+    void lock();
+    void unlock();
+    bool try_lock();
+};
+#define RSCRITSEC(zzname) CRecursiveSharedCriticalSection zzname(#zzname)
+#endif
+
+#ifndef DEBUG_LOCKORDER
 typedef AnnotatedMixin<boost::shared_mutex> CSharedCriticalSection;
 /** Define a named, shared critical section that is named in debug builds.
     Named critical sections are useful in conjunction with a lock analyzer to discover bottlenecks. */
@@ -127,7 +169,6 @@ public:
 };
 #define SCRITSEC(zzname) CSharedCriticalSection zzname(#zzname)
 #endif
-
 
 // This object can be locked or shared locked some time during its lifetime.
 // Subsequent locks or shared lock calls will be ignored.
@@ -208,6 +249,10 @@ void AssertWriteLockHeldInternal(const char *pszName,
     const char *pszFile,
     unsigned int nLine,
     CSharedCriticalSection *cs);
+void AssertRecursiveWriteLockHeldinternal(const char *pszName,
+    const char *pszFile,
+    unsigned int nLine,
+    CRecursiveSharedCriticalSection *cs);
 #else
 void static inline EnterCritical(const char *pszName,
     const char *pszFile,
@@ -222,13 +267,16 @@ void static inline AssertLockNotHeldInternal(const char *pszName, const char *ps
 void static inline AssertWriteLockHeldInternal(const char *pszName,
     const char *pszFile,
     unsigned int nLine,
-    CSharedCriticalSection *cs)
-{
-}
+    CSharedCriticalSection *cs) {}
+void static inline AssertRecursiveWriteLockHeldinternal(const char *pszName,
+    const char *pszFile,
+    unsigned int nLine,
+    CRecursiveSharedCriticalSection *cs) {}
 #endif
 #define AssertLockHeld(cs) AssertLockHeldInternal(#cs, __FILE__, __LINE__, &cs)
 #define AssertLockNotHeld(cs) AssertLockNotHeldInternal(#cs, __FILE__, __LINE__, &cs)
 #define AssertWriteLockHeld(cs) AssertWriteLockHeldInternal(#cs, __FILE__, __LINE__, &cs)
+#define AssertRecursiveWriteLockHeld(cs) AssertRecursiveWriteLockHeldInternal(#cs, __FILE__, __LINE__, &cs)
 
 #ifdef DEBUG_LOCKCONTENTION
 void PrintLockContention(const char *pszName, const char *pszFile, unsigned int nLine);
@@ -448,6 +496,15 @@ public:
 
     operator bool() { return lock.owns_lock(); }
 };
+
+typedef CMutexReadLock<CRecursiveSharedCriticalSection> CRecursiveReadBlock;
+typedef CMutexLock<CRecursiveSharedCriticalSection> CRecursiveWriteBlock;
+
+#define RECURSIVEREADLOCK(cs) CRecursiveReadBlock UNIQUIFY(recursivereadblock)(cs, #cs, __FILE__, __LINE__)
+#define RECURSIVEWRITELOCK(cs) CRecursiveWriteBlock UNIQUIFY(writeblock)(cs, #cs, __FILE__, __LINE__)
+#define RECURSIVEREADLOCK2(cs1, cs2) \
+    CReadBlock UNIQUIFY(recursivereadblock1)(cs1, #cs1, __FILE__, __LINE__), UNIQUIFY(recursivereadblock2)(cs2, #cs2, __FILE__, __LINE__)
+#define TRY_RECURSIVE_READ_LOCK(cs, name) CRecursiveReadBlock name(cs, #cs, __FILE__, __LINE__, true)
 
 typedef CMutexReadLock<CSharedCriticalSection> CReadBlock;
 typedef CMutexLock<CSharedCriticalSection> CWriteBlock;

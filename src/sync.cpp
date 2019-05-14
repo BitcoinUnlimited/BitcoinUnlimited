@@ -252,6 +252,20 @@ void AssertWriteLockHeldInternal(const char *pszName,
     }
 }
 
+void AssertRecursiveWriteLockHeldInternal(const char *pszName,
+    const char *pszFile,
+    unsigned int nLine,
+    CRecursiveSharedCriticalSection *cs)
+{
+    if (cs->try_lock()) // It would be better to check that this thread has the lock
+    {
+        fprintf(stderr, "Assertion failed: lock %s not held in %s:%i; locks held:\n%s", pszName, pszFile, nLine,
+            LocksHeld().c_str());
+        fflush(stderr);
+        abort();
+    }
+}
+
 // BU normally CCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical
 // section from the lockorder map
 #ifdef DEBUG_LOCKORDER
@@ -382,6 +396,104 @@ bool CSharedCriticalSection::try_lock()
     if (result)
     {
         exclusiveOwner = getTid();
+    }
+    return result;
+}
+
+
+
+// BU normally CRecursiveSharedCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical
+// section from the lockorder map
+#ifdef DEBUG_LOCKORDER
+CRecursiveSharedCriticalSection::CRecursiveSharedCriticalSection() : name(NULL), exclusiveOwner(0) {}
+CRecursiveSharedCriticalSection::CRecursiveSharedCriticalSection(const char *n) : name(n), exclusiveOwner(0)
+{
+// print the address of named critical sections so they can be found in the mutrace output
+#ifdef ENABLE_MUTRACE
+    if (name)
+    {
+        printf("CRecursiveSharedCriticalSection %s at %p\n", name, this);
+        fflush(stdout);
+    }
+#endif
+}
+
+CRecursiveSharedCriticalSection::~CRecursiveSharedCriticalSection()
+{
+#ifdef ENABLE_MUTRACE
+    if (name)
+    {
+        printf("Destructing CRecursiveSharedCriticalSection %s\n", name);
+        fflush(stdout);
+    }
+#endif
+    DeleteCritical((void *)this);
+}
+#endif
+
+
+void CRecursiveSharedCriticalSection::lock_shared()
+{
+    uint64_t tid = getTid();
+    std::unique_lock<std::mutex> lock(setlock);
+    sharedowners[tid].push_back(LockInfo("", 0));
+    recursive_shared_mutex::lock_shared();
+}
+
+void CRecursiveSharedCriticalSection::unlock_shared()
+{
+    uint64_t tid = getTid();
+    {
+        std::unique_lock<std::mutex> lock(setlock);
+        auto alreadyLocked = sharedowners.find(tid);
+        LockInfo li = alreadyLocked->second.back();
+        if (alreadyLocked == sharedowners.end())
+        {
+            printf("never locked at %s:%d\n", li.file, li.line);
+            assert(alreadyLocked != sharedowners.end());
+        }
+        sharedowners[tid].pop_back();
+    }
+    recursive_shared_mutex::unlock_shared();
+}
+
+bool CRecursiveSharedCriticalSection::try_lock_shared()
+{
+    // detect recursive locking
+    uint64_t tid = getTid();
+    std::unique_lock<std::mutex> lock(setlock);
+    bool result = recursive_shared_mutex::try_lock_shared();
+    if (result)
+    {
+        sharedowners[tid].push_back(LockInfo("", 0));
+    }
+    return result;
+}
+void CRecursiveSharedCriticalSection::lock()
+{
+    recursive_shared_mutex::lock();
+    exclusiveOwner = getTid();
+    exclusiveOwnerCount++;
+}
+void CRecursiveSharedCriticalSection::unlock()
+{
+    uint64_t tid = getTid();
+    assert(exclusiveOwner == tid);
+    exclusiveOwnerCount--;
+    if (exclusiveOwnerCount == 0)
+    {
+        exclusiveOwner = 0;
+    }
+    recursive_shared_mutex::unlock();
+}
+
+bool CRecursiveSharedCriticalSection::try_lock()
+{
+    bool result = recursive_shared_mutex::try_lock();
+    if (result)
+    {
+        exclusiveOwner = getTid();
+        exclusiveOwnerCount++;
     }
     return result;
 }
