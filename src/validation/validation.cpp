@@ -1369,9 +1369,9 @@ bool ContextualCheckBlock(const CBlock &block,
     const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
     const Consensus::Params &consensusParams = Params().GetConsensus();
 
-    // Start enforcing BIP113 (Median Time Past) using versionbits logic.
+    // Start enforcing BIP113 (Median Time Past)
     int nLockTimeFlags = 0;
-    if (VersionBitsState(pindexPrev, consensusParams, Consensus::DEPLOYMENT_CSV, versionbitscache) == THRESHOLD_ACTIVE)
+    if (nHeight >= consensusParams.BIP68Height)
     {
         nLockTimeFlags |= LOCKTIME_MEDIAN_TIME_PAST;
     }
@@ -1623,8 +1623,9 @@ bool AcceptBlock(const CBlock &block,
     {
         return true;
     }
+    // If we didn't ask for it:
     if (!fRequested)
-    { // If we didn't ask for it:
+    {
         if (pindex->nTx != 0)
             return true; // This is a previously-processed block that was pruned
         if (!fHasMoreWork)
@@ -1649,15 +1650,15 @@ bool AcceptBlock(const CBlock &block,
     {
         unsigned int nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
         CDiskBlockPos blockPos;
-        if (dbp != NULL)
+        if (dbp != nullptr)
         {
             blockPos = *dbp;
         }
-        if (!FindBlockPos(state, blockPos, nBlockSize + 8, nHeight, block.GetBlockTime(), dbp != NULL))
+        if (!FindBlockPos(state, blockPos, nBlockSize + 8, nHeight, block.GetBlockTime(), dbp != nullptr))
         {
             return error("AcceptBlock(): FindBlockPos failed");
         }
-        if (dbp == NULL)
+        if (dbp == nullptr)
         {
             if (!WriteBlockToDisk(block, blockPos, chainparams.MessageStart()))
             {
@@ -1704,9 +1705,8 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
         flags |= SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY;
     }
 
-    // Start enforcing BIP68 (sequence locks) and BIP112 (CHECKSEQUENCEVERIFY) using versionbits logic.
-    if (VersionBitsState(pindex->pprev, consensusparams, Consensus::DEPLOYMENT_CSV, versionbitscache) ==
-        THRESHOLD_ACTIVE)
+    // Start enforcing BIP68 (sequence locks) and BIP112 (CHECKSEQUENCEVERIFY).
+    if (pindex->nHeight >= consensusparams.BIP68Height)
     {
         flags |= SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
     }
@@ -2009,10 +2009,9 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
     int64_t nTime2 = GetTimeMicros();
     LOG(BLK, "Dependency ordering for %s MTP: %d\n", block.GetHash().ToString(), pindex->GetMedianTimePast());
 
-    // Start enforcing BIP68 (sequence locks) and BIP112 (CHECKSEQUENCEVERIFY) using versionbits logic.
+    // Start enforcing BIP68 (sequence locks) and BIP112 (CHECKSEQUENCEVERIFY)
     int nLockTimeFlags = 0;
-    if (VersionBitsState(pindex->pprev, chainparams.GetConsensus(), Consensus::DEPLOYMENT_CSV, versionbitscache) ==
-        THRESHOLD_ACTIVE)
+    if (pindex->nHeight >= chainparams.GetConsensus().BIP68Height)
     {
         nLockTimeFlags |= LOCKTIME_VERIFY_SEQUENCE;
     }
@@ -2216,10 +2215,9 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     int64_t nTime2 = GetTimeMicros();
     LOG(BLK, "Canonical ordering for %s MTP: %d\n", block.GetHash().ToString(), pindex->GetMedianTimePast());
 
-    // Start enforcing BIP68 (sequence locks) and BIP112 (CHECKSEQUENCEVERIFY) using versionbits logic.
+    // Start enforcing BIP68 (sequence locks) and BIP112 (CHECKSEQUENCEVERIFY)
     int nLockTimeFlags = 0;
-    if (VersionBitsState(pindex->pprev, chainparams.GetConsensus(), Consensus::DEPLOYMENT_CSV, versionbitscache) ==
-        THRESHOLD_ACTIVE)
+    if (pindex->nHeight >= chainparams.GetConsensus().BIP68Height)
     {
         nLockTimeFlags |= LOCKTIME_VERIFY_SEQUENCE;
     }
@@ -3432,7 +3430,7 @@ bool ProcessNewBlock(CValidationState &state,
         }
 
         // Store to disk
-        CBlockIndex *pindex = NULL;
+        CBlockIndex *pindex = nullptr;
         bool ret = AcceptBlock(*pblock, state, chainparams, &pindex, fRequested, dbp);
         if (pindex && pfrom)
         {
@@ -3461,7 +3459,6 @@ bool ProcessNewBlock(CValidationState &state,
     }
 
     int64_t end = GetTimeMicros();
-
     if (Logging::LogAcceptCategory(BENCH))
     {
         uint64_t maxTxSizeLocal = 0;

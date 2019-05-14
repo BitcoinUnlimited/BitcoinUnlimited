@@ -97,6 +97,8 @@ struct Params
     int BIP65Height;
     /** Block height at which BIP66 becomes active */
     int BIP66Height;
+    /** Block height at which BIP68, BIP112 and BIP113 become active */
+    int BIP68Height;
     /**
      * Deployment parameters for the 29 bits (0..28) defined by bip135
      */
