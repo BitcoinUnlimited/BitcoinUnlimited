@@ -772,11 +772,13 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
         }
 
-        CTxCommitData eData; // TODO awkward construction in these 4 lines
-        CTxMemPoolEntry entryTemp(tx, nFees, GetTime(), dPriority, chainActive.Height(), pool.HasNoInputsOf(*tx),
+        // Create a commit data entry
+        CTxMemPoolEntry entry(tx, nFees, GetTime(), dPriority, chainActive.Height(), pool.HasNoInputsOf(*tx),
             inChainInputValue, fSpendsCoinbase, nSigOps, lp);
-        eData.entry = entryTemp;
-        CTxMemPoolEntry &entry(eData.entry);
+        CTxCommitData eData;
+        eData.entry = entry;
+        eData.hash = hash;
+
         nSize = entry.GetTxSize();
 
         // Check that the transaction doesn't have an excessive number of
