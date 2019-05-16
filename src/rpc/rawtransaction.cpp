@@ -1516,7 +1516,6 @@ static const CRPCCommand commands[] = {
     //  category              name                      actor (function)         okSafeMode
     //  --------------------- ------------------------  -----------------------  ----------
     {"rawtransactions", "getrawtransaction", &getrawtransaction, true},
-    {"rawtransactions", "getrawtransaction", &getrawtransaction, true},
     {"rawtransactions", "getrawblocktransactions", &getrawblocktransactions, true},
     {"rawtransactions", "getrawtransactionssince", &getrawtransactionssince, true},
     {"rawtransactions", "createrawtransaction", &createrawtransaction, true},
