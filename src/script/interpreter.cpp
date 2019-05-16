@@ -608,13 +608,11 @@ static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags)
     {
     case OP_2MUL:
     case OP_2DIV:
-        // Disabled opcodes
-        return true;
-
     case OP_INVERT:
     case OP_MUL:
     case OP_LSHIFT:
     case OP_RSHIFT:
+        // disabled opcodes
         return true;
     default:
         break;
@@ -1209,64 +1207,6 @@ bool ScriptMachine::Step()
                 }
                 break;
 
-                case OP_INVERT:
-                {
-                    // (x -- out)
-                    if (stack.size() < 1)
-                    {
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                    }
-                    valtype &vch1 = stacktop(-1);
-                    // To avoid allocating, we modify vch1 in place
-                    for (size_t i = 0; i < vch1.size(); i++)
-                    {
-                        vch1[i] = ~vch1[i];
-                    }
-                }
-                break;
-
-                case OP_LSHIFT:
-                {
-                    // (x n -- out)
-                    if (stack.size() < 2)
-                    {
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                    }
-
-                    const valtype vch1 = stacktop(-2);
-                    CScriptNum n(stacktop(-1), fRequireMinimal);
-                    if (n < 0)
-                    {
-                        return set_error(serror, SCRIPT_ERR_INVALID_NUMBER_RANGE);
-                    }
-
-                    popstack(stack);
-                    popstack(stack);
-                    stack.push_back(LShift(vch1, n.getint()));
-                }
-                break;
-
-                case OP_RSHIFT:
-                {
-                    // (x n -- out)
-                    if (stack.size() < 2)
-                    {
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                    }
-
-                    const valtype vch1 = stacktop(-2);
-                    CScriptNum n(stacktop(-1), fRequireMinimal);
-                    if (n < 0)
-                    {
-                        return set_error(serror, SCRIPT_ERR_INVALID_NUMBER_RANGE);
-                    }
-
-                    popstack(stack);
-                    popstack(stack);
-                    stack.push_back(RShift(vch1, n.getint()));
-                }
-                break;
-
                 case OP_EQUAL:
                 case OP_EQUALVERIFY:
                     // case OP_NOTEQUAL: // use OP_NUMNOTEQUAL
@@ -1342,7 +1282,6 @@ bool ScriptMachine::Step()
 
                 case OP_ADD:
                 case OP_SUB:
-                case OP_MUL:
                 case OP_DIV:
                 case OP_MOD:
                 case OP_BOOLAND:
@@ -1373,10 +1312,6 @@ bool ScriptMachine::Step()
 
                     case OP_SUB:
                         bn = bn1 - bn2;
-                        break;
-
-                    case OP_MUL:
-                        bn = bn1 * bn2;
                         break;
 
                     case OP_DIV:
