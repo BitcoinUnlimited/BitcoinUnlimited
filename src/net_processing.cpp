@@ -2334,10 +2334,9 @@ bool SendMessages(CNode *pto)
             std::vector<CBlock> vHeaders;
             bool fRevertToInv = (!state->fPreferHeaders || pto->vBlockHashesToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE);
             CBlockIndex *pBestIndex = nullptr; // last header queued for delivery
-            {
-                LOCK(cs_main);
-                requester.ProcessBlockAvailability(pto->id); // ensure pindexBestKnownBlock is up-to-date
-            }
+
+            // Ensure pindexBestKnownBlock is up-to-date
+            requester.ProcessBlockAvailability(pto->id);
 
             if (!fRevertToInv)
             {
