@@ -282,6 +282,10 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0], STANDARD_SCRIPT_VERIFY_FLAGS);
     }
 
+    // Set XVal flag for new blocks. We can do this here because all transactions in this block are
+    // from the mempool.
+    pblock->fXVal = true;
+
     CValidationState state;
     if (blockstreamCoreCompatible)
     {
