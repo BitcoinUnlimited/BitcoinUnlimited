@@ -2347,21 +2347,11 @@ bool SendMessages(CNode *pto)
                 for (const uint256 &hash : vBlocksToAnnounce)
                 {
                     CBlockIndex *pindex = nullptr;
-                    {
-                        // BU skip blocks that we don't know about.  was: assert(mi != mapBlockIndex.end());
-                        pindex = LookupBlockIndex(hash);
-                        if (!pindex)
-                            continue;
+                    pindex = LookupBlockIndex(hash);
 
-                        LOCK(cs_main);
-                        if (chainActive[pindex->nHeight] != pindex)
-                        {
-                            // Bail out if we reorged away from this block
-                            fRevertToInv = true;
-                            break;
-                        }
-                    }
-
+                    // Skip blocks that we don't know about.
+                    if (!pindex)
+                        continue;
 
                     if (pBestIndex != nullptr && pindex->pprev != pBestIndex)
                     {
@@ -2415,21 +2405,11 @@ bool SendMessages(CNode *pto)
                     for (const uint256 &hashToAnnounce : vBlocksToAnnounce)
                     {
                         CBlockIndex *pindex = nullptr;
-                        {
-                            pindex = LookupBlockIndex(hashToAnnounce);
-                            if (!pindex)
-                                continue;
+                        pindex = LookupBlockIndex(hashToAnnounce);
 
-                            // Warn if we're announcing a block that is not on the main chain.
-                            // This should be very rare and could be optimized out.
-                            // Just log for now.
-                            LOCK(cs_main);
-                            if (chainActive[pindex->nHeight] != pindex)
-                            {
-                                LOG(NET, "Announcing block %s not on main chain (tip=%s)\n", hashToAnnounce.ToString(),
-                                    chainActive.Tip()->GetBlockHash().ToString());
-                            }
-                        }
+                        // Skip blocks that we don't know about.
+                        if (!pindex)
+                            continue;
 
                         // If the peer announced this block to us, don't inv it back.
                         // (Since block announcements may not be via inv's, we can't solely rely on
