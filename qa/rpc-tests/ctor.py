@@ -102,6 +102,7 @@ class CtorTest (BitcoinTestFramework):
         self.nodes[2].generate(1)
         sync_blocks_to(103, self.nodes[2:])
         waitFor(10, lambda: thereExists(self.nodes[0].getchaintips(), lambda x: x["height"] == 103 and x["status"] != "headers-only"))
+        waitFor(10, lambda: self.nodes[0].getblockcount() == 102)
         ct = self.nodes[0].getchaintips()
         tip = next(x for x in ct if x["status"] == "active")
         assert_equal(tip["height"], 102)
@@ -165,6 +166,7 @@ class CtorTest (BitcoinTestFramework):
         for i in range(0,30):
             self.nodes[0].sendtoaddress(addr[0], 1)
             self.nodes[0].generate(1)
+        sync_blocks(self.nodes[0:2])
 
         # Test that two new nodes that come up IBD and follow the appropriate chains
         ctorTip = self.nodes[3].getbestblockhash()
