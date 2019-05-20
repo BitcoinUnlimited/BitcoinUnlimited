@@ -206,7 +206,6 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
                 // Only delete valid coins from the cache when we're nearly syncd.  During IBD, and also
                 // if BlockOnly mode is turned on, these coins will be used, whereas, once the chain is
                 // syncd we only need the coins that have come from accepting txns into the memory pool.
-                bool fBlocksOnly = GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY);
                 if (IsChainNearlySyncd() && !fImporting && !fReindex && !fBlocksOnly &&
                     (nCoinCacheMaxSize < DEFAULT_HIGH_PERF_MEM_CUTOFF))
                 {
