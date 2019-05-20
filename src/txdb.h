@@ -38,9 +38,9 @@ static const uint64_t nMaxCacheIncreaseSinceLastFlush = 512 * 1000 * 1000;
  *  instead only keep coins in cache from incoming transactions that have been fully validated which gives these lower
  *  performance and more marginal nodes, such as those run on rapberry pi's, a very small memory footprint.
  */
-static const uint64_t DEFAULT_HIGH_PERF_MEM_CUTOFF = 2048 * 1000 * 1000;
+static const int64_t DEFAULT_HIGH_PERF_MEM_CUTOFF = 2048 * 1000 * 1000;
 //! the minimum system memory we always keep free when doing automatic dbcache sizing
-static const uint64_t nMinMemToKeepAvaialable = 300 * 1000 * 1000;
+static const uint64_t nMinMemToKeepAvailable = 300 * 1000 * 1000;
 //! the max size a batch can get before a write to the utxo is made
 static const size_t nMaxDBBatchSize = 16 << 20;
 //! Max memory allocated to block tree DB specific cache, if no -txindex (MiB)
