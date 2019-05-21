@@ -1050,19 +1050,18 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
     vBlocks.reserve(vBlocks.size() + count);
 
     // Make sure pindexBestKnownBlock is up to date, we'll need it.
-    LOCK(cs_main);
     ProcessBlockAvailability(nodeid);
 
     CNodeStateAccessor state(nodestate, nodeid);
     DbgAssert(state != nullptr, return );
 
+    LOCK(cs_main);
     if (state->pindexBestKnownBlock == nullptr ||
         state->pindexBestKnownBlock->nChainWork < chainActive.Tip()->nChainWork)
     {
         // This peer has nothing interesting.
         return;
     }
-
 
     if (state->pindexLastCommonBlock == nullptr)
     {

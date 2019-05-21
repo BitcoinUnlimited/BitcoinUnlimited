@@ -2323,21 +2323,20 @@ bool SendMessages(CNode *pto)
             // If no header would connect, or if we have too many
             // blocks, or if the peer doesn't want headers, just
             // add all to the inv queue.
-            std::vector<uint256> blockHashesToAnnounce;
+            std::vector<uint256> vBlocksToAnnounce;
             {
+                // Make a copy so that we do not need to keep
+                // cs_inventory which cannot be taken before cs_main.
                 LOCK(pto->cs_inventory);
-                // make a copy so that we do not need to keep cs_inventory which cannot be taken before cs_main
-                blockHashesToAnnounce = pto->vBlockHashesToAnnounce; // TODO optimize
-                pto->vBlockHashesToAnnounce.clear();
+                vBlocksToAnnounce.swap(pto->vBlockHashesToAnnounce);
             }
 
             std::vector<CBlock> vHeaders;
             bool fRevertToInv = (!state->fPreferHeaders || pto->vBlockHashesToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE);
             CBlockIndex *pBestIndex = nullptr; // last header queued for delivery
-            {
-                LOCK(cs_main);
-                requester.ProcessBlockAvailability(pto->id); // ensure pindexBestKnownBlock is up-to-date
-            }
+
+            // Ensure pindexBestKnownBlock is up-to-date
+            requester.ProcessBlockAvailability(pto->id);
 
             if (!fRevertToInv)
             {
@@ -2345,24 +2344,14 @@ bool SendMessages(CNode *pto)
                 // Try to find first header that our peer doesn't have, and
                 // then send all headers past that one.  If we come across any
                 // headers that aren't on chainActive, give up.
-                for (const uint256 &hash : blockHashesToAnnounce)
+                for (const uint256 &hash : vBlocksToAnnounce)
                 {
                     CBlockIndex *pindex = nullptr;
-                    {
-                        // BU skip blocks that we don't know about.  was: assert(mi != mapBlockIndex.end());
-                        pindex = LookupBlockIndex(hash);
-                        if (!pindex)
-                            continue;
+                    pindex = LookupBlockIndex(hash);
 
-                        LOCK(cs_main);
-                        if (chainActive[pindex->nHeight] != pindex)
-                        {
-                            // Bail out if we reorged away from this block
-                            fRevertToInv = true;
-                            break;
-                        }
-                    }
-
+                    // Skip blocks that we don't know about.
+                    if (!pindex)
+                        continue;
 
                     if (pBestIndex != nullptr && pindex->pprev != pBestIndex)
                     {
@@ -2374,7 +2363,7 @@ bool SendMessages(CNode *pto)
                         // which should be caught by the prior check), but one
                         // way this could happen is by using invalidateblock /
                         // reconsiderblock repeatedly on the tip, causing it to
-                        // be added multiple times to vBlockHashesToAnnounce.
+                        // be added multiple times to vBlocksToAnnounce.
                         // Robustly deal with this rare situation by reverting
                         // to an inv.
                         fRevertToInv = true;
@@ -2409,28 +2398,18 @@ bool SendMessages(CNode *pto)
             if (fRevertToInv)
             {
                 // If falling back to using an inv, just try to inv the tip.
-                // The last entry in vBlockHashesToAnnounce was our tip at some point
+                // The last entry in vBlocksToAnnounce was our tip at some point
                 // in the past.
-                if (!blockHashesToAnnounce.empty())
+                if (!vBlocksToAnnounce.empty())
                 {
-                    for (const uint256 &hashToAnnounce : blockHashesToAnnounce)
+                    for (const uint256 &hashToAnnounce : vBlocksToAnnounce)
                     {
                         CBlockIndex *pindex = nullptr;
-                        {
-                            pindex = LookupBlockIndex(hashToAnnounce);
-                            if (!pindex)
-                                continue;
+                        pindex = LookupBlockIndex(hashToAnnounce);
 
-                            // Warn if we're announcing a block that is not on the main chain.
-                            // This should be very rare and could be optimized out.
-                            // Just log for now.
-                            LOCK(cs_main);
-                            if (chainActive[pindex->nHeight] != pindex)
-                            {
-                                LOG(NET, "Announcing block %s not on main chain (tip=%s)\n", hashToAnnounce.ToString(),
-                                    chainActive.Tip()->GetBlockHash().ToString());
-                            }
-                        }
+                        // Skip blocks that we don't know about.
+                        if (!pindex)
+                            continue;
 
                         // If the peer announced this block to us, don't inv it back.
                         // (Since block announcements may not be via inv's, we can't solely rely on
