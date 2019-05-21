@@ -106,15 +106,17 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         }
                         else
                         {
-                            READLOCK(cs_mapBlockIndex);
                             static const int nOneMonth = 30 * 24 * 60 * 60;
                             // To prevent fingerprinting attacks, only send blocks outside of the active
                             // chain if they are valid, and no more than a month older (both in time, and in
                             // best equivalent proof of work) than the best header chain we know about.
-                            fSend = mi->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != NULL) &&
-                                    (pindexBestHeader.load()->GetBlockTime() - mi->GetBlockTime() < nOneMonth) &&
-                                    (GetBlockProofEquivalentTime(
-                                         *pindexBestHeader, *mi, *pindexBestHeader, consensusParams) < nOneMonth);
+                            {
+                                READLOCK(cs_mapBlockIndex);
+                                fSend = mi->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != NULL) &&
+                                        (pindexBestHeader.load()->GetBlockTime() - mi->GetBlockTime() < nOneMonth) &&
+                                        (GetBlockProofEquivalentTime(
+                                             *pindexBestHeader, *mi, *pindexBestHeader, consensusParams) < nOneMonth);
+                            }
                             if (!fSend)
                             {
                                 LOG(NET,
