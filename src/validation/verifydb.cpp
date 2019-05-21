@@ -74,7 +74,6 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
         if (nCheckLevel >= 3 && pindex == pindexState &&
             (int64_t)(coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <= nCoinCacheMaxSize)
         {
-            bool fClean = true;
             DisconnectResult res = DisconnectBlock(block, pindex, coins);
             if (res == DISCONNECT_FAILED)
             {
@@ -82,7 +81,7 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
                     pindex->nHeight, pindex->GetBlockHash().ToString());
             }
             pindexState = pindex->pprev;
-            if (!fClean)
+            if (res == DISCONNECT_UNCLEAN)
             {
                 nGoodTransactions = 0;
                 pindexFailure = pindex;
