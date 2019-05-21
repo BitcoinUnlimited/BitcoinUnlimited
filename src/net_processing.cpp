@@ -171,12 +171,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     }
                     // Pruned nodes may have deleted the block, so check whether
                     // it's available before trying to send.
-                    bool fHaveData = false;
-                    {
-                        READLOCK(cs_mapBlockIndex);
-                        fHaveData = (mi->nStatus & BLOCK_HAVE_DATA);
-                    }
-                    if (fSend && fHaveData)
+                    if (fSend && mi->nStatus & BLOCK_HAVE_DATA)
                     {
                         // Send block from disk
                         CBlock block;
