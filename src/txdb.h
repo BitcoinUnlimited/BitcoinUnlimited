@@ -26,7 +26,7 @@ static const bool DEFAULT_TXINDEX = false;
 //! -dbcache default (MiB)
 static const int64_t nDefaultDbCache = 500;
 //! max. -dbcache in (MiB)
-static const int64_t nMaxDbCache = sizeof(void *) > 4 ? 16384 : 2048;
+static const int64_t nMaxDbCache = sizeof(void *) > 4 ? 32736 : 2048;
 //! min. -dbcache in (MiB)
 static const int64_t nMinDbCache = 4;
 //! % of available memory to leave unused by dbcache if/when we dynamically size the dbcache.
