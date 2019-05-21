@@ -12,6 +12,7 @@
 #include "dosman.h"
 #include "net.h"
 #include "pow.h"
+#include "requestManager.h"
 #include "script/sigcache.h"
 #include "timedata.h"
 #include "txorphanpool.h"
@@ -457,7 +458,9 @@ void CParallelValidation::ClearOrphanCache(const CBlockRef pblock)
 //  the thread has finished.
 void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strCommand, CBlockRef pblock, const CInv &inv)
 {
-    uint64_t nBlockSize = pblock->GetBlockSize();
+    // Indicate that the block was received and is about to be processed. Setting the processing flag
+    // prevents us from re-requesting the block during the time it is being processed.
+    requester.ProcessingBlock(pblock->GetHash(), pfrom);
 
     // NOTE: You must not have a cs_main lock before you aquire the semaphore grant or you can end up deadlocking
     AssertLockNotHeld(cs_main);
@@ -504,7 +507,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
                     }
 
                     // if the new competing block is the biggest or of equal size to the biggest then reject it.
-                    if (fCompeting && (nLargestBlockSize <= nBlockSize))
+                    if (fCompeting && (nLargestBlockSize <= pblock->GetBlockSize()))
                     {
                         LOG(PARALLEL,
                             "New Block validation terminated - Too many blocks currently being validated: %s\n",
