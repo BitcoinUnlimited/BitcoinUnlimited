@@ -222,7 +222,7 @@ uint256 CCoinsViewCache::_GetBestBlock() const
 
 void CCoinsViewCache::SetBestBlock(const uint256 &hashBlockIn)
 {
-    READLOCK(cs_utxo);
+    WRITELOCK(cs_utxo);
     hashBlock = hashBlockIn;
 }
 
