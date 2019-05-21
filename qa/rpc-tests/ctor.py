@@ -97,12 +97,12 @@ class CtorTest (BitcoinTestFramework):
         # did the other CTOR node accept it?
         assert_equal(self.nodes[3].getblockcount(), 102)
         assert_equal(self.nodes[3].getbestblockhash(), ctorBlock)
+        waitFor(10, lambda: self.nodes[0].getblockcount() == 102)
         # did the original nodes reject it?
         # we need to generate another block so the CTOR chain exceeds the DTOR
         self.nodes[2].generate(1)
         sync_blocks_to(103, self.nodes[2:])
         waitFor(10, lambda: thereExists(self.nodes[0].getchaintips(), lambda x: x["height"] == 103 and x["status"] != "headers-only"))
-        waitFor(10, lambda: self.nodes[0].getblockcount() == 102)
         ct = self.nodes[0].getchaintips()
         tip = next(x for x in ct if x["status"] == "active")
         assert_equal(tip["height"], 102)
