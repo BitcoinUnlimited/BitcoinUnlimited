@@ -106,6 +106,9 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     vRecv >> grapheneBlockTx;
 
     auto pblock = thinrelay.GetBlockToReconstruct(pfrom);
+    if (pblock == nullptr)
+        return error("No block available to reconstruct for graphenetx");
+    DbgAssert(pblock->grapheneblock != nullptr, return false);
     std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
 
     // Message consistency checking
@@ -638,12 +641,12 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     // This must be done outside of the mempool.cs lock or may deadlock.
     if (setHashesToRequest.size() > 0)
     {
-        this->nWaitingFor = setHashesToRequest.size();
+        grapheneBlock->nWaitingFor = setHashesToRequest.size();
         CRequestGrapheneBlockTx grapheneBlockTx(header.GetHash(), setHashesToRequest);
         pfrom->PushMessage(NetMsgType::GET_GRAPHENETX, grapheneBlockTx);
 
         // Update run-time statistics of graphene block bandwidth savings
-        graphenedata.UpdateInBoundReRequestedTx(this->nWaitingFor);
+        graphenedata.UpdateInBoundReRequestedTx(grapheneBlock->nWaitingFor);
 
         return true;
     }
@@ -657,17 +660,17 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     }
 
     // We now have all the transactions that are in this block
-    this->nWaitingFor = 0;
+    grapheneBlock->nWaitingFor = 0;
     int blockSize = pblock->GetBlockSize();
     float nCompressionRatio = 0.0;
-    if (this->GetSize() > 0)
-        nCompressionRatio = (float)blockSize / (float)this->GetSize();
+    if (grapheneBlock->GetSize() > 0)
+        nCompressionRatio = (float)blockSize / (float)grapheneBlock->GetSize();
     LOG(GRAPHENE,
         "Reassembled graphene block for %s (%d bytes). Message was %d bytes, compression ratio %3.2f, peer=%s\n",
-        pblock->GetHash().ToString(), blockSize, this->GetSize(), nCompressionRatio, pfrom->GetLogName());
+        pblock->GetHash().ToString(), blockSize, grapheneBlock->GetSize(), nCompressionRatio, pfrom->GetLogName());
 
     // Update run-time statistics of graphene block bandwidth savings
-    graphenedata.UpdateInBound(this->GetSize(), blockSize);
+    graphenedata.UpdateInBound(grapheneBlock->GetSize(), blockSize);
     LOG(GRAPHENE, "Graphene block stats: %s\n", graphenedata.ToString().c_str());
 
     // Process the full block
