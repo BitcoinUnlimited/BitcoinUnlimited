@@ -250,23 +250,34 @@ void ThinTypeRelay::RequestBlock(CNode *pfrom, const uint256 &hash)
 
 std::shared_ptr<CBlockThinRelay> ThinTypeRelay::SetBlockToReconstruct(CNode *pfrom, const uint256 &hash)
 {
-    // Make sure we are starting with a fresh instance.
     LOCK(cs_reconstruct);
-    ClearBlockToReconstruct(pfrom);
+    // If another thread has already created an instance then return it.
+    // Currently we can only have one block hash in flight per node so make sure it's the same hash.
+    auto iter = mapBlocksReconstruct.find(pfrom->GetId());
+    if (iter != mapBlocksReconstruct.end() && iter->second.first == hash)
+    {
+        return iter->second.second;
+    }
+    // Otherwise, start with a fresh instance.
+    else
+    {
+        ClearBlockToReconstruct(pfrom);
 
-    // Store and empty block which can be used later
-    std::shared_ptr<CBlockThinRelay> pblock;
-    pblock = std::make_shared<CBlockThinRelay>(CBlockThinRelay());
+        // Store and empty block which can be used later
+        std::shared_ptr<CBlockThinRelay> pblock;
+        pblock = std::make_shared<CBlockThinRelay>(CBlockThinRelay());
 
-    // Initialize the thintype pointers
-    pblock->thinblock = std::make_shared<CThinBlock>(CThinBlock());
-    pblock->xthinblock = std::make_shared<CXThinBlock>(CXThinBlock());
-    pblock->cmpctblock = std::make_shared<CompactBlock>(CompactBlock());
-    pblock->grapheneblock = std::make_shared<CGrapheneBlock>(CGrapheneBlock());
+        // Initialize the thintype pointers
+        pblock->thinblock = std::make_shared<CThinBlock>(CThinBlock());
+        pblock->xthinblock = std::make_shared<CXThinBlock>(CXThinBlock());
+        pblock->cmpctblock = std::make_shared<CompactBlock>(CompactBlock());
+        pblock->grapheneblock = std::make_shared<CGrapheneBlock>(CGrapheneBlock());
 
-    mapBlocksReconstruct.insert(
-        std::make_pair(pfrom->GetId(), std::make_pair(pblock->GetBlockHeader().GetHash(), pblock)));
-    return pblock;
+        mapBlocksReconstruct.insert(
+            std::make_pair(pfrom->GetId(), std::make_pair(pblock->GetBlockHeader().GetHash(), pblock)));
+        return pblock;
+    }
+
 }
 
 std::shared_ptr<CBlockThinRelay> ThinTypeRelay::GetBlockToReconstruct(CNode *pfrom)
