@@ -1095,15 +1095,15 @@ UniValue setexcessiveblock(const UniValue &params, bool fHelp)
                             "\nExamples:\n" +
                             HelpExampleCli("getexcessiveblock", "") + HelpExampleRpc("getexcessiveblock", ""));
 
-    unsigned int ebs = 0;
+    uint64_t ebs = 0;
     if (params[0].isNum())
         ebs = params[0].get_int64();
     else
     {
         string temp = params[0].get_str();
         if (temp[0] == '-')
-            boost::throw_exception(boost::bad_lexical_cast());
-        ebs = boost::lexical_cast<unsigned int>(temp);
+            throw runtime_error("EB has to be a positive number");
+        ebs = std::stoull(temp);
     }
 
     std::string estr = ebTweak.Validate(ebs);
