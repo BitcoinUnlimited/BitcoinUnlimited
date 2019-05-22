@@ -923,7 +923,7 @@ public:
     //! returns the name of this node for logging.  Respects the user's choice to not log the node's IP
     std::string GetLogName()
     {
-        std::string idstr = boost::lexical_cast<std::string>(id);
+        std::string idstr = std::to_string(id);
         if (fLogIPs)
             return addrName + " (" + idstr + ")";
         return idstr;
