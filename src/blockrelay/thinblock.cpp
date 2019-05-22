@@ -781,12 +781,14 @@ static bool ReconstructBlock(CNode *pfrom,
     // Add the header size to the current size being tracked
     thinrelay.AddBlockBytes(::GetSerializeSize(pblock->GetBlockHeader(), SER_NETWORK, PROTOCOL_VERSION), pblock);
 
-    // Look for each transaction in our various pools and buffers.
+    // Create mapMissing by combining both xthinblock and thinblock maps.
     std::map<uint64_t, CTransactionRef> mapMissing;
-    if (pblock->xthinblock != nullptr)
-        mapMissing.insert(pblock->xthinblock->mapMissingTx.begin(), pblock->xthinblock->mapMissingTx.end());
-    if (pblock->thinblock != nullptr)
-        mapMissing.insert(pblock->thinblock->mapMissingTx.begin(), pblock->thinblock->mapMissingTx.end());
+    DbgAssert(pblock->xthinblock != nullptr, return false);
+    DbgAssert(pblock->thinblock != nullptr, return false);
+    mapMissing.insert(pblock->xthinblock->mapMissingTx.begin(), pblock->xthinblock->mapMissingTx.end());
+    mapMissing.insert(pblock->thinblock->mapMissingTx.begin(), pblock->thinblock->mapMissingTx.end());
+
+    // Look for each transaction in our various pools and buffers.
     for (const uint256 &hash : vHashes)
     {
         // Replace the truncated hash with the full hash value if it exists
