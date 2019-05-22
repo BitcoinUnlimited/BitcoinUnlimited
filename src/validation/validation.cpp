@@ -2748,6 +2748,12 @@ void CheckAndAlertUnknownVersionbits(const CChainParams &chainParams, const CBlo
     {
         // strMiscWarning is read by GetWarnings(), called by Qt and the JSON-RPC code to warn the user:
         strMiscWarning = _("Warning: Unknown block versions being mined! It's possible unknown rules are in effect");
+
+        // Temporararily disable the warning message. It is not very useful and frequently gives false positive
+        // warnings causing end users to think there is a serious problem when there is none.
+        // TODO: find a mor permanent solution or workround.
+        strMiscWarning = _("");
+
         if (!fWarned)
         {
             AlertNotify(strMiscWarning);
