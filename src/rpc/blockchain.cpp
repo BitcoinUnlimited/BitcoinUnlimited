@@ -675,7 +675,7 @@ UniValue getblock(const UniValue &params, bool fHelp)
         if (h.bits() < 65)
         {
             LOCK(cs_main);
-            uint64_t height = boost::lexical_cast<unsigned int>(strHash);
+            uint64_t height = std::stoull(strHash);
             if (height > (uint64_t)chainActive.Height())
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block index out of range");
             pblockindex = chainActive[height];
@@ -1282,9 +1282,9 @@ UniValue mempoolInfoToJSON()
     ret.pushKV("mempoolminfee", ValueFromAmount(mempool.GetMinFee(maxmempool).GetFeePerK()));
     try
     {
-        ret.pushKV("tps", boost::lexical_cast<double>(strprintf("%.2f", mempool.TransactionsPerSecond())));
+        ret.pushKV("tps", std::stod(strprintf("%.2f", mempool.TransactionsPerSecond())));
     }
-    catch (boost::bad_lexical_cast &)
+    catch (...)
     {
         ret.pushKV("tps", "N/A");
     }

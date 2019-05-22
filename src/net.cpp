@@ -45,7 +45,6 @@ extern CTweak<bool> ignoreNetTimeouts;
 #endif
 
 #include <boost/filesystem.hpp>
-#include <boost/lexical_cast.hpp>
 #include <thread>
 
 #include <math.h>
