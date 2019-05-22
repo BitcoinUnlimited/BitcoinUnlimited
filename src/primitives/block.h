@@ -191,10 +191,10 @@ public:
     {
         CBlock::SetNull();
         nCurrentBlockSize = 0;
-        thinblock = nullptr;
-        xthinblock = nullptr;
-        cmpctblock = nullptr;
-        grapheneblock = nullptr;
+        thinblock.reset();
+        xthinblock.reset();
+        cmpctblock.reset();
+        grapheneblock.reset();
     }
 };
 
