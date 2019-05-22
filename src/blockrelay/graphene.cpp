@@ -444,6 +444,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     if (PV->IsAlreadyValidating(pfrom->id))
         return false;
 
+    DbgAssert(pblock->grapheneblock != nullptr, return false);
     std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
 
     uint256 nullhash;
@@ -762,7 +763,8 @@ static bool ReconstructBlock(CNode *pfrom,
 
         // In order to prevent a memory exhaustion attack we track transaction bytes used to recreate the block
         // in order to see if we've exceeded any limits and if so clear out data and return.
-        thinrelay.AddBlockBytes(ptx->GetTxSize(), pblock);
+        if (ptx)
+            thinrelay.AddBlockBytes(ptx->GetTxSize(), pblock);
         if (pblock->nCurrentBlockSize > thinrelay.GetMaxAllowedBlockSize())
         {
             uint64_t nBlockBytes = pblock->nCurrentBlockSize;

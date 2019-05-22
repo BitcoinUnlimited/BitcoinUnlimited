@@ -192,6 +192,8 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock
     pfrom->shorttxidk0 = shorttxidk0;
     pfrom->shorttxidk1 = shorttxidk1;
 
+    DbgAssert(pblock->cmpctblock != nullptr, return false);
+
     // Because the list of shorttxids is not complete (missing the prefilled transaction hashes), we need
     // to first create the full list of compactblock shortid hashes, in proper order.
     //
@@ -669,7 +671,8 @@ static bool ReconstructBlock(CNode *pfrom,
 
         // In order to prevent a memory exhaustion attack we track transaction bytes used to recreate the block
         // in order to see if we've exceeded any limits and if so clear out data and return.
-        thinrelay.AddBlockBytes(ptx->GetTxSize(), pblock);
+        if (ptx)
+            thinrelay.AddBlockBytes(ptx->GetTxSize(), pblock);
         if (pblock->nCurrentBlockSize > thinrelay.GetMaxAllowedBlockSize())
         {
             uint64_t nBlockBytes = pblock->nCurrentBlockSize;

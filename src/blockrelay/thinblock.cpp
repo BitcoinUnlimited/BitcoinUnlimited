@@ -129,6 +129,7 @@ bool CThinBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
     pblock->hashMerkleRoot = header.hashMerkleRoot;
     pblock->hashPrevBlock = header.hashPrevBlock;
 
+    DbgAssert(pblock->thinblock != nullptr, return false);
     unsigned int &nWaitingForTxns = pblock->thinblock->nWaitingFor;
 
     // Check that the merkleroot matches the merkleroot calculated from the hashes provided.
@@ -596,6 +597,8 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<
     pblock->hashMerkleRoot = header.hashMerkleRoot;
     pblock->hashPrevBlock = header.hashPrevBlock;
 
+    DbgAssert(pblock->xthinblock != nullptr, return false);
+
     // Create the mapMissingTx from all the supplied tx's in the xthinblock
     for (const CTransaction &tx : vMissingTx)
         pblock->xthinblock->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
@@ -830,7 +833,8 @@ static bool ReconstructBlock(CNode *pfrom,
 
         // In order to prevent a memory exhaustion attack we track transaction bytes used to recreate the block
         // in order to see if we've exceeded any limits and if so clear out data and return.
-        thinrelay.AddBlockBytes(ptx->GetTxSize(), pblock);
+        if (ptx)
+            thinrelay.AddBlockBytes(ptx->GetTxSize(), pblock);
         if (pblock->nCurrentBlockSize > thinrelay.GetMaxAllowedBlockSize())
         {
             uint64_t nBlockBytes = pblock->nCurrentBlockSize;
