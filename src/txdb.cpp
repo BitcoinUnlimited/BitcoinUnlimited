@@ -239,7 +239,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
         _WriteBestBlock(hashBlock);
 
     bool ret = db.WriteBatch(batch);
-    LOG(COINDB, "Committing1 %u changed transactions (out of %u) to coin database with %u batch writes...\n",
+    LOG(COINDB, "Committing %u changed transactions (out of %u) to coin database with %u batch writes...\n",
         (unsigned int)changed, (unsigned int)count, (unsigned int)nBatchWrites);
 
     return ret;
