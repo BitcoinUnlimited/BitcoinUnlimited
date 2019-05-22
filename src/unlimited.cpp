@@ -1074,7 +1074,7 @@ UniValue getexcessiveblock(const UniValue &params, bool fHelp)
                             HelpExampleCli("getexcessiveblock", "") + HelpExampleRpc("getexcessiveblock", ""));
 
     UniValue ret(UniValue::VOBJ);
-    ret.pushKV("excessiveBlockSize", (uint64_t)excessiveBlockSize);
+    ret.pushKV("excessiveBlockSize", excessiveBlockSize);
     ret.pushKV("excessiveAcceptDepth", (uint64_t)excessiveAcceptDepth);
     return ret;
 }
