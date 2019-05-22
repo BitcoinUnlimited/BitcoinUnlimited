@@ -27,6 +27,7 @@
 #include "util.h" // FIXME: reduce scope
 
 #include <atomic>
+#include <boost/lexical_cast.hpp>
 #include <deque>
 #include <stdint.h>
 
