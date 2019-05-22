@@ -206,8 +206,8 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
                 // Only delete valid coins from the cache when we're nearly syncd.  During IBD, and also
                 // if BlockOnly mode is turned on, these coins will be used, whereas, once the chain is
                 // syncd we only need the coins that have come from accepting txns into the memory pool.
-                bool fBlocksOnly = GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY);
-                if (IsChainNearlySyncd() && !fImporting && !fReindex && !fBlocksOnly)
+                if (IsChainNearlySyncd() && !fImporting && !fReindex && !fBlocksOnly &&
+                    (nCoinCacheMaxSize < DEFAULT_HIGH_PERF_MEM_CUTOFF))
                 {
                     // Update the usage of the child cache before deleting the entry in the child cache
                     nChildCachedCoinsUsage -= nUsage;
@@ -241,6 +241,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
     bool ret = db.WriteBatch(batch);
     LOG(COINDB, "Committing %u changed transactions (out of %u) to coin database with %u batch writes...\n",
         (unsigned int)changed, (unsigned int)count, (unsigned int)nBatchWrites);
+
     return ret;
 }
 
@@ -836,7 +837,7 @@ void AdjustCoinCacheSize()
         // The amount of system memory currently available
         int64_t nMemAvailable = GetAvailableMemory();
         // The amount of memory we need to *keep* available.
-        int64_t nUnusedMem = std::max(GetTotalSystemMemory() * nDefaultPcntMemUnused / 100, nMinMemToKeepAvaialable);
+        int64_t nUnusedMem = std::max(GetTotalSystemMemory() * nDefaultPcntMemUnused / 100, nMinMemToKeepAvailable);
 
         // Make sure we leave enough room for the leveldb write cache's
         if (pcoinsdbview != nullptr && nUnusedMem < pcoinsdbview->TotalWriteBufferSize())

@@ -77,6 +77,7 @@
 // BU moved CConditionVariable cvBlockChange;
 bool fImporting = false;
 bool fReindex = false;
+bool fBlocksOnly = false;
 bool fTxIndex = false;
 bool fHavePruned = false;
 bool fPruneMode = false;

@@ -591,7 +591,8 @@ void InitParameterInteraction()
     }
 
     // disable walletbroadcast and whitelistrelay in blocksonly mode
-    if (GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY))
+    fBlocksOnly = GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY);
+    if (fBlocksOnly)
     {
         if (SoftSetBoolArg("-whitelistrelay", false))
             LOGA("%s: parameter interaction: -blocksonly=1 -> setting -whitelistrelay=0\n", __func__);

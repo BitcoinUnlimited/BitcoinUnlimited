@@ -186,6 +186,7 @@ extern CConditionVariable cvBlockChange;
 extern bool fImporting;
 extern bool fReindex;
 extern bool fTxIndex;
+extern bool fBlocksOnly;
 extern bool fIsBareMultisigStd;
 extern unsigned int nBytesPerSigOp;
 extern bool fCheckBlockIndex;
