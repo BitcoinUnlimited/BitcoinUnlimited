@@ -47,8 +47,8 @@ void UnlimitedModel::Init()
     // Ensure restart flag is unset on client startup
     setRestartRequired(false);
 
-    unsigned int tmpExcessiveBlockSize = excessiveBlockSize;
-    unsigned int tmpMaxGeneratedBlock = maxGeneratedBlock;
+    uint64_t tmpExcessiveBlockSize = excessiveBlockSize;
+    uint64_t tmpMaxGeneratedBlock = maxGeneratedBlock;
 
     if (!settings.contains("maxGeneratedBlock"))
         settings.setValue("maxGeneratedBlock", QString::number(maxGeneratedBlock));
