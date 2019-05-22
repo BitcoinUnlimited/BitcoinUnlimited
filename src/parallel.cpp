@@ -634,9 +634,9 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
                     inv.hash.ToString(), strCommand, (double)(GetTimeMicros() - startTime) / 1000000.0,
                     pfrom->GetLogName());
 
-                if (strCommand == NetMsgType::GRAPHENEBLOCK)
+                if (strCommand == NetMsgType::GRAPHENEBLOCK || strCommand == NetMsgType::GRAPHENETX)
                     graphenedata.UpdateValidationTime(nValidationTime);
-                else if (strCommand == NetMsgType::CMPCTBLOCK)
+                else if (strCommand == NetMsgType::CMPCTBLOCK || strCommand == NetMsgType::BLOCKTXN)
                     compactdata.UpdateValidationTime(nValidationTime);
                 else
                     thindata.UpdateValidationTime(nValidationTime);
