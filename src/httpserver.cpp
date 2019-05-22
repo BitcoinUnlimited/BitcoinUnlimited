@@ -522,6 +522,7 @@ void StopHTTPServer()
         }
         g_thread_http_workers.clear();
         delete workQueue;
+        workQueue = nullptr;
     }
     if (eventBase)
     {
