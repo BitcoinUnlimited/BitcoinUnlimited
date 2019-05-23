@@ -405,7 +405,7 @@ bool CSharedCriticalSection::try_lock()
 // critical
 // section from the lockorder map
 #ifdef DEBUG_LOCKORDER
-CRecursiveSharedCriticalSection::CRecursiveSharedCriticalSection() : name(NULL), exclusiveOwner(0) {}
+CRecursiveSharedCriticalSection::CRecursiveSharedCriticalSection() : name(nullptr), exclusiveOwner(0) {}
 CRecursiveSharedCriticalSection::CRecursiveSharedCriticalSection(const char *n) : name(n), exclusiveOwner(0)
 {
 // print the address of named critical sections so they can be found in the mutrace output
