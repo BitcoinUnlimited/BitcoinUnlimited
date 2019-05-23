@@ -6,7 +6,7 @@
 
 #include "primitives/transaction.h"
 
-#include "hash.h"
+#include "hashwrapper.h"
 #include "policy/policy.h"
 #include "tinyformat.h"
 #include "utilstrencodings.h"

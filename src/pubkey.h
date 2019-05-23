@@ -7,7 +7,7 @@
 #ifndef BITCOIN_PUBKEY_H
 #define BITCOIN_PUBKEY_H
 
-#include "hash.h"
+#include "hashwrapper.h"
 #include "serialize.h"
 #include "uint256.h"
 

@@ -10,7 +10,7 @@
 #include "crypto/sha1.h"
 #include "crypto/sha256.h"
 #include "crypto/sha512.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "random.h"
 #include "uint256.h"
 #include "utiltime.h"

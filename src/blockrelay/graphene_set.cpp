@@ -4,7 +4,7 @@
 
 #include "blockrelay/graphene_set.h"
 #include "bloom.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "iblt.h"
 #include "random.h"
 #include "serialize.h"

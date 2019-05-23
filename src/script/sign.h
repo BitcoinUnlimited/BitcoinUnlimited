@@ -7,7 +7,7 @@
 #ifndef BITCOIN_SCRIPT_SIGN_H
 #define BITCOIN_SCRIPT_SIGN_H
 
-#include "hash.h"
+#include "hashwrapper.h"
 #include "key.h"
 #include "script/interpreter.h"
 

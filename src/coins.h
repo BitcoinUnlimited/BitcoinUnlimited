@@ -9,7 +9,7 @@
 
 #include "compressor.h"
 #include "core_memusage.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "memusage.h"
 #include "serialize.h"
 #include "sync.h"

@@ -7,7 +7,7 @@
 
 #include "bloom.h"
 #include "fastfilter.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "iblt.h"
 #include "random.h"
 #include "serialize.h"

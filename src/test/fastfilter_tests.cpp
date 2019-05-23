@@ -7,7 +7,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include "fastfilter.h"
-#include "hash.h"
+#include "hashwrapper.h"
 
 void TestVariableFastFilter(CVariableFastFilter filt, int buffer, int n, double fpr)
 {

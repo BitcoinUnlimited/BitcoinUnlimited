@@ -347,8 +347,8 @@ libbitcoincash_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoincash_a_SOURCES = \
   cashlib/cashlib.cpp \
   script/sigcommon.cpp \
-  hash.cpp \
-  hash.h \
+  hashwrapper.cpp \
+  hashwrapper.h \
   key.cpp \
   key.h \
   primitives/transaction.cpp \
@@ -407,8 +407,8 @@ libbitcoin_consensus_a_SOURCES = \
   consensus/merkle.h \
   consensus/params.h \
   consensus/validation.h \
-  hash.cpp \
-  hash.h \
+  hashwrapper.cpp \
+  hashwrapper.h \
   prevector.h \
   primitives/block.cpp \
   primitives/block.h \

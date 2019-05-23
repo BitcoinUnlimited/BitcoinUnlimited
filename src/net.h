@@ -13,7 +13,7 @@
 #include "compat.h"
 #include "fastfilter.h"
 #include "fs.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "iblt.h"
 #include "limitedmap.h"
 #include "netbase.h"

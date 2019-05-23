@@ -7,7 +7,7 @@
 #include "merkleblock.h"
 
 #include "consensus/consensus.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "utilstrencodings.h"
 
 using namespace std;

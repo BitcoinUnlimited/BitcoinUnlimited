@@ -4,7 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "netaddress.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "netbase.h"
 #include "tinyformat.h"
 #include "uint256.h"

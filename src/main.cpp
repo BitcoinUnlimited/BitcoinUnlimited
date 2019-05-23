@@ -23,7 +23,7 @@
 #include "consensus/validation.h"
 #include "dosman.h"
 #include "expedited.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "init.h"
 #include "merkleblock.h"
 #include "net.h"

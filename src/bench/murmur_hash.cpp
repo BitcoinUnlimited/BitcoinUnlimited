@@ -3,7 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "bench.h"
-#include "hash.h"
+#include "hashwrapper.h"
 
 static void Murmur3(benchmark::State &state)
 {

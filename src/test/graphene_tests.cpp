@@ -2,7 +2,7 @@
 #include "blockrelay/graphene_set.h"
 #include "bloom.h"
 #include "fastfilter.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "serialize.h"
