@@ -2,6 +2,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifndef BITCOIN_TXADMISSION_H
+#define BITCOIN_TXADMISSION_H
+
 #include "fastfilter.h"
 #include "net.h"
 #include "threadgroup.h"
@@ -217,3 +220,5 @@ public:
         txProcessingCorral.Exit(CORRAL_TX_PAUSE);
     }
 };
+
+#endif
