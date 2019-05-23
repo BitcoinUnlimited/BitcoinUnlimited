@@ -9,7 +9,6 @@
 #include "primitives/transaction.h"
 
 #include <stdint.h>
-#include <univalue.h>
 #include <vector>
 
 class CBlockIndex;
