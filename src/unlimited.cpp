@@ -1102,7 +1102,7 @@ UniValue setexcessiveblock(const UniValue &params, bool fHelp)
     {
         string temp = params[0].get_str();
         if (temp[0] == '-')
-            throw runtime_error("EB has to be a positive number");
+            throw runtime_error("Excessive block size has to be a positive number");
         ebs = std::stoull(temp);
     }
 
