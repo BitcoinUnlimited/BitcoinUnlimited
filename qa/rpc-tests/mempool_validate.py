@@ -140,12 +140,15 @@ def createTx(dests, sources, node, maxx=None, fee=1, nextWallet=None, generatedT
             txhex = hexlify(tx.serialize()).decode("utf-8")
             txid = None
             try:
+                rawTxValid = node.validaterawtransaction(txhex)['valid']
                 txid = node.enqueuerawtransaction(txhex)
             except JSONRPCException as e:
                 logging.error("TX submission failed because %s" % str(e))
                 logging.error("tx was: %s" % txhex)
                 logging.error("amountin: %d amountout: %d outscript: %s" % (w["satoshi"], amt, w["scriptPubKey"]))
                 raise
+            # none of these txs should be invalid
+            assert(rawTxValid == True)
         else:  # return them in generatedTx
             generatedTx.append(tx)
 
@@ -209,99 +212,6 @@ class MyTest (BitcoinTestFramework):
             t.join()
         return (total, outputs)
 
-    def conflictTest(self, dests0, dests1, wallet, numNodes=2):
-        """Tests issuing a bunch of conflicting transactions.  Expects that you give it a wallet with lots of free UTXO, and nothing in the mempool
-        """
-        logging.info("conflict test")
-        assert(self.nodes[0].getmempoolinfo()["size"] == 0)  # Expects a clean mempool
-        if 1:  # test many conflicts
-            NTX = 50
-            i = 0
-            for c in range(NTX):
-                source = wallet.pop()
-                txs = createConflictingTx(dests0, source, c)
-
-                for t in txs:
-                    n = self.nodes[i % len(self.nodes)]
-                    n.enqueuerawtransaction(t.toHex())
-                    i += 1
-
-            for n in self.nodes:
-                waitFor(30, lambda: True if n.getmempoolinfo()["size"] >= NTX - 5 else None)
-            time.sleep(1)
-            # we have to allow < because bloom filter false positives in the node's
-            # sending logic may cause it to not get an INV
-            for n in self.nodes:
-                assert(n.getmempoolinfo()["size"] <= NTX)  # if its > then a doublespend got through
-            self.commitMempool()  # clear out this test
-
-        if 1:  # test 2 conflicting transactions
-            NTX = 25
-            wallet2 = []
-            gtx2 = []
-            amt = createTx(dests0, wallet[0:NTX], 1, NTX, 1, wallet2, gtx2)
-            wallet3 = []
-            gtx3 = []
-            # create conflicting tx with slightly different payment amounts
-            amt = createTx(dests0, wallet[0:NTX], 1, NTX, 2, wallet3, gtx3)
-
-            gtx = zip(gtx2, gtx3)
-            for g in gtx:
-                self.nodes[0].enqueuerawtransaction(g[0].toHex())
-                try:
-                    self.nodes[0].enqueuerawtransaction(g[1].toHex())
-                    # assert(0)  # double spend may not return an error because processing happens asynchronously
-                except JSONRPCException as e:
-                    if e.error["code"] != -26:  # txn-mempool-conflict
-                        raise
-
-            # forget about the tx I used above
-            wallet = wallet[NTX:]
-
-            waitFor(30, lambda: True if self.nodes[0].getmempoolinfo()["size"] >= NTX else None)
-            waitFor(30, lambda: True if self.nodes[1].getmempoolinfo()["size"] >= NTX else None)
-            time.sleep(2)  # see if any conflicts will be added to the mempool
-
-            assert(self.nodes[0].getmempoolinfo()["size"] == NTX)
-            assert(self.nodes[1].getmempoolinfo()["size"] == NTX)
-
-            NTX1 = NTX
-
-            # test conflicting tx sent to different nodes
-            NTX = 50
-            wallet2 = []
-            gtx2 = []
-            amt = createTx(dests0, wallet[0:NTX], 1, NTX, 1, wallet2, gtx2)
-            wallet3 = []
-            gtx3 = []
-            # create conflicting tx with slightly different payment amounts
-            amt = createTx(dests0, wallet[0:NTX], 1, NTX, 2, wallet3, gtx3)
-
-            gtx = zip(gtx2, gtx3)
-
-            count = 0
-            mempools = [x.getmempoolinfo() for x in self.nodes]
-            for g in gtx:
-                count += 1
-                self.nodes[count % numNodes].enqueuerawtransaction(g[0].toHex())
-                try:
-                    self.nodes[(count + 1) % numNodes].enqueuerawtransaction(g[1].toHex())
-                except JSONRPCException as e:
-                    if e.error["code"] != -26:  # txn-mempool-conflict
-                        pass  # we may get an error or not depending on propagation speed of 1st tx
-
-            # There is no good way to tell if the mempool sync process has fully
-            # completed because out of testing the process of accepting tx is never
-            # complete
-            waitFor(30, lambda: True if self.nodes[0].getmempoolinfo()["size"] >= NTX + NTX1 else None)
-            waitFor(30, lambda: True if self.nodes[1].getmempoolinfo()["size"] >= NTX + NTX1 else None)
-            time.sleep(2)  # see if any conflicts will be added to the mempool
-            assert(self.nodes[0].getmempoolinfo()["size"] == NTX + NTX1)
-            assert(self.nodes[1].getmempoolinfo()["size"] == NTX + NTX1)
-
-            # forget about the tx I used
-            wallet = wallet[NTX:]
-            logging.info("conflict test done")
 
     def commitMempool(self):
         """Commit all the tx in mempools on all nodes into blocks"""
@@ -333,85 +243,46 @@ class MyTest (BitcoinTestFramework):
         w0 = wallet[0:500]
         wallet = wallet[500:]
         self.commitMempool()
-        self.conflictTest(dests0, dests1, w0)
+
+        assert(self.nodes[0].getmempoolinfo()["size"] == 0)  # Expects a clean mempool
+        NTX = 25
+        wallet2 = []
+        gtx2 = []
+        amt = createTx(dests0, w0[0:NTX], 1, NTX, 1, wallet2, gtx2)
+        wallet3 = []
+        gtx3 = []
+        # create conflicting tx with slightly different payment amounts
+        amt = createTx(dests0, w0[0:NTX], 1, NTX, 2, wallet3, gtx3)
+
+        gtx = zip(gtx2, gtx3)
+        for g in gtx:
+            raised = False;
+            self.nodes[0].sendrawtransaction(g[0].toHex())
+            try:
+                rawTxValid = self.nodes[0].validaterawtransaction(g[1].toHex())
+                self.nodes[0].sendrawtransaction(g[1].toHex())
+                # assert(0)  # double spend may not return an error because processing happens asynchronously
+            except JSONRPCException as e:
+                raised = True
+                if e.error["code"] != -26:  # txn-mempool-conflict
+                    raise
+            assert(rawTxValid['valid'] != raised)
+        wallet = wallet[NTX:]
+
+        waitFor(30, lambda: True if self.nodes[0].getmempoolinfo()["size"] >= NTX else None)
+        waitFor(30, lambda: True if self.nodes[1].getmempoolinfo()["size"] >= NTX else None)
+        time.sleep(2)
+
+        assert(self.nodes[0].getmempoolinfo()["size"] == NTX)
+        assert(self.nodes[1].getmempoolinfo()["size"] == NTX)
+
         self.commitMempool()
 
-        # Create 500 transaction and ensure that they get synced
-        NTX = 500 if self.bigTest else 100
-        start = time.monotonic()
+        # Create 100 transaction and ensure that they get synced
+        NTX = 100
         (amt, wallet) = self.threadedCreateTx(dests0, wallet, 1, NTX)
-        end = time.monotonic()
-        logging.info("created %d tx in %s seconds. On node 0.  Speed %f tx/sec" %
-                     (amt, end - start, float(amt) / (end - start)))
         mp = waitFor(20, lambda: [x.getmempoolinfo() for x in self.nodes] if amt - self.nodes[1].getmempoolinfo()
                      ["size"] < 10 else None, lambda: "timeout mempool is: " + str([x.getmempoolinfo() for x in self.nodes]))
-        logging.info(mp)
-
-        # Create 5000 transactions and ensure that they get synced
-        if self.bigTest:
-            self.commitMempool()
-            NTX = 5000
-            start = time.monotonic()
-            (amt, wallet) = self.threadedCreateTx(dests1, wallet, 0, NTX)
-            end = time.monotonic()
-            logging.info("created %d tx in %s seconds. On node 0.  Speed %f tx/sec" %
-                     (amt, end - start, float(amt) / (end - start)))
-            mp = waitFor(300, lambda: [x.getmempoolinfo() for x in self.nodes] if amt - self.nodes[1].getmempoolinfo()
-                     ["size"] < 20 else None, lambda: "timeout mempool is: " + str([x.getmempoolinfo() for x in self.nodes]))
-            logging.info(mp)
-
-        if self.bigTest:
-            self.commitMempool()
-            NTX = 10000
-            start = time.monotonic()
-            (amt, wallet) = self.threadedCreateTx(dests0, wallet, 1, NTX)
-            end = time.monotonic()
-            logging.info("created %d tx in %s seconds. On node 0.  Speed %f tx/sec" %
-                         (amt, end - start, float(amt) / (end - start)))
-            start = time.monotonic()
-            mp = waitFor(300, lambda: [x.getmempoolinfo() for x in self.nodes] if amt - self.nodes[0].getmempoolinfo()[
-                         "size"] < 50 else None, lambda: "timeout mempool is: " + str([x.getmempoolinfo() for x in self.nodes]))
-            end = time.monotonic()
-            logging.info("synced %d tx in %s seconds.  Speed %f tx/sec" %
-                         (amt, end - start, float(amt) / (end - start)))
-            logging.info(mp)
-
-        # Now test pushing all of the mempool tx to other nodes
-        NTX = self.nodes[0].getmempoolinfo()["size"]  # find how many I am pushing
-
-        # Start up node 3
-        self.nodes.append(start_node(2, self.options.tmpdir))
-        connect_nodes_bi(self.nodes, 0, 2)
-        sync_blocks(self.nodes)
-
-        # Push all tx to node 3 from one node
-        destName = "127.0.0.1:" + str(p2p_port(2))
-        start = time.monotonic()
-        self.nodes[0].pushtx(destName)
-        mp = waitFor(120, lambda: [x.getmempoolinfo() for x in self.nodes]
-                     if NTX - self.nodes[2].getmempoolinfo()["size"] < 30 else None)
-        end = time.monotonic()
-        logging.info("synced %d tx in %s seconds.  Speed %f tx/sec" % (NTX, end - start, float(NTX) / (end - start)))
-
-        if self.bigTest:
-            # Start up node 4
-            self.nodes.append(start_node(3, self.options.tmpdir))
-            connect_nodes_bi(self.nodes, 0, 3)
-            connect_nodes_bi(self.nodes, 1, 3)
-            connect_nodes_bi(self.nodes, 2, 3)
-            sync_blocks(self.nodes)
-
-            # Push all tx to node 4 from many nodes
-            destName = "127.0.0.1:" + str(p2p_port(3))
-
-            start = time.monotonic()
-            self.nodes[0].pushtx(destName)
-            self.nodes[1].pushtx(destName)
-            self.nodes[2].pushtx(destName)
-            mp = waitFor(120, lambda: [x.getmempoolinfo() for x in self.nodes]
-                         if NTX - self.nodes[3].getmempoolinfo()["size"] < 30 else None)
-            end = time.monotonic()
-            logging.info("synced %d tx in %s seconds.  Speed %f tx/sec" % (NTX, end - start, float(NTX) / (end - start)))
 
 
 if __name__ == '__main__':
