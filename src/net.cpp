@@ -2650,7 +2650,7 @@ void RelayTransaction(const CTransactionRef &ptx, const bool fRespend)
             if (!fRespend && pnode->pfilter->IsRelevantAndUpdate(ptx))
                 pnode->PushInventory(inv);
         }
-        else
+        else if (!pnode->pfilter)
             pnode->PushInventory(inv);
     }
 }
@@ -2931,7 +2931,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nNextInvSend = 0;
     fRelayTxes = false;
     fSentAddr = false;
-    pfilter = new CBloomFilter();
+    pfilter = nullptr;
     pThinBlockFilter = new CBloomFilter(); // BUIP010 - Xtreme Thinblocks
     nPingNonceSent = 0;
     nPingUsecStart = 0;
