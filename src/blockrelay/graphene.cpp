@@ -25,7 +25,10 @@
 #include "xversionkeys.h"
 
 #include <iomanip>
-static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount);
+static bool ReconstructBlock(CNode *pfrom,
+    int &missingCount,
+    int &unnecessaryCount,
+    std::shared_ptr<CBlockThinRelay> pblock);
 extern CTweak<uint64_t> grapheneMinVersionSupported;
 extern CTweak<uint64_t> grapheneMaxVersionSupported;
 extern CTweak<uint64_t> grapheneFastFilterCompatibility;
@@ -40,7 +43,7 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     : // Use cryptographically strong pseudorandom number because
       // we will extract SipHash secret key from this
       sipHashNonce(GetRand(std::numeric_limits<uint64_t>::max())),
-      shorttxidk0(0), shorttxidk1(0), version(_version), computeOptimized(_computeOptimized)
+      nSize(0), nWaitingFor(0), shorttxidk0(0), shorttxidk1(0), version(_version), computeOptimized(_computeOptimized)
 {
     header = pblock->GetBlockHeader();
     nBlockTxs = pblock->vtx.size();
@@ -68,22 +71,15 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     }
 
     if (enableCanonicalTxOrder.Value())
-        pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, shorttxidk0,
-            shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, computeOptimized, false);
+        pGrapheneSet =
+            std::make_shared<CGrapheneSet>(CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes,
+                shorttxidk0, shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, computeOptimized, false));
     else
-        pGrapheneSet = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes, shorttxidk0,
-            shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, computeOptimized, true);
+        pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock,
+            blockHashes, shorttxidk0, shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, computeOptimized, true));
 }
 
-CGrapheneBlock::~CGrapheneBlock()
-{
-    if (pGrapheneSet)
-    {
-        delete pGrapheneSet;
-        pGrapheneSet = nullptr;
-    }
-}
-
+CGrapheneBlock::~CGrapheneBlock() { pGrapheneSet = nullptr; }
 void CGrapheneBlock::FillShortTxIDSelector()
 {
     CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
@@ -109,12 +105,18 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     CGrapheneBlockTx grapheneBlockTx;
     vRecv >> grapheneBlockTx;
 
+    auto pblock = thinrelay.GetBlockToReconstruct(pfrom);
+    if (pblock == nullptr)
+        return error("No block available to reconstruct for graphenetx");
+    DbgAssert(pblock->grapheneblock != nullptr, return false);
+    std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
+
     // Message consistency checking
     CInv inv(MSG_GRAPHENEBLOCK, grapheneBlockTx.blockhash);
     if (grapheneBlockTx.vMissingTx.empty() || grapheneBlockTx.blockhash.IsNull() ||
-        pfrom->grapheneBlockHashes.size() < grapheneBlockTx.vMissingTx.size())
+        grapheneBlock->vTxHashes256.size() < grapheneBlockTx.vMissingTx.size())
     {
-        graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
 
         dosMan.Misbehaving(pfrom, 100);
         return error("Incorrectly constructed grblocktx or inconsistent graphene block data received.  Banning peer=%s",
@@ -136,7 +138,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     if (AlreadyHaveBlock(inv))
     {
         requester.AlreadyReceived(pfrom, inv);
-        graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
 
         LOG(GRAPHENE, "Received grblocktx but returning because we already have this block %s on disk, peer=%s\n",
             inv.hash.ToString(), pfrom->GetLogName());
@@ -148,21 +150,21 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // it. In that case, the number of missing txs returned will be fewer than the number
     // needed. Because the graphene block will be incomplete without the missing txs, we
     // request a failover block instead.
-    if ((int)grapheneBlockTx.vMissingTx.size() < pfrom->grapheneBlockWaitingForTxns)
+    if (grapheneBlockTx.vMissingTx.size() < grapheneBlock->nWaitingFor)
     {
-        RequestFailoverBlock(pfrom, grapheneBlockTx.blockhash);
+        RequestFailoverBlock(pfrom, pblock);
         return error("Still missing transactions from those returned by sender, peer=%s: re-requesting failover block",
             pfrom->GetLogName());
     }
 
-    // If canonical ordering is activated, locate empty indexes in pfrom->grapheneBlockHashes to be used in sorting
+    // If canonical ordering is activated, locate empty indexes in vTxHashes256 to be used in sorting
     std::vector<size_t> missingTxIdxs;
     if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
     {
         uint256 nullhash;
-        for (size_t idx = 0; idx < pfrom->grapheneBlockHashes.size(); idx++)
+        for (size_t idx = 0; idx < grapheneBlock->vTxHashes256.size(); idx++)
         {
-            if (pfrom->grapheneBlockHashes[idx] == nullhash)
+            if (grapheneBlock->vTxHashes256[idx] == nullhash)
                 missingTxIdxs.push_back(idx);
         }
     }
@@ -170,7 +172,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     size_t idx = 0;
     for (const CTransaction &tx : grapheneBlockTx.vMissingTx)
     {
-        pfrom->mapGrapheneMissingTx[GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, tx.GetHash(),
+        grapheneBlock->mapMissingTx[GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, tx.GetHash(),
             NegotiateGrapheneVersion(pfrom))] = MakeTransactionRef(tx);
 
         uint256 hash = tx.GetHash();
@@ -179,16 +181,16 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
         // Insert in arbitrary order if canonical ordering is enabled and xversion is recent enough
         if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
-            pfrom->grapheneBlockHashes[missingTxIdxs[idx++]] = hash;
+            grapheneBlock->vTxHashes256[missingTxIdxs[idx++]] = hash;
         // Otherwise, use ordering information
         else
-            pfrom->grapheneBlockHashes[pfrom->grapheneMapHashOrderIndex[cheapHash]] = hash;
+            grapheneBlock->vTxHashes256[grapheneBlock->mapHashOrderIndex[cheapHash]] = hash;
     }
     // Sort order transactions if canonical ordering is enabled and xversion is recent enough
     if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
     {
         // coinbase is always first
-        std::sort(pfrom->grapheneBlockHashes.begin() + 1, pfrom->grapheneBlockHashes.end());
+        std::sort(grapheneBlock->vTxHashes256.begin() + 1, grapheneBlock->vTxHashes256.end());
         LOG(GRAPHENE, "Using canonical order for block from peer=%s\n", pfrom->GetLogName());
     }
 
@@ -197,10 +199,10 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // At this point we should have all the full hashes in the block. Check that the merkle
     // root in the block header matches the merkel root calculated from the hashes provided.
     bool mutated;
-    uint256 merkleroot = ComputeMerkleRoot(pfrom->grapheneBlockHashes, &mutated);
-    if (pfrom->grapheneBlock.hashMerkleRoot != merkleroot || mutated)
+    uint256 merkleroot = ComputeMerkleRoot(grapheneBlock->vTxHashes256, &mutated);
+    if (pblock->hashMerkleRoot != merkleroot || mutated)
     {
-        graphenedata.ClearGrapheneBlockData(pfrom, inv.hash);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
 
         return error("Merkle root for %s does not match computed merkle root, peer=%s", inv.hash.ToString(),
             pfrom->GetLogName());
@@ -213,7 +215,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // With grapheneBlocks recovered txs contains only the first 8 bytes of the tx hash.
     {
         READLOCK(orphanpool.cs);
-        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount))
+        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
             return false;
     }
 
@@ -222,7 +224,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // while we were retreiving missing transactions.
     if (missingCount > 0)
     {
-        RequestFailoverBlock(pfrom, grapheneBlockTx.blockhash);
+        RequestFailoverBlock(pfrom, pblock);
         return error("Still missing transactions after reconstructing block, peer=%s: re-requesting failover block",
             pfrom->GetLogName());
     }
@@ -232,23 +234,23 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         CInv inv2(MSG_BLOCK, grapheneBlockTx.blockhash);
 
         // for compression statistics, we have to add up the size of grapheneblock and the re-requested grapheneBlockTx.
-        int nSizeGrapheneBlockTx = msgSize;
-        int blockSize = pfrom->grapheneBlock.GetBlockSize();
+        uint64_t nSizeGrapheneBlockTx = msgSize;
+        uint64_t blockSize = pblock->GetBlockSize();
         float nCompressionRatio = 0.0;
-        if (pfrom->nSizeGrapheneBlock + nSizeGrapheneBlockTx > 0)
-            nCompressionRatio = (float)blockSize / ((float)pfrom->nSizeGrapheneBlock + (float)nSizeGrapheneBlockTx);
+        if (grapheneBlock->GetSize() + nSizeGrapheneBlockTx > 0)
+            nCompressionRatio = (float)blockSize / ((float)grapheneBlock->GetSize() + (float)nSizeGrapheneBlockTx);
         LOG(GRAPHENE, "Reassembled grblktx for %s (%d bytes). Message was %d bytes (graphene block) and %d bytes "
                       "(re-requested tx), compression ratio %3.2f, peer=%s\n",
-            pfrom->grapheneBlock.GetHash().ToString(), blockSize, pfrom->nSizeGrapheneBlock, nSizeGrapheneBlockTx,
-            nCompressionRatio, pfrom->GetLogName());
+            pblock->GetHash().ToString(), blockSize, grapheneBlock->GetSize(), nSizeGrapheneBlockTx, nCompressionRatio,
+            pfrom->GetLogName());
 
         // Update run-time statistics of graphene block bandwidth savings.
         // We add the original graphene block size with the size of transactions that were re-requested.
         // This is NOT double counting since we never accounted for the original graphene block due to the re-request.
-        graphenedata.UpdateInBound(nSizeGrapheneBlockTx + pfrom->nSizeGrapheneBlock, blockSize);
+        graphenedata.UpdateInBound(nSizeGrapheneBlockTx + grapheneBlock->GetSize(), blockSize);
         LOG(GRAPHENE, "Graphene block stats: %s\n", graphenedata.ToString());
 
-        PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->grapheneBlock), inv2);
+        PV->HandleBlockMessage(pfrom, strCommand, pblock, inv2);
     }
 
     return true;
@@ -337,38 +339,39 @@ bool CGrapheneBlock::CheckBlockHeader(const CBlockHeader &block, CValidationStat
  */
 bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string strCommand, unsigned nHops)
 {
-    int nSizeGrapheneBlock = vRecv.size();
-    CInv inv(MSG_BLOCK, uint256());
+    // Deserialize grapheneblock and store a block to reconstruct
+    CGrapheneBlock tmp(NegotiateGrapheneVersion(pfrom), NegotiateFastFilterSupport(pfrom));
+    vRecv >> tmp;
+    auto pblock = thinrelay.SetBlockToReconstruct(pfrom, tmp.header.GetHash());
+    pblock->grapheneblock = std::make_shared<CGrapheneBlock>(std::forward<CGrapheneBlock>(tmp));
 
-    CGrapheneBlock grapheneBlock(NegotiateGrapheneVersion(pfrom), NegotiateFastFilterSupport(pfrom));
-    vRecv >> grapheneBlock;
+    std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
 
-    LOG(GRAPHENE, "Block %s from peer %s using Graphene version %d\n", grapheneBlock.header.GetHash().ToString(),
-        pfrom->GetLogName(), grapheneBlock.version);
+    LOG(GRAPHENE, "Block %s from peer %s using Graphene version %d\n", grapheneBlock->header.GetHash().ToString(),
+        pfrom->GetLogName(), grapheneBlock->version);
 
     // Message consistency checking (FIXME: some redundancy here with AcceptBlockHeader)
-    if (!IsGrapheneBlockValid(pfrom, grapheneBlock.header))
+    if (!IsGrapheneBlockValid(pfrom, grapheneBlock->header))
     {
         dosMan.Misbehaving(pfrom, 100);
         LOGA("Received an invalid %s from peer %s\n", strCommand, pfrom->GetLogName());
 
-        graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
+        thinrelay.ClearAllBlockData(pfrom, pblock);
         return false;
     }
 
     // Is there a previous block or header to connect with?
-    if (!LookupBlockIndex(grapheneBlock.header.hashPrevBlock))
+    if (!LookupBlockIndex(grapheneBlock->header.hashPrevBlock))
     {
         return error(GRAPHENE, "Graphene block from peer %s will not connect, unknown previous block %s",
-            pfrom->GetLogName(), grapheneBlock.header.hashPrevBlock.ToString());
+            pfrom->GetLogName(), grapheneBlock->header.hashPrevBlock.ToString());
     }
 
     {
         LOCK(cs_main);
-
         CValidationState state;
         CBlockIndex *pIndex = nullptr;
-        if (!AcceptBlockHeader(grapheneBlock.header, state, Params(), &pIndex))
+        if (!AcceptBlockHeader(grapheneBlock->header, state, Params(), &pIndex))
         {
             int nDoS;
             if (state.IsInvalid(nDoS))
@@ -378,7 +381,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
                 LOGA("Received an invalid %s header from peer %s\n", strCommand, pfrom->GetLogName());
             }
 
-            graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
+            thinrelay.ClearAllBlockData(pfrom, pblock);
             return false;
         }
 
@@ -386,11 +389,11 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
         if (!pIndex)
         {
             LOGA("INTERNAL ERROR: pIndex null in CGrapheneBlock::HandleMessage");
-            graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
+            thinrelay.ClearAllBlockData(pfrom, pblock);
             return true;
         }
 
-        inv.hash = pIndex->GetBlockHash();
+        CInv inv(MSG_BLOCK, pIndex->GetBlockHash());
         requester.UpdateBlockAvailability(pfrom->GetId(), inv.hash);
 
         // Return early if we already have the block data
@@ -399,10 +402,10 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
             // Tell the Request Manager we received this block
             requester.AlreadyReceived(pfrom, inv);
 
-            graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
+            thinrelay.ClearAllBlockData(pfrom, pblock);
             LOG(GRAPHENE, "Received grapheneblock but returning because we already have block data %s from peer %s hop"
                           " %d size %d bytes\n",
-                inv.hash.ToString(), pfrom->GetLogName(), nHops, nSizeGrapheneBlock);
+                inv.hash.ToString(), pfrom->GetLogName(), nHops, grapheneBlock->GetSize());
             return true;
         }
 
@@ -410,7 +413,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
         if (pIndex->nChainWork <= chainActive.Tip()->nChainWork)
         {
             thinrelay.RequestBlock(pfrom, inv.hash);
-            graphenedata.ClearGrapheneBlockData(pfrom, grapheneBlock.header.GetHash());
+            thinrelay.ClearAllBlockData(pfrom, pblock);
 
             LOGA("%s %s from peer %s received but does not extend longest chain; requesting full block\n", strCommand,
                 inv.hash.ToString(), pfrom->GetLogName());
@@ -419,7 +422,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
 
         {
             LOG(GRAPHENE, "Received %s %s from peer %s. Size %d bytes.\n", strCommand, inv.hash.ToString(),
-                pfrom->GetLogName(), nSizeGrapheneBlock);
+                pfrom->GetLogName(), grapheneBlock->GetSize());
 
             // Do not process unrequested grapheneblocks.
             if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::GRAPHENEBLOCK))
@@ -431,14 +434,12 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
         }
     }
 
-    bool result = grapheneBlock.process(pfrom, nSizeGrapheneBlock, strCommand);
+    bool result = grapheneBlock->process(pfrom, strCommand, pblock);
 
     return result;
 }
 
-bool CGrapheneBlock::process(CNode *pfrom,
-    int nSizeGrapheneBlock,
-    std::string strCommand) // TODO: request from the "best" txn source not necessarily from the block source
+bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> pblock)
 {
     // In PV we must prevent two graphene blocks from simulaneously processing from that were recieved from the
     // same peer. This would only happen as in the example of an expedited block coming in
@@ -446,26 +447,18 @@ bool CGrapheneBlock::process(CNode *pfrom,
     if (PV->IsAlreadyValidating(pfrom->id))
         return false;
 
-    graphenedata.ClearGrapheneBlockData(pfrom);
-    pfrom->nSizeGrapheneBlock = nSizeGrapheneBlock;
+    DbgAssert(pblock->grapheneblock != nullptr, return false);
+    std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
 
     uint256 nullhash;
-    pfrom->grapheneBlock.nVersion = header.nVersion;
-    pfrom->grapheneBlock.nBits = header.nBits;
-    pfrom->grapheneBlock.nNonce = header.nNonce;
-    pfrom->grapheneBlock.nTime = header.nTime;
-    pfrom->grapheneBlock.hashMerkleRoot = header.hashMerkleRoot;
-    pfrom->grapheneBlock.hashPrevBlock = header.hashPrevBlock;
+    pblock->nVersion = header.nVersion;
+    pblock->nBits = header.nBits;
+    pblock->nNonce = header.nNonce;
+    pblock->nTime = header.nTime;
+    pblock->hashMerkleRoot = header.hashMerkleRoot;
+    pblock->hashPrevBlock = header.hashPrevBlock;
     pfrom->gr_shorttxidk0 = shorttxidk0;
     pfrom->gr_shorttxidk1 = shorttxidk1;
-
-    {
-        LOCK(pfrom->cs_grapheneadditionaltxs);
-
-        pfrom->grapheneAdditionalTxs.clear();
-        for (auto tx : vAdditionalTxs)
-            pfrom->grapheneAdditionalTxs.push_back(tx);
-    }
 
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
     // We need to check all transaction sources (orphan list, mempool, and new (incoming) transactions in this block)
@@ -525,7 +518,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
             }
         }
 
-        if (coinbase == NULL)
+        if (coinbase == nullptr)
         {
             LOG(GRAPHENE, "Error: No coinbase transaction found in graphene block, peer=%s", pfrom->GetLogName());
             return false;
@@ -565,18 +558,18 @@ bool CGrapheneBlock::process(CNode *pfrom,
                     // If canonical order is not enabled or xversion is less than 1, update mapHashOrderIndex so
                     // it is available if we later receive missing txs
                     if (!enableCanonicalTxOrder.Value() || NegotiateGrapheneVersion(pfrom) < 1)
-                        pfrom->grapheneMapHashOrderIndex[cheapHash] = i;
+                        grapheneBlock->mapHashOrderIndex[cheapHash] = i;
 
                     const auto &elem = mapPartialTxHash.find(cheapHash);
                     if (elem != mapPartialTxHash.end())
                     {
-                        pfrom->grapheneBlockHashes.push_back(elem->second);
+                        grapheneBlock->vTxHashes256.push_back(elem->second);
 
                         nGrapheneTxsPossessed++;
                     }
                     else
                     {
-                        pfrom->grapheneBlockHashes.push_back(nullhash);
+                        grapheneBlock->vTxHashes256.push_back(nullhash);
                         setHashesToRequest.insert(cheapHash);
                     }
                 }
@@ -585,11 +578,9 @@ bool CGrapheneBlock::process(CNode *pfrom,
                 if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
                 {
                     // coinbase is always first
-                    std::sort(pfrom->grapheneBlockHashes.begin() + 1, pfrom->grapheneBlockHashes.end());
+                    std::sort(grapheneBlock->vTxHashes256.begin() + 1, grapheneBlock->vTxHashes256.end());
                     LOG(GRAPHENE, "Using canonical order for block from peer=%s\n", pfrom->GetLogName());
                 }
-
-                graphenedata.AddGrapheneBlockBytes(nGrapheneTxsPossessed * sizeof(uint64_t), pfrom);
             }
             catch (const std::runtime_error &e)
             {
@@ -604,23 +595,23 @@ bool CGrapheneBlock::process(CNode *pfrom,
             if (setHashesToRequest.empty() && !fRequestFailover)
             {
                 bool mutated;
-                uint256 merkleroot = ComputeMerkleRoot(pfrom->grapheneBlockHashes, &mutated);
+                uint256 merkleroot = ComputeMerkleRoot(grapheneBlock->vTxHashes256, &mutated);
                 if (header.hashMerkleRoot != merkleroot || mutated)
                     fMerkleRootCorrect = false;
                 else
                 {
-                    if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount))
+                    if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
                         return false;
                 }
             }
         }
     } // End locking cs_orphancache, mempool.cs
-    LOG(GRAPHENE, "Total in-memory graphene bytes size is %ld bytes\n", graphenedata.GetGrapheneBlockBytes());
+    LOG(GRAPHENE, "Current in-memory graphene bytes size is %ld bytes\n", pblock->nCurrentBlockSize);
 
     // This must be checked outside of the above section or deadlock may occur.
     if (fRequestFailover)
     {
-        RequestFailoverBlock(pfrom, header.GetHash());
+        RequestFailoverBlock(pfrom, pblock);
         return true;
     }
 
@@ -633,7 +624,7 @@ bool CGrapheneBlock::process(CNode *pfrom,
     // the XThin block will itself failover to a thinblock, which will not have a collision.
     if (collision || !fMerkleRootCorrect)
     {
-        RequestFailoverBlock(pfrom, header.GetHash());
+        RequestFailoverBlock(pfrom, pblock);
 
         if (!fMerkleRootCorrect)
             return error(
@@ -642,21 +633,20 @@ bool CGrapheneBlock::process(CNode *pfrom,
             return error("TX HASH COLLISION for grapheneblock: requesting a full block, peer=%s", pfrom->GetLogName());
     }
 
-    pfrom->grapheneBlockWaitingForTxns = missingCount;
+    this->nWaitingFor = missingCount;
     LOG(GRAPHENE, "Graphene block waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n",
-        pfrom->grapheneBlockWaitingForTxns, unnecessaryCount, pfrom->grapheneBlock.vtx.size(),
-        pfrom->mapGrapheneMissingTx.size());
+        this->nWaitingFor, unnecessaryCount, pblock->vtx.size(), grapheneBlock->mapMissingTx.size());
 
     // If there are any missing hashes or transactions then we request them here.
     // This must be done outside of the mempool.cs lock or may deadlock.
     if (setHashesToRequest.size() > 0)
     {
-        pfrom->grapheneBlockWaitingForTxns = setHashesToRequest.size();
+        grapheneBlock->nWaitingFor = setHashesToRequest.size();
         CRequestGrapheneBlockTx grapheneBlockTx(header.GetHash(), setHashesToRequest);
         pfrom->PushMessage(NetMsgType::GET_GRAPHENETX, grapheneBlockTx);
 
         // Update run-time statistics of graphene block bandwidth savings
-        graphenedata.UpdateInBoundReRequestedTx(pfrom->grapheneBlockWaitingForTxns);
+        graphenedata.UpdateInBoundReRequestedTx(grapheneBlock->nWaitingFor);
 
         return true;
     }
@@ -665,71 +655,63 @@ bool CGrapheneBlock::process(CNode *pfrom,
     // and re-request failover block (This should never happen because we just checked the various pools).
     if (missingCount > 0)
     {
-        RequestFailoverBlock(pfrom, header.GetHash());
+        RequestFailoverBlock(pfrom, pblock);
         return error("Still missing transactions for graphene block: re-requesting failover block");
     }
 
     // We now have all the transactions that are in this block
-    pfrom->grapheneBlockWaitingForTxns = -1;
-    int blockSize = pfrom->grapheneBlock.GetBlockSize();
+    grapheneBlock->nWaitingFor = 0;
+    int blockSize = pblock->GetBlockSize();
     float nCompressionRatio = 0.0;
-    if (pfrom->nSizeGrapheneBlock > 0)
-        nCompressionRatio = (float)blockSize / (float)pfrom->nSizeGrapheneBlock;
+    if (grapheneBlock->GetSize() > 0)
+        nCompressionRatio = (float)blockSize / (float)grapheneBlock->GetSize();
     LOG(GRAPHENE,
         "Reassembled graphene block for %s (%d bytes). Message was %d bytes, compression ratio %3.2f, peer=%s\n",
-        pfrom->grapheneBlock.GetHash().ToString(), blockSize, pfrom->nSizeGrapheneBlock, nCompressionRatio,
-        pfrom->GetLogName());
+        pblock->GetHash().ToString(), blockSize, grapheneBlock->GetSize(), nCompressionRatio, pfrom->GetLogName());
 
     // Update run-time statistics of graphene block bandwidth savings
-    graphenedata.UpdateInBound(pfrom->nSizeGrapheneBlock, blockSize);
+    graphenedata.UpdateInBound(grapheneBlock->GetSize(), blockSize);
     LOG(GRAPHENE, "Graphene block stats: %s\n", graphenedata.ToString().c_str());
 
     // Process the full block
-    PV->HandleBlockMessage(pfrom, strCommand, MakeBlockRef(pfrom->grapheneBlock), GetInv());
+    PV->HandleBlockMessage(pfrom, strCommand, pblock, GetInv());
 
     return true;
 }
 
-static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCount)
+static bool ReconstructBlock(CNode *pfrom,
+    int &missingCount,
+    int &unnecessaryCount,
+    std::shared_ptr<CBlockThinRelay> pblock)
 {
     AssertLockHeld(orphanpool.cs);
+    std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
 
     // We must have all the full tx hashes by this point.  We first check for any repeating
     // sequences in transaction id's.  This is a possible attack vector and has been used in the past.
     {
-        std::set<uint256> setHashes(pfrom->grapheneBlockHashes.begin(), pfrom->grapheneBlockHashes.end());
-        if (setHashes.size() != pfrom->grapheneBlockHashes.size())
+        std::set<uint256> setHashes(grapheneBlock->vTxHashes256.begin(), grapheneBlock->vTxHashes256.end());
+        if (setHashes.size() != grapheneBlock->vTxHashes256.size())
         {
-            graphenedata.ClearGrapheneBlockData(pfrom, pfrom->grapheneBlock.GetBlockHeader().GetHash());
+            thinrelay.ClearAllBlockData(pfrom, pblock);
 
             dosMan.Misbehaving(pfrom, 10);
             return error("Repeating Transaction Id sequence, peer=%s", pfrom->GetLogName());
         }
     }
 
-    // The total maximum bytes that we can use to create a graphene block. We use shared pointers for
-    // the transactions in the graphene block so we don't need to make as much memory available as we did in
-    // the past. We caluculate the max memory allowed by using the largest block size possible, which is the
-    // (maxMessageSizeMultiplier * excessiveBlockSize), then divide that by the smallest transaction possible
-    // which is 158 bytes on a 32bit system.  That gives us the largest number of transactions possible in a block.
-    // Then we multiply number of possible transactions by the size of a shared pointer.
-    // NOTE * The 158 byte smallest txn possible was found by getting the smallest serialized size of a txn directly
-    //        from the blockchain, on a 32bit system.
-    CTransactionRef dummyptx = nullptr;
-    uint32_t nTxSize = sizeof(dummyptx);
-    uint64_t maxAllowedSize = nTxSize * maxMessageSizeMultiplier * excessiveBlockSize / 158;
-
     std::map<uint256, CTransactionRef> mapAdditionalTxs;
     {
-        LOCK(pfrom->cs_grapheneadditionaltxs);
-
-        for (auto tx : pfrom->grapheneAdditionalTxs)
+        for (auto tx : grapheneBlock->vAdditionalTxs)
             mapAdditionalTxs[tx->GetHash()] = tx;
     }
 
+    // Add the header size to the current size being tracked
+    thinrelay.AddBlockBytes(::GetSerializeSize(pblock->GetBlockHeader(), SER_NETWORK, PROTOCOL_VERSION), pblock);
+
     // Look for each transaction in our various pools and buffers.
     // With grapheneBlocks recovered txs contains only the first 8 bytes of the tx hash.
-    for (const uint256 &hash : pfrom->grapheneBlockHashes)
+    for (const uint256 &hash : grapheneBlock->vTxHashes256)
     {
         // Replace the truncated hash with the full hash value if it exists
         CTransactionRef ptx = nullptr;
@@ -754,7 +736,7 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
                     inMemPool = true;
             }
 
-            bool inMissingTx = pfrom->mapGrapheneMissingTx.count(GetShortID(pfrom->gr_shorttxidk0,
+            bool inMissingTx = grapheneBlock->mapMissingTx.count(GetShortID(pfrom->gr_shorttxidk0,
                                    pfrom->gr_shorttxidk1, hash, NegotiateGrapheneVersion(pfrom))) > 0;
             bool inAdditionalTxs = mapAdditionalTxs.count(hash) > 0;
             bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
@@ -770,46 +752,38 @@ static bool ReconstructBlock(CNode *pfrom, int &missingCount, int &unnecessaryCo
             else if (inOrphanCache)
             {
                 ptx = orphanpool.mapOrphanTransactions[hash].ptx;
-                pfrom->grapheneBlock.setUnVerifiedTxns.insert(hash);
+                pblock->setUnVerifiedTxns.insert(hash);
             }
             else if (inMissingTx)
             {
-                ptx = pfrom->mapGrapheneMissingTx[GetShortID(
+                ptx = grapheneBlock->mapMissingTx[GetShortID(
                     pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash, NegotiateGrapheneVersion(pfrom))];
-                pfrom->grapheneBlock.setUnVerifiedTxns.insert(hash);
+                pblock->setUnVerifiedTxns.insert(hash);
             }
         }
         if (!ptx)
             missingCount++;
 
-        // In order to prevent a memory exhaustion attack we track transaction bytes used to create Block
-        // to see if we've exceeded any limits and if so clear out data and return.
-        if (graphenedata.AddGrapheneBlockBytes(nTxSize, pfrom) > maxAllowedSize)
+        // In order to prevent a memory exhaustion attack we track transaction bytes used to recreate the block
+        // in order to see if we've exceeded any limits and if so clear out data and return.
+        if (ptx)
+            thinrelay.AddBlockBytes(ptx->GetTxSize(), pblock);
+        if (pblock->nCurrentBlockSize > thinrelay.GetMaxAllowedBlockSize())
         {
-            if (ClearLargestGrapheneBlockAndDisconnect(pfrom))
-            {
-                return error(
-                    "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
-                    pfrom->grapheneBlock.GetHash().ToString(), pfrom->nLocalGrapheneBlockBytes, maxAllowedSize,
-                    pfrom->GetLogName());
-            }
-        }
-        if (pfrom->nLocalGrapheneBlockBytes > maxAllowedSize)
-        {
-            graphenedata.ClearGrapheneBlockData(pfrom, pfrom->grapheneBlock.GetBlockHeader().GetHash());
+            uint64_t nBlockBytes = pblock->nCurrentBlockSize;
+            thinrelay.ClearAllBlockData(pfrom, pblock);
             pfrom->fDisconnect = true;
             return error(
                 "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
-                pfrom->grapheneBlock.GetHash().ToString(), pfrom->nLocalGrapheneBlockBytes, maxAllowedSize,
-                pfrom->GetLogName());
+                pblock->GetHash().ToString(), nBlockBytes, thinrelay.GetMaxAllowedBlockSize(), pfrom->GetLogName());
         }
 
         // Add this transaction. If the tx is null we still add it as a placeholder to keep the correct ordering.
-        pfrom->grapheneBlock.vtx.emplace_back(ptx);
+        pblock->vtx.emplace_back(ptx);
     }
     // Now that we've rebuild the block successfully we can set the XVal flag which is used in
     // ConnectBlock() to determine which if any inputs we can skip the checking of inputs.
-    pfrom->grapheneBlock.fXVal = true;
+    pblock->fXVal = true;
 
     return true;
 }
@@ -1222,34 +1196,6 @@ std::string CGrapheneBlockData::ReRequestedTxToString()
     return ss.str();
 }
 
-// After a graphene block is finished processing or if for some reason we have to pre-empt the rebuilding
-// of a graphene block then we clear out the graphene block data which can be substantial.
-void CGrapheneBlockData::ClearGrapheneBlockData(CNode *pnode)
-{
-    LOCK(pnode->cs_graphene);
-
-    // Remove bytes from counter
-    graphenedata.DeleteGrapheneBlockBytes(pnode->nLocalGrapheneBlockBytes, pnode);
-    pnode->nLocalGrapheneBlockBytes = 0;
-
-    // Clear out graphene block data we no longer need
-    pnode->grapheneBlockWaitingForTxns = -1;
-    pnode->grapheneBlock.SetNull();
-    pnode->grapheneBlockHashes.clear();
-    pnode->grapheneMapHashOrderIndex.clear();
-    pnode->mapGrapheneMissingTx.clear();
-
-    LOG(GRAPHENE, "Total in-memory graphene bytes size after clearing a graphene block is %ld bytes\n",
-        graphenedata.GetGrapheneBlockBytes());
-}
-
-void CGrapheneBlockData::ClearGrapheneBlockData(CNode *pnode, const uint256 &hash)
-{
-    // We must make sure to clear the graphene block data first before clearing the graphene block in flight.
-    ClearGrapheneBlockData(pnode);
-    thinrelay.ClearBlockInFlight(pnode, hash);
-}
-
 void CGrapheneBlockData::ClearGrapheneBlockStats()
 {
     LOCK(cs_graphenestats);
@@ -1278,25 +1224,6 @@ void CGrapheneBlockData::ClearGrapheneBlockStats()
     mapGrapheneBlocksInBoundReRequestedTx.clear();
 }
 
-uint64_t CGrapheneBlockData::AddGrapheneBlockBytes(uint64_t bytes, CNode *pfrom)
-{
-    pfrom->nLocalGrapheneBlockBytes += bytes;
-    uint64_t ret = nGrapheneBlockBytes.fetch_add(bytes) + bytes;
-
-    return ret;
-}
-
-void CGrapheneBlockData::DeleteGrapheneBlockBytes(uint64_t bytes, CNode *pfrom)
-{
-    if (bytes <= pfrom->nLocalGrapheneBlockBytes)
-        pfrom->nLocalGrapheneBlockBytes -= bytes;
-
-    if (bytes <= nGrapheneBlockBytes)
-        nGrapheneBlockBytes.fetch_sub(bytes);
-}
-
-void CGrapheneBlockData::ResetGrapheneBlockBytes() { nGrapheneBlockBytes.store(0); }
-uint64_t CGrapheneBlockData::GetGrapheneBlockBytes() { return nGrapheneBlockBytes.load(); }
 void CGrapheneBlockData::FillGrapheneQuickStats(GrapheneQuickStats &stats)
 {
     if (!IsGrapheneBlockEnabled())
@@ -1323,29 +1250,6 @@ void CGrapheneBlockData::FillGrapheneQuickStats(GrapheneQuickStats &stats)
 }
 
 bool IsGrapheneBlockEnabled() { return GetBoolArg("-use-grapheneblocks", DEFAULT_USE_GRAPHENE_BLOCKS); }
-bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom)
-{
-    CNode *pLargest = nullptr;
-    LOCK(cs_vNodes);
-    for (CNode *pnode : vNodes)
-    {
-        if ((pLargest == nullptr) || (pnode->nLocalGrapheneBlockBytes > pLargest->nLocalGrapheneBlockBytes))
-            pLargest = pnode;
-    }
-    if (pLargest != nullptr)
-    {
-        graphenedata.ClearGrapheneBlockData(pLargest, pLargest->grapheneBlock.GetBlockHeader().GetHash());
-        pLargest->fDisconnect = true;
-
-        // If the our node is currently using up the most graphene block bytes then return true so that we
-        // can stop processing this graphene block and let the disconnection happen.
-        if (pfrom == pLargest)
-            return true;
-    }
-
-    return false;
-}
-
 void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CMemPoolInfo &mempoolinfo)
 {
     if (inv.type == MSG_GRAPHENEBLOCK)
@@ -1355,7 +1259,7 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
             uint64_t nSenderMempoolPlusBlock =
                 GetGrapheneMempoolInfo().nTx + pblock->vtx.size() - 1; // exclude coinbase
 
-            CGrapheneBlock grapheneBlock(MakeBlockRef(*pblock), mempoolinfo.nTx, nSenderMempoolPlusBlock,
+            CGrapheneBlock grapheneBlock(pblock, mempoolinfo.nTx, nSenderMempoolPlusBlock,
                 NegotiateGrapheneVersion(pfrom), NegotiateFastFilterSupport(pfrom));
 
             LOG(GRAPHENE, "Block %s to peer %s using Graphene version %d\n", grapheneBlock.header.GetHash().ToString(),
@@ -1363,8 +1267,8 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
 
             pfrom->gr_shorttxidk0 = grapheneBlock.shorttxidk0;
             pfrom->gr_shorttxidk1 = grapheneBlock.shorttxidk1;
-            int nSizeBlock = pblock->GetBlockSize();
-            int nSizeGrapheneBlock = ::GetSerializeSize(grapheneBlock, SER_NETWORK, PROTOCOL_VERSION);
+            uint64_t nSizeBlock = pblock->GetBlockSize();
+            uint64_t nSizeGrapheneBlock = grapheneBlock.GetSize();
 
             // If graphene block is larger than a regular block then send a regular block instead
             if (nSizeGrapheneBlock > nSizeBlock)
@@ -1467,22 +1371,24 @@ CMemPoolInfo GetGrapheneMempoolInfo()
     }
     return CMemPoolInfo(mempool.size() + orphanpool.GetOrphanPoolSize() + nCommitQ);
 }
-void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash)
+void RequestFailoverBlock(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
 {
     // Since we were unable process this graphene block then clear out the data and the graphene
-    // block in flight.
+    // block in flight making sure to get the blockhash before you clear all the data.
     //
     // This must be done before we request the failover block otherwise it will still appear
     // as though we have a graphene block in flight, which could prevent us from receiving
     // the new thinblock or compactblock, if such is requested.
-    graphenedata.ClearGrapheneBlockData(pfrom, blockhash);
+    uint256 blockhash = pblock->GetHash();
+    thinrelay.ClearAllBlockData(pfrom, pblock);
 
     if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable())
     {
         if (!thinrelay.AddBlockInFlight(pfrom, blockhash, NetMsgType::XTHINBLOCK))
             return;
 
-        LOG(GRAPHENE | THIN, "Requesting xthin block as failover from peer %s\n", pfrom->GetLogName());
+        LOG(GRAPHENE | THIN, "Requesting xthinblock %s as failover from peer %s\n", blockhash.ToString(),
+            pfrom->GetLogName());
         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
         CBloomFilter filterMemPool;
         CInv inv(MSG_XTHINBLOCK, blockhash);
@@ -1503,7 +1409,8 @@ void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash)
         if (!thinrelay.AddBlockInFlight(pfrom, blockhash, NetMsgType::CMPCTBLOCK))
             return;
 
-        LOG(GRAPHENE | CMPCT, "Requesting a compact block as failover from peer %s\n", pfrom->GetLogName());
+        LOG(GRAPHENE | CMPCT, "Requesting a compactblock %s as failover from peer %s\n", blockhash.ToString(),
+            pfrom->GetLogName());
         CInv inv(MSG_CMPCT_BLOCK, blockhash);
         std::vector<CInv> vGetData;
         vGetData.push_back(inv);
@@ -1511,7 +1418,7 @@ void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash)
     }
     else
     {
-        LOG(GRAPHENE, "Requesting full block as failover from peer %s\n", pfrom->GetLogName());
+        LOG(GRAPHENE, "Requesting full block %s as failover from peer %s\n", blockhash.ToString(), pfrom->GetLogName());
         thinrelay.RequestBlock(pfrom, blockhash);
     }
 }

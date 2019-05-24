@@ -475,20 +475,13 @@ public:
     CCriticalSection cs_xthinblock;
     // BUIP010 Xtreme Thinblocks: end section
 
-    // BUIPXXX Graphene blocks: begin section
+    // Graphene blocks: begin section
     CCriticalSection cs_graphene;
-    CBlock grapheneBlock;
-    std::vector<uint256> grapheneBlockHashes;
-    std::map<uint64_t, uint32_t> grapheneMapHashOrderIndex;
-    std::map<uint64_t, CTransactionRef> mapGrapheneMissingTx;
-    uint64_t nLocalGrapheneBlockBytes; // the bytes used in creating this graphene block, updated dynamically
-    int nSizeGrapheneBlock; // Original on-wire size of the block. Just used for reporting
-    int grapheneBlockWaitingForTxns; // if -1 then not currently waiting
-    CCriticalSection cs_grapheneadditionaltxs; // lock grapheneAdditionalTxs
-    std::vector<CTransactionRef> grapheneAdditionalTxs; // entire transactions included in graphene block
+
+    // Store the grapheneblock salt to be used for this peer
     uint64_t gr_shorttxidk0;
     uint64_t gr_shorttxidk1;
-    // BUIPXXX Graphene blocks: end section
+    // Graphene blocks: end section
 
     // Compact Blocks : begin
     CCriticalSection cs_compactblock;

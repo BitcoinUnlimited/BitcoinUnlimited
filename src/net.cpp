@@ -2944,9 +2944,8 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     addrFromPort = 0;
 
     // graphene
-    nLocalGrapheneBlockBytes = 0;
-    nSizeGrapheneBlock = 0;
-    grapheneBlockWaitingForTxns = -1;
+    gr_shorttxidk0 = 0;
+    gr_shorttxidk1 = 0;
 
     // compact blocks
     shorttxidk0 = 0;
@@ -3017,9 +3016,6 @@ CNode::~CNode()
             pThinBlockFilter = nullptr;
         }
     }
-
-    grapheneBlockWaitingForTxns = -1;
-    grapheneBlock.SetNull();
 
     // We must set this to false on disconnect otherwise we will have trouble reconnecting -addnode nodes
     // if the remote peer restarts.
