@@ -175,6 +175,21 @@ BOOST_AUTO_TEST_CASE(bloom_match)
     CTransaction spendingTx;
     spendStream >> spendingTx;
 
+    // check empty filter
+    CBloomFilter emptyfilter1;
+    BOOST_CHECK_MESSAGE(!emptyfilter1.IsRelevantAndUpdate(ptx), "Simple Bloom filter was not empty");
+    BOOST_CHECK(emptyfilter1.IsEmpty());
+    CBloomFilter emptyfilter2(1024, 0.001, 0, BLOOM_UPDATE_ALL);
+    BOOST_CHECK_MESSAGE(!emptyfilter2.IsRelevantAndUpdate(ptx), "Simple Bloom filter was not empty");
+    BOOST_CHECK(emptyfilter2.IsEmpty());
+    CBloomFilter emptyfilter3(1024, 0.001, 0, BLOOM_UPDATE_NONE);
+    BOOST_CHECK_MESSAGE(!emptyfilter3.IsRelevantAndUpdate(ptx), "Simple Bloom filter was not empty");
+    BOOST_CHECK(emptyfilter3.IsEmpty());
+    CBloomFilter emptyfilter4(1024, 0.001, 0, BLOOM_UPDATE_NONE, true, 0);
+    BOOST_CHECK_MESSAGE(!emptyfilter4.IsRelevantAndUpdate(ptx), "Simple Bloom filter was not empty");
+    BOOST_CHECK(emptyfilter4.IsEmpty());
+
+    // basic check
     CBloomFilter filter(10, 0.000001, 0, BLOOM_UPDATE_ALL);
     filter.insert(uint256S("0xb4749f017444b051c44dfd2720e88f314ff94f3dd6d56d40ef65854fcd7fff6b"));
     BOOST_CHECK_MESSAGE(filter.IsRelevantAndUpdate(ptx), "Simple Bloom filter didn't match tx hash");
@@ -923,6 +938,7 @@ BOOST_AUTO_TEST_CASE(bloom_full_and_size_tests)
         // a filter with good parameters should be non-full upon construction
         CBloomFilter filter(8, 0.01, 0, BLOOM_UPDATE_ALL);
         BOOST_CHECK(!filter.IsFull());
+        BOOST_CHECK(filter.IsEmpty());
     }
 
     {
@@ -930,12 +946,14 @@ BOOST_AUTO_TEST_CASE(bloom_full_and_size_tests)
         // and yield non-full filters as nElements will be set to 1
         CBloomFilter filter(0, 0.01, 0, BLOOM_UPDATE_ALL);
         BOOST_CHECK(!filter.IsFull());
+        BOOST_CHECK(filter.IsEmpty());
     }
 
     {
-        // default empty filter is full
+        // default empty filter is full and empty
         CBloomFilter filter;
         BOOST_CHECK(filter.IsFull());
+        BOOST_CHECK(filter.IsEmpty());
     }
 
     {

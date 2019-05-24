@@ -143,10 +143,13 @@ void CBloomFilter::insert(const uint256 &hash)
 
 bool CBloomFilter::contains(const vector<unsigned char> &vKey) const
 {
-    if (isFull)
-        return true;
+    // NOTE: The check for empty must come first because in the case of a filter of size(0)
+    //       the filter will be showing as both empty and full but we want to make sure we return
+    //       here and indicate that no relavant matches were found.
     if (isEmpty)
         return false;
+    if (isFull)
+        return true;
     for (unsigned int i = 0; i < nHashFuncs; i++)
     {
         unsigned int nIndex = Hash(i, vKey);
@@ -187,10 +190,15 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransactionRef &tx)
     bool fFound = false;
     // Match if the filter contains the hash of tx
     //  for finding tx when they appear in a block
-    if (isFull)
-        return true;
+    //
+    // NOTE: The check for empty must come first because in the case of a filter of size(0)
+    //       the filter will be showing as both empty and full but we want to make sure we return
+    //       here and indicate that no relavant matches were found.
     if (isEmpty)
         return false;
+    if (isFull)
+        return true;
+
     const uint256 &hash = tx->GetHash();
     if (contains(hash))
         fFound = true;
