@@ -82,6 +82,24 @@ BOOST_AUTO_TEST_CASE(bloom_create_insert_serialize)
 
 BOOST_AUTO_TEST_CASE(bloom_create_insert_serialize_with_tweak)
 {
+    // check empty filter
+    CBloomFilter emptyfilter1;
+    BOOST_CHECK_MESSAGE(!emptyfilter1.contains(ParseHex("99108ad8ed9bb6274d3980bab5a85c048f0950c8")),
+        "Simple Bloom filter was not empty");
+    BOOST_CHECK(emptyfilter1.IsEmpty());
+    CBloomFilter emptyfilter2(1024, 0.001, 0, BLOOM_UPDATE_ALL);
+    BOOST_CHECK_MESSAGE(!emptyfilter2.contains(ParseHex("99108ad8ed9bb6274d3980bab5a85c048f0950c8")),
+        "Simple Bloom filter was not empty");
+    BOOST_CHECK(emptyfilter2.IsEmpty());
+    CBloomFilter emptyfilter3(1024, 0.001, 0, BLOOM_UPDATE_NONE);
+    BOOST_CHECK_MESSAGE(!emptyfilter3.contains(ParseHex("99108ad8ed9bb6274d3980bab5a85c048f0950c8")),
+        "Simple Bloom filter was not empty");
+    BOOST_CHECK(emptyfilter3.IsEmpty());
+    CBloomFilter emptyfilter4(1024, 0.001, 0, BLOOM_UPDATE_NONE, true, 0);
+    BOOST_CHECK_MESSAGE(!emptyfilter4.contains(ParseHex("99108ad8ed9bb6274d3980bab5a85c048f0950c8")),
+        "Simple Bloom filter was not empty");
+    BOOST_CHECK(emptyfilter4.IsEmpty());
+
     // Same test as bloom_create_insert_serialize, but we add a nTweak of 100
     CBloomFilter filter(3, 0.01, 2147483649UL, BLOOM_UPDATE_ALL);
 

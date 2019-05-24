@@ -2931,7 +2931,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nNextInvSend = 0;
     fRelayTxes = false;
     fSentAddr = false;
-    pfilter = nullptr;
+    pfilter = nullptr; // must be nullptr for RelayTransaction() edge case
     pThinBlockFilter = new CBloomFilter(); // BUIP010 - Xtreme Thinblocks
     nPingNonceSent = 0;
     nPingUsecStart = 0;
