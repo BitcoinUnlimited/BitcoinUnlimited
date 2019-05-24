@@ -130,6 +130,7 @@ bool CThinBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
     pblock->hashPrevBlock = header.hashPrevBlock;
 
     DbgAssert(pblock->thinblock != nullptr, return false);
+    DbgAssert(pblock->thinblock.get() == this, return false);
     unsigned int &nWaitingForTxns = pblock->thinblock->nWaitingFor;
 
     // Check that the merkleroot matches the merkleroot calculated from the hashes provided.
@@ -599,6 +600,7 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<
     pblock->hashPrevBlock = header.hashPrevBlock;
 
     DbgAssert(pblock->xthinblock != nullptr, return false);
+    DbgAssert(pblock->xthinblock.get() == this, return false);
     std::shared_ptr<CXThinBlock> thinBlock = pblock->xthinblock;
 
     // Create the mapMissingTx from all the supplied tx's in the xthinblock

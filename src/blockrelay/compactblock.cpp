@@ -193,6 +193,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock
     pfrom->shorttxidk1 = shorttxidk1;
 
     DbgAssert(pblock->cmpctblock != nullptr, return false);
+    DbgAssert(pblock->cmpctblock.get() == this, return false);
     std::shared_ptr<CompactBlock> cmpctBlock = pblock->cmpctblock;
 
     // Because the list of shorttxids is not complete (missing the prefilled transaction hashes), we need
