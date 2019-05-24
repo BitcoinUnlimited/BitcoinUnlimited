@@ -1111,7 +1111,7 @@ ac_configure_args="${ac_configure_args} --disable-shared --with-pic --with-bignu
 if test "x$enable_debug" = xyes; then
     ac_configure_args="${ac_configure_args} --enable-debug"
 fi
-AC_CONFIG_SUBDIRS([src/secp256k1 src/univalue])
+AC_CONFIG_SUBDIRS([src/rsm src/secp256k1 src/univalue])
 
 AC_OUTPUT
 

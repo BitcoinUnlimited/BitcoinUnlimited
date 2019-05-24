@@ -3,21 +3,21 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "recursive_shared_mutex.h"
+#include "exp_recursive_shared_mutex.h"
 #include "test_cxx_rsm.h"
 #include "timer.h"
 
 #include <boost/test/unit_test.hpp>
 
-BOOST_FIXTURE_TEST_SUITE(rsm_starvation_tests, TestSetup)
+BOOST_FIXTURE_TEST_SUITE(exp_rsm_starvation_tests, TestSetup)
 
-class rsm_watcher : public recursive_shared_mutex
+class exp_rsm_watcher : public exp_recursive_shared_mutex
 {
 public:
     size_t get_shared_owners_count() { return _read_owner_ids.size(); }
 };
 
-rsm_watcher rsm;
+exp_rsm_watcher rsm;
 std::vector<int> rsm_guarded_vector;
 
 void shared_only()
