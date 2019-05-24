@@ -34,15 +34,10 @@ public:
         threads.clear();
     }
 
-    // In the destructor, detach any threads that are still running.
-    // We expect that you've cleaned them up if you want to, probably via join_all()
     ~thread_group()
     {
-        for (auto &t : threads)
-        {
-            if (t.joinable())
-                t.detach();
-        }
+        interrupt_all();
+        join_all();
     }
 };
 
