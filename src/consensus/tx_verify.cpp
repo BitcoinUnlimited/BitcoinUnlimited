@@ -164,7 +164,7 @@ bool CheckTransaction(const CTransactionRef &tx, CValidationState &state)
     if (tx->vout.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vout-empty");
     // Check that the transaction doesn't have an excessive number of sigops
-    unsigned int nSigOps = GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+    unsigned int nSigOps = GetLegacySigOpCount(tx, STANDARD_SCRIPT_VERIFY_FLAGS);
     if (nSigOps > MAX_TX_SIGOPS)
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-too-many-sigops");
 
