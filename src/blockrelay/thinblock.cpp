@@ -151,8 +151,7 @@ bool CThinBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
         int missingCount = 0;
         int unnecessaryCount = 0;
 
-        if (!ReconstructBlock(
-                pfrom, missingCount, unnecessaryCount, pblock->thinblock->vTxHashes, pblock))
+        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock->thinblock->vTxHashes, pblock))
             return false;
 
         nWaitingForTxns = missingCount;
