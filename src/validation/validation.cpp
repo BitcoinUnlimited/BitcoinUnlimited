@@ -1949,8 +1949,8 @@ DisconnectResult DisconnectBlock(const CBlock &block, const CBlockIndex *pindex,
             {
                 COutPoint out(hash, o);
                 Coin coin;
-                view.SpendCoin(out, &coin);
-                if (tx.vout[o] != coin.out)
+                bool is_spent = view.SpendCoin(out, &coin);
+                if (!is_spent || tx.vout[o] != coin.out)
                 {
                     error("DisconnectBlock(): transaction output mismatch");
                     fClean = false; // transaction output mismatch

@@ -153,12 +153,12 @@ void CCoinsViewCache::AddCoin(const COutPoint &outpoint, Coin &&coin, bool possi
         nBestCoinHeight = it->second.coin.nHeight;
 }
 
-void CCoinsViewCache::SpendCoin(const COutPoint &outpoint, Coin *moveout)
+bool CCoinsViewCache::SpendCoin(const COutPoint &outpoint, Coin *moveout)
 {
     WRITELOCK(cs_utxo);
     CCoinsMap::iterator it = FetchCoin(outpoint, nullptr);
     if (it == cacheCoins.end())
-        return;
+        return false;
     cachedCoinsUsage -= it->second.coin.DynamicMemoryUsage();
     if (moveout)
     {
@@ -173,6 +173,7 @@ void CCoinsViewCache::SpendCoin(const COutPoint &outpoint, Coin *moveout)
         it->second.flags |= CCoinsCacheEntry::DIRTY;
         it->second.coin.Clear();
     }
+    return true;
 }
 
 static const Coin coinEmpty;
@@ -599,7 +600,8 @@ void SpendCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCache
         for (const CTxIn &txin : tx.vin)
         {
             txundo.vprevout.emplace_back();
-            inputs.SpendCoin(txin.prevout, &txundo.vprevout.back());
+            bool is_spent = inputs.SpendCoin(txin.prevout, &txundo.vprevout.back());
+            assert(is_spent);
         }
     }
 }
