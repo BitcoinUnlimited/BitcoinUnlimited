@@ -542,6 +542,7 @@ endif
 bitcoin_cli_LDADD = \
   $(LIBBITCOIN_CLI) \
   $(LIBUNIVALUE) \
+  $(LIBRSM) \
   $(LIBBITCOIN_UTIL)
 
 bitcoin_cli_LDADD += $(BOOST_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(EVENT_LIBS)
@@ -563,6 +564,7 @@ bitcoin_tx_LDADD = \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CONSENSUS) \
   $(LIBBITCOIN_CRYPTO) \
+  $(LIBRSM) \
   $(LIBSECP256K1)
 
 bitcoin_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
@@ -588,6 +590,7 @@ bitcoin_miner_LDADD = \
   $(LIBBITCOIN_CLI) \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBUNIVALUE) \
+  $(LIBRSM) \
   $(LIBBITCOIN_UTIL)
 
 bitcoin_miner_LDADD += $(BOOST_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(EVENT_LIBS)
