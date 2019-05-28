@@ -1859,13 +1859,14 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             dosMan.Misbehaving(pfrom, 100);
             return false;
         }
+
+        LOCK(pfrom->cs_filter);
+        delete pfrom->pfilter;
+        pfrom->pfilter = new CBloomFilter(filter);
+        if (!pfrom->pfilter->IsEmpty())
+            pfrom->fRelayTxes = true;
         else
-        {
-            LOCK(pfrom->cs_filter);
-            delete pfrom->pfilter;
-            pfrom->pfilter = new CBloomFilter(filter);
-        }
-        pfrom->fRelayTxes = true;
+            pfrom->fRelayTxes = false;
     }
 
 
