@@ -448,6 +448,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
         return false;
 
     DbgAssert(pblock->grapheneblock != nullptr, return false);
+    DbgAssert(pblock->grapheneblock.get() == this, return false);
     std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
 
     uint256 nullhash;

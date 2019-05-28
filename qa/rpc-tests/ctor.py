@@ -103,6 +103,7 @@ class CtorTest (BitcoinTestFramework):
         self.nodes[2].generate(1)
         sync_blocks_to(103, self.nodes[2:])
         waitFor(10, lambda: thereExists(self.nodes[0].getchaintips(), lambda x: x["height"] == 103 and x["status"] != "headers-only"))
+        waitFor(10, lambda: self.nodes[0].getblockcount() == 102)
         ct = self.nodes[0].getchaintips()
         tip = next(x for x in ct if x["status"] == "active")
         assert_equal(tip["height"], 102)
@@ -138,7 +139,6 @@ class CtorTest (BitcoinTestFramework):
             for i in range(3):
                 self.nodes[0].sendtoaddress(addr[0], 4-i)
             self.nodes[0].generate(1)
- 
         connect_nodes_bi(self.nodes,0,1)
         sync_blocks(self.nodes[0:2])
         waitFor(10, lambda: self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
@@ -173,7 +173,6 @@ class CtorTest (BitcoinTestFramework):
         ctorTipHeight = self.nodes[3].getblockcount()
         dtorTip = self.nodes[0].getbestblockhash()
         dtorTipHeight = self.nodes[0].getblockcount()
-
  
         self.nodes.append(start_node(4, self.options.tmpdir))
         self.nodes[4].set("consensus.enableCanonicalTxOrder=1")
@@ -214,7 +213,6 @@ class CtorTest (BitcoinTestFramework):
         ctorForkTipHash = rollbackNode.getbestblockhash()
         ctorForkTipCount = rollbackNode.getblockcount()
 
- 
         # enable ctor
         # now when 2 and 3 see the other fork, they should switch to it.
         disconnect_all(self.nodes[2])
