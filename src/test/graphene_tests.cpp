@@ -1,3 +1,6 @@
+// Copyright (c) 2018 The Bitcoin Unlimited developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "blockrelay/graphene.h"
 #include "blockrelay/graphene_set.h"
 #include "bloom.h"
