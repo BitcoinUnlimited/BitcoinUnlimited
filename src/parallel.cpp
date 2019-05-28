@@ -177,6 +177,7 @@ void CParallelValidation::Cleanup(const CBlock &block, CBlockIndex *pindex)
         }
         std::sort(vSequenceId.begin(), vSequenceId.end());
 
+        WRITELOCK(cs_mapBlockIndex);
         std::vector<std::pair<uint32_t, uint256> >::reverse_iterator riter = vSequenceId.rbegin();
         while (riter != vSequenceId.rend())
         {
@@ -194,7 +195,6 @@ void CParallelValidation::Cleanup(const CBlock &block, CBlockIndex *pindex)
                 pindex->nSequenceId = (*riter).first;
                 (*riter).first = nId;
 
-                WRITELOCK(cs_mapBlockIndex);
                 BlockMap::iterator it = mapBlockIndex.find((*riter).second);
                 if (it != mapBlockIndex.end())
                     it->second->nSequenceId = nId;

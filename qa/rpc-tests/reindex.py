@@ -54,12 +54,7 @@ class ReindexTest(BitcoinTestFramework):
         wait_bitcoinds()
 
         self.nodes.append(start_node(0, self.options.tmpdir, ["-debug", "-reindex", "-checkblockindex=1"]))
-        i = 0
-        while (i < 10):
-            if (self.nodes[0].getblockcount() == nBlocks):
-                break
-            i += 1
-            time.sleep(1)
+        waitFor(10, lambda: self.nodes[0].getblockcount() == nBlocks)
         assert_equal(self.nodes[0].getblockcount(), nBlocks)
 
         print("Success")

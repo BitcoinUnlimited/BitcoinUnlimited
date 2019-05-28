@@ -43,11 +43,14 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
                                            (nCheckLevel >= 4 ? 50 : 100)))));
         if (pindex->nHeight < chainActive.Height() - nCheckDepth)
             break;
-        if (fPruneMode && !(pindex->nStatus & BLOCK_HAVE_DATA))
         {
-            // If pruning, only go back as far as we have data.
-            LOGA("VerifyDB(): block verification stopping at height %d (pruning, no data)\n", pindex->nHeight);
-            break;
+            READLOCK(cs_mapBlockIndex); // for nStatus
+            if (fPruneMode && !(pindex->nStatus & BLOCK_HAVE_DATA))
+            {
+                // If pruning, only go back as far as we have data.
+                LOGA("VerifyDB(): block verification stopping at height %d (pruning, no data)\n", pindex->nHeight);
+                break;
+            }
         }
         CBlock block;
         // check level 0: read from disk

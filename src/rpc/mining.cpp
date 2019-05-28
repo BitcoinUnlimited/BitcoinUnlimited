@@ -577,6 +577,7 @@ UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *p
             {
                 uint256 hash = block.GetHash();
                 CBlockIndex *pindex = LookupBlockIndex(hash);
+                READLOCK(cs_mapBlockIndex);
                 if (pindex)
                 {
                     if (pindex->IsValid(BLOCK_VALID_SCRIPTS))
@@ -853,6 +854,7 @@ UniValue SubmitBlock(CBlock &block)
     bool fBlockPresent = false;
     {
         CBlockIndex *pindex = LookupBlockIndex(hash);
+        READLOCK(cs_mapBlockIndex);
         if (pindex)
         {
             if (pindex->IsValid(BLOCK_VALID_SCRIPTS))

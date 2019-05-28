@@ -686,8 +686,11 @@ UniValue getblock(const UniValue &params, bool fHelp)
 
     CBlock block;
 
-    if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Block not available (pruned data)");
+    {
+        READLOCK(cs_mapBlockIndex);
+        if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Block not available (pruned data)");
+    }
 
     if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
@@ -1118,8 +1121,11 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
     if (fPruneMode)
     {
         CBlockIndex *block = chainActive.Tip();
-        while (block && block->pprev && (block->pprev->nStatus & BLOCK_HAVE_DATA))
-            block = block->pprev;
+        {
+            READLOCK(cs_mapBlockIndex);
+            while (block && block->pprev && (block->pprev->nStatus & BLOCK_HAVE_DATA))
+                block = block->pprev;
+        }
 
         if (block != nullptr)
             obj.pushKV("pruneheight", block->nHeight);
@@ -1219,6 +1225,7 @@ UniValue getchaintips(const UniValue &params, bool fHelp)
     setTips = GetChainTips();
 
     /* Construct the output array.  */
+    WRITELOCK(cs_mapBlockIndex); // for nStatus
     UniValue res(UniValue::VARR);
     for (const CBlockIndex *block : setTips)
     {
