@@ -24,6 +24,9 @@ EXCLUDE = [
     'src/secp256k1/src/java/org_bitcoin_NativeSecp256k1.h',
     'src/secp256k1/src/java/org_bitcoin_Secp256k1Context.c',
     'src/secp256k1/src/java/org_bitcoin_Secp256k1Context.h',
+    'src/secp256k1/src/scratch.h',
+    'src/secp256k1/src/ecmult_impl.h',
+    'src/secp256k1/src/modules/schnorr/*.*',
     # univalue:
     'src/univalue/test/object.cpp',
     'src/univalue/lib/univalue_escapes.h',
@@ -37,6 +40,8 @@ EXCLUDE = [
     'qa/rpc-tests/test_framework/bignum.py',
     # python init:
     '*__init__.py',
+    # rsm:
+    'src/rsm/*',
 ]
 EXCLUDE_COMPILED = re.compile('|'.join([fnmatch.translate(m) for m in EXCLUDE]))
 
