@@ -121,6 +121,7 @@ EXPECTED_HOLDER_NAMES = [
     "G. Andrew Stone\n",
     "Amaury SÉCHET\n",
     "Stephen McCarthy\n",
+    "Jeremy Rubin\n",
 ]
 
 DOMINANT_STYLE_COMPILED = {}
