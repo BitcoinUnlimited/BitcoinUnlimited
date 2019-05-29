@@ -1,4 +1,4 @@
-// Copyright (c) 2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
 // Copyright (c) 2014 Gavin Andresen
 /*
 Permission is hereby granted, free of charge, to any person obtaining a copy
