@@ -241,7 +241,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock
         cmpctBlock->vTxHashes.insert(it, iterShortID, shorttxids.end());
     }
 
-    // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
+    // Create a map of all short tx hashes pointing to their full tx hash counterpart
     // We need to check all transaction sources (orphan list, mempool, and new (incoming) transactions in this block)
     int missingCount = 0;
     int unnecessaryCount = 0;
@@ -524,7 +524,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     int missingCount = 0;
     int unnecessaryCount = 0;
     // Look for each transaction in our various pools and buffers.
-    // With compactblocks the vTxHashes contains only the first 8 bytes of the tx hash.
+    // With compactblocks the vTxHashes contains only the first 6 bytes of the tx hash.
     {
         if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
             return false;
@@ -591,7 +591,7 @@ static bool ReconstructBlock(CNode *pfrom,
     thinrelay.AddBlockBytes(::GetSerializeSize(pblock->GetBlockHeader(), SER_NETWORK, PROTOCOL_VERSION), pblock);
 
     // Look for each transaction in our various pools and buffers.
-    // With compactblocks the vTxHashes contains only the first 8 bytes of the tx hash.
+    // With compactblocks the vTxHashes contains only the first 6 bytes of the tx hash.
     for (const uint256 &hash : pblock->cmpctblock->vTxHashes256)
     {
         // Replace the truncated hash with the full hash value if it exists
