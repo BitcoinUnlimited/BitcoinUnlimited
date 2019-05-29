@@ -122,6 +122,7 @@ EXPECTED_HOLDER_NAMES = [
     "Amaury SÉCHET\n",
     "Stephen McCarthy\n",
     "Jeremy Rubin\n",
+    "The Bitcoin ABC developers",
 ]
 
 DOMINANT_STYLE_COMPILED = {}
