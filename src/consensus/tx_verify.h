@@ -40,7 +40,8 @@ bool CheckTxInputs(const CTransactionRef &tx, CValidationState &state, const CCo
 unsigned int GetLegacySigOpCount(const CTransactionRef &tx, const uint32_t flags);
 
 /**
- * Count ECDSA signature operations in pay-to-script-hash inputs.
+ * Count ECDSA signature operations in pay-to-script-hash inputs. All inputs in the tx MUST
+ * be in CCoinsViewCache -- i.e. validate the inputs of the tx before calling this function
  *
  * @param[in] mapInputs Map of previous transactions that have outputs we're spending
  * @return maximum number of sigops required to validate this transaction's inputs
