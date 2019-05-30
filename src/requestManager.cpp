@@ -61,7 +61,7 @@ unsigned int blkReqRetryInterval = MIN_BLK_REQUEST_RETRY_INTERVAL;
 extern bool CanDirectFetch(const Consensus::Params &consensusParams);
 
 /** Find the last common ancestor two blocks have.
- *  Both pa and pb must be non-NULL. */
+ *  Both pa and pb must be non-nullptr. */
 static CBlockIndex *LastCommonAncestor(CBlockIndex *pa, CBlockIndex *pb)
 {
     if (pa->nHeight > pb->nHeight)

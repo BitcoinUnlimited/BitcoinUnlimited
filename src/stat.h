@@ -676,7 +676,7 @@ public:
 };
 
 
-// Get the named statistic.  Returns NULL if it does not exist
+// Get the named statistic.  Returns nullptr if it does not exist
 CStatBase *GetStat(char *name);
 
 

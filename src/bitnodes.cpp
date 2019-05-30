@@ -66,7 +66,7 @@ public:
         }
         else
         {
-            GENERAL_NAMES *altNames = (GENERAL_NAMES *)X509_get_ext_d2i(cert, NID_subject_alt_name, NULL, NULL);
+            GENERAL_NAMES *altNames = (GENERAL_NAMES *)X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr);
             int numNames = sk_GENERAL_NAME_num(altNames);
             for (int i = 0; i < numNames; ++i)
             {

@@ -94,7 +94,7 @@ std::stringstream http_get(const std::string &host, const int port, const std::s
         throw std::runtime_error("event_base_new");
     }
 
-    event.http_conn = evhttp_connection_base_new(event.base, NULL, host.c_str(), port);
+    event.http_conn = evhttp_connection_base_new(event.base, nullptr, host.c_str(), port);
     if (event.http_conn == nullptr)
     {
         throw std::runtime_error("evhttp_connection_base_new");

@@ -135,7 +135,7 @@ CBlock TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransa
         ++block.nNonce;
 
     CValidationState state;
-    ProcessNewBlock(state, chainparams, NULL, &block, true, NULL, false);
+    ProcessNewBlock(state, chainparams, nullptr, &block, true, nullptr, false);
 
     CBlock result = block;
     return result;

@@ -41,7 +41,7 @@ const char *GetTxnOutputType(txnouttype t)
     case TX_LABELPUBLIC:
         return "publiclabel";
     }
-    return NULL;
+    return nullptr;
 }
 
 /**

@@ -142,7 +142,7 @@ static void potential_deadlock_detected(const std::pair<void *, void *> &mismatc
 
 static void push_lock(void *c, const CLockLocation &locklocation, bool fTry)
 {
-    if (lockstack.get() == NULL)
+    if (lockstack.get() == nullptr)
         lockstack.reset(new LockStack);
 
     dd_mutex.lock();
@@ -255,7 +255,7 @@ void AssertWriteLockHeldInternal(const char *pszName,
 // BU normally CCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical
 // section from the lockorder map
 #ifdef DEBUG_LOCKORDER
-CCriticalSection::CCriticalSection() : name(NULL) {}
+CCriticalSection::CCriticalSection() : name(nullptr) {}
 CCriticalSection::CCriticalSection(const char *n) : name(n)
 {
 // print the address of named critical sections so they can be found in the mutrace output
@@ -284,7 +284,7 @@ CCriticalSection::~CCriticalSection()
 // BU normally CSharedCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical
 // section from the lockorder map
 #ifdef DEBUG_LOCKORDER
-CSharedCriticalSection::CSharedCriticalSection() : name(NULL), exclusiveOwner(0) {}
+CSharedCriticalSection::CSharedCriticalSection() : name(nullptr), exclusiveOwner(0) {}
 CSharedCriticalSection::CSharedCriticalSection(const char *n) : name(n), exclusiveOwner(0)
 {
 // print the address of named critical sections so they can be found in the mutrace output

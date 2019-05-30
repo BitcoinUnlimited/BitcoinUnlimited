@@ -35,7 +35,7 @@ static bool fRPCInWarmup = true;
 static std::string rpcWarmupStatus("RPC server started");
 extern CCriticalSection cs_rpcWarmup;
 /* Timer-creating functions */
-static RPCTimerInterface *timerInterface = NULL;
+static RPCTimerInterface *timerInterface = nullptr;
 /* Map of name to timer.
  * @note Can be changed to std::unique_ptr when C++11 */
 static std::map<std::string, boost::shared_ptr<RPCTimerBase> > deadlineTimers;
@@ -452,7 +452,7 @@ void RPCSetTimerInterface(RPCTimerInterface *iface) { timerInterface = iface; }
 void RPCUnsetTimerInterface(RPCTimerInterface *iface)
 {
     if (timerInterface == iface)
-        timerInterface = NULL;
+        timerInterface = nullptr;
 }
 
 void RPCRunLater(const std::string &name, boost::function<void(void)> func, int64_t nSeconds)

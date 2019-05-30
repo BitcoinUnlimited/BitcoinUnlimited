@@ -83,7 +83,7 @@ using namespace std;
 bool fFeeEstimatesInitialized = false;
 
 #if ENABLE_ZMQ
-static CZMQNotificationInterface *pzmqNotificationInterface = NULL;
+static CZMQNotificationInterface *pzmqNotificationInterface = nullptr;
 #endif
 
 #ifdef WIN32
@@ -166,7 +166,7 @@ public:
     // Writes do not need similar protection, as failure to write is handled by the caller.
 };
 
-static CCoinsViewErrorCatcher *pcoinscatcher = NULL;
+static CCoinsViewErrorCatcher *pcoinscatcher = nullptr;
 static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
 
 void Interrupt(thread_group &threadGroup)
@@ -246,16 +246,16 @@ void Shutdown()
 
     {
         LOCK(cs_main);
-        if (pcoinsTip != NULL)
+        if (pcoinsTip != nullptr)
         {
             FlushStateToDisk();
         }
         delete pcoinsTip;
-        pcoinsTip = NULL;
+        pcoinsTip = nullptr;
         delete pcoinscatcher;
-        pcoinscatcher = NULL;
+        pcoinscatcher = nullptr;
         delete pcoinsdbview;
-        pcoinsdbview = NULL;
+        pcoinsdbview = nullptr;
         delete pblocktree;
         pblocktree = nullptr;
         delete pblockdb;
@@ -271,7 +271,7 @@ void Shutdown()
     {
         UnregisterValidationInterface(pzmqNotificationInterface);
         delete pzmqNotificationInterface;
-        pzmqNotificationInterface = NULL;
+        pzmqNotificationInterface = nullptr;
     }
 #endif
 
@@ -288,7 +288,7 @@ void Shutdown()
     UnregisterAllValidationInterfaces();
 #ifdef ENABLE_WALLET
     delete pwalletMain;
-    pwalletMain = NULL;
+    pwalletMain = nullptr;
 #endif
     globalVerifyHandle.reset();
     ECC_Stop();
@@ -634,7 +634,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 #ifdef _MSC_VER
     // Turn off Microsoft heap dump noise
     _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
-    _CrtSetReportFile(_CRT_WARN, CreateFileA("NUL", GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, 0));
+    _CrtSetReportFile(_CRT_WARN, CreateFileA("NUL", GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, 0));
 #endif
 #if _MSC_VER >= 1400
     // Disable confusing "helpful" text message on abort, Ctrl-C
@@ -652,7 +652,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     typedef BOOL(WINAPI * PSETPROCDEPPOL)(DWORD);
     PSETPROCDEPPOL setProcDEPPol =
         (PSETPROCDEPPOL)GetProcAddress(GetModuleHandleA("Kernel32.dll"), "SetProcessDEPPolicy");
-    if (setProcDEPPol != NULL)
+    if (setProcDEPPol != nullptr)
         setProcDEPPol(PROCESS_DEP_ENABLE);
 #endif
 
@@ -677,15 +677,15 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     sa.sa_handler = HandleSIGTERM;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
-    sigaction(SIGTERM, &sa, NULL);
-    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, nullptr);
+    sigaction(SIGINT, &sa, nullptr);
 
     // Reopen debug.log on SIGHUP
     struct sigaction sa_hup;
     sa_hup.sa_handler = HandleSIGHUP;
     sigemptyset(&sa_hup.sa_mask);
     sa_hup.sa_flags = 0;
-    sigaction(SIGHUP, &sa_hup, NULL);
+    sigaction(SIGHUP, &sa_hup, nullptr);
 
     // Ignore SIGPIPE, otherwise it will bring the daemon down if the client closes unexpectedly
     signal(SIGPIPE, SIG_IGN);
@@ -1270,7 +1270,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 
     if (fDisableWallet)
     {
-        pwalletMain = NULL;
+        pwalletMain = nullptr;
         LOGA("Wallet disabled!\n");
     }
     else

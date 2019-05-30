@@ -28,7 +28,8 @@ void RegisterValidationInterface(CValidationInterface *pwalletIn);
 void UnregisterValidationInterface(CValidationInterface *pwalletIn);
 /** Unregister all wallets from core */
 void UnregisterAllValidationInterfaces();
-/** Push an updated transaction to all registered wallets, pass NULL if block not known, pass -1 if txIdx not known */
+/** Push an updated transaction to all registered wallets, pass nullptr if block not known, pass -1 if txIdx not known
+ */
 void SyncWithWallets(const CTransactionRef &ptx, const CBlock *pblock, int txIdx);
 
 class CValidationInterface

@@ -307,7 +307,7 @@ bool TestLockPointValidity(const LockPoints *lp);
 // Checks that the provided block is consistent with the chainparam's checkpoints
 bool CheckAgainstCheckpoint(unsigned int height, const uint256 &hash, const CChainParams &chainparams);
 
-/** Store block on disk. If dbp is non-NULL, the file is known to already reside on disk */
+/** Store block on disk. If dbp is non-nullptr, the file is known to already reside on disk */
 bool AcceptBlock(CBlock &block, CValidationState &state, CBlockIndex **pindex, bool fRequested, CDiskBlockPos *dbp);
 
 /** Find the last common block between the parameter chain and a locator. */

@@ -54,7 +54,7 @@ struct LockPoints
     // values are still valid even after a reorg.
     CBlockIndex *maxInputBlock;
 
-    LockPoints() : height(0), time(0), maxInputBlock(NULL) {}
+    LockPoints() : height(0), time(0), maxInputBlock(nullptr) {}
 };
 
 class CTxMemPool;
@@ -354,10 +354,10 @@ public:
     }
     void SetNull()
     {
-        ptx = NULL;
+        ptx = nullptr;
         n = (uint32_t)-1;
     }
-    bool IsNull() const { return (ptx == NULL && n == (uint32_t)-1); }
+    bool IsNull() const { return (ptx == nullptr && n == (uint32_t)-1); }
     size_t DynamicMemoryUsage() const { return 0; }
 };
 
@@ -714,7 +714,7 @@ public:
      *  If no answer can be given at nBlocks, return an estimate
      *  at the lowest number of blocks where one can be given
      */
-    CFeeRate estimateSmartFee(int nBlocks, int *answerFoundAtBlocks = NULL) const;
+    CFeeRate estimateSmartFee(int nBlocks, int *answerFoundAtBlocks = nullptr) const;
 
     /** Estimate fee rate needed to get into the next nBlocks */
     CFeeRate estimateFee(int nBlocks) const;
@@ -723,7 +723,7 @@ public:
      *  If no answer can be given at nBlocks, return an estimate
      *  at the lowest number of blocks where one can be given
      */
-    double estimateSmartPriority(int nBlocks, int *answerFoundAtBlocks = NULL) const;
+    double estimateSmartPriority(int nBlocks, int *answerFoundAtBlocks = nullptr) const;
 
     /** Estimate priority needed to get into the next nBlocks */
     double estimatePriority(int nBlocks) const;

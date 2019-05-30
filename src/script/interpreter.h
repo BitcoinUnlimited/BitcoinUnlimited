@@ -149,7 +149,7 @@ uint256 SignatureHash(const CScript &scriptCode,
     unsigned int nIn,
     uint32_t nHashType,
     const CAmount &amount,
-    size_t *nHashedOut = NULL);
+    size_t *nHashedOut = nullptr);
 
 class BaseSignatureChecker
 {
@@ -340,15 +340,15 @@ bool EvalScript(std::vector<std::vector<unsigned char> > &stack,
     unsigned int flags,
     unsigned int maxOps,
     const BaseSignatureChecker &checker,
-    ScriptError *error = NULL,
-    unsigned char *sighashtype = NULL);
+    ScriptError *error = nullptr,
+    unsigned char *sighashtype = nullptr);
 bool VerifyScript(const CScript &scriptSig,
     const CScript &scriptPubKey,
     unsigned int flags,
     unsigned int maxOps,
     const BaseSignatureChecker &checker,
-    ScriptError *error = NULL,
-    unsigned char *sighashtype = NULL);
+    ScriptError *error = nullptr,
+    unsigned char *sighashtype = nullptr);
 
 // string prefixed to data when validating signed messages via RPC call.  This ensures
 // that the signature was intended for use on this blockchain.

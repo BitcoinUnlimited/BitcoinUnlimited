@@ -230,7 +230,7 @@ UniValue addnode(const UniValue &params, bool fHelp)
         CAddress addr;
         // NOTE: Using RPC "addnode <node> onetry" ignores both the "maxconnections"
         //      and "maxoutconnections" limits and can cause both to be exceeded.
-        OpenNetworkConnection(addr, false, NULL, strNode.c_str());
+        OpenNetworkConnection(addr, false, nullptr, strNode.c_str());
         return NullUniValue;
     }
 

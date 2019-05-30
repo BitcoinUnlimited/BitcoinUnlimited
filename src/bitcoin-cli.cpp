@@ -127,7 +127,7 @@ int CommandLineRPC(int argc, char *argv[])
     }
     catch (...)
     {
-        PrintExceptionContinue(NULL, "CommandLineRPC()");
+        PrintExceptionContinue(nullptr, "CommandLineRPC()");
         throw;
     }
 
@@ -166,7 +166,7 @@ int main(int argc, char *argv[])
     }
     catch (...)
     {
-        PrintExceptionContinue(NULL, "AppInitRPC()");
+        PrintExceptionContinue(nullptr, "AppInitRPC()");
         return EXIT_FAILURE;
     }
 
@@ -181,7 +181,7 @@ int main(int argc, char *argv[])
     }
     catch (...)
     {
-        PrintExceptionContinue(NULL, "CommandLineRPC()");
+        PrintExceptionContinue(nullptr, "CommandLineRPC()");
     }
     return ret;
 }
