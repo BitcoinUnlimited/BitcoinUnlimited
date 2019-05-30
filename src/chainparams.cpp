@@ -209,7 +209,7 @@ public:
         // May 15th 2018 re-enable op_codes and 32 MB max block size
         checkpoints[530359] = uint256S("0x0000000000000000011ada8bd08f46074f44a8f155396f43e38acf9501c49103");
         // Nov 15th 2018 activate LTOR, DSV op_code
-        checkpoints[556767] = uint256S("0000000000000000004626ff6e3b936941d341c5932ece4357eeccac44e6d56c");
+        checkpoints[556767] = uint256S("0x0000000000000000004626ff6e3b936941d341c5932ece4357eeccac44e6d56c");
 
 
         // clang-format on
