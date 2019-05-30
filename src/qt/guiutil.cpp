@@ -907,6 +907,21 @@ void restoreWindowGeometry(const QString &strSetting, const QSize &defaultSize, 
         parent->move(posCenter);
 }
 
+void saveColumnConfiguration(const QString &strSetting, QHeaderView *header)
+{
+    QSettings settings;
+    settings.setValue(strSetting + "Columns", header->saveState());
+}
+
+bool restoreColumnConfiguration(const QString &strSetting, QHeaderView *header)
+{
+    QSettings settings;
+    if (!settings.contains(strSetting + "Columns"))
+        return false;
+
+    return header->restoreState(settings.value(strSetting + "Columns").toByteArray());
+}
+
 void setClipboard(const QString &str)
 {
     QApplication::clipboard()->setText(str, QClipboard::Clipboard);
