@@ -986,6 +986,10 @@ void RPCConsole::updateNodeDetail(const CNodeCombinedStats *stats)
 void RPCConsole::resizeEvent(QResizeEvent *event) { QWidget::resizeEvent(event); }
 void RPCConsole::showEvent(QShowEvent *event)
 {
+    // restore column state
+    GUIUtil::restoreColumnConfiguration("nPeersTable", ui->peerWidget->horizontalHeader());
+    GUIUtil::restoreColumnConfiguration("nBannedPeersTable", ui->banlistWidget->horizontalHeader());
+
     QWidget::showEvent(event);
 
     if (!clientModel || !clientModel->getPeerTableModel())
@@ -1004,6 +1008,10 @@ void RPCConsole::hideEvent(QHideEvent *event)
 
     // stop PeerTableModel auto refresh
     clientModel->getPeerTableModel()->stopAutoRefresh();
+
+    // save column state
+    GUIUtil::saveColumnConfiguration("nPeersTable", ui->peerWidget->horizontalHeader());
+    GUIUtil::saveColumnConfiguration("nBannedPeersTable", ui->banlistWidget->horizontalHeader());
 }
 
 void RPCConsole::showPeersTableContextMenu(const QPoint &point)
