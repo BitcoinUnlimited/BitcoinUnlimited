@@ -208,6 +208,12 @@ struct ThinBlockQuickStats
     double fLast24hOutboundCompression;
     uint64_t nLast24hRerequestTx;
     double fLast24hRerequestTxPercent;
+    ThinBlockQuickStats()
+        : nTotalInbound(0), nTotalOutbound(0), nTotalBandwidthSavings(0), nLast24hInbound(0),
+          fLast24hInboundCompression(0.0), nLast24hOutbound(0), fLast24hOutboundCompression(0.0),
+          nLast24hRerequestTx(0), fLast24hRerequestTxPercent(0.0)
+    {
+    }
 };
 
 // This class stores statistics for thin block derived protocols.
