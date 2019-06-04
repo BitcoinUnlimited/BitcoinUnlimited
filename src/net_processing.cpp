@@ -600,6 +600,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT, nLimitDescendants);
         xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT, nLimitDescendantSize);
 
+        xver.set_u64c(XVer::BU_PRUNE_HASHMASK, pruneHashMask.GetLow64());
+        xver.set_u64c(XVer::BU_PRUNE_THRESHOLD, normalized_threshold);
+
         electrum::set_xversion_flags(xver, chainparams.NetworkIDString());
 
         pfrom->PushMessage(NetMsgType::XVERSION, xver);
@@ -677,10 +680,11 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     {
         if (!ensureConnectionState(strCommand, ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION,
                 ConnectionStateOutgoing::ANY, pfrom))
+        {
             return false;
+        }
         vRecv >> pfrom->xVersion;
-
-        if (pfrom->addrFromPort != 0)
+        if (pfrom->addrFromPort == 0)
         {
             LOG(NET, "Encountered odd node that sent BUVERSION before XVERSION. Ignoring duplicate addrFromPort "
                      "setting. peer=%s version=%s\n",

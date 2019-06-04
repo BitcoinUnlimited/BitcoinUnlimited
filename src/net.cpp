@@ -3016,6 +3016,8 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nStopwatchConnected = GetStopwatchMicros();
     nTimeOffset = 0;
     addr = addrIn;
+    peerPruneHashMask = 0;
+    peerPruneThreshold = 0;
     addrName = addrNameIn == "" ? addr.ToStringIPPort() : addrNameIn;
     nVersion = 0;
     state_incoming = ConnectionStateIncoming::CONNECTED_WAIT_VERSION;
@@ -3294,6 +3296,9 @@ void CNode::ReadConfigFromXVersion()
     canSyncMempoolWithPeers = (xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC) == 1);
     nMempoolSyncMinVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED);
     nMempoolSyncMaxVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED);
+
+    peerPruneHashMask = arith_uint256(xVersion.as_u64c(XVer::BU_PRUNE_HASHMASK));
+    peerPruneThreshold = xVersion.as_u64c(XVer::BU_PRUNE_THRESHOLD);
 }
 
 

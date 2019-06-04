@@ -413,6 +413,10 @@ public:
     /** set to true if this node is ok with no message checksum */
     bool skipChecksum;
 
+    //! hash mask of the peer, if hash 64 LSB is less than this hashmask peer should have the block
+    arith_uint256 peerPruneHashMask;
+    uint64_t peerPruneThreshold;
+
     /** The address the remote peer advertised in its version message */
     CAddress addrFrom_advertised;
 
