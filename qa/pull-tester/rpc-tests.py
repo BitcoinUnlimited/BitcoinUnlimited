@@ -292,7 +292,8 @@ testScriptsExt = [ RpcTest(t) for t in [
     Disabled('maxblocksinflight', "needs a rewrite and is already somewhat tested in sendheaders.py"),
     'p2p-acceptblock',
     'mempool_packages',
-    'maxuploadtarget'
+    'maxuploadtarget',
+    'randompruning'
 ] ]
 
 #Enable ZMQ tests
