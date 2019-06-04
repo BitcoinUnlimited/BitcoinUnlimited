@@ -2694,6 +2694,21 @@ void NetCleanup()
     }
 }
 
+void RelayNewXUpdate(const CXVersionMessage &msg)
+{
+    LOCK(cs_vNodes);
+    for (CNode *pnode : vNodes)
+    {
+        pnode->PushMessage(NetMsgType::XUPDATE, msg);
+    }
+}
+
+void RelayNewXUpdate(const uint64_t key, const uint64_t val)
+{
+    CXVersionMessage msg;
+    msg.set_u64c(key, val);
+    RelayNewXUpdate(msg);
+}
 
 void RelayTransaction(const CTransactionRef ptx, const bool fRespend, const CTxProperties *txProperties)
 {

@@ -1050,6 +1050,9 @@ private:
     CNode *_pnode;
 };
 
+void RelayNewXUpdate(const CXVersionMessage &msg);
+void RelayNewXUpdate(const uint64_t key, const uint64_t val);
+
 typedef std::vector<CNodeRef> VNodeRefs;
 
 class CTransaction;
