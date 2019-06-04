@@ -64,8 +64,10 @@ public:
     // clean up the undo data if supported by the db
     virtual void CondenseUndoData(const std::string &start, const std::string &end) = 0;
 
-    // prune the database
-    virtual uint64_t PruneDB(uint64_t nLastBlockWeCanPrune) = 0;
+    // prune the database - this is now managed seperately inside prune.cpp
+    // we now pass the db to the pruner to determine if pruning is needed
+    // we do the pruning itself with erase block and erase undo
+    // virtual uint64_t PruneDB(uint64_t nLastBlockWeCanPrune) = 0;
 
     virtual ~CDatabaseAbstract() {}
 };

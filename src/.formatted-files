@@ -30,11 +30,13 @@ blockrelay/blockrelay_common.h
 blockrelay/blockrelay_common.cpp
 blockstorage/blockleveldb.cpp
 blockstorage/blockleveldb.h
-blockstorage/dbabstract.h
-blockstorage/sequential_files.cpp
-blockstorage/sequential_files.h
 blockstorage/blockstorage.cpp
 blockstorage/blockstorage.h
+blockstorage/dbabstract.h
+blockstorage/prune.cpp
+blockstorage/prune.h
+blockstorage/sequential_files.cpp
+blockstorage/sequential_files.h
 bloom.cpp
 bloom.h
 cashaddr.cpp

@@ -168,16 +168,11 @@ extern bool fHavePruned;
 extern bool fPruneMode;
 /** Number of MiB of block files that we're trying to stay below. */
 extern uint64_t nPruneTarget;
-/** Number of MiB the blockdb is using. */
-extern uint64_t nDBUsedSpace;
+
 /** The maximum bloom filter size that we will support for an xthin request. This value is communicated to
  *  our peer at the time we first make the connection.
  */
 extern uint32_t nXthinBloomFilterSize;
-/** Block files containing a block-height within MIN_BLOCKS_TO_KEEP of chainActive.Tip() will not be pruned. */
-static const unsigned int MIN_BLOCKS_TO_KEEP = 288;
-/** Minimum blocks required to signal NODE_NETWORK_LIMITED */
-static const unsigned int NODE_NETWORK_LIMITED_MIN_BLOCKS = 288;
 
 static const signed int DEFAULT_CHECKBLOCKS = 6;
 static const unsigned int DEFAULT_CHECKLEVEL = 3;
@@ -198,8 +193,6 @@ void RegisterNodeSignals(CNodeSignals &nodeSignals);
 void UnregisterNodeSignals(CNodeSignals &nodeSignals);
 
 
-/** Check whether enough disk space is available for an incoming block */
-bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 /** Import blocks from an external file */
 bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskBlockPos *dbp = nullptr);
 /** Do we already have this transaction or has it been seen in a block */

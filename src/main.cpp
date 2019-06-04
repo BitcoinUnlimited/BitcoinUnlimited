@@ -79,14 +79,10 @@ std::atomic<bool> fImporting{false};
 std::atomic<bool> fReindex{false};
 bool fBlocksOnly = false;
 bool fTxIndex = false;
-bool fHavePruned = false;
-bool fPruneMode = false;
 bool fIsBareMultisigStd = DEFAULT_PERMIT_BAREMULTISIG;
 unsigned int nBytesPerSigOp = DEFAULT_BYTES_PER_SIGOP;
 bool fCheckBlockIndex = false;
 bool fCheckpointsEnabled = DEFAULT_CHECKPOINTS_ENABLED;
-uint64_t nPruneTarget = 0;
-uint64_t nDBUsedSpace = 0;
 uint32_t nXthinBloomFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE;
 
 // BU: Move global objects to a single file
@@ -115,12 +111,6 @@ std::atomic<int> nPreferredDownload{0};
  * Pruned nodes may have entries where B is missing data.
  */
 std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
-
-/** Global flag to indicate we should check to see if there are
- *  block/undo files that should be deleted.  Set on startup
- *  or if we allocate more file space when we're in prune mode
- */
-bool fCheckForPruning = false;
 
 std::vector<CBlockFileInfo> vinfoBlockFile;
 int nLastBlockFile = 0;
@@ -456,17 +446,6 @@ bool CheckAgainstCheckpoint(unsigned int height, const uint256 &hash, const CCha
         if (hash != lkup->second) // This block does not match the checkpoint
             return false;
     }
-    return true;
-}
-
-bool CheckDiskSpace(uint64_t nAdditionalBytes)
-{
-    uint64_t nFreeBytesAvailable = fs::space(GetDataDir()).available;
-
-    // Check for nMinDiskSpace bytes (currently 50MB)
-    if (nFreeBytesAvailable < nMinDiskSpace + nAdditionalBytes)
-        return AbortNode("Disk space is low!", _("Error: Disk space is low!"));
-
     return true;
 }
 

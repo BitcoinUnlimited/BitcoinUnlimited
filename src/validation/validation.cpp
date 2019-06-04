@@ -8,6 +8,7 @@
 
 #include "blockrelay/blockrelay_common.h"
 #include "blockstorage/blockstorage.h"
+#include "blockstorage/prune.h"
 #include "blockstorage/sequential_files.h"
 #include "checkpoints.h"
 #include "connmgr.h"
@@ -88,7 +89,6 @@ CBlockIndex *pindexBestForkTip = nullptr;
 CBlockIndex *pindexBestForkBase = nullptr;
 
 extern uint64_t nBlockSequenceId;
-extern bool fCheckForPruning;
 extern std::map<uint256, NodeId> mapBlockSource;
 extern std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
 extern bool AbortNode(CValidationState &state, const std::string &strMessage, const std::string &userMessage = "");
@@ -100,6 +100,7 @@ extern std::atomic<int> nPreferredDownload;
 extern int nSyncStarted;
 extern bool fLargeWorkForkFound;
 extern bool fLargeWorkInvalidChainFound;
+extern bool fCheckForPruning;
 
 static int64_t nTimeCheck = 0;
 static int64_t nTimeForks = 0;

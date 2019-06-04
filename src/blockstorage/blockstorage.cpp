@@ -11,6 +11,7 @@
 #include "dbwrapper.h"
 #include "fs.h"
 #include "main.h"
+#include "prune.h"
 #include "sequential_files.h"
 #include "ui_interface.h"
 #include "undo.h"
@@ -21,7 +22,6 @@ extern bool fCheckForPruning;
 extern CCriticalSection cs_LastBlockFile;
 extern std::set<int> setDirtyFileInfo;
 extern std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
-extern CTweak<uint64_t> pruneIntervalTweak;
 
 CDatabaseAbstract *pblockdb = nullptr;
 unsigned int blockfile_chunk_size = DEFAULT_BLOCKFILE_CHUNK_SIZE;
@@ -520,48 +520,6 @@ bool ReadUndoFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const CBl
         return ReadUndoFromDiskSequential(blockundo, pos, pindex->GetBlockHash());
     }
     return pblockdb->ReadUndo(blockundo, pindex);
-}
-
-/* Calculate the block/rev files that should be deleted to remain under target*/
-void FindFilesToPrune(std::set<int> &setFilesToPrune, uint64_t nPruneAfterHeight)
-{
-    LOCK2(cs_main, cs_LastBlockFile);
-
-    if (chainActive.Tip() == nullptr || nPruneTarget == 0)
-    {
-        return;
-    }
-    if ((uint64_t)chainActive.Tip()->nHeight <= nPruneAfterHeight)
-    {
-        return;
-    }
-    uint64_t nLastBlockWeCanPrune = chainActive.Tip()->nHeight - MIN_BLOCKS_TO_KEEP;
-
-    if (!pblockdb)
-    {
-        FindFilesToPruneSequential(setFilesToPrune, nLastBlockWeCanPrune);
-    }
-    else // if (pblockdb)
-    {
-        if (nDBUsedSpace < nPruneTarget + (pruneIntervalTweak.Value() * 1024 * 1024))
-        {
-            return;
-        }
-        uint64_t amntPruned = pblockdb->PruneDB(nLastBlockWeCanPrune);
-        // because we just prune the DB here and dont have a file set to return, we need to set prune triggers here
-        // otherwise they will check for the fileset and incorrectly never be set
-
-        // we do not need to set fFlushForPrune since we have "already flushed"
-
-        fCheckForPruning = false;
-        // if this is the first time we attempt to prune, dont set pruned = true if we didnt prune anything so we must
-        // check amntPruned here
-        if (!fHavePruned && amntPruned != 0)
-        {
-            pblocktree->WriteFlag("prunedblockfiles", true);
-            fHavePruned = true;
-        }
-    }
 }
 
 bool FlushStateToDiskInternal(CValidationState &state,

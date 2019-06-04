@@ -13,6 +13,7 @@
 #include "addrman.h"
 #include "amount.h"
 #include "blockstorage/blockstorage.h"
+#include "blockstorage/prune.h"
 #include "blockstorage/sequential_files.h"
 #include "chain.h"
 #include "chainparams.h"

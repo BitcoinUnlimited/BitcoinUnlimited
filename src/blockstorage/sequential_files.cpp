@@ -10,7 +10,6 @@
 
 
 extern bool AbortNode(CValidationState &state, const std::string &strMessage, const std::string &userMessage = "");
-extern bool fCheckForPruning;
 extern CCriticalSection cs_LastBlockFile;
 extern std::set<int> setDirtyFileInfo;
 extern std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
@@ -73,18 +72,6 @@ void FlushBlockFile(bool fFinalize)
         fclose(fileOld);
     }
 }
-
-void UnlinkPrunedFiles(std::set<int> &setFilesToPrune)
-{
-    for (std::set<int>::iterator it = setFilesToPrune.begin(); it != setFilesToPrune.end(); ++it)
-    {
-        CDiskBlockPos pos(*it, 0);
-        fs::remove(GetBlockPosFilename(pos, "blk"));
-        fs::remove(GetBlockPosFilename(pos, "rev"));
-        LOG(PRUNE, "Prune: %s deleted blk/rev (%05u)\n", __func__, *it);
-    }
-}
-
 
 bool WriteBlockToDiskSequential(const CBlock &block,
     CDiskBlockPos &pos,

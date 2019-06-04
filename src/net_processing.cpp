@@ -13,6 +13,7 @@
 #include "blockrelay/mempool_sync.h"
 #include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
+#include "blockstorage/prune.h"
 #include "chain.h"
 #include "dosman.h"
 #include "electrum/electrs.h"

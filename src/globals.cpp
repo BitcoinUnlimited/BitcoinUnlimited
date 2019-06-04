@@ -14,6 +14,7 @@
 #include "blockrelay/graphene.h"
 #include "blockrelay/mempool_sync.h"
 #include "blockrelay/thinblock.h"
+#include "blockstorage/prune.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "clientversion.h"

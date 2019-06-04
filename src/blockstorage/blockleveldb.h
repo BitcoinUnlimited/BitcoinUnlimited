@@ -158,8 +158,6 @@ public:
         leveldb::Slice slKey2(ssKey2.data(), ssKey2.size());
         pwrapperundo->getpdb()->CompactRange(&slKey1, &slKey2);
     }
-
-    uint64_t PruneDB(uint64_t nLastBlockWeCanPrune);
 };
 
 #endif // BLOCKDB_H

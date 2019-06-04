@@ -117,6 +117,7 @@ BITCOIN_CORE_H = \
   blockstorage/blockleveldb.h \
   blockstorage/blockstorage.h \
   blockstorage/dbabstract.h \
+  blockstorage/prune.h \
   blockstorage/sequential_files.h \
   bitnodes.h \
   bloom.h \
@@ -269,8 +270,9 @@ libbitcoin_server_a_SOURCES = \
   blockrelay/mempool_sync.cpp \
   blockrelay/thinblock.cpp \
   blockstorage/blockleveldb.cpp \
-  blockstorage/sequential_files.cpp \
   blockstorage/blockstorage.cpp \
+  blockstorage/prune.cpp \
+  blockstorage/sequential_files.cpp \
   bloom.cpp \
   chain.cpp \
   checkpoints.cpp \
