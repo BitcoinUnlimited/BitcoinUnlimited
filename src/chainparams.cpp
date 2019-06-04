@@ -397,11 +397,28 @@ public:
         fMineBlocksOnDemand = false;
         fTestnetToBeDeprecatedFieldRPC = true;
 
-        checkpointData =
-            (CCheckpointData){boost::assign::map_list_of(546,
-                                  uint256S("000000002a936ca763904c3c35fce2f3556c559c0214345d31b1bcebf76acb70"))(1155876,
-                                  uint256S("00000000000e38fef93ed9582a7df43815d5c2ba9fd37ef70c9a0ea4a285b8f5")),
-                1501616524, 1488, 300};
+        // clang-format off
+        checkpointData = CCheckpointData();
+        MapCheckpoints &checkpoints = checkpointData.mapCheckpoints;
+        checkpoints[546]     = uint256S("0x000000002a936ca763904c3c35fce2f3556c559c0214345d31b1bcebf76acb70");
+        // August 1st 2017 CASH fork (UAHF) activation block
+        checkpoints[1155876] = uint256S("0x00000000000e38fef93ed9582a7df43815d5c2ba9fd37ef70c9a0ea4a285b8f5");
+        // Nov, 13th 2017. DAA activation block.
+        checkpoints[1188697] = uint256S("0x0000000000170ed0918077bde7b4d36cc4c91be69fa09211f748240dabe047fb");
+        // May 15th 2018, re-enabling opcodes, max block size 32MB
+        checkpoints[1233070] = uint256S("0x0000000000000253c6201a2076663cfe4722e4c75f537552cc4ce989d15f7cd5");
+        // Nov 15th 2018, CHECKDATASIG, ctor
+        checkpoints[1267996] = uint256S("0x00000000000001fae0095cd4bea16f1ce8ab63f3f660a03c6d8171485f484b24");
+        // May 15th 2019, Schnorr + segwit recovery activation block
+        checkpoints[1303885] = uint256S("0x00000000000000479138892ef0e4fa478ccc938fb94df862ef5bde7e8dee23d3");
+
+        // clang-format on
+        // Data as of block
+        checkpointData.nTimeLastCheckpoint = 1557923294;
+        // * total number of transactions between genesis and last checkpoint
+        checkpointData.nTransactionsLastCheckpoint = 23468264;
+        // * estimated number of transactions per day after checkpoint (~1.6 TPS)
+        checkpointData.fTransactionsPerDay = 140000;
     }
 };
 static CTestNetParams testNetParams;
