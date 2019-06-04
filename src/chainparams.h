@@ -125,6 +125,7 @@ public:
     /** Policy: Filter transactions that do not match well-defined patterns */
     bool RequireStandard() const;
     uint64_t PruneAfterHeight() const { return nPruneAfterHeight; }
+    uint64_t MinBlocksToKeep() const { return nPruneMinBlocks; }
     /** Make miner stop after a block is found. In RPC, don't return until nGenProcLimit blocks are generated */
     bool MineBlocksOnDemand() const { return fMineBlocksOnDemand; }
     /** In the future use NetworkIDString() for RPC fields */
@@ -143,6 +144,7 @@ protected:
     CMessageHeader::MessageStartChars pchCashMessageStart;
     int nDefaultPort;
     uint64_t nPruneAfterHeight;
+    uint64_t nPruneMinBlocks;
     std::vector<CDNSSeedData> vSeeds;
     std::vector<uint8_t> base58Prefixes[MAX_BASE58_TYPES];
     std::string cashaddrPrefix;
