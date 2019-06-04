@@ -172,6 +172,8 @@ extern uint64_t nPruneTarget;
 /** The maximum bloom filter size that we will support for an xthin request. This value is communicated to
  *  our peer at the time we first make the connection.
  */
+extern bool fPruneWithMask;
+
 extern uint32_t nXthinBloomFilterSize;
 
 static const signed int DEFAULT_CHECKBLOCKS = 6;

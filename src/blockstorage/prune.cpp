@@ -24,15 +24,54 @@ extern CCriticalSection cs_LastBlockFile;
 extern std::set<int> setDirtyFileInfo;
 extern std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
 
+bool fPruneWithMask = DEFAULT_PRUNE_WITH_MASK;
 bool fHavePruned = false;
 uint64_t nPruneTarget = 0;
 uint64_t nDBUsedSpace = 0;
+arith_uint256 pruneHashMask = 0;
+const arith_uint256 LSB64_MASK = std::numeric_limits<uint64_t>::max();
+const uint64_t ONE_THRESHOLD_PERCENT = std::numeric_limits<uint64_t>::max() / 100;
+uint8_t hashMaskThreshold = DEFAULT_THRESHOLD_PERCENT;
+uint64_t normalized_threshold = hashMaskThreshold * ONE_THRESHOLD_PERCENT;
+
 /** Global flag to indicate we should check to see if there are
  *  block/undo files that should be deleted.  Set on startup
  *  or if we allocate more file space when we're in prune mode
  */
 bool fCheckForPruning = false;
 bool fPruneMode = false;
+
+/** Generate a random list of 32 ints between 8 and 255 that will be used as important pruning bits*/
+void GenerateRandomPruningHashMask()
+{
+    // only generate new bits if we dont already have some
+    uint256 read_hashMask;
+    if (pblocktree->ReadHashMask(read_hashMask))
+    {
+        return;
+    }
+    pruneHashMask = UintToArith256(read_hashMask);
+    uint64_t seed = GetTime();
+    std::mt19937_64 rand(seed); // Standard mersenne_twister_engine seeded with rd()
+    arith_uint256 hashMask64(rand());
+    pruneHashMask = 0;
+    pruneHashMask = pruneHashMask | hashMask64;
+    uint256 write_hashMask = ArithToUint256(pruneHashMask);
+    pblocktree->WriteHashMask(write_hashMask);
+    pblocktree->WriteFlag("hashmaskexists", true);
+}
+
+/** Get important pruning bits from a block hash and compare their value to our pruning threshold*/
+bool hashMaskCompare(uint256 _blockHash)
+{
+    arith_uint256 value = UintToArith256(_blockHash) & LSB64_MASK;
+    if ((value ^ pruneHashMask) < normalized_threshold) // we keep all blocks below the threshold
+    {
+        return true;
+    }
+    return false;
+}
+
 void UnlinkPrunedFiles(std::set<int> &setFilesToPrune)
 {
     for (std::set<int>::iterator it = setFilesToPrune.begin(); it != setFilesToPrune.end(); ++it)

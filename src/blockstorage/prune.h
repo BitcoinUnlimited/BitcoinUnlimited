@@ -9,11 +9,23 @@
 
 #include <set>
 #include <string>
+
+static const bool DEFAULT_PRUNE_WITH_MASK = false;
+static const uint8_t DEFAULT_THRESHOLD_PERCENT = 100;
+
 /** Block files containing a block-height within MIN_BLOCKS_TO_KEEP of chainActive.Tip() will not be pruned. */
 // this has been moved to chain params
 // static const unsigned int MIN_BLOCKS_TO_KEEP = 288;
+
+extern arith_uint256 pruneHashMask;
+extern uint8_t hashMaskThreshold;
+extern uint64_t normalized_threshold;
+
 /** Number of MiB the blockdb is using. */
 extern uint64_t nDBUsedSpace;
+
+bool hashMaskCompare(uint256 _blockHash);
+bool SetupPruning();
 /**
  *  Actually unlink the specified files
  */
