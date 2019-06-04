@@ -1196,10 +1196,10 @@ bool AppInit2(Config &config, thread_group &threadGroup)
                 }
 
                 uiInterface.InitMessage(_("Verifying blocks..."));
-                if (fHavePruned && GetArg("-checkblocks", DEFAULT_CHECKBLOCKS) > MIN_BLOCKS_TO_KEEP)
+                if (fHavePruned && GetArg("-checkblocks", DEFAULT_CHECKBLOCKS) > chainparams.MinBlocksToKeep())
                 {
                     LOGA("Prune: pruned datadir may not have more than %d blocks; only checking available blocks",
-                        MIN_BLOCKS_TO_KEEP);
+                        chainparams.MinBlocksToKeep());
                 }
 
                 {

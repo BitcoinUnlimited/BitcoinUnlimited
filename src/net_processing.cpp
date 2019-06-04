@@ -167,11 +167,11 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     if (fSend && !pfrom->fWhitelisted &&
                         ((((nLocalServices & NODE_NETWORK_LIMITED) == NODE_NETWORK_LIMITED) &&
                             ((nLocalServices & NODE_NETWORK) != NODE_NETWORK) &&
-                            (chainActive.Tip()->nHeight - mi->nHeight > (int)NODE_NETWORK_LIMITED_MIN_BLOCKS + 2))))
+                            (chainActive.Tip()->nHeight - mi->nHeight > (int)Params().MinBlocksToKeep() + 2))))
                     {
                         LOG(NET, "Ignore block request below NODE_NETWORK_LIMITED threshold from peer=%d\n",
                             pfrom->GetId());
-                        // disconnect node and prevent it from stalling (would
+                            // disconnect node and prevent it from stalling (would
                         // otherwise wait for the missing block)
                         pfrom->fDisconnect = true;
                         fSend = false;
@@ -1112,7 +1112,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             // If pruning, don't inv blocks unless we have on disk and are likely to still have
             // for some reasonable time window (1 hour) that block relay might require.
             const int nPrunedBlocksLikelyToHave =
-                MIN_BLOCKS_TO_KEEP - 3600 / chainparams.GetConsensus().nPowTargetSpacing;
+                chainparams.MinBlocksToKeep() - 3600 / chainparams.GetConsensus().nPowTargetSpacing;
+            if (fPruneMode && (!(pindex->nStatus & BLOCK_HAVE_DATA) ||
+                                  pindex->nHeight <= chainActive.Tip()->nHeight - nPrunedBlocksLikelyToHave))
             {
                 READLOCK(cs_mapBlockIndex); // for nStatus
                 if (fPruneMode && (!(pindex->nStatus & BLOCK_HAVE_DATA) ||
