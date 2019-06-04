@@ -1660,9 +1660,11 @@ bool AcceptBlock(const CBlock &block,
     {
         if (state.IsInvalid() && !state.CorruptionPossible())
         {
-            WRITELOCK(cs_mapBlockIndex);
-            pindex->nStatus |= BLOCK_FAILED_VALID;
-            setDirtyBlockIndex.insert(pindex);
+            {
+                WRITELOCK(cs_mapBlockIndex);
+                pindex->nStatus |= BLOCK_FAILED_VALID;
+                setDirtyBlockIndex.insert(pindex);
+            }
             // Now mark every block index on every chain that contains pindex as child of invalid
             MarkAllContainingChainsInvalid(pindex);
         }
