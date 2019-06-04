@@ -194,6 +194,10 @@ public:
     bool WriteTxIndex(const std::vector<std::pair<uint256, CDiskTxPos> > &list);
     bool WriteFlag(const std::string &name, bool fValue);
     bool ReadFlag(const std::string &name, bool &fValue);
+    bool WriteHashMask(const uint256 &_hashMask);
+    bool ReadHashMask(uint256 &_hashMask);
+    bool WriteHashMaskThreshold(const uint8_t &_hashMaskThreshold);
+    bool ReadHashMaskThreshold(uint8_t &_hashMaskThreshold);
     bool FindBlockIndex(uint256 blockhash, CDiskBlockIndex *index);
     bool LoadBlockIndexGuts();
     bool GetSortedHashIndex(std::vector<std::pair<int, CDiskBlockIndex> > &hashesByHeight);

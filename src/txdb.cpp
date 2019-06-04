@@ -30,6 +30,8 @@ static const char DB_BEST_BLOCK = 'B';
 static const char DB_FLAG = 'F';
 static const char DB_REINDEX_FLAG = 'R';
 static const char DB_LAST_BLOCK = 'l';
+static const char DB_HASH_MASK = 'H';
+static const char DB_HASH_MASK_THRESHOLD = 'h';
 
 
 namespace
@@ -365,6 +367,18 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue)
         return false;
     fValue = ch == '1';
     return true;
+}
+
+bool CBlockTreeDB::WriteHashMask(const uint256 &_hashMask) { return Write(DB_HASH_MASK, _hashMask); }
+bool CBlockTreeDB::ReadHashMask(uint256 &_hashMask) { return Read(DB_HASH_MASK, _hashMask); }
+bool CBlockTreeDB::WriteHashMaskThreshold(const uint8_t &_hashMaskThreshold)
+{
+    return Write(DB_HASH_MASK_THRESHOLD, _hashMaskThreshold);
+}
+
+bool CBlockTreeDB::ReadHashMaskThreshold(uint8_t &_hashMaskThreshold)
+{
+    return Read(DB_HASH_MASK_THRESHOLD, _hashMaskThreshold);
 }
 
 bool CBlockTreeDB::FindBlockIndex(uint256 blockhash, CDiskBlockIndex *pindex)
