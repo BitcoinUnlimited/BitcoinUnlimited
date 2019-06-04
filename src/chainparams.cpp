@@ -210,13 +210,15 @@ public:
         checkpoints[530359] = uint256S("0x0000000000000000011ada8bd08f46074f44a8f155396f43e38acf9501c49103");
         // Nov 15th 2018 activate LTOR, DSV op_code
         checkpoints[556767] = uint256S("0x0000000000000000004626ff6e3b936941d341c5932ece4357eeccac44e6d56c");
+        // May 15th 2019 activate Schnorr, segwit recovery
+        checkpoints[582680] = uint256S("0x000000000000000001b4b8e36aec7d4f9671a47872cb9a74dc16ca398c7dcc18");
 
 
         // clang-format on
         // * UNIX timestamp of last checkpoint block
-        checkpointData.nTimeLastCheckpoint = 1542304936;
+        checkpointData.nTimeLastCheckpoint = 1557922919;
         // * total number of transactions between genesis and last checkpoint
-        checkpointData.nTransactionsLastCheckpoint = 265567564;
+        checkpointData.nTransactionsLastCheckpoint = 271769178;
         // * estimated number of transactions per day after checkpoint (~3.5 TPS)
         checkpointData.fTransactionsPerDay = 280000.0;
     }
