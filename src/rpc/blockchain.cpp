@@ -1171,15 +1171,20 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
 
     if (fPruneMode)
     {
-        CBlockIndex *block = chainActive.Tip();
+        if (!fPruneWithMask)
         {
-            READLOCK(cs_mapBlockIndex);
+            CBlockIndex *block = chainActive.Tip();
             while (block && block->pprev && (block->pprev->nStatus & BLOCK_HAVE_DATA))
                 block = block->pprev;
-        }
 
-        if (block != nullptr)
-            obj.pushKV("pruneheight", block->nHeight);
+            if (block != nullptr)
+                obj.pushKV("pruneheight", block->nHeight);
+        }
+        else
+        {
+            obj.pushKV("pruneHashMask", pruneHashMask.ToString());
+            obj.pushKV("hashMaskThreshold", hashMaskThresholdTweak.Value());
+        }
     }
     return obj;
 }
