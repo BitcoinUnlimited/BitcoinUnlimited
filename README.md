@@ -34,6 +34,7 @@ For info on installing Bitcoin Unlimited see [INSTALL.md](INSTALL.md)
 For info on building Bitcoin Unlimited from sources, see
 - [Dependencies](doc/dependencies.md)
 - [Unix Build Notes](doc/build-unix.md)
+- [Unix Build Notes (RPM)](doc/build-unix-rpm.md)
 - [Windows Build Notes](doc/build-windows.md)
 - [OpenBSD Build Notes](doc/build-openbsd.md)
 - [macOS Build Notes](doc/build-macos.md)

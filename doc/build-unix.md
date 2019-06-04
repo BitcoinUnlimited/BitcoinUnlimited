@@ -1,8 +1,9 @@
 # UNIX BUILD NOTES
 
-Some notes on how to build Bitcoin Unlimited in Unix.
+Some notes on how to build Bitcoin Unlimited in Unix. Mostly with at Ubuntu / Debian focus. 
 
-(for OpenBSD specific instructions, see [build-openbsd.md](build-openbsd.md))
+For RPM based distros, see [build-unix-rpm.md](build-unix-rpm.md).
+For OpenBSD specific instructions, see [build-openbsd.md](build-openbsd.md).
 
 ## Note
 
@@ -19,6 +20,8 @@ the usage of the absolute path.
 ## To Build
 
 ```bash
+git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git
+cd BitcoinUnlimited
 ./autogen.sh
 ./configure
 make
