@@ -311,10 +311,15 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
                     DEFAULT_PERSIST_MEMPOOL))
         .addArg("prune=<n>", requiredInt,
             strprintf(_("Reduce storage requirements by pruning (deleting) old blocks. This mode is incompatible with "
-                        "-txindex and -rescan. "
+                        "-txindex, -rescan, and -prunewithmask"
                         "Warning: Reverting this setting requires re-downloading the entire blockchain. "
                         "(default: 0 = disable pruning blocks, >%u = target size in MiB to use for block files)"),
                     MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024))
+        .addArg("prunewithmask={true,false,0,1}", optionalBool,
+            strprintf(_("Reduce storage requirements by pruning (deleting) old blocks. This mode is incompatible with "
+                        "-txindex, -rescan, and -prune "
+                        "Warning: Reverting this setting requires re-downloading the entire blockchain. "
+                        "(default: 0 = disable pruning blocks, 1 = prune blocks using a randomly generated mask)")))
         .addArg("reindex", optionalBool, _("Rebuild block chain index from current blk000??.dat files on startup"))
         .addArg("txindex", optionalBool,
             strprintf(_("Maintain a full transaction index, used by the getrawtransaction rpc call (default: %u)"),
