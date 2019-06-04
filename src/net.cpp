@@ -2295,7 +2295,8 @@ void ThreadMessageHandler()
             }
             if (shutdown_threads.load() == true)
             {
-                break; // skip down to where we release the node refs
+                // release the node refs
+                break;
             }
 
             // Put transaction and block requests into the request manager
@@ -2314,14 +2315,12 @@ void ThreadMessageHandler()
             }
             if (shutdown_threads.load() == true)
             {
-                break; // skip down to where we release the node refs
+                // release the node refs
+                break;
             }
+            requester.SendRequests(pnode);
         }
 
-        // From the request manager, make requests for transactions and blocks. We do this before potentially
-        // sleeping in the step below so as to allow requests to return during the sleep time.
-        if (shutdown_threads.load() == false)
-            requester.SendRequests();
 
         // A cs_vNodes lock is not required here when releasing refs for two reasons: one, this only decrements
         // an atomic counter, and two, the counter will always be > 0 at this point, so we don't have to worry

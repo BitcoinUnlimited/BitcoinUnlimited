@@ -2081,13 +2081,15 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 {
     UniValue ret(UniValue::VOBJ);
     ret.pushKV("time", GetTime());
+    ret.pushKV("requester.mapTxnInfo_ByPeer", (uint64_t)requester.mapTxnInfo_ByPeer.size());
+    ret.pushKV("requester.mapBlkInfo_ByPeer", (uint64_t)requester.mapBlkInfo_ByPeer.size());
     ret.pushKV("requester.mapTxnInfo", (uint64_t)requester.mapTxnInfo.size());
     ret.pushKV("requester.mapBlkInfo", (uint64_t)requester.mapBlkInfo.size());
     unsigned long int max = 0;
     unsigned long int size = 0;
     for (CRequestManager::OdMap::iterator i = requester.mapTxnInfo.begin(); i != requester.mapTxnInfo.end(); i++)
     {
-        unsigned long int temp = i->second.availableFrom.size();
+        unsigned long int temp = i->second->availableFrom.size();
         size += temp;
         if (max < temp)
             max = temp;
@@ -2099,7 +2101,7 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     size = 0;
     for (CRequestManager::OdMap::iterator i = requester.mapBlkInfo.begin(); i != requester.mapBlkInfo.end(); i++)
     {
-        unsigned long int temp = i->second.availableFrom.size();
+        unsigned long int temp = i->second->availableFrom.size();
         size += temp;
         if (max < temp)
             max = temp;

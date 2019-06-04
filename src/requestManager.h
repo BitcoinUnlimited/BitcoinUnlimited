@@ -76,19 +76,22 @@ struct MatchCNodeRequestData
 class CUnknownObj
 {
 public:
-    typedef std::list<CNodeRequestData> ObjectSourceList;
     CInv obj;
     bool rateLimited;
-    bool fProcessing; // object was received but is still being processed
+    bool fProcessing; // object received but still being processed
+    bool fProcessed;
     int64_t lastRequestTime; // In stopwatch time microseconds, 0 means no request
     unsigned int outstandingReqs;
-    ObjectSourceList availableFrom;
     unsigned int priority;
+
+    typedef std::list<CNodeRequestData> ObjectSourceList;
+    ObjectSourceList availableFrom;
 
     CUnknownObj()
     {
         rateLimited = false;
         fProcessing = false;
+        fProcessed = false;
         outstandingReqs = 0;
         lastRequestTime = 0;
         priority = 0;
@@ -133,15 +136,19 @@ protected:
 #endif
     friend class CState;
 
-    // maps and iterators all GUARDED_BY cs_objDownloader
-    typedef std::map<uint256, CUnknownObj> OdMap;
+    // section which is GUARDED_BY cs_objDownloader
+    typedef std::map<uint256, std::shared_ptr<CUnknownObj> > OdMap;
     OdMap mapTxnInfo;
     OdMap mapBlkInfo;
+
+    typedef std::map<const NodeId, std::deque<std::shared_ptr<CUnknownObj> > > peerMap;
+    peerMap mapTxnInfo_ByPeer;
+    peerMap mapBlkInfo_ByPeer;
+
     std::map<uint256, std::map<NodeId, std::list<QueuedBlock>::iterator> > mapBlocksInFlight;
     std::map<NodeId, CRequestManagerNodeState> mapRequestManagerNodeState;
-    OdMap::iterator sendIter;
-    OdMap::iterator sendBlkIter;
     CCriticalSection cs_objDownloader;
+    // end section guarded by cs_objDownloader
 
     int inFlight;
     CStatHistory<int> inFlightTxns;
@@ -255,11 +262,19 @@ public:
     void GetBlocksInFlight(std::vector<uint256> &vBlocksInFlight, NodeId nodeid);
     int GetNumBlocksInFlight(NodeId nodeid);
 
-    // Add entry to the requestmanager nodestate map
+    // Initialize the request manager node state
     void InitializeNodeState(NodeId nodeid)
     {
         LOCK(cs_objDownloader);
+
+        // Add entry to the requestmanager nodestate map
         mapRequestManagerNodeState.emplace(nodeid, CRequestManagerNodeState());
+
+        // Add an entries to the peers maps
+        std::deque<std::shared_ptr<CUnknownObj> > vTxnInfo;
+        std::deque<std::shared_ptr<CUnknownObj> > vBlkInfo;
+        mapTxnInfo_ByPeer.emplace(nodeid, vTxnInfo);
+        mapBlkInfo_ByPeer.emplace(nodeid, vBlkInfo);
     }
 
     // Remove a request manager node from the nodestate map.
