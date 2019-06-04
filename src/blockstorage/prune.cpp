@@ -72,6 +72,50 @@ bool hashMaskCompare(uint256 _blockHash)
     return false;
 }
 
+bool SetupPruning()
+{
+    // block pruning; get the amount of disk space (in MiB) to allot for block & undo files
+    int64_t nSignedPruneTarget = GetArg("-prune", 0) * 1024 * 1024;
+    if (nSignedPruneTarget < 0)
+    {
+        return InitError(_("Prune cannot be configured with a negative value."));
+    }
+    nPruneTarget = (uint64_t)nSignedPruneTarget;
+    if (nPruneTarget)
+    {
+        if (nPruneTarget < MIN_DISK_SPACE_FOR_BLOCK_FILES)
+        {
+            return InitError(strprintf(_("Prune configured below the minimum of %d MiB.  Please use a higher number."),
+                MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024));
+        }
+        LOGA("Prune configured to target %uMiB on disk for block and undo files.\n", nPruneTarget / 1024 / 1024);
+        fPruneMode = true;
+        return true;
+    }
+    bool haveUsedMask = false;
+    pblocktree->ReadFlag("hashmaskexists", haveUsedMask);
+    if (haveUsedMask || GetBoolArg("-prunewithmask", DEFAULT_PRUNE_WITH_MASK))
+    {
+        fPruneWithMask = true;
+        GenerateRandomPruningHashMask();
+        hashMaskThreshold = 100;
+        pblocktree->ReadHashMaskThreshold(hashMaskThreshold);
+        uint8_t potentialThreshold = GetArg("-prunethreshold", 100);
+        if (potentialThreshold < hashMaskThreshold)
+        {
+            hashMaskThreshold = potentialThreshold;
+            pblocktree->WriteHashMaskThreshold(hashMaskThreshold);
+        }
+        else if (potentialThreshold > hashMaskThreshold)
+        {
+            LOGA("cannot raise prunethreshold above %u, keeping it at %u \n", hashMaskThreshold, hashMaskThreshold);
+        }
+        pruneHashMask = pruneHashMask / hashMaskThreshold;
+        fPruneMode = true;
+    }
+    return true;
+}
+
 void UnlinkPrunedFiles(std::set<int> &setFilesToPrune)
 {
     for (std::set<int>::iterator it = setFilesToPrune.begin(); it != setFilesToPrune.end(); ++it)

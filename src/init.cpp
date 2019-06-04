@@ -791,24 +791,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 
     fServer = GetBoolArg("-server", false);
 
-    // block pruning; get the amount of disk space (in MiB) to allot for block & undo files
-    int64_t nSignedPruneTarget = GetArg("-prune", 0) * 1024 * 1024;
-    if (nSignedPruneTarget < 0)
-    {
-        return InitError(_("Prune cannot be configured with a negative value."));
-    }
-    nPruneTarget = (uint64_t)nSignedPruneTarget;
-    if (nPruneTarget)
-    {
-        if (nPruneTarget < MIN_DISK_SPACE_FOR_BLOCK_FILES)
-        {
-            return InitError(strprintf(_("Prune configured below the minimum of %d MiB.  Please use a higher number."),
-                MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024));
-        }
-        LOGA("Prune configured to target %uMiB on disk for block and undo files.\n", nPruneTarget / 1024 / 1024);
-        fPruneMode = true;
-    }
-
     RegisterAllCoreRPCCommands(tableRPC);
 #ifdef ENABLE_WALLET
     bool fDisableWallet = GetBoolArg("-disablewallet", false);
