@@ -41,6 +41,38 @@ uint64_t normalized_threshold = hashMaskThreshold * ONE_THRESHOLD_PERCENT;
 bool fCheckForPruning = false;
 bool fPruneMode = false;
 
+extern void RelayNewXUpdate(const uint64_t key, const uint64_t val);
+extern bool AbortNode(const std::string &strMessage, const std::string &userMessage = "");
+
+std::string hashMaskThresholdValidator(const uint8_t &value, uint8_t *item, bool validate)
+{
+    if (validate)
+    {
+        if (value > hashMaskThreshold)
+        {
+            std::ostringstream ret;
+            ret << "Sorry, your hashMaskThreshold (" << hashMaskThreshold
+                << ") is smaller than your proposed new threshold (" << value
+                << ").  You can only lower this number, not raise it.";
+            return ret.str();
+        }
+        else if (value == hashMaskThreshold)
+        {
+            // just return in this case, nothing has changed
+            return std::string();
+        }
+        hashMaskThreshold = value;
+        pblocktree->WriteHashMaskThreshold(hashMaskThreshold);
+        normalized_threshold = hashMaskThreshold * ONE_THRESHOLD_PERCENT;
+        RelayNewXUpdate(XVer::BU_PRUNE_THRESHOLD, normalized_threshold);
+    }
+    else
+    {
+        return "Validate was false, no changes were made";
+    }
+    return std::string();
+}
+
 /** Generate a random list of 32 ints between 8 and 255 that will be used as important pruning bits*/
 void GenerateRandomPruningHashMask()
 {

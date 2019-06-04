@@ -24,6 +24,7 @@ extern uint64_t normalized_threshold;
 /** Number of MiB the blockdb is using. */
 extern uint64_t nDBUsedSpace;
 
+std::string hashMaskThresholdValidator(const uint8_t &value, uint8_t *item, bool validate);
 bool hashMaskCompare(uint256 _blockHash);
 bool SetupPruning();
 /**

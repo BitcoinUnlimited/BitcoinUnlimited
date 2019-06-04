@@ -266,6 +266,11 @@ CTweak<uint64_t> pruneIntervalTweak("prune.pruneInterval",
     "How much block data (in MiB) is written to disk before trying to prune our block storage",
     DEFAULT_PRUNE_INTERVAL);
 
+CTweakRef<uint8_t> hashMaskThresholdTweak("prune.hashMaskThreshold",
+    "What percentage of blocks that fall below our threshold should be kept (integers from 0 to 100)",
+    &hashMaskThreshold,
+    &hashMaskThresholdValidator);
+
 CTweak<uint32_t> netMagic("net.magic", "network prefix override. If 0 use the default", 0);
 
 CTweak<uint32_t> randomlyDontInv("net.randomlyDontInv", "Skip sending an INV for some percent of transactions", 0);
@@ -274,6 +279,7 @@ CTweakRef<uint64_t> ebTweak("net.excessiveBlock",
     "Excessive block size in bytes",
     &excessiveBlockSize,
     &ExcessiveBlockValidator);
+
 CTweak<uint64_t> blockSigopsPerMb("net.excessiveSigopsPerMb",
     "Excessive effort per block, denoted in cost (# inputs * txsize) per MB",
     BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);

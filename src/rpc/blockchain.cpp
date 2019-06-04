@@ -41,6 +41,8 @@
 // In case of operator error, limit the rollback of a chain to 100 blocks
 static uint32_t nDefaultRollbackLimit = 100;
 
+extern CTweakRef<uint8_t> hashMaskThresholdTweak;
+
 using namespace std;
 
 extern void TxToJSON(const CTransaction &tx, const uint256 hashBlock, UniValue &entry);
