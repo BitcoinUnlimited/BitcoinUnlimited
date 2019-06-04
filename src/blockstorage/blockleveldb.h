@@ -73,6 +73,9 @@ private:
     CDBWrapper *pwrapperblock;
     CDBWrapper *pwrapperundo;
 
+    CDBBatch *blockBatch;
+    CDBBatch *undoBatch;
+
 public:
     // clean up our internal pointers
     ~CBlockLevelDB()
@@ -81,6 +84,8 @@ public:
         pwrapperblock = nullptr;
         delete pwrapperundo;
         pwrapperundo = nullptr;
+        blockBatch = new CDBBatch(*pwrapperblock);
+        undoBatch = new CDBBatch(*pwrapperundo);
     }
 
     // we need a custom read function to account for the way we want to deserialize undodbvalue
@@ -123,6 +128,7 @@ public:
         pwrapperblock->Sync();
         pwrapperundo->Sync();
     }
+    bool EraseBlock(const std::string &key);
 
     void CondenseBlockData(const std::string &key_begin, const std::string &key_end)
     {
@@ -139,6 +145,7 @@ public:
     bool WriteUndo(const CBlockUndo &blockundo, const CBlockIndex *pindex);
     bool ReadUndo(CBlockUndo &blockundo, const CBlockIndex *pindex);
     bool EraseUndo(const CBlockIndex *pindex);
+    bool EraseUndo(const std::string &key);
 
     void CondenseUndoData(const std::string &key_begin, const std::string &key_end)
     {

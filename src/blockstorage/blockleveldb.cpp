@@ -68,7 +68,7 @@ bool CBlockLevelDB::EraseBlock(const CBlockIndex *pindex)
     return pwrapperblock->Erase(key.str(), true);
 }
 
-
+bool CBlockLevelDB::EraseBlock(const std::string &key) { return pwrapperblock->Erase(key, true); }
 bool CBlockLevelDB::WriteUndo(const CBlockUndo &blockundo, const CBlockIndex *pindex)
 {
     // Create a key which will sort the database by the blocktime.  This is needed to prevent unnecessary
@@ -158,44 +158,4 @@ bool CBlockLevelDB::EraseUndo(const CBlockIndex *pindex)
     key << nBlockTime << ":" << hashBlock.ToString();
     return pwrapperundo->Erase(key.str(), true);
 }
-
-uint64_t CBlockLevelDB::PruneDB(uint64_t nLastBlockWeCanPrune)
-{
-    CBlockIndex *pindexOldest = chainActive.Tip();
-    while (pindexOldest->pprev && pindexOldest->pprev->nFile != 0)
-    {
-        pindexOldest = pindexOldest->pprev;
-    }
-    uint64_t prunedCount = 0;
-    CDBBatch blockBatch(*pwrapperblock);
-    CDBBatch undoBatch(*pwrapperundo);
-    while (nDBUsedSpace >= nPruneTarget && pindexOldest != nullptr)
-    {
-        if (pindexOldest->nHeight >= (int)nLastBlockWeCanPrune)
-        {
-            break;
-        }
-        unsigned int blockSize = pindexOldest->nDataPos;
-        std::ostringstream key;
-        key << pindexOldest->GetBlockTime() << ":" << pindexOldest->GetBlockHash().ToString();
-        blockBatch.Erase(key.str());
-        undoBatch.Erase(key.str());
-        nDBUsedSpace = nDBUsedSpace - blockSize;
-        pindexOldest->nStatus &= ~BLOCK_HAVE_DATA;
-        pindexOldest->nStatus &= ~BLOCK_HAVE_UNDO;
-        pindexOldest->nFile = 0;
-        pindexOldest->nDataPos = 0;
-        pindexOldest->nUndoPos = 0;
-        setDirtyBlockIndex.insert(pindexOldest);
-        prunedCount = prunedCount + 1;
-        pindexOldest = chainActive.Next(pindexOldest);
-    }
-    CValidationState state;
-    FlushStateToDiskInternal(state);
-    pwrapperblock->WriteBatch(blockBatch, true);
-    pwrapperundo->WriteBatch(undoBatch, true);
-    pwrapperblock->Compact();
-    pwrapperundo->Compact();
-    LOG(PRUNE, "Pruned %u blocks, size on disk %u\n", prunedCount, nDBUsedSpace);
-    return prunedCount;
-}
+bool CBlockLevelDB::EraseUndo(const std::string &key) { return pwrapperundo->Erase(key, true); }

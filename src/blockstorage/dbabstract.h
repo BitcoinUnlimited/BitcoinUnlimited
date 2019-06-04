@@ -40,6 +40,9 @@ public:
     //! remove a block from the database using the blockindex
     virtual bool EraseBlock(const CBlockIndex *pindex) = 0;
 
+    //! remove a block from the database using the key
+    virtual bool EraseBlock(const std::string &key) = 0;
+
     // clean up the block data if supported by the db
     virtual void CondenseBlockData(const std::string &start, const std::string &end) = 0;
 
@@ -54,6 +57,9 @@ public:
 
     //! Flush database files to disk
     virtual void Flush() = 0;
+    
+    //! Remove undo data from the database via its key
+    virtual bool EraseUndo(const std::string &key) = 0;
 
     // clean up the undo data if supported by the db
     virtual void CondenseUndoData(const std::string &start, const std::string &end) = 0;
