@@ -309,7 +309,6 @@ struct CompactBlockQuickStats
 class CCompactBlockData
 {
 private:
-
     CCriticalSection cs_compactblockstats; // locks everything below this point
 
     CStatHistory<uint64_t> nOriginalSize;
