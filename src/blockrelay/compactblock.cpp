@@ -95,23 +95,23 @@ uint64_t CompactBlock::GetShortID(const uint256 &txhash) const
     return ::GetShortID(shorttxidk0, shorttxidk1, txhash);
 }
 
-void validateCompactBlock(const CompactBlock &cmpctblock)
+void validateCompactBlock(std::shared_ptr<CompactBlock> cmpctblock)
 {
-    if (cmpctblock.header.IsNull() || (cmpctblock.shorttxids.empty() && cmpctblock.prefilledtxn.empty()))
+    if (cmpctblock->header.IsNull() || (cmpctblock->shorttxids.empty() && cmpctblock->prefilledtxn.empty()))
         throw std::invalid_argument("empty data in compact block");
 
     int64_t lastprefilledindex = -1;
-    for (size_t i = 0; i < cmpctblock.prefilledtxn.size(); i++)
+    for (size_t i = 0; i < cmpctblock->prefilledtxn.size(); i++)
     {
-        if (cmpctblock.prefilledtxn[i].tx.IsNull())
+        if (cmpctblock->prefilledtxn[i].tx.IsNull())
             throw std::invalid_argument("null tx in compact block");
 
         // index is a uint32_t, so cant overflow here
-        lastprefilledindex += static_cast<uint64_t>(cmpctblock.prefilledtxn[i].index) + 1;
+        lastprefilledindex += static_cast<uint64_t>(cmpctblock->prefilledtxn[i].index) + 1;
         if (lastprefilledindex > std::numeric_limits<uint32_t>::max())
             throw std::invalid_argument("tx index overflows");
 
-        if (static_cast<uint64_t>(lastprefilledindex) > cmpctblock.shorttxids.size() + i)
+        if (static_cast<uint64_t>(lastprefilledindex) > cmpctblock->shorttxids.size() + i)
         {
             // If we are inserting a tx at an index greater than our full list of shorttxids
             // plus the number of prefilled txn we've inserted, then we have txn for which we
@@ -136,7 +136,12 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     std::shared_ptr<CompactBlock> compactBlock = pblock->cmpctblock;
 
     // Message consistency checking
-    IsCompactBlockValid(pfrom, *compactBlock);
+    if (!IsCompactBlockValid(pfrom, compactBlock))
+    {
+        dosMan.Misbehaving(pfrom, 100);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
+        return error("Received an invalid compactblock from peer %s\n", pfrom->GetLogName());
+    }
 
     // Is there a previous block or header to connect with?
     CBlockIndex *pprev = LookupBlockIndex(compactBlock->header.hashPrevBlock);
@@ -524,8 +529,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     {
         if (cmpctBlock->vTxHashes256[i].IsNull())
         {
-            std::map<uint64_t, CTransactionRef>::iterator val =
-                cmpctBlock->mapMissingTx.find(cmpctBlock->vTxHashes[i]);
+            std::map<uint64_t, CTransactionRef>::iterator val = cmpctBlock->mapMissingTx.find(cmpctBlock->vTxHashes[i]);
             if (val != cmpctBlock->mapMissingTx.end())
             {
                 cmpctBlock->vTxHashes256[i] = val->second->GetHash();
@@ -545,8 +549,6 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     if (pblock->hashMerkleRoot != merkleroot || mutated)
     {
         thinrelay.ClearAllBlockData(pfrom, pblock);
-
-        dosMan.Misbehaving(pfrom, 100);
         return error("Merkle root for %s does not match computed merkle root, peer=%s", inv.hash.ToString(),
             pfrom->GetLogName());
     }
@@ -615,8 +617,6 @@ static bool ReconstructBlock(CNode *pfrom,
         if (setHashes.size() != pblock->cmpctblock->vTxHashes256.size())
         {
             thinrelay.ClearAllBlockData(pfrom, pblock);
-
-            dosMan.Misbehaving(pfrom, 10);
             return error("Duplicate transaction ids, peer=%s", pfrom->GetLogName());
         }
     }
@@ -1102,21 +1102,27 @@ void SendCompactBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
     }
 }
 
-bool IsCompactBlockValid(CNode *pfrom, const CompactBlock &compactBlock)
+bool IsCompactBlockValid(CNode *pfrom, std::shared_ptr<CompactBlock> compactBlock)
 {
     validateCompactBlock(compactBlock);
 
+    // Check that we havn't exceeded the max allowable block size that would be reconstructed from this
+    // set of hashes
+    uint64_t nTxnsInBlock = compactBlock->shorttxids.size() + compactBlock->prefilledtxn.size();
+    if (nTxnsInBlock > (thinrelay.GetMaxAllowedBlockSize() / MIN_TX_SIZE))
+        return error("Number of hashes in compactblock would reconstruct a block greather than the block size limit\n");
+
     // check block header
     CValidationState state;
-    if (!CheckBlockHeader(compactBlock.header, state, true))
+    if (!CheckBlockHeader(compactBlock->header, state, true))
     {
         return error("Received invalid header for compactblock %s from peer %s",
-            compactBlock.header.GetHash().ToString(), pfrom->GetLogName());
+            compactBlock->header.GetHash().ToString(), pfrom->GetLogName());
     }
     if (state.Invalid())
     {
         return error("Received invalid header for compactblock %s from peer %s",
-            compactBlock.header.GetHash().ToString(), pfrom->GetLogName());
+            compactBlock->header.GetHash().ToString(), pfrom->GetLogName());
     }
 
     return true;

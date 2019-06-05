@@ -5,6 +5,7 @@
 #ifndef BITCOIN_GRAPHENE_H
 #define BITCOIN_GRAPHENE_H
 
+#include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene_set.h"
 #include "bloom.h"
 #include "config.h"
@@ -138,7 +139,7 @@ public:
         // This logic assumes a smallest transaction size of MIN_TX_SIZE bytes.  This is optimistic for realistic
         // transactions and the downside for pathological blocks is just that graphene won't work so we fall back
         // to xthin
-        if (nBlockTxs > (excessiveBlockSize * maxMessageSizeMultiplier / MIN_TX_SIZE))
+        if (nBlockTxs > (thinrelay.GetMaxAllowedBlockSize() / MIN_TX_SIZE))
             throw std::runtime_error("nBlockTxs exceeds threshold for excessive block txs");
         if (!pGrapheneSet)
         {

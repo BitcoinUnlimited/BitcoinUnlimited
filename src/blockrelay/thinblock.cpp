@@ -72,10 +72,11 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     std::shared_ptr<CThinBlock> thinBlock = pblock->thinblock;
 
     // Message consistency checking
-    if (!IsThinBlockValid(pfrom, thinBlock->vMissingTx, thinBlock->header))
+    if (!IsThinBlockValid(pfrom, thinBlock->vMissingTx, thinBlock->header, thinBlock->vTxHashes.size()))
     {
         dosMan.Misbehaving(pfrom, 100);
-        return error("Invalid thinblock received");
+        thinrelay.ClearAllBlockData(pfrom, pblock);
+        return error("Received an invalid xthin or thinblock from peer %s\n", pfrom->GetLogName());
     }
 
     // Is there a previous block or header to connect with?
@@ -140,6 +141,9 @@ bool CThinBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
     {
         thinrelay.ClearAllBlockData(pfrom, pblock);
 
+        // This is the only place where we ban a peer for having the incorrect merkleroot because the
+        // hashes provided in this thinblock must be the correct ones. (In other thintype block relay there
+        // may be instances where collisions are possibly a false positive and so we don't ban in those cases.)
         dosMan.Misbehaving(pfrom, 100);
         return error("Thinblock merkle root does not match computed merkle root, peer=%s", pfrom->GetLogName());
     }
@@ -492,7 +496,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
     CInv inv(MSG_BLOCK, thinBlock->header.GetHash());
     {
         // Message consistency checking (FIXME: some redundancy here with AcceptBlockHeader)
-        if (!IsThinBlockValid(pfrom, thinBlock->vMissingTx, thinBlock->header))
+        if (!IsThinBlockValid(pfrom, thinBlock->vMissingTx, thinBlock->header, thinBlock->vTxHashes.size()))
         {
             dosMan.Misbehaving(pfrom, 100);
             LOGA("Received an invalid %s from peer %s\n", strCommand, pfrom->GetLogName());
@@ -774,8 +778,6 @@ static bool ReconstructBlock(CNode *pfrom,
         if (setHashes.size() != vHashes.size())
         {
             thinrelay.ClearAllBlockData(pfrom, pblock);
-
-            dosMan.Misbehaving(pfrom, 10);
             return error("Duplicate transaction ids, peer=%s", pfrom->GetLogName());
         }
     }
@@ -1387,7 +1389,10 @@ void RequestThinBlock(CNode *pfrom, const uint256 &hash)
     }
 }
 
-bool IsThinBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissingTx, const CBlockHeader &header)
+bool IsThinBlockValid(CNode *pfrom,
+    const std::vector<CTransaction> &vMissingTx,
+    const CBlockHeader &header,
+    const uint64_t nHashes)
 {
     // Check that that there is at least one txn in the xthin and that the first txn is the coinbase
     if (vMissingTx.empty())
@@ -1400,6 +1405,12 @@ bool IsThinBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissingTx,
         return error("First txn is not coinbase for thinblock or xthinblock %s from peer %s",
             header.GetHash().ToString(), pfrom->GetLogName());
     }
+
+    // Check that we havn't exceeded the max allowable block size that would be reconstructed from this
+    // set of hashes
+    if (nHashes > (thinrelay.GetMaxAllowedBlockSize() / MIN_TX_SIZE))
+        return error("Number of hashes in thinblock or xthinblock would reconstruct a block greater than the block "
+                     "size limit\n");
 
     // check block header
     CValidationState state;
