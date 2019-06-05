@@ -141,7 +141,7 @@ bool CThinBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
     {
         thinrelay.ClearAllBlockData(pfrom, pblock);
 
-        // This is the only place where we ban a peer for having the incorrect merkelroot because the
+        // This is the only place where we ban a peer for having the incorrect merkleroot because the
         // hashes provided in this thinblock must be the correct ones. (In other thintype block relay there
         // may be instances where collisions are possibly a false positive and so we don't ban in those cases.)
         dosMan.Misbehaving(pfrom, 100);
@@ -1409,7 +1409,8 @@ bool IsThinBlockValid(CNode *pfrom,
     // Check that we havn't exceeded the max allowable block size that would be reconstructed from this
     // set of hashes
     if (nHashes > (thinrelay.GetMaxAllowedBlockSize() / MIN_TX_SIZE))
-        return error("Number of hashes in thinblock or xthinblock would reconstruct a block the block size limit\n");
+        return error("Number of hashes in thinblock or xthinblock would reconstruct a block greater than the block "
+                     "size limit\n");
 
     // check block header
     CValidationState state;

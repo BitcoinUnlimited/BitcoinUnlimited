@@ -136,11 +136,11 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     std::shared_ptr<CompactBlock> compactBlock = pblock->cmpctblock;
 
     // Message consistency checking
-    if(!IsCompactBlockValid(pfrom, compactBlock))
+    if (!IsCompactBlockValid(pfrom, compactBlock))
     {
-       dosMan.Misbehaving(pfrom, 100);
-       thinrelay.ClearAllBlockData(pfrom, pblock);
-       return error("Received an invalid compactblock from peer %s\n", pfrom->GetLogName());
+        dosMan.Misbehaving(pfrom, 100);
+        thinrelay.ClearAllBlockData(pfrom, pblock);
+        return error("Received an invalid compactblock from peer %s\n", pfrom->GetLogName());
     }
 
     // Is there a previous block or header to connect with?
@@ -529,8 +529,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     {
         if (cmpctBlock->vTxHashes256[i].IsNull())
         {
-            std::map<uint64_t, CTransactionRef>::iterator val =
-                cmpctBlock->mapMissingTx.find(cmpctBlock->vTxHashes[i]);
+            std::map<uint64_t, CTransactionRef>::iterator val = cmpctBlock->mapMissingTx.find(cmpctBlock->vTxHashes[i]);
             if (val != cmpctBlock->mapMissingTx.end())
             {
                 cmpctBlock->vTxHashes256[i] = val->second->GetHash();
@@ -1111,7 +1110,7 @@ bool IsCompactBlockValid(CNode *pfrom, std::shared_ptr<CompactBlock> compactBloc
     // set of hashes
     uint64_t nTxnsInBlock = compactBlock->shorttxids.size() + compactBlock->prefilledtxn.size();
     if (nTxnsInBlock > (thinrelay.GetMaxAllowedBlockSize() / MIN_TX_SIZE))
-        return error("Number of hashes in thinblock or xthinblock would reconstruct a block the block size limit\n");
+        return error("Number of hashes in compactblock would reconstruct a block greather than the block size limit\n");
 
     // check block header
     CValidationState state;
