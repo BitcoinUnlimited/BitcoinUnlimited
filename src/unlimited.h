@@ -68,9 +68,6 @@ public:
 
 extern CStatusString statusStrings;
 
-
-extern uint256 bitcoinCashForkBlockHash;
-
 extern std::set<CBlockIndex *> setDirtyBlockIndex;
 extern uint32_t blockVersion; // Overrides the mined block version if non-zero
 extern uint64_t maxGeneratedBlock;
