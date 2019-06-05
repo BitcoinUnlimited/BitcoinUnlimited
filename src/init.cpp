@@ -34,6 +34,7 @@
 #include "net.h"
 #include "parallel.h"
 #include "policy/policy.h"
+#include "requestManager.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
 #include "script/sigcache.h"
@@ -292,8 +293,10 @@ void Shutdown()
 #endif
     globalVerifyHandle.reset();
     ECC_Stop();
-
+    PV.reset(nullptr); // clean up scriptcheck threads
+    requester.Cleanup();
     NetCleanup();
+    connmgr.reset(nullptr); // clean up connection manager
     MainCleanup();
     UnlimitedCleanup();
     LOGA("%s: done\n", __func__);
