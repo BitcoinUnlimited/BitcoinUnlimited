@@ -156,6 +156,10 @@ protected:
 public:
     CRequestManager();
 
+    // Cleanup stops all request manager activity, aborts all current requests, and releases all node references
+    // in preparation for shutdown
+    void Cleanup();
+
     // How many outbound nodes are we connected to.
     std::atomic<int32_t> nOutbound;
 

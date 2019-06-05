@@ -32,7 +32,7 @@ public:
     CCriticalSection cs_expedited;
 
     CConnMgr();
-
+    ~CConnMgr();
     /**
      * Call once the command line is parsed so the connection manager configures itself appropriately.
      */

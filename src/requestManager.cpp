@@ -105,6 +105,28 @@ CRequestManager::CRequestManager()
     sendBlkIter = mapBlkInfo.end();
 }
 
+void CRequestManager::Cleanup()
+{
+    LOCK(cs_objDownloader);
+    sendIter = mapTxnInfo.end();
+    sendBlkIter = mapBlkInfo.end();
+    MapBlocksInFlightClear();
+    OdMap::iterator i = mapTxnInfo.begin();
+    while (i != mapTxnInfo.end())
+    {
+        auto prev = i;
+        ++i;
+        cleanup(prev); // cleanup erases which is why I need to advance the iterator first
+    }
+
+    i = mapBlkInfo.begin();
+    while (i != mapBlkInfo.end())
+    {
+        auto prev = i;
+        ++i;
+        cleanup(prev); // cleanup erases which is why I need to advance the iterator first
+    }
+}
 
 void CRequestManager::cleanup(OdMap::iterator &itemIt)
 {
