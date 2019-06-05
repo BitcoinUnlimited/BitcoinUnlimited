@@ -55,9 +55,9 @@ UniValue getinfo(const UniValue &params, bool fHelp)
             "  \"blocks\": xxxxxx,           (numeric) the current number of blocks processed in the server\n"
             "  \"timeoffset\": xxxxx,        (numeric) the time offset\n"
             "  \"connections\": xxxxx,       (numeric) the number of connections\n"
-            "  \"peers_graph\": xxxxx,       (numeric) the number of grapheneblock peers\n"
-            "  \"peers_xthin\": xxxxx,       (numeric) the number of xthinblock peers\n"
-            "  \"peers_cmpct\": xxxxx,       (numeric) the number of compactblock peers\n"
+            "  \"peers_graphene\": xxxxx     (numeric) the number of grapheneblock peers\n"
+            "  \"peers_xthinblock\": xxxxx,  (numeric) the number of xthinblock peers\n"
+            "  \"peers_cmpctblock\": xxxxx,  (numeric) the number of compactblock peers\n"
             "  \"proxy\": \"host:port\",     (string, optional) the proxy used by the server\n"
             "  \"difficulty\": xxxxxx,       (numeric) the current difficulty\n"
             "  \"testnet\": true|false,      (boolean) if the server is using testnet or not\n"
@@ -110,9 +110,9 @@ UniValue getinfo(const UniValue &params, bool fHelp)
     obj.pushKV("blocks", (int)chainActive.Height());
     obj.pushKV("timeoffset", GetTimeOffset());
     obj.pushKV("connections", nNodes);
-    obj.pushKV("peers_graph", (int)thinrelay.GetGraphenePeers());
-    obj.pushKV("peers_xthin", (int)thinrelay.GetThinBlockPeers());
-    obj.pushKV("peers_cmpct", (int)thinrelay.GetCompactBlockPeers());
+    obj.pushKV("peers_graphene", (int)thinrelay.GetGraphenePeers());
+    obj.pushKV("peers_xthinblock", (int)thinrelay.GetThinBlockPeers());
+    obj.pushKV("peers_cmpctblock", (int)thinrelay.GetCompactBlockPeers());
     obj.pushKV("proxy", (proxy.IsValid() ? proxy.proxy.ToStringIPPort() : string()));
     obj.pushKV("difficulty", (double)GetDifficulty());
     obj.pushKV("testnet", Params().TestnetToBeDeprecatedFieldRPC());

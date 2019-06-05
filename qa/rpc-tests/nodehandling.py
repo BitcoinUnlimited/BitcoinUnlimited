@@ -91,21 +91,21 @@ class NodeHandlingTest (BitcoinTestFramework):
         connect_nodes(self.nodes[1], 2)
         # Each node should have two each of xthin/graph/cmpct peers connected
         for node in self.nodes:
-            waitFor(10, lambda: node.getinfo()["peers_graph"] == 2)
-            waitFor(10, lambda: node.getinfo()["peers_xthin"] == 2)
-            waitFor(10, lambda: node.getinfo()["peers_cmpct"] == 2)
+            waitFor(10, lambda: node.getinfo()["peers_graphene"] == 2)
+            waitFor(10, lambda: node.getinfo()["peers_xthinblock"] == 2)
+            waitFor(10, lambda: node.getinfo()["peers_cmpctblock"] == 2)
         
         disconnect_nodes(self.nodes[0], 1)
         # node0 and node1 should now only have 1 each of xthin/graph/cmpct peers but node2 should have 2 of each.
-        waitFor(10, lambda: self.nodes[0].getinfo()["peers_graph"] == 1)
-        waitFor(10, lambda: self.nodes[0].getinfo()["peers_xthin"] == 1)
-        waitFor(10, lambda: self.nodes[0].getinfo()["peers_cmpct"] == 1)
-        waitFor(10, lambda: self.nodes[1].getinfo()["peers_graph"] == 1)
-        waitFor(10, lambda: self.nodes[1].getinfo()["peers_xthin"] == 1)
-        waitFor(10, lambda: self.nodes[1].getinfo()["peers_cmpct"] == 1)
-        waitFor(10, lambda: self.nodes[2].getinfo()["peers_graph"] == 2)
-        waitFor(10, lambda: self.nodes[2].getinfo()["peers_xthin"] == 2)
-        waitFor(10, lambda: self.nodes[2].getinfo()["peers_cmpct"] == 2)
+        waitFor(10, lambda: self.nodes[0].getinfo()["peers_graphene"] == 1)
+        waitFor(10, lambda: self.nodes[0].getinfo()["peers_xthinblock"] == 1)
+        waitFor(10, lambda: self.nodes[0].getinfo()["peers_cmpctblock"] == 1)
+        waitFor(10, lambda: self.nodes[1].getinfo()["peers_graphene"] == 1)
+        waitFor(10, lambda: self.nodes[1].getinfo()["peers_xthinblock"] == 1)
+        waitFor(10, lambda: self.nodes[1].getinfo()["peers_cmpctblock"] == 1)
+        waitFor(10, lambda: self.nodes[2].getinfo()["peers_graphene"] == 2)
+        waitFor(10, lambda: self.nodes[2].getinfo()["peers_xthinblock"] == 2)
+        waitFor(10, lambda: self.nodes[2].getinfo()["peers_cmpctblock"] == 2)
 
 if __name__ == '__main__':
     NodeHandlingTest ().main ()
