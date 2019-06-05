@@ -763,11 +763,10 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
         }
 
-        CTxCommitData eData; // TODO awkward construction in these 4 lines
-        CTxMemPoolEntry entryTemp(tx, nFees, GetTime(), dPriority, chainActive.Height(), pool.HasNoInputsOf(*tx),
+        // Create a commit data entry
+        CTxMemPoolEntry entry(tx, nFees, GetTime(), dPriority, chainActive.Height(), pool.HasNoInputsOf(*tx),
             inChainInputValue, fSpendsCoinbase, nSigOps, lp);
-        eData.entry = entryTemp;
-        CTxMemPoolEntry &entry(eData.entry);
+
         nSize = entry.GetTxSize();
 
         // Check that the transaction doesn't have an excessive number of
@@ -907,7 +906,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             return state.Invalid(false, REJECT_HIGHFEE, "absurdly-high-fee",
                 strprintf("%d > %d", nFees, std::max((int64_t)1L, maxTxFee.Value()) * 10000));
 
-        eData.hash = hash;
         // Calculate in-mempool ancestors, up to a limit.
         size_t nLimitAncestors = GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
         size_t nLimitAncestorSize = GetArg("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
@@ -921,7 +919,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         if (!CheckInputs(
                 tx, state, view, true, flags, maxScriptOps.Value(), true, &resourceTracker, nullptr, &sighashType))
         {
-            LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", tx->GetHash().ToString().c_str());
+            LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", hash.ToString());
             if (state.GetDebugMessage() == "")
                 state.SetDebugMessage("CheckInputs failed");
             return false;
@@ -978,9 +976,14 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
         }
 
+        // Add entry to the commit queue
         {
+            CTxCommitData eData;
+            eData.entry = std::move(entry);
+            eData.hash = hash;
+
             boost::unique_lock<boost::mutex> lock(csCommitQ);
-            (*txCommitQ)[eData.hash] = eData;
+            (*txCommitQ).emplace(eData.hash, eData);
         }
     }
     uint64_t interval = (GetStopwatch() - start) / 1000;
