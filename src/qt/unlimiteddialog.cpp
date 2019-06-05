@@ -173,8 +173,8 @@ void UnlimitedDialog::validateBlockSize()
 {
     ui.statusLabel->setStyleSheet("QLabel { color: red; }");
 
-    int mmb = ui.miningMaxBlock->text().toInt();
-    int ebs = excessiveBlockSize;
+    uint64_t mmb = ui.miningMaxBlock->text().toInt();
+    uint64_t ebs = excessiveBlockSize;
 
     if (!MiningAndExcessiveBlockValidatorRule(ebs, mmb))
     {
