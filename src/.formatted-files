@@ -24,6 +24,8 @@ blockrelay/graphene_set.h
 blockrelay/graphene_set.cpp
 blockrelay/thinblock.h
 blockrelay/thinblock.cpp
+blockrelay/compactblock.cpp
+blockrelay/compactblock.h
 blockrelay/blockrelay_common.h
 blockrelay/blockrelay_common.cpp
 blockstorage/blockleveldb.cpp
