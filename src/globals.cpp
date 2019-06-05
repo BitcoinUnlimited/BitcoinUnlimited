@@ -291,12 +291,6 @@ CTweakRef<uint64_t> miningForkTime("consensus.forkMay2019Time",
     &nMiningForkTime,
     &ForkTimeValidator); // Thu May 15 12:00:00 UTC 2019
 
-CTweakRef<uint64_t> miningSvForkTime("consensus.svForkNov2018Time",
-    "Time in seconds since the epoch to initiate the Bitcoin SV defined hard fork scheduled on 15th Nov 2018.  A "
-    "setting of 1 will turn on the fork at the appropriate time.",
-    &nMiningSvForkTime,
-    &ForkTimeValidatorSV); // Thu Nov 15 15:40:00 UTC 2018
-
 CTweak<uint64_t> maxScriptOps("consensus.maxScriptOps",
     "Maximum number of script operations allowed.  Stack pushes are excepted.",
     MAX_OPS_PER_SCRIPT);

@@ -1412,7 +1412,7 @@ bool ContextualCheckBlock(const CBlock &block,
         }
 
         // Make sure tx size is equal or higher to 100 bytes if we are on the BCH chain and Nov 15th 2018 activated
-        if (AreWeOnBCHChain() && IsNov2018Activated(consensusParams, chainActive.Tip()))
+        if (IsNov2018Activated(consensusParams, chainActive.Tip()))
         {
             if (tx->GetTxSize() < MIN_TX_SIZE)
             {
@@ -1757,7 +1757,7 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
     // Since Nov 15, 2018 HF activates sig push only, clean stack rules
     // are enforced and CHECKDATASIG has been introduced on the BCH chain
     // (see  BIP 62 and CHECKDATASIG specification or more details)
-    if (AreWeOnBCHChain() && IsNov2018Activated(consensusparams, chainActive.Tip()))
+    if (IsNov2018Activated(consensusparams, chainActive.Tip()))
     {
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
         flags |= SCRIPT_VERIFY_CLEANSTACK;
@@ -1769,16 +1769,10 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
     // 65/64-byte Schnorr signatures in CHECKSIG and CHECKDATASIG respectively,
     // and their verify variants. We also stop accepting 65 byte signatures in
     // CHECKMULTISIG and its verify variant.
-    if (AreWeOnBCHChain() && IsMay2019Enabled(consensusparams, pindex->pprev))
+    if (IsMay2019Enabled(consensusparams, pindex->pprev))
     {
         flags |= SCRIPT_ALLOW_SEGWIT_RECOVERY;
         flags |= SCRIPT_ENABLE_SCHNORR;
-    }
-
-    // The SV Nov 15, 2018 HF rules
-    if (AreWeOnSVChain() && IsSv2018Activated(consensusparams, chainActive.Tip()))
-    {
-        flags |= SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES;
     }
 
     return flags;
@@ -2523,7 +2517,7 @@ bool ConnectBlock(const CBlock &block,
     // Discover how to handle this block
     bool canonical = enableCanonicalTxOrder.Value();
     // Always allow overwite of enableCanonicalTxOrder but for regtest on BCH
-    if (AreWeOnBCHChain() && IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip()))
+    if (IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip()))
     {
         if (!(chainparams.NetworkIDString() == "regtest"))
         {
@@ -2840,25 +2834,11 @@ void UpdateTip(CBlockIndex *pindexNew)
 
     // Set the global variables based on the fork state of the NEXT block
     // Always allow overwite of enableCanonicalTxOrder but for regtest)
-    if (AreWeOnBCHChain() && IsNov2018Activated(chainParams.GetConsensus(), chainActive.Tip()))
+    if (IsNov2018Activated(chainParams.GetConsensus(), chainActive.Tip()))
     {
         if (chainParams.NetworkIDString() != "regtest")
         {
             enableCanonicalTxOrder = true;
-        }
-    }
-
-    if (AreWeOnSVChain())
-    {
-        if (IsSv2018Activated(chainParams.GetConsensus(), chainActive.Tip()))
-        {
-            maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
-            excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
-        }
-        else // if blockchain reorg we may need to back it out
-        {
-            maxScriptOps = MAX_OPS_PER_SCRIPT;
-            excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
         }
     }
 }
@@ -2892,7 +2872,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     // If this block enabled the may152019 protocol upgrade, then we need to clear the mempool of any transaction using
     // not previously avaiable features (e.g. OP_CHECKDATASIGVERIFY).
 
-    if (AreWeOnBCHChain() && IsNov2018Activated(consensusParams, chainActive.Tip()))
+    if (IsNov2018Activated(consensusParams, chainActive.Tip()))
     {
         if (IsMay2019Enabled(consensusParams, pindexDelete) && !IsMay2019Enabled(consensusParams, pindexDelete->pprev))
         {

@@ -37,7 +37,6 @@ static const int COINBASE_MATURITY = 100;
  */
 static const unsigned int MIN_EXCESSIVE_BLOCK_SIZE = 32000000;
 static const unsigned int MIN_EXCESSIVE_BLOCK_SIZE_REGTEST = 1000;
-static const unsigned int SV_EXCESSIVE_BLOCK_SIZE = 128000000;
 static const unsigned int DEFAULT_EXCESSIVE_BLOCK_SIZE = MIN_EXCESSIVE_BLOCK_SIZE;
 
 /** Allowed messages lengths will be this * the excessive block size */

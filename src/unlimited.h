@@ -78,8 +78,6 @@ extern unsigned int maxMessageSizeMultiplier;
 // Fork configuration
 /** This specifies the MTP time of the next fork */
 extern uint64_t nMiningForkTime;
-/** This specifies the MTP time of the SV fork */
-extern uint64_t nMiningSvForkTime;
 
 /** BU Default maximum number of Outbound connections to simultaneously allow*/
 extern int nMaxOutConnections;
@@ -275,7 +273,6 @@ std::string MiningBlockSizeValidator(const uint64_t &value, uint64_t *item, bool
 std::string Bip135VoteValidator(const std::string &value, std::string *item, bool validate);
 // ensure that only 1 fork is active
 std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool validate);
-std::string ForkTimeValidatorSV(const uint64_t &value, uint64_t *item, bool validate);
 
 extern CTweak<unsigned int> maxTxSize;
 extern CTweak<uint64_t> blockSigopsPerMb;
@@ -293,8 +290,6 @@ void InterruptBlockValidationThreads();
 // Fork configuration
 /** This specifies the MTP time of the next fork */
 extern CTweakRef<uint64_t> miningForkTime;
-/** This specifies the MTP time of the SV fork */
-extern CTweakRef<uint64_t> miningSvForkTime;
 
 // Mining-Candidate start
 /** Return a Merkle root given a Coinbase hash and Merkle proof */

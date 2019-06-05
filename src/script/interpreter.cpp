@@ -1,7 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2019 The Bitcoin Unlimited developers
-// Copyright (c) 2018 The Bitcoin SV developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -44,78 +43,6 @@ inline bool set_error(ScriptError *ret, const ScriptError serror)
 }
 
 } // anon namespace
-
-inline uint8_t make_rshift_mask(size_t n)
-{
-    static uint8_t mask[] = {0xFF, 0xFE, 0xFC, 0xF8, 0xF0, 0xE0, 0xC0, 0x80};
-    return mask[n];
-}
-
-inline uint8_t make_lshift_mask(size_t n)
-{
-    static uint8_t mask[] = {0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01};
-    return mask[n];
-}
-
-// shift x right by n bits, implements OP_RSHIFT
-static valtype RShift(const valtype &x, int n)
-{
-    int bit_shift = n % 8;
-    int byte_shift = n / 8;
-
-    uint8_t mask = make_rshift_mask(bit_shift);
-    uint8_t overflow_mask = ~mask;
-
-    valtype result(x.size(), 0x00);
-    for (int i = 0; i < (int)x.size(); i++)
-    {
-        int k = i + byte_shift;
-        if (k < (int)x.size())
-        {
-            uint8_t val = (x[i] & mask);
-            val >>= bit_shift;
-            result[k] |= val;
-        }
-
-        if (k + 1 < (int)x.size())
-        {
-            uint8_t carryval = (x[i] & overflow_mask);
-            carryval <<= 8 - bit_shift;
-            result[k + 1] |= carryval;
-        }
-    }
-    return result;
-}
-
-// shift x left by n bits, implements OP_LSHIFT
-static valtype LShift(const valtype &x, int n)
-{
-    int bit_shift = n % 8;
-    int byte_shift = n / 8;
-
-    uint8_t mask = make_lshift_mask(bit_shift);
-    uint8_t overflow_mask = ~mask;
-
-    valtype result(x.size(), 0x00);
-    for (int i = x.size() - 1; i >= 0; i--)
-    {
-        int k = i - byte_shift;
-        if (k >= 0)
-        {
-            uint8_t val = (x[i] & mask);
-            val <<= bit_shift;
-            result[k] |= val;
-        }
-
-        if (k - 1 >= 0)
-        {
-            uint8_t carryval = (x[i] & overflow_mask);
-            carryval >>= 8 - bit_shift;
-            result[k - 1] |= carryval;
-        }
-    }
-    return result;
-}
 
 bool CastToBool(const valtype &vch)
 {
@@ -608,18 +535,12 @@ static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags)
     {
     case OP_2MUL:
     case OP_2DIV:
-        // Disabled opcodes
-        return true;
-
     case OP_INVERT:
     case OP_MUL:
     case OP_LSHIFT:
     case OP_RSHIFT:
-        if ((flags & SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES) == 0)
-        {
-            return true;
-        }
-        break;
+        // disabled opcodes
+        return true;
     default:
         break;
     }
@@ -1213,64 +1134,6 @@ bool ScriptMachine::Step()
                 }
                 break;
 
-                case OP_INVERT:
-                {
-                    // (x -- out)
-                    if (stack.size() < 1)
-                    {
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                    }
-                    valtype &vch1 = stacktop(-1);
-                    // To avoid allocating, we modify vch1 in place
-                    for (size_t i = 0; i < vch1.size(); i++)
-                    {
-                        vch1[i] = ~vch1[i];
-                    }
-                }
-                break;
-
-                case OP_LSHIFT:
-                {
-                    // (x n -- out)
-                    if (stack.size() < 2)
-                    {
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                    }
-
-                    const valtype vch1 = stacktop(-2);
-                    CScriptNum n(stacktop(-1), fRequireMinimal);
-                    if (n < 0)
-                    {
-                        return set_error(serror, SCRIPT_ERR_INVALID_NUMBER_RANGE);
-                    }
-
-                    popstack(stack);
-                    popstack(stack);
-                    stack.push_back(LShift(vch1, n.getint()));
-                }
-                break;
-
-                case OP_RSHIFT:
-                {
-                    // (x n -- out)
-                    if (stack.size() < 2)
-                    {
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                    }
-
-                    const valtype vch1 = stacktop(-2);
-                    CScriptNum n(stacktop(-1), fRequireMinimal);
-                    if (n < 0)
-                    {
-                        return set_error(serror, SCRIPT_ERR_INVALID_NUMBER_RANGE);
-                    }
-
-                    popstack(stack);
-                    popstack(stack);
-                    stack.push_back(RShift(vch1, n.getint()));
-                }
-                break;
-
                 case OP_EQUAL:
                 case OP_EQUALVERIFY:
                     // case OP_NOTEQUAL: // use OP_NUMNOTEQUAL
@@ -1346,7 +1209,6 @@ bool ScriptMachine::Step()
 
                 case OP_ADD:
                 case OP_SUB:
-                case OP_MUL:
                 case OP_DIV:
                 case OP_MOD:
                 case OP_BOOLAND:
@@ -1377,10 +1239,6 @@ bool ScriptMachine::Step()
 
                     case OP_SUB:
                         bn = bn1 - bn2;
-                        break;
-
-                    case OP_MUL:
-                        bn = bn1 * bn2;
                         break;
 
                     case OP_DIV:

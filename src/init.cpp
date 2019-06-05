@@ -1246,18 +1246,8 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
 
-    // Set EB and MAX_OPS_PER_SCRIPT for the SV chain
-    if (AreWeOnSVChain() && IsSv2018Activated(Params().GetConsensus(), chainActive.Tip()))
-    {
-        maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
-        excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
-        settingsToUserAgentString();
-        enableCanonicalTxOrder = false;
-    }
-
     // Set enableCanonicalTxOrder for the BCH early in the bootstrap phase
-    if (AreWeOnBCHChain() && IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()) &&
-        chainparams.NetworkIDString() != "regtest")
+    if (IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()) && chainparams.NetworkIDString() != "regtest")
     {
         enableCanonicalTxOrder = true;
     }
