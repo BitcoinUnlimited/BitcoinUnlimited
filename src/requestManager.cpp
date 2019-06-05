@@ -312,6 +312,20 @@ void CRequestManager::ProcessingBlock(const uint256 &hash, CNode *pfrom)
     LOG(BLK, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
         pfrom ? pfrom->GetLogName() : "unknown");
 }
+// This block has failed to be accepted so in case this is some sort of attack block
+// we need to set the fProcessing flag back to false.
+//
+// We don't have to remove the source because it would have already been removed if/when we
+// requested the block and if this was an unsolicited block or attack block then the source
+// would never have been added to the request manager.
+void CRequestManager::BlockRejected(const CInv &obj, CNode *pfrom)
+{
+    LOCK(cs_objDownloader);
+    OdMap::iterator item = mapBlkInfo.find(obj.hash);
+    if (item == mapBlkInfo.end())
+        return;
+    item->second.fProcessing = false;
+}
 
 // Indicate that we got this object.
 void CRequestManager::Received(const CInv &obj, CNode *pfrom)

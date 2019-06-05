@@ -3478,16 +3478,22 @@ bool ProcessNewBlock(CValidationState &state,
         }
         CheckBlockIndex(chainparams.GetConsensus());
 
-        // We must indicate to the request manager that the block was received only after it has
-        // been stored to disk (or been shown to be invalid). Doing so prevents unnecessary re-requests.
         CInv inv(MSG_BLOCK, hash);
-        requester.Received(inv, pfrom);
-
         if (!ret)
         {
             // BU TODO: if block comes out of order (before its parent) this will happen.  We should cache the block
             // until the parents arrive.
+
+            // If the block was not accepted then reset the fProcessing flag to false.
+            requester.BlockRejected(inv, pfrom);
+
             return error("%s: AcceptBlock FAILED", __func__);
+        }
+        else
+        {
+            // We must indicate to the request manager that the block was received only after it has
+            // been stored to disk (or been shown to be invalid). Doing so prevents unnecessary re-requests.
+            requester.Received(inv, pfrom);
         }
     }
     if (!ActivateBestChain(state, chainparams, pblock, fParallel))

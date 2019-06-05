@@ -193,6 +193,9 @@ public:
     // Indicate that we are processing this block
     void ProcessingBlock(const uint256 &hash, CNode *pfrom);
 
+    // Indicate that the block failed initial acceptance
+    void BlockRejected(const CInv &obj, CNode *pfrom);
+
     // Indicate that we got this object
     void Received(const CInv &obj, CNode *pfrom);
 
