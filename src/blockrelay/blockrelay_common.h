@@ -51,6 +51,9 @@ private:
 
 public:
     void AddPeers(CNode *pfrom);
+    uint32_t GetGraphenePeers() { return nGraphenePeers.load(); }
+    uint32_t GetThinBlockPeers() { return nThinBlockPeers.load(); }
+    uint32_t GetCompactBlockPeers() { return nCompactBlockPeers.load(); }
     void AddCompactBlockPeer(CNode *pfrom);
     void RemovePeers(CNode *pfrom);
     bool HasBlockRelayTimerExpired(const uint256 &hash);
@@ -61,6 +64,7 @@ public:
     void BlockWasReceived(CNode *pfrom, const uint256 &hash);
     bool AddBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType);
     void ClearBlockInFlight(CNode *pfrom, const uint256 &hash);
+    void ClearAllBlocksInFlight(NodeId id);
     void CheckForDownloadTimeout(CNode *pfrom);
     void RequestBlock(CNode *pfrom, const uint256 &hash);
 
@@ -68,7 +72,7 @@ public:
     // xthins or graphene.
     std::shared_ptr<CBlockThinRelay> SetBlockToReconstruct(CNode *pfrom, const uint256 &hash);
     std::shared_ptr<CBlockThinRelay> GetBlockToReconstruct(CNode *pfrom);
-    void ClearBlockToReconstruct(CNode *pfrom);
+    void ClearBlockToReconstruct(NodeId id);
 
     // Accessor methods for tracking total block bytes for all blocks currently in the process
     // of being reconstructed.
