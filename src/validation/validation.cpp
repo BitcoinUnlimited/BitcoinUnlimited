@@ -2872,13 +2872,9 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     // If this block enabled the may152019 protocol upgrade, then we need to clear the mempool of any transaction using
     // not previously avaiable features (e.g. OP_CHECKDATASIGVERIFY).
 
-    if (IsNov2018Activated(consensusParams, chainActive.Tip()))
+    if (IsMay2019Activated(consensusParams, pindexDelete) && !IsMay2019Activated(consensusParams, pindexDelete->pprev))
     {
-        if (IsMay2019Activated(consensusParams, pindexDelete) &&
-            !IsMay2019Activated(consensusParams, pindexDelete->pprev))
-        {
-            mempool.clear();
-        }
+        mempool.clear();
     }
 
     // these bloom filters stop us from doing duplicate work on tx we already know about.
