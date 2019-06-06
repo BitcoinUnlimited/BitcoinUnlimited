@@ -41,9 +41,21 @@ void ThinTypeRelay::RemovePeers(CNode *pfrom)
         if (pfrom->fSupportsCompactBlocks)
             nCompactBlockPeers--;
 
-        DbgAssert(nThinBlockPeers >= 0, nThinBlockPeers = 0);
-        DbgAssert(nGraphenePeers >= 0, nGraphenePeers = 0);
-        DbgAssert(nCompactBlockPeers >= 0, nCompactBlockPeers = 0);
+        if (nThinBlockPeers < 0)
+        {
+            nThinBlockPeers = 0;
+            LOG(THIN | GRAPHENE | CMPCT, "WARNING: nThinBlockPeers was less than zero");
+        }
+        if (nGraphenePeers < 0)
+        {
+            nGraphenePeers = 0;
+            LOG(THIN | GRAPHENE | CMPCT, "WARNING: nGraphenePeers was less than zero");
+        }
+        if (nCompactBlockPeers < 0)
+        {
+            nCompactBlockPeers = 0;
+            LOG(THIN | GRAPHENE | CMPCT, "WARNING: nCompactBlockPeers was less than zero");
+        }
     }
 }
 
