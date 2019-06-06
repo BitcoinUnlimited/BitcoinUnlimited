@@ -104,12 +104,3 @@ bool IsMay2019Enabled(const Consensus::Params &consensusparams, const CBlockInde
     }
     return pindexTip->IsforkActiveOnNextBlock(miningForkTime.Value());
 }
-
-bool IsMay2019Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
-{
-    if (pindexTip == nullptr)
-    {
-        return false;
-    }
-    return pindexTip->forkAtNextBlock(miningForkTime.Value());
-}

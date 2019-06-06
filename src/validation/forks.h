@@ -42,9 +42,6 @@ bool IsDAAEnabled(const Consensus::Params &consensusparams, const CBlockIndex *p
 bool IsNov2018Activated(const Consensus::Params &consensusparams, const int32_t nHeight);
 bool IsNov2018Activated(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 
-/** Check if the next will be the first block where the new set of rules will be enforced */
-bool IsMay2019Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
-
 /** Test if May 15th 2019 fork has actived */
 bool IsMay2019Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 
