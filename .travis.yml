@@ -52,7 +52,7 @@ matrix:
         - RUN_TESTS=true
         - RUN_FORMATTING_CHECK=true
         - GOAL="install"
-        - BITCOIN_CONFIG="--enable-shared --enable-zmq --enable-glibc-back-compat --enable-reduce-exports CPPFLAGS=-DDEBUG_LOCKORDER" #need to test also libdb 4.8
+        - BITCOIN_CONFIG="--enable-debug --enable-shared --enable-zmq --enable-glibc-back-compat --enable-reduce-exports CPPFLAGS=-DDEBUG_LOCKORDER" #need to test also libdb 4.8
     #ARM64
     - compiler: gcc
       env:
