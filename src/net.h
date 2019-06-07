@@ -240,7 +240,7 @@ public:
     double dPingMin;
     //! What this peer sees as my address
     std::string addrLocal;
-    //! Whether this peer supports CompactBlocks (for statistics only, BU doesn't support CB protocol)
+    //! Whether this peer supports CompactBlocks
     bool fSupportsCompactBlocks;
 };
 
