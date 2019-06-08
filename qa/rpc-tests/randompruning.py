@@ -30,7 +30,7 @@ class RandomPruning (BitcoinTestFramework):
 
     def setup_network(self, split=False):
         self.nodes = []
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug", "-useblockdb=1"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug=0", "-useblockdb=1"]))
         self.nodes.append(start_node(1, self.options.tmpdir, ["-debug=prune", "-useblockdb=1", "-prunewithmask=1", "-prunethreshold=10"]))
 
         # Now interconnect the nodes
@@ -68,6 +68,9 @@ class RandomPruning (BitcoinTestFramework):
         # this hardcode is a work around for uint being little endian, this is what x is equal to
         normalized_threshold = int(0x000000000000000000000000000000000000000000000000fffffffffffffff0)
 
+        # our threshold should be 10
+        assert_equal({'prune.hashMaskThreshold': 10}, self.nodes[1].get("prune.hashMaskThreshold"))
+
         # check the blocks mined prior to determine if we are keeping the blocks we expect to have
         # and pruning the ones we expect to prune
 
@@ -84,10 +87,30 @@ class RandomPruning (BitcoinTestFramework):
             else:
                 kept.append(self.nodes[1].getblock(block)['height'])
 
+        print("checking if we can raise the threshold higher than the current one... (should not be able to)")
         # we should get an error raising the threshold higher than 10% since that was its last value
-        assert_raises_rpc_error(-32603, "Block not available (pruned data)", self.nodes[1].set, "prune.hashMaskThreshold=70")
+        assert_raises_rpc_error(-1, "current hashMaskThreshold (10) is smaller than your proposed new threshold (70)",
+        self.nodes[1].set, "prune.hashMaskThreshold=70")
+        # our threshold should still be 10
+        print("checking to make sure nothing has changed...")
+        assert_equal({'prune.hashMaskThreshold': 10}, self.nodes[1].get("prune.hashMaskThreshold"))
         # we should be able to lower it, for example to 5
-        self.nodes[1].set("prune.hashMaskThreshold=70")
+        print("attempting to lower threshold from 10 to 5... (should be able to)")
+        self.nodes[1].set("prune.hashMaskThreshold=5")
+        # our threshold should now be 5
+        print("checking to make sure threshold was lowered...")
+        assert_equal({'prune.hashMaskThreshold': 5}, self.nodes[1].get("prune.hashMaskThreshold"))
+        print("stopping nodes...")
+        # stop the nodes
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+        print("starting nodes...")
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug=prune", "-useblockdb=1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug=prune", "-useblockdb=1"]))
+        # our prune threshold should be persistant across restarts
+        print("checking that threshold is persistant across node restarts...")
+        assert_equal({'prune.hashMaskThreshold': 5}, self.nodes[1].get("prune.hashMaskThreshold"))
+
 
 
 
