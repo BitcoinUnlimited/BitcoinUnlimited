@@ -142,6 +142,11 @@ public:
         pwrapperblock->getpdb()->CompactRange(&slKey1, &slKey2);
     }
 
+    void CondenseBlockData()
+    {
+        pwrapperblock->Compact();
+    }
+
     bool WriteUndo(const CBlockUndo &blockundo, const CBlockIndex *pindex);
     bool ReadUndo(CBlockUndo &blockundo, const CBlockIndex *pindex);
     bool EraseUndo(const CBlockIndex *pindex);
@@ -157,6 +162,11 @@ public:
         leveldb::Slice slKey1(ssKey1.data(), ssKey1.size());
         leveldb::Slice slKey2(ssKey2.data(), ssKey2.size());
         pwrapperundo->getpdb()->CompactRange(&slKey1, &slKey2);
+    }
+
+    void CondenseUndoData()
+    {
+        pwrapperundo->Compact();
     }
 };
 

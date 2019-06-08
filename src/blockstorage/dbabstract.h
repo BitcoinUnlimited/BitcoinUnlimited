@@ -45,6 +45,7 @@ public:
 
     // clean up the block data if supported by the db
     virtual void CondenseBlockData(const std::string &start, const std::string &end) = 0;
+    virtual void CondenseBlockData() = 0;
 
     //! Write undo data to the database
     virtual bool WriteUndo(const CBlockUndo &blockundo, const CBlockIndex *pindex) = 0;
@@ -63,6 +64,7 @@ public:
 
     // clean up the undo data if supported by the db
     virtual void CondenseUndoData(const std::string &start, const std::string &end) = 0;
+    virtual void CondenseUndoData() = 0;
 
     // prune the database - this is now managed seperately inside prune.cpp
     // we now pass the db to the pruner to determine if pruning is needed

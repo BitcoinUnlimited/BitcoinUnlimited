@@ -322,6 +322,8 @@ uint64_t PruneDB(uint64_t nLastBlockWeCanPrune)
     {
         pblockdb->EraseUndo(key);
     }
+    pblockdb->CondenseBlockData();
+    pblockdb->CondenseUndoData();
     LOG(PRUNE, "Pruned %u blocks, size on disk %u\n", prunedCount, nDBUsedSpace);
     return prunedCount;
 }
