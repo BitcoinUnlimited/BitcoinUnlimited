@@ -139,7 +139,7 @@ bool SetupPruning()
         GenerateRandomPruningHashMask();
         hashMaskThreshold = 100;
         pblocktree->ReadHashMaskThreshold(hashMaskThreshold);
-        uint8_t potentialThreshold = GetArg("-prunethreshold", 100);
+        uint8_t potentialThreshold = GetArg("-prunethreshold", DEFAULT_THRESHOLD_PERCENT);
         if (potentialThreshold < hashMaskThreshold)
         {
             hashMaskThreshold = potentialThreshold;

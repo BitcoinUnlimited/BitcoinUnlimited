@@ -7,6 +7,7 @@
 
 #include "allowed_args.h"
 #include "blockstorage/blockstorage.h"
+#include "blockstorage/prune.h"
 #include "chainparams.h"
 #include "dosman.h"
 #include "httpserver.h"
@@ -320,6 +321,8 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
                         "-txindex, -rescan, and -prune "
                         "Warning: Reverting this setting requires re-downloading the entire blockchain. "
                         "(default: 0 = disable pruning blocks, 1 = prune blocks using a randomly generated mask)")))
+        .addArg("prunethreshold=<n>", requiredInt, strprintf(_("A normalized threshold to determine how"
+                        "many blocks to keep when prunning with hashmask (default: %u)"), DEFAULT_THRESHOLD_PERCENT))
         .addArg("reindex", optionalBool, _("Rebuild block chain index from current blk000??.dat files on startup"))
         .addArg("txindex", optionalBool,
             strprintf(_("Maintain a full transaction index, used by the getrawtransaction rpc call (default: %u)"),
