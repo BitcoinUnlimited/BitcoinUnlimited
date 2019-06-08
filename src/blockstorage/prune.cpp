@@ -46,30 +46,23 @@ extern bool AbortNode(const std::string &strMessage, const std::string &userMess
 
 std::string hashMaskThresholdValidator(const uint8_t &value, uint8_t *item, bool validate)
 {
-    if (validate)
+    if (value > hashMaskThreshold)
     {
-        if (value > hashMaskThreshold)
-        {
-            std::ostringstream ret;
-            ret << "Sorry, your hashMaskThreshold (" << hashMaskThreshold
-                << ") is smaller than your proposed new threshold (" << value
-                << ").  You can only lower this number, not raise it.";
-            return ret.str();
-        }
-        else if (value == hashMaskThreshold)
-        {
-            // just return in this case, nothing has changed
-            return std::string();
-        }
-        hashMaskThreshold = value;
-        pblocktree->WriteHashMaskThreshold(hashMaskThreshold);
-        normalized_threshold = hashMaskThreshold * ONE_THRESHOLD_PERCENT;
-        RelayNewXUpdate(XVer::BU_PRUNE_THRESHOLD, normalized_threshold);
+        std::ostringstream ret;
+        ret << "Sorry, your current hashMaskThreshold (" << std::to_string(hashMaskThreshold)
+            << ") is smaller than your proposed new threshold (" << std::to_string(value)
+            << "). You can only lower this number, not raise it.";
+        return ret.str();
     }
-    else
+    else if (value == hashMaskThreshold)
     {
-        return "Validate was false, no changes were made";
+        // just return in this case, nothing has changed
+        return std::string();
     }
+    hashMaskThreshold = value;
+    pblocktree->WriteHashMaskThreshold(hashMaskThreshold);
+    normalized_threshold = hashMaskThreshold * ONE_THRESHOLD_PERCENT;
+    RelayNewXUpdate(XVer::BU_PRUNE_THRESHOLD, normalized_threshold);
     return std::string();
 }
 
@@ -97,7 +90,9 @@ void GenerateRandomPruningHashMask()
 bool hashMaskCompare(uint256 _blockHash)
 {
     arith_uint256 value = UintToArith256(_blockHash) & LSB64_MASK;
-    if ((value ^ pruneHashMask) < normalized_threshold) // we keep all blocks below the threshold
+    arith_uint256 valxmask = arith_uint256(value ^ pruneHashMask);
+    arith_uint256 normalized_threshold_256(normalized_threshold);
+    if (valxmask < normalized_threshold_256) // we keep all blocks below the threshold
     {
         return true;
     }
