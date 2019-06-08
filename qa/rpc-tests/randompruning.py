@@ -31,7 +31,7 @@ class RandomPruning (BitcoinTestFramework):
     def setup_network(self, split=False):
         self.nodes = []
         self.nodes.append(start_node(0, self.options.tmpdir, ["-debug", "-useblockdb=1"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug=prune", "-useblockdb=1", "-prunewithmask=1"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug=prune", "-useblockdb=1", "-prunewithmask=1", "-prunethreshold=10"]))
 
         # Now interconnect the nodes
         connect_nodes_full(self.nodes)
