@@ -64,7 +64,9 @@ class RandomPruning (BitcoinTestFramework):
         # get the 64 LSB (everything else should just be 0's)
         hashMask64 = GetLow64(fullhashMask)
         # calculate the normalize threshold for the node
-        normalized_threshold = threshold * threshold_percent
+        x = threshold * threshold_percent
+        # this hardcode is a work around for uint being little endian, this is what x is equal to
+        normalized_threshold = int(0x000000000000000000000000000000000000000000000000fffffffffffffff0)
 
         # check the blocks mined prior to determine if we are keeping the blocks we expect to have
         # and pruning the ones we expect to prune
@@ -76,7 +78,8 @@ class RandomPruning (BitcoinTestFramework):
             low64block = GetLow64(block)
             # if the 64LSB of the blockhash is equal to or above our threshold we should have pruned it
             # assert this is the case
-            if ((int(low64block, 16) ^ int(hashMask64, 16)) >= normalized_threshold):
+            valxmask = (int(low64block, 16) ^ int(hashMask64, 16))
+            if valxmask >= normalized_threshold:
                 assert_raises_rpc_error(-32603, "Block not available (pruned data)", self.nodes[1].getblock, block)
             else:
                 kept.append(self.nodes[1].getblock(block)['height'])
