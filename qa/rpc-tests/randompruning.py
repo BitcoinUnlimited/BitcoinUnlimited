@@ -84,6 +84,11 @@ class RandomPruning (BitcoinTestFramework):
             else:
                 kept.append(self.nodes[1].getblock(block)['height'])
 
+        # we should get an error raising the threshold higher than 10% since that was its last value
+        assert_raises_rpc_error(-32603, "Block not available (pruned data)", self.nodes[1].set, "prune.hashMaskThreshold=70")
+        # we should be able to lower it, for example to 5
+        self.nodes[1].set("prune.hashMaskThreshold=70")
+
 
 
 
