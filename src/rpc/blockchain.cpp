@@ -1173,6 +1173,7 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
     {
         if (!fPruneWithMask)
         {
+            READLOCK(cs_mapBlockIndex);
             CBlockIndex *block = chainActive.Tip();
             while (block && block->pprev && (block->pprev->nStatus & BLOCK_HAVE_DATA))
                 block = block->pprev;
