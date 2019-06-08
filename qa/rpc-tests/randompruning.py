@@ -107,12 +107,39 @@ class RandomPruning (BitcoinTestFramework):
         print("starting nodes...")
         self.nodes.append(start_node(0, self.options.tmpdir, ["-debug=prune", "-useblockdb=1"]))
         self.nodes.append(start_node(1, self.options.tmpdir, ["-debug=prune", "-useblockdb=1"]))
+        connect_nodes_full(self.nodes)
         # our prune threshold should be persistant across restarts
         print("checking that threshold is persistant across node restarts...")
         assert_equal({'prune.hashMaskThreshold': 5}, self.nodes[1].get("prune.hashMaskThreshold"))
 
 
+        blocks_mined2 = []
+        for i in range(500):
+            blockhash = self.nodes[0].generate(1)[0]
+            # dont add blocks above the min blocks to keep line
+            if (i + 100 < 680):
+                blocks_mined.append(blockhash)
+            if (i % 50 == 0):
+                self.sync_blocks()
+        self.sync_blocks()
 
+        blockchaininfo = self.nodes[1].getblockchaininfo()
+        fullhashMask = blockchaininfo["pruneHashMask"]
+        threshold = blockchaininfo["hashMaskThreshold"]
+
+        # this is a hack fix, this is a 5% threshold
+        normalized_threshold = int(0x0000000000000000000000000000000000000000000000000ccccccccccccccc)
+        kept2 = []
+        for block in blocks_mined2:
+            assert_equal(len(block), 64)
+            low64block = GetLow64(block)
+            # if the 64LSB of the blockhash is equal to or above our threshold we should have pruned it
+            # assert this is the case
+            valxmask = (int(low64block, 16) ^ int(hashMask64, 16))
+            if valxmask >= normalized_threshold:
+                assert_raises_rpc_error(-32603, "Block not available (pruned data)", self.nodes[1].getblock, block)
+            else:
+                kept2.append(self.nodes[1].getblock(block)['height'])
 
 
 
