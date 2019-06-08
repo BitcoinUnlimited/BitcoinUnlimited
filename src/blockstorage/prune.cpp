@@ -108,11 +108,17 @@ bool SetupPruning()
 {
     // block pruning; get the amount of disk space (in MiB) to allot for block & undo files
     int64_t nSignedPruneTarget = GetArg("-prune", 0) * 1024 * 1024;
+    bool useMask = GetBoolArg("-prunewithmask", DEFAULT_PRUNE_WITH_MASK);
     if (nSignedPruneTarget < 0)
     {
         return InitError(_("Prune cannot be configured with a negative value."));
     }
     nPruneTarget = (uint64_t)nSignedPruneTarget;
+    if (nPruneTarget && useMask)
+    {
+        return InitError(_("Prune and prunewithmask are incompatible, please choose only one"));
+    }
+    // standard pruning
     if (nPruneTarget)
     {
         if (nPruneTarget < MIN_DISK_SPACE_FOR_BLOCK_FILES)
@@ -124,9 +130,10 @@ bool SetupPruning()
         fPruneMode = true;
         return true;
     }
+    // pruning using a hash mask
     bool haveUsedMask = false;
     pblocktree->ReadFlag("hashmaskexists", haveUsedMask);
-    if (haveUsedMask || GetBoolArg("-prunewithmask", DEFAULT_PRUNE_WITH_MASK))
+    if (haveUsedMask || useMask)
     {
         fPruneWithMask = true;
         GenerateRandomPruningHashMask();
