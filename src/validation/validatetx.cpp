@@ -31,7 +31,7 @@
 
 #include <boost/scope_exit.hpp>
 
-UniValue CheckInputsBetter(const CTransactionRef &ptx,
+bool CheckInputsBetter(const CTransactionRef &ptx,
     CValidationState &state,
     const CCoinsViewCache &inputs,
     bool fScriptChecks,
@@ -154,7 +154,7 @@ UniValue CheckInputsBetter(const CTransactionRef &ptx,
     return inputsCheckResult;
 }
 
-UniValue ValidateTransaction(CTxMemPool &pool,
+bool ValidateTransaction(CTxMemPool &pool,
     CValidationState &state,
     const CTransactionRef &ptx,
     bool fLimitFree,
@@ -186,9 +186,11 @@ UniValue ValidateTransaction(CTxMemPool &pool,
     if (!CheckTransaction(ptx, state))
     {
         if (state.GetDebugMessage() == "")
+        {
             state.SetDebugMessage("CheckTransaction failed");
+        }
         errorList.push_back(state.GetRejectReason());
-        state = CValidationState();
+
     }
 
     // Coinbase is only valid in a block, not as a loose transaction
@@ -580,34 +582,6 @@ UniValue ValidateTransaction(CTxMemPool &pool,
     transactionAssessment.pushKV("minable", minable);
     transactionAssessment.pushKV("futureMinable", futureMinable);
     transactionAssessment.pushKV("standard", standard);
-    //    errorList.shrink_to_fit();
     transactionAssessment.pushKV("errors", errorList);
-
     return transactionAssessment;
-}
-
-UniValue VerifyTransactionWithMemoryPool(CTxMemPool &pool,
-    CValidationState &state,
-    const CTransactionRef &ptx,
-    bool fLimitFree,
-    bool *pfMissingInputs,
-    bool fOverrideMempoolLimit,
-    bool fRejectAbsurdFee,
-    TransactionClass allowedTx)
-{
-    std::vector<COutPoint> vCoinsToUncache;
-    UniValue res = ValidateTransaction(pool, state, ptx, fLimitFree, pfMissingInputs, fOverrideMempoolLimit,
-        fRejectAbsurdFee, allowedTx, vCoinsToUncache);
-    if (res["minable"].isFalse())
-    {
-        for (const COutPoint &outpoint : vCoinsToUncache)
-        {
-            pcoinsTip->Uncache(outpoint);
-        }
-    }
-    // After we've (potentially) uncached entries, ensure our coins cache is
-    // still within its size limits
-    CValidationState stateDummy;
-    FlushStateToDisk(stateDummy, FLUSH_STATE_PERIODIC);
-    return res;
 }

@@ -169,7 +169,8 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit = false,
     bool fRejectAbsurdFee = false,
-    TransactionClass allowedTx = TransactionClass::DEFAULT);
+    TransactionClass allowedTx = TransactionClass::DEFAULT,
+    CValidationDebugger *debugger = nullptr);
 
 /** (try to) add transaction to memory pool **/
 bool ParallelAcceptToMemoryPool(Snapshot &ss,
@@ -182,7 +183,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     bool fRejectAbsurdFee,
     TransactionClass allowedTx,
     std::vector<COutPoint> &vCoinsToUncache,
-    bool *isRespend);
+    bool *isRespend,
+    CValidationDebugger *debugger = nullptr);
 
 /** Checks the size of the mempool and trims it if needed */
 void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age);

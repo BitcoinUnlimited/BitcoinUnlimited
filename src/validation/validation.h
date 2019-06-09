@@ -69,7 +69,8 @@ bool CheckInputs(const CTransactionRef &tx,
     bool cacheStore,
     ValidationResourceTracker *resourceTracker,
     std::vector<CScriptCheck> *pvChecks = nullptr,
-    unsigned char *sighashType = nullptr);
+    unsigned char *sighashType = nullptr,
+    CValidationDebugger *debugger = nullptr);
 
 /** Remove invalidity status from a block and its descendants. */
 bool ReconsiderBlock(CValidationState &state, CBlockIndex *pindex);

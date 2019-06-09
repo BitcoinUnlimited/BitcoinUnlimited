@@ -14,15 +14,19 @@
 #include "txadmission.h"
 #include "txmempool.h"
 
-#include <univalue.h>
+#include <map>
+#include <string>
+#include <utility>
+#include <vector>
 
-UniValue VerifyTransactionWithMemoryPool(CTxMemPool &pool,
+bool VerifyTransactionWithMemoryPool(CTxMemPool &pool,
     CValidationState &state,
     const CTransactionRef &ptx,
     bool fLimitFree,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit,
     bool fRejectAbsurdFee,
-    TransactionClass allowedTx);
+    TransactionClass allowedTx,
+    CValidationDebugger *debugger = nullptr);
 
 #endif

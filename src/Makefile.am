@@ -219,7 +219,6 @@ BITCOIN_CORE_H = \
   utiltime.h \
   validation/forks.h \
   validation/validation.h \
-  validation/validatetx.h \
   validation/verifydb.h \
   validationinterface.h \
   versionbits.h \
@@ -319,7 +318,6 @@ libbitcoin_server_a_SOURCES = \
   requestManager.cpp \
   validation/forks.cpp \
   validation/validation.cpp \
-  validation/validatetx.cpp \
   validation/verifydb.cpp \
   validationinterface.cpp \
   versionbits.cpp \
@@ -671,7 +669,6 @@ CLEANFILES += consensus/*.gcda consensus/*.gcno
 CLEANFILES += crypto/*.gcda crypto/*.gcno
 CLEANFILES += policy/*.gcda policy/*.gcno
 CLEANFILES += primitives/*.gcda primitives/*.gcno
-CLEANFILES += rsm/*.gcda rsm/*.gcno
 CLEANFILES += script/*.gcda script/*.gcno
 CLEANFILES += support/*.gcda support/*.gcno
 CLEANFILES += univalue/*.gcda univalue/*.gcno

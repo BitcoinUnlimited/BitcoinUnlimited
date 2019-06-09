@@ -900,12 +900,22 @@ bool CheckInputs(const CTransactionRef &tx,
     bool cacheStore,
     ValidationResourceTracker *resourceTracker,
     std::vector<CScriptCheck> *pvChecks,
-    unsigned char *sighashType)
+    unsigned char *sighashType,
+    CValidationDebugger *debugger)
 {
+    bool allPassed = true;
     if (!tx->IsCoinBase())
     {
         if (!Consensus::CheckTxInputs(tx, state, inputs))
+        {
+            if(debugger)
+            {
+                debugger->SetInputCheckResult(false);
+                debugger->AddInputCheckError(state.GetRejectReason());
+                debugger->FinishCheckInputSession();
+            }
             return false;
+        }
         if (pvChecks)
             pvChecks->reserve(tx->vin.size());
 
@@ -924,13 +934,22 @@ bool CheckInputs(const CTransactionRef &tx,
             for (unsigned int i = 0; i < tx->vin.size(); i++)
             {
                 const COutPoint &prevout = tx->vin[i].prevout;
+                const CScript &scriptSig = tx->vin[i].scriptSig;
                 CoinAccessor coin(inputs, prevout);
 
-                if (coin->IsSpent())
-                {
-                    LOGA("ASSERTION: no inputs available\n");
+                if (debugger)
+                {   if (coin->IsSpent())
+                    {
+                        debugger->SetInputCheckResult(false);
+                        debugger->AddInputCheckError(strprintf("COutPoint %s is spent", prevout.ToString().c_str()));
+                        debugger->FinishCheckInputSession();
+                        return false;
+                    }
                 }
-                assert(!coin->IsSpent());
+                else
+                {
+                    assert(!coin->IsSpent());
+                }
 
                 // We very carefully only pass in things to CScriptCheck which
                 // are clearly committed. This provides
@@ -939,6 +958,15 @@ bool CheckInputs(const CTransactionRef &tx,
                 // spent being checked as a part of CScriptCheck.
                 const CScript scriptPubKey = coin->out.scriptPubKey;
                 const CAmount amount = coin->out.nValue;
+                bool inputVerified = true;
+                if (debugger)
+                {
+                    debugger->AddInputCheckMetadata("prevtx", prevout.hash.ToString());
+                    debugger->AddInputCheckMetadata("n", std::to_string(prevout.n));
+                    debugger->AddInputCheckMetadata("scriptPubKey", HexStr(scriptPubKey.begin(), scriptPubKey.end()));
+                    debugger->AddInputCheckMetadata("scriptSig", HexStr(scriptSig.begin(), scriptSig.end()));
+                    debugger->AddInputCheckMetadata("amount", std::to_string(amount));
+                }
 
                 // Verify signature
                 CScriptCheck check(resourceTracker, scriptPubKey, amount, *tx, i, flags, maxOps, cacheStore);
@@ -969,9 +997,20 @@ bool CheckInputs(const CTransactionRef &tx,
                         // non-upgraded nodes.
                         CScriptCheck check2(nullptr, scriptPubKey, amount, *tx, i, mandatoryFlags, maxOps, cacheStore);
                         if (check2())
-                            return state.Invalid(
-                                false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)",
+                        {
+                            if (debugger)
+                            {
+                                debugger->AddInputCheckError(strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
+                                inputVerified = false;
+                                allPassed = false;
+                            }
+                            else
+                            {
+                                return state.Invalid(
+                                    false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)",
                                                                ScriptErrorString(check.GetScriptError())));
+                            }
+                        }
                     }
 
                     // We also, regardless, need to check whether the transaction would
@@ -986,8 +1025,15 @@ bool CheckInputs(const CTransactionRef &tx,
                         maxOps, cacheStore);
                     if (check3())
                     {
-                        return state.Invalid(false, REJECT_INVALID, strprintf("upgrade-conditional-script-failure (%s)",
+                        if (debugger)
+                        {
+                            debugger->AddInputCheckError(strprintf("upgrade-conditional-script-failure (%s)", ScriptErrorString(check.GetScriptError())));
+                        }
+                        else
+                        {
+                            return state.Invalid(false, REJECT_INVALID, strprintf("upgrade-conditional-script-failure (%s)",
                                                                         ScriptErrorString(check.GetScriptError())));
+                        }
                     }
 
                     // Failures of other flags indicate a transaction that is
@@ -997,15 +1043,33 @@ bool CheckInputs(const CTransactionRef &tx,
                     // as to the correct behavior - we may want to continue
                     // peering with non-upgraded nodes even after a soft-fork
                     // super-majority vote has passed.
-                    return state.DoS(100, false, REJECT_INVALID, strprintf("mandatory-script-verify-flag-failed (%s)",
+                    if (debugger)
+                    {
+                        inputVerified = false;
+                        allPassed = false;
+                        debugger->AddInputCheckError(strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
+                    }
+                    else
+                    {
+                        return state.DoS(100, false, REJECT_INVALID, strprintf("mandatory-script-verify-flag-failed (%s)",
                                                                      ScriptErrorString(check.GetScriptError())));
+                    }
+                }
+                if (debugger)
+                {
+                    debugger->SetInputCheckValidity(inputVerified);
+                    debugger->IncrementCheckIndex();
                 }
                 if (sighashType)
                     *sighashType = check.sighashType;
             }
         }
     }
-
+    if(debugger)
+    {
+        debugger->SetInputCheckResult(allPassed);
+        debugger->FinishCheckInputSession();
+    }
     return true;
 }
 

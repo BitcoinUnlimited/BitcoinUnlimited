@@ -529,7 +529,8 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit,
     bool fRejectAbsurdFee,
-    TransactionClass allowedTx)
+    TransactionClass allowedTx,
+    CValidationDebugger *debugger)
 {
     std::vector<COutPoint> vCoinsToUncache;
 
@@ -541,7 +542,11 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     bool isRespend = false;
     bool missingInputs = false;
     res = ParallelAcceptToMemoryPool(txHandlerSnap, pool, state, tx, fLimitFree, &missingInputs, fOverrideMempoolLimit,
-        fRejectAbsurdFee, allowedTx, vCoinsToUncache, &isRespend);
+        fRejectAbsurdFee, allowedTx, vCoinsToUncache, &isRespend, debugger);
+    if (debugger != nullptr)
+    {
+        return res;
+    }
     if (res)
     {
         RelayTransaction(tx);
@@ -576,7 +581,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     bool fRejectAbsurdFee,
     TransactionClass allowedTx,
     std::vector<COutPoint> &vCoinsToUncache,
-    bool *isRespend)
+    bool *isRespend,
+    CValidationDebugger *debugger)
 {
     if (isRespend)
         *isRespend = false;
@@ -588,17 +594,40 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         *pfMissingInputs = false;
 
     const CChainParams &chainparams = Params();
+    if(debugger)
+    {
+        debugger->AddTxid(tx->GetHash().ToString());
+    }
 
     if (!CheckTransaction(tx, state))
     {
         if (state.GetDebugMessage() == "")
             state.SetDebugMessage("CheckTransaction failed");
-        return false;
+        if(debugger)
+        {
+            debugger->AddInvalidReason(state.GetRejectReason());
+            state = CValidationState();
+        }
+        else
+        {
+            return false;
+        }
     }
 
     // Coinbase is only valid in a block, not as a loose transaction
     if (tx->IsCoinBase())
-        return state.DoS(100, false, REJECT_INVALID, "coinbase");
+    {
+        if(debugger)
+        {
+            debugger->AddInvalidReason("Coinbase is only valid in a block, not as a loose transaction");
+            debugger->SetMineable(false);
+            debugger->SetFutureMineable(false);
+        }
+        else
+        {
+            return state.DoS(100, false, REJECT_INVALID, "coinbase");
+        }
+    }
 
     // Reject nonstandard transactions if so configured.
     // (-testnet/-regtest allow nonstandard, and explicit submission via RPC)
@@ -606,13 +635,24 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     bool fRequireStandard = chainparams.RequireStandard();
 
     if (allowedTx == TransactionClass::STANDARD)
+    {
         fRequireStandard = true;
+    }
     else if (allowedTx == TransactionClass::NONSTANDARD)
+    {
         fRequireStandard = false;
+    }
     if (fRequireStandard && !IsStandardTx(tx, reason))
     {
-        state.SetDebugMessage("IsStandardTx failed");
-        return state.DoS(0, false, REJECT_NONSTANDARD, reason);
+        if(debugger)
+        {
+            debugger->AddInvalidReason(reason);
+        }
+        else
+        {
+            state.SetDebugMessage("IsStandardTx failed");
+            return state.DoS(0, false, REJECT_NONSTANDARD, reason);
+        }
     }
 
     const uint32_t cds_flag =
@@ -632,23 +672,50 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     // be mined yet.
     if (!CheckFinalTx(tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &ss))
     {
-        if (!IsChainSyncd() && IsChainNearlySyncd())
-            return state.DoS(0, false, REJECT_WAITING, "non-final");
+        if(debugger)
+        {
+            debugger->AddInvalidReason("non-final");
+            debugger->SetMineable(false);
+        }
         else
-            return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
+        {
+            if (!IsChainSyncd() && IsChainNearlySyncd())
+                return state.DoS(0, false, REJECT_WAITING, "non-final");
+            else
+                return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
+        }
     }
 
     // Make sure tx size is acceptable after Nov 15, 2018 fork
     if (IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip()))
     {
         if (tx->GetTxSize() < MIN_TX_SIZE)
-            return state.DoS(0, false, REJECT_INVALID, "txn-undersize");
+        {
+            if (debugger)
+            {
+                debugger->AddInvalidReason("txn-undersize");
+                debugger->SetMineable(false);
+            }
+            else
+            {
+                return state.DoS(0, false, REJECT_INVALID, "txn-undersize");
+            }
+        }
     }
 
     // is it already in the memory pool?
     uint256 hash = tx->GetHash();
     if (pool.exists(hash))
-        return state.Invalid(false, REJECT_ALREADY_KNOWN, "txn-already-in-mempool");
+    {
+        if (debugger)
+        {
+            debugger->AddInvalidReason("txn-already-in-mempool");
+        }
+        else
+        {
+            return state.Invalid(false, REJECT_ALREADY_KNOWN, "txn-already-in-mempool");
+        }
+    }
 
     // Check for conflicts with in-memory transactions and triggers actions at
     // end of scope (relay tx, sync wallet, etc)
@@ -657,9 +724,20 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
     if (respend.IsRespend() && !respend.IsInteresting())
     {
-        // Tx is a respend, and it's not an interesting one (we don't care to
-        // validate it further)
-        return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
+        if (debugger)
+        {
+            debugger->SetMineable(false);
+            debugger->SetFutureMineable(false);
+            // debugger->AddInvalidReason(
+            // "tx-mempool-conflict: " + txin.prevout.hash.ToString() + ":" + std::to_string(txin.prevout.n));
+            debugger->AddInvalidReason("txn-mempool-conflict");
+        }
+        else
+        {
+            // Tx is a respend, and it's not an interesting one (we don't care to
+            // validate it further)
+            return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
+        }
     }
     {
         CCoinsView dummy;
@@ -671,7 +749,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             READLOCK(pool.cs);
             CCoinsViewMemPool &viewMemPool(*ss.cvMempool);
             view.SetBackend(viewMemPool);
-
+            bool txnAlreadyKnown = false;
             // do all inputs exist?
             if (pfMissingInputs)
             {
@@ -699,15 +777,49 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                     }
                     if (fSpent || fMissingOrSpent)
                     {
+                        // Are inputs missing because we already have the ptx?
+                        for (size_t out = 0; out < tx->vout.size(); out++)
+                        {
+                            // Optimistically just do efficient check of cache for
+                            // outputs.
+                            if (pcoinsTip->HaveCoinInCache(COutPoint(tx->GetHash(), out)))
+                            {
+                                // return state.Invalid(false, REJECT_DUPLICATE,
+                                //                     "txn-already-known");
+                                // debugger->AddInvalidReason("txn-already-known");
+                                txnAlreadyKnown = true;
+                                break;
+                            }
+                        }
+                        if (debugger)
+                        {
+                            debugger->SetMineable(false);
+                            debugger->SetFutureMineable(false);
+                            debugger->AddInvalidReason("input-does-not-exist: " + txin.prevout.hash.ToString() + ":" +
+                                            std::to_string(txin.prevout.n));
+                        }
+                        // fMissingInputs and not state.IsInvalid() is used to detect this condition, don't set
+                        // state.Invalid()
                         *pfMissingInputs = true;
                         break; // There is no point checking any more once one fails, for orphans we will recheck
                     }
                 }
+                if (txnAlreadyKnown)
+                {
+                    debugger->AddInvalidReason("txn-already-known");
+                }
                 if (*pfMissingInputs == true)
                 {
-                    state.SetDebugMessage("Inputs are missing");
-                    return false; // state.Invalid(false, REJECT_MISSING_INPUTS, "bad-txns-missing-inputs", "Inputs
-                    // unavailable in ParallelAcceptToMemoryPool", false);
+                    if (debugger)
+                    {
+
+                    }
+                    else
+                    {
+                        state.SetDebugMessage("Inputs are missing");
+                        return false; // state.Invalid(false, REJECT_MISSING_INPUTS, "bad-txns-missing-inputs", "Inputs
+                        // unavailable in ParallelAcceptToMemoryPool", false);
+                    }
                 }
             }
 
@@ -725,12 +837,31 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             // Must keep pool.cs for this unless we change CheckSequenceLocks to take a
             // CoinsViewCache instead of create its own
             if (!CheckSequenceLocks(tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp, false, &ss))
-                return state.DoS(0, false, REJECT_NONSTANDARD, "non-BIP68-final");
+            {
+                if (debugger)
+                {
+                    debugger->AddInvalidReason("non-BIP68-final");
+                }
+                else
+                {
+                    return state.DoS(0, false, REJECT_NONSTANDARD, "non-BIP68-final");
+                }
+            }
         }
 
         // Check for non-standard pay-to-script-hash in inputs
         if (fRequireStandard && !AreInputsStandard(tx, view))
-            return state.Invalid(false, REJECT_NONSTANDARD, "bad-txns-nonstandard-inputs");
+        {
+            if (debugger)
+            {
+                debugger->AddInvalidReason("bad-txns-nonstandard-inputs");
+                debugger->SetStandard(false);
+            }
+            else
+            {
+                return state.Invalid(false, REJECT_NONSTANDARD, "bad-txns-nonstandard-inputs");
+            }
+        }
 
         nSigOps = GetLegacySigOpCount(tx, STANDARD_SCRIPT_VERIFY_FLAGS);
         nSigOps += GetP2SHSigOpCount(tx, view, STANDARD_SCRIPT_VERIFY_FLAGS);
@@ -767,22 +898,57 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // Check that the transaction doesn't have an excessive number of
         // sigops, making it impossible to mine.
         if (nSigOps > MAX_TX_SIGOPS)
-            return state.DoS(0, false, REJECT_NONSTANDARD, "bad-txns-too-many-sigops", false, strprintf("%d", nSigOps));
+        {
+            if (debugger)
+            {
+                debugger->AddInvalidReason("bad-txns-too-many-sigops");
+                debugger->SetMineable(false);
+            }
+            else
+            {
+                return state.DoS(0, false, REJECT_NONSTANDARD, "bad-txns-too-many-sigops", false, strprintf("%d", nSigOps));
+            }
+        }
 
         CAmount mempoolRejectFee =
             pool.GetMinFee(GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000).GetFee(nSize);
         if (mempoolRejectFee > 0 && nModifiedFees < mempoolRejectFee)
         {
-            return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool min fee not met", false,
-                strprintf("%d < %d", nFees, mempoolRejectFee));
+            if (debugger)
+            {
+                debugger->AddInvalidReason("mempool min fee not met");
+                debugger->SetStandard(false);
+            }
+            else
+            {
+                return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool min fee not met", false,
+                    strprintf("%d < %d", nFees, mempoolRejectFee));
+            }
         }
         else if (GetBoolArg("-relaypriority", DEFAULT_RELAYPRIORITY) && nModifiedFees < ::minRelayTxFee.GetFee(nSize) &&
                  !AllowFree(entry.GetPriority(chainActive.Height() + 1)))
         {
-            // Require that free transactions have sufficient priority to be mined in the next block.
-            LOG(MEMPOOL, "Txn fee %lld (%d - %d), priority fee delta was %lld\n", nFees, nValueIn, nValueOut,
-                nModifiedFees - nFees);
-            return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "insufficient priority");
+            if (debugger)
+            {
+                debugger->AddInvalidReason("insufficient-priority");
+                debugger->AddInvalidReason("insufficient-fee: need " + std::to_string(minRelayTxFee.GetFee(nSize)) + " was only " +
+                                    std::to_string(nModifiedFees));
+                debugger->AddInvalidReason("minimum-fee: " + std::to_string(minRelayTxFee.GetFee(nSize)));
+                debugger->SetStandard(false);
+            }
+            else
+            {
+                // Require that free transactions have sufficient priority to be mined in the next block.
+                LOG(MEMPOOL, "Txn fee %lld (%d - %d), priority fee delta was %lld\n", nFees, nValueIn, nValueOut,
+                    nModifiedFees - nFees);
+                    return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "insufficient priority");
+            }
+        }
+        if (debugger)
+        {
+            debugger->AddMetadata("size", std::to_string(nSize));
+            debugger->AddMetadata("txfee", std::to_string(nModifiedFees));
+            debugger->AddMetadata("txfeeneeded", std::to_string(minRelayTxFee.GetFee(nSize)));
         }
 
         // BU - Xtreme Thinblocks Auto Mempool Limiter - begin section
@@ -885,10 +1051,18 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 if ((dFreeCount + nSize) >=
                     (nFreeLimit * 10 * 1000 * nLargestBlockSeen / BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
                 {
-                    thindata.UpdateMempoolLimiterBytesSaved(nSize);
-                    LOG(MEMPOOL, "AcceptToMemoryPool : free transaction %s rejected by rate limiter\n",
-                        hash.ToString());
-                    return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "rate limited free transaction");
+                    if (debugger)
+                    {
+                        debugger->AddInvalidReason("rate limited free transaction");
+                        debugger->SetStandard(false);
+                    }
+                    else
+                    {
+                        thindata.UpdateMempoolLimiterBytesSaved(nSize);
+                        LOG(MEMPOOL, "AcceptToMemoryPool : free transaction %s rejected by rate limiter\n",
+                            hash.ToString());
+                            return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "rate limited free transaction");
+                    }
                 }
                 dFreeCount += nSize;
             }
@@ -900,8 +1074,18 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // empty mempool.  So set the minimum "absurd" fee to 10000 satoshies per byte.  If for some reason fees rise
         // above that, you can specify up to 100x what other txns are paying in the mempool
         if (fRejectAbsurdFee && nFees > std::max((int64_t)100L * nSize, maxTxFee.Value()) * 100)
-            return state.Invalid(false, REJECT_HIGHFEE, "absurdly-high-fee",
-                strprintf("%d > %d", nFees, std::max((int64_t)1L, maxTxFee.Value()) * 10000));
+        {
+            if (debugger)
+            {
+                debugger->AddInvalidReason("absurdly-high-fee");
+                debugger->SetStandard(false);
+            }
+            else
+            {
+                return state.Invalid(false, REJECT_HIGHFEE, "absurdly-high-fee",
+                    strprintf("%d > %d", nFees, std::max((int64_t)1L, maxTxFee.Value()) * 10000));
+            }
+        }
 
         // Calculate in-mempool ancestors, up to a limit.
         size_t nLimitAncestors = GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
@@ -914,12 +1098,21 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         unsigned char sighashType = 0;
         if (!CheckInputs(
-                tx, state, view, true, flags, maxScriptOps.Value(), true, &resourceTracker, nullptr, &sighashType))
+                tx, state, view, true, flags, maxScriptOps.Value(), true, &resourceTracker, nullptr, &sighashType, debugger))
         {
-            LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", hash.ToString());
-            if (state.GetDebugMessage() == "")
-                state.SetDebugMessage("CheckInputs failed");
-            return false;
+            if (debugger && debugger->InputsCheck1IsValid())
+            {
+                debugger->AddInvalidReason("input-script-failed");
+                debugger->SetMineable(false);
+                debugger->SetFutureMineable(false);
+            }
+            else
+            {
+                LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", hash.ToString());
+                if (state.GetDebugMessage() == "")
+                    state.SetDebugMessage("CheckInputs failed");
+                return false;
+            }
         }
         entry.UpdateRuntimeSigOps(resourceTracker.GetSigOps(), resourceTracker.GetSighashBytes());
 
@@ -934,14 +1127,23 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // can be exploited as a DoS attack.
         unsigned char sighashType2 = 0;
         if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | featureFlags, maxScriptOps.Value(),
-                true, nullptr, nullptr, &sighashType2))
+                true, nullptr, nullptr, &sighashType2, debugger))
         {
-            if (state.GetDebugMessage() == "")
-                state.SetDebugMessage("CheckInputs failed against mandatory but not standard flags");
+            if (debugger && debugger->InputsCheck1IsValid())
+            {
+                debugger->AddInvalidReason("CheckInputs failed against mandatory but not standard flags");
+                debugger->SetMineable(false);
+                debugger->SetFutureMineable(false);
+            }
+            else
+            {
+                if (state.GetDebugMessage() == "")
+                    state.SetDebugMessage("CheckInputs failed against mandatory but not standard flags");
 
-            return error(
-                "%s: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s, %s",
-                __func__, hash.ToString(), FormatStateMessage(state));
+                return error(
+                    "%s: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s, %s",
+                    __func__, hash.ToString(), FormatStateMessage(state));
+            }
         }
 
         entry.sighashType = sighashType | sighashType2;
@@ -949,13 +1151,27 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // This code denies old style tx from entering the mempool as soon as we fork
         if (!IsTxUAHFOnly(entry))
         {
-            return state.Invalid(false, REJECT_WRONG_FORK, "txn-uses-old-sighash-algorithm");
+            if(debugger)
+            {
+                debugger->AddInvalidReason("txn-uses-old-sighash-algorithm");
+            }
+            else
+            {
+                return state.Invalid(false, REJECT_WRONG_FORK, "txn-uses-old-sighash-algorithm");
+            }
         }
 
         respend.SetValid(true);
         if (respend.IsRespend())
         {
-            return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
+            if (debugger)
+            {
+                debugger->AddInvalidReason("txn-mempool-conflict");
+            }
+            else
+            {
+                return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
+            }
         }
 
         {
@@ -965,15 +1181,24 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             if (!pool._CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize,
                     nLimitDescendants, nLimitDescendantSize, errString))
             {
-                // If the chain is not sync'd entirely then we'll defer this tx until the new block is processed.
-                if (!IsChainSyncd() && IsChainNearlySyncd())
-                    return state.DoS(0, false, REJECT_WAITING, "too-long-mempool-chain");
+                if (debugger)
+                {
+                    debugger->AddInvalidReason("too-long-mempool-chain");
+                    debugger->SetMineable(false);
+                }
                 else
-                    return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
+                {
+                    // If the chain is not sync'd entirely then we'll defer this tx until the new block is processed.
+                    if (!IsChainSyncd() && IsChainNearlySyncd())
+                        return state.DoS(0, false, REJECT_WAITING, "too-long-mempool-chain");
+                    else
+                        return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
+                }
             }
         }
 
         // Add entry to the commit queue
+        if (debugger == nullptr)
         {
             CTxCommitData eData;
             eData.entry = std::move(entry);

@@ -28,7 +28,6 @@
 #include "txmempool.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
-#include "validation/validatetx.h"
 #include "validation/validation.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
@@ -1563,8 +1562,9 @@ UniValue validaterawtransaction(const UniValue &params, bool fHelp)
     {
         CValidationState state;
         bool fMissingInputs;
-        result = VerifyTransactionWithMemoryPool(
-            mempool, state, std::move(ptx), false, &fMissingInputs, false, fOverrideFees, txClass);
+        CValidationDebugger debugger;
+        result = AcceptToMemoryPool(
+            mempool, state, std::move(ptx), false, &fMissingInputs, false, fOverrideFees, txClass, &debugger);
     }
     else if (fHaveChain)
     {
