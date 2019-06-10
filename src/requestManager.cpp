@@ -736,6 +736,13 @@ void CRequestManager::SendRequests(CNode *pnode)
                         item->lastRequestTime = nPreviousRequestTime;
                     }
 
+                    // Move the item to the back of the queue
+                    if (blkPeerIter->second.size() >= 2)
+                    {
+                        blkPeerIter->second.push_back(blkPeerIter->second.front());
+                        blkPeerIter->second.pop_front();
+                    }
+
                     // Break because the queue won't be empty
                     break;
                 }
