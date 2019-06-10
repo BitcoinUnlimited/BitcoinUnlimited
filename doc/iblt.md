@@ -6,15 +6,15 @@ Invertible Bloom Lookup Tables (IBLTs) are a data structure [originally describe
 
 ## High Level Design and Operation
 
-Fundamentally, IBLTs store items as key-value pairs. Each IBLT is comprised of multiple cells with each cell containing four fields: `count`, `keySum`, `keyCheck`, and `valueSum`. Cells are divided into `c` groups of equal size, and to each group is assigned a distinct hash function. Items can be either inserted or erased from the IBLT. Insertion involves mapping key `k` (and corresponding value `v`) to a single cell from each of the `c` groups by way of the associated hash function. For each cell corresponding to the key, the fields are updated with the following values: the `k` XORed with the `keySum`, a separate independent hash of `k` XORed with the keyCheck, `v` XORed with the `valueSum`, and the `count` incremented by one. Items are erased with the same set of operations as insertion except that the `count` field is decremented by one. IBLT `R` can be *subtracted* from IBLT `S` provided that they share the same number of cells and the same hash function for each cell group. This difference, `S-R`, results in a new IBLT `D`, which is calculated by XORing each of the fields `keySum`, `valueSum`, and `keyCheck` from `S` with the same field in the corresponding cell of `R`, and the `count` field from each cell in `R` is subtracted from the `count` field in the corresponding cell of `S`.
+Fundamentally, IBLTs store items as key-value pairs. Each IBLT is comprised of multiple cells with each cell containing four fields: `count`, `keySum`, `keyCheck`, and `valueSum`. Cells are divided into `c` groups of equal size, and to each group is assigned a distinct hash function. Items can be either inserted or erased from the IBLT. Insertion involves mapping key `k` (and corresponding value `v`) to a single cell from each of the `c` groups by way of the associated hash function. For each cell corresponding to the key, the fields are updated with the following values: `k` XORed with the `keySum`, a separate independent hash of `k` XORed with the keyCheck, `v` XORed with the `valueSum`, and the `count` incremented by one. Items are erased with the same set of operations as insertion except that the `count` field is decremented by one. IBLT `R` can be *subtracted* from IBLT `S` provided that the two share the same number of cells and the same hash function for each cell group. This difference, `S-R`, results in a new IBLT `D`, which is calculated by XORing each of the fields `keySum`, `valueSum`, and `keyCheck` from `S` with the same field in the corresponding cell of `R`, and the `count` field from each cell in `R` is subtracted from the `count` field in the corresponding cell of `S`.
 
 ## Design Concepts
 
-The following concepts are fundamental to the operation of IBLTs, particularly in the conext of the Graphene protocol.
+The following concepts are fundamental to the operation of IBLTs, particularly in the context of the Graphene protocol.
 
 ### Symmetric Difference
 
-In the last section we described the subtraction process for IBLTs `S` and `R` that contain the same number of cells and are constructed such that each of their cell groups use the same hash function. Because all fields except the count are XORed, subtraction is an entirely symmetric operation. That is to say `S-R` is equivalent to `R-S` except that the count fields are negated. Thus, we can regard `D = S-R` as the symmetric difference between the sets represented by `S` and `R` (see [Eppstein et al.](https://dl.acm.org/citation.cfm?id=2018462) for theoretical details). Any cell in `D` with count 1 or -1 and whose `keyCheck` is equal to the hash of its `keySum` field is considered *pure*, i.e. it contains a single element equal to the `valueSum`. The idea is that if the cell in `S` contains for example keys `a`, `b`, and `c` and the cell in `R` contains keys `a` and `b`, then the `keySum` field in `D` will contain `c` and the `count` field will be 1 (note that the `valueSum` field in `D` should also contain the value corresponding to the key representred by `keySum`). Similarly, if the `count` field has value -1, then we can deduce that the `keySum` field contains an element from `R`. In either case, the additional `keyCheck` validation is needed to ensure that the elements in the cell from `R` are a subset of the elements from the corresponding cell in `S`, e.g. if `R` instead contained keys `a` and `x`, then the `count` field in `D` would still be 1, but the `keySum` and `valueSum` fields would be bogus. 
+In the last section we described the subtraction process for IBLTs `S` and `R` that contain the same number of cells and are constructed such that each of their cell groups use the same hash function. Because all fields except the count are XORed, subtraction is an entirely symmetric operation. That is to say `S-R` is equivalent to `R-S` except that the count fields are negated. Thus, we can regard `D = S-R` as the symmetric difference between the sets represented by `S` and `R` (see [Eppstein et al.](https://dl.acm.org/citation.cfm?id=2018462) for theoretical details). Any cell in `D` with count 1 or -1 and whose `keyCheck` is equal to the hash of its `keySum` field is considered *pure*, i.e. it contains a single element equal to the `valueSum`. The idea is that if the cell in `S` contains for example keys `a`, `b`, and `c` and the cell in `R` contains keys `a` and `b`, then the `keySum` field in `D` will contain `c` and the `count` field will be 1 (note that the `valueSum` field in `D` should also contain the value corresponding to the key represented by `keySum`). Similarly, if the `count` field has value -1, then we can deduce that the `keySum` field contains an element from `R`. In either case, the additional `keyCheck` validation is needed to ensure that the elements in the cell from `R` are a subset of the elements from the corresponding cell in `S`, e.g. if `R` instead contained keys `a` and `x`, then the `count` field in `D` would still be 1, but the `keySum` and `valueSum` fields would be bogus. 
 
 ### Peeling Process
 
@@ -29,10 +29,10 @@ There are two new data structures associated with an IBLT: `CIblt` and `HashTabl
 |**Field Name**|**Type**|**Size**|**Encoding Details**|**Purpose**|
 |:------------:|:------:|:------:|:------------------:|:---------:|
 |`version`|`uint64_t`|8 bytes|Compact size|Version bits|
-|`mapHashIdxSeeds`|`map<uint8_t, uint32_t>`|variable|Standard|Mapping from hash function nunber (0 to `n_hash - 1`) to random seed for that hash function|
+|`mapHashIdxSeeds`|`map<uint8_t, uint32_t>`|variable|Standard|Mapping from hash function number (0 to `n_hash - 1`) to random seed for that hash function|
 |`salt`|`uint32_t`|4 bytes|Standard|Entropy for generating random seeds in `mapHashIdxSeeds`|
 |`n_hash`|`uint8_t`|1 byte|Standard|Number of hash functions used|
-|`is_modified`|`bool`|1 byte|Standard||True if any items have been inserted into the IBLT|
+|`is_modified`|`bool`|1 byte|Standard|True if any items have been inserted into the IBLT|
 |`hashTable`|`vector<HashTableEntry>`|variable|Standard|Data cells for IBLT|
 
 The Graphene protocol requires that IBLT `R`, created by the receiver, be subtracted from IBLT `S`, originating from the sender. In order for this operation to succeed, it is critical that the IBLTs use the same quantity of hash functions, have the same number of cells, and that hash function `i` uses the same function and seed for both `S` and `R`. Although the sender may use [complex optimization techniques](https://github.com/umass-forensics/IBLT-optimization) to determine the number of cells and hash functions for `S`, which we discuss below, the receiver should simply copy those values provided that they are reasonably sized. The `i`th hash function is implemented by method `saltedHashValue` (defined below), which takes the [MurmurHash3](http://code.google.com/p/smhasher/source/browse/trunk/MurmurHash3.cpp) of the input using `mapHashIdxSeeds[i]` as its seed. Entries in `mapHashIdxSeeds` are extracted from entropy `salt` however the IBLT creator sees fit.
@@ -56,7 +56,7 @@ In order to operate within the Graphene protocol, the `CIblt` and `HashTable` cl
 
 #### `uint32_t keyChecksumCalc(uint64_t k)`
 
-Return the [MurmurHash3](http://code.google.com/p/smhasher/source/browse/trunk/MurmurHash3.cpp) of key `k` using the ingteger `11` for the seed.
+Return the [MurmurHash3](http://code.google.com/p/smhasher/source/browse/trunk/MurmurHash3.cpp) of key `k` using the integer `11` for the seed.
 
 #### `_insert(int plusOrMinus, uint64_t k, vector<uint8_t> &v)`
 
@@ -94,7 +94,7 @@ Return `true` if `count == 0`, `keySum == 0`, and `keyCheck == 0`. Return `false
 
 #### `void addValue(const vector<uint8_t> &v)`
 
-For each `i`, `valueSum[i] ^= v[i]`. Resize `valueSum` to accomodate `v` if necessary.
+For each `i`, `valueSum[i] ^= v[i]`. Resize `valueSum` to accommodate `v` if necessary.
 
 ## Selecting parameters for the and IBLT
 
@@ -103,7 +103,7 @@ The IBLT decode rate varies with the number of recovered items. In order to ensu
 
 ## Backward compatibility
 
-CIblt implementations with higher version numbers are expected to maintain backward compatability with those having lower version numbers.
+CIblt implementations with higher version numbers are expected to maintain backward compatibility with those having lower version numbers.
 
 ## Implementation
 
