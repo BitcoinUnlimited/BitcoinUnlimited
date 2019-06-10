@@ -2081,10 +2081,20 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 {
     UniValue ret(UniValue::VOBJ);
     ret.pushKV("time", GetTime());
-    ret.pushKV("requester.mapTxnInfo_ByPeer", (uint64_t)requester.mapTxnInfo_ByPeer.size());
-    ret.pushKV("requester.mapBlkInfo_ByPeer", (uint64_t)requester.mapBlkInfo_ByPeer.size());
-    ret.pushKV("requester.mapTxnInfo", (uint64_t)requester.mapTxnInfo.size());
-    ret.pushKV("requester.mapBlkInfo", (uint64_t)requester.mapBlkInfo.size());
+    {
+        uint64_t nSizeTxnInfoByPeer = 0;
+        uint64_t nSizeBlkInfoByPeer = 0;
+        LOCK(requester.cs_objDownloader);
+        for (auto iter : requester.mapTxnInfo_ByPeer)
+        {
+            nSizeTxnInfoByPeer += (requester.mapTxnInfo_ByPeer.at(iter.first)).size();
+            nSizeBlkInfoByPeer += (requester.mapTxnInfo_ByPeer.at(iter.first)).size();
+        }
+        ret.pushKV("requester.mapTxnInfo_ByPeer", nSizeTxnInfoByPeer);
+        ret.pushKV("requester.mapBlkInfo_ByPeer", nSizeBlkInfoByPeer);
+        ret.pushKV("requester.mapTxnInfo", (uint64_t)requester.mapTxnInfo.size());
+        ret.pushKV("requester.mapBlkInfo", (uint64_t)requester.mapBlkInfo.size());
+    }
     unsigned long int max = 0;
     unsigned long int size = 0;
     for (CRequestManager::OdMap::iterator i = requester.mapTxnInfo.begin(); i != requester.mapTxnInfo.end(); i++)
