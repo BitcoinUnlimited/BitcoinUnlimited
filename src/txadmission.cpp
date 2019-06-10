@@ -812,7 +812,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 {
                     if (debugger)
                     {
-
+                        debugger->AddInvalidReason("Inputs are missing");
                     }
                     else
                     {

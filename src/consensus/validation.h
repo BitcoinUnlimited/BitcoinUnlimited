@@ -148,18 +148,19 @@ public:
 /** Capture information about block/transaction validation */
 class CValidationDebugger
 {
+public:
+    bool mineable;
+    bool futureMineable;
+    bool standard;
+    std::vector<std::string> strRejectReasons;
+    std::map<std::string, std::string> txMetadata;
+    std::string txid;
 private:
     enum mode_state
     {
         MODE_VALID, //! everything ok
         MODE_INVALID, //! network rule violation (DoS value may be set)
     } mode;
-    std::vector<std::string> strRejectReasons;
-    std::map<std::string, std::string> txMetadata;
-    std::string txid;
-    bool mineable;
-    bool futureMineable;
-    bool standard;
     uint8_t inputSession;
     CInputDebugger inputsCheck1;
     CInputDebugger inputsCheck2;
@@ -181,6 +182,10 @@ public:
     void AddTxid(const std::string txidIn)
     {
         txid = txidIn;
+    }
+    std::string GetTxid()
+    {
+        return txid;
     }
     bool AddInvalidReason(const std::string &strRejectReasonIn)
     {
@@ -282,6 +287,14 @@ public:
     bool InputsCheck2IsValid()
     {
         return inputsCheck2.isValid;
+    }
+    CInputDebugger GetInputCheck1()
+    {
+        return inputsCheck1;
+    }
+    CInputDebugger GetInputCheck2()
+    {
+        return inputsCheck2;
     }
 
     bool IsValid() const { return mode == MODE_VALID; }
