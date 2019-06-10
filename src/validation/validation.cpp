@@ -908,7 +908,7 @@ bool CheckInputs(const CTransactionRef &tx,
     {
         if (!Consensus::CheckTxInputs(tx, state, inputs))
         {
-            if(debugger)
+            if (debugger)
             {
                 debugger->SetInputCheckResult(false);
                 debugger->AddInputCheckError(state.GetRejectReason());
@@ -938,7 +938,8 @@ bool CheckInputs(const CTransactionRef &tx,
                 CoinAccessor coin(inputs, prevout);
 
                 if (debugger)
-                {   if (coin->IsSpent())
+                {
+                    if (coin->IsSpent())
                     {
                         debugger->SetInputCheckResult(false);
                         debugger->AddInputCheckError(strprintf("COutPoint %s is spent", prevout.ToString().c_str()));
@@ -1000,7 +1001,8 @@ bool CheckInputs(const CTransactionRef &tx,
                         {
                             if (debugger)
                             {
-                                debugger->AddInputCheckError(strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
+                                debugger->AddInputCheckError(strprintf("non-mandatory-script-verify-flag (%s)",
+                                    ScriptErrorString(check.GetScriptError())));
                                 inputVerified = false;
                                 allPassed = false;
                             }
@@ -1008,7 +1010,7 @@ bool CheckInputs(const CTransactionRef &tx,
                             {
                                 return state.Invalid(
                                     false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)",
-                                                               ScriptErrorString(check.GetScriptError())));
+                                                                   ScriptErrorString(check.GetScriptError())));
                             }
                         }
                     }
@@ -1027,12 +1029,14 @@ bool CheckInputs(const CTransactionRef &tx,
                     {
                         if (debugger)
                         {
-                            debugger->AddInputCheckError(strprintf("upgrade-conditional-script-failure (%s)", ScriptErrorString(check.GetScriptError())));
+                            debugger->AddInputCheckError(strprintf(
+                                "upgrade-conditional-script-failure (%s)", ScriptErrorString(check.GetScriptError())));
                         }
                         else
                         {
-                            return state.Invalid(false, REJECT_INVALID, strprintf("upgrade-conditional-script-failure (%s)",
-                                                                        ScriptErrorString(check.GetScriptError())));
+                            return state.Invalid(
+                                false, REJECT_INVALID, strprintf("upgrade-conditional-script-failure (%s)",
+                                                           ScriptErrorString(check.GetScriptError())));
                         }
                     }
 
@@ -1047,12 +1051,14 @@ bool CheckInputs(const CTransactionRef &tx,
                     {
                         inputVerified = false;
                         allPassed = false;
-                        debugger->AddInputCheckError(strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
+                        debugger->AddInputCheckError(strprintf(
+                            "non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
                     }
                     else
                     {
-                        return state.DoS(100, false, REJECT_INVALID, strprintf("mandatory-script-verify-flag-failed (%s)",
-                                                                     ScriptErrorString(check.GetScriptError())));
+                        return state.DoS(
+                            100, false, REJECT_INVALID, strprintf("mandatory-script-verify-flag-failed (%s)",
+                                                            ScriptErrorString(check.GetScriptError())));
                     }
                 }
                 if (debugger)
@@ -1065,7 +1071,7 @@ bool CheckInputs(const CTransactionRef &tx,
             }
         }
     }
-    if(debugger)
+    if (debugger)
     {
         debugger->SetInputCheckResult(allPassed);
         debugger->FinishCheckInputSession();

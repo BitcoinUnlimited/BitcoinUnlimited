@@ -594,7 +594,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         *pfMissingInputs = false;
 
     const CChainParams &chainparams = Params();
-    if(debugger)
+    if (debugger)
     {
         debugger->AddTxid(tx->GetHash().ToString());
     }
@@ -603,7 +603,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     {
         if (state.GetDebugMessage() == "")
             state.SetDebugMessage("CheckTransaction failed");
-        if(debugger)
+        if (debugger)
         {
             debugger->AddInvalidReason(state.GetRejectReason());
             state = CValidationState();
@@ -617,7 +617,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     // Coinbase is only valid in a block, not as a loose transaction
     if (tx->IsCoinBase())
     {
-        if(debugger)
+        if (debugger)
         {
             debugger->AddInvalidReason("Coinbase is only valid in a block, not as a loose transaction");
             debugger->SetMineable(false);
@@ -644,7 +644,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     }
     if (fRequireStandard && !IsStandardTx(tx, reason))
     {
-        if(debugger)
+        if (debugger)
         {
             debugger->AddInvalidReason(reason);
         }
@@ -672,7 +672,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     // be mined yet.
     if (!CheckFinalTx(tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &ss))
     {
-        if(debugger)
+        if (debugger)
         {
             debugger->AddInvalidReason("non-final");
             debugger->SetMineable(false);
@@ -796,7 +796,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                             debugger->SetMineable(false);
                             debugger->SetFutureMineable(false);
                             debugger->AddInvalidReason("input-does-not-exist: " + txin.prevout.hash.ToString() + ":" +
-                                            std::to_string(txin.prevout.n));
+                                                       std::to_string(txin.prevout.n));
                         }
                         // fMissingInputs and not state.IsInvalid() is used to detect this condition, don't set
                         // state.Invalid()
@@ -906,7 +906,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
             else
             {
-                return state.DoS(0, false, REJECT_NONSTANDARD, "bad-txns-too-many-sigops", false, strprintf("%d", nSigOps));
+                return state.DoS(
+                    0, false, REJECT_NONSTANDARD, "bad-txns-too-many-sigops", false, strprintf("%d", nSigOps));
             }
         }
 
@@ -931,8 +932,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             if (debugger)
             {
                 debugger->AddInvalidReason("insufficient-priority");
-                debugger->AddInvalidReason("insufficient-fee: need " + std::to_string(minRelayTxFee.GetFee(nSize)) + " was only " +
-                                    std::to_string(nModifiedFees));
+                debugger->AddInvalidReason("insufficient-fee: need " + std::to_string(minRelayTxFee.GetFee(nSize)) +
+                                           " was only " + std::to_string(nModifiedFees));
                 debugger->AddInvalidReason("minimum-fee: " + std::to_string(minRelayTxFee.GetFee(nSize)));
                 debugger->SetStandard(false);
             }
@@ -941,7 +942,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 // Require that free transactions have sufficient priority to be mined in the next block.
                 LOG(MEMPOOL, "Txn fee %lld (%d - %d), priority fee delta was %lld\n", nFees, nValueIn, nValueOut,
                     nModifiedFees - nFees);
-                    return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "insufficient priority");
+                return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "insufficient priority");
             }
         }
         if (debugger)
@@ -1061,7 +1062,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                         thindata.UpdateMempoolLimiterBytesSaved(nSize);
                         LOG(MEMPOOL, "AcceptToMemoryPool : free transaction %s rejected by rate limiter\n",
                             hash.ToString());
-                            return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "rate limited free transaction");
+                        return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "rate limited free transaction");
                     }
                 }
                 dFreeCount += nSize;
@@ -1097,8 +1098,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         unsigned char sighashType = 0;
-        if (!CheckInputs(
-                tx, state, view, true, flags, maxScriptOps.Value(), true, &resourceTracker, nullptr, &sighashType, debugger))
+        if (!CheckInputs(tx, state, view, true, flags, maxScriptOps.Value(), true, &resourceTracker, nullptr,
+                &sighashType, debugger))
         {
             if (debugger && debugger->InputsCheck1IsValid())
             {
@@ -1151,7 +1152,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // This code denies old style tx from entering the mempool as soon as we fork
         if (!IsTxUAHFOnly(entry))
         {
-            if(debugger)
+            if (debugger)
             {
                 debugger->AddInvalidReason("txn-uses-old-sighash-algorithm");
             }

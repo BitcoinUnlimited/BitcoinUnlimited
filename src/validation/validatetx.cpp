@@ -190,7 +190,6 @@ bool ValidateTransaction(CTxMemPool &pool,
             state.SetDebugMessage("CheckTransaction failed");
         }
         errorList.push_back(state.GetRejectReason());
-
     }
 
     // Coinbase is only valid in a block, not as a loose transaction
