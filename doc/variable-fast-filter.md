@@ -15,7 +15,7 @@ In the BitcoinUnlimited codebase, there exist multiple fast filter implementatio
 ### CVariableFastFilter
 
 |**Field Name**|**Type**|**Size**|**Purpose**|
-|:------------:|:------:|:------:|:------------------:|:---------:|
+|:------------:|:------:|:------:|:---------:|
 |`vData`|`vector<unbsigned char>`|variable|Bit array|
 |`nHashFuncs`|`uint8_t`|1 byte|Number of hash functions to use|
 |`nFilterBytes`|`uint32_t`|4 bytes|Size of `vData` in bytes|
