@@ -792,6 +792,9 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
          * be annoying or make others' transactions take longer to confirm. */
         // maximum nMinRelay in satoshi per byte
         static const int nLimitFreeRelay = GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY);
+        // In case nLimitFreeRelay is defined less than the DEFAULT_MIN_LIMITFREERELAY we have to use the lower value
+        static const int nMinLimitFreeRelay = std::min((int)DEFAULT_MIN_LIMITFREERELAY, nLimitFreeRelay);
+
 
         // get current memory pool size
         uint64_t poolBytes = pool.GetTotalTxSize();
@@ -831,8 +834,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
 
             // When the mempool starts falling use an exponentially decaying ~24 hour window:
-            // nFreeLimit = nFreeLimit + ((double)(DEFAULT_LIMIT_FREE_RELAY - nFreeLimit) / pow(1.0 - 1.0/86400,
-            // (double)(nNow - nLastTime)));
             nFreeLimit /= std::pow(1.0 - 1.0 / 86400, (double)(nNow - nLastTime));
 
             // When the mempool starts falling use an exponentially decaying ~24 hour window:
@@ -852,19 +853,19 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                     _dMinLimiterTxFee + ((_dMaxLimiterTxFee - _dMinLimiterTxFee) * (poolBytes - nLargestBlockSeen) /
                                             (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1))));
 
-                // Gradually choke off the nFreeLimit as well but leave at least DEFAULT_MIN_LIMITFREERELAY
+                // Gradually choke off the nFreeLimit as well but leave at least nMinLimitFreeRelay
                 // So that some free transactions can still get through
                 nFreeLimit = std::min(
-                    nFreeLimit, ((double)nLimitFreeRelay - ((double)(nLimitFreeRelay - DEFAULT_MIN_LIMITFREERELAY) *
+                    nFreeLimit, ((double)nLimitFreeRelay - ((double)(nLimitFreeRelay - nMinLimitFreeRelay) *
                                                                (double)(poolBytes - nLargestBlockSeen) /
                                                                (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1)))));
-                if (nFreeLimit < DEFAULT_MIN_LIMITFREERELAY)
-                    nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
+                if (nFreeLimit < nMinLimitFreeRelay)
+                    nFreeLimit = nMinLimitFreeRelay;
             }
             else
             {
                 nMinRelay = _dMaxLimiterTxFee;
-                nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
+                nFreeLimit = nMinLimitFreeRelay;
             }
 
             minRelayTxFee = CFeeRate(nMinRelay * 1000);
