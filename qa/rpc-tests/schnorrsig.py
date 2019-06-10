@@ -6,7 +6,6 @@
 
 # Test Schnorr signatures.
 # This test first compares the signatures created in Python with those created by the bitcoind library.
-# Next it enables Schnorr signatures on 2 out of 3 nodes, generates a lot of transactions and blocks and verifies that 2 out of 3 nodes accept them.
 from test_framework.script import *
 from test_framework.util import *
 from test_framework.nodemessages import *
@@ -27,7 +26,6 @@ if sys.version_info[0] < 3:
 # is activated. Hence just set activation time in the past so
 # that node 0 and 1 would be able to use schnorr sig and drop
 # transaction that come from pre-activation nodes
-MAY_2019_FORK_TIME = 1500000000
 
 class PlaceHolder():
     def __init__(self, d=None):
@@ -39,7 +37,7 @@ class SchnorrSigTest (BitcoinTestFramework):
         # initialize_chain(self.options.tmpdir, bitcoinConfDict, wallets)
         # I cannot used cached because I am using mocktime
         initialize_chain_clean(self.options.tmpdir, 4, bitcoinConfDict, wallets)
-        
+
     def setup_network(self, split=False):
         self.nodes = start_nodes(3, self.options.tmpdir)
 
@@ -102,15 +100,11 @@ class SchnorrSigTest (BitcoinTestFramework):
             sigpy = schnorr.sign(privkey, hsh)
             sigcashlib = cashlib.signHashSchnorr(privkey, hsh)
             assert sigpy == sigcashlib
-        
+
 
     def run_test(self):
         self.basicSchnorrSigning()
-        
-        self.nodes[0].set("consensus.forkMay2019Time={}".format(MAY_2019_FORK_TIME))
-        self.nodes[1].set("consensus.forkMay2019Time={}".format(MAY_2019_FORK_TIME))
-        curTime=MAY_2019_FORK_TIME-50
-        for n in self.nodes: n.setmocktime(curTime)
+
         self.nodes[0].generate(15)
         self.sync_blocks()
         self.nodes[1].generate(15)
@@ -121,47 +115,6 @@ class SchnorrSigTest (BitcoinTestFramework):
         self.sync_blocks()
 
         logging.info("Schnorr signature transaction generation and commitment")
-
-        # reject early schnorr
-
-        resultWallet = []
-
-        inp = self.nodes[0].listunspent()[0]
-        privb58 = self.nodes[0].dumpprivkey(inp["address"])
-        privkey = decodeBase58(privb58)[1:-5]
-        pubkey = cashlib.pubkey(privkey)
-
-        tx = CTransaction()
-        tx.vin.append(CTxIn(COutPoint(inp["txid"], inp["vout"]), b"", 0xffffffff)) 
-
-        destPrivKey = cashlib.randombytes(32)
-        destPubKey = cashlib.pubkey(destPrivKey)
-        destHash = cashlib.addrbin(destPubKey)
-
-        output = CScript([OP_DUP, OP_HASH160, destHash, OP_EQUALVERIFY, OP_CHECKSIG])
-
-        amt = int(inp["amount"] * cashlib.BCH)
-        tx.vout.append(CTxOut(amt, output))
-
-        sighashtype = 0x41
-        sig = cashlib.signTxInputSchnorr(tx, 0, inp["amount"], inp["scriptPubKey"], privkey, sighashtype)
-        tx.vin[0].scriptSig = cashlib.spendscript(sig)  # P2PK
-
-        txhex = hexlify(tx.serialize()).decode("utf-8")
-        txid = self.nodes[0].enqueuerawtransaction(txhex, "flush")
-        assert self.nodes[0].getmempoolinfo()["size"] == 0  # Schnorr tx should be rejected
-
-        # Now move 2 nodes to the fork block
-
-        curTime=MAY_2019_FORK_TIME
-        for n in self.nodes[0:2]: n.setmocktime(curTime)
-        forkingBlocks = self.nodes[0].generate(6)  # MedianTimeSpan is 11
-        self.sync_all()
-
-        # We should be exactly at the fork time
-        assert self.nodes[0].getblock(str(self.nodes[0].getblockcount()))["mediantime"] == MAY_2019_FORK_TIME
-
-        # grab inputs from 2 different full nodes and sign a single tx that spends them both
 
         resultWallet = []
         alltx = []
@@ -208,16 +161,12 @@ class SchnorrSigTest (BitcoinTestFramework):
         waitFor(10, lambda: self.nodes[1].getmempoolinfo()['size'] == txcount+1)
         mp = [i.getmempoolinfo() for i in self.nodes]
         assert txcount+1 == mp[0]['size'] == mp[1]['size']
-        assert mp[2]['size'] == 0  # non schnorr enabled nodes should have rejected all of them
 
         nonSchnorrBlkHash = self.nodes[0].getbestblockhash()
-        curTime+=11  # trigger the fork
-        for n in self.nodes[0:2]: n.setmocktime(curTime)
         self.nodes[0].generate(1)
-       
+
         assert self.nodes[0].getmempoolinfo()['size'] == 0
         waitFor(10, lambda: self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
-        assert self.nodes[2].getbestblockhash() == nonSchnorrBlkHash  # because node 2 will fork off
 
         FEEINSAT = 5000
         # now spend all the new utxos again
@@ -258,35 +207,6 @@ class SchnorrSigTest (BitcoinTestFramework):
             while self.nodes[0].getmempoolinfo()['size'] != 0:
                 self.nodes[0].generate(1)
             waitFor(10, lambda: self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
-            assert self.nodes[2].getbestblockhash() == nonSchnorrBlkHash  # because node 2 will fork off
-
-        # reorg to pre-fork, non-schnorr chain
-        self.nodes[2].setmocktime(MAY_2019_FORK_TIME-10)
-        self.nodes[2].invalidateblock(forkingBlocks[0])
-        blks = self.nodes[2].generate(16)
-        self.sync_blocks()
-        assert self.nodes[0].getblock(str(self.nodes[0].getblockcount()))["mediantime"] < MAY_2019_FORK_TIME
-        # make sure no schnorr tx are in the mempool
-        assert self.nodes[0].getmempoolinfo()["size"] == 0
-        assert self.nodes[1].getmempoolinfo()["size"] == 0
-
-
-        # refork and reissue tx
-        for n in self.nodes: n.setmocktime(MAY_2019_FORK_TIME+10)
-        self.nodes[1].generate(6)
-        self.sync_all()
-        
-        for tx in alltx[:-1]:
-            self.nodes[0].enqueuerawtransaction(tx)
-        self.nodes[0].enqueuerawtransaction(alltx[-1], "flush")
-        print(self.nodes[0].getmempoolinfo())
-        waitFor(10, lambda: self.nodes[0].getmempoolinfo()["size"] == len(alltx))
-        assert self.nodes[0].getmempoolinfo()["size"] == len(alltx)
-
-        self.nodes[0].generate(1)
-        assert self.nodes[0].getmempoolinfo()["size"] == 0
-        
-
 
 if __name__ == '__main__':
     binpath = findBitcoind()
@@ -306,7 +226,6 @@ def Test():
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
 
-    logging.info("PID is %d" % os.getpid())
     flags = []  # ["--nocleanup", "--noshutdown"]
     if os.path.isdir("/ramdisk/test/t"):
         flags.append("--tmpdir=/ramdisk/test/t")
