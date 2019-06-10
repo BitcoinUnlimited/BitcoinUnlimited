@@ -10,7 +10,7 @@
 #include "dosman.h"
 #include "fastfilter.h"
 #include "init.h"
-#include "main.h" // for cs_main
+#include "main.h"
 #include "net.h"
 #include "parallel.h"
 #include "requestManager.h"

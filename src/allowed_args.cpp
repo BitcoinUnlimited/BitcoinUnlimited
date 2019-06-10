@@ -22,6 +22,7 @@
 #include "tinyformat.h"
 #include "torcontrol.h"
 #include "tweak.h"
+#include "txadmission.h"
 #include "txdb.h"
 #include "util.h"
 #include "utilmoneystr.h"
