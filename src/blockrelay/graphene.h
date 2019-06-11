@@ -254,9 +254,6 @@ struct GrapheneQuickStats
 class CGrapheneBlockData
 {
 private:
-    /* The sum total of all bytes for graphene blocks currently in process of being reconstructed */
-    std::atomic<uint64_t> nGrapheneBlockBytes{0};
-
     CCriticalSection cs_graphenestats; // locks everything below this point
 
     CStatHistory<uint64_t> nOriginalSize;
