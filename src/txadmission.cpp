@@ -872,7 +872,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             LOG(MEMPOOL, "MempoolBytes:%d  LimitFreeRelay:%.5g  nMinRelay:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d  "
                          "TxFees:%d\n",
                 poolBytes, nFreeLimit, nMinRelay, ((double)nFees) / nSize, nSize, nFees);
-            if (fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize))
+            if ((fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize)) ||
+                (nLimitFreeRelay == 0 && nFees < ::minRelayTxFee.GetFee(nSize)))
             {
                 static double dFreeCount = 0;
 
