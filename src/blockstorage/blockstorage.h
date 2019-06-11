@@ -20,7 +20,6 @@ enum FlushStateMode
 static const BlockDBMode DEFAULT_BLOCK_DB_MODE = SEQUENTIAL_BLOCK_FILES;
 extern BlockDBMode BLOCK_DB_MODE;
 extern CDatabaseAbstract *pblockdb;
-extern arith_uint256 pruneHashMask;
 
 /** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
 static const unsigned int DEFAULT_BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB

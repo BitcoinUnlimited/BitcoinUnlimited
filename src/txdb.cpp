@@ -369,8 +369,8 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue)
     return true;
 }
 
-bool CBlockTreeDB::WriteHashMask(const uint256 &_hashMask) { return Write(DB_HASH_MASK, _hashMask); }
-bool CBlockTreeDB::ReadHashMask(uint256 &_hashMask) { return Read(DB_HASH_MASK, _hashMask); }
+bool CBlockTreeDB::WriteHashMask(const uint64_t &_hashMask) { return Write(DB_HASH_MASK, _hashMask); }
+bool CBlockTreeDB::ReadHashMask(uint64_t &_hashMask) { return Read(DB_HASH_MASK, _hashMask); }
 bool CBlockTreeDB::WriteHashMaskThreshold(const uint8_t &_hashMaskThreshold)
 {
     return Write(DB_HASH_MASK_THRESHOLD, _hashMaskThreshold);

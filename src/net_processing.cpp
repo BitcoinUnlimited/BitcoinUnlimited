@@ -600,7 +600,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT, nLimitDescendants);
         xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT, nLimitDescendantSize);
 
-        xver.set_u64c(XVer::BU_PRUNE_HASHMASK, pruneHashMask.GetLow64());
+        xver.set_u64c(XVer::BU_PRUNE_HASHMASK, pruneHashMask);
         xver.set_u64c(XVer::BU_PRUNE_THRESHOLD, normalized_threshold);
 
         electrum::set_xversion_flags(xver, chainparams.NetworkIDString());

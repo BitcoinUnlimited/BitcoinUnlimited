@@ -7,6 +7,7 @@
 #include "arith_uint256.h"
 #include "uint256.h"
 
+#include <atomic>
 #include <set>
 #include <string>
 
@@ -17,14 +18,14 @@ static const uint8_t DEFAULT_THRESHOLD_PERCENT = 100;
 // this has been moved to chain params
 // static const unsigned int MIN_BLOCKS_TO_KEEP = 288;
 
-extern arith_uint256 pruneHashMask;
+extern uint64_t pruneHashMask;
 extern uint8_t hashMaskThreshold;
-extern uint64_t normalized_threshold;
+extern std::atomic<uint64_t> normalized_threshold;
 
 /** Number of MiB the blockdb is using. */
 extern uint64_t nDBUsedSpace;
 
-std::string hashMaskThresholdValidator(const uint8_t &value, uint8_t *item, bool validate = true);
+std::string hashMaskThresholdValidator(const uint8_t &value, uint8_t *item, bool validate);
 bool hashMaskCompare(uint256 _blockHash);
 bool SetupPruning();
 /**

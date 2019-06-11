@@ -3297,7 +3297,7 @@ void CNode::ReadConfigFromXVersion()
     nMempoolSyncMinVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED);
     nMempoolSyncMaxVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED);
 
-    peerPruneHashMask = arith_uint256(xVersion.as_u64c(XVer::BU_PRUNE_HASHMASK));
+    peerPruneHashMask = xVersion.as_u64c(XVer::BU_PRUNE_HASHMASK);
     peerPruneThreshold = xVersion.as_u64c(XVer::BU_PRUNE_THRESHOLD);
 }
 

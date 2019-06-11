@@ -7,6 +7,7 @@
 #include "rpc/blockchain.h"
 #include "amount.h"
 #include "blockstorage/blockstorage.h"
+#include "blockstorage/prune.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -1183,7 +1184,7 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
         }
         else
         {
-            obj.pushKV("pruneHashMask", pruneHashMask.ToString());
+            obj.pushKV("pruneHashMask", pruneHashMask);
             obj.pushKV("hashMaskThreshold", hashMaskThresholdTweak.Value());
         }
     }

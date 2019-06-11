@@ -58,15 +58,10 @@ class RandomPruning (BitcoinTestFramework):
         # calculate 1% which
         threshold_percent = uint64_t_max / 100
         blockchaininfo = self.nodes[1].getblockchaininfo()
-        fullhashMask = blockchaininfo["pruneHashMask"]
+        hashMask64 = blockchaininfo["pruneHashMask"]
         threshold = blockchaininfo["hashMaskThreshold"]
-        # the mask is stored as a 256 bit int for easy bitwise operations with block hashes
-        # get the 64 LSB (everything else should just be 0's)
-        hashMask64 = GetLow64(fullhashMask)
         # calculate the normalize threshold for the node
-        x = threshold * threshold_percent
-        # this hardcode is a work around for uint being little endian, this is what x is equal to
-        normalized_threshold = int(0x000000000000000000000000000000000000000000000000fffffffffffffff0)
+        normalized_threshold = threshold * threshold_percent
 
         # our threshold should be 10
         assert_equal({'prune.hashMaskThreshold': 10}, self.nodes[1].get("prune.hashMaskThreshold"))
@@ -81,7 +76,7 @@ class RandomPruning (BitcoinTestFramework):
             low64block = GetLow64(block)
             # if the 64LSB of the blockhash is equal to or above our threshold we should have pruned it
             # assert this is the case
-            valxmask = (int(low64block, 16) ^ int(hashMask64, 16))
+            valxmask = int(low64block, 16) ^ hashMask64
             if valxmask >= normalized_threshold:
                 assert_raises_rpc_error(-32603, "Block not available (pruned data)", self.nodes[1].getblock, block)
             else:
@@ -126,9 +121,8 @@ class RandomPruning (BitcoinTestFramework):
         blockchaininfo = self.nodes[1].getblockchaininfo()
         fullhashMask = blockchaininfo["pruneHashMask"]
         threshold = blockchaininfo["hashMaskThreshold"]
+        normalized_threshold = threshold * threshold_percent
 
-        # this is a hack fix, this is a 5% threshold
-        normalized_threshold = int(0x0000000000000000000000000000000000000000000000000ccccccccccccccc)
         kept2 = []
         for block in blocks_mined2:
             assert_equal(len(block), 64)
