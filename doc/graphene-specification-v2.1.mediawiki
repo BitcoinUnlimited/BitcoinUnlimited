@@ -35,7 +35,7 @@ In the Bitcoin Cash Network, blocks are relayed from a peer possessing the block
 
 <A id='fig1'>
 {| class="wikitable" style="float:left"
-|[[File:media/buip093-messaging.png]] 
+|[[File:media/graphene-messaging.png]] 
 |  A diagram of Graphene's messaging between the sender and receiver. ''M'' is the set of transactions that are in the block but missing from the receiver mempool. If ''M'' is too large, then the IBLT will not decode; in this case a fail-over block must be requested.
 |}</a>
 
