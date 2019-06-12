@@ -52,7 +52,7 @@ matrix:
         - RUN_TESTS=true
         - RUN_FORMATTING_CHECK=true
         - GOAL="install"
-        - BITCOIN_CONFIG="--enable-debug --enable-shared --enable-zmq --enable-glibc-back-compat --enable-reduce-exports CPPFLAGS=-DDEBUG_LOCKORDER" #need to test also libdb 4.8
+        - BITCOIN_CONFIG="--enable-shared --enable-zmq --enable-glibc-back-compat --enable-reduce-exports CPPFLAGS=-DDEBUG_LOCKORDER" #need to test also libdb 4.8
     #ARM64
     - compiler: gcc
       env:
@@ -104,7 +104,7 @@ matrix:
         - HOST=x86_64-unknown-linux-gnu
         - PACKAGES="python3 qtbase5-dev qttools5-dev-tools protobuf-compiler libdbus-1-dev libharfbuzz-dev libprotobuf-dev"
         - DEP_OPTS="NO_WALLET=1 NO_QT=1 ALLOW_HOST_PACKAGES=1"
-        - RUN_TESTS=true GOAL="install" BITCOIN_CONFIG="--with-gui=qt5 --enable-glibc-back-compat --enable-reduce-exports"
+        - RUN_TESTS=true GOAL="install" BITCOIN_CONFIG="--enable-debug --with-gui=qt5 --enable-glibc-back-compat --enable-reduce-exports"
     #Cross-Mac
     - compiler: gcc
       env:
