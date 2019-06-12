@@ -30,7 +30,7 @@ uint64_t nPruneTarget = 0;
 uint64_t nDBUsedSpace = 0;
 uint64_t pruneHashMask = 0;
 const uint64_t ONE_THRESHOLD_PERCENT = std::numeric_limits<uint64_t>::max() / 100;
-uint8_t hashMaskThreshold = DEFAULT_THRESHOLD_PERCENT;
+uint8_t hashMaskThreshold;
 std::atomic<uint64_t> normalized_threshold;
 extern CTweakRef<uint8_t> hashMaskThresholdTweak;
 
@@ -46,6 +46,7 @@ extern bool AbortNode(const std::string &strMessage, const std::string &userMess
 
 std::string hashMaskThresholdValidator(const uint8_t &value, uint8_t *item, bool validate)
 {
+    std::string strReturn = std::string();
     if (validate)
     {
         if (value > hashMaskThreshold)
@@ -54,21 +55,24 @@ std::string hashMaskThresholdValidator(const uint8_t &value, uint8_t *item, bool
             ret << "Sorry, your current hashMaskThreshold (" << std::to_string(hashMaskThreshold)
                 << ") is smaller than your proposed new threshold (" << std::to_string(value)
                 << "). You can only lower this number, not raise it.";
-            return ret.str();
+            strReturn = ret.str();
         }
         else if (value == hashMaskThreshold)
         {
-            // just return in this case, nothing has changed
-            return std::string();
+            // do nothing
         }
     }
     else
     {
-        pblocktree->WriteHashMaskThreshold(value);
-        normalized_threshold = (value * ONE_THRESHOLD_PERCENT);
+        uint8_t newValue = *item;
+        if(!pblocktree->WriteHashMaskThreshold(newValue))
+        {
+            strReturn = "Error writing new threshold to disk";
+        }
+        normalized_threshold = (newValue * ONE_THRESHOLD_PERCENT);
         RelayNewXUpdate(XVer::BU_PRUNE_THRESHOLD, normalized_threshold);
     }
-    return std::string();
+    return strReturn;
 }
 
 /** Generate a random list of 32 ints between 8 and 255 that will be used as important pruning bits*/
@@ -140,6 +144,10 @@ bool SetupPruning()
         {
             hashMaskThresholdTweak.Set(read_hashMaskThreshold);
         }
+        else
+        {
+            hashMaskThresholdTweak.Set(DEFAULT_THRESHOLD_PERCENT);
+        }
         uint8_t potentialThreshold = GetArg("-prunethreshold", DEFAULT_THRESHOLD_PERCENT);
         if (potentialThreshold < hashMaskThresholdTweak.Value())
         {
@@ -148,9 +156,14 @@ bool SetupPruning()
         }
         else if (potentialThreshold > hashMaskThresholdTweak.Value())
         {
-            LOGA("cannot raise prunethreshold above %u, keeping it at %u \n", hashMaskThresholdTweak.Value(), hashMaskThresholdTweak.Value());
+            LOGA("cannot raise prunethreshold above %u to %u, keeping it at %u \n", hashMaskThresholdTweak.Value(), potentialThreshold, hashMaskThresholdTweak.Value());
+            if(hashMaskThresholdTweak.Value() == 0)
+            {
+                LOGA("CRITICAL ERROR, THRESHOLD == 0, PLEASE REPORT THIS\n");
+                return false;
+            }
         }
-        normalized_threshold = hashMaskThreshold * ONE_THRESHOLD_PERCENT;
+        normalized_threshold = hashMaskThresholdTweak.Value() * ONE_THRESHOLD_PERCENT;
         fPruneMode = true;
     }
     return true;
