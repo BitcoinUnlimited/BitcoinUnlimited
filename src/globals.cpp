@@ -106,6 +106,8 @@ std::map<uint256, NodeId> mapBlockSource GUARDED_BY(cs_main);
 std::set<int> setDirtyFileInfo GUARDED_BY(cs_main);
 /** Dirty block index entries. */
 std::set<CBlockIndex *> setDirtyBlockIndex GUARDED_BY(cs_main);
+/** Holds temporary mining candidates */
+map<int64_t, CMiningCandidate> miningCandidatesMap GUARDED_BY(cs_main);
 
 /** Flags for coinbase transactions we create */
 CCriticalSection cs_coinbaseFlags;
@@ -433,9 +435,12 @@ CGrapheneBlockData graphenedata;
 CCompactBlockData compactdata;
 ThinTypeRelay thinrelay;
 
-map<int64_t, CMiningCandidate> miningCandidatesMap GUARDED_BY(cs_main);
-
+// Are we shutting down. Replaces boost interrupts.
 std::atomic<bool> shutdown_threads{false};
+
+// Size of last block that was successfully connected at the tip.
+std::atomic<uint64_t> nBlockSizeAtChainTip{0};
+
 
 #ifdef ENABLE_MUTRACE
 class CPrintSomePointers

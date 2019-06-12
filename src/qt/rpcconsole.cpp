@@ -21,6 +21,7 @@
 #include "rpc/client.h"
 #include "rpc/server.h"
 #include "util.h"
+#include "validation/validation.h"
 
 #include <openssl/crypto.h>
 
@@ -487,7 +488,6 @@ void RPCConsole::setClientModel(ClientModel *model)
         // Provide initial values
         ui->clientVersion->setText(model->formatFullVersion());
         ui->clientUserAgent->setText(model->formatSubVersion());
-        ui->clientName->setText(model->clientName());
         ui->dataDir->setText(model->dataDir());
         ui->startupTime->setText(model->formatClientStartupTime());
         ui->networkName->setText(QString::fromStdString(Params().NetworkIDString()));
@@ -631,6 +631,14 @@ void RPCConsole::setNumBlocks(int count, const QDateTime &blockDate, double nVer
 {
     ui->numberOfBlocks->setText(QString::number(count));
     ui->lastBlockTime->setText(blockDate.toString(time_format));
+
+    ui->lastBlockSize->setText(QString::number(nBlockSizeAtChainTip.load()));
+    if (nBlockSizeAtChainTip.load() == 0)
+        ui->lastBlockSize->setText("N/A");
+    else if (nBlockSizeAtChainTip.load() < 1000000)
+        ui->lastBlockSize->setText(QString::number(nBlockSizeAtChainTip.load() / 1000.0, 'f', 2) + " KB");
+    else
+        ui->lastBlockSize->setText(QString::number(nBlockSizeAtChainTip.load() / 1000000.0, 'f', 2) + " MB");
 }
 
 void RPCConsole::updateTimeSinceLastBlock(qint64 lastBlockTime)
