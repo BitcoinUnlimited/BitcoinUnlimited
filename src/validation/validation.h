@@ -15,6 +15,8 @@
 #include "txmempool.h"
 #include "versionbits.h"
 
+extern std::atomic<uint64_t> nBlockSizeAtChainTip;
+
 enum DisconnectResult
 {
     DISCONNECT_OK, // All good.

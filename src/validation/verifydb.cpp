@@ -9,7 +9,6 @@
 
 #include "blockstorage/blockstorage.h"
 #include "init.h"
-#include "requestManager.h"
 #include "ui_interface.h"
 #include "validation.h"
 
@@ -58,7 +57,7 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
         if (!ReadBlockFromDisk(block, pindex, chainparams.GetConsensus()))
             return error("VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s", pindex->nHeight,
                 pindex->GetBlockHash().ToString());
-        requester.nLastBlockSize = block.GetBlockSize();
+        nBlockSizeAtChainTip.store(block.GetBlockSize());
 
         // check level 1: verify block validity
         if (nCheckLevel >= 1 && !CheckBlock(block, state))

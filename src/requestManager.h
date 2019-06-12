@@ -160,9 +160,6 @@ public:
     // in preparation for shutdown
     void Cleanup();
 
-    // Size of last block that was successfully connected at the tip.
-    std::atomic<uint64_t> nLastBlockSize;
-
     // How many outbound nodes are we connected to.
     std::atomic<int32_t> nOutbound;
 

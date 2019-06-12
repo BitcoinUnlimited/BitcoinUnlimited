@@ -18,10 +18,10 @@
 #include "platformstyle.h"
 
 #include "chainparams.h"
-#include "requestManager.h"
 #include "rpc/client.h"
 #include "rpc/server.h"
 #include "util.h"
+#include "validation/validation.h"
 
 #include <openssl/crypto.h>
 
@@ -632,13 +632,13 @@ void RPCConsole::setNumBlocks(int count, const QDateTime &blockDate, double nVer
     ui->numberOfBlocks->setText(QString::number(count));
     ui->lastBlockTime->setText(blockDate.toString(time_format));
 
-    ui->lastBlockSize->setText(QString::number(requester.nLastBlockSize));
-    if (requester.nLastBlockSize == 0)
+    ui->lastBlockSize->setText(QString::number(nBlockSizeAtChainTip.load()));
+    if (nBlockSizeAtChainTip.load() == 0)
         ui->lastBlockSize->setText("N/A");
-    else if (requester.nLastBlockSize < 1000000)
-        ui->lastBlockSize->setText(QString::number(requester.nLastBlockSize / 1000.0, 'f', 2) + " KB");
+    else if (nBlockSizeAtChainTip.load() < 1000000)
+        ui->lastBlockSize->setText(QString::number(nBlockSizeAtChainTip.load() / 1000.0, 'f', 2) + " KB");
     else
-        ui->lastBlockSize->setText(QString::number(requester.nLastBlockSize / 1000000.0, 'f', 2) + " MB");
+        ui->lastBlockSize->setText(QString::number(nBlockSizeAtChainTip.load() / 1000000.0, 'f', 2) + " MB");
 }
 
 void RPCConsole::updateTimeSinceLastBlock(qint64 lastBlockTime)
