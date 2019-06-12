@@ -153,7 +153,6 @@ bool CThinBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
         pblock->thinblock->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     {
-        READLOCK(orphanpool.cs);
         int missingCount = 0;
         int unnecessaryCount = 0;
 
@@ -361,7 +360,6 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // Look for each transaction in our various pools and buffers.
     // With xThinBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
     {
-        READLOCK(orphanpool.cs);
         if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, thinBlock->vTxHashes256, pblock))
             return false;
     }
@@ -626,22 +624,29 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<
     bool fMerkleRootCorrect = true;
     {
         // Do the orphans first before taking the mempool.cs lock, so that we maintain correct locking order.
-        READLOCK(orphanpool.cs);
-        for (auto &mi : orphanpool.mapOrphanTransactions)
+        //
+        // We must keep the orphanpool lock during the period that we check the mempool hashes to prevent
+        // us from seeing a hash in the orphan pool that may have gotten into the mempool just after we
+        // released the orphan lock and before we took the mempool lock, which would show up as a false hash
+        // collision.
         {
-            uint64_t cheapHash = mi.first.GetCheapHash();
-            if (mapPartialTxHash.count(cheapHash)) // Check for collisions
-                _collision = true;
-            mapPartialTxHash[cheapHash] = mi.first;
-        }
+            READLOCK(orphanpool.cs);
+            for (auto &mi : orphanpool.mapOrphanTransactions)
+            {
+                uint64_t cheapHash = mi.first.GetCheapHash();
+                if (mapPartialTxHash.count(cheapHash)) // Check for collisions
+                    _collision = true;
+                mapPartialTxHash[cheapHash] = mi.first;
+            }
 
-        mempool.queryHashes(memPoolHashes);
-        for (uint64_t i = 0; i < memPoolHashes.size(); i++)
-        {
-            uint64_t cheapHash = memPoolHashes[i].GetCheapHash();
-            if (mapPartialTxHash.count(cheapHash)) // Check for collisions
-                _collision = true;
-            mapPartialTxHash[cheapHash] = memPoolHashes[i];
+            mempool.queryHashes(memPoolHashes);
+            for (uint64_t i = 0; i < memPoolHashes.size(); i++)
+            {
+                uint64_t cheapHash = memPoolHashes[i].GetCheapHash();
+                if (mapPartialTxHash.count(cheapHash)) // Check for collisions
+                    _collision = true;
+                mapPartialTxHash[cheapHash] = memPoolHashes[i];
+            }
         }
         for (auto &mi : thinBlock->mapMissingTx)
         {
@@ -769,8 +774,6 @@ static bool ReconstructBlock(CNode *pfrom,
     const std::vector<uint256> &vHashes,
     std::shared_ptr<CBlockThinRelay> pblock)
 {
-    AssertLockHeld(orphanpool.cs);
-
     // We must have all the full tx hashes by this point.  We first check for any duplicate
     // transaction ids.  This is a possible attack vector and has been used in the past.
     {
@@ -818,22 +821,36 @@ static bool ReconstructBlock(CNode *pfrom,
                     inMemPool = true;
             }
 
-            bool inMissingTx = mapMissing.count(hash.GetCheapHash()) > 0;
-            bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
+            // Continue Checking
+            bool inMissingTx = false;
+            bool inOrphanCache = false;
+            if (!ptx)
+            {
+                std::map<uint64_t, CTransactionRef>::iterator iter1 = mapMissing.find(hash.GetCheapHash());
+                if (iter1 != mapMissing.end())
+                {
+                    inMissingTx = true;
+                    ptx = iter1->second;
+                }
+                else
+                {
+                    READLOCK(orphanpool.cs);
+                    std::map<uint256, CTxOrphanPool::COrphanTx>::iterator iter2 =
+                        orphanpool.mapOrphanTransactions.find(hash);
+                    if (iter2 != orphanpool.mapOrphanTransactions.end())
+                    {
+                        inOrphanCache = true;
+                        ptx = iter2->second.ptx;
+                    }
+                }
 
+                // XVal: these transactions still need to be verified since they were not in the mempool
+                // or CommitQ.
+                if (ptx)
+                    pblock->setUnVerifiedTxns.insert(hash);
+            }
             if (((inMemPool || inCommitQ) && inMissingTx) || (inOrphanCache && inMissingTx))
                 unnecessaryCount++;
-
-            if (inOrphanCache)
-            {
-                ptx = orphanpool.mapOrphanTransactions[hash].ptx;
-                pblock->setUnVerifiedTxns.insert(hash);
-            }
-            else if (inMissingTx)
-            {
-                ptx = mapMissing[hash.GetCheapHash()];
-                pblock->setUnVerifiedTxns.insert(hash);
-            }
         }
         if (!ptx)
             missingCount++;
