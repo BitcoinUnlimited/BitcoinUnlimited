@@ -13,6 +13,7 @@
 #include "checkpoints.h"
 #include "clientversion.h"
 #include "net.h"
+#include "requestManager.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
 #include "ui_interface.h"
