@@ -134,8 +134,8 @@ public:
         consensus.may2018Height = 530359;
         // Nov, 15 2018 hard fork
         consensus.nov2018Height = 556766;
-        // Wed, 15 May 2019 12:00:00 UTC hard fork activation time
-        consensus.may2019ActivationTime = 1557921600;
+        // May, 15 2019 hard fork
+        consensus.may2019Height = 582679;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -275,8 +275,8 @@ public:
         consensus.may2018Height = 0;
         // Nov, 15 2018 hard fork
         consensus.nov2018Height = 0;
-        // Wed, 15 May 2019 12:00:00 UTC hard fork activation time
-        consensus.may2019ActivationTime = 1557921600;
+        // May, 15 2019 hard fork
+        consensus.may2019Height = 0;
 
         vFixedSeeds.clear();
         vSeeds.clear();
@@ -342,8 +342,8 @@ public:
         consensus.may2018Height = 1233070;
         // Nov 15, 2018 hard fork
         consensus.nov2018Height = 1267996;
-        // Wed, 15 May 2019 12:00:00 UTC hard fork activation time
-        consensus.may2019ActivationTime = 1557921600;
+        // May, 15 2019 hard fork
+        consensus.may2019Height = 1303884;
 
 
         pchMessageStart[0] = 0x0b;
@@ -459,8 +459,8 @@ public:
         consensus.may2018Height = 0;
         // Nov, 15 2018 hard fork is always active on regtest
         consensus.nov2018Height = 0;
-        // Wed, 15 May 2019 12:00:00 UTC hard fork activation time
-        consensus.may2019ActivationTime = 1557921600;
+        // May, 15 2019 hard fork
+        consensus.may2019Height = 0;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;

@@ -1769,7 +1769,7 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
     // 65/64-byte Schnorr signatures in CHECKSIG and CHECKDATASIG respectively,
     // and their verify variants. We also stop accepting 65 byte signatures in
     // CHECKMULTISIG and its verify variant.
-    if (IsMay2019Enabled(consensusparams, pindex->pprev))
+    if (IsMay2019Activated(consensusparams, pindex->pprev))
     {
         flags |= SCRIPT_ALLOW_SEGWIT_RECOVERY;
         flags |= SCRIPT_ENABLE_SCHNORR;
@@ -2872,12 +2872,9 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     // If this block enabled the may152019 protocol upgrade, then we need to clear the mempool of any transaction using
     // not previously avaiable features (e.g. OP_CHECKDATASIGVERIFY).
 
-    if (IsNov2018Activated(consensusParams, chainActive.Tip()))
+    if (IsMay2019Activated(consensusParams, pindexDelete) && !IsMay2019Activated(consensusParams, pindexDelete->pprev))
     {
-        if (IsMay2019Enabled(consensusParams, pindexDelete) && !IsMay2019Enabled(consensusParams, pindexDelete->pprev))
-        {
-            mempool.clear();
-        }
+        mempool.clear();
     }
 
     // these bloom filters stop us from doing duplicate work on tx we already know about.
