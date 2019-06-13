@@ -144,7 +144,11 @@ public:
     {
         READWRITE(vData);
         READWRITE(nHashFuncs);
+        if (ser_action.ForRead() && (nHashFuncs < 1 || nHashFuncs > 32))
+            throw std::ios_base::failure("nHashFuncs must be in the range [1,32], inclusive");
         READWRITE(nFilterBits);
+        if (ser_action.ForRead())
+            nFilterBytes = 8 * nFilterBits;
     }
 };
 
