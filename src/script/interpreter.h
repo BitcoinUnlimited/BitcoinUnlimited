@@ -111,7 +111,9 @@ enum
     // https:
     SCRIPT_ENABLE_REPLAY_PROTECTION = (1U << 17),
 
-    // Is OP_CHECKDATASIG and variant are enabled.
+    // Count sigops for OP_CHECKDATASIG and variant. The interpreter treats
+    // OP_CHECKDATASIG(VERIFY) as always valid, this flag only affects sigops
+    // counting.
     //
     SCRIPT_ENABLE_CHECKDATASIG = (1U << 18),
 
