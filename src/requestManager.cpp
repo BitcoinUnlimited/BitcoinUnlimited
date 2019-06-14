@@ -100,7 +100,6 @@ CRequestManager::CRequestManager()
 {
     inFlight = 0;
     nOutbound = 0;
-    nLastBlockSize = 0;
 
     sendIter = mapTxnInfo.end();
     sendBlkIter = mapBlkInfo.end();
