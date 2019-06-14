@@ -284,7 +284,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
 
     // Set XVal flag for new blocks. We can do this here because all transactions in this block are
     // from the mempool.
-    pblock->fXVal = true;
+    pblock->fXVal = GetBoolArg("-xval", true);
 
     CValidationState state;
     if (blockstreamCoreCompatible)

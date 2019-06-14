@@ -678,7 +678,9 @@ static void addBlockCreationOptions(AllowedArgs &allowedArgs)
         .addArg("blockprioritysize=<n>", requiredInt,
             strprintf(_("Set maximum size of high-priority/low-fee transactions in bytes (default: %d)"),
                     DEFAULT_BLOCK_PRIORITY_SIZE))
-        .addArg("blockversion=<n>", requiredInt, _("Generated block version number.  Value must be an integer"));
+        .addArg("blockversion=<n>", requiredInt, _("Generated block version number.  Value must be an integer"))
+        .addDebugArg(
+            "xval={true,false,0,1}", optionalBool, strprintf("Turn on/off Xpress Validation (default: %u)", true));
 }
 
 static void addRpcServerOptions(AllowedArgs &allowedArgs)

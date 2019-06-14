@@ -157,7 +157,7 @@ class CtorTest (BitcoinTestFramework):
             for i in range(3):
                 self.nodes[2].sendtoaddress(addr[2], 4-i)
             self.nodes[2].generate(1)
- 
+
         connect_nodes_bi(self.nodes,2,3)
         sync_blocks(self.nodes[2:])
         waitFor(10, lambda: self.nodes[2].getbestblockhash() == self.nodes[3].getbestblockhash())
