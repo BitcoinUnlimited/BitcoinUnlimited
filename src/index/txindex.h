@@ -69,7 +69,7 @@ public:
     bool BlockUntilSyncedToCurrentChain();
 
     /// Look up the on-disk location of a transaction by hash.
-    bool FindTx(const uint256 &txid, CDiskTxPos &pos) const;
+    bool FindTx(const uint256 &txhash, uint256 &blockhash, CTransactionRef tx) const;
 
     /// Start initializes the sync state and registers the instance as a
     /// ValidationInterface so that it stays in sync with blockchain updates.

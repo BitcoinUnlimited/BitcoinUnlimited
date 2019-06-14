@@ -24,6 +24,7 @@
 #include "dosman.h"
 #include "expedited.h"
 #include "hashwrapper.h"
+#include "index/txindex.h"
 #include "init.h"
 #include "merkleblock.h"
 #include "net.h"
@@ -292,28 +293,7 @@ bool GetTransaction(const uint256 &hash,
 
         if (fTxIndex)
         {
-            CDiskTxPos postx;
-            if (pblocktree->ReadTxIndex(hash, postx))
-            {
-                CAutoFile file(OpenBlockFile(postx, true), SER_DISK, CLIENT_VERSION);
-                if (file.IsNull())
-                    return error("%s: OpenBlockFile failed", __func__);
-                CBlockHeader header;
-                try
-                {
-                    file >> header;
-                    fseek(file.Get(), postx.nTxOffset, SEEK_CUR);
-                    file >> txOut;
-                }
-                catch (const std::exception &e)
-                {
-                    return error("%s: Deserialize or I/O error - %s", __func__, e.what());
-                }
-                hashBlock = header.GetHash();
-                if (txOut->GetHash() != hash)
-                    return error("%s: txid mismatch", __func__);
-                return true;
-            }
+            g_txindex->FindTx(hash, hashBlock, txOut);
         }
 
         // use coin database to locate block that contains transaction, and scan it

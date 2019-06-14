@@ -4,6 +4,7 @@
 
 #include "index/txindex.h"
 #include "blockstorage/blockstorage.h"
+#include "blockstorage/sequential_files.h"
 #include "chainparams.h"
 #include "init.h"
 #include "tinyformat.h"
@@ -258,7 +259,33 @@ bool TxIndex::BlockUntilSyncedToCurrentChain()
     return true;
 }
 
-bool TxIndex::FindTx(const uint256 &txid, CDiskTxPos &pos) const { return m_db->ReadTxPos(txid, pos); }
+bool TxIndex::FindTx(const uint256 &txhash, uint256 &blockhash, CTransactionRef ptx) const
+{
+    AssertLockHeld(cs_main);
+
+    CDiskTxPos postx;
+    if (!m_db->ReadTxPos(txhash, postx))
+        return false;
+
+    CAutoFile file(OpenBlockFile(postx, true), SER_DISK, CLIENT_VERSION);
+    if (file.IsNull())
+        return error("%s: OpenBlockFile failed", __func__);
+    CBlockHeader header;
+    try
+    {
+        file >> header;
+        fseek(file.Get(), postx.nTxOffset, SEEK_CUR);
+        file >> ptx;
+    }
+    catch (const std::exception &e)
+    {
+        return error("%s: Deserialize or I/O error - %s", __func__, e.what());
+    }
+    if (ptx->GetHash() != txhash)
+        return error("%s: txid mismatch", __func__);
+    blockhash = header.GetHash();
+    return true;
+}
 void TxIndex::Start()
 {
     // Need to register this ValidationInterface before running Init(), so that
