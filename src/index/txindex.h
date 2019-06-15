@@ -47,8 +47,7 @@ private:
 
 public:
     /// Update the txindex with this newly connected block data
-    void BlockConnected(const CBlock &block,
-        CBlockIndex *pindex);
+    void BlockConnected(const CBlock &block, CBlockIndex *pindex);
 
     /// Write the current chain block locator to the DB.
     bool WriteBestBlock(CBlockIndex *block_index);

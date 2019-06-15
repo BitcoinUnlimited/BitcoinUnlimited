@@ -161,8 +161,7 @@ bool TxIndex::WriteBestBlock(CBlockIndex *block_index)
     return true;
 }
 
-void TxIndex::BlockConnected(const CBlock &block,
-    CBlockIndex *pindex)
+void TxIndex::BlockConnected(const CBlock &block, CBlockIndex *pindex)
 {
     if (!m_synced)
     {
