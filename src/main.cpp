@@ -293,7 +293,7 @@ bool GetTransaction(const uint256 &hash,
 
         if (fTxIndex)
         {
-            g_txindex->FindTx(hash, hashBlock, txOut);
+            return g_txindex->FindTx(hash, hashBlock, txOut);
         }
 
         // use coin database to locate block that contains transaction, and scan it

@@ -28,7 +28,7 @@ private:
     std::atomic<bool> m_synced;
 
     /// The last block in the chain that the TxIndex is in sync with.
-    std::atomic<const CBlockIndex *> m_best_block_index;
+    std::atomic<CBlockIndex *> m_best_block_index;
 
     std::thread m_thread_sync;
 
@@ -45,17 +45,14 @@ private:
     /// Write update index entries for a newly connected block.
     bool WriteBlock(const CBlock &block, const CBlockIndex *pindex);
 
-    /// Write the current chain block locator to the DB.
-    bool WriteBestBlock(const CBlockIndex *block_index);
-
-protected:
-    void BlockConnected(const std::shared_ptr<const CBlock> &block,
-        const CBlockIndex *pindex,
-        const std::vector<CTransactionRef> &txn_conflicted);
-
-    void SetBestChain(const CBlockLocator &locator) override;
-
 public:
+    /// Update the txindex with this newly connected block data
+    void BlockConnected(const CBlock &block,
+        CBlockIndex *pindex);
+
+    /// Write the current chain block locator to the DB.
+    bool WriteBestBlock(CBlockIndex *block_index);
+
     /// Constructs the TxIndex, which becomes available to be queried.
     explicit TxIndex(std::unique_ptr<TxIndexDB> db);
 

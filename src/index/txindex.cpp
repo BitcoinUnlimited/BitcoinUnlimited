@@ -72,7 +72,7 @@ static const CBlockIndex *NextSyncBlock(const CBlockIndex *pindex_prev)
 
 void TxIndex::ThreadSync()
 {
-    const CBlockIndex *pindex = m_best_block_index.load();
+    CBlockIndex *pindex = m_best_block_index.load();
     if (!m_synced)
     {
         auto &consensus_params = Params().GetConsensus();
@@ -97,7 +97,7 @@ void TxIndex::ThreadSync()
                     m_synced = true;
                     break;
                 }
-                pindex = pindex_next;
+                pindex = const_cast<CBlockIndex *>(pindex_next);
             }
 
             int64_t current_time = GetTime();
@@ -151,7 +151,7 @@ bool TxIndex::WriteBlock(const CBlock &block, const CBlockIndex *pindex)
     return m_db->WriteTxs(vPos);
 }
 
-bool TxIndex::WriteBestBlock(const CBlockIndex *block_index)
+bool TxIndex::WriteBestBlock(CBlockIndex *block_index)
 {
     LOCK(cs_main);
     if (!m_db->WriteBestBlock(chainActive.GetLocator(block_index)))
@@ -161,9 +161,8 @@ bool TxIndex::WriteBestBlock(const CBlockIndex *block_index)
     return true;
 }
 
-void TxIndex::BlockConnected(const std::shared_ptr<const CBlock> &block,
-    const CBlockIndex *pindex,
-    const std::vector<CTransactionRef> &txn_conflicted)
+void TxIndex::BlockConnected(const CBlock &block,
+    CBlockIndex *pindex)
 {
     if (!m_synced)
     {
@@ -195,54 +194,19 @@ void TxIndex::BlockConnected(const std::shared_ptr<const CBlock> &block,
         }
     }
 
-    if (WriteBlock(*block, pindex))
+    if (WriteBlock(block, pindex))
     {
         m_best_block_index = pindex;
+
+        if (WriteBestBlock(pindex))
+        {
+            error("%s: Failed to write locator to disk", __func__);
+        }
     }
     else
     {
         FatalError("%s: Failed to write block %s to txindex", __func__, pindex->GetBlockHash().ToString());
         return;
-    }
-}
-
-void TxIndex::SetBestChain(const CBlockLocator &locator)
-{
-    if (!m_synced)
-    {
-        return;
-    }
-
-    const uint256 &locator_tip_hash = locator.vHave.front();
-    const CBlockIndex *locator_tip_index;
-    {
-        LOCK(cs_main);
-        locator_tip_index = LookupBlockIndex(locator_tip_hash);
-    }
-
-    if (!locator_tip_index)
-    {
-        FatalError("%s: First block (hash=%s) in locator was not found", __func__, locator_tip_hash.ToString());
-        return;
-    }
-
-    // This checks that SetBestChain callbacks are received after BlockConnected. The check may fail
-    // immediately after the the sync thread catches up and sets m_synced. Consider the case where
-    // there is a reorg and the blocks on the stale branch are in the ValidationInterface queue
-    // backlog even after the sync thread has caught up to the new chain tip. In this unlikely
-    // event, log a warning and let the queue clear.
-    const CBlockIndex *best_block_index = m_best_block_index.load();
-    if (best_block_index->GetAncestor(locator_tip_index->nHeight) != locator_tip_index)
-    {
-        LOGA("%s: WARNING: Locator contains block (hash=%s) not on known best " /* Continued */
-             "chain (tip=%s); not writing txindex locator\n",
-            __func__, locator_tip_hash.ToString(), best_block_index->GetBlockHash().ToString());
-        return;
-    }
-
-    if (!m_db->WriteBestBlock(locator))
-    {
-        error("%s: Failed to write locator to disk", __func__);
     }
 }
 
@@ -281,9 +245,10 @@ bool TxIndex::FindTx(const uint256 &txhash, uint256 &blockhash, CTransactionRef 
     {
         return error("%s: Deserialize or I/O error - %s", __func__, e.what());
     }
+    blockhash = header.GetHash();
     if (ptx->GetHash() != txhash)
         return error("%s: txid mismatch", __func__);
-    blockhash = header.GetHash();
+
     return true;
 }
 void TxIndex::Start()

@@ -15,6 +15,7 @@
 #include "consensus/tx_verify.h"
 #include "dosman.h"
 #include "expedited.h"
+#include "index/txindex.h"
 #include "init.h"
 #include "requestManager.h"
 #include "sync.h"
@@ -2603,6 +2604,12 @@ bool ConnectBlock(const CBlock &block,
             pindex->RaiseValidity(BLOCK_VALID_SCRIPTS);
             setDirtyBlockIndex.insert(pindex);
         }
+    }
+
+    // Write transaction data to the txindex
+    if (fTxIndex)
+    {
+        g_txindex->BlockConnected(block, pindex);
     }
 
     // add this block to the view's block chain (the main UTXO in memory cache)
