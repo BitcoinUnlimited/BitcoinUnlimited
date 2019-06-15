@@ -11,6 +11,7 @@
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "dstencode.h"
+#include "index/txindex.h"
 #include "init.h"
 #include "keystore.h"
 #include "main.h"
@@ -125,6 +126,16 @@ void TxToJSON(const CTransaction &tx, const uint256 hashBlock, UniValue &entry)
         }
     }
     entry.pushKV("hex", EncodeHexTx(tx));
+}
+
+static bool IsTxIndexReady()
+{
+    bool fReady = false;
+    if (g_txindex)
+    {
+        fReady = g_txindex->BlockUntilSyncedToCurrentChain();
+    }
+    return fReady;
 }
 
 UniValue getrawtransaction(const UniValue &params, bool fHelp)
@@ -246,10 +257,17 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
             }
             errmsg = "No such transaction found in the provided block";
         }
+        else if (!fTxIndex)
+        {
+            errmsg = "No such mempool transaction. Use -txindex to enable blockchain transaction queries";
+        }
+        else if (fTxIndex && !IsTxIndexReady())
+        {
+            errmsg = "transaction index is still syncing...try again later";
+        }
         else
         {
-            errmsg = fTxIndex ? "No such mempool or blockchain transaction" :
-                                "No such mempool transaction. Use -txindex to enable blockchain transaction queries";
+            errmsg = "No such mempool or blockchain transaction";
         }
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, errmsg + ". Use gettransaction for wallet transactions.");
     }
@@ -656,7 +674,19 @@ UniValue gettxoutproof(const UniValue &params, bool fHelp)
     {
         CTransactionRef tx;
         if (!GetTransaction(oneTxid, tx, Params().GetConsensus(), hashBlock, false) || hashBlock.IsNull())
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction not yet in block");
+        {
+            std::string errmsg;
+            if (!fTxIndex)
+            {
+                errmsg = "No such mempool transaction. Use -txindex to enable blockchain transaction queries";
+            }
+            else if (fTxIndex && !IsTxIndexReady())
+                errmsg = "Transaction index is still syncing...try again later";
+            else
+                errmsg = "Transaction not found in transaction index";
+
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, errmsg);
+        }
         pblockindex = LookupBlockIndex(hashBlock);
         if (!pblockindex)
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Transaction index corrupt");
