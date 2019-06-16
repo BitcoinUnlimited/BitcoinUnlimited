@@ -12,6 +12,7 @@
 #include "blockrelay/blockrelay_common.h"
 #include "blockrelay/compactblock.h"
 #include "blockrelay/graphene.h"
+#include "blockrelay/mempool_sync.h"
 #include "blockrelay/thinblock.h"
 #include "chain.h"
 #include "chainparams.h"
@@ -42,12 +43,14 @@
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include "utiltime.h"
 #include "validationinterface.h"
 #include "version.h"
 #include "versionbits.h"
 
 #include <atomic>
 #include <boost/lexical_cast.hpp>
+#include <chrono>
 #include <inttypes.h>
 #include <iomanip>
 #include <list>
@@ -265,6 +268,8 @@ CTweak<uint64_t> pruneIntervalTweak("prune.pruneInterval",
 
 CTweak<uint32_t> netMagic("net.magic", "network prefix override. If 0 use the default", 0);
 
+CTweak<uint32_t> randomlyDontInv("net.randomlyDontInv", "Skip sending an INV for some percent of transactions", 0);
+
 CTweakRef<uint64_t> ebTweak("net.excessiveBlock",
     "Excessive block size in bytes",
     &excessiveBlockSize,
@@ -397,6 +402,26 @@ CTweak<uint64_t> grapheneFastFilterCompatibility("net.grapheneFastFilterCompatib
     "Support fast Bloom filter: 0 - either, 1 - fast only, 2 - regular only (default: either)",
     GRAPHENE_FAST_FILTER_SUPPORT);
 
+CTweak<bool> syncMempoolWithPeers("net.syncMempoolWithPeers", "Synchronize mempool with peers", false);
+
+/** This setting specifies the minimum supported mempool sync version (inclusive).
+ *  The actual version used will be negotiated between sender and receiver.
+ */
+std::string memSyncMinVerStr = "Minimum mempool sync version supported (default: " +
+                               std::to_string(DEFAULT_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED) + ")";
+CTweak<uint64_t> mempoolSyncMinVersionSupported("net.mempoolSyncMinVersionSupported",
+    memSyncMinVerStr,
+    DEFAULT_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED);
+
+/** This setting specifies the maximum supported mempool sync version (inclusive).
+ *  The actual version used will be negotiated between sender and receiver.
+ */
+std::string memSyncMaxVerStr = "Maximum mempool sync version supported (default: " +
+                               std::to_string(DEFAULT_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED) + ")";
+CTweak<uint64_t> mempoolSyncMaxVersionSupported("net.mempoolSyncMaxVersionSupported",
+    memSyncMaxVerStr,
+    DEFAULT_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED);
+
 /** This is the initial size of CFileBuffer's RAM buffer during reindex.  A
 larger size will result in a tiny bit better performance if blocks are that
 size.
@@ -450,6 +475,11 @@ CThinBlockData thindata;
 CGrapheneBlockData graphenedata;
 CCompactBlockData compactdata;
 ThinTypeRelay thinrelay;
+CCriticalSection cs_mempoolsync;
+std::map<NodeId, CMempoolSyncState> mempoolSyncRequested GUARDED_BY(cs_mempoolsync);
+std::map<NodeId, CMempoolSyncState> mempoolSyncResponded GUARDED_BY(cs_mempoolsync);
+uint64_t lastMempoolSync = GetStopwatchMicros();
+uint64_t lastMempoolSyncClear = GetStopwatchMicros();
 
 // Are we shutting down. Replaces boost interrupts.
 std::atomic<bool> shutdown_threads{false};

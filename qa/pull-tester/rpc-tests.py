@@ -217,6 +217,7 @@ testScripts = [ RpcTest(t) for t in [
     'mempool_limit',
     'mempool_persist',
     'mempool_validate',
+    'mempoolsync',
     'httpbasics',
     'multi_rpc',
     'zapwallettxes',

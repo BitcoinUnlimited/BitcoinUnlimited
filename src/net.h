@@ -370,6 +370,12 @@ public:
     /** This node's max acceptable sum of all descendant transaction sizes.  Used to decide whether this node will
      * accept a particular transaction. */
     size_t nLimitDescendantSize = BCH_DEFAULT_DESCENDANT_SIZE_LIMIT * 1000;
+    // Does this node support mempool synchronization?
+    bool canSyncMempoolWithPeers;
+    // Minimum supported mempool synchronization version
+    uint64_t nMempoolSyncMinVersionSupported;
+    // Maximum supported mempool synchronization version
+    uint64_t nMempoolSyncMaxVersionSupported;
 
     // This is shared-locked whenever messages are processed.
     // Take it exclusive-locked to finish all ongoing processing

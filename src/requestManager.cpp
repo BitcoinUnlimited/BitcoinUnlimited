@@ -6,6 +6,7 @@
 #include "blockrelay/blockrelay_common.h"
 #include "blockrelay/compactblock.h"
 #include "blockrelay/graphene.h"
+#include "blockrelay/mempool_sync.h"
 #include "blockrelay/thinblock.h"
 #include "chain.h"
 #include "chainparams.h"
@@ -27,9 +28,11 @@
 #include "unlimited.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include "utiltime.h"
 #include "validation/validation.h"
 #include "validationinterface.h"
 #include "version.h"
+#include "xversionkeys.h"
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
@@ -1188,6 +1191,33 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
                 }
             }
         }
+    }
+}
+
+void CRequestManager::RequestMempoolSync(CNode *pto)
+{
+    LOCK(cs_mempoolsync);
+    NodeId nodeId = pto->GetId();
+
+    if ((mempoolSyncRequested.count(nodeId) == 0 ||
+            ((GetStopwatchMicros() - mempoolSyncRequested[nodeId].lastUpdated) > MEMPOOLSYNC_FREQ_US)) &&
+        pto->canSyncMempoolWithPeers)
+    {
+        // Similar to Graphene, receiver must send CMempoolInfo
+        CInv inv;
+        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+
+        inv.type = MSG_MEMPOOLSYNC;
+        CMempoolSyncInfo receiverMemPoolInfo = GetMempoolSyncInfo();
+        ss << inv;
+        ss << receiverMemPoolInfo;
+
+        mempoolSyncRequested[nodeId] = CMempoolSyncState(
+            GetStopwatchMicros(), receiverMemPoolInfo.shorttxidk0, receiverMemPoolInfo.shorttxidk1, false);
+        pto->PushMessage(NetMsgType::GET_MEMPOOLSYNC, ss);
+        LOG(MPOOLSYNC, "Requesting mempool synchronization from peer %s\n", pto->GetLogName());
+
+        lastMempoolSync = GetStopwatchMicros();
     }
 }
 

@@ -17,6 +17,7 @@
 #include "addrman.h"
 #include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene.h"
+#include "blockrelay/mempool_sync.h"
 #include "chainparams.h"
 #include "connmgr.h"
 #include "consensus/consensus.h"
@@ -47,6 +48,7 @@ extern CTweak<bool> ignoreNetTimeouts;
 #endif
 
 #include <boost/filesystem.hpp>
+#include <chrono>
 #include <thread>
 
 #include <math.h>
@@ -140,6 +142,10 @@ boost::condition_variable messageHandlerCondition;
 // BU  Connection Slot mitigation - used to determine how many connection attempts over time
 extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
 extern CCriticalSection cs_mapInboundConnectionTracker;
+
+// Mempool synchronization
+extern uint64_t lastMempoolSync;
+extern uint64_t lastMempoolSyncClear;
 
 // Signals for message handling
 extern CNodeSignals g_signals;
@@ -2278,6 +2284,18 @@ void ThreadMessageHandler()
 
         bool fSleep = true;
 
+        if (((GetStopwatchMicros() - lastMempoolSync) > MEMPOOLSYNC_FREQ_US) && vNodesCopy.size() > 0)
+        {
+            // select node from whom to request mempool sync
+            CNode *syncPeer = SelectMempoolSyncPeer(vNodesCopy);
+            if (!(syncPeer == nullptr))
+                requester.RequestMempoolSync(syncPeer);
+        }
+
+        // Periodically clear mempool sync maps in case peers have disconnected
+        if (GetStopwatchMicros() - lastMempoolSyncClear > MEMPOOLSYNC_CLEAR_FREQ_US)
+            ClearDisconnectedFromMempoolSyncMaps();
+
         for (CNode *pnode : vNodesCopy)
         {
             if (pnode->fDisconnect)
@@ -3246,6 +3264,10 @@ void CNode::ReadConfigFromXVersion()
     num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT);
     if (num)
         nLimitDescendantSize = num;
+
+    canSyncMempoolWithPeers = (xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC) == 1);
+    nMempoolSyncMinVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED);
+    nMempoolSyncMaxVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED);
 }
 
 

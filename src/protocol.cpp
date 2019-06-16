@@ -51,6 +51,12 @@ const char *GRAPHENETX = "grblktx";
 const char *GET_GRAPHENETX = "get_grblktx";
 const char *GET_GRAPHENE = "get_grblk";
 // BUIPXXX Graphene - end section
+// Mempool sync - begin section
+const char *MEMPOOLSYNC = "memsync";
+const char *MEMPOOLSYNCTX = "memsynctx";
+const char *GET_MEMPOOLSYNC = "get_memsync";
+const char *GET_MEMPOOLSYNCTX = "getmemsynctx";
+// Mempool sync - end section
 const char *XPEDITEDREQUEST = "req_xpedited";
 const char *XPEDITEDBLK = "Xb";
 const char *XPEDITEDTxn = "Xt";
