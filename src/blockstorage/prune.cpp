@@ -65,7 +65,7 @@ std::string hashMaskThresholdValidator(const uint8_t &value, uint8_t *item, bool
     else
     {
         uint8_t newValue = *item;
-        if(!pblocktree->WriteHashMaskThreshold(newValue))
+        if (!pblocktree->WriteHashMaskThreshold(newValue))
         {
             strReturn = "Error writing new threshold to disk";
         }
@@ -156,8 +156,9 @@ bool SetupPruning()
         }
         else if (potentialThreshold > hashMaskThresholdTweak.Value())
         {
-            LOGA("cannot raise prunethreshold above %u to %u, keeping it at %u \n", hashMaskThresholdTweak.Value(), potentialThreshold, hashMaskThresholdTweak.Value());
-            if(hashMaskThresholdTweak.Value() == 0)
+            LOGA("cannot raise prunethreshold above %u to %u, keeping it at %u \n", hashMaskThresholdTweak.Value(),
+                potentialThreshold, hashMaskThresholdTweak.Value());
+            if (hashMaskThresholdTweak.Value() == 0)
             {
                 LOGA("CRITICAL ERROR, THRESHOLD == 0, PLEASE REPORT THIS\n");
                 return false;

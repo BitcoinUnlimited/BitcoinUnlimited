@@ -171,7 +171,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     {
                         LOG(NET, "Ignore block request below NODE_NETWORK_LIMITED threshold from peer=%d\n",
                             pfrom->GetId());
-                            // disconnect node and prevent it from stalling (would
+                        // disconnect node and prevent it from stalling (would
                         // otherwise wait for the missing block)
                         pfrom->fDisconnect = true;
                         fSend = false;

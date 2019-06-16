@@ -142,11 +142,7 @@ public:
         pwrapperblock->getpdb()->CompactRange(&slKey1, &slKey2);
     }
 
-    void CondenseBlockData()
-    {
-        pwrapperblock->Compact();
-    }
-
+    void CondenseBlockData() { pwrapperblock->Compact(); }
     bool WriteUndo(const CBlockUndo &blockundo, const CBlockIndex *pindex);
     bool ReadUndo(CBlockUndo &blockundo, const CBlockIndex *pindex);
     bool EraseUndo(const CBlockIndex *pindex);
@@ -164,10 +160,7 @@ public:
         pwrapperundo->getpdb()->CompactRange(&slKey1, &slKey2);
     }
 
-    void CondenseUndoData()
-    {
-        pwrapperundo->Compact();
-    }
+    void CondenseUndoData() { pwrapperundo->Compact(); }
 };
 
 #endif // BLOCKDB_H
