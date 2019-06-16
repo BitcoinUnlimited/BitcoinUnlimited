@@ -20,17 +20,17 @@ class CBlockIndex;
 class TxIndex final : public CValidationInterface
 {
 private:
-    const std::unique_ptr<TxIndexDB> m_db;
+    const std::unique_ptr<TxIndexDB> db;
 
     /// Whether the index is in sync with the main chain. The flag is flipped
     /// from false to true once, after which point this starts processing
     /// ValidationInterface notifications to stay in sync.
-    std::atomic<bool> m_synced;
+    std::atomic<bool> fSynced;
 
     /// The last block in the chain that the TxIndex is in sync with.
-    std::atomic<CBlockIndex *> m_best_block_index;
+    std::atomic<CBlockIndex *> pbestindex;
 
-    std::thread m_thread_sync;
+    std::thread syncthread;
 
     /// Initialize internal state from the database and block index.
     bool Init();
