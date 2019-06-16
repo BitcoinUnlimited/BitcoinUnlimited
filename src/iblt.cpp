@@ -33,16 +33,8 @@ static const size_t N_HASHCHECK = 11;
 // than 1 cell for every 10 items.
 static const float MIN_OVERHEAD = 0.1;
 
-// mask that can be reduced to reduce the number of checksum bits in the IBLT
-// -- ANY VALUE OTHER THAN 0xffffffff IS FOR TESTING ONLY! --
-static const uint32_t KEYCHECK_MASK = 0xffffffff;
 
-static inline uint32_t keyChecksumCalc(const std::vector<uint8_t> &kvec)
-{
-    return MurmurHash3(N_HASHCHECK, kvec) & KEYCHECK_MASK;
-}
-
-
+static inline uint32_t keyChecksumCalc(const std::vector<uint8_t> &kvec) { return MurmurHash3(N_HASHCHECK, kvec); }
 template <typename T>
 std::vector<uint8_t> ToVec(T number)
 {
@@ -55,18 +47,18 @@ std::vector<uint8_t> ToVec(T number)
 }
 
 
-bool HashTableEntry::isPure() const
+bool BaseHashTableEntry::isPure(uint32_t keycheckMask) const
 {
     if (count == 1 || count == -1)
     {
-        uint32_t check = keyChecksumCalc(ToVec(keySum));
+        uint32_t check = (keyChecksumCalc(ToVec(keySum)) & keycheckMask);
         return (keyCheck == check);
     }
     return false;
 }
 
-bool HashTableEntry::empty() const { return (count == 0 && keySum == 0 && keyCheck == 0); }
-void HashTableEntry::addValue(const std::vector<uint8_t> &v)
+bool BaseHashTableEntry::empty() const { return (count == 0 && keySum == 0 && keyCheck == 0); }
+void BaseHashTableEntry::addValue(const std::vector<uint8_t> &v)
 {
     if (v.empty())
     {
@@ -88,6 +80,7 @@ CIblt::CIblt()
     n_hash = 1;
     is_modified = false;
     version = 0;
+    keycheckMask = 0xffffffff;
 }
 
 CIblt::CIblt(uint64_t _version)
@@ -95,20 +88,32 @@ CIblt::CIblt(uint64_t _version)
     salt = 0;
     n_hash = 1;
     is_modified = false;
+    keycheckMask = 0xffffffff;
 
     CIblt::version = _version;
 }
 
-CIblt::CIblt(size_t _expectedNumEntries, uint64_t _version) : salt(0), n_hash(0), is_modified(false)
+CIblt::CIblt(size_t _expectedNumEntries, uint64_t _version)
+    : salt(0), n_hash(0), is_modified(false), keycheckMask(0xffffffff)
 {
     CIblt::version = _version;
     CIblt::resize(_expectedNumEntries);
 }
 
-CIblt::CIblt(size_t _expectedNumEntries, uint32_t _salt, uint64_t _version) : n_hash(0), is_modified(false)
+CIblt::CIblt(size_t _expectedNumEntries, uint32_t _salt, uint64_t _version)
+    : n_hash(0), is_modified(false), keycheckMask(0xffffffff)
 {
     CIblt::version = _version;
     CIblt::salt = _salt;
+    CIblt::resize(_expectedNumEntries);
+}
+
+CIblt::CIblt(size_t _expectedNumEntries, uint32_t _salt, uint64_t _version, uint32_t _keycheckMask)
+    : n_hash(0), is_modified(false)
+{
+    CIblt::version = _version;
+    CIblt::salt = _salt;
+    CIblt::keycheckMask = _keycheckMask;
     CIblt::resize(_expectedNumEntries);
 }
 
@@ -117,6 +122,7 @@ CIblt::CIblt(const CIblt &other) : n_hash(0), is_modified(false)
     salt = other.salt;
     version = other.version;
     n_hash = other.n_hash;
+    keycheckMask = other.keycheckMask;
     hashTable = other.hashTable;
     mapHashIdxSeeds = other.mapHashIdxSeeds;
 }
@@ -179,7 +185,7 @@ void CIblt::_insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> &v)
         HashTableEntry &entry = hashTable.at(startEntry + (h % bucketsPerHash));
         entry.count += plusOrMinus;
         entry.keySum ^= k;
-        entry.keyCheck ^= kchk;
+        entry.keyCheck = (entry.keyCheck ^ kchk) & keycheckMask;
         if (entry.empty())
         {
             entry.valueSum.clear();
@@ -221,7 +227,7 @@ bool CIblt::get(uint64_t k, std::vector<uint8_t> &result) const
             // result empty, return true.
             return true;
         }
-        else if (entry.isPure())
+        else if (entry.isPure(keycheckMask))
         {
             if (entry.keySum == k)
             {
@@ -244,7 +250,7 @@ bool CIblt::get(uint64_t k, std::vector<uint8_t> &result) const
     for (size_t i = 0; i < peeled.hashTable.size(); i++)
     {
         HashTableEntry &entry = peeled.hashTable.at(i);
-        if (entry.isPure())
+        if (entry.isPure(keycheckMask))
         {
             if (entry.keySum == k)
             {
@@ -279,7 +285,7 @@ bool CIblt::listEntries(std::set<std::pair<uint64_t, std::vector<uint8_t> > > &p
         for (size_t i = 0; i < peeled.hashTable.size(); i++)
         {
             HashTableEntry &entry = peeled.hashTable.at(i);
-            if (entry.isPure())
+            if (entry.isPure(keycheckMask))
             {
                 if (entry.count == 1)
                 {
@@ -326,7 +332,7 @@ CIblt CIblt::operator-(const CIblt &other) const
         const HashTableEntry &e2 = other.hashTable.at(i);
         e1.count -= e2.count;
         e1.keySum ^= e2.keySum;
-        e1.keyCheck ^= e2.keyCheck;
+        e1.keyCheck = (e1.keyCheck ^ e2.keyCheck) & keycheckMask;
         if (e1.empty())
         {
             e1.valueSum.clear();
@@ -350,7 +356,7 @@ std::string CIblt::DumpTable() const
     {
         const HashTableEntry &entry = hashTable.at(i);
         result << entry.count << " " << entry.keySum << " ";
-        result << (keyChecksumCalc(ToVec(entry.keySum)) == entry.keyCheck ? "true" : "false");
+        result << ((keyChecksumCalc(ToVec(entry.keySum)) & keycheckMask) == entry.keyCheck ? "true" : "false");
         result << "\n";
     }
 
