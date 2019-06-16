@@ -596,7 +596,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     const CChainParams &chainparams = Params();
     if (debugger)
     {
-        debugger->AddTxid(tx->GetHash().ToString());
+        debugger->txid = tx->GetHash().ToString();
     }
 
     if (!CheckTransaction(tx, state))
@@ -620,8 +620,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         if (debugger)
         {
             debugger->AddInvalidReason("Coinbase is only valid in a block, not as a loose transaction");
-            debugger->SetMineable(false);
-            debugger->SetFutureMineable(false);
+            debugger->mineable = false;
+            debugger->futureMineable = false;
         }
         else
         {
@@ -675,7 +675,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         if (debugger)
         {
             debugger->AddInvalidReason("non-final");
-            debugger->SetMineable(false);
+            debugger->mineable = false;
         }
         else
         {
@@ -694,7 +694,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             if (debugger)
             {
                 debugger->AddInvalidReason("txn-undersize");
-                debugger->SetMineable(false);
+                debugger->mineable = false;
             }
             else
             {
@@ -726,8 +726,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     {
         if (debugger)
         {
-            debugger->SetMineable(false);
-            debugger->SetFutureMineable(false);
+            debugger->mineable = false;
+            debugger->futureMineable = false;
             // debugger->AddInvalidReason(
             // "tx-mempool-conflict: " + txin.prevout.hash.ToString() + ":" + std::to_string(txin.prevout.n));
             debugger->AddInvalidReason("txn-mempool-conflict");
@@ -793,8 +793,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                         }
                         if (debugger)
                         {
-                            debugger->SetMineable(false);
-                            debugger->SetFutureMineable(false);
+                            debugger->mineable = false;
+                            debugger->futureMineable = false;
                             debugger->AddInvalidReason("input-does-not-exist: " + txin.prevout.hash.ToString() + ":" +
                                                        std::to_string(txin.prevout.n));
                         }
@@ -855,7 +855,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             if (debugger)
             {
                 debugger->AddInvalidReason("bad-txns-nonstandard-inputs");
-                debugger->SetStandard(false);
+                debugger->standard = false;
             }
             else
             {
@@ -902,7 +902,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             if (debugger)
             {
                 debugger->AddInvalidReason("bad-txns-too-many-sigops");
-                debugger->SetMineable(false);
+                debugger->mineable = false;
             }
             else
             {
@@ -918,7 +918,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             if (debugger)
             {
                 debugger->AddInvalidReason("mempool min fee not met");
-                debugger->SetStandard(false);
+                debugger->standard = false;
             }
             else
             {
@@ -935,7 +935,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 debugger->AddInvalidReason("insufficient-fee: need " + std::to_string(minRelayTxFee.GetFee(nSize)) +
                                            " was only " + std::to_string(nModifiedFees));
                 debugger->AddInvalidReason("minimum-fee: " + std::to_string(minRelayTxFee.GetFee(nSize)));
-                debugger->SetStandard(false);
+                debugger->standard = false;
             }
             else
             {
@@ -947,9 +947,9 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         }
         if (debugger)
         {
-            debugger->AddMetadata("size", std::to_string(nSize));
-            debugger->AddMetadata("txfee", std::to_string(nModifiedFees));
-            debugger->AddMetadata("txfeeneeded", std::to_string(minRelayTxFee.GetFee(nSize)));
+            debugger->txMetadata.emplace("size", std::to_string(nSize));
+            debugger->txMetadata.emplace("txfee", std::to_string(nModifiedFees));
+            debugger->txMetadata.emplace("txfeeneeded", std::to_string(minRelayTxFee.GetFee(nSize)));
         }
 
         // BU - Xtreme Thinblocks Auto Mempool Limiter - begin section
@@ -1055,7 +1055,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                     if (debugger)
                     {
                         debugger->AddInvalidReason("rate limited free transaction");
-                        debugger->SetStandard(false);
+                        debugger->standard = false;
                     }
                     else
                     {
@@ -1079,7 +1079,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             if (debugger)
             {
                 debugger->AddInvalidReason("absurdly-high-fee");
-                debugger->SetStandard(false);
+                debugger->standard = false;
             }
             else
             {
@@ -1104,8 +1104,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             if (debugger && debugger->InputsCheck1IsValid())
             {
                 debugger->AddInvalidReason("input-script-failed");
-                debugger->SetMineable(false);
-                debugger->SetFutureMineable(false);
+                debugger->mineable = false;
+                debugger->futureMineable = false;
             }
             else
             {
@@ -1133,8 +1133,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             if (debugger && debugger->InputsCheck1IsValid())
             {
                 debugger->AddInvalidReason("CheckInputs failed against mandatory but not standard flags");
-                debugger->SetMineable(false);
-                debugger->SetFutureMineable(false);
+                debugger->mineable = false;
+                debugger->futureMineable = false;
             }
             else
             {
@@ -1185,7 +1185,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 if (debugger)
                 {
                     debugger->AddInvalidReason("too-long-mempool-chain");
-                    debugger->SetMineable(false);
+                    debugger->mineable = false;
                 }
                 else
                 {

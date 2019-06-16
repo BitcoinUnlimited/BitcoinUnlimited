@@ -138,7 +138,6 @@ public:
     bool mineable;
     bool futureMineable;
     bool standard;
-    std::vector<std::string> strRejectReasons;
     std::map<std::string, std::string> txMetadata;
     std::string txid;
 
@@ -151,6 +150,8 @@ private:
     uint8_t inputSession;
     CInputDebugger inputsCheck1;
     CInputDebugger inputsCheck2;
+    // this is private because the method to add a reason modifies mode
+    std::vector<std::string> strRejectReasons;
 
 public:
     CValidationDebugger()
@@ -166,21 +167,15 @@ public:
         inputsCheck1.SetNull();
         inputsCheck2.SetNull();
     }
-    void AddTxid(const std::string txidIn) { txid = txidIn; }
-    std::string GetTxid() { return txid; }
-    bool AddInvalidReason(const std::string &strRejectReasonIn)
+    void AddInvalidReason(const std::string &strRejectReasonIn)
     {
         strRejectReasons.push_back(strRejectReasonIn);
         mode = MODE_INVALID;
-        return false;
     }
-    void AddMetadata(const std::string &keyIn, const std::string &valueIn) { txMetadata.emplace(keyIn, valueIn); }
-    bool GetMineable() { return mineable; }
-    void SetMineable(bool state) { mineable = state; }
-    bool GetFutureMineable() { return futureMineable; }
-    void SetFutureMineable(bool state) { futureMineable = state; }
-    bool GetStandard() { return standard; }
-    void SetStandard(bool state) { standard = state; }
+    std::vector<std::string> GetRejectReasons() const { return strRejectReasons; }
+    bool IsValid() const { return mode == MODE_VALID; }
+    bool IsInvalid() const { return mode == MODE_INVALID; }
+
     void SetInputCheckResult(bool state)
     {
         if (inputSession == 1)
@@ -241,9 +236,6 @@ public:
     bool InputsCheck2IsValid() { return inputsCheck2.isValid; }
     CInputDebugger GetInputCheck1() { return inputsCheck1; }
     CInputDebugger GetInputCheck2() { return inputsCheck2; }
-    bool IsValid() const { return mode == MODE_VALID; }
-    bool IsInvalid() const { return mode == MODE_INVALID; }
-    std::vector<std::string> GetRejectReasons() const { return strRejectReasons; }
 };
 
 #endif // BITCOIN_CONSENSUS_VALIDATION_H

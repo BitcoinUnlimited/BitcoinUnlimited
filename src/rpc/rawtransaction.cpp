@@ -1598,11 +1598,11 @@ UniValue validaterawtransaction(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "transaction already in block chain");
     }
 
-    result.pushKV("txid", debugger.GetTxid());
-    result.pushKV("isValid", (debugger.GetMineable() && debugger.GetFutureMineable() && debugger.GetStandard()));
-    result.pushKV("isMineable", debugger.GetMineable());
-    result.pushKV("isFutureMineable", debugger.GetFutureMineable());
-    result.pushKV("isStandard", debugger.GetStandard());
+    result.pushKV("txid", debugger.txid);
+    result.pushKV("isValid", debugger.IsValid());
+    result.pushKV("isMineable", debugger.mineable);
+    result.pushKV("isFutureMineable", debugger.futureMineable);
+    result.pushKV("isStandard", debugger.standard);
 
     UniValue uv_txmetadata(UniValue::VOBJ);
     std::map<std::string, std::string>::iterator it;
@@ -1613,7 +1613,8 @@ UniValue validaterawtransaction(const UniValue &params, bool fHelp)
     result.pushKV("metadata", uv_txmetadata);
 
     UniValue uv_errors(UniValue::VARR);
-    for (auto error : debugger.strRejectReasons)
+    std::vector<std::string> strRejectReasons = debugger.GetRejectReasons();
+    for (auto error : strRejectReasons)
     {
         uv_errors.push_back(error);
     }
