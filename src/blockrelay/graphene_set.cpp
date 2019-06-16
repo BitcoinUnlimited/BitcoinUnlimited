@@ -31,6 +31,14 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     // Below is the parameter "n" from the graphene paper
     uint64_t nItems = _itemHashes.size();
 
+    uint64_t ibltVersion;
+    if (version < 2)
+        ibltVersion = 0;
+    else if (version < 4)
+        ibltVersion = 1;
+    else
+        ibltVersion = 2;
+
     FastRandomContext insecure_rand(fDeterministic);
 
     // Infer various receiver quantities
@@ -58,11 +66,7 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     }
 
     // Set false positive rate for Bloom filter based on optSymDiff
-    double fpr;
-    if (optSymDiff >= nReceiverExcessItems)
-        fpr = FILTER_FPR_MAX;
-    else
-        fpr = optSymDiff / float(nReceiverExcessItems);
+    double fpr = BloomFalsePositiveRate(optSymDiff, nReceiverExcessItems);
 
     // So far we have only made room for false positives in the IBLT
     // Make more room for missing items
@@ -84,7 +88,19 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
 
     // Construct IBLT
     uint64_t nIbltCells = std::max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
-    pSetIblt = std::make_shared<CIblt>(CIblt(nIbltCells, ibltSalt, version >= 2));
+    uint8_t nCheckSumBits;
+    if (ibltVersion >= 2)
+    {
+        nCheckSumBits = CGrapheneSet::NChecksumBits(nIbltCells * CIblt::OptimalOverhead(nIbltCells),
+            CIblt::OptimalNHash(nIbltCells), nReceiverUniverseItems, fpr, UNCHECKED_ERROR_TOL);
+    }
+    else
+        nCheckSumBits = MAX_CHECKSUM_BITS;
+
+    LOG(GRAPHENE, "using %d checksum bits in IBLT\n", nCheckSumBits);
+    uint32_t keycheckMask = 0xffffffff >> (MAX_CHECKSUM_BITS - nCheckSumBits);
+    pSetIblt = std::make_shared<CIblt>(CIblt(nIbltCells, ibltSalt, ibltVersion, keycheckMask));
+
     std::map<uint64_t, uint256> mapCheapHashes;
 
     LOG(GRAPHENE, "constructed IBLT with %d cells\n", nIbltCells);
@@ -148,14 +164,34 @@ double CGrapheneSet::OptimalSymDiff(uint64_t nBlockTxs,
     /* Optimal symmetric difference between block txs and receiver mempool txs passing
      * though filter to use for IBLT.
      */
-    if (nBlockTxs >= APPROX_ITEMS_THRESH && nReceiverExcessTxs >= nBlockTxs / APPROX_EXCESS_RATE)
-        return ApproxOptimalSymDiff(nBlockTxs);
+    uint16_t approx_items_thresh = version >= 4 ? APPROX_ITEMS_THRESH_REDUCE_CHECK : APPROX_ITEMS_THRESH;
+
+    // First calculate optimal symmetric difference assuming the maximum number of checksum bits
+    double optSymDiff;
+    if (nBlockTxs >= approx_items_thresh && nReceiverExcessTxs >= nBlockTxs / APPROX_EXCESS_RATE)
+        optSymDiff = ApproxOptimalSymDiff(nBlockTxs, MAX_CHECKSUM_BITS);
     else
-        return BruteForceSymDiff(nBlockTxs, nReceiverPoolTx, nReceiverExcessTxs, nReceiverMissingTxs);
+        optSymDiff =
+            BruteForceSymDiff(nBlockTxs, nReceiverPoolTx, nReceiverExcessTxs, nReceiverMissingTxs, MAX_CHECKSUM_BITS);
+
+    if (version < 4)
+        return optSymDiff;
+
+    // Calculate optimal number of checksum bits assuming optimal symmetric difference
+    uint64_t nIbltCells = std::max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
+    uint8_t nChecksumBits =
+        CGrapheneSet::NChecksumBits(nIbltCells * CIblt::OptimalOverhead(nIbltCells), CIblt::OptimalNHash(nIbltCells),
+            nReceiverPoolTx, BloomFalsePositiveRate(optSymDiff, nReceiverExcessTxs), UNCHECKED_ERROR_TOL);
+
+    // Recalculate optimal symmetric difference assuming optimal checksum bits
+    if (nBlockTxs >= approx_items_thresh && nReceiverExcessTxs >= nBlockTxs / APPROX_EXCESS_RATE)
+        return ApproxOptimalSymDiff(nBlockTxs, nChecksumBits);
+    else
+        return BruteForceSymDiff(nBlockTxs, nReceiverPoolTx, nReceiverExcessTxs, nReceiverMissingTxs, nChecksumBits);
 }
 
 
-double CGrapheneSet::ApproxOptimalSymDiff(uint64_t nBlockTxs)
+double CGrapheneSet::ApproxOptimalSymDiff(uint64_t nBlockTxs, uint8_t nChecksumBits)
 {
     /* Approximation to the optimal symmetric difference between block txs and receiver
      * mempool txs passing through filter to use for IBLT.
@@ -167,17 +203,21 @@ double CGrapheneSet::ApproxOptimalSymDiff(uint64_t nBlockTxs)
      * For details see
      * https://github.com/bissias/graphene-experiments/blob/master/jupyter/graphene_size_optimization.ipynb
      */
-    assert(nBlockTxs >= APPROX_ITEMS_THRESH);
+    if (version >= 4)
+        assert(nBlockTxs >= APPROX_ITEMS_THRESH_REDUCE_CHECK);
+    else
+        assert(nBlockTxs >= APPROX_ITEMS_THRESH);
 
-    return std::max(
-        1.0, std::round(FILTER_CELL_SIZE * nBlockTxs / (8 * IBLT_CELL_SIZE * IBLT_DEFAULT_OVERHEAD * LN2SQUARED)));
+    return std::max(1.0, std::round(FILTER_CELL_SIZE * nBlockTxs /
+                                    ((nChecksumBits + 8 * IBLT_FIXED_CELL_SIZE) * IBLT_DEFAULT_OVERHEAD * LN2SQUARED)));
 }
 
 
 double CGrapheneSet::BruteForceSymDiff(uint64_t nBlockTxs,
     uint64_t nReceiverPoolTx,
     uint64_t nReceiverExcessTxs,
-    uint64_t nReceiverMissingTxs)
+    uint64_t nReceiverMissingTxs,
+    uint8_t nChecksumBits)
 {
     /* Brute force search for optimal symmetric difference between block txs and receiver
      * mempool txs passing though filter to use for IBLT.
@@ -206,13 +246,13 @@ double CGrapheneSet::BruteForceSymDiff(uint64_t nBlockTxs,
     auto F = [nBlockTxs, fpr](
         uint64_t a) { return floor(FILTER_CELL_SIZE * (-1 / LN2SQUARED * nBlockTxs * log(fpr(a)) / 8)); };
 
-    auto L = [](uint64_t a) {
+    auto L = [nChecksumBits](uint64_t a) {
         uint8_t n_iblt_hash = CIblt::OptimalNHash(a);
         float iblt_overhead = CIblt::OptimalOverhead(a);
         uint64_t padded_cells = (int)(iblt_overhead * a);
         uint64_t cells = n_iblt_hash * int(ceil(padded_cells / float(n_iblt_hash)));
 
-        return IBLT_CELL_SIZE * cells;
+        return (nChecksumBits / 8 + IBLT_FIXED_CELL_SIZE) * cells;
     };
 
     uint64_t optSymDiff = 1;
@@ -374,4 +414,31 @@ std::vector<uint64_t> CGrapheneSet::DecodeRank(std::vector<unsigned char> encode
             items[i] |= bits[j + i * nBitsPerItem] << j;
     }
     return items;
+}
+
+double CGrapheneSet::BloomFalsePositiveRate(double optSymDiff, uint64_t nReceiverExcessItems)
+{
+    double fpr;
+    if (optSymDiff >= nReceiverExcessItems)
+        fpr = FILTER_FPR_MAX;
+    else
+        fpr = optSymDiff / float(nReceiverExcessItems);
+
+    return fpr;
+}
+
+
+uint8_t CGrapheneSet::NChecksumBits(size_t nIbltEntries,
+    uint8_t nIbltHashFuncs,
+    uint64_t nReceiverUniverseItems,
+    double fBloomFPR,
+    double fUncheckedErrorTol)
+{
+    if (nIbltEntries < nIbltHashFuncs)
+        return 32;
+
+    return (uint8_t)std::max((double)MIN_CHECKSUM_BITS,
+        std::log2(nIbltEntries *
+                  (1 - std::pow(1 - fBloomFPR * (nIbltHashFuncs / (double)nIbltEntries), nReceiverUniverseItems))) -
+            std::log2(fUncheckedErrorTol));
 }

@@ -31,7 +31,7 @@ enum FastFilterSupport
 
 const uint8_t GRAPHENE_FAST_FILTER_SUPPORT = EITHER;
 const uint64_t GRAPHENE_MIN_VERSION_SUPPORTED = 0;
-const uint64_t GRAPHENE_MAX_VERSION_SUPPORTED = 4;
+const uint64_t GRAPHENE_MAX_VERSION_SUPPORTED = 5;
 const unsigned char MIN_MEMPOOL_INFO_BYTES = 8;
 const uint8_t SHORTTXIDS_LENGTH = 8;
 
@@ -144,13 +144,9 @@ public:
         if (!pGrapheneSet)
         {
             if (version > 3)
-                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(3, computeOptimized));
-            else if (version == 3)
-                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(2));
-            else if (version == 2)
-                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(1));
+                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(version - 1, computeOptimized));
             else
-                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(0));
+                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(version - 1));
         }
         READWRITE(*pGrapheneSet);
     }
