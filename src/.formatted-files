@@ -178,8 +178,6 @@ validation/forks.cpp
 validation/forks.h
 validation/validation.cpp
 validation/validation.h
-validation/validatetx.cpp
-validation/validatetx.h
 validation/verifydb.cpp
 validation/verifydb.h
 validationinterface.cpp

@@ -175,7 +175,6 @@ public:
     std::vector<std::string> GetRejectReasons() const { return strRejectReasons; }
     bool IsValid() const { return mode == MODE_VALID; }
     bool IsInvalid() const { return mode == MODE_INVALID; }
-
     void SetInputCheckResult(bool state)
     {
         if (inputSession == 1)
