@@ -86,7 +86,6 @@ void TxIndex::ThreadSync()
         {
             if (shutdown_threads.load() == true)
             {
-                WriteBestBlock(pindex);
                 return;
             }
 
