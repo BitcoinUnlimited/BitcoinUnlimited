@@ -72,6 +72,9 @@ static const CBlockIndex *NextSyncBlock(const CBlockIndex *pindex_prev)
 
 void TxIndex::ThreadSync()
 {
+    if (fReindex)
+        return;
+
     CBlockIndex *pindex = pbestindex.load();
     if (!fSynced)
     {
@@ -163,34 +166,9 @@ bool TxIndex::WriteBestBlock(CBlockIndex *block_index)
 
 void TxIndex::BlockConnected(const CBlock &block, CBlockIndex *pindex)
 {
-    if (!fSynced.load())
+    if (!fSynced.load() && !fReindex)
     {
         return;
-    }
-
-    const CBlockIndex *pbest = pbestindex.load();
-    if (!pbest)
-    {
-        if (pindex->nHeight != 0)
-        {
-            FatalError("%s: First block connected is not the genesis block (height=%d)", __func__, pindex->nHeight);
-            return;
-        }
-    }
-    else
-    {
-        // Ensure block connects to an ancestor of the current best block. This should be the case
-        // most of the time, but may not be immediately after the the sync thread catches up and sets
-        // fSynced. Consider the case where there is a reorg and the blocks on the stale branch are
-        // in the ValidationInterface queue backlog even after the sync thread has caught up to the
-        // new chain tip. In this unlikely event, log a warning and let the queue clear.
-        if (pbest->GetAncestor(pindex->nHeight - 1) != pindex->pprev)
-        {
-            LOGA("%s: WARNING: Block %s does not connect to an ancestor of " /* Continued */
-                 "known best chain (tip=%s); not updating txindex\n",
-                __func__, pindex->GetBlockHash().ToString(), pbest->GetBlockHash().ToString());
-            return;
-        }
     }
 
     if (WriteBlock(block, pindex))
