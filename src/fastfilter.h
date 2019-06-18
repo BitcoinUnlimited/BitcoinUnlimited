@@ -21,7 +21,7 @@ class uint256;
 /**
  * This class can be used anywhere a Bloom filter is used so long as the input data is random.
  *
- * If nHashFuncs is 16 and nFilterItems is >= 64k all bits in the uint256 input data will be used to set bits in
+ * If nHashFuncs is 16 and nFilterBits is >= 64k all bits in the uint256 input data will be used to set bits in
  * the filter.
  *
  * nHashFuncs may range from 1 to 32 inclusive.
@@ -35,9 +35,9 @@ protected:
 public:
     uint8_t nHashFuncs;
     uint32_t nFilterBytes;
-    uint64_t nFilterItems;
+    uint64_t nFilterBits;
 
-    CVariableFastFilter() : nHashFuncs(MIN_N_HASH_FUNC), nFilterBytes(1), nFilterItems(8) { vData.resize(1); }
+    CVariableFastFilter() : nHashFuncs(MIN_N_HASH_FUNC), nFilterBytes(1), nFilterBits(8) { vData.resize(1); }
     CVariableFastFilter(uint64_t nElements, double nFPRate)
     {
         if (nElements == 0)
@@ -47,7 +47,7 @@ public:
         }
 
         nFilterBytes = (uint32_t)(std::ceil(-1 / LN2SQUARED * nElements * log(nFPRate) / 8));
-        nFilterItems = 8 * nFilterBytes;
+        nFilterBits = 8 * nFilterBytes;
 
         if (nFilterBytes > std::numeric_limits<uint32_t>::max())
             throw std::runtime_error("CVariableFastFilter can have size no greater maximum uint32_t.");
@@ -76,7 +76,7 @@ public:
         for (unsigned int i = 0; i < nHashFuncs; i++, pos++)
         {
             uint32_t val = *pos;
-            uint32_t idx = val % (nFilterItems - 1);
+            uint32_t idx = val % (nFilterBits - 1);
             uint32_t bit = (1 << (idx & 7));
             idx >>= 3;
             unset |= (0 == (vData[idx] & bit));
@@ -101,7 +101,7 @@ public:
         for (unsigned int i = 0; i < nHashFuncs; i++, pos++)
         {
             uint32_t val = *pos;
-            uint32_t idx = val % (nFilterItems - 1);
+            uint32_t idx = val % (nFilterBits - 1);
             vData[idx >> 3] |= (1 << (idx & 7));
 
             // Rotate hash array once pos gets to the end of the array
@@ -122,7 +122,7 @@ public:
         for (unsigned int i = 0; i < nHashFuncs; i++, pos++)
         {
             uint32_t val = *pos;
-            uint32_t idx = val % (nFilterItems - 1);
+            uint32_t idx = val % (nFilterBits - 1);
             unset |= (0 == (vData[idx >> 3] & (1 << (idx & 7))));
 
             // Rotate hash array once pos gets to the end of the array
@@ -144,7 +144,11 @@ public:
     {
         READWRITE(vData);
         READWRITE(nHashFuncs);
-        READWRITE(nFilterItems);
+        if (ser_action.ForRead() && (nHashFuncs < 1 || nHashFuncs > 32))
+            throw std::ios_base::failure("nHashFuncs must be in the range [1,32], inclusive");
+        READWRITE(nFilterBits);
+        if (ser_action.ForRead())
+            nFilterBytes = 8 * nFilterBits;
     }
 };
 
