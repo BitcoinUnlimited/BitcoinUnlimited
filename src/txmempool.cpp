@@ -978,144 +978,7 @@ void CTxMemPool::_removeConflicts(const CTransaction &tx, std::list<CTransaction
 // If a transaction has an ancestor, it is placed on a deferred map: ancestor->descendant list.
 // Whenever a tx is removed from the mempool, any of its descendants are placed back onto the
 // queue of tx that are removable.
-void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
-    uint64_t nBlockHeight,
-    std::list<CTransactionRef> &conflicts,
-    bool fCurrentEstimate,
-    std::vector<CTxChange> *txChanges)
-{
-    WRITELOCK(cs_txmempool);
-
-    // Process the block for transasction removal and ancestor state updates.
-    // As a first step remove all the txns that are in the block from the mempool by
-    // first updating the children for removal of the parent, and also saving the entries
-    // for policy estimate updates.  Then in the final loop simply remove all the txns.
-    //
-    // While we're updating the child transactions prior to removal we can also gather the
-    // mapTxnChaiTips.
-    mapEntryHistory mapTxnChainTips;
-    setEntries setAncestorsFromBlock;
-    {
-        setEntries setTxnsInBlock;
-        for (const auto &tx : vtx)
-        {
-            uint256 hash = tx->GetHash();
-            txiter it = mapTx.find(hash);
-            if (it == mapTx.end())
-            {
-                continue;
-            }
-
-            // Get all ancestors from related to txns in the block. Stop looking if we've already looked up
-            // this set of ancestors before; we don't want to be traversing the same part of the ancestor
-            // tree more than once.
-            setEntries setAncestors;
-            uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
-            std::string dummy;
-            _CalculateMemPoolAncestors(
-                *it, setAncestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy, &setAncestorsFromBlock, false);
-
-            setAncestorsFromBlock.insert(setAncestors.begin(), setAncestors.end());
-            setTxnsInBlock.insert(it);
-
-            const setEntries &setMemPoolChildren = GetMemPoolChildren(it);
-            for (txiter updateIt : setMemPoolChildren)
-            {
-                // Get the current ancestor state values and save them for later comparison
-                ancestor_state ancestorState(updateIt->GetSizeWithAncestors(), updateIt->GetModFeesWithAncestors(),
-                    updateIt->GetCountWithAncestors(), updateIt->GetSigOpCountWithAncestors());
-                mapTxnChainTips.emplace(updateIt, ancestorState);
-
-                // Remove each block entry from the parent map in mapLinks
-                _UpdateParent(updateIt, it, false);
-            }
-        }
-
-        // Before the txs in the new block have been removed from the mempool, update policy estimates
-        minerPolicyEstimator->processBlock(nBlockHeight, setTxnsInBlock, fCurrentEstimate);
-        lastRollingFeeUpdate = GetTime();
-        blockSinceLastRollingFeeBump = true;
-
-        // Remove Transactions that were in the block from the mempool.
-        for (txiter it : setTxnsInBlock)
-        {
-            setAncestorsFromBlock.erase(it);
-            mapTxnChainTips.erase(it);
-            removeUnchecked(it);
-        }
-
-        // This is a safeguard in the case where ancestors of transactions in this block have re-entered
-        // the mempool, possibly from a re-org. This should never happen and would likely indicate a locking
-        // issue if it did.
-        if (!setAncestorsFromBlock.empty())
-        {
-            DbgAssert(!"Ancestors in the mempool when they should not be", );
-            for (txiter it : setAncestorsFromBlock)
-            {
-                removeUnchecked(it);
-            }
-        }
-    }
-
-    // For every chain tip walk through their decendants finding any transaction that have more than one parent.
-    // These will then need to be considered as chain tips.
-    CTxMemPool::TxMempoolOriginalStateMap changeSet;
-    mapEntryHistory mapAdditionalChainTips;
-    for (auto iter : mapTxnChainTips)
-    {
-        // Get descendants but stop looking if/when we find another txnchaintip in the descendant tree.
-        setEntries setDescendants;
-        _CalculateDescendants(iter.first, setDescendants, &mapTxnChainTips);
-        for (txiter dit : setDescendants)
-        {
-            // If long chain transaction forwarding is turned on, get the original descendant state
-            // and save it for later comparison.
-            if (txChanges && changeSet.count(dit) == 0)
-                changeSet.insert({dit, TxMempoolOriginalState(dit)});
-
-            // Add a new chaintip if there is more than 1 parent.
-            if (GetMemPoolParents(dit).size() > 1)
-            {
-                ancestor_state ancestorState(dit->GetSizeWithAncestors(), dit->GetModFeesWithAncestors(),
-                    dit->GetCountWithAncestors(), dit->GetSigOpCountWithAncestors());
-                mapAdditionalChainTips.emplace(dit, ancestorState);
-            }
-        }
-    }
-    mapTxnChainTips.insert(mapAdditionalChainTips.begin(), mapAdditionalChainTips.end());
-
-    // Update ancestor state for remaining chains
-    UpdateTxnChainState(mapTxnChainTips);
-
-    // After the updates are complete then process changeSet into a list of tx and mempool changes
-    // and sort into dependency order.
-    if (!changeSet.empty())
-    {
-        txChanges->reserve(changeSet.size());
-        for (auto &mc : changeSet)
-        {
-            txChanges->push_back(CTxChange(mc.second));
-        }
-        sort(txChanges->begin(), txChanges->end(), [](const CTxChange &a, const CTxChange &b) {
-            return a.now.countWithDescendants > b.now.countWithDescendants;
-        });
-    }
-
-    // Remove conflicting tx
-    for (const auto &tx : vtx)
-    {
-        _removeConflicts(*tx, conflicts);
-        _ClearPrioritisation(tx->GetHash());
-    }
-
-    // With the cs_txmepool lock on, resubmit the txCommitQ so we don't allow txns back into
-    // the mempool that may be ancestors of txns that were in the block we just processed.  If we allowed
-    // this then the txns would essentialy be orphans within the mempool.
-    ResubmitCommitQ();
-}
-
-// This is the old version of remove for block which is still kept for testing purposes.
-void CTxMemPool::removeForBlock_Legacy(const std::vector<CTransactionRef> &vtx,
+void CTxMemPool::removeForBlock(const CBlock &block,
     unsigned int nBlockHeight,
     std::list<CTransactionRef> &conflicts,
     bool fCurrentEstimate,
@@ -1129,10 +992,7 @@ void CTxMemPool::removeForBlock_Legacy(const std::vector<CTransactionRef> &vtx,
     DeferredMap deferred;
     std::queue<txiter> ready;
 
-    CTxMemPool::TxMempoolOriginalStateMap changeSet;
-
-    setEntries setTxnsInBlock;
-    for (const auto &tx : vtx)
+    for (const auto &tx : block)
     {
         uint256 hash = tx->GetHash();
         txiter i = mapTx.find(hash);
@@ -1223,7 +1083,7 @@ void CTxMemPool::removeForBlock_Legacy(const std::vector<CTransactionRef> &vtx,
     }
 
     // Remove conflicting tx
-    for (const auto &tx : vtx)
+    for (const auto &tx : block)
     {
         _removeConflicts(*tx, conflicts);
         _ClearPrioritisation(tx->GetHash());

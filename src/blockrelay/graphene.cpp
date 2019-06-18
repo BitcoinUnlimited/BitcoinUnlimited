@@ -51,7 +51,7 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
         FillShortTxIDSelector();
 
     std::vector<uint256> blockHashes;
-    for (auto &tx : pblock->vtx)
+    for (const auto &tx : *pblock)
     {
         blockHashes.push_back(tx->GetHash());
 
@@ -1319,8 +1319,7 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
         try
         {
             uint64_t nSenderMempoolPlusBlock =
-                GetGrapheneMempoolInfo().nTx + pblock->vtx.size() - 1; // exclude coinbase
-
+                GetGrapheneMempoolInfo().nTx + pblock->numTransactions() - 1; // exclude coinbase
             CGrapheneBlock grapheneBlock(pblock, mempoolinfo.nTx, nSenderMempoolPlusBlock,
                 NegotiateGrapheneVersion(pfrom), NegotiateFastFilterSupport(pfrom));
 

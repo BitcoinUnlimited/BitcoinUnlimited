@@ -224,7 +224,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     CBlock *pblock = &pblocktemplate->block;
 
     // Add dummy coinbase tx as first transaction
-    pblock->vtx.emplace_back();
+    pblock->add(CTransactionRef(new CTransaction()));
     pblocktemplate->vTxFees.push_back(-1); // updated at end
     pblocktemplate->vTxSigOps.push_back(-1); // updated at end
 
@@ -303,14 +303,14 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
 
         for (auto &txe : vtxe)
         {
-            pblocktemplate->block.vtx.push_back(txe->GetSharedTx());
+            pblocktemplate->block.add(txe->GetSharedTx());
             pblocktemplate->vTxFees.push_back(txe->GetFee());
             pblocktemplate->vTxSigOps.push_back(txe->GetSigOpCount());
         }
 
         // Create coinbase transaction.
-        pblock->vtx[0] =
-            coinbaseTx(scriptPubKeyIn, nHeight, nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus()));
+        pblock->setCoinbase(
+            coinbaseTx(scriptPubKeyIn, nHeight, nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus())));
         pblocktemplate->vTxFees[0] = -nFees;
 
         // Fill in header
@@ -784,7 +784,7 @@ void IncrementExtraNonce(CBlock *pblock, unsigned int &nExtraNonce)
     }
     ++nExtraNonce;
     unsigned int nHeight = pblock->GetHeight(); // Height first in coinbase required for block.version=2
-    CMutableTransaction txCoinbase(*pblock->vtx[0]);
+    CMutableTransaction txCoinbase(*pblock->coinbase());
 
     CScript script = (CScript() << nHeight << CScriptNum(nExtraNonce));
     CScript cbFlags;
@@ -806,6 +806,6 @@ void IncrementExtraNonce(CBlock *pblock, unsigned int &nExtraNonce)
         txCoinbase.vin[0].scriptSig << std::vector<uint8_t>(MIN_TX_SIZE - nCoinbaseSize - 1);
     }
 
-    pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));
+    pblock->setCoinbase(MakeTransactionRef(std::move(txCoinbase)));
     pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
 }

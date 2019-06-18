@@ -392,7 +392,7 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
 
     UniValue resultSet(UniValue::VOBJ);
-    for (auto tx : block.vtx)
+    for (const auto &tx : block)
     {
         if (has_protocol)
         {
@@ -571,7 +571,7 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
         }
         UniValue blockResults(UniValue::VOBJ);
-        for (auto tx : block.vtx)
+        for (const auto &tx : block)
         {
             if (has_protocol)
             {
@@ -685,7 +685,7 @@ UniValue gettxoutproof(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
 
     unsigned int ntxFound = 0;
-    for (const auto &tx : block.vtx)
+    for (const auto &tx : block)
         if (setTxids.count(tx->GetHash()))
             ntxFound++;
     if (ntxFound != setTxids.size())
@@ -754,7 +754,7 @@ UniValue gettxoutproofs(const UniValue &params, bool fHelp)
     bool ntxFound = false;
     for (const auto &txid : setTxids)
     {
-        for (const auto &tx : block.vtx)
+        for (const auto &tx : block)
         {
             if (setTxids.count(tx->GetHash()))
             {

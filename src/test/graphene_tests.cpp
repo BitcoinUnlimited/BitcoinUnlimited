@@ -380,7 +380,7 @@ BOOST_AUTO_TEST_CASE(graphene_block_can_serde)
             SER_DISK, CLIENT_VERSION);
         stream >> tx;
         const CTransactionRef ptx = MakeTransactionRef(tx);
-        block.vtx.push_back(ptx);
+        block.add(ptx);
         CGrapheneBlock senderGrapheneBlock(MakeBlockRef(block), 5, 6, version, false);
         CGrapheneBlock receiverGrapheneBlock(4);
         CDataStream ss(SER_DISK, 0);
@@ -388,7 +388,7 @@ BOOST_AUTO_TEST_CASE(graphene_block_can_serde)
         ss << senderGrapheneBlock;
         ss >> receiverGrapheneBlock;
     }
-    
+
     // compute optimized graphene block
     {
         CBlock block;
@@ -403,6 +403,7 @@ BOOST_AUTO_TEST_CASE(graphene_block_can_serde)
             SER_DISK, CLIENT_VERSION);
         stream >> tx;
         const CTransactionRef ptx = MakeTransactionRef(tx);
+        block.add(ptx);
         block.vtx.push_back(ptx);
         CGrapheneBlock senderGrapheneBlock(MakeBlockRef(block), 5, 6, version, true);
         CGrapheneBlock receiverGrapheneBlock(4, true);

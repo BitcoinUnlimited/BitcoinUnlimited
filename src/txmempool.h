@@ -643,12 +643,7 @@ public:
     void removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMemPoolHeight, int flags);
     void removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed);
     void _removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed);
-    void removeForBlock(const std::vector<CTransactionRef> &vtx,
-        uint64_t nBlockHeight,
-        std::list<CTransactionRef> &conflicted,
-        bool fCurrentEstimate = true,
-        std::vector<CTxChange> *txChange = nullptr);
-    void removeForBlock_Legacy(const std::vector<CTransactionRef> &vtx,
+    void removeForBlock(const CBlock &block,
         unsigned int nBlockHeight,
         std::list<CTransactionRef> &conflicted,
         bool fCurrentEstimate = true,
