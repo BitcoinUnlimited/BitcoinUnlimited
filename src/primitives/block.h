@@ -77,6 +77,9 @@ private:
     // memory only
     mutable uint64_t nBlockSize; // Serialized block size in bytes
 
+    // network and disk
+    std::vector<CTransactionRef> vtx;
+
 public:
     // Xpress Validation: (memory only)
     //! Orphans, or Missing transactions that have been re-requested, are stored here.
@@ -87,8 +90,46 @@ public:
     bool fXVal;
 
 public:
-    // network and disk
-    std::vector<CTransactionRef> vtx;
+    typedef std::vector<CTransactionRef>::const_iterator const_iterator;
+
+    // functions to access internal transaction data
+    const_iterator begin() const { return vtx.begin(); }
+    const_iterator begin_past_coinbase() const
+    {
+        const_iterator b = begin();
+        b++;
+        return b;
+    }
+    const_iterator end() const { return vtx.end(); }
+    const CTransactionRef coinbase() const
+    {
+        if (vtx.size())
+            return vtx[0];
+        else
+            return nullptr;
+    }
+    uint64_t numTransactions() const { return vtx.size(); }
+    bool empty() const { return numTransactions() == 0; }
+    void add(const CTransactionRef &txnref) { vtx.emplace_back(txnref); }
+    void setCoinbase(const CTransactionRef &txnref)
+    {
+        if (vtx.empty())
+            vtx.resize(1);
+        vtx[0] = txnref;
+    }
+
+    // sort block to be LTOR (leaves coinbase alone)
+    void sortLTOR();
+
+    //! DEPRECATED. This is solely here to aid for implementation/porting of
+    // existing (test) code and should NOT be used.
+    CTransactionRef by_pos(size_t index) const
+    {
+        if (index < vtx.size())
+            return vtx[index];
+        else
+            return nullptr;
+    }
 
     // memory only
     // 0.11: mutable std::vector<uint256> vMerkleTree;
@@ -127,7 +168,9 @@ public:
 
     uint64_t GetHeight() const // Returns the block's height as specified in its coinbase transaction
     {
-        const CScript &sig = vtx[0]->vin[0].scriptSig;
+        if (coinbase() == nullptr)
+            return 0;
+        const CScript &sig = coinbase()->vin[0].scriptSig;
         int numlen = sig[0];
         if (numlen == OP_0)
             return 0;
@@ -166,6 +209,8 @@ public:
     // Return the serialized block size in bytes. This is only done once and then the result stored
     // in nBlockSize for future reference, saving unncessary and expensive serializations.
     uint64_t GetBlockSize() const;
+
+    size_t RecursiveDynamicUsage() const;
 };
 
 /**

@@ -792,7 +792,7 @@ void CTxMemPool::_removeConflicts(const CTransaction &tx, std::list<CTransaction
 // If a transaction has an ancestor, it is placed on a deferred map: ancestor->descendant list.
 // Whenever a tx is removed from the mempool, any of its descendants are placed back onto the
 // queue of tx that are removable.
-void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
+void CTxMemPool::removeForBlock(const CBlock &block,
     unsigned int nBlockHeight,
     std::list<CTransactionRef> &conflicts,
     bool fCurrentEstimate)
@@ -806,7 +806,7 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
     DeferredMap deferred;
     std::queue<txiter> ready;
 
-    for (const auto &tx : vtx)
+    for (const auto &tx : block)
     {
         setEntries descendants;
         uint256 hash = tx->GetHash();
@@ -881,7 +881,7 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
     }
 
     // Remove conflicting tx
-    for (const auto &tx : vtx)
+    for (const auto &tx : block)
     {
         _removeConflicts(*tx, conflicts);
         _ClearPrioritisation(tx->GetHash());

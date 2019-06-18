@@ -437,7 +437,7 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
     UniValue transactions(UniValue::VARR);
     map<uint256, int64_t> setTxIndex;
     int i = 0;
-    for (const auto &it : pblock->vtx)
+    for (const auto &it : *pblock)
     {
         const CTransaction &tx = *it;
         uint256 txHash = tx.GetHash();
@@ -508,7 +508,7 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
     result.pushKV("previousblockhash", pblock->hashPrevBlock.GetHex());
     result.pushKV("transactions", transactions);
     result.pushKV("coinbaseaux", aux);
-    result.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue);
+    result.pushKV("coinbasevalue", (int64_t)pblock->coinbase()->vout[0].nValue);
     result.pushKV("longpollid", chainActive.Tip()->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast));
     result.pushKV("target", hashTarget.GetHex());
     result.pushKV("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1);

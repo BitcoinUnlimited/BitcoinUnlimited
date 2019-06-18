@@ -560,7 +560,7 @@ public:
     void removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMemPoolHeight, int flags);
     void removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed);
     void _removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed);
-    void removeForBlock(const std::vector<CTransactionRef> &vtx,
+    void removeForBlock(const CBlock &block,
         unsigned int nBlockHeight,
         std::list<CTransactionRef> &conflicted,
         bool fCurrentEstimate = true);
