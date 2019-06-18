@@ -1067,12 +1067,12 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
     // in the queue twice.
     {
         WRITELOCK(orphanpool.cs);
-        for (auto &it : mapEnqueue)
+        for (auto it = mapEnqueue.begin(); it != mapEnqueue.end(); it++)
         {
-            // If the orphan was not erased then it must already have been erased/enqueue'd by another thread
+            // If the orphan was not erased then it must already have been erased/enqueued by another thread
             // so do not enqueue this orphan again.
-            if (!orphanpool.EraseOrphanTx(it.first))
-                mapEnqueue.erase(it.first);
+            if (!orphanpool.EraseOrphanTx(it->first))
+                it = mapEnqueue.erase(it);
         }
         orphanpool.EraseOrphansByTime();
     }
