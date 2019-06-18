@@ -662,6 +662,7 @@ UniValue gettxoutproof(const UniValue &params, bool fHelp)
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Transaction index corrupt");
     }
 
+
     CBlock block;
     if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
