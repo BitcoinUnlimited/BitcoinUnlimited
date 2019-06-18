@@ -620,10 +620,7 @@ static void MutateTx(CMutableTransaction &tx, const string &command, const strin
 
     else if (command == "sign")
     {
-        if (!ecc)
-        {
-            ecc.reset(new Secp256k1Init());
-        }
+        ecc.reset(new Secp256k1Init());
         MutateTxSign(tx, commandVal);
     }
 
