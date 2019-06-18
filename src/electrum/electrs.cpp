@@ -98,7 +98,7 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
     return args;
 }
 
-std::map<std::string, int> fetch_electrs_info()
+std::map<std::string, int64_t> fetch_electrs_info()
 {
     if (!GetBoolArg("-electrum", false))
     {
@@ -108,7 +108,7 @@ std::map<std::string, int> fetch_electrs_info()
     std::stringstream infostream = http_get(monitoring_host(), std::stoi(monitoring_port()), "/");
 
     const std::regex keyval("^([a-z_]+)\\s(\\d+)\\s*$");
-    std::map<std::string, int> info;
+    std::map<std::string, int64_t> info;
     std::string line;
     std::smatch match;
     while (std::getline(infostream, line, '\n'))
@@ -117,7 +117,14 @@ std::map<std::string, int> fetch_electrs_info()
         {
             continue;
         }
-        info[match[1].str()] = std::stoi(match[2].str());
+        try
+        {
+            info[match[1].str()] = std::stol(match[2].str());
+        }
+        catch (const std::exception &e)
+        {
+            LOG(ELECTRUM, "%s error: %s", __func__, e.what());
+        }
     }
     return info;
 }

@@ -17,12 +17,12 @@ public:
     bool ibd = false;
     bool isrunning = false;
     int height = 0;
-    std::map<std::string, int> info;
+    std::map<std::string, int64_t> info;
 
     int ActiveTipHeight() const override { return height; }
     bool IsInitialBlockDownload() const override { return ibd; }
     bool IsRunning() const override { return isrunning; }
-    std::map<std::string, int> FetchElectrsInfo() const override { return info; }
+    std::map<std::string, int64_t> FetchElectrsInfo() const override { return info; }
 };
 
 BOOST_FIXTURE_TEST_SUITE(electrumrpcinfo_tests, BasicTestingSetup)
@@ -83,6 +83,15 @@ BOOST_AUTO_TEST_CASE(info_indexheight)
     rpc.info = {{INDEX_HEIGHT_KEY, 100}};
     status = rpc.GetElectrumInfo();
     BOOST_CHECK_EQUAL(100, status["index_height"].get_int());
+}
+
+BOOST_AUTO_TEST_CASE(info_can_handle_longint)
+{
+    ElectrumRPCInfoMOC rpc;
+
+    rpc.info = {{INDEX_HEIGHT_KEY, std::numeric_limits<int64_t>::max()}};
+    UniValue status = rpc.GetElectrumInfo();
+    BOOST_CHECK_EQUAL(std::numeric_limits<int64_t>::max(), status["index_height"].get_int64());
 }
 
 BOOST_AUTO_TEST_SUITE_END()
