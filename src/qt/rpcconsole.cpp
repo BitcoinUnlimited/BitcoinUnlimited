@@ -227,8 +227,13 @@ void RPCExecutor::request(const QString &command)
         std::string strPrint;
         // Convert argument list to JSON objects in method-dependent way,
         // and pass it along with the method name to the dispatcher.
-        UniValue result = tableRPC.execute(
-            args[0], RPCConvertValues(args[0], std::vector<std::string>(args.begin() + 1, args.end())));
+        UniValue params(UniValue::VARR);
+        for (unsigned int idx = 1; idx < args.size(); idx++)
+        {
+            const std::string &strVal = args[idx];
+            params.push_back(strVal);
+        }
+        UniValue result = tableRPC.execute(args[0], params);
 
         // Format result reply
         if (result.isNull())
