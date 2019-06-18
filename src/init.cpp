@@ -1034,6 +1034,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     // ********************************************************* Step 6: load block chain
 
     fReindex = GetBoolArg("-reindex", DEFAULT_REINDEX);
+    fTxIndex = GetBoolArg("-txindex", DEFAULT_TXINDEX);
     int64_t requested_block_mode = GetArg("-useblockdb", DEFAULT_BLOCK_DB_MODE);
     if (requested_block_mode >= 0 && requested_block_mode < END_STORAGE_OPTIONS)
     {

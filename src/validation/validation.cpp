@@ -487,10 +487,6 @@ bool LoadBlockIndexDB()
     if (fReindexing)
         fReindex = fReindexing;
 
-    // Check whether we have a transaction index
-    pblocktree->ReadFlag("txindex", fTxIndex);
-    LOGA("%s: transaction index %s\n", __func__, fTxIndex ? "enabled" : "disabled");
-
     // Load pointer to end of best chain
     uint256 bestblockhash = pcoinsdbview->GetBestBlock();
     BlockMap::iterator it = mapBlockIndex.find(bestblockhash);
@@ -578,9 +574,6 @@ bool InitBlockIndex(const CChainParams &chainparams)
     if (chainActive.Genesis() != nullptr)
         return true;
 
-    // Use the provided setting for -txindex in the new database
-    fTxIndex = GetBoolArg("-txindex", DEFAULT_TXINDEX);
-    pblocktree->WriteFlag("txindex", fTxIndex);
     LOGA("Initializing databases...\n");
 
     // Only add the genesis block if not reindexing (in which case we reuse the one already on disk)
