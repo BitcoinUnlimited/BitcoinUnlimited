@@ -7,6 +7,7 @@
 #ifndef BITCOIN_SYNC_H
 #define BITCOIN_SYNC_H
 
+#include "recursive_shared_mutex.h"
 #include "threadsafety.h"
 #include "util.h"
 #include "utiltime.h"
@@ -51,6 +52,12 @@ LEAVE_CRITICAL_SECTION(mutex); // no RAII
 //                           //
 ///////////////////////////////
 
+#ifdef DEBUG_LOCKORDER
+// BU if a CCriticalSection is allocated on the heap we need to clean it from the lockorder map upon destruction because
+// another CCriticalSection could be created on top of it.
+void DeleteCritical(const void *cs);
+#endif
+
 /**
  * Template mixin that adds -Wthread-safety locking
  * annotations to a subset of the mutex API.
@@ -83,6 +90,58 @@ public:
 /** Define a critical section that is named in debug builds.
     Named critical sections are useful in conjunction with a lock analyzer to discover bottlenecks. */
 #define CRITSEC(zzname) CCriticalSection zzname(#zzname)
+#endif
+
+#ifndef DEBUG_LOCKORDER
+typedef recursive_shared_mutex CRecursiveSharedCriticalSection;
+/** Define a named, shared critical section that is named in debug builds.
+    Named critical sections are useful in conjunction with a lock analyzer to discover bottlenecks. */
+#define RSCRITSEC(x) CRecursiveSharedCriticalSection x
+#else
+
+/** A shared critical section allows multiple entities to recursively take the critical section in a "shared" mode,
+    but only one entity to recursively take the critical section exclusively.
+
+    A RecursiveSharedCriticalSection IS recursive.
+*/
+class CRecursiveSharedCriticalSection : public recursive_shared_mutex
+{
+public:
+    const char *name;
+    CRecursiveSharedCriticalSection() : name(nullptr) {}
+    CRecursiveSharedCriticalSection(const char *n) : name(n)
+    {
+// print the address of named critical sections so they can be found in the mutrace output
+#ifdef ENABLE_MUTRACE
+        if (name)
+        {
+            printf("CRecursiveSharedCriticalSection %s at %p\n", name, this);
+            fflush(stdout);
+        }
+#endif
+    }
+
+    ~CRecursiveSharedCriticalSection()
+    {
+#ifdef ENABLE_MUTRACE
+        if (name)
+        {
+            printf("Destructing CRecursiveSharedCriticalSection %s\n", name);
+            fflush(stdout);
+        }
+#endif
+        DeleteCritical((void *)this);
+    }
+    // shared lock functions
+    void lock_shared() SHARED_LOCK_FUNCTION() { recursive_shared_mutex::lock_shared(); }
+    bool try_lock_shared() SHARED_TRYLOCK_FUNCTION(true) { return recursive_shared_mutex::try_lock_shared(); }
+    void unlock_shared() UNLOCK_FUNCTION() { recursive_shared_mutex::unlock_shared(); }
+    // exclusive lock functions
+    void lock() EXCLUSIVE_LOCK_FUNCTION() { recursive_shared_mutex::lock(); }
+    bool try_lock() EXCLUSIVE_TRYLOCK_FUNCTION(true) { return recursive_shared_mutex::try_lock(); }
+    void unlock() UNLOCK_FUNCTION() { recursive_shared_mutex::unlock(); }
+};
+#define RSCRITSEC(zzname) CRecursiveSharedCriticalSection zzname(#zzname)
 #endif
 
 #ifndef DEBUG_LOCKORDER
@@ -127,7 +186,6 @@ public:
 };
 #define SCRITSEC(zzname) CSharedCriticalSection zzname(#zzname)
 #endif
-
 
 // This object can be locked or shared locked some time during its lifetime.
 // Subsequent locks or shared lock calls will be ignored.
@@ -196,9 +254,6 @@ typedef boost::condition_variable_any CCond;
 #ifdef DEBUG_LOCKORDER
 void EnterCritical(const char *pszName, const char *pszFile, unsigned int nLine, void *cs, bool fTry = false);
 void LeaveCritical();
-// BU if a CCriticalSection is allocated on the heap we need to clean it from the lockorder map upon destruction because
-// another CCriticalSection could be created on top of it.
-void DeleteCritical(const void *cs);
 std::string LocksHeld();
 /** Asserts in debug builds if a critical section is not held. */
 void AssertLockHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs);
@@ -208,6 +263,10 @@ void AssertWriteLockHeldInternal(const char *pszName,
     const char *pszFile,
     unsigned int nLine,
     CSharedCriticalSection *cs);
+void AssertRecursiveWriteLockHeldinternal(const char *pszName,
+    const char *pszFile,
+    unsigned int nLine,
+    CRecursiveSharedCriticalSection *cs);
 #else
 void static inline EnterCritical(const char *pszName,
     const char *pszFile,
@@ -225,10 +284,17 @@ void static inline AssertWriteLockHeldInternal(const char *pszName,
     CSharedCriticalSection *cs)
 {
 }
+void static inline AssertRecursiveWriteLockHeldinternal(const char *pszName,
+    const char *pszFile,
+    unsigned int nLine,
+    CRecursiveSharedCriticalSection *cs)
+{
+}
 #endif
 #define AssertLockHeld(cs) AssertLockHeldInternal(#cs, __FILE__, __LINE__, &cs)
 #define AssertLockNotHeld(cs) AssertLockNotHeldInternal(#cs, __FILE__, __LINE__, &cs)
 #define AssertWriteLockHeld(cs) AssertWriteLockHeldInternal(#cs, __FILE__, __LINE__, &cs)
+#define AssertRecursiveWriteLockHeld(cs) AssertRecursiveWriteLockHeldInternal(#cs, __FILE__, __LINE__, &cs)
 
 #ifdef DEBUG_LOCKCONTENTION
 void PrintLockContention(const char *pszName, const char *pszFile, unsigned int nLine);
@@ -448,6 +514,16 @@ public:
 
     operator bool() { return lock.owns_lock(); }
 };
+
+typedef CMutexReadLock<CRecursiveSharedCriticalSection> CRecursiveReadBlock;
+typedef CMutexLock<CRecursiveSharedCriticalSection> CRecursiveWriteBlock;
+
+#define RECURSIVEREADLOCK(cs) CRecursiveReadBlock UNIQUIFY(recursivereadblock)(cs, #cs, __FILE__, __LINE__)
+#define RECURSIVEWRITELOCK(cs) CRecursiveWriteBlock UNIQUIFY(writeblock)(cs, #cs, __FILE__, __LINE__)
+#define RECURSIVEREADLOCK2(cs1, cs2)                                         \
+    CReadBlock UNIQUIFY(recursivereadblock1)(cs1, #cs1, __FILE__, __LINE__), \
+        UNIQUIFY(recursivereadblock2)(cs2, #cs2, __FILE__, __LINE__)
+#define TRY_RECURSIVE_READ_LOCK(cs, name) CRecursiveReadBlock name(cs, #cs, __FILE__, __LINE__, true)
 
 typedef CMutexReadLock<CSharedCriticalSection> CReadBlock;
 typedef CMutexLock<CSharedCriticalSection> CWriteBlock;

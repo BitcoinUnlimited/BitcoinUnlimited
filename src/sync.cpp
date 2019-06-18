@@ -252,6 +252,20 @@ void AssertWriteLockHeldInternal(const char *pszName,
     }
 }
 
+void AssertRecursiveWriteLockHeldInternal(const char *pszName,
+    const char *pszFile,
+    unsigned int nLine,
+    CRecursiveSharedCriticalSection *cs)
+{
+    if (cs->try_lock()) // It would be better to check that this thread has the lock
+    {
+        fprintf(stderr, "Assertion failed: lock %s not held in %s:%i; locks held:\n%s", pszName, pszFile, nLine,
+            LocksHeld().c_str());
+        fflush(stderr);
+        abort();
+    }
+}
+
 // BU normally CCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical
 // section from the lockorder map
 #ifdef DEBUG_LOCKORDER
@@ -385,6 +399,5 @@ bool CSharedCriticalSection::try_lock()
     }
     return result;
 }
-
 
 #endif /* DEBUG_LOCKORDER */
