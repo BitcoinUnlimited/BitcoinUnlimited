@@ -21,3 +21,4 @@ BEGIN_FOLD functional-tests
 if [ "$RUN_TESTS" = "true" ]; then DOCKER_EXEC qa/pull-tester/rpc-tests.py --coverage --no-ipv6-rpc-listen; fi
 END_FOLD
 
+cd ${TRAVIS_BUILD_DIR} || (echo "could not enter travis build dir $TRAVIS_BUILD_DIR"; exit 1)
