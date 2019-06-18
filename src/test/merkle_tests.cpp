@@ -15,12 +15,13 @@ BOOST_FIXTURE_TEST_SUITE(merkle_tests, TestingSetup)
 static uint256 BlockBuildMerkleTree(const CBlock &block, bool *fMutated, std::vector<uint256> &vMerkleTree)
 {
     vMerkleTree.clear();
-    vMerkleTree.reserve(block.vtx.size() * 2 + 16); // Safe upper bound for the number of total nodes.
-    for (std::vector<CTransactionRef>::const_iterator it(block.vtx.begin()); it != block.vtx.end(); ++it)
-        vMerkleTree.push_back((*it)->GetHash());
+    vMerkleTree.reserve(block.numTransactions() * 2 + 16); // Safe upper bound for the number of total nodes.
+    for (auto txref : block)
+        vMerkleTree.push_back(txref->GetHash());
+
     int j = 0;
     bool mutated = false;
-    for (int nSize = block.vtx.size(); nSize > 1; nSize = (nSize + 1) / 2)
+    for (int nSize = block.numTransactions(); nSize > 1; nSize = (nSize + 1) / 2)
     {
         for (int i = 0; i < nSize; i += 2)
         {
@@ -49,7 +50,7 @@ static std::vector<uint256> BlockGetMerkleBranch(const CBlock &block,
 {
     std::vector<uint256> vMerkleBranch;
     int j = 0;
-    for (int nSize = block.vtx.size(); nSize > 1; nSize = (nSize + 1) / 2)
+    for (int nSize = block.numTransactions(); nSize > 1; nSize = (nSize + 1) / 2)
     {
         int i = std::min(nIndex ^ 1, nSize - 1);
         vMerkleBranch.push_back(vMerkleTree[j + i]);
@@ -144,30 +145,28 @@ BOOST_AUTO_TEST_CASE(merkle_test)
             int ntx3 = ntx2 + duplicate3;
             // Build a block with ntx different transactions.
             CBlock block;
-            block.vtx.resize(ntx);
             for (int j = 0; j < ntx; j++)
             {
                 CMutableTransaction mtx;
                 mtx.nLockTime = j;
-                block.vtx[j] = MakeTransactionRef(std::move(mtx));
+                block.add(MakeTransactionRef(std::move(mtx)));
             }
             // Compute the root of the block before mutating it.
             bool unmutatedMutated = false;
             uint256 unmutatedRoot = BlockMerkleRoot(block, &unmutatedMutated);
             BOOST_CHECK(unmutatedMutated == false);
             // Optionally mutate by duplicating the last transactions, resulting in the same merkle root.
-            block.vtx.resize(ntx3);
             for (int j = 0; j < duplicate1; j++)
             {
-                block.vtx[ntx + j] = block.vtx[ntx + j - duplicate1];
+                block.add(block.by_pos(ntx + j - duplicate1));
             }
             for (int j = 0; j < duplicate2; j++)
             {
-                block.vtx[ntx1 + j] = block.vtx[ntx1 + j - duplicate2];
+                block.add(block.by_pos(ntx1 + j - duplicate2));
             }
             for (int j = 0; j < duplicate3; j++)
             {
-                block.vtx[ntx2 + j] = block.vtx[ntx2 + j - duplicate3];
+                block.add(block.by_pos(ntx2 + j - duplicate3));
             }
             // Compute the merkle root and merkle tree using the old mechanism.
             bool oldMutated = false;
@@ -195,7 +194,7 @@ BOOST_AUTO_TEST_CASE(merkle_test)
                     std::vector<uint256> newBranch = BlockMerkleBranch(block, mtx);
                     std::vector<uint256> oldBranch = BlockGetMerkleBranch(block, merkleTree, mtx);
                     BOOST_CHECK(oldBranch == newBranch);
-                    BOOST_CHECK(ComputeMerkleRootFromBranch(block.vtx[mtx]->GetHash(), newBranch, mtx) == oldRoot);
+                    BOOST_CHECK(ComputeMerkleRootFromBranch(block.by_pos(mtx)->GetHash(), newBranch, mtx) == oldRoot);
                 }
             }
         }

@@ -92,12 +92,6 @@ TestingSetup::~TestingSetup()
     fs::remove_all(pathTemp);
 }
 
-struct NumericallyLessTxHashComparator
-{
-public:
-    bool operator()(const CTransactionRef &a, const CTransactionRef &b) const { return a->GetHash() < b->GetHash(); }
-};
-
 TestChain100Setup::TestChain100Setup() : TestingSetup(CBaseChainParams::REGTEST)
 {
     // Generate a 100-block chain:
@@ -107,7 +101,7 @@ TestChain100Setup::TestChain100Setup() : TestingSetup(CBaseChainParams::REGTEST)
     {
         std::vector<CMutableTransaction> noTxns;
         CBlock b = CreateAndProcessBlock(noTxns, scriptPubKey);
-        coinbaseTxns.push_back(*b.vtx[0]);
+        coinbaseTxns.push_back(*b.coinbase());
     }
 }
 
@@ -121,15 +115,19 @@ CBlock TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransa
     const CChainParams &chainparams = Params();
     std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
     pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey);
-    CBlock &block = pblocktemplate->block;
+    CBlockHeader &blockheader = pblocktemplate->block;
+
+    CBlock block(blockheader);
 
     // Replace mempool-selected txns with just coinbase plus passed-in txns:
-    block.vtx.resize(1);
+    CTransactionRef cb = pblocktemplate->block.coinbase();
+    block.setCoinbase(cb);
     for (const CMutableTransaction &tx : txns)
-        block.vtx.push_back(MakeTransactionRef(tx));
+        block.add(MakeTransactionRef(tx));
 
     // enfore LTOR ordering of transactions
-    std::sort(block.vtx.begin() + 1, block.vtx.end(), NumericallyLessTxHashComparator());
+    block.sortLTOR();
+    // std::sort(block.begin() + 1, block.end(), NumericallyLessTxHashComparator());
 
     // IncrementExtraNonce creates a valid coinbase and merkleRoot
     unsigned int extraNonce = 0;

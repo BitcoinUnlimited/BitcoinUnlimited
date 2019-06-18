@@ -442,7 +442,7 @@ void CParallelValidation::ClearOrphanCache(const CBlockRef pblock)
             vPreviousBlock.clear();
 
             // Erase orphans from the current block that were already received.
-            for (auto &tx : pblock->vtx)
+            for (const auto &tx : *pblock)
             {
                 uint256 hash = tx->GetHash();
                 vPreviousBlock.push_back(hash);

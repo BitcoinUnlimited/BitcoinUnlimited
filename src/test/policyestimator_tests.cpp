@@ -55,7 +55,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
     CFeeRate baseRate(basefee, ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION));
 
     // Create a fake block
-    std::vector<CTransactionRef> block;
+    CBlock block;
     int blocknum = 0;
 
     // Loop through 200 blocks
@@ -87,12 +87,12 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
             {
                 CTransactionRef ptx = mpool.get(txHashes[9 - h].back());
                 if (ptx)
-                    block.push_back(ptx);
+                    block.add(ptx);
                 txHashes[9 - h].pop_back();
             }
         }
         mpool.removeForBlock(block, ++blocknum, dummyConflicted);
-        block.clear();
+        block.SetNull();
         if (blocknum == 30)
         {
             // At this point we should need to combine 5 buckets to get enough data points
@@ -188,12 +188,12 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
         {
             CTransactionRef ptx = mpool.get(txHashes[j].back());
             if (ptx)
-                block.push_back(ptx);
+                block.add(ptx);
             txHashes[j].pop_back();
         }
     }
     mpool.removeForBlock(block, 265, dummyConflicted);
-    block.clear();
+    block.SetNull();
     for (int i = 1; i < 10; i++)
     {
         BOOST_CHECK(mpool.estimateFee(i).GetFeePerK() > origFeeEst[i - 1] - deltaFee);
@@ -217,11 +217,11 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
                                              .FromTx(tx, &mpool));
                 CTransactionRef ptx = mpool.get(hash);
                 if (ptx)
-                    block.push_back(ptx);
+                    block.add(ptx);
             }
         }
         mpool.removeForBlock(block, ++blocknum, dummyConflicted);
-        block.clear();
+        block.SetNull();
     }
     for (int i = 1; i < 10; i++)
     {

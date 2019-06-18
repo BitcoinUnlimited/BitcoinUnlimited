@@ -333,7 +333,7 @@ bool GetTransaction(const uint256 &hash,
         CBlock block;
         if (ReadBlockFromDisk(block, pindexSlow, consensusParams))
         {
-            for (const auto &tx : block.vtx)
+            for (const auto &tx : block)
             {
                 if (tx->GetHash() == hash)
                 {
