@@ -58,11 +58,8 @@ public:
     /// Destructor interrupts sync thread if running and blocks until it exits.
     ~TxIndex();
 
-    /// Blocks the current thread until the transaction index is caught up to
-    /// the current state of the block chain. This only blocks if the index has gotten in sync once
-    /// and only needs to process blocks in the ValidationInterface queue. If the index is catching
-    /// up from far behind, this method does not block and immediately returns false.
-    bool BlockUntilSyncedToCurrentChain();
+    /// Is the transaction index is caught up to the current state of the block chain.
+    bool IsSynced();
 
     /// Look up the on-disk location of a transaction by hash.
     bool FindTx(const uint256 &txhash, uint256 &blockhash, CTransactionRef tx) const;

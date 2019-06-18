@@ -133,7 +133,7 @@ static bool IsTxIndexReady()
     bool fReady = false;
     if (g_txindex)
     {
-        fReady = g_txindex->BlockUntilSyncedToCurrentChain();
+        fReady = g_txindex->IsSynced();
     }
     return fReady;
 }

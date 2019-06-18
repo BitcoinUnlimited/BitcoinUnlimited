@@ -186,16 +186,15 @@ void TxIndex::BlockConnected(const CBlock &block, CBlockIndex *pindex)
     }
 }
 
-bool TxIndex::BlockUntilSyncedToCurrentChain()
+bool TxIndex::IsSynced()
 {
     AssertLockNotHeld(cs_main);
 
     if (!fSynced)
     {
+        LOGA("%s: txindex is catching up on block notifications\n", __func__);
         return false;
     }
-
-    LOGA("%s: txindex is catching up on block notifications\n", __func__);
     return true;
 }
 
