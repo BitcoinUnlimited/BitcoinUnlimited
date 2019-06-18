@@ -188,7 +188,7 @@ unsigned int base_uint<BITS>::bits() const
         {
             for (int bits = 31; bits > 0; bits--)
             {
-                if (pn[pos] & 1 << bits)
+                if (pn[pos] & 1U << bits)
                     return 32 * pos + bits + 1;
             }
             return 32 * pos + 1;
