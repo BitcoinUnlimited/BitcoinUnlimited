@@ -1,4 +1,5 @@
 // Copyright (c) 2009-2015 The Bitcoin developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -619,10 +620,7 @@ static void MutateTx(CMutableTransaction &tx, const string &command, const strin
 
     else if (command == "sign")
     {
-        if (!ecc)
-        {
-            ecc.reset(new Secp256k1Init());
-        }
+        ecc.reset(new Secp256k1Init());
         MutateTxSign(tx, commandVal);
     }
 
@@ -757,7 +755,7 @@ static int CommandLineRawTx(int argc, char *argv[])
     }
     catch (...)
     {
-        PrintExceptionContinue(NULL, "CommandLineRawTx()");
+        PrintExceptionContinue(nullptr, "CommandLineRawTx()");
         throw;
     }
 
@@ -785,7 +783,7 @@ int main(int argc, char *argv[])
     }
     catch (...)
     {
-        PrintExceptionContinue(NULL, "AppInitRawTx()");
+        PrintExceptionContinue(nullptr, "AppInitRawTx()");
         return EXIT_FAILURE;
     }
 
@@ -800,7 +798,7 @@ int main(int argc, char *argv[])
     }
     catch (...)
     {
-        PrintExceptionContinue(NULL, "CommandLineRawTx()");
+        PrintExceptionContinue(nullptr, "CommandLineRawTx()");
     }
     return ret;
 }

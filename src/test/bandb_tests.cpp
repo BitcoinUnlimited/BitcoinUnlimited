@@ -102,14 +102,14 @@ BOOST_AUTO_TEST_CASE(bandb_read_write_non_empty_database)
 
     // Ensure entry 1 matches the pre-write entry
     CBanEntry *read1 = &banset_read[singleIP];
-    BOOST_CHECK(read1 != NULL);
+    BOOST_CHECK(read1 != nullptr);
     BOOST_CHECK(read1->banReason == write1.banReason);
     BOOST_CHECK(read1->nBanUntil == write1.nBanUntil);
     BOOST_CHECK(read1->nCreateTime == write1.nCreateTime);
 
     // Ensure entry 2 matches the pre-write entry
     CBanEntry *read2 = &banset_read[subNet];
-    BOOST_CHECK(read2 != NULL);
+    BOOST_CHECK(read2 != nullptr);
     BOOST_CHECK(read2->banReason == write2.banReason);
     BOOST_CHECK(read2->nBanUntil == write2.nBanUntil);
     BOOST_CHECK(read2->nCreateTime == write2.nCreateTime);

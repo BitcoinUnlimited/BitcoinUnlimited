@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Bitcoin Unlimited Developers
+// Copyright (c) 2016-2019 The Bitcoin Unlimited Developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -106,6 +106,8 @@ std::map<uint256, NodeId> mapBlockSource GUARDED_BY(cs_main);
 std::set<int> setDirtyFileInfo GUARDED_BY(cs_main);
 /** Dirty block index entries. */
 std::set<CBlockIndex *> setDirtyBlockIndex GUARDED_BY(cs_main);
+/** Holds temporary mining candidates */
+map<int64_t, CMiningCandidate> miningCandidatesMap GUARDED_BY(cs_main);
 
 /** Flags for coinbase transactions we create */
 CCriticalSection cs_coinbaseFlags;
@@ -208,8 +210,8 @@ CCriticalSection cs_mapRelay;
 
 vector<CNode *> vNodes;
 list<CNode *> vNodesDisconnected;
-CSemaphore *semOutbound = NULL;
-CSemaphore *semOutboundAddNode = NULL; // BU: separate semaphore for -addnodes
+CSemaphore *semOutbound = nullptr;
+CSemaphore *semOutboundAddNode = nullptr; // BU: separate semaphore for -addnodes
 CNodeSignals g_signals;
 CAddrMan addrman;
 CDoSManager dosMan;
@@ -290,12 +292,6 @@ CTweakRef<uint64_t> miningForkTime("consensus.forkMay2019Time",
     "will turn on the fork at the appropriate time.",
     &nMiningForkTime,
     &ForkTimeValidator); // Thu May 15 12:00:00 UTC 2019
-
-CTweakRef<uint64_t> miningSvForkTime("consensus.svForkNov2018Time",
-    "Time in seconds since the epoch to initiate the Bitcoin SV defined hard fork scheduled on 15th Nov 2018.  A "
-    "setting of 1 will turn on the fork at the appropriate time.",
-    &nMiningSvForkTime,
-    &ForkTimeValidatorSV); // Thu Nov 15 15:40:00 UTC 2018
 
 CTweak<uint64_t> maxScriptOps("consensus.maxScriptOps",
     "Maximum number of script operations allowed.  Stack pushes are excepted.",
@@ -439,11 +435,12 @@ CGrapheneBlockData graphenedata;
 CCompactBlockData compactdata;
 ThinTypeRelay thinrelay;
 
-uint256 bitcoinCashForkBlockHash = uint256S("000000000000000000651ef99cb9fcbe0dadde1d424bd9f15ff20136191a5eec");
-
-map<int64_t, CMiningCandidate> miningCandidatesMap GUARDED_BY(cs_main);
-
+// Are we shutting down. Replaces boost interrupts.
 std::atomic<bool> shutdown_threads{false};
+
+// Size of last block that was successfully connected at the tip.
+std::atomic<uint64_t> nBlockSizeAtChainTip{0};
+
 
 #ifdef ENABLE_MUTRACE
 class CPrintSomePointers

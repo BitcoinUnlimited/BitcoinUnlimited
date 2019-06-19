@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -286,7 +286,7 @@ void SyncStorage(const CChainParams &chainparams)
                 {
                     pblockdbsync->EraseBlock(removeIndex);
                 }
-                // you must use NULL here, not nullptr
+                // you must use nullptr here, not nullptr
                 CBlockIndex *indexfront = blocksToRemove.front();
                 std::ostringstream frontkey;
                 frontkey << indexfront->GetBlockTime() << ":" << indexfront->GetBlockHash().ToString();
@@ -525,7 +525,7 @@ void FindFilesToPrune(std::set<int> &setFilesToPrune, uint64_t nPruneAfterHeight
 {
     LOCK2(cs_main, cs_LastBlockFile);
 
-    if (chainActive.Tip() == NULL || nPruneTarget == 0)
+    if (chainActive.Tip() == nullptr || nPruneTarget == 0)
     {
         return;
     }

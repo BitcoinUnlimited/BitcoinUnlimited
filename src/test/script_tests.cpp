@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -185,7 +185,7 @@ void DoTest(const CScript &scriptPubKey,
     {
         BOOST_CHECK_MESSAGE(
             bitcoinconsensus_verify_script(begin_ptr(scriptPubKey), scriptPubKey.size(),
-                (const unsigned char *)&stream[0], stream.size(), 0, flags, MAX_OPS_PER_SCRIPT, NULL) == expect,
+                (const unsigned char *)&stream[0], stream.size(), 0, flags, MAX_OPS_PER_SCRIPT, nullptr) == expect,
             message);
     }
 #endif

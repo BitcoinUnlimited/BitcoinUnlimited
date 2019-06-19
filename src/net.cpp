@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,6 +15,7 @@
 #include "net.h"
 
 #include "addrman.h"
+#include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene.h"
 #include "chainparams.h"
 #include "connmgr.h"
@@ -1104,6 +1105,73 @@ static void AcceptConnection(const ListenSocket &hListenSocket)
 
 char recvMsgBuf[MAX_RECV_CHUNK]; // Messages are first pulled into this buffer
 
+void CleanupDisconnectedNodes()
+{
+    //
+    // Disconnect nodes
+    //
+    {
+        LOCK(cs_vNodes);
+        // Disconnect unused nodes
+        vector<CNode *> vNodesCopy = vNodes;
+        for (CNode *pnode : vNodesCopy)
+        {
+            if (pnode->fDisconnect || (pnode->GetRefCount() <= 0 && pnode->vRecvMsg.empty() && pnode->nSendSize == 0 &&
+                                          pnode->ssSend.empty()))
+            {
+                // remove from vNodes
+                vNodes.erase(remove(vNodes.begin(), vNodes.end(), pnode), vNodes.end());
+
+                // inform connection manager
+                connmgr->RemovedNode(pnode);
+
+                // release outbound grant (if any)
+                pnode->grantOutbound.Release();
+
+                // close socket and cleanup
+                pnode->CloseSocketDisconnect();
+
+                // hold in disconnected pool until all refs are released
+                if (pnode->fNetworkNode || pnode->fInbound)
+                    pnode->Release();
+                vNodesDisconnected.push_back(pnode);
+            }
+        }
+    }
+    {
+        // Delete disconnected nodes
+        list<CNode *> vNodesDisconnectedCopy = vNodesDisconnected;
+        for (CNode *pnode : vNodesDisconnectedCopy)
+        {
+            // wait until threads are done using it
+            if (pnode->GetRefCount() <= 0)
+            {
+                bool fDelete = false;
+                {
+                    TRY_LOCK(pnode->cs_vSend, lockSend);
+                    if (lockSend)
+                    {
+                        TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
+                        if (lockRecv)
+                        {
+                            TRY_LOCK(pnode->cs_inventory, lockInv);
+                            if (lockInv)
+                                fDelete = true;
+                        }
+                    }
+                }
+                if (fDelete)
+                {
+                    vNodesDisconnected.remove(pnode);
+                    // no need to remove from vNodes. we know pnode has already been removed from vNodes since that
+                    // occurred prior to insertion into vNodesDisconnected
+                    delete pnode;
+                }
+            }
+        }
+    }
+}
+
 void ThreadSocketHandler()
 {
     unsigned int nPrevNodeCount = 0;
@@ -1117,69 +1185,7 @@ void ThreadSocketHandler()
         progress = 0;
         fAquiredAllRecvLocks = true;
         stat_io_service.poll(); // BU instrumentation
-        //
-        // Disconnect nodes
-        //
-        {
-            LOCK(cs_vNodes);
-            // Disconnect unused nodes
-            vector<CNode *> vNodesCopy = vNodes;
-            for (CNode *pnode : vNodesCopy)
-            {
-                if (pnode->fDisconnect || (pnode->GetRefCount() <= 0 && pnode->vRecvMsg.empty() &&
-                                              pnode->nSendSize == 0 && pnode->ssSend.empty()))
-                {
-                    // remove from vNodes
-                    vNodes.erase(remove(vNodes.begin(), vNodes.end(), pnode), vNodes.end());
-
-                    // inform connection manager
-                    connmgr->RemovedNode(pnode);
-
-                    // release outbound grant (if any)
-                    pnode->grantOutbound.Release();
-
-                    // close socket and cleanup
-                    pnode->CloseSocketDisconnect();
-
-                    // hold in disconnected pool until all refs are released
-                    if (pnode->fNetworkNode || pnode->fInbound)
-                        pnode->Release();
-                    vNodesDisconnected.push_back(pnode);
-                }
-            }
-        }
-        {
-            // Delete disconnected nodes
-            list<CNode *> vNodesDisconnectedCopy = vNodesDisconnected;
-            for (CNode *pnode : vNodesDisconnectedCopy)
-            {
-                // wait until threads are done using it
-                if (pnode->GetRefCount() <= 0)
-                {
-                    bool fDelete = false;
-                    {
-                        TRY_LOCK(pnode->cs_vSend, lockSend);
-                        if (lockSend)
-                        {
-                            TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                            if (lockRecv)
-                            {
-                                TRY_LOCK(pnode->cs_inventory, lockInv);
-                                if (lockInv)
-                                    fDelete = true;
-                            }
-                        }
-                    }
-                    if (fDelete)
-                    {
-                        vNodesDisconnected.remove(pnode);
-                        // no need to remove from vNodes. we know pnode has already been removed from vNodes since that
-                        // occurred prior to insertion into vNodesDisconnected
-                        delete pnode;
-                    }
-                }
-            }
-        }
+        CleanupDisconnectedNodes();
         if (vNodes.size() != nPrevNodeCount)
         {
             nPrevNodeCount = vNodes.size();
@@ -1306,7 +1312,7 @@ void ThreadSocketHandler()
         {
             if (shutdown_threads.load() == true)
             {
-                return;
+                break; // drop out of this loop so we can quickly release node refs and return
             }
 
             //
@@ -2279,7 +2285,7 @@ void ThreadMessageHandler()
             }
             if (shutdown_threads.load() == true)
             {
-                return;
+                break; // skip down to where we release the node refs
             }
 
             // Put transaction and block requests into the request manager
@@ -2298,13 +2304,14 @@ void ThreadMessageHandler()
             }
             if (shutdown_threads.load() == true)
             {
-                return;
+                break; // skip down to where we release the node refs
             }
         }
 
         // From the request manager, make requests for transactions and blocks. We do this before potentially
         // sleeping in the step below so as to allow requests to return during the sleep time.
-        requester.SendRequests();
+        if (shutdown_threads.load() == false)
+            requester.SendRequests();
 
         // A cs_vNodes lock is not required here when releasing refs for two reasons: one, this only decrements
         // an atomic counter, and two, the counter will always be > 0 at this point, so we don't have to worry
@@ -2577,44 +2584,73 @@ bool StopNode()
 
 void NetCleanup()
 {
-    LOCK(cs_vNodes);
-
-    // Close sockets
-    for (CNode *pnode : vNodes)
-    {
-        if (pnode->hSocket != INVALID_SOCKET)
-            CloseSocket(pnode->hSocket);
-    }
-    for (ListenSocket &hListenSocket : vhListenSocket)
-    {
-        if (hListenSocket.socket != INVALID_SOCKET)
-            if (!CloseSocket(hListenSocket.socket))
-                LOG(NET, "CloseSocket(hListenSocket) failed with error %s\n", NetworkErrorString(WSAGetLastError()));
-    }
-
     // clean up some globals (to help leak detection)
-    for (CNode *pnode : vNodes)
-        delete pnode;
-    for (CNode *pnode : vNodesDisconnected)
-        delete pnode;
-    vNodes.clear();
-    vNodesDisconnected.clear();
-    vhListenSocket.clear();
-    if (semOutbound)
-        delete semOutbound;
-    semOutbound = nullptr;
-    // BU: clean up the "-addnode" semaphore
-    if (semOutboundAddNode)
-        delete semOutboundAddNode;
-    semOutboundAddNode = nullptr;
-    if (pnodeLocalHost)
-        delete pnodeLocalHost;
-    pnodeLocalHost = nullptr;
+    {
+        LOCK(cs_vNodes);
+
+        // Close sockets
+        for (CNode *pnode : vNodes)
+        {
+            // Since we are quitting, disconnect abruptly from the node rather than finishing up our conversation
+            // with it.
+            pnode->vRecvMsg.clear();
+            pnode->ssSend.clear();
+            pnode->nSendSize = 0;
+            // Now close communications with the other node
+            pnode->CloseSocketDisconnect();
+        }
+        for (ListenSocket &hListenSocket : vhListenSocket)
+        {
+            if (hListenSocket.socket != INVALID_SOCKET)
+                if (!CloseSocket(hListenSocket.socket))
+                    LOG(NET, "CloseSocket(hListenSocket) failed with error %s\n",
+                        NetworkErrorString(WSAGetLastError()));
+        }
+    }
+
+    // Try to let nodes be cleaned up for a while, but ultimately give up because we are shutting down.
+    for (int iters = 0; iters < 20; iters++)
+    {
+        CleanupDisconnectedNodes();
+        {
+            LOCK(cs_vNodes);
+            if ((vNodes.size() == 0) && (vNodesDisconnected.size() == 0))
+                break; // every node is properly disconnected
+        }
+        MilliSleep(100); // Give other threads a chance to finish up using the node.
+    }
+
+
+    {
+        LOCK(cs_vNodes);
+        if (!((vNodes.size() == 0) && (vNodesDisconnected.size() == 0)))
+        {
+            LOG(NET, "Some node objects were not properly cleaned up.\n");
+        }
+
+        // If the nodes were not properly shut down, remove them from the vNodes list now, so the vNode item
+        // is not leaked.
+        // The node memory itself will be leaked but since we are quitting this is not a big issue.
+        // We cannot just delete them because some other thread still has a reference.
+        vNodes.clear();
+        vNodesDisconnected.clear();
+        vhListenSocket.clear();
+        if (semOutbound)
+            delete semOutbound;
+        semOutbound = nullptr;
+        // BU: clean up the "-addnode" semaphore
+        if (semOutboundAddNode)
+            delete semOutboundAddNode;
+        semOutboundAddNode = nullptr;
+        if (pnodeLocalHost)
+            delete pnodeLocalHost;
+        pnodeLocalHost = nullptr;
 
 #ifdef WIN32
-    // Shutdown Windows Sockets
-    WSACleanup();
+        // Shutdown Windows Sockets
+        WSACleanup();
 #endif
+    }
 }
 
 
@@ -3033,6 +3069,9 @@ CNode::~CNode()
     // Update addrman timestamp
     if (nMisbehavior == 0 && successfullyConnected())
         addrman.Connected(addr);
+
+    // Decrement thintype peer counters
+    thinrelay.RemovePeers(this);
 
     GetNodeSignals().FinalizeNode(GetId());
 }

@@ -1,10 +1,11 @@
-// Copyright (c) 2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef BITCOIN_GRAPHENE_H
 #define BITCOIN_GRAPHENE_H
 
+#include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene_set.h"
 #include "bloom.h"
 #include "config.h"
@@ -138,7 +139,7 @@ public:
         // This logic assumes a smallest transaction size of MIN_TX_SIZE bytes.  This is optimistic for realistic
         // transactions and the downside for pathological blocks is just that graphene won't work so we fall back
         // to xthin
-        if (nBlockTxs > (excessiveBlockSize * maxMessageSizeMultiplier / MIN_TX_SIZE))
+        if (nBlockTxs > (thinrelay.GetMaxAllowedBlockSize() / MIN_TX_SIZE))
             throw std::runtime_error("nBlockTxs exceeds threshold for excessive block txs");
         if (!pGrapheneSet)
         {
@@ -247,15 +248,18 @@ struct GrapheneQuickStats
     double fLast24hOutboundCompression;
     uint64_t nLast24hRerequestTx;
     double fLast24hRerequestTxPercent;
+    GrapheneQuickStats()
+        : nTotalInbound(0), nTotalOutbound(0), nTotalBandwidthSavings(0), nTotalDecodeFailures(0), nLast24hInbound(0),
+          fLast24hInboundCompression(0.0), nLast24hOutbound(0), fLast24hOutboundCompression(0.0),
+          nLast24hRerequestTx(0), fLast24hRerequestTxPercent(0.0)
+    {
+    }
 };
 
 // This class stores statistics for graphene block derived protocols.
 class CGrapheneBlockData
 {
 private:
-    /* The sum total of all bytes for graphene blocks currently in process of being reconstructed */
-    std::atomic<uint64_t> nGrapheneBlockBytes{0};
-
     CCriticalSection cs_graphenestats; // locks everything below this point
 
     CStatHistory<uint64_t> nOriginalSize;

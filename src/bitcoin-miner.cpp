@@ -1,4 +1,4 @@
-// Copyright (c) 2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -445,7 +445,7 @@ int CpuMiner(void)
         }
         catch (...)
         {
-            PrintExceptionContinue(NULL, "CommandLineRPC()");
+            PrintExceptionContinue(nullptr, "CommandLineRPC()");
             throw;
         }
 
@@ -490,7 +490,7 @@ void static MinerThread()
         }
         catch (...)
         {
-            PrintExceptionContinue(NULL, "CommandLineRPC()");
+            PrintExceptionContinue(nullptr, "CommandLineRPC()");
         }
     }
 }
@@ -519,7 +519,7 @@ int main(int argc, char *argv[])
     }
     catch (...)
     {
-        PrintExceptionContinue(NULL, "AppInitRPC()");
+        PrintExceptionContinue(nullptr, "AppInitRPC()");
         return EXIT_FAILURE;
     }
 
@@ -539,7 +539,7 @@ int main(int argc, char *argv[])
     }
     catch (...)
     {
-        PrintExceptionContinue(NULL, "CommandLineRPC()");
+        PrintExceptionContinue(nullptr, "CommandLineRPC()");
     }
     return ret;
 }

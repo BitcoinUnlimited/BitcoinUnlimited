@@ -5,8 +5,8 @@ language: minimal
 cache:
   ccache: true
   directories:
-  - depends/built
-  - depends/sdk-sources
+  - $TRAVIS_BUILD_DIR/depends/built
+  - $TRAVIS_BUILD_DIR/depends/sdk-sources
   - $HOME/.ccache
 
 env:
@@ -28,6 +28,7 @@ env:
     - WINEDEBUG=fixme-all
     - DOCKER_PACKAGES="build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git ca-certificates ccache python3"
     - DIST=DEB
+    - CACHE_ERR_MSG="Error! Initial build successful, but not enough time remains to run later build stages and tests. Please manually re-run this job by using the travis restart button or asking a bitcoin maintainer to restart.  The next run should not time out because the build cache has been saved."
 
 matrix:
   include:
@@ -102,9 +103,9 @@ matrix:
       env:
         - CXX=g++ CC=gcc
         - HOST=x86_64-unknown-linux-gnu
-        - PACKAGES="python3 qtbase5-dev qttools5-dev-tools protobuf-compiler libdbus-1-dev libharfbuzz-dev libprotobuf-dev"
+        - PACKAGES="python3 qtbase5-dev qttools5-dev-tools protobuf-compiler libdbus-1-dev libharfbuzz-dev libprotobuf-dev libdb5.3++-dev"
         - DEP_OPTS="NO_WALLET=1 NO_QT=1 ALLOW_HOST_PACKAGES=1"
-        - RUN_TESTS=true GOAL="install" BITCOIN_CONFIG="--with-gui=qt5 --enable-glibc-back-compat --enable-reduce-exports"
+        - RUN_TESTS=true GOAL="install" BITCOIN_CONFIG="--enable-debug --with-incompatible-bdb --with-gui=qt5 --enable-glibc-back-compat --enable-reduce-exports"
     #Cross-Mac
     - compiler: gcc
       env:
@@ -132,8 +133,12 @@ install:
 before_script:
     - set -o errexit; source .travis/before_script.sh
 script:
-    - if [ $SECONDS -gt 1980 ]; then set +o errexit; echo "Travis early exit to cache current state"; false; else set -o errexit; source .travis/script_a.sh; fi
-    - if [ $SECONDS -gt 1980 ]; then set +o errexit; echo "Travis early exit to cache current state"; false; else set -o errexit; source .travis/script_b.sh; fi
+    - export CONTINUE=1
+    - if [ $SECONDS -gt 1980 ]; then export CONTINUE=0; fi  # Likely the depends build took very long
+    - if [ $CONTINUE = "1" ]; then set -o errexit; source .travis/script_a.sh; else set +o errexit; echo "$CACHE_ERR_MSG"; false; fi
+    - if [ $SECONDS -gt 1980 ]; then export CONTINUE=0; fi  # Likely the build took very long
+    - if [ $CONTINUE = "1" ]; then set -o errexit; source .travis/script_b.sh; else set +o errexit; echo "$CACHE_ERR_MSG"; false; fi
+
 after_script:
     - set -o errexit; cd $TRAVIS_BUILD_DIR; source .travis/after_script.sh
 after_failure:

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -649,15 +649,14 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
         }
 
         // When we request a thin type block we may get back a regular block if it is smaller than
-        // either of the former.  Therefore we have to remove the thin or graphene block in flight if it
+        // either of the former.  Therefore we have to remove the thintype block in flight if it
         // exists and we also need to check that the block didn't arrive from some other peer.
-        {
-            // Remove thinblock data and thinblock in flight
-            thinrelay.ClearBlockInFlight(pfrom, inv.hash);
-            pfrom->firstBlock += 1;
-        }
+        thinrelay.ClearBlockInFlight(pfrom, inv.hash);
 
-        // Erase any txns from the orphan cache that are no longer needed
+        // Increment block counter
+        pfrom->firstBlock += 1;
+
+        // Erase any txns from the orphan cache, which were in this block, and that are now no longer needed.
         PV->ClearOrphanCache(pblock);
 
         // If chain is nearly caught up then flush the state after a block is finished processing and the

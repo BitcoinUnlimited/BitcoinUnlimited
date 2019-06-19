@@ -1,5 +1,5 @@
 // Copyright (c) 2017 Stephen McCarthy
-// Copyright (c) 2017-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2017-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -22,6 +22,7 @@
 #include "tinyformat.h"
 #include "torcontrol.h"
 #include "tweak.h"
+#include "txadmission.h"
 #include "txdb.h"
 #include "util.h"
 #include "utilmoneystr.h"

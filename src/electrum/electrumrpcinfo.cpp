@@ -11,7 +11,7 @@
 
 namespace electrum
 {
-static int64_t get_index_height(const std::map<std::string, int> &info)
+static int64_t get_index_height(const std::map<std::string, int64_t> &info)
 {
     auto height_it = info.find(INDEX_HEIGHT_KEY);
     if (height_it == end(info))
@@ -64,7 +64,7 @@ void ElectrumRPCInfo::ThrowHelp()
 int ElectrumRPCInfo::ActiveTipHeight() const { return chainActive.Height(); }
 bool ElectrumRPCInfo::IsInitialBlockDownload() const { return ::IsInitialBlockDownload(); }
 bool ElectrumRPCInfo::IsRunning() const { return ElectrumServer::Instance().IsRunning(); }
-std::map<std::string, int> ElectrumRPCInfo::FetchElectrsInfo() const { return fetch_electrs_info(); }
+std::map<std::string, int64_t> ElectrumRPCInfo::FetchElectrsInfo() const { return fetch_electrs_info(); }
 std::string ElectrumRPCInfo::GetStatus(int64_t index_height) const
 {
     if (!this->IsRunning())

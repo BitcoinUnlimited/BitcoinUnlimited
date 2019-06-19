@@ -56,6 +56,20 @@ CConnMgr::CConnMgr() : nExpeditedBlocksMax(32), nExpeditedTxsMax(32), next(0)
     vExpeditedUpstream.reserve(256);
 }
 
+CConnMgr::~CConnMgr()
+{
+    LOCK(cs_expedited);
+    for (auto node : vSendExpeditedBlocks)
+        node->Release();
+    for (auto node : vSendExpeditedTxs)
+        node->Release();
+    for (auto node : vExpeditedUpstream)
+        node->Release();
+    vSendExpeditedBlocks.clear();
+    vSendExpeditedTxs.clear();
+    vExpeditedUpstream.clear();
+}
+
 NodeId CConnMgr::NextNodeId()
 {
     // Pre-increment; do not use zero

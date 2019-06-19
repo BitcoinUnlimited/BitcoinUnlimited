@@ -1,4 +1,5 @@
 // Copyright (c) 2015 G. Andrew Stone
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -226,12 +227,6 @@ std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool valida
 {
     if (validate)
     {
-        if (value != 0 && miningSvForkTime.Value() != 0)
-        {
-            std::ostringstream ret;
-            ret << "Only one fork can be enabled at a time";
-            return ret.str();
-        }
     }
     else // If it was just turned "on" then set to the default activation time.
     {
@@ -244,32 +239,6 @@ std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool valida
     return std::string();
 }
 
-// Ensure that only one fork can be active at a time, update the UA string, and convert values of 1 to the
-// fork time default.
-std::string ForkTimeValidatorSV(const uint64_t &value, uint64_t *item, bool validate)
-{
-    if (validate)
-    {
-        if (value != 0 && miningForkTime.Value() != 0)
-        {
-            std::ostringstream ret;
-            ret << "Only one fork can be enabled at a time";
-            return ret.str();
-        }
-    }
-    else // If it was just turned "on" then set to the default activation time.
-    {
-        if (*item == 1)
-        {
-            // Since SV there's no other fork upcoming we going to use nov2018ActivationTime
-            // but since we removed the variable from src/chainparams.cpp we are going to use
-            // a literal integer here 1542300000 (Nov 15, 2019 15:40:00 UTC)
-            *item = 1542300000;
-        }
-        settingsToUserAgentString();
-    }
-    return std::string();
-}
 // Push all transactions in the mempool to another node
 void UnlimitedPushTxns(CNode *dest);
 
@@ -448,8 +417,6 @@ void settingsToUserAgentString()
     BUComments.clear();
 
     std::string flavor;
-    if (miningSvForkTime.Value() != 0)
-        BUComments.push_back("SV");
 
     std::stringstream ebss;
     ebss << (excessiveBlockSize / 100000);
@@ -480,15 +447,6 @@ void UnlimitedSetup(void)
     // If the user configures it to 1, assume this means default
     if (miningForkTime.Value() == 1)
         miningForkTime = Params().GetConsensus().may2019ActivationTime;
-    if (miningSvForkTime.Value() == 1)
-        miningSvForkTime = 1542300000;
-
-    if (miningForkTime.Value() != 0 && miningSvForkTime.Value() != 0)
-    {
-        LOGA("Both the SV and ABC forks are enabled.  You must choose one.");
-        printf("Both the SV and ABC forks are enabled.  You must choose one.\n");
-        exit(1);
-    }
 
     if (maxGeneratedBlock > excessiveBlockSize)
     {
@@ -547,47 +505,6 @@ void UnlimitedSetup(void)
     // Start Internal CPU miner
     // Generate coins in the background
     GenerateBitcoins(GetBoolArg("-gen", DEFAULT_GENERATE), GetArg("-genproclimit", DEFAULT_GENERATE_THREADS), Params());
-
-
-    // Modify checkpoints depending on whether BCH or SV fork
-    if (Params().NetworkIDString() == "main")
-    {
-        CCheckpointData &checkpoints = ModifiableParams().ModifiableCheckpoints();
-        if (nMiningSvForkTime == 0)
-        {
-            // Nov 15th 2018 activate LTOR, DSV op_code
-            checkpoints.mapCheckpoints[556767] =
-                uint256S("0000000000000000004626ff6e3b936941d341c5932ece4357eeccac44e6d56c");
-            // * UNIX timestamp of last checkpoint block
-            checkpoints.nTimeLastCheckpoint = 1542304936;
-            // * total number of transactions between genesis and last checkpoint
-            checkpoints.nTransactionsLastCheckpoint = 265567564;
-            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
-            checkpoints.fTransactionsPerDay = 280000.0;
-        }
-        else if (nMiningSvForkTime != 0)
-        {
-            // Nov 15th 2018 SV fork, 128MB blocks, re-enable bitcoin 0.1.0 op_codes
-            checkpoints.mapCheckpoints[556767] =
-                uint256S("000000000000000001d956714215d96ffc00e0afda4cd0a96c96f8d802b1662b");
-            // * UNIX timestamp of last checkpoint block
-            checkpoints.nTimeLastCheckpoint = 1542305817;
-            // * total number of transactions between genesis and last checkpoint
-            checkpoints.nTransactionsLastCheckpoint = 265615408;
-            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
-            checkpoints.fTransactionsPerDay = 280000.0;
-        }
-        else
-        {
-            // unknown scenario, dont update these values or add a new checkpoint
-            // * UNIX timestamp of last checkpoint block
-            checkpoints.nTimeLastCheckpoint = 1526410186;
-            // * total number of transactions between genesis and last checkpoint
-            checkpoints.nTransactionsLastCheckpoint = 249416375;
-            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
-            checkpoints.fTransactionsPerDay = 280000.0;
-        }
-    }
 }
 
 FILE *blockReceiptLog = nullptr;
@@ -734,7 +651,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
     {
         // Throw an error if no script was provided.  This can happen
         // due to some internal error but also if the keypool is empty.
-        // In the latter case, already the pointer is NULL.
+        // In the latter case, already the pointer is nullptr.
         if (!coinbaseScript || coinbaseScript->reserveScript.empty())
             throw std::runtime_error("No coinbase script available (mining requires a wallet)");
 
@@ -1074,7 +991,7 @@ UniValue getexcessiveblock(const UniValue &params, bool fHelp)
                             HelpExampleCli("getexcessiveblock", "") + HelpExampleRpc("getexcessiveblock", ""));
 
     UniValue ret(UniValue::VOBJ);
-    ret.pushKV("excessiveBlockSize", (uint64_t)excessiveBlockSize);
+    ret.pushKV("excessiveBlockSize", excessiveBlockSize);
     ret.pushKV("excessiveAcceptDepth", (uint64_t)excessiveAcceptDepth);
     return ret;
 }
@@ -1095,15 +1012,15 @@ UniValue setexcessiveblock(const UniValue &params, bool fHelp)
                             "\nExamples:\n" +
                             HelpExampleCli("getexcessiveblock", "") + HelpExampleRpc("getexcessiveblock", ""));
 
-    unsigned int ebs = 0;
+    uint64_t ebs = 0;
     if (params[0].isNum())
         ebs = params[0].get_int64();
     else
     {
         string temp = params[0].get_str();
         if (temp[0] == '-')
-            boost::throw_exception(boost::bad_lexical_cast());
-        ebs = boost::lexical_cast<unsigned int>(temp);
+            throw runtime_error("Excessive block size has to be a positive number");
+        ebs = std::stoull(temp);
     }
 
     std::string estr = ebTweak.Validate(ebs);

@@ -15,6 +15,8 @@
 #include "txmempool.h"
 #include "versionbits.h"
 
+extern std::atomic<uint64_t> nBlockSizeAtChainTip;
+
 enum DisconnectResult
 {
     DISCONNECT_OK, // All good.
@@ -55,7 +57,7 @@ void CheckBlockIndex(const Consensus::Params &consensusParams);
 
 /**
  * Check whether all inputs of this transaction are valid (no double spends, scripts & sigs, amounts)
- * This does not modify the UTXO set. If pvChecks is not NULL, script checks are pushed onto it
+ * This does not modify the UTXO set. If pvChecks is not nullptr, script checks are pushed onto it
  * instead of being performed inline.
  */
 bool CheckInputs(const CTransactionRef &tx,

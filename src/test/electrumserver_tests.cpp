@@ -12,7 +12,7 @@ BOOST_FIXTURE_TEST_SUITE(electrumserver_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(isrunning)
 {
-#if BOOST_OS_LINUX
+#if (BOOST_OS_LINUX && (BOOST_VERSION >= 106500))
     if (!boost::filesystem::exists("/bin/sleep"))
     {
         std::cout << "Skipping " << __func__ << std::endl;

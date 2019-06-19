@@ -1,4 +1,4 @@
-// Copyright (c) 2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -6,10 +6,28 @@
 #define BITCOIN_TXADMISSION_H
 
 #include "fastfilter.h"
+#include "main.h"
 #include "net.h"
 #include "threadgroup.h"
 #include "txmempool.h"
 #include <queue>
+
+/** The default value for -minrelaytxfee in sat/byte */
+static const double DEFAULT_MINLIMITERTXFEE = (double)DEFAULT_MIN_RELAY_TX_FEE / 1000;
+/** The default value for -maxrelaytxfee in sat/byte */
+static const double DEFAULT_MAXLIMITERTXFEE = (double)DEFAULT_MIN_RELAY_TX_FEE / 1000;
+/** The number of block heights to gradually choke spam transactions over */
+static const unsigned int MAX_BLOCK_SIZE_MULTIPLIER = 3;
+
+/** The maximum number of free transactions (in KB) that can enter the mempool per minute.
+ *  For a 1MB block we allow 15KB of free transactions per 1 minute.
+ */
+static const uint32_t DEFAULT_LIMITFREERELAY = DEFAULT_BLOCK_MAX_SIZE * 0.000015;
+/** The minimum value possible for -limitfreerelay when rate limiting */
+static const unsigned int DEFAULT_MIN_LIMITFREERELAY = 1;
+
+/** Subject free transactions to priority checking when entering the mempool */
+static const bool DEFAULT_RELAYPRIORITY = false;
 
 /**
  * Filter for transactions that were recently rejected by

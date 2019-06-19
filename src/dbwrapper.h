@@ -1,4 +1,5 @@
 // Copyright (c) 2012-2016 The Bitcoin Core developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -365,10 +366,10 @@ public:
     void Compact() const
     {
         // workaround for google/leveldb#227
-        // NULL batch means just wait for earlier writes to be done
+        // nullptr batch means just wait for earlier writes to be done
         leveldb::WriteBatch b;
         pdb->Write(writeoptions, &b);
-        pdb->CompactRange(NULL, NULL);
+        pdb->CompactRange(nullptr, nullptr);
     }
 
     /**

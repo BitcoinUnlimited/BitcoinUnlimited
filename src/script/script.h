@@ -1,7 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
-// Copyright (c) 2018 The Bitcoin SV developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -26,8 +25,6 @@ static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520;
 
 // Maximum number of non-push operations per script
 static const int MAX_OPS_PER_SCRIPT = 201;
-static const int SV_MAX_OPS_PER_SCRIPT = 500;
-
 
 // Maximum number of public keys per multisig
 static const int MAX_PUBKEYS_PER_MULTISIG = 20;
@@ -482,7 +479,7 @@ public:
     bool GetOp(iterator &pc, opcodetype &opcodeRet)
     {
         const_iterator pc2 = pc;
-        bool fRet = GetOp2(pc2, opcodeRet, NULL);
+        bool fRet = GetOp2(pc2, opcodeRet, nullptr);
         pc = begin() + (pc2 - begin());
         return fRet;
     }
@@ -492,7 +489,7 @@ public:
         return GetOp2(pc, opcodeRet, &vchRet);
     }
 
-    bool GetOp(const_iterator &pc, opcodetype &opcodeRet) const { return GetOp2(pc, opcodeRet, NULL); }
+    bool GetOp(const_iterator &pc, opcodetype &opcodeRet) const { return GetOp2(pc, opcodeRet, nullptr); }
     bool GetOp2(const_iterator &pc, opcodetype &opcodeRet, std::vector<unsigned char> *pvchRet) const
     {
         opcodeRet = OP_INVALIDOPCODE;

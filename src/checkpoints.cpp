@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -27,10 +27,10 @@ static const double SIGCHECK_VERIFICATION_FACTOR = 5.0;
 //! Guess how far we are in the verification process at the given block index
 double GuessVerificationProgress(const CCheckpointData &data, CBlockIndex *pindex, bool fSigchecks)
 {
-    if (pindex == NULL)
+    if (pindex == nullptr)
         return 0.0;
 
-    int64_t nNow = time(NULL);
+    int64_t nNow = time(nullptr);
 
     double fSigcheckVerificationFactor = fSigchecks ? SIGCHECK_VERIFICATION_FACTOR : 1.0;
     double fWorkBefore = 0.0; // Amount of work done before pindex
@@ -80,7 +80,7 @@ CBlockIndex *GetLastCheckpoint(const CCheckpointData &data)
         if (t != mapBlockIndex.end())
             return t->second;
     }
-    return NULL;
+    return nullptr;
 }
 #endif
 } // namespace Checkpoints

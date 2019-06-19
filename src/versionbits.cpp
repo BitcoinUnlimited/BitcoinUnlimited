@@ -1,5 +1,6 @@
 // Copyright (c) 2016 The Bitcoin Core developers
 // Copyright (c) 2017 The Bitcoin developers
+// Copyright (c) 2017-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -174,7 +175,7 @@ ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex 
 
     // A block's state is always the same as that of the first of its period, so it is computed based on a pindexPrev
     // whose height equals a multiple of nPeriod - 1.
-    if (pindexPrev != NULL)
+    if (pindexPrev != nullptr)
     {
         assert(nPeriod);
         pindexPrev = pindexPrev->GetAncestor(pindexPrev->nHeight - ((pindexPrev->nHeight + 1) % nPeriod));
@@ -185,7 +186,7 @@ ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex 
 
     while (!backAtDefined(cache, (const CBlockIndex *)pindexPrev))
     {
-        if (pindexPrev == NULL)
+        if (pindexPrev == nullptr)
         {
             // The genesis block is by definition defined.
             cache[pindexPrev] = THRESHOLD_DEFINED;

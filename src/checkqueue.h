@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -209,8 +209,8 @@ public:
     CCheckQueueControl() {} // BU: parallel block validation
     CCheckQueueControl(CCheckQueue<T> *pqueueIn) : pqueue(pqueueIn), fDone(false)
     {
-        // passed queue is supposed to be unused, or NULL
-        if (pqueue != NULL)
+        // passed queue is supposed to be unused, or nullptr
+        if (pqueue != nullptr)
         {
             bool isIdle = pqueue->IsIdle();
             assert(isIdle);
@@ -220,8 +220,8 @@ public:
     void Queue(CCheckQueue<T> *pqueueIn)
     {
         pqueue = pqueueIn;
-        // passed queue is supposed to be unused, or NULL
-        if (pqueue != NULL)
+        // passed queue is supposed to be unused, or nullptr
+        if (pqueue != nullptr)
         {
             bool isIdle = pqueue->IsIdle();
             assert(isIdle);
@@ -233,7 +233,7 @@ public:
     {
         if (fDone)
             return true;
-        else if (pqueue == NULL)
+        else if (pqueue == nullptr)
             return true;
         bool fRet = pqueue->Wait();
         fDone = true;
@@ -242,7 +242,7 @@ public:
 
     void Add(std::vector<T> &vChecks)
     {
-        if (pqueue != NULL)
+        if (pqueue != nullptr)
             pqueue->Add(vChecks);
     }
 

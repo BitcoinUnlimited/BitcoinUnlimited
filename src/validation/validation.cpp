@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -270,7 +270,6 @@ CBlockIndex *AddToBlockIndex(const CBlockHeader &block)
 
     // Construct new block index object
     CBlockIndex *pindexNew = new CBlockIndex(block);
-    assert(pindexNew);
     // We assign the sequence id to blocks only when the full data is available,
     // to avoid miners withholding blocks but broadcasting headers, to get a
     // competitive advantage.
@@ -321,8 +320,6 @@ CBlockIndex *InsertBlockIndex(const uint256 &hash)
 
     // Create new
     CBlockIndex *pindexNew = new CBlockIndex();
-    if (!pindexNew)
-        throw std::runtime_error("LoadBlockIndex(): new CBlockIndex failed");
     mi = mapBlockIndex.insert(std::make_pair(hash, pindexNew)).first;
     pindexNew->phashBlock = &((*mi).first);
 
@@ -649,51 +646,51 @@ void CheckBlockIndex(const Consensus::Params &consensusParams)
 
     std::pair<std::multimap<CBlockIndex *, CBlockIndex *>::iterator,
         std::multimap<CBlockIndex *, CBlockIndex *>::iterator>
-        rangeGenesis = forward.equal_range(NULL);
+        rangeGenesis = forward.equal_range(nullptr);
     CBlockIndex *pindex = rangeGenesis.first->second;
     rangeGenesis.first++;
-    assert(rangeGenesis.first == rangeGenesis.second); // There is only one index entry with parent NULL.
+    assert(rangeGenesis.first == rangeGenesis.second); // There is only one index entry with parent nullptr.
 
     // Iterate over the entire block tree, using depth-first search.
     // Along the way, remember whether there are blocks on the path from genesis
     // block being explored which are the first to have certain properties.
     size_t nNodes = 0;
     int nHeight = 0;
-    CBlockIndex *pindexFirstInvalid = NULL; // Oldest ancestor of pindex which is invalid.
-    CBlockIndex *pindexFirstMissing = NULL; // Oldest ancestor of pindex which does not have BLOCK_HAVE_DATA.
-    CBlockIndex *pindexFirstNeverProcessed = NULL; // Oldest ancestor of pindex for which nTx == 0.
+    CBlockIndex *pindexFirstInvalid = nullptr; // Oldest ancestor of pindex which is invalid.
+    CBlockIndex *pindexFirstMissing = nullptr; // Oldest ancestor of pindex which does not have BLOCK_HAVE_DATA.
+    CBlockIndex *pindexFirstNeverProcessed = nullptr; // Oldest ancestor of pindex for which nTx == 0.
     // Oldest ancestor of pindex which does not have BLOCK_VALID_TREE (regardless of being valid or not).
-    CBlockIndex *pindexFirstNotTreeValid = NULL;
+    CBlockIndex *pindexFirstNotTreeValid = nullptr;
     // Oldest ancestor of pindex which does not have BLOCK_VALID_TRANSACTIONS (regardless of being valid or not).
-    CBlockIndex *pindexFirstNotTransactionsValid = NULL;
+    CBlockIndex *pindexFirstNotTransactionsValid = nullptr;
     // Oldest ancestor of pindex which does not have BLOCK_VALID_CHAIN (regardless of being valid or not).
-    CBlockIndex *pindexFirstNotChainValid = NULL;
+    CBlockIndex *pindexFirstNotChainValid = nullptr;
     // Oldest ancestor of pindex which does not have BLOCK_VALID_SCRIPTS (regardless of being valid or not).
-    CBlockIndex *pindexFirstNotScriptsValid = NULL;
-    while (pindex != NULL)
+    CBlockIndex *pindexFirstNotScriptsValid = nullptr;
+    while (pindex != nullptr)
     {
         nNodes++;
-        if (pindexFirstInvalid == NULL && pindex->nStatus & BLOCK_FAILED_VALID)
+        if (pindexFirstInvalid == nullptr && pindex->nStatus & BLOCK_FAILED_VALID)
             pindexFirstInvalid = pindex;
-        if (pindexFirstMissing == NULL && !(pindex->nStatus & BLOCK_HAVE_DATA))
+        if (pindexFirstMissing == nullptr && !(pindex->nStatus & BLOCK_HAVE_DATA))
             pindexFirstMissing = pindex;
-        if (pindexFirstNeverProcessed == NULL && pindex->nTx == 0)
+        if (pindexFirstNeverProcessed == nullptr && pindex->nTx == 0)
             pindexFirstNeverProcessed = pindex;
-        if (pindex->pprev != NULL && pindexFirstNotTreeValid == NULL &&
+        if (pindex->pprev != nullptr && pindexFirstNotTreeValid == nullptr &&
             (pindex->nStatus & BLOCK_VALID_MASK) < BLOCK_VALID_TREE)
             pindexFirstNotTreeValid = pindex;
-        if (pindex->pprev != NULL && pindexFirstNotTransactionsValid == NULL &&
+        if (pindex->pprev != nullptr && pindexFirstNotTransactionsValid == nullptr &&
             (pindex->nStatus & BLOCK_VALID_MASK) < BLOCK_VALID_TRANSACTIONS)
             pindexFirstNotTransactionsValid = pindex;
-        if (pindex->pprev != NULL && pindexFirstNotChainValid == NULL &&
+        if (pindex->pprev != nullptr && pindexFirstNotChainValid == nullptr &&
             (pindex->nStatus & BLOCK_VALID_MASK) < BLOCK_VALID_CHAIN)
             pindexFirstNotChainValid = pindex;
-        if (pindex->pprev != NULL && pindexFirstNotScriptsValid == NULL &&
+        if (pindex->pprev != nullptr && pindexFirstNotScriptsValid == nullptr &&
             (pindex->nStatus & BLOCK_VALID_MASK) < BLOCK_VALID_SCRIPTS)
             pindexFirstNotScriptsValid = pindex;
 
         // Begin: actual consistency checks.
-        if (pindex->pprev == NULL)
+        if (pindex->pprev == nullptr)
         {
             // Genesis block checks.
             assert(pindex->GetBlockHash() == consensusParams.hashGenesisBlock); // Genesis block's hash must match.
@@ -723,24 +720,24 @@ void CheckBlockIndex(const Consensus::Params &consensusParams)
         // All parents having had data (at some point) is equivalent to all parents being VALID_TRANSACTIONS, which is
         // equivalent to nChainTx being set.
         // nChainTx != 0 is used to signal that all parent blocks have been processed (but may have been pruned).
-        assert((pindexFirstNeverProcessed != NULL) == (pindex->nChainTx == 0));
-        assert((pindexFirstNotTransactionsValid != NULL) == (pindex->nChainTx == 0));
+        assert((pindexFirstNeverProcessed != nullptr) == (pindex->nChainTx == 0));
+        assert((pindexFirstNotTransactionsValid != nullptr) == (pindex->nChainTx == 0));
         assert(pindex->nHeight == nHeight); // nHeight must be consistent.
         // For every block except the genesis block, the chainwork must be larger than the parent's.
-        assert(pindex->pprev == NULL || pindex->nChainWork >= pindex->pprev->nChainWork);
+        assert(pindex->pprev == nullptr || pindex->nChainWork >= pindex->pprev->nChainWork);
         // The pskip pointer must point back for all but the first 2 blocks.
         assert(nHeight < 2 || (pindex->pskip && (pindex->pskip->nHeight < nHeight)));
-        assert(pindexFirstNotTreeValid == NULL); // All mapBlockIndex entries must at least be TREE valid
+        assert(pindexFirstNotTreeValid == nullptr); // All mapBlockIndex entries must at least be TREE valid
         // TREE valid implies all parents are TREE valid
         if ((pindex->nStatus & BLOCK_VALID_MASK) >= BLOCK_VALID_TREE)
-            assert(pindexFirstNotTreeValid == NULL);
+            assert(pindexFirstNotTreeValid == nullptr);
         // CHAIN valid implies all parents are CHAIN valid
         if ((pindex->nStatus & BLOCK_VALID_MASK) >= BLOCK_VALID_CHAIN)
-            assert(pindexFirstNotChainValid == NULL);
+            assert(pindexFirstNotChainValid == nullptr);
         // SCRIPTS valid implies all parents are SCRIPTS valid
         if ((pindex->nStatus & BLOCK_VALID_MASK) >= BLOCK_VALID_SCRIPTS)
-            assert(pindexFirstNotScriptsValid == NULL);
-        if (pindexFirstInvalid == NULL)
+            assert(pindexFirstNotScriptsValid == nullptr);
+        if (pindexFirstInvalid == nullptr)
         {
             // Checks for not-invalid blocks.
             // The failed mask cannot be set for blocks without invalid parents.
@@ -749,8 +746,8 @@ void CheckBlockIndex(const Consensus::Params &consensusParams)
 
         /*  This section does not apply to PV since blocks can arrive and be processed in potentially any order.
             Leaving the commented section for now for further review.
-        if (!CBlockIndexWorkComparator()(pindex, chainActive.Tip()) && pindexFirstNeverProcessed == NULL) {
-            if (pindexFirstInvalid == NULL) {
+        if (!CBlockIndexWorkComparator()(pindex, chainActive.Tip()) && pindexFirstNeverProcessed == nullptr) {
+            if (pindexFirstInvalid == nullptr) {
                 // If this block sorts at least as good as the current tip and
                 // is valid and we have all data for its parents, it must be in
                 // setBlockIndexCandidates.  chainActive.Tip() must also be there
@@ -758,7 +755,8 @@ void CheckBlockIndex(const Consensus::Params &consensusParams)
 
                 // PV:  this is no longer true under certain condition for PV - leaving it in here for further review
                 // BU: if the chain is excessive it won't be on the list of active chain candidates
-                //if ((!chainContainsExcessive(pindex)) && (pindexFirstMissing == NULL || pindex == chainActive.Tip()) )
+                //if ((!chainContainsExcessive(pindex)) && (pindexFirstMissing == nullptr || pindex ==
+        chainActive.Tip()) )
                 //    assert(setBlockIndexCandidates.count(pindex));
 
                     // If some parent is missing, then it could be that this block was in
@@ -787,8 +785,8 @@ void CheckBlockIndex(const Consensus::Params &consensusParams)
             }
             rangeUnlinked.first++;
         }
-        if (pindex->pprev && (pindex->nStatus & BLOCK_HAVE_DATA) && pindexFirstNeverProcessed != NULL &&
-            pindexFirstInvalid == NULL)
+        if (pindex->pprev && (pindex->nStatus & BLOCK_HAVE_DATA) && pindexFirstNeverProcessed != nullptr &&
+            pindexFirstInvalid == nullptr)
         {
             // If this block has block data available, some parent was never received, and has no invalid parents, it
             // must be in mapBlocksUnlinked.
@@ -798,12 +796,12 @@ void CheckBlockIndex(const Consensus::Params &consensusParams)
         if (!(pindex->nStatus & BLOCK_HAVE_DATA))
             assert(!foundInUnlinked);
         // BU: blocks that are excessive are placed in the unlinked map
-        if ((pindexFirstMissing == NULL) && (!chainContainsExcessive(pindex)))
+        if ((pindexFirstMissing == nullptr) && (!chainContainsExcessive(pindex)))
         {
             assert(!foundInUnlinked); // We aren't missing data for any parent -- cannot be in mapBlocksUnlinked.
         }
-        if (pindex->pprev && (pindex->nStatus & BLOCK_HAVE_DATA) && pindexFirstNeverProcessed == NULL &&
-            pindexFirstMissing != NULL)
+        if (pindex->pprev && (pindex->nStatus & BLOCK_HAVE_DATA) && pindexFirstNeverProcessed == nullptr &&
+            pindexFirstMissing != nullptr)
         {
             // We HAVE_DATA for this block, have received data for all parents at some point, but we're currently
             // missing data for some parent.
@@ -818,7 +816,7 @@ void CheckBlockIndex(const Consensus::Params &consensusParams)
             // setBlockIndexCandidates, then it must be in mapBlocksUnlinked.
             if (!CBlockIndexWorkComparator()(pindex, chainActive.Tip()) && setBlockIndexCandidates.count(pindex) == 0)
             {
-                if (pindexFirstInvalid == NULL)
+                if (pindexFirstInvalid == nullptr)
                 {
                     assert(foundInUnlinked);
                 }
@@ -845,19 +843,19 @@ void CheckBlockIndex(const Consensus::Params &consensusParams)
             // We are going to either move to a parent or a sibling of pindex.
             // If pindex was the first with a certain property, unset the corresponding variable.
             if (pindex == pindexFirstInvalid)
-                pindexFirstInvalid = NULL;
+                pindexFirstInvalid = nullptr;
             if (pindex == pindexFirstMissing)
-                pindexFirstMissing = NULL;
+                pindexFirstMissing = nullptr;
             if (pindex == pindexFirstNeverProcessed)
-                pindexFirstNeverProcessed = NULL;
+                pindexFirstNeverProcessed = nullptr;
             if (pindex == pindexFirstNotTreeValid)
-                pindexFirstNotTreeValid = NULL;
+                pindexFirstNotTreeValid = nullptr;
             if (pindex == pindexFirstNotTransactionsValid)
-                pindexFirstNotTransactionsValid = NULL;
+                pindexFirstNotTransactionsValid = nullptr;
             if (pindex == pindexFirstNotChainValid)
-                pindexFirstNotChainValid = NULL;
+                pindexFirstNotChainValid = nullptr;
             if (pindex == pindexFirstNotScriptsValid)
-                pindexFirstNotScriptsValid = NULL;
+                pindexFirstNotScriptsValid = nullptr;
             // Find our parent.
             CBlockIndex *pindexPar = pindex->pprev;
             // Find which child we just visited.
@@ -1045,14 +1043,14 @@ bool ReconsiderBlock(CValidationState &state, CBlockIndex *pindex)
             if (it->second == pindexBestInvalid)
             {
                 // Reset invalid block marker if it was pointing to one of those.
-                pindexBestInvalid = NULL;
+                pindexBestInvalid = nullptr;
             }
         }
         it++;
     }
 
     // Remove the invalidity flag from all ancestors too.
-    while (pindex != NULL)
+    while (pindex != nullptr)
     {
         if (pindex->nStatus & BLOCK_FAILED_MASK)
         {
@@ -1157,13 +1155,13 @@ CBlockIndex *FindMostWorkChain()
 
     do
     {
-        CBlockIndex *pindexNew = NULL;
+        CBlockIndex *pindexNew = nullptr;
 
         // Find the best candidate header.
         {
             std::set<CBlockIndex *, CBlockIndexWorkComparator>::reverse_iterator it = setBlockIndexCandidates.rbegin();
             if (it == setBlockIndexCandidates.rend())
-                return NULL;
+                return nullptr;
             pindexNew = *it;
         }
 
@@ -1237,7 +1235,7 @@ CBlockIndex *FindMostWorkChain()
         if (fFailedChain || fMissingData || (fRecentExcessive && !fOldExcessive))
         {
             // Candidate chain is not usable (either invalid or missing data)
-            if (fFailedChain && (pindexBestInvalid == NULL || pindexNew->nChainWork > pindexBestInvalid->nChainWork))
+            if (fFailedChain && (pindexBestInvalid == nullptr || pindexNew->nChainWork > pindexBestInvalid->nChainWork))
                 pindexBestInvalid = pindexNew;
             CBlockIndex *pindexFailed = pindexNew;
             // Remove the entire chain from the set.
@@ -1264,7 +1262,7 @@ CBlockIndex *FindMostWorkChain()
         if (!fInvalidAncestor)
             return pindexNew;
     } while (true);
-    DbgAssert(0, return NULL); // should never get here
+    DbgAssert(0, return nullptr); // should never get here
 }
 
 bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensusParams, CBlockIndex *pindex)
@@ -1337,7 +1335,7 @@ void CheckForkWarningConditions()
     // If our best fork is no longer within 72 blocks (+/- 12 hours if no one mines it)
     // of our head, drop it
     if (pindexBestForkTip && chainActive.Height() - pindexBestForkTip->nHeight >= 72)
-        pindexBestForkTip = NULL;
+        pindexBestForkTip = nullptr;
 
     if (pindexBestForkTip)
     {
@@ -1411,7 +1409,7 @@ bool ContextualCheckBlock(const CBlock &block,
         }
 
         // Make sure tx size is equal or higher to 100 bytes if we are on the BCH chain and Nov 15th 2018 activated
-        if (AreWeOnBCHChain() && IsNov2018Activated(consensusParams, chainActive.Tip()))
+        if (IsNov2018Activated(consensusParams, chainActive.Tip()))
         {
             if (tx->GetTxSize() < MIN_TX_SIZE)
             {
@@ -1563,7 +1561,7 @@ bool ReceivedBlockTransactions(const CBlock &block,
     pindexNew->RaiseValidity(BLOCK_VALID_TRANSACTIONS);
     setDirtyBlockIndex.insert(pindexNew);
 
-    if (pindexNew->pprev == NULL || pindexNew->pprev->nChainTx)
+    if (pindexNew->pprev == nullptr || pindexNew->pprev->nChainTx)
     {
         // If pindexNew is the genesis block or all parents are BLOCK_VALID_TRANSACTIONS.
         std::deque<CBlockIndex *> queue;
@@ -1576,7 +1574,7 @@ bool ReceivedBlockTransactions(const CBlock &block,
             queue.pop_front();
             pindex->nChainTx = (pindex->pprev ? pindex->pprev->nChainTx : 0) + pindex->nTx;
             pindex->nSequenceId = ++nBlockSequenceId;
-            if (chainActive.Tip() == NULL || !setBlockIndexCandidates.value_comp()(pindex, chainActive.Tip()))
+            if (chainActive.Tip() == nullptr || !setBlockIndexCandidates.value_comp()(pindex, chainActive.Tip()))
             {
                 setBlockIndexCandidates.insert(pindex);
             }
@@ -1603,7 +1601,7 @@ bool ReceivedBlockTransactions(const CBlock &block,
     return true;
 }
 
-/** Store block on disk. If dbp is non-NULL, the file is known to already reside on disk */
+/** Store block on disk. If dbp is non-nullptr, the file is known to already reside on disk */
 bool AcceptBlock(const CBlock &block,
     CValidationState &state,
     const CChainParams &chainparams,
@@ -1659,9 +1657,11 @@ bool AcceptBlock(const CBlock &block,
     {
         if (state.IsInvalid() && !state.CorruptionPossible())
         {
-            WRITELOCK(cs_mapBlockIndex);
-            pindex->nStatus |= BLOCK_FAILED_VALID;
-            setDirtyBlockIndex.insert(pindex);
+            {
+                WRITELOCK(cs_mapBlockIndex);
+                pindex->nStatus |= BLOCK_FAILED_VALID;
+                setDirtyBlockIndex.insert(pindex);
+            }
             // Now mark every block index on every chain that contains pindex as child of invalid
             MarkAllContainingChainsInvalid(pindex);
         }
@@ -1754,7 +1754,7 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
     // Since Nov 15, 2018 HF activates sig push only, clean stack rules
     // are enforced and CHECKDATASIG has been introduced on the BCH chain
     // (see  BIP 62 and CHECKDATASIG specification or more details)
-    if (AreWeOnBCHChain() && IsNov2018Activated(consensusparams, chainActive.Tip()))
+    if (IsNov2018Activated(consensusparams, chainActive.Tip()))
     {
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
         flags |= SCRIPT_VERIFY_CLEANSTACK;
@@ -1766,16 +1766,10 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
     // 65/64-byte Schnorr signatures in CHECKSIG and CHECKDATASIG respectively,
     // and their verify variants. We also stop accepting 65 byte signatures in
     // CHECKMULTISIG and its verify variant.
-    if (AreWeOnBCHChain() && IsMay2019Enabled(consensusparams, pindex->pprev))
+    if (IsMay2019Activated(consensusparams, pindex->pprev))
     {
         flags |= SCRIPT_ALLOW_SEGWIT_RECOVERY;
         flags |= SCRIPT_ENABLE_SCHNORR;
-    }
-
-    // The SV Nov 15, 2018 HF rules
-    if (AreWeOnSVChain() && IsSv2018Activated(consensusparams, chainActive.Tip()))
-    {
-        flags |= SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES;
     }
 
     return flags;
@@ -1921,7 +1915,7 @@ bool ConnectBlockPrevalidations(const CBlock &block,
     }
 
     // verify that the view's current state corresponds to the previous block
-    uint256 hashPrevBlock = pindex->pprev == NULL ? uint256() : pindex->pprev->GetBlockHash();
+    uint256 hashPrevBlock = pindex->pprev == nullptr ? uint256() : pindex->pprev->GetBlockHash();
     assert(hashPrevBlock == view.GetBestBlock());
 
     int64_t nTime1 = GetTimeMicros();
@@ -2062,7 +2056,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
 
     // Aquire the control that is used to wait for the script threads to finish. Do this after aquiring the
     // scoped lock to ensure the scriptqueue is free and available.
-    CCheckQueueControl<CScriptCheck> control(fScriptChecks && PV->ThreadCount() ? pScriptQueue : NULL);
+    CCheckQueueControl<CScriptCheck> control(fScriptChecks && PV->ThreadCount() ? pScriptQueue : nullptr);
 
     // Initialize a PV session.
     if (!PV->Initialize(this_id, pindex, fParallel))
@@ -2160,7 +2154,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
                                                             (still consult the cache, though) */
                         if (!CheckInputs(txref, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
-                                &resourceTracker, PV->ThreadCount() ? &vChecks : NULL))
+                                &resourceTracker, PV->ThreadCount() ? &vChecks : nullptr))
                         {
                             return error("%s: block %s CheckInputs on %s failed with %s", __func__,
                                 block.GetHash().ToString(), tx.GetHash().ToString(), FormatStateMessage(state));
@@ -2268,7 +2262,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
 
     // Aquire the control that is used to wait for the script threads to finish. Do this after aquiring the
     // scoped lock to ensure the scriptqueue is free and available.
-    CCheckQueueControl<CScriptCheck> control(fScriptChecks && PV->ThreadCount() ? pScriptQueue : NULL);
+    CCheckQueueControl<CScriptCheck> control(fScriptChecks && PV->ThreadCount() ? pScriptQueue : nullptr);
 
     // Initialize a PV session.
     if (!PV->Initialize(this_id, pindex, fParallel))
@@ -2520,7 +2514,7 @@ bool ConnectBlock(const CBlock &block,
     // Discover how to handle this block
     bool canonical = enableCanonicalTxOrder.Value();
     // Always allow overwite of enableCanonicalTxOrder but for regtest on BCH
-    if (AreWeOnBCHChain() && IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip()))
+    if (IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip()))
     {
         if (!(chainparams.NetworkIDString() == "regtest"))
         {
@@ -2683,7 +2677,7 @@ void CheckAndAlertUnknownVersionbits(const CChainParams &chainParams, const CBlo
                 const CBlockIndex *iindex = pindex; // iterating index, reset to chain tip
                 // set count for this bit to 0
                 unknownFork[bit].UnknownForkSignalStrength = 0;
-                for (int i = 0; i < BIT_WARNING_WINDOW && iindex != NULL; i++)
+                for (int i = 0; i < BIT_WARNING_WINDOW && iindex != nullptr; i++)
                 {
                     unknownFork[bit].UnknownForkSignalStrength += ((iindex->nVersion >> bit) & 0x1);
                     if (!upgradedEval)
@@ -2837,25 +2831,11 @@ void UpdateTip(CBlockIndex *pindexNew)
 
     // Set the global variables based on the fork state of the NEXT block
     // Always allow overwite of enableCanonicalTxOrder but for regtest)
-    if (AreWeOnBCHChain() && IsNov2018Activated(chainParams.GetConsensus(), chainActive.Tip()))
+    if (IsNov2018Activated(chainParams.GetConsensus(), chainActive.Tip()))
     {
         if (chainParams.NetworkIDString() != "regtest")
         {
             enableCanonicalTxOrder = true;
-        }
-    }
-
-    if (AreWeOnSVChain())
-    {
-        if (IsSv2018Activated(chainParams.GetConsensus(), chainActive.Tip()))
-        {
-            maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
-            excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
-        }
-        else // if blockchain reorg we may need to back it out
-        {
-            maxScriptOps = MAX_OPS_PER_SCRIPT;
-            excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
         }
     }
 }
@@ -2889,12 +2869,9 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     // If this block enabled the may152019 protocol upgrade, then we need to clear the mempool of any transaction using
     // not previously avaiable features (e.g. OP_CHECKDATASIGVERIFY).
 
-    if (AreWeOnBCHChain() && IsNov2018Activated(consensusParams, chainActive.Tip()))
+    if (IsMay2019Activated(consensusParams, pindexDelete) && !IsMay2019Activated(consensusParams, pindexDelete->pprev))
     {
-        if (IsMay2019Enabled(consensusParams, pindexDelete) && !IsMay2019Enabled(consensusParams, pindexDelete->pprev))
-        {
-            mempool.clear();
-        }
+        mempool.clear();
     }
 
     // these bloom filters stop us from doing duplicate work on tx we already know about.
@@ -2933,7 +2910,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
 
 
 /**
- * Connect a new block to chainActive. pblock is either NULL or a pointer to a CBlock
+ * Connect a new block to chainActive. pblock is either nullptr or a pointer to a CBlock
  * corresponding to pindexNew, to bypass loading it again from disk.
  */
 bool ConnectTip(CValidationState &state,
@@ -2988,6 +2965,7 @@ bool ConnectTip(CValidationState &state,
         }
         int64_t nStart = GetTimeMicros();
         bool result = view.Flush();
+        nBlockSizeAtChainTip.store(pblock->GetBlockSize());
         assert(result);
         LOG(BENCH, "      - Update Coins %.3fms\n", GetTimeMicros() - nStart);
 
@@ -3071,7 +3049,7 @@ void CheckForkWarningConditionsOnNewFork(CBlockIndex *pindexNewForkTip)
 
 /**
  * Try to make some progress towards making pindexMostWork the active block.
- * pblock is either NULL or a pointer to a CBlock corresponding to pindexMostWork.
+ * pblock is either nullptr or a pointer to a CBlock corresponding to pindexMostWork.
  */
 bool ActivateBestChainStep(CValidationState &state,
     const CChainParams &chainparams,
@@ -3112,9 +3090,9 @@ bool ActivateBestChainStep(CValidationState &state,
     // Build list of new blocks to connect.
     std::vector<CBlockIndex *> vpindexToConnect;
     bool fContinue = true;
-    /** Parallel Validation: fBlock determines whether we pass a block or NULL to ConnectTip().
+    /** Parallel Validation: fBlock determines whether we pass a block or nullptr to ConnectTip().
      *  If the pindexMostWork has been extended while we have been validating the last block then we
-     *  want to pass a NULL so that the next block is read from disk, because we will definitely not
+     *  want to pass a nullptr so that the next block is read from disk, because we will definitely not
      *  have the block.
      */
     bool fBlock = true;
@@ -3292,7 +3270,7 @@ bool ActivateBestChainStep(CValidationState &state,
 
 /**
  * Make the best chain active, in multiple steps. The result is either failure
- * or an activated best chain. pblock is either NULL or a pointer to a block
+ * or an activated best chain. pblock is either nullptr or a pointer to a block
  * that is already loaded (to avoid loading it again from disk).
  */
 bool ActivateBestChain(CValidationState &returnedState,
@@ -3395,7 +3373,7 @@ bool ActivateBestChain(CValidationState &returnedState,
         }
 
         if (!ActivateBestChainStep(state, chainparams, pindexMostWork,
-                ((pblock) && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : NULL), fParallel))
+                ((pblock) && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : nullptr), fParallel))
         {
             // If we fail to activate a chain because it is bad, keep iterating to reactivate the best known chain
             if (state.IsInvalid())
@@ -3412,7 +3390,7 @@ bool ActivateBestChain(CValidationState &returnedState,
         // Check if the best chain has changed while we were processing blocks.  If so then we need to
         // continue processing the newer chain.  This satisfies a rare edge case where we have initiated
         // a reorg to another chain but before the reorg is complete we end up reorging to a different
-        // chain. Set pblock to NULL here to make sure as we continue we get blocks from disk.
+        // chain. Set pblock to nullptr here to make sure as we continue we get blocks from disk.
         pindexMostWork = FindMostWorkChain();
         if (!pindexMostWork)
             return false;
@@ -3475,16 +3453,22 @@ bool ProcessNewBlock(CValidationState &state,
         }
         CheckBlockIndex(chainparams.GetConsensus());
 
-        // We must indicate to the request manager that the block was received only after it has
-        // been stored to disk (or been shown to be invalid). Doing so prevents unnecessary re-requests.
         CInv inv(MSG_BLOCK, hash);
-        requester.Received(inv, pfrom);
-
         if (!ret)
         {
             // BU TODO: if block comes out of order (before its parent) this will happen.  We should cache the block
             // until the parents arrive.
+
+            // If the block was not accepted then reset the fProcessing flag to false.
+            requester.BlockRejected(inv, pfrom);
+
             return error("%s: AcceptBlock FAILED", __func__);
+        }
+        else
+        {
+            // We must indicate to the request manager that the block was received only after it has
+            // been stored to disk (or been shown to be invalid). Doing so prevents unnecessary re-requests.
+            requester.Received(inv, pfrom);
         }
     }
     if (!ActivateBestChain(state, chainparams, pblock, fParallel))

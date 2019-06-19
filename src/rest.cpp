@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -146,7 +146,7 @@ static bool rest_headers(HTTPRequest *req, const std::string &strURIPart)
     if (path.size() != 2)
         return RESTERR(req, HTTP_BAD_REQUEST, "No header count specified. Use /rest/headers/<count>/<hash>.<ext>.");
 
-    long count = strtol(path[0].c_str(), NULL, 10);
+    long count = strtol(path[0].c_str(), nullptr, 10);
     if (count < 1 || count > 2000)
         return RESTERR(req, HTTP_BAD_REQUEST, "Header count out of range: " + path[0]);
 
@@ -160,7 +160,7 @@ static bool rest_headers(HTTPRequest *req, const std::string &strURIPart)
     {
         const CBlockIndex *pindex = LookupBlockIndex(hash);
         LOCK(cs_main);
-        while (pindex != NULL && chainActive.Contains(pindex))
+        while (pindex != nullptr && chainActive.Contains(pindex))
         {
             headers.push_back(pindex);
             if (headers.size() == (unsigned long)count)
@@ -464,7 +464,7 @@ static bool rest_getutxos(HTTPRequest *req, const std::string &strURIPart)
     if (uriParts.size() > 0)
     {
         // inputs is sent over URI scheme (/rest/getutxos/checkmempool/txid1-n/txid2-n/...)
-        if (uriParts.size() > 0 && uriParts[0] == "checkmempool")
+        if (uriParts[0] == "checkmempool")
             fCheckMemPool = true;
 
         for (size_t i = (fCheckMemPool) ? 1 : 0; i < uriParts.size(); i++)

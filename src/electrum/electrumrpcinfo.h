@@ -24,7 +24,7 @@ protected:
     virtual int ActiveTipHeight() const;
     virtual bool IsInitialBlockDownload() const;
     virtual bool IsRunning() const;
-    virtual std::map<std::string, int> FetchElectrsInfo() const;
+    virtual std::map<std::string, int64_t> FetchElectrsInfo() const;
 
 private:
     std::string GetStatus(int64_t index_height) const;

@@ -1,6 +1,6 @@
 ﻿// Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -19,7 +19,6 @@
 
 #include "chainparamsseeds.h"
 
-uint64_t nMiningSvForkTime = 0;
 // FIXME This need to be update every new fork
 uint64_t nMiningForkTime = 1557921600;
 
@@ -135,9 +134,8 @@ public:
         consensus.may2018Height = 530359;
         // Nov, 15 2018 hard fork
         consensus.nov2018Height = 556766;
-        consensus.sv2018Height = 556766;
-        // Wed, 15 May 2019 12:00:00 UTC hard fork activation time
-        consensus.may2019ActivationTime = 1557921600;
+        // May, 15 2019 hard fork
+        consensus.may2019Height = 582679;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -168,10 +166,6 @@ public:
         vSeeds.push_back(CDNSSeedData("bitcoinforks.org", "seed-abc.bitcoinforks.org", true));
         vSeeds.push_back(CDNSSeedData("bitprim.org", "seed.bitprim.org", true)); // Bitprim
         vSeeds.push_back(CDNSSeedData("deadalnix.me", "seed.deadalnix.me", true)); // Amaury SÉCHET
-        if (nMiningSvForkTime != 0)
-        {
-            vSeeds.push_back(CDNSSeedData("bitcoinsv.io", "seed.bitcoinsv.io", true)); // Bitcoin SV seeder
-        }
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1, 0);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1, 5);
@@ -214,8 +208,19 @@ public:
         checkpoints[504031] = uint256S("0x0000000000000000011ebf65b60d0a3de80b8175be709d653b4c1a1beeb6ab9c");
         // May 15th 2018 re-enable op_codes and 32 MB max block size
         checkpoints[530359] = uint256S("0x0000000000000000011ada8bd08f46074f44a8f155396f43e38acf9501c49103");
+        // Nov 15th 2018 activate LTOR, DSV op_code
+        checkpoints[556767] = uint256S("0x0000000000000000004626ff6e3b936941d341c5932ece4357eeccac44e6d56c");
+        // May 15th 2019 activate Schnorr, segwit recovery
+        checkpoints[582680] = uint256S("0x000000000000000001b4b8e36aec7d4f9671a47872cb9a74dc16ca398c7dcc18");
+
 
         // clang-format on
+        // * UNIX timestamp of last checkpoint block
+        checkpointData.nTimeLastCheckpoint = 1557922919;
+        // * total number of transactions between genesis and last checkpoint
+        checkpointData.nTransactionsLastCheckpoint = 271769178;
+        // * estimated number of transactions per day after checkpoint (~3.5 TPS)
+        checkpointData.fTransactionsPerDay = 280000.0;
     }
 };
 
@@ -270,9 +275,8 @@ public:
         consensus.may2018Height = 0;
         // Nov, 15 2018 hard fork
         consensus.nov2018Height = 0;
-        consensus.sv2018Height = 0;
-        // Wed, 15 May 2019 12:00:00 UTC hard fork activation time
-        consensus.may2019ActivationTime = 1557921600;
+        // May, 15 2019 hard fork
+        consensus.may2019Height = 0;
 
         vFixedSeeds.clear();
         vSeeds.clear();
@@ -338,9 +342,8 @@ public:
         consensus.may2018Height = 1233070;
         // Nov 15, 2018 hard fork
         consensus.nov2018Height = 1267996;
-        consensus.sv2018Height = 1267996;
-        // Wed, 15 May 2019 12:00:00 UTC hard fork activation time
-        consensus.may2019ActivationTime = 1557921600;
+        // May, 15 2019 hard fork
+        consensus.may2019Height = 1303884;
 
 
         pchMessageStart[0] = 0x0b;
@@ -377,11 +380,6 @@ public:
         vSeeds.push_back(CDNSSeedData("deadalnix.me", "testnet-seed.deadalnix.me", true));
         // criptolayer.net
         vSeeds.push_back(CDNSSeedData("criptolayer.net", "testnet-seeder.criptolayer.net", true));
-        // Bitcoin SV seeder
-        if (nMiningSvForkTime != 0)
-        {
-            vSeeds.push_back(CDNSSeedData("bitcoinsv.io", "testnet-seed.bitcoinsv.io", true));
-        }
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 196);
@@ -399,11 +397,28 @@ public:
         fMineBlocksOnDemand = false;
         fTestnetToBeDeprecatedFieldRPC = true;
 
-        checkpointData =
-            (CCheckpointData){boost::assign::map_list_of(546,
-                                  uint256S("000000002a936ca763904c3c35fce2f3556c559c0214345d31b1bcebf76acb70"))(1155876,
-                                  uint256S("00000000000e38fef93ed9582a7df43815d5c2ba9fd37ef70c9a0ea4a285b8f5")),
-                1501616524, 1488, 300};
+        // clang-format off
+        checkpointData = CCheckpointData();
+        MapCheckpoints &checkpoints = checkpointData.mapCheckpoints;
+        checkpoints[546]     = uint256S("0x000000002a936ca763904c3c35fce2f3556c559c0214345d31b1bcebf76acb70");
+        // August 1st 2017 CASH fork (UAHF) activation block
+        checkpoints[1155876] = uint256S("0x00000000000e38fef93ed9582a7df43815d5c2ba9fd37ef70c9a0ea4a285b8f5");
+        // Nov, 13th 2017. DAA activation block.
+        checkpoints[1188697] = uint256S("0x0000000000170ed0918077bde7b4d36cc4c91be69fa09211f748240dabe047fb");
+        // May 15th 2018, re-enabling opcodes, max block size 32MB
+        checkpoints[1233070] = uint256S("0x0000000000000253c6201a2076663cfe4722e4c75f537552cc4ce989d15f7cd5");
+        // Nov 15th 2018, CHECKDATASIG, ctor
+        checkpoints[1267996] = uint256S("0x00000000000001fae0095cd4bea16f1ce8ab63f3f660a03c6d8171485f484b24");
+        // May 15th 2019, Schnorr + segwit recovery activation block
+        checkpoints[1303885] = uint256S("0x00000000000000479138892ef0e4fa478ccc938fb94df862ef5bde7e8dee23d3");
+
+        // clang-format on
+        // Data as of block
+        checkpointData.nTimeLastCheckpoint = 1557923294;
+        // * total number of transactions between genesis and last checkpoint
+        checkpointData.nTransactionsLastCheckpoint = 23468264;
+        // * estimated number of transactions per day after checkpoint (~1.6 TPS)
+        checkpointData.fTransactionsPerDay = 140000;
     }
 };
 static CTestNetParams testNetParams;
@@ -444,9 +459,8 @@ public:
         consensus.may2018Height = 0;
         // Nov, 15 2018 hard fork is always active on regtest
         consensus.nov2018Height = 0;
-        consensus.sv2018Height = 0;
-        // Wed, 15 May 2019 12:00:00 UTC hard fork activation time
-        consensus.may2019ActivationTime = 1557921600;
+        // May, 15 2019 hard fork
+        consensus.may2019Height = 0;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;

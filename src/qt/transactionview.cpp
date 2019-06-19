@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -328,7 +328,7 @@ void TransactionView::exportClicked()
 {
     // CSV is currently the only supported format
     QString filename = GUIUtil::getSaveFileName(
-        this, tr("Export Transaction History"), QString(), tr("Comma separated file (*.csv)"), NULL);
+        this, tr("Export Transaction History"), QString(), tr("Comma separated file (*.csv)"), nullptr);
 
     if (filename.isNull())
         return;

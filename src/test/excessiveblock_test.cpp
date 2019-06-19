@@ -1,3 +1,6 @@
+// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "unlimited.h"
 
 #include "../consensus/consensus.h"
@@ -30,7 +33,7 @@ BOOST_AUTO_TEST_CASE(rpc_excessive)
     BOOST_CHECK_THROW(CallRPC("setexcessiveblock not_uint"), runtime_error);
     BOOST_CHECK_THROW(CallRPC("setexcessiveblock 36000000 not_uint"), boost::bad_lexical_cast);
     BOOST_CHECK_THROW(CallRPC("setexcessiveblock 36000000 -1"), boost::bad_lexical_cast);
-    BOOST_CHECK_THROW(CallRPC("setexcessiveblock -1 0"), boost::bad_lexical_cast);
+    BOOST_CHECK_THROW(CallRPC("setexcessiveblock -1 0"), runtime_error);
 
     // 2) passing 3 params should raise an exception
     BOOST_CHECK_THROW(CallRPC("setexcessiveblock 1000 0 0"), runtime_error);

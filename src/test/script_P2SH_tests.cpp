@@ -360,7 +360,7 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard)
     BOOST_CHECK(::AreInputsStandard(MakeTransactionRef(CTransaction(txTo)), coins));
     // 22 P2SH sigops for all inputs (1 for vin[0], 6 for vin[3], 15 for vin[4]
     BOOST_CHECK_EQUAL(
-        GetP2SHSigOpCount(MakeTransactionRef(CTransaction(txTo)), coins, STANDARD_CHECKDATASIG_VERIFY_FLAGS), 22U);
+        GetP2SHSigOpCount(MakeTransactionRef(CTransaction(txTo)), coins, STANDARD_SCRIPT_VERIFY_FLAGS), 22U);
     // Check that no sigops show up when P2SH is not activated.
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(MakeTransactionRef(CTransaction(txTo)), coins, SCRIPT_VERIFY_NONE), 0);
 
@@ -375,8 +375,7 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard)
 
     BOOST_CHECK(!::AreInputsStandard(MakeTransactionRef(CTransaction(txToNonStd1)), coins));
     BOOST_CHECK_EQUAL(
-        GetP2SHSigOpCount(MakeTransactionRef(CTransaction(txToNonStd1)), coins, STANDARD_CHECKDATASIG_VERIFY_FLAGS),
-        16U);
+        GetP2SHSigOpCount(MakeTransactionRef(CTransaction(txToNonStd1)), coins, STANDARD_SCRIPT_VERIFY_FLAGS), 16U);
     // Check that no sigops show up when P2SH is not activated.
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(MakeTransactionRef(CTransaction(txToNonStd1)), coins, SCRIPT_VERIFY_NONE), 0);
 
@@ -391,8 +390,7 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard)
 
     BOOST_CHECK(!::AreInputsStandard(MakeTransactionRef(CTransaction(txToNonStd2)), coins));
     BOOST_CHECK_EQUAL(
-        GetP2SHSigOpCount(MakeTransactionRef(CTransaction(txToNonStd2)), coins, STANDARD_CHECKDATASIG_VERIFY_FLAGS),
-        20U);
+        GetP2SHSigOpCount(MakeTransactionRef(CTransaction(txToNonStd2)), coins, STANDARD_SCRIPT_VERIFY_FLAGS), 20U);
     // Check that no sigops show up when P2SH is not activated.
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(MakeTransactionRef(CTransaction(txToNonStd2)), coins, SCRIPT_VERIFY_NONE), 0);
 }

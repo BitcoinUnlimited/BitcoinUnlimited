@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -145,8 +145,9 @@ void InitializeNode(const CNode *pnode)
 
 void FinalizeNode(NodeId nodeid)
 {
-    // Decrement thin type peer counters
-    thinrelay.RemovePeers(connmgr->FindNodeFromId(nodeid).get());
+    // Clear thintype block data if we have any.
+    thinrelay.ClearBlockToReconstruct(nodeid);
+    thinrelay.ClearAllBlocksInFlight(nodeid);
 
     // Update block sync counters
     {
@@ -404,7 +405,7 @@ void PartitionCheck(bool (*initialDownloadCheck)(),
     const CBlockIndex *const &bestHeader,
     int64_t nPowTargetSpacing)
 {
-    if (bestHeader == NULL || initialDownloadCheck())
+    if (bestHeader == nullptr || initialDownloadCheck())
         return;
 
     static int64_t lastAlertTime = 0;
@@ -428,7 +429,7 @@ void PartitionCheck(bool (*initialDownloadCheck)(),
     {
         ++nBlocks;
         i = i->pprev;
-        if (i == NULL)
+        if (i == nullptr)
             return; // Ran out of chain, we must not be fully sync'ed
     }
 
@@ -583,7 +584,7 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
                 if (pindex == nullptr || !fHaveData)
                 {
                     CValidationState state;
-                    if (ProcessNewBlock(state, chainparams, NULL, &block, true, dbp, false))
+                    if (ProcessNewBlock(state, chainparams, nullptr, &block, true, dbp, false))
                         nLoaded++;
                     if (state.IsError())
                         break;
@@ -611,7 +612,7 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
                             LOGA("%s: Processing out of order child %s of %s\n", __func__, block.GetHash().ToString(),
                                 head.ToString());
                             CValidationState dummy;
-                            if (ProcessNewBlock(dummy, chainparams, NULL, &block, true, &it->second, false))
+                            if (ProcessNewBlock(dummy, chainparams, nullptr, &block, true, &it->second, false))
                             {
                                 nLoaded++;
                                 queue.push_back(block.GetHash());

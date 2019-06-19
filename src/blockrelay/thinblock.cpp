@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -72,10 +72,11 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     std::shared_ptr<CThinBlock> thinBlock = pblock->thinblock;
 
     // Message consistency checking
-    if (!IsThinBlockValid(pfrom, thinBlock->vMissingTx, thinBlock->header))
+    if (!IsThinBlockValid(pfrom, thinBlock->vMissingTx, thinBlock->header, thinBlock->vTxHashes.size()))
     {
         dosMan.Misbehaving(pfrom, 100);
-        return error("Invalid thinblock received");
+        thinrelay.ClearAllBlockData(pfrom, pblock);
+        return error("Received an invalid xthin or thinblock from peer %s\n", pfrom->GetLogName());
     }
 
     // Is there a previous block or header to connect with?
@@ -140,6 +141,9 @@ bool CThinBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
     {
         thinrelay.ClearAllBlockData(pfrom, pblock);
 
+        // This is the only place where we ban a peer for having the incorrect merkleroot because the
+        // hashes provided in this thinblock must be the correct ones. (In other thintype block relay there
+        // may be instances where collisions are possibly a false positive and so we don't ban in those cases.)
         dosMan.Misbehaving(pfrom, 100);
         return error("Thinblock merkle root does not match computed merkle root, peer=%s", pfrom->GetLogName());
     }
@@ -149,7 +153,6 @@ bool CThinBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
         pblock->thinblock->mapMissingTx[tx.GetHash().GetCheapHash()] = MakeTransactionRef(tx);
 
     {
-        READLOCK(orphanpool.cs);
         int missingCount = 0;
         int unnecessaryCount = 0;
 
@@ -357,7 +360,6 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // Look for each transaction in our various pools and buffers.
     // With xThinBlocks the vTxHashes contains only the first 8 bytes of the tx hash.
     {
-        READLOCK(orphanpool.cs);
         if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, thinBlock->vTxHashes256, pblock))
             return false;
     }
@@ -492,7 +494,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
     CInv inv(MSG_BLOCK, thinBlock->header.GetHash());
     {
         // Message consistency checking (FIXME: some redundancy here with AcceptBlockHeader)
-        if (!IsThinBlockValid(pfrom, thinBlock->vMissingTx, thinBlock->header))
+        if (!IsThinBlockValid(pfrom, thinBlock->vMissingTx, thinBlock->header, thinBlock->vTxHashes.size()))
         {
             dosMan.Misbehaving(pfrom, 100);
             LOGA("Received an invalid %s from peer %s\n", strCommand, pfrom->GetLogName());
@@ -622,22 +624,29 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<
     bool fMerkleRootCorrect = true;
     {
         // Do the orphans first before taking the mempool.cs lock, so that we maintain correct locking order.
-        READLOCK(orphanpool.cs);
-        for (auto &mi : orphanpool.mapOrphanTransactions)
+        //
+        // We must keep the orphanpool lock during the period that we check the mempool hashes to prevent
+        // us from seeing a hash in the orphan pool that may have gotten into the mempool just after we
+        // released the orphan lock and before we took the mempool lock, which would show up as a false hash
+        // collision.
         {
-            uint64_t cheapHash = mi.first.GetCheapHash();
-            if (mapPartialTxHash.count(cheapHash)) // Check for collisions
-                _collision = true;
-            mapPartialTxHash[cheapHash] = mi.first;
-        }
+            READLOCK(orphanpool.cs);
+            for (auto &mi : orphanpool.mapOrphanTransactions)
+            {
+                uint64_t cheapHash = mi.first.GetCheapHash();
+                if (mapPartialTxHash.count(cheapHash)) // Check for collisions
+                    _collision = true;
+                mapPartialTxHash[cheapHash] = mi.first;
+            }
 
-        mempool.queryHashes(memPoolHashes);
-        for (uint64_t i = 0; i < memPoolHashes.size(); i++)
-        {
-            uint64_t cheapHash = memPoolHashes[i].GetCheapHash();
-            if (mapPartialTxHash.count(cheapHash)) // Check for collisions
-                _collision = true;
-            mapPartialTxHash[cheapHash] = memPoolHashes[i];
+            mempool.queryHashes(memPoolHashes);
+            for (uint64_t i = 0; i < memPoolHashes.size(); i++)
+            {
+                uint64_t cheapHash = memPoolHashes[i].GetCheapHash();
+                if (mapPartialTxHash.count(cheapHash)) // Check for collisions
+                    _collision = true;
+                mapPartialTxHash[cheapHash] = memPoolHashes[i];
+            }
         }
         for (auto &mi : thinBlock->mapMissingTx)
         {
@@ -765,8 +774,6 @@ static bool ReconstructBlock(CNode *pfrom,
     const std::vector<uint256> &vHashes,
     std::shared_ptr<CBlockThinRelay> pblock)
 {
-    AssertLockHeld(orphanpool.cs);
-
     // We must have all the full tx hashes by this point.  We first check for any duplicate
     // transaction ids.  This is a possible attack vector and has been used in the past.
     {
@@ -774,8 +781,6 @@ static bool ReconstructBlock(CNode *pfrom,
         if (setHashes.size() != vHashes.size())
         {
             thinrelay.ClearAllBlockData(pfrom, pblock);
-
-            dosMan.Misbehaving(pfrom, 10);
             return error("Duplicate transaction ids, peer=%s", pfrom->GetLogName());
         }
     }
@@ -816,22 +821,36 @@ static bool ReconstructBlock(CNode *pfrom,
                     inMemPool = true;
             }
 
-            bool inMissingTx = mapMissing.count(hash.GetCheapHash()) > 0;
-            bool inOrphanCache = orphanpool.mapOrphanTransactions.count(hash) > 0;
+            // Continue Checking
+            bool inMissingTx = false;
+            bool inOrphanCache = false;
+            if (!ptx)
+            {
+                std::map<uint64_t, CTransactionRef>::iterator iter1 = mapMissing.find(hash.GetCheapHash());
+                if (iter1 != mapMissing.end())
+                {
+                    inMissingTx = true;
+                    ptx = iter1->second;
+                }
+                else
+                {
+                    READLOCK(orphanpool.cs);
+                    std::map<uint256, CTxOrphanPool::COrphanTx>::iterator iter2 =
+                        orphanpool.mapOrphanTransactions.find(hash);
+                    if (iter2 != orphanpool.mapOrphanTransactions.end())
+                    {
+                        inOrphanCache = true;
+                        ptx = iter2->second.ptx;
+                    }
+                }
 
+                // XVal: these transactions still need to be verified since they were not in the mempool
+                // or CommitQ.
+                if (ptx)
+                    pblock->setUnVerifiedTxns.insert(hash);
+            }
             if (((inMemPool || inCommitQ) && inMissingTx) || (inOrphanCache && inMissingTx))
                 unnecessaryCount++;
-
-            if (inOrphanCache)
-            {
-                ptx = orphanpool.mapOrphanTransactions[hash].ptx;
-                pblock->setUnVerifiedTxns.insert(hash);
-            }
-            else if (inMissingTx)
-            {
-                ptx = mapMissing[hash.GetCheapHash()];
-                pblock->setUnVerifiedTxns.insert(hash);
-            }
         }
         if (!ptx)
             missingCount++;
@@ -1387,7 +1406,10 @@ void RequestThinBlock(CNode *pfrom, const uint256 &hash)
     }
 }
 
-bool IsThinBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissingTx, const CBlockHeader &header)
+bool IsThinBlockValid(CNode *pfrom,
+    const std::vector<CTransaction> &vMissingTx,
+    const CBlockHeader &header,
+    const uint64_t nHashes)
 {
     // Check that that there is at least one txn in the xthin and that the first txn is the coinbase
     if (vMissingTx.empty())
@@ -1400,6 +1422,12 @@ bool IsThinBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissingTx,
         return error("First txn is not coinbase for thinblock or xthinblock %s from peer %s",
             header.GetHash().ToString(), pfrom->GetLogName());
     }
+
+    // Check that we havn't exceeded the max allowable block size that would be reconstructed from this
+    // set of hashes
+    if (nHashes > (thinrelay.GetMaxAllowedBlockSize() / MIN_TX_SIZE))
+        return error("Number of hashes in thinblock or xthinblock would reconstruct a block greater than the block "
+                     "size limit\n");
 
     // check block header
     CValidationState state;

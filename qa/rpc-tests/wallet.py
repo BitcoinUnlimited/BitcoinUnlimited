@@ -284,16 +284,12 @@ class WalletTest (BitcoinTestFramework):
         try:
             txId  = self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), "1f-4")
         except JSONRPCException as e:
-            assert("Invalid amount" in e.error['message'])
+            assert("Error parsing JSON:1f-4" in e.error['message'])
         else:
             raise AssertionError("Must not parse invalid amounts")
 
-
-        try:
-            self.nodes[0].generate("2")
-            raise AssertionError("Must not accept strings as numeric")
-        except JSONRPCException as e:
-            assert("not an integer" in e.error['message'])
+        # this is now a valid call because we convert on server side instead of client side
+        self.nodes[0].generate("2")
 
         # Import address and private key to check correct behavior of spendable unspents
         # 1. Send some coins to generate new UTXO
@@ -446,9 +442,7 @@ class WalletTest (BitcoinTestFramework):
             wait_bitcoinds()
             self.node_args = [['-usehd=0', m], ['-usehd=0', m], ['-usehd=0', m]]
             self.nodes = start_nodes(3, self.options.tmpdir, self.node_args)
-            while m == '-reindex' and [block_count] * 3 != [self.nodes[i].getblockcount() for i in range(3)]:
-                # reindex will leave rpc warm up "early"; Wait for it to finish
-                time.sleep(0.1)
+            waitFor(60, lambda : [block_count] * 3 == [self.nodes[i].getblockcount() for i in range(3)])
             assert_equal(balance_nodes, [self.nodes[i].getbalance() for i in range(3)])
 
         # Exercise listsinceblock with the last two blocks

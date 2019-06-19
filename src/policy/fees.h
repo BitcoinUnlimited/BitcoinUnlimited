@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #ifndef BITCOIN_POLICYESTIMATOR_H
@@ -276,7 +277,7 @@ private:
         TxConfirmStats *stats;
         unsigned int blockHeight;
         unsigned int bucketIndex;
-        TxStatsInfo() : stats(NULL), blockHeight(0), bucketIndex(0) {}
+        TxStatsInfo() : stats(nullptr), blockHeight(0), bucketIndex(0) {}
     };
 
     // map of txids to information about that transaction

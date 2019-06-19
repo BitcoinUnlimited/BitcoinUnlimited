@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -21,6 +21,7 @@
 #include "rpc/client.h"
 #include "rpc/server.h"
 #include "util.h"
+#include "validation/validation.h"
 
 #include <openssl/crypto.h>
 
@@ -56,7 +57,7 @@ const struct
     const char *url;
     const char *source;
 } ICON_MAPPING[] = {{"cmd-request", ":/icons/tx_input"}, {"cmd-reply", ":/icons/tx_output"},
-    {"cmd-error", ":/icons/tx_output"}, {"misc", ":/icons/tx_inout"}, {NULL, NULL}};
+    {"cmd-error", ":/icons/tx_output"}, {"misc", ":/icons/tx_inout"}, {nullptr, nullptr}};
 
 /* Object for executing console RPC commands in a separate thread.
 */
@@ -226,8 +227,13 @@ void RPCExecutor::request(const QString &command)
         std::string strPrint;
         // Convert argument list to JSON objects in method-dependent way,
         // and pass it along with the method name to the dispatcher.
-        UniValue result = tableRPC.execute(
-            args[0], RPCConvertValues(args[0], std::vector<std::string>(args.begin() + 1, args.end())));
+        UniValue params(UniValue::VARR);
+        for (unsigned int idx = 1; idx < args.size(); idx++)
+        {
+            const std::string &strVal = args[idx];
+            params.push_back(strVal);
+        }
+        UniValue result = tableRPC.execute(args[0], params);
 
         // Format result reply
         if (result.isNull())
@@ -384,7 +390,7 @@ void RPCConsole::setClientModel(ClientModel *model)
         setNumConnections(model->getNumConnections());
         connect(model, SIGNAL(numConnectionsChanged(int)), this, SLOT(setNumConnections(int)));
 
-        setNumBlocks(model->getNumBlocks(), model->getLastBlockDate(), model->getVerificationProgress(NULL));
+        setNumBlocks(model->getNumBlocks(), model->getLastBlockDate(), model->getVerificationProgress(nullptr));
         connect(
             model, SIGNAL(numBlocksChanged(int, QDateTime, double)), this, SLOT(setNumBlocks(int, QDateTime, double)));
         connect(model, SIGNAL(timeSinceLastBlockChanged(qint64)), this, SLOT(updateTimeSinceLastBlock(qint64)));
@@ -487,7 +493,6 @@ void RPCConsole::setClientModel(ClientModel *model)
         // Provide initial values
         ui->clientVersion->setText(model->formatFullVersion());
         ui->clientUserAgent->setText(model->formatSubVersion());
-        ui->clientName->setText(model->clientName());
         ui->dataDir->setText(model->dataDir());
         ui->startupTime->setText(model->formatClientStartupTime());
         ui->networkName->setText(QString::fromStdString(Params().NetworkIDString()));
@@ -631,6 +636,14 @@ void RPCConsole::setNumBlocks(int count, const QDateTime &blockDate, double nVer
 {
     ui->numberOfBlocks->setText(QString::number(count));
     ui->lastBlockTime->setText(blockDate.toString(time_format));
+
+    ui->lastBlockSize->setText(QString::number(nBlockSizeAtChainTip.load()));
+    if (nBlockSizeAtChainTip.load() == 0)
+        ui->lastBlockSize->setText("N/A");
+    else if (nBlockSizeAtChainTip.load() < 1000000)
+        ui->lastBlockSize->setText(QString::number(nBlockSizeAtChainTip.load() / 1000.0, 'f', 2) + " KB");
+    else
+        ui->lastBlockSize->setText(QString::number(nBlockSizeAtChainTip.load() / 1000000.0, 'f', 2) + " MB");
 }
 
 void RPCConsole::updateTimeSinceLastBlock(qint64 lastBlockTime)
@@ -875,7 +888,7 @@ void RPCConsole::peerLayoutChanged()
     if (!clientModel || !clientModel->getPeerTableModel())
         return;
 
-    const CNodeCombinedStats *stats = NULL;
+    const CNodeCombinedStats *stats = nullptr;
     bool fUnselect = false;
     bool fReselect = false;
 
@@ -986,6 +999,10 @@ void RPCConsole::updateNodeDetail(const CNodeCombinedStats *stats)
 void RPCConsole::resizeEvent(QResizeEvent *event) { QWidget::resizeEvent(event); }
 void RPCConsole::showEvent(QShowEvent *event)
 {
+    // restore column state
+    GUIUtil::restoreColumnConfiguration("nPeersTable", ui->peerWidget->horizontalHeader());
+    GUIUtil::restoreColumnConfiguration("nBannedPeersTable", ui->banlistWidget->horizontalHeader());
+
     QWidget::showEvent(event);
 
     if (!clientModel || !clientModel->getPeerTableModel())
@@ -1004,6 +1021,10 @@ void RPCConsole::hideEvent(QHideEvent *event)
 
     // stop PeerTableModel auto refresh
     clientModel->getPeerTableModel()->stopAutoRefresh();
+
+    // save column state
+    GUIUtil::saveColumnConfiguration("nPeersTable", ui->peerWidget->horizontalHeader());
+    GUIUtil::saveColumnConfiguration("nBannedPeersTable", ui->banlistWidget->horizontalHeader());
 }
 
 void RPCConsole::showPeersTableContextMenu(const QPoint &point)

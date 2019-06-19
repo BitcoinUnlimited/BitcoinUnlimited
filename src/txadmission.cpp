@@ -1,4 +1,4 @@
-// Copyright (c) 2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,7 +10,7 @@
 #include "dosman.h"
 #include "fastfilter.h"
 #include "init.h"
-#include "main.h" // for cs_main
+#include "main.h"
 #include "net.h"
 #include "parallel.h"
 #include "requestManager.h"
@@ -334,7 +334,7 @@ void CommitTxToMempool()
         while (!txDeferQ.empty())
         {
             const uint256 &hash = txDeferQ.front().tx->GetHash();
-            mapWasDeferred.insert(std::pair<uint256, CTxInputData>(hash, txDeferQ.front()));
+            mapWasDeferred.emplace(hash, txDeferQ.front());
 
             txDeferQ.pop();
         }
@@ -619,20 +619,16 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         return state.DoS(0, false, REJECT_NONSTANDARD, reason);
     }
 
-    const uint32_t cds_flag = (AreWeOnBCHChain() && IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip())) ?
-                                  SCRIPT_ENABLE_CHECKDATASIG :
-                                  0;
+    const uint32_t cds_flag =
+        (IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip())) ? SCRIPT_ENABLE_CHECKDATASIG : 0;
     const uint32_t schnorrflag =
-        (AreWeOnBCHChain() && IsMay2019Enabled(chainparams.GetConsensus(), chainActive.Tip())) ? SCRIPT_ENABLE_SCHNORR :
-                                                                                                 0;
+        (IsMay2019Activated(chainparams.GetConsensus(), chainActive.Tip())) ? SCRIPT_ENABLE_SCHNORR : 0;
     const uint32_t segwit_flag =
-        (AreWeOnBCHChain() && IsMay2019Enabled(chainparams.GetConsensus(), chainActive.Tip()) && !fRequireStandard) ?
+        (IsMay2019Activated(chainparams.GetConsensus(), chainActive.Tip()) && !fRequireStandard) ?
             SCRIPT_ALLOW_SEGWIT_RECOVERY :
             0;
-    const uint32_t svflag = (AreWeOnSVChain() && IsSv2018Activated(chainparams.GetConsensus(), chainActive.Tip())) ?
-                                SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES :
-                                0;
-    const uint32_t featureFlags = cds_flag | schnorrflag | segwit_flag | svflag;
+
+    const uint32_t featureFlags = cds_flag | schnorrflag | segwit_flag;
     const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;
 
     // Only accept nLockTime-using transactions that can be mined in the next
@@ -647,7 +643,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     }
 
     // Make sure tx size is acceptable after Nov 15, 2018 fork
-    if (AreWeOnBCHChain() && IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip()))
+    if (IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip()))
     {
         if (tx->GetTxSize() < MIN_TX_SIZE)
             return state.DoS(0, false, REJECT_INVALID, "txn-undersize");
@@ -737,8 +733,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         if (fRequireStandard && !AreInputsStandard(tx, view))
             return state.Invalid(false, REJECT_NONSTANDARD, "bad-txns-nonstandard-inputs");
 
-        nSigOps = GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
-        nSigOps += GetP2SHSigOpCount(tx, view, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+        nSigOps = GetLegacySigOpCount(tx, STANDARD_SCRIPT_VERIFY_FLAGS);
+        nSigOps += GetP2SHSigOpCount(tx, view, STANDARD_SCRIPT_VERIFY_FLAGS);
 
         CAmount nValueOut = tx->GetValueOut();
         CAmount nFees = nValueIn - nValueOut;
@@ -763,11 +759,10 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
         }
 
-        CTxCommitData eData; // TODO awkward construction in these 4 lines
-        CTxMemPoolEntry entryTemp(tx, nFees, GetTime(), dPriority, chainActive.Height(), pool.HasNoInputsOf(*tx),
+        // Create a commit data entry
+        CTxMemPoolEntry entry(tx, nFees, GetTime(), dPriority, chainActive.Height(), pool.HasNoInputsOf(*tx),
             inChainInputValue, fSpendsCoinbase, nSigOps, lp);
-        eData.entry = entryTemp;
-        CTxMemPoolEntry &entry(eData.entry);
+
         nSize = entry.GetTxSize();
 
         // Check that the transaction doesn't have an excessive number of
@@ -797,6 +792,9 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
          * be annoying or make others' transactions take longer to confirm. */
         // maximum nMinRelay in satoshi per byte
         static const int nLimitFreeRelay = GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY);
+        // In case nLimitFreeRelay is defined less than the DEFAULT_MIN_LIMITFREERELAY we have to use the lower value
+        static const int nMinLimitFreeRelay = std::min((int)DEFAULT_MIN_LIMITFREERELAY, nLimitFreeRelay);
+
 
         // get current memory pool size
         uint64_t poolBytes = pool.GetTotalTxSize();
@@ -836,8 +834,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
 
             // When the mempool starts falling use an exponentially decaying ~24 hour window:
-            // nFreeLimit = nFreeLimit + ((double)(DEFAULT_LIMIT_FREE_RELAY - nFreeLimit) / pow(1.0 - 1.0/86400,
-            // (double)(nNow - nLastTime)));
             nFreeLimit /= std::pow(1.0 - 1.0 / 86400, (double)(nNow - nLastTime));
 
             // When the mempool starts falling use an exponentially decaying ~24 hour window:
@@ -857,26 +853,27 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                     _dMinLimiterTxFee + ((_dMaxLimiterTxFee - _dMinLimiterTxFee) * (poolBytes - nLargestBlockSeen) /
                                             (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1))));
 
-                // Gradually choke off the nFreeLimit as well but leave at least DEFAULT_MIN_LIMITFREERELAY
+                // Gradually choke off the nFreeLimit as well but leave at least nMinLimitFreeRelay
                 // So that some free transactions can still get through
                 nFreeLimit = std::min(
-                    nFreeLimit, ((double)nLimitFreeRelay - ((double)(nLimitFreeRelay - DEFAULT_MIN_LIMITFREERELAY) *
+                    nFreeLimit, ((double)nLimitFreeRelay - ((double)(nLimitFreeRelay - nMinLimitFreeRelay) *
                                                                (double)(poolBytes - nLargestBlockSeen) /
                                                                (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1)))));
-                if (nFreeLimit < DEFAULT_MIN_LIMITFREERELAY)
-                    nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
+                if (nFreeLimit < nMinLimitFreeRelay)
+                    nFreeLimit = nMinLimitFreeRelay;
             }
             else
             {
                 nMinRelay = _dMaxLimiterTxFee;
-                nFreeLimit = DEFAULT_MIN_LIMITFREERELAY;
+                nFreeLimit = nMinLimitFreeRelay;
             }
 
             minRelayTxFee = CFeeRate(nMinRelay * 1000);
             LOG(MEMPOOL, "MempoolBytes:%d  LimitFreeRelay:%.5g  nMinRelay:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d  "
                          "TxFees:%d\n",
                 poolBytes, nFreeLimit, nMinRelay, ((double)nFees) / nSize, nSize, nFees);
-            if (fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize))
+            if ((fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize)) ||
+                (nLimitFreeRelay == 0 && nFees < ::minRelayTxFee.GetFee(nSize)))
             {
                 static double dFreeCount = 0;
 
@@ -907,7 +904,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             return state.Invalid(false, REJECT_HIGHFEE, "absurdly-high-fee",
                 strprintf("%d > %d", nFees, std::max((int64_t)1L, maxTxFee.Value()) * 10000));
 
-        eData.hash = hash;
         // Calculate in-mempool ancestors, up to a limit.
         size_t nLimitAncestors = GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
         size_t nLimitAncestorSize = GetArg("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
@@ -921,7 +917,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         if (!CheckInputs(
                 tx, state, view, true, flags, maxScriptOps.Value(), true, &resourceTracker, nullptr, &sighashType))
         {
-            LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", tx->GetHash().ToString().c_str());
+            LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", hash.ToString());
             if (state.GetDebugMessage() == "")
                 state.SetDebugMessage("CheckInputs failed");
             return false;
@@ -978,9 +974,14 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
         }
 
+        // Add entry to the commit queue
         {
+            CTxCommitData eData;
+            eData.entry = std::move(entry);
+            eData.hash = hash;
+
             boost::unique_lock<boost::mutex> lock(csCommitQ);
-            (*txCommitQ)[eData.hash] = eData;
+            (*txCommitQ).emplace(eData.hash, eData);
         }
     }
     uint64_t interval = (GetStopwatch() - start) / 1000;
@@ -1017,9 +1018,9 @@ TransactionClass ParseTransactionClass(const std::string &s)
 
 void ProcessOrphans(std::vector<uint256> &vWorkQueue)
 {
-    std::vector<uint256> vEraseQueue;
-
-    // Recursively process any orphan transactions that depended on this one
+    // Recursively process any orphan transactions that depended on this one.
+    // NOTE: you must not return early since EraseOrphansByTime() must always be checked
+    std::map<uint256, CTxInputData> mapEnqueue;
     {
         READLOCK(orphanpool.cs);
         std::set<NodeId> setMisbehaving;
@@ -1037,39 +1038,46 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
                 // we always erase orphans and any mapOrphanTransactionsByPrev at the same time, still we need to
                 // be sure.
                 bool fOk = true;
-                DbgAssert(orphanpool.mapOrphanTransactions.count(orphanHash), fOk = false);
+                std::map<uint256, CTxOrphanPool::COrphanTx>::iterator iter =
+                    orphanpool.mapOrphanTransactions.find(orphanHash);
+                DbgAssert(iter != orphanpool.mapOrphanTransactions.end(), fOk = false);
                 if (!fOk)
                     continue;
 
-                const CTransactionRef &orphanTx = orphanpool.mapOrphanTransactions[orphanHash].ptx;
-                NodeId fromPeer = orphanpool.mapOrphanTransactions[orphanHash].fromPeer;
                 // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan
                 // resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get
                 // anyone relaying LegitTxX banned)
                 CValidationState stateDummy;
 
-                if (setMisbehaving.count(fromPeer))
+                if (setMisbehaving.count(iter->second.fromPeer))
                     continue;
                 {
                     CTxInputData txd;
-                    txd.tx = orphanTx;
-                    txd.nodeId = fromPeer;
+                    txd.tx = iter->second.ptx;
+                    txd.nodeId = iter->second.fromPeer;
                     txd.nodeName = "orphan";
-                    LOG(MEMPOOL, "Resubmitting orphan tx: %s\n", orphanTx->GetHash().ToString().c_str());
-                    EnqueueTxForAdmission(txd);
+                    LOG(MEMPOOL, "Resubmitting orphan tx: %s\n", orphanHash.ToString());
+                    mapEnqueue.emplace(std::move(orphanHash), std::move(txd));
                 }
-                vEraseQueue.push_back(orphanHash);
             }
         }
     }
 
+    // First delete the orphans before enqueuing them otherwise we may end up putting them
+    // in the queue twice.
     {
         WRITELOCK(orphanpool.cs);
-        for (auto hash : vEraseQueue)
-            orphanpool.EraseOrphanTx(hash);
-        //  BU: Xtreme thinblocks - purge orphans that are too old
+        for (auto it = mapEnqueue.begin(); it != mapEnqueue.end(); it++)
+        {
+            // If the orphan was not erased then it must already have been erased/enqueued by another thread
+            // so do not enqueue this orphan again.
+            if (!orphanpool.EraseOrphanTx(it->first))
+                it = mapEnqueue.erase(it);
+        }
         orphanpool.EraseOrphansByTime();
     }
+    for (auto &it : mapEnqueue)
+        EnqueueTxForAdmission(it.second);
 }
 
 

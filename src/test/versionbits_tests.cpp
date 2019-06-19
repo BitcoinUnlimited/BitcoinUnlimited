@@ -1,5 +1,5 @@
 // Copyright (c) 2014-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -83,7 +83,7 @@ public:
         {
             CBlockIndex *pindex = new CBlockIndex();
             pindex->nHeight = vpblock.size();
-            pindex->pprev = vpblock.size() > 0 ? vpblock.back() : NULL;
+            pindex->pprev = vpblock.size() > 0 ? vpblock.back() : nullptr;
             pindex->nTime = nTime;
             pindex->nVersion = nVersion;
             pindex->BuildSkip();
@@ -99,7 +99,7 @@ public:
             if ((insecure_rand() & ((1 << i) - 1)) == 0)
             {
                 BOOST_CHECK_MESSAGE(
-                    checker[i].GetStateFor(vpblock.empty() ? NULL : vpblock.back()) == THRESHOLD_DEFINED,
+                    checker[i].GetStateFor(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_DEFINED,
                     strprintf("Test %i for DEFINED", num));
             }
         }
@@ -114,7 +114,7 @@ public:
             if ((insecure_rand() & ((1 << i) - 1)) == 0)
             {
                 BOOST_CHECK_MESSAGE(
-                    checker[i].GetStateFor(vpblock.empty() ? NULL : vpblock.back()) == THRESHOLD_STARTED,
+                    checker[i].GetStateFor(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_STARTED,
                     strprintf("Test %i for STARTED", num));
             }
         }
@@ -129,7 +129,7 @@ public:
             if ((insecure_rand() & ((1 << i) - 1)) == 0)
             {
                 BOOST_CHECK_MESSAGE(
-                    checker[i].GetStateFor(vpblock.empty() ? NULL : vpblock.back()) == THRESHOLD_LOCKED_IN,
+                    checker[i].GetStateFor(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_LOCKED_IN,
                     strprintf("Test %i for LOCKED_IN", num));
             }
         }
@@ -143,7 +143,8 @@ public:
         {
             if ((insecure_rand() & ((1 << i) - 1)) == 0)
             {
-                BOOST_CHECK_MESSAGE(checker[i].GetStateFor(vpblock.empty() ? NULL : vpblock.back()) == THRESHOLD_ACTIVE,
+                BOOST_CHECK_MESSAGE(
+                    checker[i].GetStateFor(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_ACTIVE,
                     strprintf("Test %i for ACTIVE", num));
             }
         }
@@ -157,7 +158,8 @@ public:
         {
             if ((insecure_rand() & ((1 << i) - 1)) == 0)
             {
-                BOOST_CHECK_MESSAGE(checker[i].GetStateFor(vpblock.empty() ? NULL : vpblock.back()) == THRESHOLD_FAILED,
+                BOOST_CHECK_MESSAGE(
+                    checker[i].GetStateFor(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_FAILED,
                     strprintf("Test %i for FAILED", num));
             }
         }
@@ -165,7 +167,7 @@ public:
         return *this;
     }
 
-    CBlockIndex *Tip() { return vpblock.size() ? vpblock.back() : NULL; }
+    CBlockIndex *Tip() { return vpblock.size() ? vpblock.back() : nullptr; }
 };
 
 BOOST_FIXTURE_TEST_SUITE(versionbits_tests, TestingSetup)
@@ -335,7 +337,7 @@ BOOST_AUTO_TEST_CASE(versionbits_computeblockversion)
 
     // Before MedianTimePast of the chain has crossed nStartTime, the bit
     // should not be set.
-    CBlockIndex *lastBlock = NULL;
+    CBlockIndex *lastBlock = nullptr;
     lastBlock = firstChain.Mine(2016, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
     BOOST_CHECK_EQUAL(ComputeBlockVersion(lastBlock, mainnetParams) & (1 << bit), 0);
 

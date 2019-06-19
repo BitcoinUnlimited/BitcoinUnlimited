@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -55,7 +55,7 @@ public:
     CNode *node;
     CNodeRequestData(CNode *);
 
-    CNodeRequestData() : requestCount(0), desirability(0), node(NULL) {}
+    CNodeRequestData() : requestCount(0), desirability(0), node(nullptr) {}
     void clear(void)
     {
         requestCount = 0;
@@ -156,6 +156,10 @@ protected:
 public:
     CRequestManager();
 
+    // Cleanup stops all request manager activity, aborts all current requests, and releases all node references
+    // in preparation for shutdown
+    void Cleanup();
+
     // How many outbound nodes are we connected to.
     std::atomic<int32_t> nOutbound;
 
@@ -192,6 +196,9 @@ public:
 
     // Indicate that we are processing this block
     void ProcessingBlock(const uint256 &hash, CNode *pfrom);
+
+    // Indicate that the block failed initial acceptance
+    void BlockRejected(const CInv &obj, CNode *pfrom);
 
     // Indicate that we got this object
     void Received(const CInv &obj, CNode *pfrom);

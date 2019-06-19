@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -61,7 +61,7 @@ unsigned int blkReqRetryInterval = MIN_BLK_REQUEST_RETRY_INTERVAL;
 extern bool CanDirectFetch(const Consensus::Params &consensusParams);
 
 /** Find the last common ancestor two blocks have.
- *  Both pa and pb must be non-NULL. */
+ *  Both pa and pb must be non-nullptr. */
 static CBlockIndex *LastCommonAncestor(CBlockIndex *pa, CBlockIndex *pb)
 {
     if (pa->nHeight > pb->nHeight)
@@ -105,6 +105,28 @@ CRequestManager::CRequestManager()
     sendBlkIter = mapBlkInfo.end();
 }
 
+void CRequestManager::Cleanup()
+{
+    LOCK(cs_objDownloader);
+    sendIter = mapTxnInfo.end();
+    sendBlkIter = mapBlkInfo.end();
+    MapBlocksInFlightClear();
+    OdMap::iterator i = mapTxnInfo.begin();
+    while (i != mapTxnInfo.end())
+    {
+        auto prev = i;
+        ++i;
+        cleanup(prev); // cleanup erases which is why I need to advance the iterator first
+    }
+
+    i = mapBlkInfo.begin();
+    while (i != mapBlkInfo.end())
+    {
+        auto prev = i;
+        ++i;
+        cleanup(prev); // cleanup erases which is why I need to advance the iterator first
+    }
+}
 
 void CRequestManager::cleanup(OdMap::iterator &itemIt)
 {
@@ -311,6 +333,20 @@ void CRequestManager::ProcessingBlock(const uint256 &hash, CNode *pfrom)
     item->second.fProcessing = true;
     LOG(BLK, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
         pfrom ? pfrom->GetLogName() : "unknown");
+}
+// This block has failed to be accepted so in case this is some sort of attack block
+// we need to set the fProcessing flag back to false.
+//
+// We don't have to remove the source because it would have already been removed if/when we
+// requested the block and if this was an unsolicited block or attack block then the source
+// would never have been added to the request manager.
+void CRequestManager::BlockRejected(const CInv &obj, CNode *pfrom)
+{
+    LOCK(cs_objDownloader);
+    OdMap::iterator item = mapBlkInfo.find(obj.hash);
+    if (item == mapBlkInfo.end())
+        return;
+    item->second.fProcessing = false;
 }
 
 // Indicate that we got this object.

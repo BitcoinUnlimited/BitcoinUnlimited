@@ -1,4 +1,4 @@
-// Copyright (c) 2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -41,9 +41,21 @@ void ThinTypeRelay::RemovePeers(CNode *pfrom)
         if (pfrom->fSupportsCompactBlocks)
             nCompactBlockPeers--;
 
-        DbgAssert(nThinBlockPeers >= 0, nThinBlockPeers = 0);
-        DbgAssert(nGraphenePeers >= 0, nGraphenePeers = 0);
-        DbgAssert(nCompactBlockPeers >= 0, nCompactBlockPeers = 0);
+        if (nThinBlockPeers < 0)
+        {
+            nThinBlockPeers = 0;
+            LOG(THIN | GRAPHENE | CMPCT, "WARNING: nThinBlockPeers was less than zero");
+        }
+        if (nGraphenePeers < 0)
+        {
+            nGraphenePeers = 0;
+            LOG(THIN | GRAPHENE | CMPCT, "WARNING: nGraphenePeers was less than zero");
+        }
+        if (nCompactBlockPeers < 0)
+        {
+            nCompactBlockPeers = 0;
+            LOG(THIN | GRAPHENE | CMPCT, "WARNING: nCompactBlockPeers was less than zero");
+        }
     }
 }
 
@@ -210,6 +222,18 @@ void ThinTypeRelay::ClearBlockInFlight(CNode *pfrom, const uint256 &hash)
     }
 }
 
+void ThinTypeRelay::ClearAllBlocksInFlight(NodeId id)
+{
+    LOCK(cs_inflight);
+    std::pair<std::multimap<const NodeId, CThinTypeBlockInFlight>::iterator,
+        std::multimap<const NodeId, CThinTypeBlockInFlight>::iterator>
+        range = mapThinTypeBlocksInFlight.equal_range(id);
+    while (range.first != range.second)
+    {
+        range.first = mapThinTypeBlocksInFlight.erase(range.first);
+    }
+}
+
 void ThinTypeRelay::CheckForDownloadTimeout(CNode *pfrom)
 {
     LOCK(cs_inflight);
@@ -261,7 +285,7 @@ std::shared_ptr<CBlockThinRelay> ThinTypeRelay::SetBlockToReconstruct(CNode *pfr
     // Otherwise, start with a fresh instance.
     else
     {
-        ClearBlockToReconstruct(pfrom);
+        ClearBlockToReconstruct(pfrom->GetId());
 
         // Store and empty block which can be used later
         std::shared_ptr<CBlockThinRelay> pblock;
@@ -293,10 +317,10 @@ std::shared_ptr<CBlockThinRelay> ThinTypeRelay::GetBlockToReconstruct(CNode *pfr
         return nullptr;
 }
 
-void ThinTypeRelay::ClearBlockToReconstruct(CNode *pfrom)
+void ThinTypeRelay::ClearBlockToReconstruct(NodeId id)
 {
     LOCK(cs_reconstruct);
-    mapBlocksReconstruct.erase(pfrom->GetId());
+    mapBlocksReconstruct.erase(id);
 }
 
 void ThinTypeRelay::AddBlockBytes(uint64_t bytes, std::shared_ptr<CBlockThinRelay> pblock)
@@ -309,8 +333,10 @@ void ThinTypeRelay::ClearAllBlockData(CNode *pnode, std::shared_ptr<CBlockThinRe
 {
     // We must make sure to clear the block data first before clearing the thinblock in flight.
     uint256 hash = pblock->GetBlockHeader().GetHash();
-    ClearBlockToReconstruct(pnode);
-    if (pblock != nullptr)
+    ClearBlockToReconstruct(pnode->GetId());
+
+    // Clear block data
+    if (pblock)
         pblock->SetNull();
 
     // Now clear the block in flight.

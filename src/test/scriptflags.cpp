@@ -1,5 +1,6 @@
 // Copyright (c) 2017 The Bitcoin developers
 // Copyright (c) 2018 The Bitcoin SV developers
+// Copyright (c) 2017-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -36,8 +37,7 @@ static std::map<std::string, uint32_t> mapFlagNames =
     {"REPLAY_PROTECTION", SCRIPT_ENABLE_REPLAY_PROTECTION},
     {"CHECKDATASIG", SCRIPT_ENABLE_CHECKDATASIG},
     {"SCHNORR", SCRIPT_ENABLE_SCHNORR},
-    {"ALLOW_SEGWIT_RECOVERY", SCRIPT_ALLOW_SEGWIT_RECOVERY},
-    {"MUL_SHIFT_INV", SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES}
+    {"ALLOW_SEGWIT_RECOVERY", SCRIPT_ALLOW_SEGWIT_RECOVERY}
 };
 // clang-format on
 

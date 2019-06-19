@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -111,7 +111,9 @@ enum
     // https:
     SCRIPT_ENABLE_REPLAY_PROTECTION = (1U << 17),
 
-    // Is OP_CHECKDATASIG and variant are enabled.
+    // Count sigops for OP_CHECKDATASIG and variant. The interpreter treats
+    // OP_CHECKDATASIG(VERIFY) as always valid, this flag only affects sigops
+    // counting.
     //
     SCRIPT_ENABLE_CHECKDATASIG = (1U << 18),
 
@@ -122,9 +124,6 @@ enum
 
     // Allows the recovery of coins sent to p2sh segwit addresses
     SCRIPT_ALLOW_SEGWIT_RECOVERY = (1U << 20),
-
-    // Are OP_INVERT, OP_MUL, OP_LSHIFT, OP_RSHIFT enabled?
-    SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES = (1U << 21),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);
@@ -149,7 +148,7 @@ uint256 SignatureHash(const CScript &scriptCode,
     unsigned int nIn,
     uint32_t nHashType,
     const CAmount &amount,
-    size_t *nHashedOut = NULL);
+    size_t *nHashedOut = nullptr);
 
 class BaseSignatureChecker
 {
@@ -340,15 +339,15 @@ bool EvalScript(std::vector<std::vector<unsigned char> > &stack,
     unsigned int flags,
     unsigned int maxOps,
     const BaseSignatureChecker &checker,
-    ScriptError *error = NULL,
-    unsigned char *sighashtype = NULL);
+    ScriptError *error = nullptr,
+    unsigned char *sighashtype = nullptr);
 bool VerifyScript(const CScript &scriptSig,
     const CScript &scriptPubKey,
     unsigned int flags,
     unsigned int maxOps,
     const BaseSignatureChecker &checker,
-    ScriptError *error = NULL,
-    unsigned char *sighashtype = NULL);
+    ScriptError *error = nullptr,
+    unsigned char *sighashtype = nullptr);
 
 // string prefixed to data when validating signed messages via RPC call.  This ensures
 // that the signature was intended for use on this blockchain.
