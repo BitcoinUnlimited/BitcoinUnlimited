@@ -1,7 +1,7 @@
 Gitian build
 ============
 
-This guide takes for granted that you are using Ubuntu Bionic 18.04 as host OS. the aim of the document is to be able to produce deterministic binaries using gitian-tools and docker containers.
+This guide takes for granted that you are using Ubuntu Bionic 18.04 as host OS. The aim of the document is to be able to produce deterministic binaries using gitian-tools and docker containers.
 
 
 Prerequisite
