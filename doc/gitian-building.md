@@ -1,7 +1,7 @@
 Gitian build
 ============
 
-This is guide take for granted that you are using Ubuntu bionic 18.04 as host OS. the aim of the document is to be able to produce deterministic binaries using gitian-tools and docker containers.
+This guide takes for granted that you are using Ubuntu Bionic 18.04 as host OS. the aim of the document is to be able to produce deterministic binaries using gitian-tools and docker containers.
 
 
 Prerequisite
@@ -23,7 +23,7 @@ bin/make-base-vm --suite bionic --arch amd64 --docker
 Build the binaries
 ------------------
 
-These are the commands to actually roduce the executable:
+These are the commands to actually produce the executable:
 
 ```bash
 cd ~/src/gitian-builder
