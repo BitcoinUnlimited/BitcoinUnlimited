@@ -2,8 +2,6 @@ Gitian build
 ============
 
 This guide takes for granted that you are using Ubuntu Bionic 18.04 as host OS. The aim of the document is to be able to produce deterministic binaries using gitian-tools and docker containers.
-=======
-
 
 Prerequisite
 -------------
@@ -14,6 +12,7 @@ These are steps that as to be executed once and that don't need to be repeated f
 sudo apt install git apt-cacher-ng ruby docker.io
 sudo usermod -a -G docker $USER
 exec su -l $USER  #make effective the usermod command
+mkdir -p ~/src
 cd ~/src
 git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git
 git clone https://github.com/devrandom/gitian-builder.git
