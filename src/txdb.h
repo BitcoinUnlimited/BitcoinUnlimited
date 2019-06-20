@@ -23,6 +23,9 @@ class uint256;
 
 static const bool DEFAULT_TXINDEX = false;
 
+//! The max allowed size of the in memory UTXO cache which can also be dynamically adjusted
+//! (if it has been configured) based on the current availability of memory.
+extern std::atomic<int64_t> nCoinCacheMaxSize;
 //! -dbcache default (MiB)
 static const int64_t nDefaultDbCache = 500;
 //! max. -dbcache in (MiB)
@@ -63,7 +66,6 @@ void GetCacheConfiguration(int64_t &_nBlockDBCache,
     int64_t &_nBlockUndoDBcache,
     int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
-    int64_t &_nCoinCacheMaxSize,
     bool fDefault = false);
 /** Calculate the various cache sizes. This is primarily used in GetCacheConfiguration() however during
  *  dynamic sizing of the coins cache we also need to use this function directly.
@@ -72,8 +74,7 @@ void CacheSizeCalculations(int64_t _nTotalCache,
     int64_t &_nBlockDBCache,
     int64_t &_nBlockUndoDBcache,
     int64_t &_nBlockTreeDBCache,
-    int64_t &_nCoinDBCache,
-    int64_t &_nCoinCacheMaxSize);
+    int64_t &_nCoinDBCache);
 /** This function is called during FlushStateToDisk.  The coins cache is dynamically sized before any
  *  checking is done for cache flushing and trimming
  */
