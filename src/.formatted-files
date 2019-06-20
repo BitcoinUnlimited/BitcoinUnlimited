@@ -313,6 +313,7 @@ test/compress_tests.cpp
 test/crypto_tests.cpp
 test/dbwrapper_tests.cpp
 test/DoS_tests.cpp
+test/electrs_tests.cpp
 test/electrumrpcinfo_tests.cpp
 test/electrumserver_tests.cpp
 test/excessiveblock_test.cpp

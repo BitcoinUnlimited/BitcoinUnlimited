@@ -14,6 +14,21 @@
 
 static std::string monitoring_port() { return GetArg("-electrum.monitoring.port", "4224"); }
 static std::string monitoring_host() { return GetArg("-electrum.monitoring.host", "127.0.0.1"); }
+static std::string rpc_host() { return GetArg("-electrum.host", "127.0.0.1"); }
+static std::string rpc_port(const std::string &network)
+{
+    std::map<std::string, std::string> portmap = {{"main", "50001"}, {"test", "60001"}, {"regtest", "60401"}};
+
+    auto defaultPort = portmap.find(network);
+    if (defaultPort == end(portmap))
+    {
+        std::stringstream ss;
+        ss << "Electrum server does not support '" << network << "' network.";
+        throw std::invalid_argument(ss.str());
+    }
+
+    return GetArg("-electrum.port", defaultPort->second);
+}
 namespace electrum
 {
 std::string electrs_path()
@@ -58,12 +73,7 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
         args.push_back(ss.str());
     }
 
-    const std::string electrumport = GetArg("-electrum.port", "DEFAULT");
-    if (electrumport != "DEFAULT")
-    {
-        const std::string host = GetArg("-electrum.host", "127.0.0.1");
-        args.push_back("--electrum-rpc-addr=" + host + ":" + electrumport);
-    }
+    args.push_back("--electrum-rpc-addr=" + rpc_host() + ":" + rpc_port(network));
 
     // bitcoind data dir (for cookie file)
     args.push_back("--daemon-dir=" + GetDataDir(false).string());
