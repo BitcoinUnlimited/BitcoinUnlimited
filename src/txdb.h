@@ -53,24 +53,28 @@ static const int64_t nMaxBlockDBCache = 2;
 uint64_t GetAvailableMemory();
 /** Get the total physical memory */
 uint64_t GetTotalSystemMemory();
+
+struct CacheConfig
+{
+    int64_t nBlockDBCache;
+    int64_t nBlockUndoDBCache;
+    int64_t nBlockTreeDBCache;
+    int64_t nTxIndexCache;
+    int64_t nCoinDBCache;
+
+    CacheConfig() : nBlockDBCache(0), nBlockUndoDBCache(0), nBlockTreeDBCache(0), nTxIndexCache(0), nCoinDBCache(0) {}
+};
+
 /** Get the sizes for each of the caches. This is done during init.cpp on startup but also
  *  later, during dynamic sizing of the coins cache, when need to know the initial startup values.
  */
-void GetCacheConfiguration(int64_t &_nBlockDBCache,
-    int64_t &_nBlockUndoDBcache,
-    int64_t &_nBlockTreeDBCache,
-    int64_t &_nCoinDBCache,
-    int64_t &_nTxIndexCache,
-    bool fDefault = false);
-/** Calculate the various cache sizes. This is primarily used in GetCacheConfiguration() however during
+CacheConfig SetCacheConfiguration(bool fDefault = false);
+
+/** Calculate the various cache sizes. This is primarily used in SetCacheConfiguration() however during
  *  dynamic sizing of the coins cache we also need to use this function directly.
  */
-void CacheSizeCalculations(int64_t _nTotalCache,
-    int64_t &_nBlockDBCache,
-    int64_t &_nBlockUndoDBcache,
-    int64_t &_nBlockTreeDBCache,
-    int64_t &_nCoinDBCache,
-    int64_t &_nTxIndexCache);
+CacheConfig CacheSizeCalculations(int64_t _nTotalCache);
+
 /** This function is called during FlushStateToDisk.  The coins cache is dynamically sized before any
  *  checking is done for cache flushing and trimming
  */
