@@ -1070,16 +1070,12 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     }
 
     // Return the initial values for the various in memory caches.
-    int64_t nBlockDBCache = 0;
-    int64_t nBlockUndoDBCache = 0;
-    int64_t nBlockTreeDBCache = 0;
-    int64_t nCoinDBCache = 0;
-    GetCacheConfiguration(nBlockDBCache, nBlockUndoDBCache, nBlockTreeDBCache, nCoinDBCache, nCoinCacheMaxSize);
+    CacheConfig cacheConfig = SetCacheConfiguration();
     LOGA("Cache configuration:\n");
-    LOGA("* Using %.1fMiB for block database\n", nBlockDBCache * (1.0 / 1024 / 1024));
-    LOGA("* Using %.1fMiB for block undo database\n", nBlockUndoDBCache * (1.0 / 1024 / 1024));
-    LOGA("* Using %.1fMiB for block index database\n", nBlockTreeDBCache * (1.0 / 1024 / 1024));
-    LOGA("* Using %.1fMiB for chain state database\n", nCoinDBCache * (1.0 / 1024 / 1024));
+    LOGA("* Using %.1fMiB for block database\n", cacheConfig.nBlockDBCache * (1.0 / 1024 / 1024));
+    LOGA("* Using %.1fMiB for block undo database\n", cacheConfig.nBlockUndoDBCache * (1.0 / 1024 / 1024));
+    LOGA("* Using %.1fMiB for block index database\n", cacheConfig.nBlockTreeDBCache * (1.0 / 1024 / 1024));
+    LOGA("* Using %.1fMiB for chain state database\n", cacheConfig.nCoinDBCache * (1.0 / 1024 / 1024));
     LOGA("* Using %.1fMiB for in-memory UTXO set\n", nCoinCacheMaxSize * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
@@ -1103,10 +1099,11 @@ bool AppInit2(Config &config, thread_group &threadGroup)
                 delete pblockdb;
 
                 uiInterface.InitMessage(_("Opening Block database..."));
-                InitializeBlockStorage(nBlockTreeDBCache, nBlockDBCache, nBlockUndoDBCache);
+                InitializeBlockStorage(
+                    cacheConfig.nBlockTreeDBCache, cacheConfig.nBlockDBCache, cacheConfig.nBlockUndoDBCache);
 
                 uiInterface.InitMessage(_("Opening UTXO database..."));
-                pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);
+                pcoinsdbview = new CCoinsViewDB(cacheConfig.nCoinDBCache, false, fReindex);
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
                 uiInterface.InitMessage(_("Opening Coins Cache database..."));
                 pcoinsTip = new CCoinsViewCache(pcoinscatcher);
