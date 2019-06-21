@@ -760,7 +760,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         }
 
         // Create a commit data entry
-        CTxMemPoolEntry entry(tx, nFees, GetTime(), dPriority, chainActive.Height(), pool.HasNoInputsOf(*tx),
+        CTxMemPoolEntry entry(tx, nFees, GetTimeMicros(), dPriority, chainActive.Height(), pool.HasNoInputsOf(*tx),
             inChainInputValue, fSpendsCoinbase, nSigOps, lp);
 
         nSize = entry.GetTxSize();
