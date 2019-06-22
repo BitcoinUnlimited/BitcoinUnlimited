@@ -592,7 +592,7 @@ bool FlushStateToDiskInternal(CValidationState &state,
     size_t cacheSize = pcoinsTip->DynamicMemoryUsage();
     static int64_t nSizeAfterLastFlush = 0;
     // The cache is close to the limit. Try to flush and trim.
-    bool fCacheCritical = ((mode == FLUSH_STATE_IF_NEEDED) && (cacheSize > nCoinCacheMaxSize * 0.995)) ||
+    bool fCacheCritical = ((mode == FLUSH_STATE_IF_NEEDED) && (cacheSize > nCoinCacheMaxSize)) ||
                           (cacheSize - nSizeAfterLastFlush > (int64_t)nMaxCacheIncreaseSinceLastFlush);
     // It's been a while since we wrote the block index to disk. Do this frequently, so we don't need to redownload
     // after a crash.
@@ -681,7 +681,7 @@ bool FlushStateToDiskInternal(CValidationState &state,
         // trim extra so that we don't flush as often during IBD.
         if (IsChainNearlySyncd() && !fReindex && !fImporting)
         {
-            pcoinsTip->Trim(nCoinCacheMaxSize);
+            pcoinsTip->Trim(nCoinCacheMaxSize * .95);
         }
         else
         {
