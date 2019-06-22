@@ -1175,6 +1175,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CTxInputData txd;
         vRecv >> txd.tx;
 
+        LOG(NET, "got transaction: %s peer=%s\n", txd.tx->GetHash().GetHex(), pfrom->GetLogName());
+
         // Indicate that the tx was received and is about to be processed. Setting the processing flag
         // prevents us from re-requesting the txn during the time of processing and before mempool acceptance.
         requester.ProcessingTxn(txd.tx->GetHash(), pfrom);
