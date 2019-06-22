@@ -689,7 +689,8 @@ bool FlushStateToDiskInternal(CValidationState &state,
             size_t nTrimSize = nCoinCacheMaxSize * .90;
             if (nCoinCacheMaxSize - nMaxCacheIncreaseSinceLastFlush > nTrimSize)
             {
-                nTrimSize = nCoinCacheMaxSize - nMaxCacheIncreaseSinceLastFlush;
+                if (nCoinCacheMaxSize > (int64_t)nMaxCacheIncreaseSinceLastFlush)
+                    nTrimSize = nCoinCacheMaxSize - nMaxCacheIncreaseSinceLastFlush;
             }
             pcoinsTip->Trim(nTrimSize);
         }
