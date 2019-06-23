@@ -26,7 +26,6 @@ static void FatalError(const char *fmt, const Args &... args)
         "Error: A fatal internal error occurred, see debug.log for details", "", CClientUIInterface::MSG_ERROR);
     StartShutdown();
 }
-
 TxIndex::TxIndex(std::unique_ptr<TxIndexDB> _db) : db(std::move(_db)), fSynced(false), pbestindex(nullptr) {}
 TxIndex::~TxIndex() {}
 bool TxIndex::Init()
@@ -46,16 +45,44 @@ bool TxIndex::Init()
     {
         locator.SetNull();
     }
-
     pbestindex = FindForkInGlobalIndex(chainActive, locator);
+
+    // If this is the first time running txindex then write the genesis transaction
+    // to the index.
+    if (pbestindex.load() && pbestindex.load() == chainActive.Genesis())
+    {
+        if (!WriteGenesisTransaction())
+            return false;
+    }
+
     fSynced = pbestindex.load() == chainActive.Tip();
     return true;
 }
 
+bool TxIndex::WriteGenesisTransaction()
+{
+    CBlock block;
+    if (!ReadBlockFromDisk(block, chainActive.Genesis(), Params().GetConsensus()))
+    {
+        FatalError("%s: Failed to read block %s from disk", __func__, chainActive.Genesis()->GetBlockHash().ToString());
+        return false;
+    }
+    if (!WriteBlock(block, chainActive.Genesis()))
+    {
+        FatalError("%s: Failed to write block %s to tx index database", __func__,
+            chainActive.Genesis()->GetBlockHash().ToString());
+        return false;
+
+        if (!WriteBestBlock(chainActive.Genesis()))
+        {
+            return error("%s: Failed to write best block to disk", __func__);
+        }
+    }
+    return true;
+}
 static const CBlockIndex *NextSyncBlock(const CBlockIndex *pindex_prev)
 {
     AssertLockHeld(cs_main);
-
     if (!pindex_prev)
     {
         return chainActive.Genesis();
@@ -170,11 +197,15 @@ void TxIndex::BlockConnected(const CBlock &block, CBlockIndex *pindex)
         return;
     }
 
+    // If we're reindexing we need to write the transaction from the genesis block here
+    if (fReindex && pindex->nHeight == 1)
+        WriteGenesisTransaction();
+
     if (WriteBlock(block, pindex))
     {
         pbestindex = pindex;
 
-        if (WriteBestBlock(pindex))
+        if (!WriteBestBlock(pindex))
         {
             error("%s: Failed to write locator to disk", __func__);
         }

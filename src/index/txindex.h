@@ -35,6 +35,9 @@ private:
     /// Initialize internal state from the database and block index.
     bool Init();
 
+    /// Write the genesis transaction to the txindex
+    bool WriteGenesisTransaction();
+
     /// Sync the tx index with the block index starting from the current best
     /// block. Intended to be run in its own thread, m_thread_sync, and can be
     /// interrupted with shutdown_threads.store(true). Once the txindex gets in sync, the
