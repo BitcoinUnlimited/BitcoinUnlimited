@@ -30,8 +30,6 @@ TxIndex::TxIndex(std::unique_ptr<TxIndexDB> _db) : db(std::move(_db)), fSynced(f
 TxIndex::~TxIndex() {}
 bool TxIndex::Init()
 {
-    LOCK(cs_main);
-
     // Attempt to migrate txindex from the old database to the new one. Even if
     // chain_tip is null, the node could be reindexing and we still want to
     // delete txindex records in the old database.
@@ -82,7 +80,7 @@ bool TxIndex::WriteGenesisTransaction()
 }
 static const CBlockIndex *NextSyncBlock(const CBlockIndex *pindex_prev)
 {
-    AssertLockHeld(cs_main);
+    LOCK(cs_main);
     if (!pindex_prev)
     {
         return chainActive.Genesis();
@@ -103,7 +101,7 @@ void TxIndex::ThreadSync()
         return;
 
     CBlockIndex *pindex = pbestindex.load();
-    if (!fSynced)
+    if (!fSynced.load())
     {
         auto &consensus_params = Params().GetConsensus();
 
@@ -117,7 +115,6 @@ void TxIndex::ThreadSync()
             }
 
             {
-                LOCK(cs_main);
                 const CBlockIndex *pindex_next = NextSyncBlock(pindex);
                 if (!pindex_next)
                 {
@@ -221,7 +218,7 @@ bool TxIndex::IsSynced()
 {
     AssertLockNotHeld(cs_main);
 
-    if (!fSynced)
+    if (!fSynced.load())
     {
         LOGA("%s: txindex is catching up on block notifications\n", __func__);
         return false;
@@ -229,10 +226,8 @@ bool TxIndex::IsSynced()
     return true;
 }
 
-bool TxIndex::FindTx(const uint256 &txhash, uint256 &blockhash, CTransactionRef ptx) const
+bool TxIndex::FindTx(const uint256 &txhash, uint256 &blockhash, CTransactionRef &ptx) const
 {
-    AssertLockHeld(cs_main);
-
     CDiskTxPos postx;
     if (!db->ReadTxPos(txhash, postx))
         return false;

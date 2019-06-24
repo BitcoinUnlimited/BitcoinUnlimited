@@ -215,8 +215,6 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
             HelpExampleCli("getrawtransaction", "\"mytxid\" false \"myblockhash\"") +
             HelpExampleCli("getrawtransaction", "\"mytxid\" true \"myblockhash\""));
 
-    LOCK(cs_main);
-
     bool in_active_chain = true;
     uint256 hash = ParseHashV(params[0], "parameter 1");
     CBlockIndex *blockindex = nullptr;
