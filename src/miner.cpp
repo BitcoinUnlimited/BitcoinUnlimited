@@ -282,8 +282,9 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0], STANDARD_SCRIPT_VERIFY_FLAGS);
     }
 
-    // Set XVal flag for new blocks. We can do this here because all transactions in this block are
-    // from the mempool.
+    // All the transactions in this block are from the mempool and therefore we can use XVal to speed
+    // up the testing of the block validity. Set XVal flag for new blocks to true unless otherwise
+    // configured.
     pblock->fXVal = GetBoolArg("-xval", true);
 
     CValidationState state;
