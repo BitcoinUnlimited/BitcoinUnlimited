@@ -614,24 +614,16 @@ static bool ProcessBlockFound(const CBlock *pblock, const CChainParams &chainpar
     // Inform about the new block
     GetMainSignals().BlockFound(pblock->GetHash());
 
+    // In we are mining our own block or not running in parallel for any reason
+    // we must terminate any block validation threads that are currently running,
+    // Unless they have more work than our own block or are processing a chain
+    // that has more work than our block.
+    PV->StopAllValidationThreads(pblock->GetBlockHeader().nBits);
 
-    {
-        // We take a cs_main lock here even though it will also be aquired in ProcessNewBlock.  We want
-        // to make sure we give priority to our own blocks.  This is in order to prevent any other Parallel
-        // Blocks to validate when we've just mined one of our own blocks.
-        LOCK(cs_main);
-
-        // In we are mining our own block or not running in parallel for any reason
-        // we must terminate any block validation threads that are currently running,
-        // Unless they have more work than our own block or are processing a chain
-        // that has more work than our block.
-        PV->StopAllValidationThreads(pblock->GetBlockHeader().nBits);
-
-        // Process this block the same as if we had received it from another node
-        CValidationState state;
-        if (!ProcessNewBlock(state, chainparams, nullptr, pblock, true, nullptr, false))
-            return error("BitcoinMiner: ProcessNewBlock, block not accepted");
-    }
+    // Process this block the same as if we had received it from another node
+    CValidationState state;
+    if (!ProcessNewBlock(state, chainparams, nullptr, pblock, true, nullptr, false))
+        return error("BitcoinMiner: ProcessNewBlock, block not accepted");
 
     return true;
 }
