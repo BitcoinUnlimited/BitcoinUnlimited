@@ -270,16 +270,10 @@ void CommitTxToMempool()
     }
 
 #ifdef ENABLE_WALLET
+    for (auto &it : *q)
     {
-        // cs_main is taken again in SyncWithWallets but must be locked before csCommitQ
-        // to maintain correct locking order.
-        LOCK(cs_main);
-
-        for (auto &it : *q)
-        {
-            CTxCommitData &data = it.second;
-            SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
-        }
+        CTxCommitData &data = it.second;
+        SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
     }
 #endif
     q->clear();
