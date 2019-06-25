@@ -484,6 +484,13 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         {
             vRecv >> LIMITED_STRING(pfrom->strSubVer, MAX_SUBVERSION_LENGTH);
             pfrom->cleanSubVer = SanitizeString(pfrom->strSubVer);
+
+            // ban SV peers
+            if (pfrom->strSubVer.find("Bitcoin SV") != std::string::npos ||
+                pfrom->strSubVer.find("(SV;") != std::string::npos)
+            {
+                dosMan.Misbehaving(pfrom, 100);
+            }
         }
         if (!vRecv.empty())
             vRecv >> pfrom->nStartingHeight;
