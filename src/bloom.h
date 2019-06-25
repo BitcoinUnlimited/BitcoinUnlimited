@@ -150,9 +150,7 @@ public:
     //! Check if the transaction is relevant for any reason.
     //! Also adds any outputs which match the filter to the filter (to match
     //! their spending txes)
-    bool IsRelevantAndUpdate(const CTransactionRef &tx) {
-        return MatchAndInsertOutputs(tx) || MatchInputs(tx);
-    }
+    bool IsRelevantAndUpdate(const CTransactionRef &tx) { return MatchAndInsertOutputs(tx) || MatchInputs(tx); }
 };
 
 /**

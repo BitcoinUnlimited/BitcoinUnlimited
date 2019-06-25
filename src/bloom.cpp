@@ -230,7 +230,8 @@ bool CBloomFilter::MatchAndInsertOutputs(const CTransactionRef &tx)
     return (fFound);
 }
 
-bool CBloomFilter::MatchInputs(const CTransactionRef &tx) {
+bool CBloomFilter::MatchInputs(const CTransactionRef &tx)
+{
     if (isEmpty)
         return false;
     for (const CTxIn &txin : tx->vin)

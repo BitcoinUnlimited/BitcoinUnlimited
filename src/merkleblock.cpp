@@ -22,7 +22,8 @@ CMerkleBlock::CMerkleBlock(const CBlock &block, CBloomFilter &filter)
     vMatch.reserve(block.vtx.size());
     vHashes.reserve(block.vtx.size());
 
-    for (const auto &tx : block.vtx) {
+    for (const auto &tx : block.vtx)
+    {
         vMatch.push_back(filter.MatchAndInsertOutputs(tx));
     }
 
