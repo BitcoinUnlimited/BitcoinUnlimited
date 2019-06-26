@@ -796,7 +796,10 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                         // fMissingInputs and not state.IsInvalid() is used to detect this condition, don't set
                         // state.Invalid()
                         *pfMissingInputs = true;
-                        break; // There is no point checking any more once one fails, for orphans we will recheck
+                        if (debugger == nullptr)
+                        {
+                            break; // There is no point checking any more once one fails, for orphans we will recheck
+                        }
                     }
                 }
                 if (txnAlreadyKnown)
