@@ -170,8 +170,7 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit = false,
     bool fRejectAbsurdFee = false,
-    TransactionClass allowedTx = TransactionClass::DEFAULT,
-    CValidationDebugger *debugger = nullptr);
+    TransactionClass allowedTx = TransactionClass::DEFAULT);
 
 /** (try to) add transaction to memory pool **/
 bool ParallelAcceptToMemoryPool(Snapshot &ss,

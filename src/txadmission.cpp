@@ -529,8 +529,7 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     bool *pfMissingInputs,
     bool fOverrideMempoolLimit,
     bool fRejectAbsurdFee,
-    TransactionClass allowedTx,
-    CValidationDebugger *debugger)
+    TransactionClass allowedTx)
 {
     std::vector<COutPoint> vCoinsToUncache;
 
@@ -542,11 +541,7 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     bool isRespend = false;
     bool missingInputs = false;
     res = ParallelAcceptToMemoryPool(txHandlerSnap, pool, state, tx, fLimitFree, &missingInputs, fOverrideMempoolLimit,
-        fRejectAbsurdFee, allowedTx, vCoinsToUncache, &isRespend, debugger);
-    if (debugger != nullptr)
-    {
-        return res;
-    }
+        fRejectAbsurdFee, allowedTx, vCoinsToUncache, &isRespend, nullptr);
     if (res)
     {
         RelayTransaction(tx);
