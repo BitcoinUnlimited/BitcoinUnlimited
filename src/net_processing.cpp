@@ -453,11 +453,17 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         int64_t nTime;
         CAddress addrMe;
         uint64_t nNonce = 1;
-        vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
 
-        // Update thin type peer counters. This should be at the top here before we have any
-        // potential disconnects, because on disconnect the counters will then get decremented.
-        thinrelay.AddPeers(pfrom);
+        // Increment the thin type peer counters if they haven't already been updated for this peer
+        // from a previously received VERSION message.
+        bool fAddPeer = false;
+        if (pfrom->nVersion == 0)
+            fAddPeer = true;
+
+        vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
+        // We must increment the peer counters after we've deserialized and have the correct nServices.
+        if (fAddPeer)
+            thinrelay.AddPeers(pfrom);
 
         if (pfrom->nVersion < MIN_PEER_PROTO_VERSION)
         {
@@ -892,12 +898,19 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         uint64_t nVersion = 0;
         vRecv >> fHighBandwidth >> nVersion;
 
+        // Increment the compactblock peer counter if is hasn't already been updated for this peer
+        // from a previously received SENDCMPCT message.
+        bool fAddPeer = false;
+        if (!pfrom->fSupportsCompactBlocks)
+        {
+            fAddPeer = true;
+        }
+
         // BCH network currently only supports version 1 (v2 is segwit support on BTC)
         // May need to be updated in the future if other clients deploy a new version
         pfrom->fSupportsCompactBlocks = nVersion == 1;
-
-        // Increment compact block peer counter.
-        thinrelay.AddCompactBlockPeer(pfrom);
+        if (pfrom->fSupportsCompactBlocks && fAddPeer)
+            thinrelay.AddCompactBlockPeer(pfrom);
     }
 
     else if (strCommand == NetMsgType::INV)
