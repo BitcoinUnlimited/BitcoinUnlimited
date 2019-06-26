@@ -91,8 +91,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             {
                 return;
             }
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_THINBLOCK ||
-                inv.type == MSG_CMPCT_BLOCK)
+            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
             {
                 auto *mi = LookupBlockIndex(inv.hash);
                 if (mi)
@@ -188,14 +187,6 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                             {
                                 pfrom->blocksSent += 1;
                                 pfrom->PushMessage(NetMsgType::BLOCK, block);
-                            }
-                            else if (inv.type == MSG_THINBLOCK && pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) < 2 &&
-                                     pfrom->ThinBlockCapable())
-                            {
-                                // TODO: This code path enables backward compatibility for older BU nodes
-                                // and can be removed in the future.
-                                LOG(THIN, "Sending thinblock via getdata message\n");
-                                SendXThinBlock(MakeBlockRef(block), pfrom, inv);
                             }
                             else if (inv.type == MSG_CMPCT_BLOCK)
                             {
@@ -1031,14 +1022,14 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         {
             const CInv &inv = vInv[nInv];
             if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK) || (inv.type == MSG_FILTERED_BLOCK) ||
-                    (inv.type == MSG_CMPCT_BLOCK) || (inv.type == MSG_THINBLOCK)))
+                    (inv.type == MSG_CMPCT_BLOCK)))
             {
                 dosMan.Misbehaving(pfrom, 20);
                 return error("message inv invalid type = %u", inv.type);
             }
 
             // Make basic checks
-            if (inv.type == MSG_CMPCT_BLOCK || inv.type == MSG_THINBLOCK)
+            if (inv.type == MSG_CMPCT_BLOCK)
             {
                 if (!requester.CheckForRequestDOS(pfrom, chainparams))
                     return false;
