@@ -44,7 +44,12 @@ private:
     // attack surface.
     size_t MAX_THINTYPE_BLOCKS_IN_FLIGHT = 6;
 
-    // Counters for how many of each peer are currently connected.
+    // Counters for how many of each peer are currently connected.  We use the set to store the
+    // nodeid so that we can then get a unique count of peers with with to update the atomic counters.
+    CCriticalSection cs_addpeers;
+    std::set<NodeId> setThinBlockPeers;
+    std::set<NodeId> setGraphenePeers;
+    std::set<NodeId> setCompactBlockPeers;
     std::atomic<int32_t> nThinBlockPeers{0};
     std::atomic<int32_t> nGraphenePeers{0};
     std::atomic<int32_t> nCompactBlockPeers{0};

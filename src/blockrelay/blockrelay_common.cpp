@@ -17,46 +17,41 @@ bool IsCompactBlocksEnabled();
 // Update the counters for how many peers we have connected.
 void ThinTypeRelay::AddPeers(CNode *pfrom)
 {
+    LOCK(cs_addpeers);
     if (pfrom)
     {
         if (pfrom->nServices & NODE_XTHIN)
-            nThinBlockPeers++;
+            setThinBlockPeers.insert(pfrom->GetId());
         if (pfrom->nServices & NODE_GRAPHENE)
-            nGraphenePeers++;
+            setGraphenePeers.insert(pfrom->GetId());
     }
+    nThinBlockPeers = setThinBlockPeers.size();
+    nGraphenePeers = setGraphenePeers.size();
 }
 void ThinTypeRelay::AddCompactBlockPeer(CNode *pfrom)
 {
+    LOCK(cs_addpeers);
     if (pfrom && pfrom->fSupportsCompactBlocks)
-        nCompactBlockPeers++;
+    {
+        setCompactBlockPeers.insert(pfrom->GetId());
+    }
+    nCompactBlockPeers = setCompactBlockPeers.size();
 }
 void ThinTypeRelay::RemovePeers(CNode *pfrom)
 {
+    LOCK(cs_addpeers);
     if (pfrom)
     {
         if (pfrom->nServices & NODE_XTHIN)
-            nThinBlockPeers--;
+            setThinBlockPeers.erase(pfrom->GetId());
         if (pfrom->nServices & NODE_GRAPHENE)
-            nGraphenePeers--;
+            setGraphenePeers.erase(pfrom->GetId());
         if (pfrom->fSupportsCompactBlocks)
-            nCompactBlockPeers--;
-
-        if (nThinBlockPeers < 0)
-        {
-            nThinBlockPeers = 0;
-            LOG(THIN | GRAPHENE | CMPCT, "WARNING: nThinBlockPeers was less than zero");
-        }
-        if (nGraphenePeers < 0)
-        {
-            nGraphenePeers = 0;
-            LOG(THIN | GRAPHENE | CMPCT, "WARNING: nGraphenePeers was less than zero");
-        }
-        if (nCompactBlockPeers < 0)
-        {
-            nCompactBlockPeers = 0;
-            LOG(THIN | GRAPHENE | CMPCT, "WARNING: nCompactBlockPeers was less than zero");
-        }
+            setCompactBlockPeers.erase(pfrom->GetId());
     }
+    nThinBlockPeers = setThinBlockPeers.size();
+    nGraphenePeers = setGraphenePeers.size();
+    nCompactBlockPeers = setCompactBlockPeers.size();
 }
 
 // Preferential Block Relay Timer:
