@@ -1564,7 +1564,30 @@ UniValue validaterawtransaction(const UniValue &params, bool fHelp)
     // 2nd parameter allows high fees
     if (params.size() > 1)
     {
-        fOverrideFees = params[1].get_bool();
+        if (params[1].isBool())
+        {
+            fOverrideFees = params[1].get_bool();
+        }
+        else if (params[1].isStr())
+        {
+            std::string maybeOverride = params[1].get_str();
+            if (maybeOverride == "allowhighfees")
+            {
+                fOverrideFees = true;
+            }
+            else if (maybeOverride == "allowhighfees")
+            {
+                fOverrideFees = false;
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid allowhighfees value");
+            }
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid allowhighfees value");
+        }
     }
     // 3rd parameter must be the transaction class
     if (params.size() > 2)
