@@ -1500,11 +1500,11 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
 
 void InputDebuggerToJSON(const CInputDebugger &input, UniValue &result)
 {
-    std::map<std::string, std::string>::iterator it;
+    std::map<std::string, std::string>::const_iterator it;
 
     result.pushKV("isValid", input.isValid);
     UniValue uv_vdata(UniValue::VARR);
-    for (auto data : input.vData)
+    for (auto &data : input.vData)
     {
         UniValue entry(UniValue::VOBJ);
         entry.pushKV("isValid", data.isValid);
@@ -1515,7 +1515,7 @@ void InputDebuggerToJSON(const CInputDebugger &input, UniValue &result)
         }
         entry.pushKV("metadata", entry_metadata);
         UniValue entry_errors(UniValue::VARR);
-        for (auto error : data.errors)
+        for (auto &error : data.errors)
         {
             entry_errors.push_back(error);
         }
@@ -1617,7 +1617,7 @@ UniValue validaterawtransaction(const UniValue &params, bool fHelp)
 
     UniValue uv_errors(UniValue::VARR);
     std::vector<std::string> strRejectReasons = debugger.GetRejectReasons();
-    for (auto error : strRejectReasons)
+    for (auto &error : strRejectReasons)
     {
         uv_errors.push_back(error);
     }
