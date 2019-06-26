@@ -1577,9 +1577,9 @@ UniValue validaterawtransaction(const UniValue &params, bool fHelp)
     CCoinsViewCache &view = *pcoinsTip;
     bool fHaveChain = false;
     {
-        for (size_t o = 0; !fHaveChain && o < tx.vout.size(); o++)
+        for (size_t i = 0; !fHaveChain && i < tx.vout.size(); i++)
         {
-            CoinAccessor existingCoin(view, COutPoint(hashTx, o));
+            CoinAccessor existingCoin(view, COutPoint(hashTx, i));
             fHaveChain = !existingCoin->IsSpent();
         }
     }
