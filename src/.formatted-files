@@ -154,6 +154,7 @@ txadmission.cpp
 txadmission.h
 txdb.cpp
 txdb.h
+txdebugger.h
 txmempool.cpp
 txmempool.h
 ui_interface.h

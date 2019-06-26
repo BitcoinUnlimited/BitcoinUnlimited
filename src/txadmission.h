@@ -9,6 +9,7 @@
 #include "main.h"
 #include "net.h"
 #include "threadgroup.h"
+#include "txdebugger.h"
 #include "txmempool.h"
 #include <queue>
 

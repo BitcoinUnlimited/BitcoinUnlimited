@@ -12,6 +12,7 @@
 #include "consensus/validation.h"
 #include "forks.h"
 #include "parallel.h"
+#include "txdebugger.h"
 #include "txmempool.h"
 #include "versionbits.h"
 

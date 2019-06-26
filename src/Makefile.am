@@ -204,6 +204,7 @@ BITCOIN_CORE_H = \
   torcontrol.h \
   txadmission.h \
   txdb.h \
+  txdebugger.h \
   txmempool.h \
   txorphanpool.h \
   ui_interface.h \
