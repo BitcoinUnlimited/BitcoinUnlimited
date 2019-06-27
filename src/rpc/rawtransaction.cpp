@@ -1663,10 +1663,9 @@ UniValue validaterawtransaction(const UniValue &params, bool fHelp)
     if (!fHaveMempool && !fHaveChain)
     {
         CValidationState state;
-        bool fMissingInputs;
+        bool fMissingInputs = false;
         std::vector<COutPoint> vCoinsToUncache;
         bool isRespend = false;
-        bool missingInputs = false;
         ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, std::move(ptx), false, &fMissingInputs, false,
             fOverrideFees, txClass, vCoinsToUncache, &isRespend, &debugger);
     }
