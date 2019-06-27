@@ -70,6 +70,8 @@ class CtorTest (BitcoinTestFramework):
         # force CTOR on node 2,3
         self.nodes[2].set("consensus.enableCanonicalTxOrder=1")
         self.nodes[3].set("consensus.enableCanonicalTxOrder=1")
+        waitFor(5, lambda: "True" in str(self.nodes[2].get("consensus.enableCanonicalTxOrder")))
+        waitFor(5, lambda: "True" in str(self.nodes[3].get("consensus.enableCanonicalTxOrder")))
 
         waitFor(30, lambda: self.nodes[2].getmempoolinfo()["size"] >= 20)
 
@@ -176,11 +178,14 @@ class CtorTest (BitcoinTestFramework):
  
         self.nodes.append(start_node(4, self.options.tmpdir))
         self.nodes[4].set("consensus.enableCanonicalTxOrder=1")
+        waitFor(5, lambda: "True" in str(self.nodes[4].get("consensus.enableCanonicalTxOrder")))
         for i in range(5):
             connect_nodes_bi(self.nodes,4,i)
 
         self.nodes.append(start_node(5, self.options.tmpdir))
         self.nodes[5].set("consensus.enableCanonicalTxOrder=0")
+        waitFor(5, lambda: "False" in str(self.nodes[5].get("consensus.enableCanonicalTxOrder")))
+
         # node 5 is non-ctor
         for i in range(5):
             connect_nodes_bi(self.nodes,5,i)
@@ -193,9 +198,9 @@ class CtorTest (BitcoinTestFramework):
         # Now run the rollback across fork test
 
         # first generate a competing ctor fork on our isolated node that is longer than the current fork
-
- 
         rollbackNode.set("consensus.enableCanonicalTxOrder=1")
+        waitFor(5, lambda: "True" in str(rollbackNode.get("consensus.enableCanonicalTxOrder")))
+
         # make the new fork longer than current
         for n in range(10):
             time.sleep(.1)
@@ -210,6 +215,7 @@ class CtorTest (BitcoinTestFramework):
             rollbackNode.sendtoaddress(rollbackAddr, bal-Decimal(i*.01)) # a little less each time to account for fees
         ctorForkHash = rollbackNode.generate(1)[0]
         rollbackNode.generate(5)
+        time.sleep(3)
         ctorForkTipHash = rollbackNode.getbestblockhash()
         ctorForkTipCount = rollbackNode.getblockcount()
 
@@ -219,9 +225,11 @@ class CtorTest (BitcoinTestFramework):
         disconnect_all(self.nodes[3])
         self.nodes[2].set("consensus.enableCanonicalTxOrder=1")
         self.nodes[3].set("consensus.enableCanonicalTxOrder=1")
+        waitFor(5, lambda: "True" in str(self.nodes[2].get("consensus.enableCanonicalTxOrder")))
+        waitFor(5, lambda: "True" in str(self.nodes[3].get("consensus.enableCanonicalTxOrder")))
+
         connect_nodes(rollbackNode,2)
         connect_nodes(rollbackNode,3)
-
         waitFor(15, lambda: self.nodes[2].getblockcount() == ctorForkTipCount)
         waitFor(15, lambda: self.nodes[3].getblockcount() == ctorForkTipCount)
 
