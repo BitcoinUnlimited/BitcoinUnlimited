@@ -73,10 +73,8 @@
  * Global state
  */
 
-// BU moved CWaitableCriticalSection csBestBlock;
-// BU moved CConditionVariable cvBlockChange;
-bool fImporting = false;
-bool fReindex = false;
+std::atomic<bool> fImporting{false};
+std::atomic<bool> fReindex{false};
 bool fBlocksOnly = false;
 bool fTxIndex = false;
 bool fHavePruned = false;
