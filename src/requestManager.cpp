@@ -931,6 +931,11 @@ void CRequestManager::SendRequests()
                                     next.node->Release();
                                 }
                             }
+
+                            // Now that we've completed setting up our request for this transaction
+                            // we're done with this node, for this item, and can release and delete it.
+                            next.node->Release();
+                            next.node = nullptr;
                         }
 
                         inFlight++;
