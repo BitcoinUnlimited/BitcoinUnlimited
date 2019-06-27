@@ -17,7 +17,23 @@ bool IsCompactBlocksEnabled();
 // Update the counters for how many peers we have connected.
 void ThinTypeRelay::AddPeers(CNode *pfrom)
 {
+    uint32_t nNodes = 0;
+    {
+        LOCK(cs_vNodes);
+        nNodes = vNodes.size();
+    }
+
     LOCK(cs_addpeers);
+
+    // Don't allow the set sizes to grow unbounded.  They should never be greater
+    // than the number of peers connected.  If this should happen we'll just stop
+    // adding them and return, but if running a debug build we'll assert.
+    DbgAssert(setThinBlockPeers.size() <= nNodes, return );
+    DbgAssert(setGraphenePeers.size() <= nNodes, return );
+    if (setThinBlockPeers.size() > nNodes || setGraphenePeers.size() > nNodes)
+        return;
+
+    // Update the counters
     if (pfrom)
     {
         if (pfrom->nServices & NODE_XTHIN)
@@ -30,7 +46,21 @@ void ThinTypeRelay::AddPeers(CNode *pfrom)
 }
 void ThinTypeRelay::AddCompactBlockPeer(CNode *pfrom)
 {
+    uint32_t nNodes = 0;
+    {
+        LOCK(cs_vNodes);
+        nNodes = vNodes.size();
+    }
+
     LOCK(cs_addpeers);
+
+    // Don't allow the set sizes to grow unbounded.  They should never be greater
+    // than the number of peers connected.  If this should happen we'll just stop
+    // adding them and return, but if running a debug build we'll assert.
+    DbgAssert(setCompactBlockPeers.size() <= nNodes, return );
+    if (setCompactBlockPeers.size() > nNodes)
+        return;
+
     if (pfrom && pfrom->fSupportsCompactBlocks)
     {
         setCompactBlockPeers.insert(pfrom->GetId());

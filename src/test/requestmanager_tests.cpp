@@ -101,6 +101,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     dummyNodeNone.state_outgoing = ConnectionStateOutgoing::READY;
     dummyNodeNone.id = 4;
 
+    // Add to vNodes
+    vNodes.push_back(&dummyNodeXthin);
+    vNodes.push_back(&dummyNodeGraphene);
+    vNodes.push_back(&dummyNodeCmpct);
+    vNodes.push_back(&dummyNodeNone);
+
     // Initialize Nodes
     GetNodeSignals().InitializeNode(&dummyNodeXthin);
     GetNodeSignals().InitializeNode(&dummyNodeGraphene);
@@ -949,5 +955,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     // Final cleanup: Unset mocktime
     SetMockTime(0);
     requester.MapBlocksInFlightClear();
+
+    // remove from vNodes
+    vNodes.erase(remove(vNodes.begin(), vNodes.end(), &dummyNodeGraphene), vNodes.end());
+    vNodes.erase(remove(vNodes.begin(), vNodes.end(), &dummyNodeNone), vNodes.end());
+    vNodes.erase(remove(vNodes.begin(), vNodes.end(), &dummyNodeCmpct), vNodes.end());
+    vNodes.erase(remove(vNodes.begin(), vNodes.end(), &dummyNodeXthin), vNodes.end());
 }
 BOOST_AUTO_TEST_SUITE_END()
