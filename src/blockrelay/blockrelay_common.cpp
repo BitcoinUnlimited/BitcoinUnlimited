@@ -10,6 +10,12 @@
 #include "sync.h"
 #include "util.h"
 
+// When a node disconnects it may not be removed from the peer tracking sets immediately and so the size
+// of those sets could temporarily rise above the maxiumum number of connections.  This padding prevents
+// us from asserting in debug mode when a node or group of nodes drops off suddenly while another set
+// of nodes is connecting.
+static unsigned int NODE_PADDING = 5;
+
 bool IsThinBlockEnabled();
 bool IsGrapheneBlockEnabled();
 bool IsCompactBlocksEnabled();
@@ -17,17 +23,12 @@ bool IsCompactBlocksEnabled();
 // Update the counters for how many peers we have connected.
 void ThinTypeRelay::AddPeers(CNode *pfrom)
 {
-    uint32_t nNodes = 0;
-    {
-        LOCK(cs_vNodes);
-        nNodes = vNodes.size();
-    }
-
     LOCK(cs_addpeers);
 
     // Don't allow the set sizes to grow unbounded.  They should never be greater
     // than the number of peers connected.  If this should happen we'll just stop
     // adding them and return, but if running a debug build we'll assert.
+    uint32_t nNodes = nMaxConnections + NODE_PADDING;
     DbgAssert(setThinBlockPeers.size() <= nNodes, return );
     DbgAssert(setGraphenePeers.size() <= nNodes, return );
     if (setThinBlockPeers.size() > nNodes || setGraphenePeers.size() > nNodes)
@@ -46,17 +47,12 @@ void ThinTypeRelay::AddPeers(CNode *pfrom)
 }
 void ThinTypeRelay::AddCompactBlockPeer(CNode *pfrom)
 {
-    uint32_t nNodes = 0;
-    {
-        LOCK(cs_vNodes);
-        nNodes = vNodes.size();
-    }
-
     LOCK(cs_addpeers);
 
     // Don't allow the set sizes to grow unbounded.  They should never be greater
     // than the number of peers connected.  If this should happen we'll just stop
     // adding them and return, but if running a debug build we'll assert.
+    uint32_t nNodes = nMaxConnections + NODE_PADDING;
     DbgAssert(setCompactBlockPeers.size() <= nNodes, return );
     if (setCompactBlockPeers.size() > nNodes)
         return;
