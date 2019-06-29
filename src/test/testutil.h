@@ -11,6 +11,9 @@
 
 #include "fs.h"
 
+class CMutableTransaction;
+
 fs::path GetTempPath();
+CMutableTransaction CreateRandomTx();
 
 #endif // BITCOIN_TEST_TESTUTIL_H
