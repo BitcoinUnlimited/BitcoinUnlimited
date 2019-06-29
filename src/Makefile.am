@@ -200,6 +200,7 @@ BITCOIN_CORE_H = \
   torcontrol.h \
   txadmission.h \
   txdb.h \
+  txlookup.h \
   txmempool.h \
   txorphanpool.h \
   ui_interface.h \
@@ -304,6 +305,7 @@ libbitcoin_server_a_SOURCES = \
   torcontrol.cpp \
   txadmission.cpp \
   txdb.cpp \
+  txlookup.cpp \
   txmempool.cpp \
   txorphanpool.cpp \
   tweak.cpp \

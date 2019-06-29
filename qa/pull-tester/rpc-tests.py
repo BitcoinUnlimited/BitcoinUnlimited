@@ -246,7 +246,8 @@ testScripts = [ RpcTest(t) for t in [
     'getlogcategories',
     'getrawtransaction',
     Disabled('electrum_basics', "Needs to be skipped if electrs is not built"),
-    Disabled('electrum_reorg', "Needs to be skipped if electrs is not built")
+    Disabled('electrum_reorg', "Needs to be skipped if electrs is not built"),
+    'gettxpos',
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [

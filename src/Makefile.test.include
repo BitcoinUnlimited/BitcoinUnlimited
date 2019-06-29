@@ -127,6 +127,7 @@ BITCOIN_TESTS =\
   test/thinblock_util_tests.cpp \
   test/timedata_tests.cpp \
   test/transaction_tests.cpp \
+  test/txlookup_tests.cpp \
   test/txvalidationcache_tests.cpp \
   test/versionbits_tests.cpp \
   test/genversionbits_tests.cpp \

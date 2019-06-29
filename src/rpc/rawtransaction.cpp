@@ -24,6 +24,7 @@
 #include "script/sign.h"
 #include "script/standard.h"
 #include "txadmission.h"
+#include "txlookup.h"
 #include "txmempool.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
@@ -1514,6 +1515,63 @@ UniValue enqueuerawtransaction(const UniValue &params, bool fHelp)
     return txd.tx->GetHash().GetHex();
 }
 
+// Used by electrs for every tx proof creation, so keep this rpc call fast please.
+UniValue gettxpos(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() != 2)
+    {
+        "gettxpos \"txid\" \"blockhash\"\n"
+
+        "\nReturn the position of the transaction in the block, zero indexed.\n"
+
+        "\nArguments:\n"
+        "1. \"txid\"      (string, required) The transaction id\n"
+        "3. \"blockhash\" (string, required) The block in which to look for the transaction\n"
+
+        "\nResult:\n"
+        "{\n"
+        "  \"position\": (numeric) Position of the transaction (zero indexed)\n"
+        "}\n"
+
+        "\nExamples:\n" +
+            HelpExampleRpc("getrawtransaction", "\"mytxid\" \"myblockhash\"") +
+            HelpExampleCli("getrawtransaction", "\"mytxid\" \"myblockhash\"");
+    }
+    uint256 txhash = ParseHashV(params[0], "txhash");
+    uint256 blockhash = ParseHashV(params[1], "blockhash");
+
+    CBlockIndex *blockIndex = nullptr;
+    CBlock block;
+    {
+        READLOCK(cs_mapBlockIndex);
+        auto index = mapBlockIndex.find(blockhash);
+        if (index == end(mapBlockIndex))
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Block not found");
+        }
+        blockIndex = index->second;
+    }
+    auto consensus = Params().GetConsensus();
+    {
+        LOCK(cs_main);
+        if (!ReadBlockFromDisk(block, blockIndex, consensus))
+        {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to read block");
+        }
+    }
+
+    bool ctorOptimize = int64_t(block.GetHeight()) >= consensus.may2018Height;
+    int64_t res = FindTxPosition(block, txhash, ctorOptimize);
+    if (res == TX_NOT_FOUND)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Transaction not in block");
+    }
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("position", res);
+    return result;
+}
+
+
 static const CRPCCommand commands[] = {
     //  category              name                      actor (function)         okSafeMode
     //  --------------------- ------------------------  -----------------------  ----------
@@ -1528,7 +1586,7 @@ static const CRPCCommand commands[] = {
     {"rawtransactions", "signrawtransaction", &signrawtransaction, false}, /* uses wallet if enabled */
 
     {"blockchain", "gettxoutproof", &gettxoutproof, true}, {"blockchain", "gettxoutproofs", &gettxoutproofs, true},
-    {"blockchain", "verifytxoutproof", &verifytxoutproof, true},
+    {"blockchain", "verifytxoutproof", &verifytxoutproof, true}, {"blockchain", "gettxpos", &gettxpos, true},
 };
 
 void RegisterRawTransactionRPCCommands(CRPCTable &table)
