@@ -60,20 +60,27 @@ class HashTableEntry : public BaseHashTableEntry
 {
 public:
     uint64_t keyCheck64;
+    uint64_t count64;
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
-        READWRITE(count);
         READWRITE(keySum);
 
         if (!ser_action.ForRead())
+        {
             keyCheck64 = (uint64_t)keyCheck;
+            count64 = (uint64_t)count;
+        }
         READWRITE(COMPACTSIZE(keyCheck64));
+        READWRITE(COMPACTSIZE(count64));
         if (ser_action.ForRead())
+        {
             keyCheck = (uint32_t)keyCheck64;
+            count = (uint64_t)count64;
+        }
 
         READWRITE(valueSum);
     }
