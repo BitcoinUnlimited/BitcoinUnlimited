@@ -41,6 +41,7 @@ SOFTWARE.
 //
 
 const uint64_t IBLT_MAX_VERSION_SUPPORTED = 2;
+const uint32_t MAX_CHECKSUM_MASK = 0xffffffff;
 
 class BaseHashTableEntry
 {
@@ -188,7 +189,7 @@ public:
             std::vector<HashTableEntryStaticChk> hashTableChk;
             if (ser_action.ForRead())
             {
-                keycheckMask = 0xffffffff;
+                keycheckMask = MAX_CHECKSUM_MASK;
                 READWRITE(hashTableChk);
                 for (auto entryChk : hashTableChk)
                 {

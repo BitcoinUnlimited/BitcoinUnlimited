@@ -98,7 +98,7 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
         nCheckSumBits = MAX_CHECKSUM_BITS;
 
     LOG(GRAPHENE, "using %d checksum bits in IBLT\n", nCheckSumBits);
-    uint32_t keycheckMask = 0xffffffff >> (MAX_CHECKSUM_BITS - nCheckSumBits);
+    uint32_t keycheckMask = MAX_CHECKSUM_MASK >> (MAX_CHECKSUM_BITS - nCheckSumBits);
     pSetIblt = std::make_shared<CIblt>(CIblt(nIbltCells, ibltSalt, ibltVersion, keycheckMask));
 
     std::map<uint64_t, uint256> mapCheapHashes;

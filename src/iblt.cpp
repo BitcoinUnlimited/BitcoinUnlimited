@@ -80,7 +80,7 @@ CIblt::CIblt()
     n_hash = 1;
     is_modified = false;
     version = 0;
-    keycheckMask = 0xffffffff;
+    keycheckMask = MAX_CHECKSUM_MASK;
 }
 
 CIblt::CIblt(uint64_t _version)
@@ -88,20 +88,20 @@ CIblt::CIblt(uint64_t _version)
     salt = 0;
     n_hash = 1;
     is_modified = false;
-    keycheckMask = 0xffffffff;
+    keycheckMask = MAX_CHECKSUM_MASK;
 
     CIblt::version = _version;
 }
 
 CIblt::CIblt(size_t _expectedNumEntries, uint64_t _version)
-    : salt(0), n_hash(0), is_modified(false), keycheckMask(0xffffffff)
+    : salt(0), n_hash(0), is_modified(false), keycheckMask(MAX_CHECKSUM_MASK)
 {
     CIblt::version = _version;
     CIblt::resize(_expectedNumEntries);
 }
 
 CIblt::CIblt(size_t _expectedNumEntries, uint32_t _salt, uint64_t _version)
-    : n_hash(0), is_modified(false), keycheckMask(0xffffffff)
+    : n_hash(0), is_modified(false), keycheckMask(MAX_CHECKSUM_MASK)
 {
     CIblt::version = _version;
     CIblt::salt = _salt;
@@ -145,7 +145,7 @@ void CIblt::resize(size_t _expectedNumEntries)
 
     // set hash seeds from salt
     for (size_t i = 0; i < n_hash; i++)
-        mapHashIdxSeeds[i] = salt % (0xffffffff - n_hash) + i;
+        mapHashIdxSeeds[i] = salt % (MAX_CHECKSUM_MASK - n_hash) + i;
 
     // reduce probability of failure by increasing by overhead factor
     size_t nEntries = (size_t)(_expectedNumEntries * OptimalOverhead(_expectedNumEntries));
