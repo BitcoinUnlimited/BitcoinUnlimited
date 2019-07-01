@@ -31,13 +31,7 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     // Below is the parameter "n" from the graphene paper
     uint64_t nItems = _itemHashes.size();
 
-    uint64_t ibltVersion;
-    if (version < 2)
-        ibltVersion = 0;
-    else if (version < 4)
-        ibltVersion = 1;
-    else
-        ibltVersion = 2;
+    uint64_t ibltVersion = CGrapheneSet::GetCIbltVersion(version);
 
     FastRandomContext insecure_rand(fDeterministic);
 

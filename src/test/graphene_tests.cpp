@@ -27,15 +27,7 @@ size_t ProjectedGrapheneSizeBytes(uint64_t version, uint64_t nBlockTxs, uint64_t
     FastRandomContext insecure_rand(true);
     auto fpr = [nExcessTxs](int a) { return a / float(nExcessTxs); };
 
-    uint64_t ibltVersion;
-    if (version < 2)
-        ibltVersion = 0;
-    else if (version < 4)
-        ibltVersion = 1;
-    else
-        ibltVersion = 2;
-
-    CIblt iblt(nSymDiff, ibltVersion);
+    CIblt iblt(nSymDiff, CGrapheneSet::GetCIbltVersion(version));
     size_t ibltBytes = ::GetSerializeSize(iblt, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;
 
     size_t filterBytes;

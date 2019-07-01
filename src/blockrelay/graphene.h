@@ -122,6 +122,17 @@ public:
      */
     static bool HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string strCommand, unsigned nHops);
 
+    static inline uint64_t GetGrapheneSetVersion(uint64_t grapheneBlockVersion)
+    {
+        if (grapheneBlockVersion < 2)
+            return 0;
+        else
+        {
+            // Currently CGrapheneSet version trails CGrapheneBlock version by 1
+            return grapheneBlockVersion - 1;
+        }
+    }
+
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
@@ -143,12 +154,12 @@ public:
             throw std::runtime_error("nBlockTxs exceeds threshold for excessive block txs");
         if (!pGrapheneSet)
         {
-            // Currently CGrapheneSet version trails CGrapheneBlock version by 1
-            uint64_t grapheneSetVersion = version - 1;
             if (version > 3)
-                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(grapheneSetVersion, computeOptimized));
+                pGrapheneSet = std::make_shared<CGrapheneSet>(
+                    CGrapheneSet(CGrapheneBlock::GetGrapheneSetVersion(version), computeOptimized));
             else
-                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(grapheneSetVersion));
+                pGrapheneSet =
+                    std::make_shared<CGrapheneSet>(CGrapheneSet(CGrapheneBlock::GetGrapheneSetVersion(version)));
         }
         READWRITE(*pGrapheneSet);
     }

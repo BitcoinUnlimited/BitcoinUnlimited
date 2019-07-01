@@ -169,6 +169,16 @@ public:
         pSetIblt = nullptr;
     }
 
+    static inline uint64_t GetCIbltVersion(uint64_t grapheneSetVersion)
+    {
+        if (grapheneSetVersion < 2)
+            return 0;
+        else if (grapheneSetVersion < 4)
+            return 1;
+        else
+            return 2;
+    }
+
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
@@ -201,14 +211,7 @@ public:
             READWRITE(*pSetFilter);
         }
         if (!pSetIblt)
-        {
-            if (version < 2)
-                pSetIblt = std::make_shared<CIblt>(CIblt(0));
-            else if (version < 4)
-                pSetIblt = std::make_shared<CIblt>(CIblt(1));
-            else
-                pSetIblt = std::make_shared<CIblt>(CIblt(2));
-        }
+            pSetIblt = std::make_shared<CIblt>(CIblt(CGrapheneSet::GetCIbltVersion(version)));
         READWRITE(*pSetIblt);
     }
 };
