@@ -802,10 +802,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                         }
                     }
                 }
-                if (txnAlreadyKnown)
-                {
-                    debugger->AddInvalidReason("txn-already-known");
-                }
                 if (*pfMissingInputs == true)
                 {
                     if (debugger)
