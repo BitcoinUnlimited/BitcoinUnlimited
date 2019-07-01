@@ -1459,7 +1459,7 @@ void CWallet::ReacceptWalletTransactions()
     // If transactions aren't being broadcasted, don't let them into local mempool either
     if (!fBroadcastTransactions)
         return;
-    std::map<int64_t, CWalletTx *> mapSorted;
+    std::map<int64_t, CTransactionRef> mapSorted;
 
     {
         LOCK2(cs_main, cs_wallet);
@@ -1475,18 +1475,17 @@ void CWallet::ReacceptWalletTransactions()
 
             if (!wtx.IsCoinBase() && (nDepth == 0 && !wtx.isAbandoned()))
             {
-                mapSorted.insert(std::make_pair(wtx.nOrderPos, &wtx));
+                mapSorted.insert(std::make_pair(wtx.nOrderPos, MakeTransactionRef(wtx)));
             }
         }
     }
 
     // Try to add wallet transactions to memory pool
-    for (std::pair<const int64_t, CWalletTx *> &item : mapSorted)
+    for (std::pair<const int64_t, CTransactionRef> &item : mapSorted)
     {
-        CWalletTx &wtx = *(item.second);
-
-        wtx.AcceptToMemoryPool(false);
-        SyncWithWallets(MakeTransactionRef(wtx), nullptr, -1);
+        CValidationState state;
+        AcceptToMemoryPool(mempool, state, item.second, false, nullptr, false, true, TransactionClass::DEFAULT);
+        SyncWithWallets(item.second, nullptr, -1);
     }
     CommitTxToMempool();
 }
