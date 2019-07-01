@@ -54,7 +54,10 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     if (version < 2)
         grapheneSetVersion = 0;
     else
+    {
+        // Currently CGrapheneSet version trails CGrapheneBlock version by 1
         grapheneSetVersion = version - 1;
+    }
 
     std::vector<uint256> blockHashes;
     for (auto &tx : pblock->vtx)

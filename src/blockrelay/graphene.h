@@ -143,10 +143,12 @@ public:
             throw std::runtime_error("nBlockTxs exceeds threshold for excessive block txs");
         if (!pGrapheneSet)
         {
+            // Currently CGrapheneSet version trails CGrapheneBlock version by 1
+            uint64_t grapheneSetVersion = version - 1;
             if (version > 3)
-                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(version - 1, computeOptimized));
+                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(grapheneSetVersion, computeOptimized));
             else
-                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(version - 1));
+                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(grapheneSetVersion));
         }
         READWRITE(*pGrapheneSet);
     }
