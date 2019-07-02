@@ -27,7 +27,7 @@ class CtorTest (BitcoinTestFramework):
         initialize_chain_clean(self.options.tmpdir, 7, bitcoinConfDict, wallets)
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(4, self.options.tmpdir)
+        self.nodes = start_nodes(4, self.options.tmpdir,[["-debug"],["-debug"],["-debug"],["-debug"]])
         # Now interconnect the nodes
         connect_nodes_full(self.nodes[:3])
         connect_nodes_bi(self.nodes,2,3)
@@ -89,8 +89,8 @@ class CtorTest (BitcoinTestFramework):
         try:
             invalid = next(x for x in ct if x["status"] == "invalid")
         except Exception as e:
-            pdb.set_trace()
             print(str(e))
+            AssertionError("CTOR node did not reject the block: " + str(e))
         assert_equal(invalid["height"], 102)
 
         # Now generate a CTOR block
@@ -182,7 +182,7 @@ class CtorTest (BitcoinTestFramework):
         for i in range(5):
             connect_nodes_bi(self.nodes,4,i)
 
-        self.nodes.append(start_node(5, self.options.tmpdir))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug"]))
         self.nodes[5].set("consensus.enableCanonicalTxOrder=0")
         waitFor(5, lambda: "False" in str(self.nodes[5].get("consensus.enableCanonicalTxOrder")))
 
