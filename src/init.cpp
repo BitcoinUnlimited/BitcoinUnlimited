@@ -1344,6 +1344,15 @@ bool AppInit2(Config &config, thread_group &threadGroup)
             return InitError(strprintf(_("User Agent comment (%s) contains unsafe characters."), cmt));
         uacomments.push_back(SanitizeString(cmt, SAFE_CHARS_UA_COMMENT));
     }
+    // If this is a 32bit build then append an identifier since we'd like to know
+    // how many still run this configuration.
+    {
+        int temp = 0;
+        int *ptemp = &temp;
+        if (sizeof(ptemp) == 4)
+            uacomments.push_back("32bit");
+    }
+
     strSubVersion = FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, uacomments);
     if (strSubVersion.size() > MAX_SUBVERSION_LENGTH)
     {
