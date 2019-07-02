@@ -74,6 +74,7 @@ extern CTweak<bool> ignoreNetTimeouts;
 #endif
 
 extern std::atomic<bool> fRescan;
+extern bool fReindex;
 
 using namespace std;
 
@@ -1857,27 +1858,29 @@ void ThreadOpenConnections()
             }
             // Disconnect a node that is not XTHIN capable if all outbound slots are full and we
             // have not yet connected to enough XTHIN nodes.
-            nMinXthinNodes = GetArg("-min-xthin-nodes", MIN_XTHIN_NODES);
-            if (nOutbound >= nMaxOutConnections && nThinBlockCapable <= min(nMinXthinNodes, nMaxOutConnections) &&
-                nDisconnects < MAX_DISCONNECTS && IsThinBlocksEnabled() && IsChainNearlySyncd())
+            if (!fReindex)
             {
-                if (pNonXthinNode != nullptr)
+                nMinXthinNodes = GetArg("-min-xthin-nodes", MIN_XTHIN_NODES);
+                if (nOutbound >= nMaxOutConnections && nThinBlockCapable <= min(nMinXthinNodes, nMaxOutConnections) &&
+                    nDisconnects < MAX_DISCONNECTS && IsThinBlocksEnabled() && IsChainNearlySyncd())
                 {
-                    pNonXthinNode->fDisconnect = true;
-                    fDisconnected = true;
-                    nDisconnects++;
+                    if (pNonXthinNode != nullptr)
+                    {
+                        pNonXthinNode->fDisconnect = true;
+                        fDisconnected = true;
+                        nDisconnects++;
+                    }
+                }
+                else if (IsInitialBlockDownload())
+                {
+                    if (pNonNodeNetwork != nullptr)
+                    {
+                        pNonNodeNetwork->fDisconnect = true;
+                        fDisconnected = true;
+                        nDisconnects++;
+                    }
                 }
             }
-            else if (IsInitialBlockDownload())
-            {
-                if (pNonNodeNetwork != nullptr)
-                {
-                    pNonNodeNetwork->fDisconnect = true;
-                    fDisconnected = true;
-                    nDisconnects++;
-                }
-            }
-
             // In the event that outbound nodes restart or drop off the network over time we need to
             // replenish the number of disconnects allowed once per day.
             if (GetTime() - nStart > 86400)

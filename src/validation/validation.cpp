@@ -481,7 +481,8 @@ bool LoadBlockIndexDB()
     // Check whether we need to continue reindexing
     bool fReindexing = false;
     pblocktree->ReadReindexing(fReindexing);
-    fReindex |= fReindexing;
+    if (fReindexing)
+        fReindex = fReindexing;
 
     // Check whether we have a transaction index
     pblocktree->ReadFlag("txindex", fTxIndex);
