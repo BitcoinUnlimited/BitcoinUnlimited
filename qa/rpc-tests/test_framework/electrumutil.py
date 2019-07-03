@@ -3,6 +3,8 @@
 from test_framework.loginit import logging
 import socket
 import json
+from . import cashaddr
+from .script import *
 
 ELECTRUM_PORT = None
 
@@ -40,3 +42,34 @@ class ElectrumConnection:
         self.s.sendall(msg.encode('ascii'))
         res = self.f.readline()
         return json.loads(res)
+
+# Helper function to attempt several times to connect to electrum server.
+# At startup, it may take a while before the server accepts connections.
+def create_electrum_connection(timeout = 30):
+    import time
+    start = time.time()
+    err = None
+    while time.time() < (start + timeout):
+        try:
+            return ElectrumConnection()
+        except Exception as e:
+            err = e
+            time.sleep(1)
+
+    raise Exception("Failed to connect to electrum server. Error '%s'" % err)
+
+# To look up an address with the electrum protocol, you need the hash
+# of the locking script (scriptpubkey)
+def address_to_scripthash(addr):
+    _, _, hash160 = cashaddr.decode(addr)
+    script = CScript([OP_DUP, OP_HASH160, hash160, OP_EQUALVERIFY, OP_CHECKSIG])
+
+    import hashlib
+    scripthash = hashlib.sha256(script).digest()
+
+    # Electrum wants little endian
+    scripthash = bytearray(scripthash)
+    scripthash.reverse()
+
+    return scripthash.hex()
+
