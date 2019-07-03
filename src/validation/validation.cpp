@@ -1320,6 +1320,15 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
     InvalidChainFound(pindex);
     // Now mark every block index on every chain that contains pindex as child of invalid
     MarkAllContainingChainsInvalid(pindex);
+
+    // Since this block has been invalidated and removed from setBlockIndexCandidates
+    // then reset the best header to the current most work chain.
+    CBlockIndex *mostWork = FindMostWorkChain();
+    if (mostWork)
+    {
+        pindexBestHeader = mostWork;
+    }
+
     mempool.removeForReorg(pcoinsTip, chainActive.Tip()->nHeight + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
     uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev);
     return true;
@@ -2655,6 +2664,14 @@ void InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state)
 
         // Now mark every block index on every chain that contains pindex as child of invalid
         MarkAllContainingChainsInvalid(pindex);
+
+        // Since this block has been invalidated and removed from setBlockIndexCandidates
+        // then reset the best header to the current most work chain.
+        CBlockIndex *mostWork = FindMostWorkChain();
+        if (mostWork)
+        {
+            pindexBestHeader = mostWork;
+        }
     }
 }
 
