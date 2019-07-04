@@ -116,17 +116,33 @@ std::string FormatSubVersion(const std::string &name, int nClientVersion, const 
     if (!subverOverride.empty())
         return subverOverride;
 
+    // sanitize comments per BIP014, format user agent and check total size
+    std::vector<std::string> uacomments = {};
+    for (std::string &cmt : mapMultiArgs["-uacomment"])
+    {
+        if (cmt != SanitizeString(cmt, SAFE_CHARS_UA_COMMENT))
+            break;
+        uacomments.push_back(SanitizeString(cmt, SAFE_CHARS_UA_COMMENT));
+    }
+
+    std::vector<std::string> vTotComments = comments;
+    vTotComments.insert(std::end(vTotComments), std::begin(uacomments), std::end(uacomments));
+
     std::ostringstream ss;
     ss << "/";
     ss << name << ":" << FormatVersion(nClientVersion);
-    if (!comments.empty())
+    if (!vTotComments.empty())
     {
-        std::vector<std::string>::const_iterator it(comments.begin());
+        std::vector<std::string>::const_iterator it(vTotComments.begin());
         ss << "(" << *it;
-        for (++it; it != comments.end(); ++it)
+        for (++it; it != vTotComments.end(); ++it)
             ss << "; " << *it;
         ss << ")";
     }
     ss << "/";
-    return ss.str();
+
+    std::string subver = ss.str();
+    if (subver.size() > MAX_SUBVERSION_LENGTH)
+        subver = subver.substr(0, MAX_SUBVERSION_LENGTH - 3) + ")/";
+    return subver;
 }

@@ -1349,14 +1349,16 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     RegisterNodeSignals(GetNodeSignals());
 
     // sanitize comments per BIP-0014, format user agent and check total size
-    std::vector<string> uacomments;
+    std::vector<string> uacomments = {};
     for (string &cmt : mapMultiArgs["-uacomment"])
     {
         if (cmt != SanitizeString(cmt, SAFE_CHARS_UA_COMMENT))
             return InitError(strprintf(_("User Agent comment (%s) contains unsafe characters."), cmt));
         uacomments.push_back(SanitizeString(cmt, SAFE_CHARS_UA_COMMENT));
     }
-    strSubVersion = FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, uacomments);
+
+    strSubVersion = FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, BUComments);
+
     if (strSubVersion.size() > MAX_SUBVERSION_LENGTH)
     {
         return InitError(strprintf(_("Total length of network version string (%i) exceeds maximum length (%i). Reduce "
