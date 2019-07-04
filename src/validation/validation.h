@@ -134,7 +134,8 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
 bool ActivateBestChain(CValidationState &state,
     const CChainParams &chainparams,
     const CBlock *pblock = nullptr,
-    bool fParallel = false);
+    bool fParallel = false,
+    CNode *pfrom = nullptr);
 
 /**
  * Process an incoming block. This only returns after the best known valid

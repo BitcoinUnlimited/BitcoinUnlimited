@@ -3294,7 +3294,11 @@ bool ActivateBestChainStep(CValidationState &state,
  * or an activated best chain. pblock is either nullptr or a pointer to a block
  * that is already loaded (to avoid loading it again from disk).
  */
-bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams, const CBlock *pblock, bool fParallel)
+bool ActivateBestChain(CValidationState &state,
+    const CChainParams &chainparams,
+    const CBlock *pblock,
+    bool fParallel,
+    CNode *pfrom)
 {
     bool result = true;
     CBlockIndex *pindexMostWork = nullptr;
@@ -3392,11 +3396,21 @@ bool ActivateBestChain(CValidationState &state, const CChainParams &chainparams,
         if (!ActivateBestChainStep(state, chainparams, pindexMostWork,
                 ((pblock) && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : nullptr), fParallel))
         {
-            // If we fail to activate a chain because it is bad, keep iterating to reactivate the best known chain
-            if (state.IsInvalid())
+            // If we fail to activate a chain because it is bad, send a reject message
+            // but keep iterating to reactivate the best known chain.
+            int nDoS = 0;
+            if (state.IsInvalid(nDoS))
             {
                 LOGA("Chain activation failed, returning to next best choice\n");
                 result = false;
+
+                if (pfrom)
+                {
+                    pfrom->PushMessage(NetMsgType::REJECT, (std::string)NetMsgType::BLOCK, state.GetRejectCode(),
+                        state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), pblock->GetHash());
+                    if (nDoS > 0)
+                        dosMan.Misbehaving(pfrom, nDoS);
+                }
             }
             else
             {
