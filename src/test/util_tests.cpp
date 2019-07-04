@@ -11,6 +11,7 @@
 #include "sync.h"
 #include "test/test_bitcoin.h"
 #include "test/test_random.h"
+#include "unlimited.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 
@@ -580,10 +581,29 @@ BOOST_AUTO_TEST_CASE(test_FormatSubVersion)
     // Semicolon is discouraged but not forbidden by BIP-0014
     comments2.push_back(
         SanitizeString(std::string("Comment2; .,_?@-; !\"#$%&'()*+/<=>[]\\^`{|}~"), SAFE_CHARS_UA_COMMENT));
-    BOOST_CHECK_EQUAL(FormatSubVersion("Test", 99900, std::vector<std::string>()), std::string("/Test:0.9.99/"));
+    BOOST_CHECK_EQUAL(FormatSubVersion("Test", 99900, {}), std::string("/Test:0.9.99/"));
     BOOST_CHECK_EQUAL(FormatSubVersion("Test", 99900, comments), std::string("/Test:0.9.99(comment1)/"));
     BOOST_CHECK_EQUAL(
         FormatSubVersion("Test", 99900, comments2), std::string("/Test:0.9.99(comment1; Comment2; .,_?@-; )/"));
+
+    excessiveBlockSize = 1000000;
+    excessiveAcceptDepth = 40;
+    settingsToUserAgentString();
+    const char *argv_test[] = {"bitcoind", "-uacomment=comment1", "-uacomment=Comment2", "-uacomment=Comment3"};
+    ParseParameters(4, (char **)argv_test, AllowedArgs::Bitcoind());
+    BOOST_CHECK_EQUAL(FormatSubVersion("Test", 99900, BUComments),
+        std::string("/Test:0.9.99(EB1; AD40; comment1; Comment2; Comment3)/"));
+
+    const char *argv_test2[] = {"bitcoind", "-uacomment=Commenttttttttttttttttttttttttttttttttttttttttt1",
+        "-uacomment=Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt2",
+        "-uacomment=Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt3",
+        "-uacomment=Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt4"};
+    ParseParameters(5, (char **)argv_test2, AllowedArgs::Bitcoind());
+    BOOST_CHECK_EQUAL(FormatSubVersion("Test", 99900, BUComments),
+        std::string("/Test:0.9.99(EB1; AD40; Commenttttttttttttttttttttttttttttttttttttttttt1; "
+                    "Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt2; "
+                    "Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt3; "
+                    "Commenttttttttttttttttttttttttttttttttttttttttttttttttt)/"));
 }
 
 BOOST_AUTO_TEST_CASE(test_ParseFixedPoint)
