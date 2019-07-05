@@ -27,7 +27,7 @@ class CtorTest (BitcoinTestFramework):
         initialize_chain_clean(self.options.tmpdir, 7, bitcoinConfDict, wallets)
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(4, self.options.tmpdir)
+        self.nodes = start_nodes(4, self.options.tmpdir,[["-debug"],["-debug"],["-debug"],["-debug"]])
         setup_connection_tracking(self.nodes)
         # Now interconnect the nodes
         connect_nodes_full(self.nodes[:3])
@@ -188,7 +188,7 @@ class CtorTest (BitcoinTestFramework):
         for i in range(5):
             connect_nodes_bi(self.nodes,4,i)
 
-        self.nodes.append(start_node(5, self.options.tmpdir))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug"]))
         self.nodes[5].set("consensus.enableCanonicalTxOrder=0")
         waitFor(5, lambda: "False" in str(self.nodes[5].get("consensus.enableCanonicalTxOrder")))
 
