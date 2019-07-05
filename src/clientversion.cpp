@@ -124,6 +124,14 @@ std::string FormatSubVersion(const std::string &name, int nClientVersion, const 
             break;
         uacomments.push_back(SanitizeString(cmt, SAFE_CHARS_UA_COMMENT));
     }
+    // If this is a 32bit build then append an identifier since we'd like to know
+    // how many still run this configuration.
+    {
+        int temp = 0;
+        int *ptemp = &temp;
+        if (sizeof(ptemp) == 4)
+            uacomments.push_back("32bit");
+    }
 
     std::vector<std::string> vTotComments = comments;
     vTotComments.insert(std::end(vTotComments), std::begin(uacomments), std::end(uacomments));
