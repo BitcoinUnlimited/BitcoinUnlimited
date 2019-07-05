@@ -3266,6 +3266,58 @@ CNode::~CNode()
     GetNodeSignals().FinalizeNode(GetId());
 }
 
+void CNode::PrioritizeSendMsg(CNode *pnode)
+{
+    LOCK(cs_PrioritySendQ);
+    vPrioritySendQ.push_back(CNodeRef(pnode));
+
+    // if there are more priority messages than the one we just added then find out how many
+    // are currently from this peer so we can order them by time of entry.
+    uint32_t nItemsPriority = 0;
+    if (vPrioritySendQ.size() >= 2)
+    {
+        for (auto &noderef : vPrioritySendQ)
+        {
+            if (noderef.get() == pnode)
+                nItemsPriority++;
+        }
+    }
+    else
+        nItemsPriority = 1;
+
+    // Move the range of priority msg's forward and place the new priority message (pri3) at the
+    // end of the range of priority msg's but still prior to non-priority msg's. This way we
+    // maintain the time based order of arrival of messages.
+    //
+    // Note that we sometimes keep the first message "msg1" at the beginning. This is in case part of msg1
+    // may have already been sent. The following examples show the relative locations of the messages
+    // after a new message arrives and then again after the iterator swap.
+    //
+    //   ** after a new priority message "pri3" is added to the front of the queue **
+    // Front of queue => *pri3* pri1 pri2 msg1 msg2 msg3 msg4 ...
+    //   or, in the case where msg1 has already been partially sent (nSendOffset != 0)
+    // Front of queue => *pri3* msg1 pri1 pri2 msg2 msg3 msg4 ...
+    //
+    //   **after iterator swap, becomes **
+    // Front of queue => pri1 pri2 *pri3* msg1, msg2 msg3 msg4 ...
+    //   or, in the case where msg1 has already been partially sent (nSendOffset != 0)
+    // Front of queue => msg1 pri1 pri2 *pri3* msg2 msg3 msg4 ...
+    assert(vSendMsg.size() > 0);
+    assert(nItemsPriority > 0);
+    size_t nIterSwaps = std::min((size_t)nItemsPriority, vSendMsg.size() - 1);
+    if (nSendOffset == 0 && nIterSwaps > 0)
+        nIterSwaps--;
+
+    if (vSendMsg.size() >= 2)
+    {
+        for (size_t i = 0; i < nIterSwaps; i++)
+            std::iter_swap(vSendMsg.begin() + i, vSendMsg.begin() + i + 1);
+    }
+
+    // Set the global flag to indicate there is a priority message waiting to be sent.
+    fPrioritySendMsg = true;
+}
+
 void CNode::BeginMessage(const char *pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSend)
 {
     ENTER_CRITICAL_SECTION(cs_vSend);
@@ -3346,51 +3398,7 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
         nSendSize.fetch_add((*it).size());
 
         // Add to the priority queue and position the message by swapping the iterators.
-        {
-            LOCK(cs_PrioritySendQ);
-            vPrioritySendQ.push_back(CNodeRef(this));
-
-            // if there are more priority messages than the one we just added then find out how many
-            // are currently from this peer so we can order them by time of entry.
-            uint32_t nItemsPriority = 0;
-            if (vPrioritySendQ.size() >= 2)
-            {
-                for (auto &noderef : vPrioritySendQ)
-                {
-                    if (noderef.get() == this)
-                        nItemsPriority++;
-                }
-            }
-            else
-                nItemsPriority = 1;
-
-            // Move the range of priority msg's forward and place the new priority message (pri3) at the
-            // end of the range of priority msg's but still prior to non-priority msg's. This way we
-            // maintain the time based order of arrival of messages.
-            //
-            // Note that we sometimes keep the first message "msg1" at the beginning. This is in case part of msg1
-            // may have already been sent. The following examples show the relative locations of the messages
-            // after a new message arrives and then again after the iterator swap.
-            //
-            //   ** after a new priority message "pri3" is added to the front of the queue **
-            // Front of queue => *pri3* pri1 pri2 msg1 msg2 msg3 msg4 ...
-            //   or, in the case where msg1 has already been partially sent (nSendOffset != 0)
-            // Front of queue => *pri3* msg1 pri1 pri2 msg2 msg3 msg4 ...
-            //
-            //   **after iterator swap, becomes **
-            // Front of queue => pri1 pri2 *pri3* msg1, msg2 msg3 msg4 ...
-            //   or, in the case where msg1 has already been partially sent (nSendOffset != 0)
-            // Front of queue => msg1 pri1 pri2 *pri3* msg2 msg3 msg4 ...
-            uint32_t nCutoff = 2;
-            if (nSendOffset != 0)
-                nCutoff = 1;
-            if (nItemsPriority >= nCutoff && vSendMsg.size() >= 2)
-            {
-                for (size_t i = 0; i < nItemsPriority && i < vSendMsg.size() - 1; i++)
-                    std::iter_swap(vSendMsg.begin() + i, vSendMsg.begin() + i + 1);
-            }
-        }
-        fPrioritySendMsg = true;
+        PrioritizeSendMsg(this);
         LOG(THIN | GRAPHENE | CMPCT, "Send Queue: pushed %s to the front of the queue, peer(%d)\n", strCommand,
             this->GetId());
     }

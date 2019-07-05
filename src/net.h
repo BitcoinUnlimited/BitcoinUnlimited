@@ -744,6 +744,11 @@ public:
         vBlockHashesToAnnounce.push_back(hash);
     }
 
+    //! Place this message at the front of the send message queue. This message will be sent
+    //! out before any other messages regarless of which node we are currently processing
+    //! messages for.
+    void PrioritizeSendMsg(CNode *pnode);
+
     // TODO: Document the postcondition of this function.  Is cs_vSend locked?
     void BeginMessage(const char *pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSend);
 

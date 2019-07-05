@@ -217,6 +217,7 @@ public:
     CDataStream *rdbuf() { return this; }
     int in_avail() { return size(); }
     void SetType(int n) { nType = n; }
+    void SetPos(int n) { nReadPos = n; }
     int GetType() const { return nType; }
     void SetVersion(int n) { nVersion = n; }
     int GetVersion() const { return nVersion; }
