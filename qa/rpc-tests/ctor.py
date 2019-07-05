@@ -27,7 +27,8 @@ class CtorTest (BitcoinTestFramework):
         initialize_chain_clean(self.options.tmpdir, 7, bitcoinConfDict, wallets)
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(4, self.options.tmpdir,[["-debug"],["-debug"],["-debug"],["-debug"]])
+        self.nodes = start_nodes(4, self.options.tmpdir)
+        setup_connection_tracking(self.nodes)
         # Now interconnect the nodes
         connect_nodes_full(self.nodes[:3])
         connect_nodes_bi(self.nodes,2,3)
@@ -136,7 +137,7 @@ class CtorTest (BitcoinTestFramework):
 
         connect_nodes_bi(self.nodes,0,1)
         sync_blocks(self.nodes[0:2])
-
+        logging.info("Nodes 0,1 at block: %d " % self.nodes[2].getblockcount())
         # make n0 send coin to itself 4*3 times
         for j in range(4):
             for i in range(3):
@@ -144,6 +145,7 @@ class CtorTest (BitcoinTestFramework):
             self.nodes[0].generate(1)
         connect_nodes_bi(self.nodes,0,1)
         sync_blocks(self.nodes[0:2])
+        logging.info("Nodes 0,1 at block: %d " % self.nodes[2].getblockcount())
         waitFor(10, lambda: self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
         # ctor rollback test
@@ -152,17 +154,19 @@ class CtorTest (BitcoinTestFramework):
             for i in range(3):
                 self.nodes[3].sendtoaddress(addr[3], 4-i)
             self.nodes[3].generate(1)
- 
+
         connect_nodes_bi(self.nodes,2,3)
         sync_blocks(self.nodes[2:])
- 
+        logging.info("Nodes 2,3 at block: %d " % self.nodes[2].getblockcount())
+
         for j in range(4):
             for i in range(3):
                 self.nodes[2].sendtoaddress(addr[2], 4-i)
             self.nodes[2].generate(1)
- 
+
         connect_nodes_bi(self.nodes,2,3)
         sync_blocks(self.nodes[2:])
+        logging.info("Nodes 2,3 at block: %d " % self.nodes[2].getblockcount())
         waitFor(10, lambda: self.nodes[2].getbestblockhash() == self.nodes[3].getbestblockhash())
 
         # push the dtor chain beyond ctor by 29 blocks
@@ -170,20 +174,21 @@ class CtorTest (BitcoinTestFramework):
             self.nodes[0].sendtoaddress(addr[0], 1)
             self.nodes[0].generate(1)
         sync_blocks(self.nodes[0:2])
+        logging.info("Nodes 0,1 at block: %d " % self.nodes[0].getblockcount())
 
         # Test that two new nodes that come up IBD and follow the appropriate chains
         ctorTip = self.nodes[3].getbestblockhash()
         ctorTipHeight = self.nodes[3].getblockcount()
         dtorTip = self.nodes[0].getbestblockhash()
         dtorTipHeight = self.nodes[0].getblockcount()
- 
+
         self.nodes.append(start_node(4, self.options.tmpdir))
         self.nodes[4].set("consensus.enableCanonicalTxOrder=1")
         waitFor(5, lambda: "True" in str(self.nodes[4].get("consensus.enableCanonicalTxOrder")))
         for i in range(5):
             connect_nodes_bi(self.nodes,4,i)
 
-        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug"]))
+        self.nodes.append(start_node(5, self.options.tmpdir))
         self.nodes[5].set("consensus.enableCanonicalTxOrder=0")
         waitFor(5, lambda: "False" in str(self.nodes[5].get("consensus.enableCanonicalTxOrder")))
 
