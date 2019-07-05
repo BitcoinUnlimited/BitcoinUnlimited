@@ -1132,9 +1132,10 @@ void CleanupDisconnectedNodes()
                 // close socket and cleanup
                 pnode->CloseSocketDisconnect();
 
-                // hold in disconnected pool until all refs are released
-                if (pnode->fNetworkNode || pnode->fInbound)
-                    pnode->Release();
+                // Release this one reference.
+                pnode->Release();
+
+                // hold in disconnected pool until all other refs are released
                 vNodesDisconnected.push_back(pnode);
             }
         }
