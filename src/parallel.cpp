@@ -596,33 +596,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
             ProcessNewBlock(state, chainparams, pfrom, pblock.get(), forceProcessing, nullptr, false);
         }
 
-        int nDoS;
-        if (state.IsInvalid(nDoS))
-        {
-            LOGA("Invalid block due to %s\n", state.GetRejectReason().c_str());
-            if (!strCommand.empty())
-            {
-                pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
-                    state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
-                if (nDoS > 0)
-                    dosMan.Misbehaving(pfrom, nDoS);
-            }
-
-            // the current fork is bad due to this block so reset the best header to the best fully-validated block
-            // so we can download another fork of headers (and blocks).
-            LOCK(cs_main);
-            CBlockIndex *mostWork = FindMostWorkChain();
-            CBlockIndex *tip = chainActive.Tip();
-            if (mostWork && tip && (mostWork->nChainWork > tip->nChainWork))
-            {
-                pindexBestHeader = mostWork;
-            }
-            else
-            {
-                pindexBestHeader = tip;
-            }
-        }
-        else
+        if (!state.IsInvalid())
         {
             LargestBlockSeen(nSizeBlock); // update largest block seen
 

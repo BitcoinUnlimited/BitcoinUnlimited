@@ -27,7 +27,7 @@ class CtorTest (BitcoinTestFramework):
         initialize_chain_clean(self.options.tmpdir, 7, bitcoinConfDict, wallets)
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(4, self.options.tmpdir)
+        self.nodes = start_nodes(4, self.options.tmpdir,[["-debug"],["-debug"],["-debug"],["-debug"]])
         # Now interconnect the nodes
         connect_nodes_full(self.nodes[:3])
         connect_nodes_bi(self.nodes,2,3)
@@ -56,7 +56,7 @@ class CtorTest (BitcoinTestFramework):
             self.nodes[0].sendtoaddress(a, 5)
 
         # now send tx to myself that must reuse coins because I don't have enough
-        for i in range(1,20):
+        for i in range(1, 20):
             try:
                 self.nodes[0].sendtoaddress(addr[0], 21-i)
             except JSONRPCException as e: # an exception you don't catch is a testing error
@@ -83,14 +83,15 @@ class CtorTest (BitcoinTestFramework):
         assert_equal(self.nodes[1].getblockcount(), 102)
 
         # check that a CTOR node rejected the block
+        waitFor(30, lambda: "invalid" in str(self.nodes[2].getchaintips()))
         ct = self.nodes[2].getchaintips()
         tip = next(x for x in ct if x["status"] == "active")
         assert_equal(tip["height"], 101)
         try:
             invalid = next(x for x in ct if x["status"] == "invalid")
         except Exception as e:
-            pdb.set_trace()
-            print(str(e))
+            print(str(ct))
+            AssertionError("Incorrect chain status: " + str(e))
         assert_equal(invalid["height"], 102)
 
         # Now generate a CTOR block
@@ -182,7 +183,7 @@ class CtorTest (BitcoinTestFramework):
         for i in range(5):
             connect_nodes_bi(self.nodes,4,i)
 
-        self.nodes.append(start_node(5, self.options.tmpdir))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug"]))
         self.nodes[5].set("consensus.enableCanonicalTxOrder=0")
         waitFor(5, lambda: "False" in str(self.nodes[5].get("consensus.enableCanonicalTxOrder")))
 

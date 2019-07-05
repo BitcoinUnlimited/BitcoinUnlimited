@@ -1320,6 +1320,15 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
     InvalidChainFound(pindex);
     // Now mark every block index on every chain that contains pindex as child of invalid
     MarkAllContainingChainsInvalid(pindex);
+
+    // Since this block has been invalidated and removed from setBlockIndexCandidates
+    // then reset the best header to the current most work chain.
+    CBlockIndex *mostWork = FindMostWorkChain();
+    if (mostWork)
+    {
+        pindexBestHeader = mostWork;
+    }
+
     mempool.removeForReorg(pcoinsTip, chainActive.Tip()->nHeight + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
     uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev);
     return true;
@@ -2655,6 +2664,14 @@ void InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state)
 
         // Now mark every block index on every chain that contains pindex as child of invalid
         MarkAllContainingChainsInvalid(pindex);
+
+        // Since this block has been invalidated and removed from setBlockIndexCandidates
+        // then reset the best header to the current most work chain.
+        CBlockIndex *mostWork = FindMostWorkChain();
+        if (mostWork)
+        {
+            pindexBestHeader = mostWork;
+        }
     }
 }
 
@@ -2958,7 +2975,6 @@ bool ConnectTip(CValidationState &state,
         {
             if (state.IsInvalid())
             {
-                // DbgPause();
                 InvalidBlockFound(pindexNew, state);
                 return error("ConnectTip(): ConnectBlock %s failed", pindexNew->GetBlockHash().ToString());
             }
@@ -3014,7 +3030,7 @@ bool ConnectTip(CValidationState &state,
     return true;
 }
 
-void CheckForkWarningConditionsOnNewFork(CBlockIndex *pindexNewForkTip)
+static void CheckForkWarningConditionsOnNewFork(CBlockIndex *pindexNewForkTip)
 {
     AssertLockHeld(cs_main);
     // If we are on a fork that is sufficiently large, set a warning flag
@@ -3117,6 +3133,10 @@ bool ActivateBestChainStep(CValidationState &state,
         CBlockIndex *pindexLastNotify = nullptr;
         for (auto i = vpindexToConnect.rbegin(); i != vpindexToConnect.rend(); i++)
         {
+            // Start with a clear state in case we're connecting another block after
+            // trying to connect an invalid on a different chain.
+            state = CValidationState();
+
             CBlockIndex *pindexConnect = *i;
             // Check if the best chain has changed while we were disconnecting or processing blocks.
             // If so then we need to return and continue processing the newer chain.
@@ -3134,6 +3154,8 @@ bool ActivateBestChainStep(CValidationState &state,
             {
                 if (state.IsInvalid())
                 {
+                    LOGA("Invalid block due to %s\n", state.GetRejectReason().c_str());
+
                     // The block violates a consensus rule.
                     if (!state.CorruptionPossible())
                         InvalidChainFound(vpindexToConnect.back());
@@ -3274,12 +3296,12 @@ bool ActivateBestChainStep(CValidationState &state,
  * or an activated best chain. pblock is either nullptr or a pointer to a block
  * that is already loaded (to avoid loading it again from disk).
  */
-bool ActivateBestChain(CValidationState &returnedState,
+bool ActivateBestChain(CValidationState &state,
     const CChainParams &chainparams,
     const CBlock *pblock,
-    bool fParallel)
+    bool fParallel,
+    CNode *pfrom)
 {
-    CValidationState state;
     bool result = true;
     CBlockIndex *pindexMostWork = nullptr;
 
@@ -3376,16 +3398,32 @@ bool ActivateBestChain(CValidationState &returnedState,
         if (!ActivateBestChainStep(state, chainparams, pindexMostWork,
                 ((pblock) && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : nullptr), fParallel))
         {
-            // If we fail to activate a chain because it is bad, keep iterating to reactivate the best known chain
-            if (state.IsInvalid())
+            // If we fail to activate a chain because it is bad, send a reject message
+            // but keep iterating to reactivate the best known chain.
+            int nDoS = 0;
+            if (state.IsInvalid(nDoS))
             {
-                LOG(BLK, "Chain activation failed, returning to next best choice\n");
-                returnedState = state; // We'll eventually want to return the error we found
-                state = CValidationState(); // but clear it now for activating the new best chain.
-                result = false; // and remember that we failed
+                LOGA("Chain activation failed, returning to next best choice\n");
+                result = false;
+
+                if (pfrom)
+                {
+                    pfrom->PushMessage(NetMsgType::REJECT, (std::string)NetMsgType::BLOCK, state.GetRejectCode(),
+                        state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), pblock->GetHash());
+                    if (nDoS > 0)
+                        dosMan.Misbehaving(pfrom, nDoS);
+                }
             }
             else
+            {
                 return false;
+            }
+        }
+        else
+        {
+            // We may have tried to connect an invalid chain prior to connecting a valid one so we need
+            // to reset the result to true if we had previously set it to false.
+            result = true;
         }
 
         // Check if the best chain has changed while we were processing blocks.  If so then we need to
