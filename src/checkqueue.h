@@ -95,7 +95,7 @@ private:
                     }
                     if (fQuit && !fMaster)
                     {
-                        nTodo = 0;
+                        nTodo -= queue.size();
                         queue.clear();
                         condMaster.notify_one();
                     }

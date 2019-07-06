@@ -3208,8 +3208,6 @@ bool ActivateBestChainStep(CValidationState &state,
                 }
             }
         }
-        if (fInvalidFound)
-            break; // stop processing more blocks if the last one was invalid.
 
         // Notify the UI with the new block tip information.
         if (pindexMostWork->nHeight >= nHeight && pindexNewTip != nullptr && pindexLastNotify != pindexNewTip)
