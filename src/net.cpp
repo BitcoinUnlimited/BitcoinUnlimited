@@ -110,7 +110,6 @@ int nMaxConnections = DEFAULT_MAX_PEER_CONNECTIONS;
 int nMinXthinNodes = MIN_XTHIN_NODES;
 
 bool fAddressesInitialized = false;
-std::string strSubVersion;
 
 // BU moved to global.cpp
 // extern vector<CNode*> vNodes;

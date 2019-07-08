@@ -1357,7 +1357,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         uacomments.push_back(SanitizeString(cmt, SAFE_CHARS_UA_COMMENT));
     }
 
-    strSubVersion = FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, BUComments);
+    std::string strSubVersion = FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, BUComments);
 
     if (strSubVersion.size() > MAX_SUBVERSION_LENGTH)
     {

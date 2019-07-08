@@ -204,9 +204,6 @@ extern CCriticalSection cs_mapRelay;
 extern std::vector<std::string> vAddedNodes;
 extern CCriticalSection cs_vAddedNodes;
 
-/** Subversion as sent to the P2P network in `version` messages */
-extern std::string strSubVersion;
-
 struct LocalServiceInfo
 {
     int nScore;
