@@ -143,6 +143,11 @@ std::string FormatSubVersion(const std::string &name, int nClientVersion, const 
 
     std::string subver = ss.str();
     if (subver.size() > MAX_SUBVERSION_LENGTH)
+    {
+        LOGA("Total length of network version string (%i) exceeds maximum length (%i). Reduce "
+             "the number or size of uacomments.",
+            subver.size(), MAX_SUBVERSION_LENGTH);
         subver = subver.substr(0, MAX_SUBVERSION_LENGTH - 3) + ")/";
+    }
     return subver;
 }
