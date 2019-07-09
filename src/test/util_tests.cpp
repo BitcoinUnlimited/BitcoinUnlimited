@@ -14,6 +14,7 @@
 #include "unlimited.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
+#include "xversionmessage.h"
 
 #include <stdint.h>
 #include <vector>
@@ -604,6 +605,9 @@ BOOST_AUTO_TEST_CASE(test_FormatSubVersion)
                     "Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt2; "
                     "Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt3; "
                     "Commentttttttttttttttttttttttttttttttttttttttttttttttttt)/"));
+
+    std::string subver = FormatSubVersion("Test", 99900, BUComments);
+    BOOST_CHECK_EQUAL(subver.size(), MAX_SUBVERSION_LENGTH);
 }
 
 BOOST_AUTO_TEST_CASE(test_ParseFixedPoint)
