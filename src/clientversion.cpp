@@ -125,8 +125,8 @@ std::string FormatSubVersion(const std::string &name, int nClientVersion, const 
     {
         int temp = 0;
         int *ptemp = &temp;
-        if (sizeof(ptemp) == 4)
-            uacomments.insert(uacomments.begin(), "32bit");
+        std::string arch = (sizeof(ptemp) == 4) ? "32bit" : "64bit";
+        uacomments.insert(std::begin(uacomments), arch);
     }
 
     std::vector<std::string> vTotComments = comments;
