@@ -93,7 +93,6 @@ extern std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
 extern bool AbortNode(CValidationState &state, const std::string &strMessage, const std::string &userMessage = "");
 extern void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age);
 extern void AlertNotify(const std::string &strMessage);
-extern CBlockIndex *pindexBestInvalid;
 extern std::set<int> setDirtyFileInfo;
 extern std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders;
 extern std::atomic<int> nPreferredDownload;
@@ -223,15 +222,6 @@ bool AcceptBlockHeader(const CBlockHeader &block,
     if (pindex == nullptr)
         pindex = AddToBlockIndex(block);
 
-    // If the block belongs to the set of check-pointed blocks but it has a mismatched hash,
-    // then we are on the wrong fork so ignore
-    if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindex->nHeight, *pindex->phashBlock, chainparams))
-    {
-        WRITELOCK(cs_mapBlockIndex);
-        pindex->nStatus |= BLOCK_FAILED_VALID; // block doesn't match checkpoints so invalid
-        pindex->nStatus &= ~BLOCK_VALID_CHAIN;
-    }
-
     if (ppindex)
         *ppindex = pindex;
 
@@ -282,13 +272,23 @@ CBlockIndex *AddToBlockIndex(const CBlockHeader &block)
         pindexNew->pprev = (*miPrev).second;
         pindexNew->nHeight = pindexNew->pprev->nHeight + 1;
         pindexNew->BuildSkip();
-        // BU If the prior block or an ancestor has failed, mark this one failed
+        // If the prior block or an ancestor has failed, mark this one failed
         if (pindexNew->pprev && pindexNew->pprev->nStatus & BLOCK_FAILED_MASK)
             pindexNew->nStatus |= BLOCK_FAILED_CHILD;
     }
     pindexNew->nChainWork = (pindexNew->pprev ? pindexNew->pprev->nChainWork : 0) + GetBlockProof(*pindexNew);
     pindexNew->RaiseValidity(BLOCK_VALID_TREE);
 
+    // If the block belongs to the set of check-pointed blocks but it has a mismatched hash,
+    // then we are on the wrong fork so ignore.
+    if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindexNew->nHeight, *pindexNew->phashBlock, Params()))
+    {
+        pindexNew->nStatus |= BLOCK_FAILED_VALID; // block doesn't match checkpoints so invalid
+        pindexNew->nStatus &= ~BLOCK_VALID_CHAIN;
+    }
+
+    // Lastly, set the best header if this is a valid header on a valid chain and if the chain work
+    // is higher than the previous best header.
     if ((!(pindexNew->nStatus & BLOCK_FAILED_MASK)) &&
         (pindexBestHeader.load() == nullptr || pindexBestHeader.load()->nChainWork < pindexNew->nChainWork))
         pindexBestHeader = pindexNew;
@@ -425,7 +425,7 @@ bool LoadBlockIndexDB()
         if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->pprev == nullptr))
             setBlockIndexCandidates.insert(pindex);
         if (pindex->nStatus & BLOCK_FAILED_MASK &&
-            (!pindexBestInvalid || pindex->nChainWork > pindexBestInvalid->nChainWork))
+            (!pindexBestInvalid || pindex->nChainWork > pindexBestInvalid.load()->nChainWork))
             pindexBestInvalid = pindex;
         if (pindex->pprev)
             pindex->BuildSkip();
@@ -1041,7 +1041,7 @@ bool ReconsiderBlock(CValidationState &state, CBlockIndex *pindex)
             {
                 setBlockIndexCandidates.insert(it->second);
             }
-            if (it->second == pindexBestInvalid)
+            if (it->second == pindexBestInvalid.load())
             {
                 // Reset invalid block marker if it was pointing to one of those.
                 pindexBestInvalid = nullptr;
@@ -1236,7 +1236,8 @@ CBlockIndex *FindMostWorkChain()
         if (fFailedChain || fMissingData || (fRecentExcessive && !fOldExcessive))
         {
             // Candidate chain is not usable (either invalid or missing data)
-            if (fFailedChain && (pindexBestInvalid == nullptr || pindexNew->nChainWork > pindexBestInvalid->nChainWork))
+            if (fFailedChain &&
+                (pindexBestInvalid == nullptr || pindexNew->nChainWork > pindexBestInvalid.load()->nChainWork))
                 pindexBestInvalid = pindexNew;
             CBlockIndex *pindexFailed = pindexNew;
             // Remove the entire chain from the set.
@@ -1373,7 +1374,7 @@ void CheckForkWarningConditions()
 
 void InvalidChainFound(CBlockIndex *pindexNew)
 {
-    if (!pindexBestInvalid || pindexNew->nChainWork > pindexBestInvalid->nChainWork)
+    if (!pindexBestInvalid || pindexNew->nChainWork > pindexBestInvalid.load()->nChainWork)
         pindexBestInvalid = pindexNew;
 
     LOGA("%s: invalid block=%s  height=%d  log2_work=%.8g  date=%s\n", __func__, pindexNew->GetBlockHash().ToString(),
