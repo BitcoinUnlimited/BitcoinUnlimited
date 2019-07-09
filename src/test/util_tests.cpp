@@ -603,7 +603,7 @@ BOOST_AUTO_TEST_CASE(test_FormatSubVersion)
         std::string("/Test:0.9.99(EB1; AD40; Commenttttttttttttttttttttttttttttttttttttttttt1; "
                     "Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt2; "
                     "Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt3; "
-                    "Commenttttttttttttttttttttttttttttttttttttttttttttttttt)/"));
+                    "Commentttttttttttttttttttttttttttttttttttttttttttttttttt)/"));
 }
 
 BOOST_AUTO_TEST_CASE(test_ParseFixedPoint)
