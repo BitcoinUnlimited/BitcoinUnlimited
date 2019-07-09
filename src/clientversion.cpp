@@ -120,11 +120,13 @@ std::string FormatSubVersion(const std::string &name, int nClientVersion, const 
 
     // If this is a 32bit build then append an identifier since we'd like to know
     // how many still run this configuration.
+    // We are going to put it at the front of uacomments so it immediately
+    // follows the EB/AD parameters and won't get truncated
     {
         int temp = 0;
         int *ptemp = &temp;
         if (sizeof(ptemp) == 4)
-            uacomments.push_back("32bit");
+            uacomments.insert(uacomments.begin(), "32bit");
     }
 
     std::vector<std::string> vTotComments = comments;
