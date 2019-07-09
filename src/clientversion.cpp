@@ -116,14 +116,8 @@ std::string FormatSubVersion(const std::string &name, int nClientVersion, const 
     if (!subverOverride.empty())
         return subverOverride;
 
-    // sanitize comments per BIP014, format user agent and check total size
-    std::vector<std::string> uacomments = {};
-    for (std::string &cmt : mapMultiArgs["-uacomment"])
-    {
-        if (cmt != SanitizeString(cmt, SAFE_CHARS_UA_COMMENT))
-            break;
-        uacomments.push_back(SanitizeString(cmt, SAFE_CHARS_UA_COMMENT));
-    }
+    std::vector<std::string> uacomments = mapMultiArgs["-uacomment"];
+
     // If this is a 32bit build then append an identifier since we'd like to know
     // how many still run this configuration.
     {
