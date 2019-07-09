@@ -432,7 +432,7 @@ uint8_t CGrapheneSet::NChecksumBits(size_t nIbltEntries,
         return 32;
 
     return (uint8_t)std::max((double)MIN_CHECKSUM_BITS,
-        std::log2(nIbltEntries *
-                  (1 - std::pow(1 - fBloomFPR * (nIbltHashFuncs / (double)nIbltEntries), nReceiverUniverseItems))) -
-            std::log2(fUncheckedErrorTol));
+        std::ceil(std::log2(nIbltEntries * (1 - std::pow(1 - fBloomFPR * (nIbltHashFuncs / (double)nIbltEntries),
+                                                    nReceiverUniverseItems))) -
+                                 std::log2(fUncheckedErrorTol)));
 }
