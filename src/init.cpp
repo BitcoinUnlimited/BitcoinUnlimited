@@ -1358,6 +1358,14 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     }
 
     std::string strSubVersion = FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, BUComments);
+    if (strSubVersion.size() == MAX_SUBVERSION_LENGTH)
+    {
+        InitWarning(
+            strprintf(_("Total length of network version string with uacomments added exceeded "
+                        "the maximum length (%i) and have been truncated.  Reduce the number or size of uacomments "
+                        "to avoid truncation."),
+                MAX_SUBVERSION_LENGTH));
+    }
 
     if (mapArgs.count("-onlynet"))
     {
