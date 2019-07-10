@@ -78,7 +78,7 @@ matrix:
         - DPKG_ADD_ARCH="i386"
         - DEP_OPTS="NO_QT=1"
         - PACKAGES="python3 nsis g++-mingw-w64-i686 wine32 wine-binfmt"
-        - RUN_TESTS=true GOAL="install"
+        - RUN_TESTS=false GOAL="install"
         - BITCOIN_CONFIG="--enable-reduce-exports"
     #Win64
     - compiler: gcc
