@@ -289,8 +289,9 @@ CBlockIndex *AddToBlockIndex(const CBlockHeader &block)
 
     // Lastly, set the best header if this is a valid header on a valid chain and if the chain work
     // is higher than the previous best header.
+    CBlockIndex *pBestHeader = pindexBestHeader.load();
     if ((!(pindexNew->nStatus & BLOCK_FAILED_MASK)) &&
-        (pindexBestHeader.load() == nullptr || pindexBestHeader.load()->nChainWork < pindexNew->nChainWork))
+        (pBestHeader == nullptr || pBestHeader->nChainWork < pindexNew->nChainWork))
         pindexBestHeader = pindexNew;
 
     setDirtyBlockIndex.insert(pindexNew);
@@ -424,13 +425,14 @@ bool LoadBlockIndexDB()
         }
         if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->nChainTx || pindex->pprev == nullptr))
             setBlockIndexCandidates.insert(pindex);
-        if (pindex->nStatus & BLOCK_FAILED_MASK &&
-            (!pindexBestInvalid || pindex->nChainWork > pindexBestInvalid.load()->nChainWork))
+        CBlockIndex *pBestInvalid = pindexBestInvalid.load();
+        if (pindex->nStatus & BLOCK_FAILED_MASK && (!pBestInvalid || pindex->nChainWork > pBestInvalid->nChainWork))
             pindexBestInvalid = pindex;
         if (pindex->pprev)
             pindex->BuildSkip();
+        CBlockIndex *pBestHeader = pindexBestHeader.load();
         if (pindex->IsValid(BLOCK_VALID_TREE) &&
-            (pindexBestHeader.load() == nullptr || CBlockIndexWorkComparator()(pindexBestHeader.load(), pindex)))
+            (pBestHeader == nullptr || CBlockIndexWorkComparator()(pBestHeader, pindex)))
             pindexBestHeader = pindex;
     }
 
@@ -1236,8 +1238,8 @@ CBlockIndex *FindMostWorkChain()
         if (fFailedChain || fMissingData || (fRecentExcessive && !fOldExcessive))
         {
             // Candidate chain is not usable (either invalid or missing data)
-            if (fFailedChain &&
-                (pindexBestInvalid == nullptr || pindexNew->nChainWork > pindexBestInvalid.load()->nChainWork))
+            CBlockIndex *pBestInvalid = pindexBestInvalid.load();
+            if (fFailedChain && (pBestInvalid == nullptr || pindexNew->nChainWork > pBestInvalid->nChainWork))
                 pindexBestInvalid = pindexNew;
             CBlockIndex *pindexFailed = pindexNew;
             // Remove the entire chain from the set.
@@ -1374,7 +1376,8 @@ void CheckForkWarningConditions()
 
 void InvalidChainFound(CBlockIndex *pindexNew)
 {
-    if (!pindexBestInvalid || pindexNew->nChainWork > pindexBestInvalid.load()->nChainWork)
+    CBlockIndex *pBestInvalid = pindexBestInvalid.load();
+    if (!pBestInvalid || pindexNew->nChainWork > pBestInvalid->nChainWork)
         pindexBestInvalid = pindexNew;
 
     LOGA("%s: invalid block=%s  height=%d  log2_work=%.8g  date=%s\n", __func__, pindexNew->GetBlockHash().ToString(),
@@ -2507,14 +2510,14 @@ bool ConnectBlock(const CBlock &block,
     // download we don't need to check most of those scripts except for the most
     // recent ones.
     bool fScriptChecks = true;
-    if (pindexBestHeader.load())
+    CBlockIndex *pBestHeader = pindexBestHeader.load();
+    if (pBestHeader)
     {
         if (fReindex || fImporting)
             fScriptChecks = !fCheckpointsEnabled || block.nTime > timeBarrier;
         else
-            fScriptChecks =
-                !fCheckpointsEnabled || block.nTime > timeBarrier ||
-                (uint32_t)pindex->nHeight > pindexBestHeader.load()->nHeight - (144 * checkScriptDays.Value());
+            fScriptChecks = !fCheckpointsEnabled || block.nTime > timeBarrier ||
+                            (uint32_t)pindex->nHeight > pBestHeader->nHeight - (144 * checkScriptDays.Value());
     }
 
     CAmount nFees = 0;
