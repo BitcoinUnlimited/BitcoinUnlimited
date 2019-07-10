@@ -6,6 +6,7 @@
 #include "util.h"
 
 #include "clientversion.h"
+#include "consensus/consensus.h"
 #include "primitives/transaction.h"
 #include "reverse_iterator.h"
 #include "sync.h"
@@ -612,6 +613,10 @@ BOOST_AUTO_TEST_CASE(test_FormatSubVersion)
 
     std::string subver = FormatSubVersion("Test", 99900, BUComments);
     BOOST_CHECK_EQUAL(subver.size(), MAX_SUBVERSION_LENGTH);
+
+    // set EB?AD back to default value
+    excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
+    excessiveAcceptDepth = DEFAULT_EXCESSIVE_ACCEPT_DEPTH;
 }
 
 BOOST_AUTO_TEST_CASE(test_ParseFixedPoint)
