@@ -2524,8 +2524,12 @@ bool SendMessages(CNode *pto)
         // download (our chain will now not sync until the next block announcement is received). Therefore, if the
         // best invalid chain work is still greater than our chaintip then we have to keep looking for more blocks
         // to download.
-        if (!IsChainSyncd() || (pindexBestInvalid.load() && chainActive.Tip() &&
-                                   pindexBestInvalid.load()->nChainWork > chainActive.Tip()->nChainWork))
+        //
+        // Use temporaries for the chain tip and best invalid because they are both atomics and either could
+        // be nullified between the two calls.
+        CBlockIndex *pTip = chainActive.Tip();
+        CBlockIndex *pBestInvalid = pindexBestInvalid.load();
+        if (!IsChainSyncd() || (pBestInvalid && pTip && pBestInvalid->nChainWork > pTip->nChainWork))
         {
             TRY_LOCK(cs_main, locked);
             if (locked)
