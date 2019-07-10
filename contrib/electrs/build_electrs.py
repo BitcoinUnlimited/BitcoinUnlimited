@@ -4,9 +4,9 @@ import logging
 import os
 import sys
 import shutil
-GIT_REPO = "https://github.com/dagurval/electrs.git"
+GIT_REPO = "https://github.com/BitcoinUnlimited/electrs.git"
 GIT_BRANCH = "v0.7.0bu"
-EXPECT_HEAD = "5d37e7fe52e5cd81c00f269ad09dd32a835ff808"
+EXPECT_HEAD = "04bab5857acf15738cfb5c0324821a184f54ea8f"
 
 ROOT_DIR = os.path.realpath(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
