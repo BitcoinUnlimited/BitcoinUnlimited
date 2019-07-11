@@ -1466,9 +1466,23 @@ void CTxMemPool::UpdateTransactionsPerSecond()
 {
     std::lock_guard<std::mutex> lock(cs_txPerSec);
 
+    static uint64_t nCount = 0;
     static int64_t nLastTime = GetTime();
-    double nSecondsToAverage = 60; // Length of time in seconds to smooth the tx rate over
+    const static double nSecondsToAverage = 60; // Length of time in seconds to smooth the tx rate over
+
     int64_t nNow = GetTime();
+    nCount++;
+
+    // Don't report the transaction rate for 10 seconds after startup. This gives time for any
+    // transations to be processed, from the mempool.dat file stored on disk, which would skew the
+    // peak transaction rate.
+    const static int64_t nStartTime = GetTime() + 10;
+    if (nStartTime > nNow)
+    {
+        nTxPerSec = 0;
+        nCount = 0;
+        return;
+    }
 
     // Decay the previous tx rate.
     int64_t nDeltaTime = nNow - nLastTime;
@@ -1483,20 +1497,18 @@ void CTxMemPool::UpdateTransactionsPerSecond()
     if (nTxPerSec < 0)
         nTxPerSec = 0;
 
-    // Don't report the transaction rate for 10 seconds after startup. This gives time for any
-    // transations to be processed, from the mempool.dat file stored on disk, which would skew the
-    // peak transaction rate.
-    const static int64_t nStartTime = GetTime();
-    if (nStartTime + 10 > nNow)
+    // Calculate the peak rate if we've gone more that 1 second beyond the last sample time.
+    // This will give us the finest grain peak rate possible for txns per second.
+    static int64_t nLastSampleTime = GetTimeMillis();
+    int64_t nCurrentSampleTime = GetTimeMillis();
+    if (nCurrentSampleTime > nLastSampleTime + 1000)
     {
-        nTxPerSec = 0;
+        double nRate = (double)(nCount * 1000) / (nCurrentSampleTime - nLastSampleTime);
+        if (nRate > nPeakRate)
+            nPeakRate = nRate;
+        nCount = 0;
     }
-
-    // Update the max txn rate
-    if (nTxPerSec > nPeakRate)
-    {
-        nPeakRate = nTxPerSec;
-    }
+    nLastSampleTime = nCurrentSampleTime;
 }
 
 SaltedTxidHasher::SaltedTxidHasher()
