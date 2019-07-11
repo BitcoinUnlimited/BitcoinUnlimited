@@ -530,6 +530,13 @@ CTxMemPool::CTxMemPool(const CFeeRate &_minReasonableRelayFee) : nTransactionsUp
 
     minerPolicyEstimator = new CBlockPolicyEstimator(_minReasonableRelayFee);
     minReasonableRelayFee = _minReasonableRelayFee;
+
+    lastRollingFeeUpdate = 0;
+    blockSinceLastRollingFeeBump = false;
+    rollingMinimumFeeRate = 0;
+
+    nTxPerSec = 0;
+    nPeakRate = 0;
 }
 
 CTxMemPool::~CTxMemPool() { delete minerPolicyEstimator; }
@@ -1475,6 +1482,21 @@ void CTxMemPool::UpdateTransactionsPerSecond()
     nTxPerSec += 1 / nSecondsToAverage; // The amount that the new tx will add to the tx rate
     if (nTxPerSec < 0)
         nTxPerSec = 0;
+
+    // Don't report the transaction rate for 10 seconds after startup. This gives time for any
+    // transations to be processed, from the mempool.dat file stored on disk, which would skew the
+    // peak transaction rate.
+    const static int64_t nStartTime = GetTime();
+    if (nStartTime + 10 > nNow)
+    {
+        nTxPerSec = 0;
+    }
+
+    // Update the max txn rate
+    if (nTxPerSec > nPeakRate)
+    {
+        nPeakRate = nTxPerSec;
+    }
 }
 
 SaltedTxidHasher::SaltedTxidHasher()
