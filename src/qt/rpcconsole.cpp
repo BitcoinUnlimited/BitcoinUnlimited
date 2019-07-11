@@ -671,10 +671,30 @@ void RPCConsole::setMempoolSize(long numberOfTxs, size_t dynUsage)
 void RPCConsole::setOrphanPoolSize(long numberOfTxs) { ui->orphanPoolNumberTxs->setText(QString::number(numberOfTxs)); }
 void RPCConsole::setTransactionsPerSecond(double nTxPerSec)
 {
+    // Don't report the transaction rate for 10 seconds after startup. This gives time for any
+    // transations to be processed, from the mempool.dat file stored on disk, which would skew the
+    // peak transaction rate.
+    const static int64_t nStartTime = GetTime();
+    if (nStartTime + 10 > GetTime())
+    {
+        nTxPerSec = 0;
+    }
+
+    // Update the max txn rate
+    static std::atomic<double> nMax{0};
+    double nMaxExpected = nMax;
+    if (nTxPerSec > nMaxExpected)
+    {
+        nMax.compare_exchange_weak(nMaxExpected, nTxPerSec);
+    }
+
+    // Format the output
     if (nTxPerSec < 100)
-        ui->transactionsPerSecond->setText(QString::number(nTxPerSec, 'f', 2));
+        ui->transactionsPerSecond->setText(
+            QString::number(nTxPerSec, 'f', 2) + "  (peak: " + QString::number(nMax, 'f', 2) + ")");
     else
-        ui->transactionsPerSecond->setText(QString::number((uint64_t)nTxPerSec));
+        ui->transactionsPerSecond->setText(
+            QString::number((uint64_t)nTxPerSec) + "  (peak: " + QString::number((uint64_t)nMax) + ")");
 }
 
 void RPCConsole::setThinBlockPropagationStats(const ThinBlockQuickStats &thin)
