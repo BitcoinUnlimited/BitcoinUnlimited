@@ -103,7 +103,7 @@
        <item row="15" column="0">
         <widget class="QLabel" name="labelNumberOfTransactions">
          <property name="text">
-          <string>Current number of transactions</string>
+          <string>Transactions in Memory pool</string>
          </property>
         </widget>
        </item>
@@ -117,7 +117,7 @@
        <item row="17" column="0">
         <widget class="QLabel" name="labelMemoryUsage">
          <property name="text">
-          <string>Memory usage</string>
+          <string>Memory pool usage</string>
          </property>
         </widget>
        </item>
@@ -405,7 +405,7 @@
           </font>
          </property>
          <property name="text">
-          <string>Memory Pool</string>
+          <string>Transaction Pools</string>
          </property>
         </widget>
        </item>
