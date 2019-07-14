@@ -183,6 +183,12 @@ public:
         {
             READWRITE(keycheckMask);
             READWRITE(hashTable);
+            // Ensure that keyChecks do not exceed keycheckMask
+            if (ser_action.ForRead())
+            {
+                for (auto entry : hashTable)
+                    entry.keyCheck = entry.keyCheck & keycheckMask;
+            }
         }
         else
         {
