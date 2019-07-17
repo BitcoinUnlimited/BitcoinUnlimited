@@ -11,14 +11,16 @@ fi
 
 cd "build" || (echo "could not enter distdir build"; exit 1)
 
-BEGIN_FOLD unit-tests
 if [ "$RUN_TESTS" = "true" ] && ! { [ "$HOST" = "i686-w64-mingw32" ] || [ "$HOST" = "x86_64-w64-mingw32" ]; }; then
-  travis_wait 50 DOCKER_EXEC LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/depends/$HOST/lib make $MAKEJOBS check VERBOSE=1;
+  BEGIN_FOLD unit-tests
+  DOCKER_EXEC LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/depends/$HOST/lib make $MAKEJOBS check VERBOSE=1;
+  END_FOLD
 fi
-END_FOLD
 
-BEGIN_FOLD functional-tests
-if [ "$RUN_TESTS" = "true" ]; then DOCKER_EXEC qa/pull-tester/rpc-tests.py --coverage --no-ipv6-rpc-listen; fi
-END_FOLD
+if [ "$RUN_TESTS" = "true" ]; then
+  BEGIN_FOLD functional-tests
+  DOCKER_EXEC qa/pull-tester/rpc-tests.py --coverage --no-ipv6-rpc-listen;
+  END_FOLD
+fi
 
 cd ${TRAVIS_BUILD_DIR} || (echo "could not enter travis build dir $TRAVIS_BUILD_DIR"; exit 1)
