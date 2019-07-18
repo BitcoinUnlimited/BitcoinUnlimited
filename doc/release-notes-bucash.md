@@ -57,6 +57,11 @@ This is list of the main changes that have been merged in this release:
 Commit details
 --------------
 
+- `0892e9e76` Criptolayer nodes seeder are going to be decomissioned (#1841) (Andrea Suisani)
+- `1868b9158` Fix invalid memory access in CScript::operator+= (#1846) (Andrea Suisani)
+- `0406c1190` debugging electrs deterministic build (Andrew Stone)
+- `ee8f321c2` Run unit test without using travis_wait (Andrea Suisani)
+- `a721e9424` Print folding log statements for unit tests only if we run make check (Andrea Suisani)
 - `dc48a8c47` move electrs forward (Andrew Stone)
 - `e235393a9` Bump BU version to 1.6.0.1 (#1835) (Andrea Suisani)
 - `248c4a10f` ensure that the wallet is fully synced before proceeding with c… (#1833) (Andrew Stone)
