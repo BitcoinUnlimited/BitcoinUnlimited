@@ -18,6 +18,9 @@ with the Bitcoin Cash specifications you could find here:
 - https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2018-nov-upgrade.md (Nov 15th '18 Protocol Upgrade, bucash 1.5.0.0, 1.5.0.1, 1.5.0.2, 1.5.1.0)
 - https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-upgrade.md (May 15th '19 Protocol Upgrade, bucash 1.6.0.0)
 
+Note: This release won't include in the gitian linux64 binaries archives the [electrs](https://github.com/BitcoinUnlimited/electrs) executable due to
+some [issues](https://github.com/dtolnay/syn/issues/667) we have in producing the aforementioned binary in a reproducible way.
+
 Upgrading
 ---------
 
