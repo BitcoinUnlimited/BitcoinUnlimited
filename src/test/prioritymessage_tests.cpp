@@ -18,21 +18,13 @@ static uint256 GetMessageHash(CSerializeData &data)
     if (data.size() < 60)
         throw "data size not large enough";
 
-    // The following is a workaround to an issue when inserting into a datastream
-    // object using char *'s. The issue is that when you insert into a vector
-    // the last item you insert is actually the one before the position you give.
-    // This means if we want to copy the last char (&data[59]) we have to pass &data[60],
-    // however &data[60] is out of bounds. Some compilers seem to work around this but
-    // others don't. So what we need to do is just add a few bytes at the end of the
-    // data before copying the subset.
-    CDataStream ssCommand(SER_NETWORK, PROTOCOL_VERSION);
-    ssCommand.insert(ssCommand.begin(), &data[4], &data[16]);
-    data.insert(data.end(), ssCommand.begin(), ssCommand.end()); // add some bytes
+    // Convert data to a string so we can pass this to a datastream insert.
+    std::string strData(data.begin(), data.end());
 
     // Now copy the inv data to get the hash
     CInv inv;
     CDataStream ssInv(SER_NETWORK, PROTOCOL_VERSION);
-    ssInv.insert(ssInv.begin(), &data[24], &data[60]);
+    ssInv.insert(ssInv.begin(), strData.begin() + 24, strData.begin() + 60);
     ssInv >> inv;
     return inv.hash;
 }
