@@ -18,9 +18,6 @@ with the Bitcoin Cash specifications you could find here:
 - https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2018-nov-upgrade.md (Nov 15th '18 Protocol Upgrade, bucash 1.5.0.0, 1.5.0.1, 1.5.0.2, 1.5.1.0)
 - https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/2019-05-15-upgrade.md (May 15th '19 Protocol Upgrade, bucash 1.6.0.0)
 
-Note: This release won't include in the gitian linux64 binaries archives the [electrs](https://github.com/BitcoinUnlimited/electrs) executable due to
-some [issues](https://github.com/dtolnay/syn/issues/667) we have in producing the aforementioned binary in a reproducible way.
-
 Upgrading
 ---------
 
@@ -52,16 +49,12 @@ This is list of the main changes that have been merged in this release:
 - Add CDV to the set of standard flag
 - SV protocol features has been removed
 - Update Windows build script
+- Improve Graphene decode rates by padding IBLT
 
 
 Commit details
 --------------
 
-- `0892e9e76` Criptolayer nodes seeder are going to be decomissioned (#1841) (Andrea Suisani)
-- `1868b9158` Fix invalid memory access in CScript::operator+= (#1846) (Andrea Suisani)
-- `0406c1190` debugging electrs deterministic build (Andrew Stone)
-- `ee8f321c2` Run unit test without using travis_wait (Andrea Suisani)
-- `a721e9424` Print folding log statements for unit tests only if we run make check (Andrea Suisani)
 - `dc48a8c47` move electrs forward (Andrew Stone)
 - `e235393a9` Bump BU version to 1.6.0.1 (#1835) (Andrea Suisani)
 - `248c4a10f` ensure that the wallet is fully synced before proceeding with c… (#1833) (Andrew Stone)
