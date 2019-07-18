@@ -52,7 +52,6 @@ This is list of the main changes that have been merged in this release:
 - Add CDV to the set of standard flag
 - SV protocol features has been removed
 - Update Windows build script
-- Improve Graphene decode rates by padding IBLT
 
 
 Commit details
