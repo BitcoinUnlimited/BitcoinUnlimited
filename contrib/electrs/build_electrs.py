@@ -6,7 +6,7 @@ import sys
 import shutil
 GIT_REPO = "https://github.com/BitcoinUnlimited/electrs.git"
 GIT_BRANCH = "v0.7.0bu"
-EXPECT_HEAD = "08132e01a82cd8e1dd9a458df04788164be784b8"
+EXPECT_HEAD = "8e1734d5d54339cc469ea6230b0e02395f2ab82d"
 
 ROOT_DIR = os.path.realpath(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
