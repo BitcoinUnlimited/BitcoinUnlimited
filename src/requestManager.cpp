@@ -84,6 +84,12 @@ static CBlockIndex *LastCommonAncestor(CBlockIndex *pa, CBlockIndex *pb)
     return pa;
 }
 
+static bool IsBlockType(const CInv &obj)
+{
+    return ((obj.type == MSG_BLOCK) || (obj.type == MSG_CMPCT_BLOCK) || (obj.type == MSG_XTHINBLOCK) ||
+            (obj.type == MSG_GRAPHENEBLOCK));
+}
+
 // Constructor for CRequestManagerNodeState struct
 CRequestManagerNodeState::CRequestManagerNodeState()
 {
@@ -200,7 +206,7 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
         // Got the data, now add the node as a source
         data.AddSource(from);
     }
-    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_CMPCT_BLOCK) || (obj.type == MSG_XTHINBLOCK))
+    else if (IsBlockType(obj))
     {
         uint256 temp = obj.hash;
         OdMap::value_type v(temp, CUnknownObj());
@@ -362,7 +368,7 @@ void CRequestManager::Received(const CInv &obj, CNode *pfrom)
         LOG(REQ, "ReqMgr: TX received for %s.\n", item->second.obj.ToString().c_str());
         cleanup(item);
     }
-    else if (obj.type == MSG_BLOCK || obj.type == MSG_CMPCT_BLOCK || obj.type == MSG_XTHINBLOCK)
+    else if (IsBlockType(obj))
     {
         OdMap::iterator item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
@@ -415,7 +421,7 @@ void CRequestManager::Rejected(const CInv &obj, CNode *from, unsigned char reaso
 
         rejectedTxns += 1;
     }
-    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_CMPCT_BLOCK) || (obj.type == MSG_XTHINBLOCK))
+    else if (IsBlockType(obj))
     {
         item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
