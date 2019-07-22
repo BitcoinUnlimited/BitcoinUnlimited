@@ -91,9 +91,9 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
     while (!vInv.empty())
     {
         // Don't bother if send buffer is too full to respond anyway
-        if (pfrom->nSendSize >= SendBufferSize())
+        if (pfrom->nSendSize >= SendBufferSize() + ss.size())
         {
-            LOG(REQ, "Dropping %d getdata requests.  Send buffer is too large: %d\n", vInv.size(), pfrom->nSendSize);
+            LOG(REQ, "Postponing %d getdata requests.  Send buffer is too large: %d\n", vInv.size(), pfrom->nSendSize);
             break;
         }
 
@@ -303,14 +303,12 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
                 break;
         }
-
-        // Send the transactions if any to send.
-        if (!ss.empty())
-        {
-            pfrom->PushMessage(NetMsgType::TX, ss);
-            ss.clear();
-        }
-     }
+    }
+    // Send the batched transactions if any to send.
+    if (!ss.empty())
+    {
+        pfrom->PushMessage(NetMsgType::TX, ss);
+    }
 
     if (!vNotFound.empty())
     {
