@@ -285,13 +285,6 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
 
             // Track requests for our stuff.
             GetMainSignals().Inventory(inv.hash);
-
-            // We only want to process one of these message types before returning. These are high
-            // priority messages and we don't want to sit here processing a large number of messages
-            // while we hold the cs_main lock, but rather allow these messages to be sent first and
-            // process the return message before potentially reading from the queue again.
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
-                break;
         }
     }
 
