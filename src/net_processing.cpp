@@ -248,46 +248,35 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             }
             else if (inv.IsKnownType())
             {
-                // Send stream from relay memory
-                bool fPushed = false;
-                {
-                    CTransactionRef ptx;
+                CTransactionRef ptx = nullptr;
 
+                // Send stream from relay memory
+                {
                     // We need to release this lock before push message. There is a potential deadlock because
                     // cs_vSend is often taken before cs_mapRelay
+                    LOCK(cs_mapRelay);
+                    std::map<CInv, CTransactionRef>::iterator mi = mapRelay.find(inv);
+                    if (mi != mapRelay.end())
                     {
-                        LOCK(cs_mapRelay);
-                        std::map<CInv, CTransactionRef>::iterator mi = mapRelay.find(inv);
-                        if (mi != mapRelay.end())
-                        {
-                            // Copy shared ptr to second because it may be deleted once lock is released
-                            ptx = (*mi).second;
-                            fPushed = true;
-                        }
-                    }
-
-                    if (fPushed)
-                    {
-                        pfrom->PushMessage(inv.GetCommand(), ptx);
-                        pfrom->txsSent += 1;
+                        ptx = (*mi).second;
                     }
                 }
-                if (!fPushed && inv.type == MSG_TX)
+                if (!ptx)
                 {
-                    CTransactionRef ptx = nullptr;
                     ptx = CommitQGet(inv.hash);
                     if (!ptx)
                     {
                         ptx = mempool.get(inv.hash);
                     }
-                    if (ptx)
-                    {
-                        pfrom->PushMessage(NetMsgType::TX, ptx);
-                        fPushed = true;
-                        pfrom->txsSent += 1;
-                    }
                 }
-                if (!fPushed)
+
+                // If we found a txn then push it
+                if (ptx)
+                {
+                    pfrom->PushMessage(NetMsgType::TX, ptx);
+                    pfrom->txsSent += 1;
+                }
+                else
                 {
                     vNotFound.push_back(inv);
                 }
