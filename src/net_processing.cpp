@@ -44,6 +44,8 @@ extern CTweak<uint32_t> randomlyDontInv;
 
 /** How many inbound connections will we track before pruning entries */
 const uint32_t MAX_INBOUND_CONNECTIONS_TRACKED = 10000;
+/** maximum size (in bytes) of a batched set of transactions */
+static uint32_t MAX_TXN_BATCH_SIZE = 10000;
 
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
@@ -84,6 +86,7 @@ bool PeerHasHeader(const CNodeState *state, CBlockIndex *pindex)
 void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParams, std::deque<CInv> &vInv)
 {
     std::vector<CInv> vNotFound;
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
 
     while (!vInv.empty())
     {
@@ -273,8 +276,16 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                 // If we found a txn then push it
                 if (ptx)
                 {
-                    pfrom->PushMessage(NetMsgType::TX, ptx);
+                    ss << *ptx;
                     pfrom->txsSent += 1;
+
+                    // Send the concatenated txns if we're over the limit. We don't want to batch
+                    // too many and end up delaying the send.
+                    if (ss.size() > MAX_TXN_BATCH_SIZE)
+                    {
+                        pfrom->PushMessage(NetMsgType::TX, ss);
+                        ss.clear();
+                    }
                 }
                 else
                 {
@@ -292,7 +303,14 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
                 break;
         }
-    }
+
+        // Send the transactions if any to send.
+        if (!ss.empty())
+        {
+            pfrom->PushMessage(NetMsgType::TX, ss);
+            ss.clear();
+        }
+     }
 
     if (!vNotFound.empty())
     {
