@@ -3302,8 +3302,8 @@ void CNode::PrioritizeSendMsg(CNode *pnode)
     // Front of queue => pri1 pri2 *pri3* msg1, msg2 msg3 msg4 ...
     //   or, in the case where msg1 has already been partially sent (nSendOffset != 0)
     // Front of queue => msg1 pri1 pri2 *pri3* msg2 msg3 msg4 ...
-    assert(vSendMsg.size() > 0);
-    assert(nItemsPriority > 0);
+    DbgAssert(vSendMsg.size() > 0, );
+    DbgAssert(nItemsPriority > 0, );
     size_t nIterSwaps = std::min((size_t)nItemsPriority, vSendMsg.size() - 1);
     if (nSendOffset == 0 && nIterSwaps > 0)
         nIterSwaps--;
