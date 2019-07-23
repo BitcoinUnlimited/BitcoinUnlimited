@@ -635,6 +635,11 @@ static bool IsPriorityMsg(std::string strCommand)
     if (!IsChainNearlySyncd())
         return false;
 
+    // Most traffic is INV, TX or GETDATA so check that first to prevent us from having to
+    // to evaluate, for every message, the long if statement that follows this one.
+    if (strCommand == NetMsgType::INV || strCommand == NetMsgType::TX || strCommand == NetMsgType::GETDATA)
+        return false;
+
     // Various messages types that are considered priority.
     // NOTE: The absence of BLOCK is not by accident. Full BLOCK messages are problematic for priority queuing.
     //       as it is difficult to know the state of the peer in terms of whether they are sync'd to the chain.
@@ -724,7 +729,8 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                             "Receive Queue: pushed %s to the front of the queue, %d bytes, peer(%d)\n",
                             strFirstMsgCommand, vPriorityRecvQ.back().second.hdr.nMessageSize, this->GetId());
 
-                        // Set msg.nTime
+                        // Set nTime. We must do this separately for priority messages because
+                        // we swapped "msg" to the priority queue.
                         vPriorityRecvQ.back().second.nTime = GetTimeMicros();
                         fPriorityRecvMsg.store(true);
                         messageHandlerCondition.notify_one();
