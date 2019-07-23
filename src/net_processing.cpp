@@ -1009,8 +1009,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         std::vector<CInv> vInv;
         vRecv >> vInv;
-        // BU check size == 0 to be intolerant of an empty and useless request
-        if ((vInv.size() > MAX_INV_SZ) || (vInv.size() == 0))
+
+        // validate sizes are within constraints
+        if ((vInv.size() > MAX_INV_SZ) || vInv.empty())
         {
             dosMan.Misbehaving(pfrom, 20);
             return error("message getdata size() = %u", vInv.size());
@@ -1044,7 +1045,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if ((fDebug && invDeque.size() > 0) || (invDeque.size() == 1))
             LOG(NET, "received getdata for: %s peer=%s\n", invDeque[0].ToString(), pfrom->GetLogName());
 
-        ProcessGetData(pfrom, chainparams.GetConsensus(), invDeque);
+        // Append these valid getdata requests to the getadata queue
         {
             LOCK(pfrom->csRecvGetData);
             pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), invDeque.begin(), invDeque.end());
