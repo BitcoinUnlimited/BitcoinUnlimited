@@ -45,7 +45,7 @@ extern CTweak<uint32_t> randomlyDontInv;
 /** How many inbound connections will we track before pruning entries */
 const uint32_t MAX_INBOUND_CONNECTIONS_TRACKED = 10000;
 /** maximum size (in bytes) of a batched set of transactions */
-static uint32_t MAX_TXN_BATCH_SIZE = 10000;
+static const uint32_t MAX_TXN_BATCH_SIZE = 10000;
 
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
@@ -276,16 +276,25 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                 // If we found a txn then push it
                 if (ptx)
                 {
-                    ss << *ptx;
-                    pfrom->txsSent += 1;
-
-                    // Send the concatenated txns if we're over the limit. We don't want to batch
-                    // too many and end up delaying the send.
-                    if (ss.size() > MAX_TXN_BATCH_SIZE)
+                    if (pfrom->xVersion.as_u64c(XVer::BU_TXN_CONCATENATION))
                     {
-                        pfrom->PushMessage(NetMsgType::TX, ss);
-                        ss.clear();
+                        ss << *ptx;
+
+                        // Send the concatenated txns if we're over the limit. We don't want to batch
+                        // too many and end up delaying the send.
+                        if (ss.size() > MAX_TXN_BATCH_SIZE)
+                        {
+                            pfrom->PushMessage(NetMsgType::TX, ss);
+                            ss.clear();
+                        }
                     }
+                    else
+                    {
+                        // Or if this is not a peer that supports
+                        // concatenation then send the transaction right away.
+                        pfrom->PushMessage(NetMsgType::TX, ptx);
+                    }
+                    pfrom->txsSent += 1;
                 }
                 else
                 {
@@ -622,6 +631,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT, nLimitAncestorSize);
         xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT, nLimitDescendants);
         xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT, nLimitDescendantSize);
+        xver.set_u64c(XVer::BU_TXN_CONCATENATION, 1);
 
         electrum::set_xversion_flags(xver, chainparams.NetworkIDString());
 
