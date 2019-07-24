@@ -99,219 +99,216 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
 
         const CInv inv = vInv.front();
         vInv.pop_front();
+
+        if (shutdown_threads.load() == true)
         {
-            if (shutdown_threads.load() == true)
+            return;
+        }
+        if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
+        {
+            auto *mi = LookupBlockIndex(inv.hash);
+            if (mi)
             {
-                return;
-            }
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
-            {
-                auto *mi = LookupBlockIndex(inv.hash);
-                if (mi)
+                bool fSend = false;
                 {
-                    bool fSend = false;
+                    LOCK(cs_main);
+                    if (chainActive.Contains(mi))
                     {
-                        LOCK(cs_main);
-                        if (chainActive.Contains(mi))
-                        {
-                            fSend = true;
-                        }
-                        else
-                        {
-                            static const int nOneMonth = 30 * 24 * 60 * 60;
-                            // To prevent fingerprinting attacks, only send blocks outside of the active
-                            // chain if they are valid, and no more than a month older (both in time, and in
-                            // best equivalent proof of work) than the best header chain we know about.
-                            {
-                                READLOCK(cs_mapBlockIndex);
-                                fSend = mi->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != nullptr) &&
-                                        (pindexBestHeader.load()->GetBlockTime() - mi->GetBlockTime() < nOneMonth) &&
-                                        (GetBlockProofEquivalentTime(
-                                             *pindexBestHeader, *mi, *pindexBestHeader, consensusParams) < nOneMonth);
-                            }
-                            if (!fSend)
-                            {
-                                LOG(NET,
-                                    "%s: ignoring request from peer=%s for old block that isn't in the main chain\n",
-                                    __func__, pfrom->GetLogName());
-                            }
-                            else
-                            {
-                                // BU: don't relay excessive blocks that are not on the active chain
-                                if (mi->nStatus & BLOCK_EXCESSIVE)
-                                    fSend = false;
-                                if (!fSend)
-                                    LOG(NET,
-                                        "%s: ignoring request from peer=%s for excessive block of height %d not on "
-                                        "the main chain\n",
-                                        __func__, pfrom->GetLogName(), mi->nHeight);
-                            }
-                            // BU: in the future we can throttle old block requests by setting send=false if we are out
-                            // of
-                            // bandwidth
-                        }
-                    }
-                    // disconnect node in case we have reached the outbound limit for serving historical blocks
-                    // never disconnect whitelisted nodes
-                    static const int nOneWeek = 7 * 24 * 60 * 60; // assume > 1 week = historical
-                    if (fSend && CNode::OutboundTargetReached(true) &&
-                        (((pindexBestHeader != nullptr) &&
-                             (pindexBestHeader.load()->GetBlockTime() - mi->GetBlockTime() > nOneWeek)) ||
-                            inv.type == MSG_FILTERED_BLOCK) &&
-                        !pfrom->fWhitelisted)
-                    {
-                        LOG(NET, "historical block serving limit reached, disconnect peer %s\n", pfrom->GetLogName());
-
-                        // disconnect node
-                        pfrom->fDisconnect = true;
-                        fSend = false;
-                    }
-                    // Avoid leaking prune-height by never sending blocks below the
-                    // NODE_NETWORK_LIMITED threshold.
-                    // Add two blocks buffer extension for possible races
-                    if (fSend && !pfrom->fWhitelisted &&
-                        ((((nLocalServices & NODE_NETWORK_LIMITED) == NODE_NETWORK_LIMITED) &&
-                            ((nLocalServices & NODE_NETWORK) != NODE_NETWORK) &&
-                            (chainActive.Tip()->nHeight - mi->nHeight > (int)NODE_NETWORK_LIMITED_MIN_BLOCKS + 2))))
-                    {
-                        LOG(NET, "Ignore block request below NODE_NETWORK_LIMITED threshold from peer=%d\n",
-                            pfrom->GetId());
-                        // disconnect node and prevent it from stalling (would
-                        // otherwise wait for the missing block)
-                        pfrom->fDisconnect = true;
-                        fSend = false;
-                    }
-                    // Pruned nodes may have deleted the block, so check whether
-                    // it's available before trying to send.
-                    if (fSend && mi->nStatus & BLOCK_HAVE_DATA)
-                    {
-                        // Send block from disk
-                        CBlock block;
-                        if (!ReadBlockFromDisk(block, mi, consensusParams))
-                        {
-                            // its possible that I know about it but haven't stored it yet
-                            LOG(THIN, "unable to load block %s from disk\n",
-                                mi->phashBlock ? mi->phashBlock->ToString() : "");
-                            // no response
-                        }
-                        else
-                        {
-                            if (inv.type == MSG_BLOCK)
-                            {
-                                pfrom->blocksSent += 1;
-                                pfrom->PushMessage(NetMsgType::BLOCK, block);
-                            }
-                            else if (inv.type == MSG_CMPCT_BLOCK)
-                            {
-                                LOG(CMPCT, "Sending compactblock via getdata message\n");
-                                SendCompactBlock(MakeBlockRef(block), pfrom, inv);
-                            }
-                            else // MSG_FILTERED_BLOCK)
-                            {
-                                LOCK(pfrom->cs_filter);
-                                if (pfrom->pfilter)
-                                {
-                                    CMerkleBlock merkleBlock(block, *pfrom->pfilter);
-                                    pfrom->PushMessage(NetMsgType::MERKLEBLOCK, merkleBlock);
-                                    pfrom->blocksSent += 1;
-                                    // CMerkleBlock just contains hashes, so also push any transactions in the block the
-                                    // client did not see
-                                    // This avoids hurting performance by pointlessly requiring a round-trip
-                                    // Note that there is currently no way for a node to request any single transactions
-                                    // we
-                                    // didn't send here -
-                                    // they must either disconnect and retry or request the full block.
-                                    // Thus, the protocol spec specified allows for us to provide duplicate txn here,
-                                    // however we MUST always provide at least what the remote peer needs
-                                    typedef std::pair<unsigned int, uint256> PairType;
-                                    for (PairType &pair : merkleBlock.vMatchedTxn)
-                                    {
-                                        pfrom->txsSent += 1;
-                                        pfrom->PushMessage(NetMsgType::TX, block.vtx[pair.first]);
-                                    }
-                                }
-                                // else
-                                // no response
-                            }
-
-                            // Trigger the peer node to send a getblocks request for the next batch of inventory
-                            if (inv.hash == pfrom->hashContinue)
-                            {
-                                // Bypass PushInventory, this must send even if redundant,
-                                // and we want it right after the last block so they don't
-                                // wait for other stuff first.
-                                std::vector<CInv> oneInv;
-                                oneInv.push_back(CInv(MSG_BLOCK, chainActive.Tip()->GetBlockHash()));
-                                pfrom->PushMessage(NetMsgType::INV, oneInv);
-                                pfrom->hashContinue.SetNull();
-                            }
-                        }
-                    }
-                }
-            }
-            else if (inv.IsKnownType())
-            {
-                CTransactionRef ptx = nullptr;
-
-                // Send stream from relay memory
-                {
-                    // We need to release this lock before push message. There is a potential deadlock because
-                    // cs_vSend is often taken before cs_mapRelay
-                    LOCK(cs_mapRelay);
-                    std::map<CInv, CTransactionRef>::iterator mi = mapRelay.find(inv);
-                    if (mi != mapRelay.end())
-                    {
-                        ptx = (*mi).second;
-                    }
-                }
-                if (!ptx)
-                {
-                    ptx = CommitQGet(inv.hash);
-                    if (!ptx)
-                    {
-                        ptx = mempool.get(inv.hash);
-                    }
-                }
-
-                // If we found a txn then push it
-                if (ptx)
-                {
-                    if (pfrom->xVersion.as_u64c(XVer::BU_TXN_CONCATENATION))
-                    {
-                        ss << *ptx;
-
-                        // Send the concatenated txns if we're over the limit. We don't want to batch
-                        // too many and end up delaying the send.
-                        if (ss.size() > MAX_TXN_BATCH_SIZE)
-                        {
-                            pfrom->PushMessage(NetMsgType::TX, ss);
-                            ss.clear();
-                        }
+                        fSend = true;
                     }
                     else
                     {
-                        // Or if this is not a peer that supports
-                        // concatenation then send the transaction right away.
-                        pfrom->PushMessage(NetMsgType::TX, ptx);
+                        static const int nOneMonth = 30 * 24 * 60 * 60;
+                        // To prevent fingerprinting attacks, only send blocks outside of the active
+                        // chain if they are valid, and no more than a month older (both in time, and in
+                        // best equivalent proof of work) than the best header chain we know about.
+                        {
+                            READLOCK(cs_mapBlockIndex);
+                            fSend = mi->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != NULL) &&
+                                    (pindexBestHeader.load()->GetBlockTime() - mi->GetBlockTime() < nOneMonth) &&
+                                    (GetBlockProofEquivalentTime(
+                                         *pindexBestHeader, *mi, *pindexBestHeader, consensusParams) < nOneMonth);
+                        }
+                        if (!fSend)
+                        {
+                            LOG(NET, "%s: ignoring request from peer=%s for old block that isn't in the main chain\n",
+                                __func__, pfrom->GetLogName());
+                        }
+                        else
+                        {
+                            // BU: don't relay excessive blocks that are not on the active chain
+                            if (mi->nStatus & BLOCK_EXCESSIVE)
+                                fSend = false;
+                            if (!fSend)
+                                LOG(NET, "%s: ignoring request from peer=%s for excessive block of height %d not on "
+                                         "the main chain\n",
+                                    __func__, pfrom->GetLogName(), mi->nHeight);
+                        }
+                        // BU: in the future we can throttle old block requests by setting send=false if we are out
+                        // of
+                        // bandwidth
                     }
-                    pfrom->txsSent += 1;
                 }
-                else
+                // disconnect node in case we have reached the outbound limit for serving historical blocks
+                // never disconnect whitelisted nodes
+                static const int nOneWeek = 7 * 24 * 60 * 60; // assume > 1 week = historical
+                if (fSend && CNode::OutboundTargetReached(true) &&
+                    (((pindexBestHeader != nullptr) &&
+                         (pindexBestHeader.load()->GetBlockTime() - mi->GetBlockTime() > nOneWeek)) ||
+                        inv.type == MSG_FILTERED_BLOCK) &&
+                    !pfrom->fWhitelisted)
                 {
-                    vNotFound.push_back(inv);
+                    LOG(NET, "historical block serving limit reached, disconnect peer %s\n", pfrom->GetLogName());
+
+                    // disconnect node
+                    pfrom->fDisconnect = true;
+                    fSend = false;
+                }
+                // Avoid leaking prune-height by never sending blocks below the
+                // NODE_NETWORK_LIMITED threshold.
+                // Add two blocks buffer extension for possible races
+                if (fSend && !pfrom->fWhitelisted &&
+                    ((((nLocalServices & NODE_NETWORK_LIMITED) == NODE_NETWORK_LIMITED) &&
+                        ((nLocalServices & NODE_NETWORK) != NODE_NETWORK) &&
+                        (chainActive.Tip()->nHeight - mi->nHeight > (int)NODE_NETWORK_LIMITED_MIN_BLOCKS + 2))))
+                {
+                    LOG(NET, "Ignore block request below NODE_NETWORK_LIMITED threshold from peer=%d\n",
+                        pfrom->GetId());
+                    // disconnect node and prevent it from stalling (would
+                    // otherwise wait for the missing block)
+                    pfrom->fDisconnect = true;
+                    fSend = false;
+                }
+                // Pruned nodes may have deleted the block, so check whether
+                // it's available before trying to send.
+                if (fSend && mi->nStatus & BLOCK_HAVE_DATA)
+                {
+                    // Send block from disk
+                    CBlock block;
+                    if (!ReadBlockFromDisk(block, mi, consensusParams))
+                    {
+                        // its possible that I know about it but haven't stored it yet
+                        LOG(THIN, "unable to load block %s from disk\n",
+                            mi->phashBlock ? mi->phashBlock->ToString() : "");
+                        // no response
+                    }
+                    else
+                    {
+                        if (inv.type == MSG_BLOCK)
+                        {
+                            pfrom->blocksSent += 1;
+                            pfrom->PushMessage(NetMsgType::BLOCK, block);
+                        }
+                        else if (inv.type == MSG_CMPCT_BLOCK)
+                        {
+                            LOG(CMPCT, "Sending compactblock via getdata message\n");
+                            SendCompactBlock(MakeBlockRef(block), pfrom, inv);
+                        }
+                        else // MSG_FILTERED_BLOCK)
+                        {
+                            LOCK(pfrom->cs_filter);
+                            if (pfrom->pfilter)
+                            {
+                                CMerkleBlock merkleBlock(block, *pfrom->pfilter);
+                                pfrom->PushMessage(NetMsgType::MERKLEBLOCK, merkleBlock);
+                                pfrom->blocksSent += 1;
+                                // CMerkleBlock just contains hashes, so also push any transactions in the block the
+                                // client did not see
+                                // This avoids hurting performance by pointlessly requiring a round-trip
+                                // Note that there is currently no way for a node to request any single transactions
+                                // we
+                                // didn't send here -
+                                // they must either disconnect and retry or request the full block.
+                                // Thus, the protocol spec specified allows for us to provide duplicate txn here,
+                                // however we MUST always provide at least what the remote peer needs
+                                typedef std::pair<unsigned int, uint256> PairType;
+                                for (PairType &pair : merkleBlock.vMatchedTxn)
+                                {
+                                    pfrom->txsSent += 1;
+                                    pfrom->PushMessage(NetMsgType::TX, block.vtx[pair.first]);
+                                }
+                            }
+                            // else
+                            // no response
+                        }
+
+                        // Trigger the peer node to send a getblocks request for the next batch of inventory
+                        if (inv.hash == pfrom->hashContinue)
+                        {
+                            // Bypass PushInventory, this must send even if redundant,
+                            // and we want it right after the last block so they don't
+                            // wait for other stuff first.
+                            std::vector<CInv> oneInv;
+                            oneInv.push_back(CInv(MSG_BLOCK, chainActive.Tip()->GetBlockHash()));
+                            pfrom->PushMessage(NetMsgType::INV, oneInv);
+                            pfrom->hashContinue.SetNull();
+                        }
+                    }
+                }
+            }
+        }
+        else if (inv.IsKnownType())
+        {
+            CTransactionRef ptx = nullptr;
+
+            // Send stream from relay memory
+            {
+                // We need to release this lock before push message. There is a potential deadlock because
+                // cs_vSend is often taken before cs_mapRelay
+                LOCK(cs_mapRelay);
+                std::map<CInv, CTransactionRef>::iterator mi = mapRelay.find(inv);
+                if (mi != mapRelay.end())
+                {
+                    ptx = (*mi).second;
+                }
+            }
+            if (!ptx)
+            {
+                ptx = CommitQGet(inv.hash);
+                if (!ptx)
+                {
+                    ptx = mempool.get(inv.hash);
                 }
             }
 
-            // Track requests for our stuff.
-            GetMainSignals().Inventory(inv.hash);
+            // If we found a txn then push it
+            if (ptx)
+            {
+                if (pfrom->xVersion.as_u64c(XVer::BU_TXN_CONCATENATION))
+                {
+                    ss << *ptx;
 
-            // We only want to process one of these message types before returning. These are high
-            // priority messages and we don't want to sit here processing a large number of messages
-            // while we hold the cs_main lock, but rather allow these messages to be sent first and
-            // process the return message before potentially reading from the queue again.
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
-                break;
+                    // Send the concatenated txns if we're over the limit. We don't want to batch
+                    // too many and end up delaying the send.
+                    if (ss.size() > MAX_TXN_BATCH_SIZE)
+                    {
+                        pfrom->PushMessage(NetMsgType::TX, ss);
+                        ss.clear();
+                    }
+                }
+                else
+                {
+                    // Or if this is not a peer that supports
+                    // concatenation then send the transaction right away.
+                    pfrom->PushMessage(NetMsgType::TX, ptx);
+                }
+                pfrom->txsSent += 1;
+            }
+            else
+            {
+                vNotFound.push_back(inv);
+            }
         }
+
+        // Track requests for our stuff.
+        GetMainSignals().Inventory(inv.hash);
+
+        // We only want to process one of these message types before returning. These are high
+        // priority messages and we don't want to sit here processing a large number of messages
+        // while we hold the cs_main lock, but rather allow these messages to be sent first and
+        // process the return message before potentially reading from the queue again.
+        if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
+            break;
     }
     // Send the batched transactions if any to send.
     if (!ss.empty())
