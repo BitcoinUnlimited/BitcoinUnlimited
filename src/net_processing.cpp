@@ -88,7 +88,8 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
     std::vector<CInv> vNotFound;
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
 
-    while (!vInv.empty())
+    std::deque<CInv>::iterator it = vInv.begin();
+    while (it != vInv.end())
     {
         // Don't bother if send buffer is too full to respond anyway
         if (pfrom->nSendSize >= SendBufferSize() + ss.size())
@@ -96,14 +97,15 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             LOG(REQ, "Postponing %d getdata requests.  Send buffer is too large: %d\n", vInv.size(), pfrom->nSendSize);
             break;
         }
-
-        const CInv inv = vInv.front();
-        vInv.pop_front();
-
         if (shutdown_threads.load() == true)
         {
             return;
         }
+
+        // start processing inventory here
+        const CInv &inv = *it;
+        it++;
+
         if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
         {
             auto *mi = LookupBlockIndex(inv.hash);
@@ -136,7 +138,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         }
                         else
                         {
-                            // BU: don't relay excessive blocks that are not on the active chain
+                            // Don't relay excessive blocks that are not on the active chain
                             if (mi->nStatus & BLOCK_EXCESSIVE)
                                 fSend = false;
                             if (!fSend)
@@ -144,9 +146,8 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                                          "the main chain\n",
                                     __func__, pfrom->GetLogName(), mi->nHeight);
                         }
-                        // BU: in the future we can throttle old block requests by setting send=false if we are out
-                        // of
-                        // bandwidth
+                        // TODO: in the future we can throttle old block requests by setting send=false if we are out
+                        // of bandwidth
                     }
                 }
                 // disconnect node in case we have reached the outbound limit for serving historical blocks
@@ -213,14 +214,13 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                                 pfrom->PushMessage(NetMsgType::MERKLEBLOCK, merkleBlock);
                                 pfrom->blocksSent += 1;
                                 // CMerkleBlock just contains hashes, so also push any transactions in the block the
-                                // client did not see
-                                // This avoids hurting performance by pointlessly requiring a round-trip
+                                // client did not see. This avoids hurting performance by pointlessly requiring a
+                                // round-trip.
+                                //
                                 // Note that there is currently no way for a node to request any single transactions
-                                // we
-                                // didn't send here -
-                                // they must either disconnect and retry or request the full block.
-                                // Thus, the protocol spec specified allows for us to provide duplicate txn here,
-                                // however we MUST always provide at least what the remote peer needs
+                                // we didn't send here - they must either disconnect and retry or request the full
+                                // block. Thus, the protocol spec specified allows for us to provide duplicate txn
+                                // here, however we MUST always provide at least what the remote peer needs
                                 typedef std::pair<unsigned int, uint256> PairType;
                                 for (PairType &pair : merkleBlock.vMatchedTxn)
                                 {
@@ -315,6 +315,9 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
     {
         pfrom->PushMessage(NetMsgType::TX, ss);
     }
+
+    // Erase all messages inv's we processed
+    vInv.erase(vInv.begin(), it);
 
     if (!vNotFound.empty())
     {
