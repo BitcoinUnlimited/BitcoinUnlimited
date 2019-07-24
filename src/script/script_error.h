@@ -26,6 +26,7 @@ typedef enum ScriptError_t {
     SCRIPT_ERR_INVALID_NUMBER_RANGE,
     SCRIPT_ERR_IMPOSSIBLE_ENCODING,
     SCRIPT_ERR_INVALID_SPLIT_RANGE,
+    SCRIPT_ERR_INVALID_BIT_COUNT,
 
     /* Failed verify operations */
     SCRIPT_ERR_VERIFY,
@@ -67,6 +68,7 @@ typedef enum ScriptError_t {
 
     /* Schnorr */
     SCRIPT_ERR_SIG_BADLENGTH,
+    SCRIPT_ERR_SIG_NONSCHNORR,
     SCRIPT_ERR_MUST_USE_FORKID,
 
     /* softfork safeness */

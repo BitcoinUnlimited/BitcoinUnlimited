@@ -122,6 +122,10 @@ enum
     // The exception to CLEANSTACK and P2SH for the recovery of coins sent
     // to p2sh segwit addresses is not allowed.
     SCRIPT_DISALLOW_SEGWIT_RECOVERY = (1U << 20),
+
+    // Whether to allow new OP_CHECKMULTISIG logic to trigger. (new multisig
+    // logic verifies faster, and only allows Schnorr signatures)
+    SCRIPT_ENABLE_SCHNORR_MULTISIG = (1U << 21),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);
@@ -132,6 +136,13 @@ bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned i
  * using this function.
  */
 bool CheckDataSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags, ScriptError *serror);
+
+/**
+ * Check that the signature provided to authentify a transaction is properly
+ * encoded Schnorr signature (or null). Signatures passed to the new-mode
+ * OP_CHECKMULTISIG and its verify variant must be checked using this function.
+ */
+bool CheckTransactionSchnorrSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags, ScriptError *serror);
 
 // WARNING:
 // SIGNATURE_HASH_ERROR represents the special value of uint256(1) that is used by the legacy SignatureHash
