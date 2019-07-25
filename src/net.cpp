@@ -675,6 +675,31 @@ static bool IsPriorityMsg(std::string strCommand)
         return false;
     }
 }
+
+void CNode::LookAhead(CNetMessage &_msg)
+{
+    // Do lookahead for CBlock messages.  If it's a block then get the blockhash
+    // and indicate we are downloading it so that we don't re-request the block
+    // prematurely. If it's downloading and fails then we can reset the re-request
+    // flag so that we can get another block from somewhere.
+    static const CBlockHeader temp_header;
+    static const unsigned int nSizeHeader = ::GetSerializeSize(temp_header, SER_NETWORK, PROTOCOL_VERSION);
+    if (_msg.hdr.GetCommand() == NetMsgType::BLOCK)
+    {
+        if (_msg.nDataPos > nSizeHeader)
+        {
+            CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+            ss.append(_msg.vRecv, nSizeHeader);
+
+            CBlockHeader header;
+            ss >> header;
+            requester.Downloading(header.GetHash(), this);
+
+            fLookedOnce.store(true);
+        }
+    }
+}
+
 bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 {
     AssertLockHeld(cs_vRecvMsg);
@@ -683,9 +708,17 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
         // Absorb network data.
         int handled;
         if (!msg.in_data)
+        {
             handled = msg.readHeader(pch, nBytes);
+        }
         else
+        {
             handled = msg.readData(pch, nBytes);
+
+            // Do a lookahead if we haven't already done one for this message.
+            if (!fLookedOnce.load())
+                LookAhead(msg);
+        }
 
         if (handled < 0)
             return false;
@@ -738,13 +771,13 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                     }
                 }
             }
-
             if (fSendLowPriority)
             {
                 vRecvMsg.push_back(std::move(msg));
                 msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
             }
             messageHandlerCondition.notify_one();
+            fLookedOnce.store(false);
         }
     }
 

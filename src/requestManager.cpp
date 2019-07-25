@@ -358,6 +358,18 @@ void CRequestManager::BlockRejected(const CInv &obj, CNode *pfrom)
     item->second.fProcessing = false;
 }
 
+void CRequestManager::Downloading(const uint256 &hash, CNode *pfrom)
+{
+    LOCK(cs_objDownloader);
+    OdMap::iterator item = mapBlkInfo.find(hash);
+    if (item == mapBlkInfo.end())
+        return;
+
+    item->second.nDownloadingSince = GetStopwatchMicros();
+    LOG(BLK, "ReqMgr: Downloading %s (received from %s).\n", item->second.obj.ToString(),
+        pfrom ? pfrom->GetLogName() : "unknown");
+}
+
 // Indicate that we got this object.
 void CRequestManager::Received(const CInv &obj, CNode *pfrom)
 {
@@ -653,6 +665,7 @@ void CRequestManager::ResetLastBlockRequestTime(const uint256 &hash)
         CUnknownObj &item = itemIter->second;
         item.outstandingReqs--;
         item.lastRequestTime = 0;
+        item.nDownloadingSince = 0;
     }
 }
 
@@ -708,7 +721,8 @@ void CRequestManager::SendRequests()
             continue;
 
         // if never requested then lastRequestTime==0 so this will always be true
-        if (now - item.lastRequestTime > _blkReqRetryInterval)
+        if ((now - item.lastRequestTime > _blkReqRetryInterval && item.nDownloadingSince == 0) ||
+            (item.nDownloadingSince != 0 && now - item.nDownloadingSince > blkReqRetryInterval))
         {
             if (!item.availableFrom.empty())
             {
@@ -746,7 +760,9 @@ void CRequestManager::SendRequests()
                     CInv obj = item.obj;
                     item.outstandingReqs++;
                     int64_t then = item.lastRequestTime;
+                    int64_t nDownloadingSincePrev = item.nDownloadingSince;
                     item.lastRequestTime = now;
+                    item.nDownloadingSince = 0;
                     bool fReqBlkResult = false;
 
                     if (fBatchBlockRequests)
@@ -780,6 +796,7 @@ void CRequestManager::SendRequests()
                                 item = itemIter->second;
                                 item.outstandingReqs--;
                                 item.lastRequestTime = then;
+                                item.nDownloadingSince = nDownloadingSincePrev;
                             }
                         }
                     }

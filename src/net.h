@@ -668,6 +668,10 @@ public:
         return vSendMsg.size();
     }
 
+    // Examine the current message (msg) to see if block or thintype blocks have begun downloading data.
+    std::atomic<bool> fLookedOnce{false};
+    void LookAhead(CNetMessage &_msg);
+
     // requires LOCK(cs_vRecvMsg)
     bool ReceiveMsgBytes(const char *pch, unsigned int nBytes) EXCLUSIVE_LOCKS_REQUIRED(cs_vRecvMsg);
 
