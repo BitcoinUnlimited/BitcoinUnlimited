@@ -1044,7 +1044,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if ((fDebug && invDeque.size() > 0) || (invDeque.size() == 1))
             LOG(NET, "received getdata for: %s peer=%s\n", invDeque[0].ToString(), pfrom->GetLogName());
 
+        // Run process getdata and process as much of the getdata's as we can before taking the lock
+        // and appending the remainder to the vRecvGetData queue.
         ProcessGetData(pfrom, chainparams.GetConsensus(), invDeque);
+        if (!invDeque.empty())
         {
             LOCK(pfrom->csRecvGetData);
             pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), invDeque.begin(), invDeque.end());
