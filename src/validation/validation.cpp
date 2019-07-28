@@ -2578,7 +2578,6 @@ bool ConnectBlock(const CBlock &block,
 
     // Write undo information to disk
     {
-        WRITELOCK(cs_mapBlockIndex);
         if (pindex->GetUndoPos().IsNull() || !pindex->IsValid(BLOCK_VALID_SCRIPTS))
         {
             if (pindex->GetUndoPos().IsNull())
@@ -2592,6 +2591,7 @@ bool ConnectBlock(const CBlock &block,
                     return AbortNode(state, "Failed to write undo data");
 
                 // update nUndoPos in block index
+                WRITELOCK(cs_mapBlockIndex);
                 pindex->nUndoPos = _pos.nPos;
                 pindex->nStatus |= BLOCK_HAVE_UNDO;
             }
