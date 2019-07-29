@@ -671,10 +671,13 @@ void RPCConsole::setMempoolSize(long numberOfTxs, size_t dynUsage)
 void RPCConsole::setOrphanPoolSize(long numberOfTxs) { ui->orphanPoolNumberTxs->setText(QString::number(numberOfTxs)); }
 void RPCConsole::setTransactionsPerSecond(double nTxPerSec)
 {
+    // Format the output
     if (nTxPerSec < 100)
-        ui->transactionsPerSecond->setText(QString::number(nTxPerSec, 'f', 2));
+        ui->transactionsPerSecond->setText(
+            QString::number(nTxPerSec, 'f', 2) + "  (peak: " + QString::number(mempool.GetPeakRate(), 'f', 2) + ")");
     else
-        ui->transactionsPerSecond->setText(QString::number((uint64_t)nTxPerSec));
+        ui->transactionsPerSecond->setText(QString::number((uint64_t)nTxPerSec) + "  (peak: " +
+                                           QString::number((uint64_t)mempool.GetPeakRate()) + ")");
 }
 
 void RPCConsole::setThinBlockPropagationStats(const ThinBlockQuickStats &thin)

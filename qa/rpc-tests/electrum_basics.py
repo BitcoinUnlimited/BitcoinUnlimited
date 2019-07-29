@@ -7,7 +7,9 @@ import random
 from test_framework.util import waitFor, assert_equal
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.loginit import logging
-from test_framework.electrumutil import compare, bitcoind_electrum_args
+from test_framework.electrumutil import compare, bitcoind_electrum_args, \
+    create_electrum_connection, address_to_scripthash
+from test_framework.nodemessages import COIN
 
 
 class ElectrumBasicTests(BitcoinTestFramework):
@@ -24,8 +26,12 @@ class ElectrumBasicTests(BitcoinTestFramework):
         logging.info("Checking that blocks are indexed")
         n.generate(200)
 
-        # waitFor throws on timeout, failing the test
+        self.test_mempoolsync(n)
+        electrum_client = create_electrum_connection()
+        self.test_address_balance(n, electrum_client)
 
+    def test_mempoolsync(self, n):
+        # waitFor throws on timeout, failing the test
         waitFor(10, lambda: compare(n, "index_height", n.getblockcount()))
         waitFor(10, lambda: compare(n, "index_txns", n.getblockcount() + 1, True)) # +1 is genesis tx
         waitFor(10, lambda: compare(n, "mempool_count", 0, True))
@@ -40,6 +46,25 @@ class ElectrumBasicTests(BitcoinTestFramework):
         waitFor(10, lambda: compare(n, "index_height", n.getblockcount()))
         waitFor(10, lambda: compare(n, "mempool_count", 0, True))
         waitFor(10, lambda: compare(n, "index_txns", n.getblockcount() + 2, True))
+
+    def test_address_balance(self, n, electrum_client):
+        addr = n.getnewaddress()
+        txhash = n.sendtoaddress(addr, 1)
+
+        scripthash = address_to_scripthash(addr)
+
+        def check_address(address, unconfirmed = 0, confirmed = 0):
+            res = electrum_client.call("blockchain.scripthash.get_balance",
+                address_to_scripthash(addr))
+            res = res["result"]
+
+            return res["unconfirmed"] == unconfirmed * COIN \
+                and res["confirmed"] == confirmed * COIN
+
+        waitFor(10, lambda: check_address(scripthash, unconfirmed = 1))
+        n.generate(1)
+        waitFor(10, lambda: check_address(scripthash, confirmed = 1))
+
 
 
     def setup_network(self, dummy = None):
