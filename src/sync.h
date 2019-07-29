@@ -19,38 +19,6 @@
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/thread/thread.hpp>
 
-////////////////////////////////////////////////
-//                                            //
-// THE SIMPLE DEFINITION, EXCLUDING DEBUG CODE //
-//                                            //
-////////////////////////////////////////////////
-
-/*
-CCriticalSection mutex;
-    boost::recursive_mutex mutex;
-
-LOCK(mutex);
-    boost::unique_lock<boost::recursive_mutex> criticalblock(mutex);
-
-LOCK2(mutex1, mutex2);
-    boost::unique_lock<boost::recursive_mutex> criticalblock1(mutex1);
-    boost::unique_lock<boost::recursive_mutex> criticalblock2(mutex2);
-
-TRY_LOCK(mutex, name);
-    boost::unique_lock<boost::recursive_mutex> name(mutex, boost::try_to_lock_t);
-
-ENTER_CRITICAL_SECTION(mutex); // no RAII
-    mutex.lock();
-
-LEAVE_CRITICAL_SECTION(mutex); // no RAII
-    mutex.unlock();
- */
-
-///////////////////////////////
-//                           //
-// THE ACTUAL IMPLEMENTATION //
-//                           //
-///////////////////////////////
 
 #ifdef DEBUG_LOCKORDER
 // BU if a CCriticalSection is allocated on the heap we need to clean it from the lockorder map upon destruction because
@@ -161,28 +129,17 @@ typedef AnnotatedMixin<boost::shared_mutex> CSharedCriticalSection;
 class CSharedCriticalSection : public AnnotatedMixin<boost::shared_mutex>
 {
 public:
-    class LockInfo
-    {
-    public:
-        const char *file;
-        unsigned int line;
-        LockInfo() : file(""), line(0) {}
-        LockInfo(const char *f, unsigned int l) : file(f), line(l) {}
-    };
-
-    std::mutex setlock;
-    std::map<uint64_t, LockInfo> sharedowners;
     const char *name;
-    uint64_t exclusiveOwner;
     CSharedCriticalSection(const char *name);
     CSharedCriticalSection();
     ~CSharedCriticalSection();
-    void lock_shared();
-    bool try_lock_shared();
-    void unlock_shared();
-    void lock();
-    void unlock();
-    bool try_lock();
+    void lock_shared() { boost::shared_mutex::lock_shared(); }
+    void unlock_shared() { boost::shared_mutex::unlock_shared(); }
+    bool try_lock_shared() { return boost::shared_mutex::try_lock_shared(); }
+    void lock() { boost::shared_mutex::lock(); }
+    void unlock() { boost::shared_mutex::unlock(); }
+    bool try_lock() { return boost::shared_mutex::try_lock(); }
+
 };
 #define SCRITSEC(zzname) CSharedCriticalSection zzname(#zzname)
 #endif
@@ -643,24 +600,6 @@ public:
     ~CSemaphoreGrant() { Release(); }
     operator bool() { return fHaveGrant; }
 };
-
-// BU move from sync.c because I need to create these in globals.cpp
-struct CLockLocation
-{
-    CLockLocation(const char *pszName, const char *pszFile, unsigned int nLine, bool fTryIn);
-    std::string ToString() const;
-    std::string MutexName() const;
-
-    bool fTry;
-
-private:
-    std::string mutexName;
-    std::string sourceFile;
-    unsigned int sourceLine;
-};
-
-typedef std::vector<std::pair<void *, CLockLocation> > LockStack;
-typedef std::map<std::pair<void *, void *>, LockStack> LockStackMap;
 
 /** A thread corral is a granular thread organization technique.
 Code is assigned to a corral via Enter(...) and Exit(...) APIs (but use the scoped CCorralLock object instead of direct

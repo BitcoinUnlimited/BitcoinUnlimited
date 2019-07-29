@@ -2093,9 +2093,6 @@ UniValue validateblocktemplate(const UniValue &params, bool fHelp)
 }
 
 #ifdef DEBUG
-#ifdef DEBUG_LOCKORDER
-extern std::map<std::pair<void *, void *>, LockStack> lockorders;
-#endif
 
 extern std::vector<std::string> vUseDNSSeeds;
 extern std::list<CNode *> vNodesDisconnected;
@@ -2164,10 +2161,6 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         ret.pushKV("txCommitQ", (uint64_t)txCommitQ->size());
     ret.pushKV("txInQ", (uint64_t)txInQ.size());
     ret.pushKV("txDeferQ", (uint64_t)txDeferQ.size());
-
-#ifdef DEBUG_LOCKORDER
-    ret.pushKV("lockorders", (uint64_t)lockorders.size());
-#endif
 
     LOCK(cs_vNodes);
     int disconnected = 0; // watch # of disconnected nodes to ensure they are being cleaned up

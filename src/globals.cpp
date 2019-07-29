@@ -57,9 +57,6 @@
 using namespace std;
 
 #ifdef DEBUG_LOCKORDER
-boost::mutex dd_mutex;
-std::map<std::pair<void *, void *>, LockStack> lockorders;
-boost::thread_specific_ptr<LockStack> lockstack;
 #endif
 
 
