@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -23,7 +23,7 @@
 #include "consensus/validation.h"
 #include "dosman.h"
 #include "expedited.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "init.h"
 #include "merkleblock.h"
 #include "net.h"
@@ -73,10 +73,9 @@
  * Global state
  */
 
-// BU moved CWaitableCriticalSection csBestBlock;
-// BU moved CConditionVariable cvBlockChange;
-bool fImporting = false;
-bool fReindex = false;
+std::atomic<bool> fImporting{false};
+std::atomic<bool> fReindex{false};
+bool fBlocksOnly = false;
 bool fTxIndex = false;
 bool fHavePruned = false;
 bool fPruneMode = false;
@@ -144,8 +143,9 @@ void InitializeNode(const CNode *pnode)
 
 void FinalizeNode(NodeId nodeid)
 {
-    // Decrement thin type peer counters
-    thinrelay.RemovePeers(connmgr->FindNodeFromId(nodeid).get());
+    // Clear thintype block data if we have any.
+    thinrelay.ClearBlockToReconstruct(nodeid);
+    thinrelay.ClearAllBlocksInFlight(nodeid);
 
     // Update block sync counters
     {
@@ -403,7 +403,7 @@ void PartitionCheck(bool (*initialDownloadCheck)(),
     const CBlockIndex *const &bestHeader,
     int64_t nPowTargetSpacing)
 {
-    if (bestHeader == NULL || initialDownloadCheck())
+    if (bestHeader == nullptr || initialDownloadCheck())
         return;
 
     static int64_t lastAlertTime = 0;
@@ -427,7 +427,7 @@ void PartitionCheck(bool (*initialDownloadCheck)(),
     {
         ++nBlocks;
         i = i->pprev;
-        if (i == NULL)
+        if (i == nullptr)
             return; // Ran out of chain, we must not be fully sync'ed
     }
 
@@ -502,6 +502,7 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
         CBufferedFile blkdat(fileIn, 2 * (reindexTypicalBlockSize.Value() + MESSAGE_START_SIZE + sizeof(unsigned int)),
             reindexTypicalBlockSize.Value() + MESSAGE_START_SIZE + sizeof(unsigned int), SER_DISK, CLIENT_VERSION);
         uint64_t nRewind = blkdat.GetPos();
+
         while (!blkdat.eof())
         {
             if (shutdown_threads.load() == true)
@@ -572,10 +573,16 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
 
                 // process in case the block isn't known yet
                 auto *pindex = LookupBlockIndex(hash);
-                if (pindex == nullptr || (pindex->nStatus & BLOCK_HAVE_DATA) == 0)
+                bool fHaveData = false;
+                if (pindex)
+                {
+                    READLOCK(cs_mapBlockIndex);
+                    fHaveData = (pindex->nStatus & BLOCK_HAVE_DATA);
+                }
+                if (pindex == nullptr || !fHaveData)
                 {
                     CValidationState state;
-                    if (ProcessNewBlock(state, chainparams, NULL, &block, true, dbp, false))
+                    if (ProcessNewBlock(state, chainparams, nullptr, &block, true, dbp, false))
                         nLoaded++;
                     if (state.IsError())
                         break;
@@ -603,7 +610,7 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
                             LOGA("%s: Processing out of order child %s of %s\n", __func__, block.GetHash().ToString(),
                                 head.ToString());
                             CValidationState dummy;
-                            if (ProcessNewBlock(dummy, chainparams, NULL, &block, true, &it->second, false))
+                            if (ProcessNewBlock(dummy, chainparams, nullptr, &block, true, &it->second, false))
                             {
                                 nLoaded++;
                                 queue.push_back(block.GetHash());

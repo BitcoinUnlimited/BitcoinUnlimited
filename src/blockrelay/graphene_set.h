@@ -1,4 +1,4 @@
-// Copyright (c) 2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,7 +7,7 @@
 
 #include "bloom.h"
 #include "fastfilter.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "iblt.h"
 #include "random.h"
 #include "serialize.h"
@@ -41,9 +41,9 @@ private:
     uint32_t ibltSalt;
     bool computeOptimized;
     std::vector<unsigned char> encodedRank;
-    CBloomFilter *pSetFilter;
-    CVariableFastFilter *pFastFilter;
-    CIblt *pSetIblt;
+    std::shared_ptr<CBloomFilter> pSetFilter;
+    std::shared_ptr<CVariableFastFilter> pFastFilter;
+    std::shared_ptr<CIblt> pSetIblt;
 
     static const uint8_t SHORTTXIDS_LENGTH = 8;
 
@@ -147,23 +147,9 @@ public:
     uint64_t GetRankSerializationSize() { return ::GetSerializeSize(encodedRank, SER_NETWORK, PROTOCOL_VERSION); }
     ~CGrapheneSet()
     {
-        if (pFastFilter)
-        {
-            delete pFastFilter;
-            pFastFilter = nullptr;
-        }
-
-        if (pSetFilter)
-        {
-            delete pSetFilter;
-            pSetFilter = nullptr;
-        }
-
-        if (pSetIblt)
-        {
-            delete pSetIblt;
-            pSetIblt = nullptr;
-        }
+        pFastFilter = nullptr;
+        pSetFilter = nullptr;
+        pSetIblt = nullptr;
     }
 
     ADD_SERIALIZE_METHODS;
@@ -186,19 +172,19 @@ public:
         if (version >= 3 && computeOptimized)
         {
             if (!pFastFilter)
-                pFastFilter = new CVariableFastFilter();
+                pFastFilter = std::make_shared<CVariableFastFilter>(CVariableFastFilter());
 
             READWRITE(*pFastFilter);
         }
         else
         {
             if (!pSetFilter)
-                pSetFilter = new CBloomFilter();
+                pSetFilter = std::make_shared<CBloomFilter>(CBloomFilter());
 
             READWRITE(*pSetFilter);
         }
         if (!pSetIblt)
-            pSetIblt = new CIblt();
+            pSetIblt = std::make_shared<CIblt>(CIblt());
         READWRITE(*pSetIblt);
     }
 };

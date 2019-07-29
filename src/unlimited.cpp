@@ -1,4 +1,5 @@
 // Copyright (c) 2015 G. Andrew Stone
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -21,7 +22,7 @@
 #include "dosman.h"
 #include "dstencode.h"
 #include "expedited.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "leakybucket.h"
 #include "miner.h"
 #include "net.h"
@@ -226,12 +227,6 @@ std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool valida
 {
     if (validate)
     {
-        if (value != 0 && miningSvForkTime.Value() != 0)
-        {
-            std::ostringstream ret;
-            ret << "Only one fork can be enabled at a time";
-            return ret.str();
-        }
     }
     else // If it was just turned "on" then set to the default activation time.
     {
@@ -244,32 +239,6 @@ std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool valida
     return std::string();
 }
 
-// Ensure that only one fork can be active at a time, update the UA string, and convert values of 1 to the
-// fork time default.
-std::string ForkTimeValidatorSV(const uint64_t &value, uint64_t *item, bool validate)
-{
-    if (validate)
-    {
-        if (value != 0 && miningForkTime.Value() != 0)
-        {
-            std::ostringstream ret;
-            ret << "Only one fork can be enabled at a time";
-            return ret.str();
-        }
-    }
-    else // If it was just turned "on" then set to the default activation time.
-    {
-        if (*item == 1)
-        {
-            // Since SV there's no other fork upcoming we going to use nov2018ActivationTime
-            // but since we removed the variable from src/chainparams.cpp we are going to use
-            // a literal integer here 1542300000 (Nov 15, 2019 15:40:00 UTC)
-            *item = 1542300000;
-        }
-        settingsToUserAgentString();
-    }
-    return std::string();
-}
 // Push all transactions in the mempool to another node
 void UnlimitedPushTxns(CNode *dest);
 
@@ -448,8 +417,6 @@ void settingsToUserAgentString()
     BUComments.clear();
 
     std::string flavor;
-    if (miningSvForkTime.Value() != 0)
-        BUComments.push_back("SV");
 
     std::stringstream ebss;
     ebss << (excessiveBlockSize / 100000);
@@ -480,15 +447,6 @@ void UnlimitedSetup(void)
     // If the user configures it to 1, assume this means default
     if (miningForkTime.Value() == 1)
         miningForkTime = Params().GetConsensus().may2019ActivationTime;
-    if (miningSvForkTime.Value() == 1)
-        miningSvForkTime = 1542300000;
-
-    if (miningForkTime.Value() != 0 && miningSvForkTime.Value() != 0)
-    {
-        LOGA("Both the SV and ABC forks are enabled.  You must choose one.");
-        printf("Both the SV and ABC forks are enabled.  You must choose one.\n");
-        exit(1);
-    }
 
     if (maxGeneratedBlock > excessiveBlockSize)
     {
@@ -547,47 +505,6 @@ void UnlimitedSetup(void)
     // Start Internal CPU miner
     // Generate coins in the background
     GenerateBitcoins(GetBoolArg("-gen", DEFAULT_GENERATE), GetArg("-genproclimit", DEFAULT_GENERATE_THREADS), Params());
-
-
-    // Modify checkpoints depending on whether BCH or SV fork
-    if (Params().NetworkIDString() == "main")
-    {
-        CCheckpointData &checkpoints = ModifiableParams().ModifiableCheckpoints();
-        if (nMiningSvForkTime == 0)
-        {
-            // Nov 15th 2018 activate LTOR, DSV op_code
-            checkpoints.mapCheckpoints[556767] =
-                uint256S("0000000000000000004626ff6e3b936941d341c5932ece4357eeccac44e6d56c");
-            // * UNIX timestamp of last checkpoint block
-            checkpoints.nTimeLastCheckpoint = 1542304936;
-            // * total number of transactions between genesis and last checkpoint
-            checkpoints.nTransactionsLastCheckpoint = 265567564;
-            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
-            checkpoints.fTransactionsPerDay = 280000.0;
-        }
-        else if (nMiningSvForkTime != 0)
-        {
-            // Nov 15th 2018 SV fork, 128MB blocks, re-enable bitcoin 0.1.0 op_codes
-            checkpoints.mapCheckpoints[556767] =
-                uint256S("000000000000000001d956714215d96ffc00e0afda4cd0a96c96f8d802b1662b");
-            // * UNIX timestamp of last checkpoint block
-            checkpoints.nTimeLastCheckpoint = 1542305817;
-            // * total number of transactions between genesis and last checkpoint
-            checkpoints.nTransactionsLastCheckpoint = 265615408;
-            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
-            checkpoints.fTransactionsPerDay = 280000.0;
-        }
-        else
-        {
-            // unknown scenario, dont update these values or add a new checkpoint
-            // * UNIX timestamp of last checkpoint block
-            checkpoints.nTimeLastCheckpoint = 1526410186;
-            // * total number of transactions between genesis and last checkpoint
-            checkpoints.nTransactionsLastCheckpoint = 249416375;
-            // * estimated number of transactions per day after checkpoint (~3.5 TPS)
-            checkpoints.fTransactionsPerDay = 280000.0;
-        }
-    }
 }
 
 FILE *blockReceiptLog = nullptr;
@@ -696,24 +613,16 @@ static bool ProcessBlockFound(const CBlock *pblock, const CChainParams &chainpar
     // Inform about the new block
     GetMainSignals().BlockFound(pblock->GetHash());
 
+    // In we are mining our own block or not running in parallel for any reason
+    // we must terminate any block validation threads that are currently running,
+    // Unless they have more work than our own block or are processing a chain
+    // that has more work than our block.
+    PV->StopAllValidationThreads(pblock->GetBlockHeader().nBits);
 
-    {
-        // We take a cs_main lock here even though it will also be aquired in ProcessNewBlock.  We want
-        // to make sure we give priority to our own blocks.  This is in order to prevent any other Parallel
-        // Blocks to validate when we've just mined one of our own blocks.
-        LOCK(cs_main);
-
-        // In we are mining our own block or not running in parallel for any reason
-        // we must terminate any block validation threads that are currently running,
-        // Unless they have more work than our own block or are processing a chain
-        // that has more work than our block.
-        PV->StopAllValidationThreads(pblock->GetBlockHeader().nBits);
-
-        // Process this block the same as if we had received it from another node
-        CValidationState state;
-        if (!ProcessNewBlock(state, chainparams, nullptr, pblock, true, nullptr, false))
-            return error("BitcoinMiner: ProcessNewBlock, block not accepted");
-    }
+    // Process this block the same as if we had received it from another node
+    CValidationState state;
+    if (!ProcessNewBlock(state, chainparams, nullptr, pblock, true, nullptr, false))
+        return error("BitcoinMiner: ProcessNewBlock, block not accepted");
 
     return true;
 }
@@ -734,7 +643,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
     {
         // Throw an error if no script was provided.  This can happen
         // due to some internal error but also if the keypool is empty.
-        // In the latter case, already the pointer is NULL.
+        // In the latter case, already the pointer is nullptr.
         if (!coinbaseScript || coinbaseScript->reserveScript.empty())
             throw std::runtime_error("No coinbase script available (mining requires a wallet)");
 
@@ -939,6 +848,8 @@ UniValue setgenerate(const UniValue &params, bool fHelp)
 
 int chainContainsExcessive(const CBlockIndex *blk, unsigned int goBack)
 {
+    AssertLockHeld(cs_mapBlockIndex);
+
     if (goBack == 0)
         goBack = excessiveAcceptDepth + EXCESSIVE_BLOCK_CHAIN_RESET;
     for (unsigned int i = 0; i < goBack; i++, blk = blk->pprev)
@@ -953,6 +864,8 @@ int chainContainsExcessive(const CBlockIndex *blk, unsigned int goBack)
 
 int isChainExcessive(const CBlockIndex *blk, unsigned int goBack)
 {
+    AssertLockHeld(cs_mapBlockIndex);
+
     if (goBack == 0)
         goBack = excessiveAcceptDepth;
     bool recentExcessive = false;
@@ -1070,7 +983,7 @@ UniValue getexcessiveblock(const UniValue &params, bool fHelp)
                             HelpExampleCli("getexcessiveblock", "") + HelpExampleRpc("getexcessiveblock", ""));
 
     UniValue ret(UniValue::VOBJ);
-    ret.pushKV("excessiveBlockSize", (uint64_t)excessiveBlockSize);
+    ret.pushKV("excessiveBlockSize", excessiveBlockSize);
     ret.pushKV("excessiveAcceptDepth", (uint64_t)excessiveAcceptDepth);
     return ret;
 }
@@ -1091,15 +1004,15 @@ UniValue setexcessiveblock(const UniValue &params, bool fHelp)
                             "\nExamples:\n" +
                             HelpExampleCli("getexcessiveblock", "") + HelpExampleRpc("getexcessiveblock", ""));
 
-    unsigned int ebs = 0;
+    uint64_t ebs = 0;
     if (params[0].isNum())
         ebs = params[0].get_int64();
     else
     {
         string temp = params[0].get_str();
         if (temp[0] == '-')
-            boost::throw_exception(boost::bad_lexical_cast());
-        ebs = boost::lexical_cast<unsigned int>(temp);
+            throw runtime_error("Excessive block size has to be a positive number");
+        ebs = std::stoull(temp);
     }
 
     std::string estr = ebTweak.Validate(ebs);
@@ -2053,6 +1966,7 @@ UniValue validatechainhistory(const UniValue &params, bool fHelp)
     while (pos && !failedChain)
     {
         // LOGA("validate %d %s\n", pos->nHeight, pos->phashBlock->ToString());
+        READLOCK(cs_mapBlockIndex);
         failedChain = pos->nStatus & BLOCK_FAILED_MASK;
         if (!failedChain)
         {
@@ -2068,6 +1982,7 @@ UniValue validatechainhistory(const UniValue &params, bool fHelp)
             pos = stk.top();
             if (pos)
             {
+                WRITELOCK(cs_mapBlockIndex);
                 pos->nStatus |= BLOCK_FAILED_CHILD;
             }
             setDirtyBlockIndex.insert(pos);
@@ -2206,9 +2121,12 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     ret.pushKV("vRelayExpiration", (int64_t)vRelayExpiration.size());
     ret.pushKV("vNodes", (int64_t)vNodes.size());
     ret.pushKV("vNodesDisconnected", (int64_t)vNodesDisconnected.size());
+    {
+        READLOCK(orphanpool.cs);
+        ret.pushKV("mapOrphanTransactions", (int64_t)orphanpool.mapOrphanTransactions.size());
+        ret.pushKV("mapOrphanTransactionsByPrev", (int64_t)orphanpool.mapOrphanTransactionsByPrev.size());
+    }
     // CAddrMan
-    ret.pushKV("mapOrphanTransactions", (int64_t)orphanpool.mapOrphanTransactions.size());
-    ret.pushKV("mapOrphanTransactionsByPrev", (int64_t)orphanpool.mapOrphanTransactionsByPrev.size());
 
     uint32_t nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream;
     connmgr->ExpeditedNodeCounts(nExpeditedBlocks, nExpeditedTxs, nExpeditedUpstream);
@@ -2226,7 +2144,6 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 #endif
 
     LOCK(cs_vNodes);
-    std::vector<CNode *>::iterator n;
     int disconnected = 0; // watch # of disconnected nodes to ensure they are being cleaned up
     for (std::vector<CNode *>::iterator it = vNodes.begin(); it != vNodes.end(); ++it)
     {
@@ -2251,7 +2168,12 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
                     (int64_t)::GetSerializeSize(*inode.pThinBlockFilter, SER_NETWORK, PROTOCOL_VERSION));
             }
         }
-        node.pushKV("vAddrToSend", (int64_t)inode.vAddrToSend.size());
+
+        {
+            LOCK(inode.cs_vSend);
+            node.pushKV("vAddrToSend", (int64_t)inode.vAddrToSend.size());
+        }
+
         node.pushKV("vInventoryToSend", (int64_t)inode.vInventoryToSend.size());
         ret.pushKV(inode.addrName, node);
     }
@@ -2279,6 +2201,7 @@ struct CompareBlocksByHeight
 void MarkAllContainingChainsInvalid(CBlockIndex *invalidBlock)
 {
     LOCK(cs_main);
+    READLOCK(cs_mapBlockIndex);
 
     bool dirty = false;
     DbgAssert(invalidBlock->nStatus & BLOCK_FAILED_MASK, return );

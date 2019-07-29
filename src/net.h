@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -13,7 +13,7 @@
 #include "compat.h"
 #include "fastfilter.h"
 #include "fs.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "iblt.h"
 #include "limitedmap.h"
 #include "netbase.h"
@@ -116,8 +116,8 @@ CNodeRef FindNodeRef(const NodeId id);
 int DisconnectSubNetNodes(const CSubNet &subNet);
 bool OpenNetworkConnection(const CAddress &addrConnect,
     bool fCountFailure,
-    CSemaphoreGrant *grantOutbound = NULL,
-    const char *strDest = NULL,
+    CSemaphoreGrant *grantOutbound = nullptr,
+    const char *strDest = nullptr,
     bool fOneShot = false,
     bool fFeeler = false);
 void MapPort(bool fUseUPnP);
@@ -179,10 +179,10 @@ bool AddLocal(const CNetAddr &addr, int nScore = LOCAL_NONE);
 bool RemoveLocal(const CService &addr);
 bool SeenLocal(const CService &addr);
 bool IsLocal(const CService &addr);
-bool GetLocal(CService &addr, const CNetAddr *paddrPeer = NULL);
+bool GetLocal(CService &addr, const CNetAddr *paddrPeer = nullptr);
 bool IsReachable(enum Network net);
 bool IsReachable(const CNetAddr &addr);
-CAddress GetLocalAddress(const CNetAddr *paddrPeer = NULL);
+CAddress GetLocalAddress(const CNetAddr *paddrPeer = nullptr);
 
 
 extern bool fDiscover;
@@ -240,7 +240,7 @@ public:
     double dPingMin;
     //! What this peer sees as my address
     std::string addrLocal;
-    //! Whether this peer supports CompactBlocks (for statistics only, BU doesn't support CB protocol)
+    //! Whether this peer supports CompactBlocks
     bool fSupportsCompactBlocks;
 };
 
@@ -475,20 +475,13 @@ public:
     CCriticalSection cs_xthinblock;
     // BUIP010 Xtreme Thinblocks: end section
 
-    // BUIPXXX Graphene blocks: begin section
+    // Graphene blocks: begin section
     CCriticalSection cs_graphene;
-    CBlock grapheneBlock;
-    std::vector<uint256> grapheneBlockHashes;
-    std::map<uint64_t, uint32_t> grapheneMapHashOrderIndex;
-    std::map<uint64_t, CTransactionRef> mapGrapheneMissingTx;
-    uint64_t nLocalGrapheneBlockBytes; // the bytes used in creating this graphene block, updated dynamically
-    int nSizeGrapheneBlock; // Original on-wire size of the block. Just used for reporting
-    int grapheneBlockWaitingForTxns; // if -1 then not currently waiting
-    CCriticalSection cs_grapheneadditionaltxs; // lock grapheneAdditionalTxs
-    std::vector<CTransactionRef> grapheneAdditionalTxs; // entire transactions included in graphene block
+
+    // Store the grapheneblock salt to be used for this peer
     uint64_t gr_shorttxidk0;
     uint64_t gr_shorttxidk1;
-    // BUIPXXX Graphene blocks: end section
+    // Graphene blocks: end section
 
     // Compact Blocks : begin
     CCriticalSection cs_compactblock;
@@ -923,7 +916,7 @@ public:
     //! returns the name of this node for logging.  Respects the user's choice to not log the node's IP
     std::string GetLogName()
     {
-        std::string idstr = boost::lexical_cast<std::string>(id);
+        std::string idstr = std::to_string(id);
         if (fLogIPs)
             return addrName + " (" + idstr + ")";
         return idstr;

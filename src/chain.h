@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -204,9 +204,9 @@ public:
 
     void SetNull()
     {
-        phashBlock = NULL;
-        pprev = NULL;
-        pskip = NULL;
+        phashBlock = nullptr;
+        pprev = nullptr;
+        pskip = nullptr;
         nHeight = 0;
         nFile = 0;
         nDataPos = 0;
@@ -440,15 +440,15 @@ private:
 
 public:
     CChain() : tip(nullptr) {}
-    /** Returns the index entry for the genesis block of this chain, or NULL if none. */
-    CBlockIndex *Genesis() const { return vChain.size() > 0 ? vChain[0] : NULL; }
-    /** Returns the index entry for the tip of this chain, or NULL if none.  Does not require cs_main. */
+    /** Returns the index entry for the genesis block of this chain, or nullptr if none. */
+    CBlockIndex *Genesis() const { return vChain.size() > 0 ? vChain[0] : nullptr; }
+    /** Returns the index entry for the tip of this chain, or nullptr if none.  Does not require cs_main. */
     CBlockIndex *Tip() const { return tip; }
-    /** Returns the index entry at a particular height in this chain, or NULL if no such height exists. */
+    /** Returns the index entry at a particular height in this chain, or nullptr if no such height exists. */
     CBlockIndex *operator[](int nHeight) const
     {
         if (nHeight < 0 || nHeight >= (int)vChain.size())
-            return NULL;
+            return nullptr;
         return vChain[nHeight];
     }
 
@@ -466,7 +466,7 @@ public:
         return (*this)[pindex->nHeight] == pindex;
     }
 
-    /** Find the successor of a block in this chain, or NULL if the given index is not found or is the tip. */
+    /** Find the successor of a block in this chain, or nullptr if the given index is not found or is the tip. */
     CBlockIndex *Next(const CBlockIndex *pindex) const
     {
         if (Contains(pindex))
@@ -481,7 +481,7 @@ public:
     void SetTip(CBlockIndex *pindex);
 
     /** Return a CBlockLocator that refers to a block in this chain (by default the tip). */
-    CBlockLocator GetLocator(const CBlockIndex *pindex = NULL) const;
+    CBlockLocator GetLocator(const CBlockIndex *pindex = nullptr) const;
 
     /** Find the last common block between this chain and a block index entry. */
     const CBlockIndex *FindFork(const CBlockIndex *pindex) const;

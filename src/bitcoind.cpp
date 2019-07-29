@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2017 The Bitcoin developers
+// Copyright (c) 2009-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -18,7 +19,6 @@
 #include "init.h"
 #include "noui.h"
 #include "rpc/server.h"
-#include "unlimited.h"
 #include "unlimited.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -257,7 +257,7 @@ bool AppInit(int argc, char *argv[])
     }
     catch (...)
     {
-        PrintExceptionContinue(NULL, "AppInit()");
+        PrintExceptionContinue(nullptr, "AppInit()");
     }
 
     if (!fRet)

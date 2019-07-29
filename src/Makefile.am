@@ -2,7 +2,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-DIST_SUBDIRS = secp256k1 univalue
+DIST_SUBDIRS = rsm secp256k1 univalue
 
 AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS) $(HARDENED_LDFLAGS)
 AM_LIBTOOLFLAGS = --preserve-dup-deps
@@ -36,7 +36,7 @@ BITCOIN_INCLUDES=-I$(builddir) -I$(builddir)/obj $(BDB_CPPFLAGS) $(BOOST_CPPFLAG
 
 BITCOIN_INCLUDES += -I$(srcdir)/secp256k1/include
 BITCOIN_INCLUDES += -I$(srcdir)/univalue/include
-BITCOIN_INCLUDES += -I$(srcdir)/rsm
+BITCOIN_INCLUDES += -I$(srcdir)/rsm/include
 
 LIBBITCOIN_SERVER=libbitcoin_server.a
 LIBBITCOIN_COMMON=libbitcoin_common.a
@@ -45,6 +45,7 @@ LIBBITCOIN_CLI=libbitcoin_cli.a
 LIBBITCOIN_UTIL=libbitcoin_util.a
 LIBBITCOIN_CRYPTO=crypto/libbitcoin_crypto.a
 LIBBITCOINQT=qt/libbitcoinqt.a
+LIBRSM=rsm/librsm.la
 LIBSECP256K1=secp256k1/libsecp256k1.la
 LIBUNIVALUE=univalue/libunivalue.la
 
@@ -58,6 +59,9 @@ endif
 if ENABLE_WALLET
 LIBBITCOIN_WALLET=libbitcoin_wallet.a
 endif
+
+$(LIBRSM): $(wildcard rsm/lib/*) $(wildcard rsm/include/*)
+	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
 
 $(LIBSECP256K1): $(wildcard secp256k1/src/*) $(wildcard secp256k1/include/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
@@ -138,6 +142,7 @@ BITCOIN_CORE_H = \
   dstencode.h \
   expedited.h \
   electrum/electrs.h \
+  electrum/electrumrpcinfo.h \
   electrum/electrumserver.h \
   fast-cpp-csv-parser/csv.h \
   fastfilter.h \
@@ -170,7 +175,6 @@ BITCOIN_CORE_H = \
   protocol.h \
   random.h \
   reverse_iterator.h \
-  rsm/recursive_shared_mutex.h \
   reverselock.h \
   rpc/client.h \
   rpc/protocol.h \
@@ -263,6 +267,7 @@ libbitcoin_server_a_SOURCES = \
   dosman.cpp \
   expedited.cpp \
   electrum/electrs.cpp \
+  electrum/electrumrpcinfo.cpp \
   electrum/electrumserver.cpp \
   forks_csv.cpp \
   httprpc.cpp \
@@ -283,6 +288,7 @@ libbitcoin_server_a_SOURCES = \
   pow.cpp \
   rest.cpp \
   rpc/blockchain.cpp \
+  rpc/client.cpp \
   rpc/electrum.cpp \
   rpc/mining.cpp \
   rpc/misc.cpp \
@@ -345,8 +351,8 @@ libbitcoincash_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoincash_a_SOURCES = \
   cashlib/cashlib.cpp \
   script/sigcommon.cpp \
-  hash.cpp \
-  hash.h \
+  hashwrapper.cpp \
+  hashwrapper.h \
   key.cpp \
   key.h \
   primitives/transaction.cpp \
@@ -405,8 +411,8 @@ libbitcoin_consensus_a_SOURCES = \
   consensus/merkle.h \
   consensus/params.h \
   consensus/validation.h \
-  hash.cpp \
-  hash.h \
+  hashwrapper.cpp \
+  hashwrapper.h \
   prevector.h \
   primitives/block.cpp \
   primitives/block.h \
@@ -472,7 +478,6 @@ libbitcoin_util_a_SOURCES = \
   compat/strnlen.cpp \
   fs.cpp \
   random.cpp \
-  rsm/recursive_shared_mutex.cpp \
   rpc/protocol.cpp \
   support/cleanse.cpp \
   sync.cpp \
@@ -520,6 +525,7 @@ bitcoind_LDADD = \
   $(LIBLEVELDB) \
   $(LIBLEVELDB_SSE42) \
   $(LIBMEMENV) \
+  $(LIBRSM) \
   $(LIBSECP256K1)
 
 bitcoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
@@ -537,7 +543,8 @@ endif
 bitcoin_cli_LDADD = \
   $(LIBBITCOIN_CLI) \
   $(LIBUNIVALUE) \
-  $(LIBBITCOIN_UTIL)
+  $(LIBBITCOIN_UTIL) \
+  $(LIBRSM)
 
 bitcoin_cli_LDADD += $(BOOST_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(EVENT_LIBS)
 #
@@ -558,7 +565,8 @@ bitcoin_tx_LDADD = \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CONSENSUS) \
   $(LIBBITCOIN_CRYPTO) \
-  $(LIBSECP256K1)
+  $(LIBSECP256K1) \
+  $(LIBRSM)
 
 bitcoin_tx_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS)
 #
@@ -583,7 +591,8 @@ bitcoin_miner_LDADD = \
   $(LIBBITCOIN_CLI) \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBUNIVALUE) \
-  $(LIBBITCOIN_UTIL)
+  $(LIBBITCOIN_UTIL) \
+  $(LIBRSM)
 
 bitcoin_miner_LDADD += $(BOOST_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(EVENT_LIBS)
 #
@@ -634,6 +643,7 @@ CLEANFILES += consensus/*.gcda consensus/*.gcno
 CLEANFILES += crypto/*.gcda crypto/*.gcno
 CLEANFILES += policy/*.gcda policy/*.gcno
 CLEANFILES += primitives/*.gcda primitives/*.gcno
+CLEANFILES += rsm/*.gcda rsm/*.gcno
 CLEANFILES += script/*.gcda script/*.gcno
 CLEANFILES += support/*.gcda support/*.gcno
 CLEANFILES += univalue/*.gcda univalue/*.gcno
@@ -646,6 +656,7 @@ DISTCLEANFILES = obj/build.h xversionkeys.h
 EXTRA_DIST = leveldb $(CTAES_DIST) $(srcdir)/xversionkeys.dat $(top_srcdir)/contrib/devtools/xversionkeys.py
 
 clean-local:
+	-$(MAKE) -C rsm clean
 	-$(MAKE) -C secp256k1 clean
 	-$(MAKE) -C univalue clean
 	-rm -f leveldb/*/*.gcda leveldb/*/*.gcno leveldb/helpers/memenv/*.gcda leveldb/helpers/memenv/*.gcno

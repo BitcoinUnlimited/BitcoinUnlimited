@@ -1,3 +1,6 @@
+// Copyright (c) 2019 The Bitcoin Unlimited developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "electrum/electrs.h"
 #include "util.h"
 #include "utilhttp.h"
@@ -11,6 +14,21 @@
 
 static std::string monitoring_port() { return GetArg("-electrum.monitoring.port", "4224"); }
 static std::string monitoring_host() { return GetArg("-electrum.monitoring.host", "127.0.0.1"); }
+static std::string rpc_host() { return GetArg("-electrum.host", "127.0.0.1"); }
+static std::string rpc_port(const std::string &network)
+{
+    std::map<std::string, std::string> portmap = {{"main", "50001"}, {"test", "60001"}, {"regtest", "60401"}};
+
+    auto defaultPort = portmap.find(network);
+    if (defaultPort == end(portmap))
+    {
+        std::stringstream ss;
+        ss << "Electrum server does not support '" << network << "' network.";
+        throw std::invalid_argument(ss.str());
+    }
+
+    return GetArg("-electrum.port", defaultPort->second);
+}
 namespace electrum
 {
 std::string electrs_path()
@@ -55,12 +73,7 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
         args.push_back(ss.str());
     }
 
-    const std::string electrumport = GetArg("-electrum.port", "DEFAULT");
-    if (electrumport != "DEFAULT")
-    {
-        const std::string host = GetArg("-electrum.host", "127.0.0.1");
-        args.push_back("--electrum-rpc-addr=" + host + ":" + electrumport);
-    }
+    args.push_back("--electrum-rpc-addr=" + rpc_host() + ":" + rpc_port(network));
 
     // bitcoind data dir (for cookie file)
     args.push_back("--daemon-dir=" + GetDataDir(false).string());
@@ -95,7 +108,7 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
     return args;
 }
 
-std::map<std::string, int> fetch_electrs_info()
+std::map<std::string, int64_t> fetch_electrs_info()
 {
     if (!GetBoolArg("-electrum", false))
     {
@@ -105,7 +118,7 @@ std::map<std::string, int> fetch_electrs_info()
     std::stringstream infostream = http_get(monitoring_host(), std::stoi(monitoring_port()), "/");
 
     const std::regex keyval("^([a-z_]+)\\s(\\d+)\\s*$");
-    std::map<std::string, int> info;
+    std::map<std::string, int64_t> info;
     std::string line;
     std::smatch match;
     while (std::getline(infostream, line, '\n'))
@@ -114,7 +127,14 @@ std::map<std::string, int> fetch_electrs_info()
         {
             continue;
         }
-        info[match[1].str()] = std::stoi(match[2].str());
+        try
+        {
+            info[match[1].str()] = std::stol(match[2].str());
+        }
+        catch (const std::exception &e)
+        {
+            LOG(ELECTRUM, "%s error: %s", __func__, e.what());
+        }
     }
     return info;
 }

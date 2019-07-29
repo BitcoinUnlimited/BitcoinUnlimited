@@ -90,10 +90,8 @@ sudo apt-get install libdb4.8-dev libdb4.8++-dev
 ## Fetching the code and compile it
 
 ```sh
-mkdir -p ~/src
-cd ~/src
-git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git bu-src
-cd bu-src
+git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git
+cd BitcoinUnlimited
 git checkout release 	# or git checkout origin/dev
 ./autogen.sh
 

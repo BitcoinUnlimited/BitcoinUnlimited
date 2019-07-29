@@ -1,10 +1,11 @@
-// Copyright (c) 2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef BITCOIN_GRAPHENE_H
 #define BITCOIN_GRAPHENE_H
 
+#include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene_set.h"
 #include "bloom.h"
 #include "config.h"
@@ -61,14 +62,27 @@ private:
     // Entropy used for SipHash secret key; this is distinct from the block nonce
     uint64_t sipHashNonce;
 
+private:
+    // memory only
+    mutable uint64_t nSize; // Serialized grapheneblock size in bytes
+
+public:
+    // memory only
+    mutable unsigned int nWaitingFor; // Number of txns we are still needing to recontruct the block
+
+    // memory only
+    std::vector<uint256> vTxHashes256; // List of all 256 bit transaction hashes in the block
+    std::map<uint64_t, CTransactionRef> mapMissingTx; // Map of transactions that were re-requested
+    std::vector<CTransactionRef> vAdditionalTxs; // vector of transactions receiver probably does not have
+    std::map<uint64_t, uint32_t> mapHashOrderIndex;
+
 public:
     // These describe, in two parts, the 128-bit secret key used for SipHash
     // Note that they are populated by FillShortTxIDSelector, which uses header and sipHashNonce
     uint64_t shorttxidk0, shorttxidk1;
     CBlockHeader header;
-    std::vector<CTransactionRef> vAdditionalTxs; // vector of transactions receiver probably does not have
     uint64_t nBlockTxs;
-    CGrapheneSet *pGrapheneSet;
+    std::shared_ptr<CGrapheneSet> pGrapheneSet;
     uint64_t version;
     bool computeOptimized;
 
@@ -78,13 +92,19 @@ public:
         uint64_t nSenderMempoolPlusBlock,
         uint64_t _version,
         bool _computeOptimized);
-    CGrapheneBlock() : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(2), computeOptimized(false) {}
+    CGrapheneBlock()
+        : nSize(0), nWaitingFor(0), shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(2),
+          computeOptimized(false)
+    {
+    }
     CGrapheneBlock(uint64_t _version)
-        : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(_version), computeOptimized(false)
+        : nSize(0), nWaitingFor(0), shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(_version),
+          computeOptimized(false)
     {
     }
     CGrapheneBlock(uint64_t _version, bool _computeOptimized)
-        : shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(_version), computeOptimized(_computeOptimized)
+        : nSize(0), nWaitingFor(0), shorttxidk0(0), shorttxidk1(0), pGrapheneSet(nullptr), version(_version),
+          computeOptimized(_computeOptimized)
     {
     }
     ~CGrapheneBlock();
@@ -116,20 +136,21 @@ public:
         READWRITE(header);
         READWRITE(vAdditionalTxs);
         READWRITE(nBlockTxs);
-        // This logic assumes a smallest transaction size of 100 bytes.  This is optimistic for realistic transactions
-        // and the downside for pathological blocks is just that graphene won't work so we fall back to xthin
-        if (nBlockTxs > (excessiveBlockSize * maxMessageSizeMultiplier / 100))
+        // This logic assumes a smallest transaction size of MIN_TX_SIZE bytes.  This is optimistic for realistic
+        // transactions and the downside for pathological blocks is just that graphene won't work so we fall back
+        // to xthin
+        if (nBlockTxs > (thinrelay.GetMaxAllowedBlockSize() / MIN_TX_SIZE))
             throw std::runtime_error("nBlockTxs exceeds threshold for excessive block txs");
         if (!pGrapheneSet)
         {
             if (version > 3)
-                pGrapheneSet = new CGrapheneSet(3, computeOptimized);
+                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(3, computeOptimized));
             else if (version == 3)
-                pGrapheneSet = new CGrapheneSet(2);
+                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(2));
             else if (version == 2)
-                pGrapheneSet = new CGrapheneSet(1);
+                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(1));
             else
-                pGrapheneSet = new CGrapheneSet(0);
+                pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(0));
         }
         READWRITE(*pGrapheneSet);
     }
@@ -137,8 +158,16 @@ public:
     {
         return ::GetSerializeSize(vAdditionalTxs, SER_NETWORK, PROTOCOL_VERSION);
     }
+
+    uint64_t GetSize() const
+    {
+        if (nSize == 0)
+            nSize = ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
+        return nSize;
+    }
+
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
-    bool process(CNode *pfrom, int nSizeGrapheneBlock, std::string strCommand);
+    bool process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> pblock);
     bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state);
 };
 
@@ -219,15 +248,18 @@ struct GrapheneQuickStats
     double fLast24hOutboundCompression;
     uint64_t nLast24hRerequestTx;
     double fLast24hRerequestTxPercent;
+    GrapheneQuickStats()
+        : nTotalInbound(0), nTotalOutbound(0), nTotalBandwidthSavings(0), nTotalDecodeFailures(0), nLast24hInbound(0),
+          fLast24hInboundCompression(0.0), nLast24hOutbound(0), fLast24hOutboundCompression(0.0),
+          nLast24hRerequestTx(0), fLast24hRerequestTxPercent(0.0)
+    {
+    }
 };
 
 // This class stores statistics for graphene block derived protocols.
 class CGrapheneBlockData
 {
 private:
-    /* The sum total of all bytes for graphene blocks currently in process of being reconstructed */
-    std::atomic<uint64_t> nGrapheneBlockBytes{0};
-
     CCriticalSection cs_graphenestats; // locks everything below this point
 
     CStatHistory<uint64_t> nOriginalSize;
@@ -332,14 +364,7 @@ public:
     std::string ValidationTimeToString();
     std::string ReRequestedTxToString();
 
-    void ClearGrapheneBlockData(CNode *pfrom);
-    void ClearGrapheneBlockData(CNode *pfrom, const uint256 &hash);
     void ClearGrapheneBlockStats();
-
-    uint64_t AddGrapheneBlockBytes(uint64_t, CNode *pfrom);
-    void DeleteGrapheneBlockBytes(uint64_t, CNode *pfrom);
-    void ResetGrapheneBlockBytes();
-    uint64_t GetGrapheneBlockBytes();
 
     void FillGrapheneQuickStats(GrapheneQuickStats &stats);
 };
@@ -347,12 +372,11 @@ extern CGrapheneBlockData graphenedata; // Singleton class
 
 
 bool IsGrapheneBlockEnabled();
-bool ClearLargestGrapheneBlockAndDisconnect(CNode *pfrom);
 void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CMemPoolInfo &mempoolinfo);
 bool IsGrapheneBlockValid(CNode *pfrom, const CBlockHeader &header);
 bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams);
 CMemPoolInfo GetGrapheneMempoolInfo();
-void RequestFailoverBlock(CNode *pfrom, const uint256 &blockhash);
+void RequestFailoverBlock(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock);
 // Generate cheap hash from seeds using SipHash
 uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256 &txhash, uint64_t grapheneVersion);
 // This method decides on the value of computeOptimized depending on what modes are supported

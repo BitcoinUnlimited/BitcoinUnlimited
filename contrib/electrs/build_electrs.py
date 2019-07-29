@@ -4,9 +4,9 @@ import logging
 import os
 import sys
 import shutil
-GIT_REPO = "https://github.com/dagurval/electrs.git"
-GIT_BRANCH = "v0.5.0bu"
-EXPECT_HEAD = "84d449ed283296dfc266433a6919ffcb3ca55344"
+GIT_REPO = "https://github.com/BitcoinUnlimited/electrs.git"
+GIT_BRANCH = "v0.7.0bu"
+EXPECT_HEAD = "8e1734d5d54339cc469ea6230b0e02395f2ab82d"
 
 ROOT_DIR = os.path.realpath(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
@@ -126,8 +126,8 @@ if not os.path.exists(ELECTRS_DIR):
     clone_repo()
 verify_repo(args.allow_modified)
 
-cargo_run(["build", "--release", "--target=%s" % get_target(args.target)])
-cargo_run(["test", "--release", "--target=%s" % get_target(args.target)])
+cargo_run(["build", "--verbose", "--locked", "--release", "--target=%s" % get_target(args.target)])
+cargo_run(["test", "--verbose", "--locked", "--release", "--target=%s" % get_target(args.target)])
 
 src = os.path.join(ELECTRS_DIR, "target", get_target(args.target), "release", "electrs")
 logging.info("Copying %s to %s", src, args.dst)

@@ -42,14 +42,14 @@ struct secure_allocator : public std::allocator<T> {
     {
         T* p;
         p = std::allocator<T>::allocate(n, hint);
-        if (p != NULL)
+        if (p != nullptr)
             LockedPageManager::Instance().LockRange(p, sizeof(T) * n);
         return p;
     }
 
     void deallocate(T* p, std::size_t n)
     {
-        if (p != NULL) {
+        if (p != nullptr) {
             memory_cleanse(p, sizeof(T) * n);
             LockedPageManager::Instance().UnlockRange(p, sizeof(T) * n);
         }

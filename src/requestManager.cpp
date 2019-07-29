@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -61,7 +61,7 @@ unsigned int blkReqRetryInterval = MIN_BLK_REQUEST_RETRY_INTERVAL;
 extern bool CanDirectFetch(const Consensus::Params &consensusParams);
 
 /** Find the last common ancestor two blocks have.
- *  Both pa and pb must be non-NULL. */
+ *  Both pa and pb must be non-nullptr. */
 static CBlockIndex *LastCommonAncestor(CBlockIndex *pa, CBlockIndex *pb)
 {
     if (pa->nHeight > pb->nHeight)
@@ -105,6 +105,28 @@ CRequestManager::CRequestManager()
     sendBlkIter = mapBlkInfo.end();
 }
 
+void CRequestManager::Cleanup()
+{
+    LOCK(cs_objDownloader);
+    sendIter = mapTxnInfo.end();
+    sendBlkIter = mapBlkInfo.end();
+    MapBlocksInFlightClear();
+    OdMap::iterator i = mapTxnInfo.begin();
+    while (i != mapTxnInfo.end())
+    {
+        auto prev = i;
+        ++i;
+        cleanup(prev); // cleanup erases which is why I need to advance the iterator first
+    }
+
+    i = mapBlkInfo.begin();
+    while (i != mapBlkInfo.end())
+    {
+        auto prev = i;
+        ++i;
+        cleanup(prev); // cleanup erases which is why I need to advance the iterator first
+    }
+}
 
 void CRequestManager::cleanup(OdMap::iterator &itemIt)
 {
@@ -289,30 +311,42 @@ void CRequestManager::UpdateTxnResponseTime(const CInv &obj, CNode *pfrom)
     }
 }
 
-// Indicate that we are processing this object.
-void CRequestManager::Processing(const CInv &obj, CNode *pfrom)
+void CRequestManager::ProcessingTxn(const uint256 &hash, CNode *pfrom)
 {
     LOCK(cs_objDownloader);
-    if (obj.type == MSG_TX)
-    {
-        OdMap::iterator item = mapTxnInfo.find(obj.hash);
-        if (item == mapTxnInfo.end())
-            return;
+    OdMap::iterator item = mapTxnInfo.find(hash);
+    if (item == mapTxnInfo.end())
+        return;
 
-        item->second.fProcessing = true;
-        LOG(REQ, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
-            pfrom ? pfrom->GetLogName() : "unknown");
-    }
-    else if (obj.type == MSG_BLOCK || obj.type == MSG_CMPCT_BLOCK || obj.type == MSG_XTHINBLOCK)
-    {
-        OdMap::iterator item = mapBlkInfo.find(obj.hash);
-        if (item == mapBlkInfo.end())
-            return;
+    item->second.fProcessing = true;
+    LOG(REQ, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
+        pfrom ? pfrom->GetLogName() : "unknown");
+}
 
-        item->second.fProcessing = true;
-        LOG(BLK, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
-            pfrom ? pfrom->GetLogName() : "unknown");
-    }
+void CRequestManager::ProcessingBlock(const uint256 &hash, CNode *pfrom)
+{
+    LOCK(cs_objDownloader);
+    OdMap::iterator item = mapBlkInfo.find(hash);
+    if (item == mapBlkInfo.end())
+        return;
+
+    item->second.fProcessing = true;
+    LOG(BLK, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
+        pfrom ? pfrom->GetLogName() : "unknown");
+}
+// This block has failed to be accepted so in case this is some sort of attack block
+// we need to set the fProcessing flag back to false.
+//
+// We don't have to remove the source because it would have already been removed if/when we
+// requested the block and if this was an unsolicited block or attack block then the source
+// would never have been added to the request manager.
+void CRequestManager::BlockRejected(const CInv &obj, CNode *pfrom)
+{
+    LOCK(cs_objDownloader);
+    OdMap::iterator item = mapBlkInfo.find(obj.hash);
+    if (item == mapBlkInfo.end())
+        return;
+    item->second.fProcessing = false;
 }
 
 // Indicate that we got this object.
@@ -646,6 +680,11 @@ void CRequestManager::SendRequests()
         ++sendBlkIter; // move it forward up here in case we need to erase the item we are working with.
         CUnknownObj &item = itemIter->second;
 
+        // If we've already received the item and it's in processing then skip it here so we don't
+        // end up re-requesting it again.
+        if (item.fProcessing)
+            continue;
+
         // if never requested then lastRequestTime==0 so this will always be true
         if (now - item.lastRequestTime > _blkReqRetryInterval)
         {
@@ -892,6 +931,11 @@ void CRequestManager::SendRequests()
                                     next.node->Release();
                                 }
                             }
+
+                            // Now that we've completed setting up our request for this transaction
+                            // we're done with this node, for this item, and can release and delete it.
+                            next.node->Release();
+                            next.node = nullptr;
                         }
 
                         inFlight++;
@@ -928,29 +972,31 @@ void CRequestManager::SendRequests()
 
 bool CRequestManager::CheckForRequestDOS(CNode *pfrom, const CChainParams &chainparams)
 {
-    LOCK(cs_objDownloader);
-
     // Check for Misbehaving and DOS
-    // If they make more than MAX_THINTYPE_OBJECT_REQUESTS requests in 10 minutes then disconnect them
-    if (chainparams.NetworkIDString() != "regtest")
+    // If they make more than MAX_THINTYPE_OBJECT_REQUESTS requests in 10 minutes then assign misbehavior points.
+    //
+    // Other networks have variable mining rates, so only apply these rules to mainnet only.
+    if (chainparams.NetworkIDString() == "main")
     {
+        LOCK(cs_objDownloader);
+
         std::map<NodeId, CRequestManagerNodeState>::iterator it = mapRequestManagerNodeState.find(pfrom->GetId());
         DbgAssert(it != mapRequestManagerNodeState.end(), return false);
         CRequestManagerNodeState *state = &it->second;
 
+        // First decay the previous value
         uint64_t nNow = GetTime();
-        state->nNumRequests = std::pow(1.0 - 1.0 / 600.0, (double)(nNow - state->nLastRequest)) + 1;
-        state->nLastRequest = nNow;
-        LOG(THIN | GRAPHENE | CMPCT, "Number of thin object requests is %f\n", state->nNumRequests);
+        state->nNumRequests = std::pow(1.0 - 1.0 / 600.0, (double)(nNow - state->nLastRequest));
 
-        // Other networks have variable mining rates, so only apply these rules to mainnet.
-        if (chainparams.NetworkIDString() == "main")
+        // Now add one request and update the time
+        state->nNumRequests++;
+        state->nLastRequest = nNow;
+
+        if (state->nNumRequests >= MAX_THINTYPE_OBJECT_REQUESTS)
         {
-            if (state->nNumRequests >= MAX_THINTYPE_OBJECT_REQUESTS)
-            {
-                dosMan.Misbehaving(pfrom, 50);
-                return error("%s is misbehaving. Making too many thin type requests.", pfrom->GetLogName());
-            }
+            pfrom->fDisconnect = true;
+            return error("Disconnecting  %s. Making too many (%f) thin object requests.", pfrom->GetLogName(),
+                state->nNumRequests);
         }
     }
     return true;
@@ -1048,19 +1094,18 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
     vBlocks.reserve(vBlocks.size() + count);
 
     // Make sure pindexBestKnownBlock is up to date, we'll need it.
-    LOCK(cs_main);
     ProcessBlockAvailability(nodeid);
 
     CNodeStateAccessor state(nodestate, nodeid);
     DbgAssert(state != nullptr, return );
 
+    LOCK(cs_main);
     if (state->pindexBestKnownBlock == nullptr ||
         state->pindexBestKnownBlock->nChainWork < chainActive.Tip()->nChainWork)
     {
         // This peer has nothing interesting.
         return;
     }
-
 
     if (state->pindexLastCommonBlock == nullptr)
     {

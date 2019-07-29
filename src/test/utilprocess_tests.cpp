@@ -25,8 +25,8 @@ BOOST_AUTO_TEST_CASE(this_process_path_test)
 static bool bin_exists(const std::string &path) { return boost::filesystem::exists(path); }
 BOOST_AUTO_TEST_CASE(subprocess_return_code)
 {
+#if (BOOST_OS_LINUX && (BOOST_VERSION >= 106500))
     auto dummy_callb = [](const std::string &) {};
-#if BOOST_OS_LINUX
 
     if (!bin_exists("/bin/true") || !bin_exists("/bin/false"))
     {
@@ -54,10 +54,10 @@ BOOST_AUTO_TEST_CASE(subprocess_return_code)
 
 BOOST_AUTO_TEST_CASE(subprocess_stdout)
 {
+#if (BOOST_OS_LINUX && (BOOST_VERSION >= 106500))
     std::vector<std::string> callback_lines;
     auto callb = [&callback_lines](const std::string &line) { callback_lines.push_back(line); };
 
-#if BOOST_OS_LINUX
     if (!bin_exists("/bin/echo"))
     {
         std::cerr << "Skipping test " << __func__ << std::endl;
@@ -73,8 +73,9 @@ BOOST_AUTO_TEST_CASE(subprocess_stdout)
 
 BOOST_AUTO_TEST_CASE(subprocess_terminate)
 {
+#if (BOOST_OS_LINUX && (BOOST_VERSION >= 106500))
     auto dummy_callb = [](const std::string &) {};
-#if BOOST_OS_LINUX
+
     if (!bin_exists("/bin/sleep"))
     {
         std::cerr << "Skipping test " << __func__ << std::endl;
@@ -106,8 +107,8 @@ BOOST_AUTO_TEST_CASE(subprocess_terminate)
 
 BOOST_AUTO_TEST_CASE(subprocess_non_existing_path)
 {
+#if (BOOST_OS_LINUX && (BOOST_VERSION >= 106500))
     auto dummy_callb = [](const std::string &) {};
-#if BOOST_OS_LINUX
     const std::string path = "/nonexistingpath";
     if (bin_exists(path))
     {

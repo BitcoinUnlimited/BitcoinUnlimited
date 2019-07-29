@@ -1,6 +1,6 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -221,6 +221,7 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
         uint256 blockhash = ParseHashV(params[2], "parameter 3");
         if (!blockhash.IsNull())
         {
+            READLOCK(cs_mapBlockIndex);
             BlockMap::iterator it = mapBlockIndex.find(blockhash);
             if (it == mapBlockIndex.end())
             {
@@ -238,6 +239,7 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
         std::string errmsg;
         if (blockindex)
         {
+            READLOCK(cs_mapBlockIndex);
             if (!(blockindex->nStatus & BLOCK_HAVE_DATA))
             {
                 throw JSONRPCError(RPC_MISC_ERROR, "Block not available");
@@ -1126,7 +1128,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             HelpExampleCli("signrawtransaction", "\"myhex\"") + HelpExampleRpc("signrawtransaction", "\"myhex\""));
 
 #ifdef ENABLE_WALLET
-    LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : NULL);
+    LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : nullptr);
 #else
     LOCK(cs_main);
 #endif
@@ -1515,7 +1517,6 @@ UniValue enqueuerawtransaction(const UniValue &params, bool fHelp)
 static const CRPCCommand commands[] = {
     //  category              name                      actor (function)         okSafeMode
     //  --------------------- ------------------------  -----------------------  ----------
-    {"rawtransactions", "getrawtransaction", &getrawtransaction, true},
     {"rawtransactions", "getrawtransaction", &getrawtransaction, true},
     {"rawtransactions", "getrawblocktransactions", &getrawblocktransactions, true},
     {"rawtransactions", "getrawtransactionssince", &getrawtransactionssince, true},

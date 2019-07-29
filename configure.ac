@@ -12,7 +12,7 @@ AC_PREREQ([2.60])
 define(_CLIENT_VERSION_MAJOR, 1)
 define(_CLIENT_VERSION_MINOR, 6)
 define(_CLIENT_VERSION_REVISION, 0)
-define(_CLIENT_VERSION_BUILD, 0)  # version 99 here indicates an unreleased version
+define(_CLIENT_VERSION_BUILD, 1)  # version 99 here indicates an unreleased version
 define(_CLIENT_VERSION_RC, 0)
 define(_CLIENT_VERSION_IS_RELEASE, true)
 define(_COPYRIGHT_YEAR, 2019)
@@ -1111,7 +1111,7 @@ ac_configure_args="${ac_configure_args} --disable-shared --with-pic --with-bignu
 if test "x$enable_debug" = xyes; then
     ac_configure_args="${ac_configure_args} --enable-debug"
 fi
-AC_CONFIG_SUBDIRS([src/secp256k1 src/univalue])
+AC_CONFIG_SUBDIRS([src/rsm src/secp256k1 src/univalue])
 
 AC_OUTPUT
 

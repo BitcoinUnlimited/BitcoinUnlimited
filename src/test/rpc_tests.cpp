@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -21,7 +21,7 @@
 
 using namespace std;
 
-UniValue createArgs(int nRequired, const char *address1 = NULL, const char *address2 = NULL)
+UniValue createArgs(int nRequired, const char *address1 = nullptr, const char *address2 = nullptr)
 {
     UniValue result(UniValue::VARR);
     result.push_back(nRequired);
@@ -366,7 +366,7 @@ BOOST_AUTO_TEST_CASE(findlikelynode)
 
     // Test prefix matching
     BOOST_CHECK(FindLikelyNode("169.254.1.2").get() == &n1);
-    BOOST_CHECK(FindLikelyNode("169.254.1.2:1234").get() == NULL);
+    BOOST_CHECK(FindLikelyNode("169.254.1.2:1234").get() == nullptr);
     BOOST_CHECK(FindLikelyNode("169.254.1").get() == &n1);
 
     // Test wildcard matching

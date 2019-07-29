@@ -4,7 +4,7 @@
 
 
 #include "xversionmessage.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "random.h"
 #include "streams.h"
 #include "util.h"

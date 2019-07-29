@@ -1,3 +1,8 @@
+// Copyright (c) 2016 The Bitcoin Core developers
+// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "wallet/test/wallet_test_fixture.h"
 
 #include "rpc/server.h"
@@ -21,7 +26,7 @@ WalletTestingSetup::~WalletTestingSetup()
 {
     UnregisterValidationInterface(pwalletMain);
     delete pwalletMain;
-    pwalletMain = NULL;
+    pwalletMain = nullptr;
 
     bitdb.Flush(true);
     bitdb.Reset();

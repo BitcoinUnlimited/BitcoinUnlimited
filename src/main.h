@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Copyright (c) 2016 Bitcoin Unlimited Developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -126,12 +126,6 @@ static const uint32_t UNCONNECTED_HEADERS_TIMEOUT = 120;
 /** Maximum number of INV's that can be send in one message */
 static const int MAX_INV_TO_SEND = 1000;
 
-/** The maximum number of free transactions (in KB) that can enter the mempool per minute.
- *  For a 1MB block we allow 15KB of free transactions per 1 minute.
- */
-static const uint32_t DEFAULT_LIMITFREERELAY = DEFAULT_BLOCK_MAX_SIZE * 0.000015;
-/** Subject free transactions to priority checking when entering the mempool */
-static const bool DEFAULT_RELAYPRIORITY = false;
 /** The number of MiB that we will wait for the block storage method to go over before pruning */
 static const uint64_t DEFAULT_PRUNE_INTERVAL = 100;
 
@@ -156,17 +150,6 @@ static const bool DEFAULT_REINDEX = false;
 static const bool DEFAULT_DISCOVER = true;
 static const bool DEFAULT_PRINTTOCONSOLE = false;
 
-// BU - Xtreme Thinblocks Auto Mempool Limiter - begin section
-/** The default value for -minrelaytxfee in sat/byte */
-static const double DEFAULT_MINLIMITERTXFEE = (double)DEFAULT_MIN_RELAY_TX_FEE / 1000;
-/** The default value for -maxrelaytxfee in sat/byte */
-static const double DEFAULT_MAXLIMITERTXFEE = (double)DEFAULT_MIN_RELAY_TX_FEE / 1000;
-/** The number of block heights to gradually choke spam transactions over */
-static const unsigned int MAX_BLOCK_SIZE_MULTIPLIER = 3;
-/** The minimum value possible for -limitfreerelay when rate limiting */
-static const unsigned int DEFAULT_MIN_LIMITFREERELAY = 1;
-// BU - Xtreme Thinblocks Auto Mempool Limiter - end section
-
 struct BlockHasher
 {
     size_t operator()(const uint256 &hash) const { return hash.GetCheapHash(); }
@@ -183,9 +166,10 @@ extern uint64_t nLastBlockTx;
 extern uint64_t nLastBlockSize;
 extern CWaitableCriticalSection csBestBlock;
 extern CConditionVariable cvBlockChange;
-extern bool fImporting;
-extern bool fReindex;
+extern std::atomic<bool> fImporting;
+extern std::atomic<bool> fReindex;
 extern bool fTxIndex;
+extern bool fBlocksOnly;
 extern bool fIsBareMultisigStd;
 extern unsigned int nBytesPerSigOp;
 extern bool fCheckBlockIndex;
@@ -306,7 +290,7 @@ bool TestLockPointValidity(const LockPoints *lp);
 // Checks that the provided block is consistent with the chainparam's checkpoints
 bool CheckAgainstCheckpoint(unsigned int height, const uint256 &hash, const CChainParams &chainparams);
 
-/** Store block on disk. If dbp is non-NULL, the file is known to already reside on disk */
+/** Store block on disk. If dbp is non-nullptr, the file is known to already reside on disk */
 bool AcceptBlock(CBlock &block, CValidationState &state, CBlockIndex **pindex, bool fRequested, CDiskBlockPos *dbp);
 
 /** Find the last common block between the parameter chain and a locator. */

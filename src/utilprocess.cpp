@@ -127,6 +127,14 @@ struct RunCleanupRAII
         }
     }
 };
+
+struct SpawnAttrRAII
+{
+    posix_spawnattr_t posixAttr;
+
+    SpawnAttrRAII() { THROW_IF_RETERROR(posix_spawnattr_init(&posixAttr)); }
+    ~SpawnAttrRAII() { posix_spawnattr_destroy(&posixAttr); }
+};
 #endif
 
 void SubProcess::Run()
@@ -168,7 +176,14 @@ void SubProcess::Run()
     }
     cmdargs[cmdargs.size() - 1] = nullptr;
     pid_t child_pid;
-    THROW_IF_RETERROR(posix_spawnp(&child_pid, path.c_str(), &action, nullptr, &cmdargs[0], nullptr));
+    {
+        SpawnAttrRAII attr;
+        THROW_IF_RETERROR(posix_spawnattr_setflags(&attr.posixAttr, POSIX_SPAWN_SETPGROUP));
+        THROW_IF_RETERROR(posix_spawnattr_setpgroup(&attr.posixAttr, 0));
+
+        THROW_IF_RETERROR(posix_spawnp(&child_pid, path.c_str(), &action, &attr.posixAttr, &cmdargs[0], nullptr));
+    }
+
     pid.store(child_pid);
     is_running.store(true);
 

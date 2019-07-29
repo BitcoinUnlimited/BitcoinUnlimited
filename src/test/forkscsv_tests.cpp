@@ -1,4 +1,5 @@
 // Copyright (c) 2017 The Bitcoin developers
+// Copyright (c) 2017-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -32,20 +33,17 @@ BOOST_AUTO_TEST_CASE(forkscsv_read_and_dumpforks_test)
 
     std::istringstream is_1(
             "# deployment info for network 'main':\n"
-            "main,0,csv,1462060800,1493596800,2016,1916,0,0,true\n"
             "main,28,testdummy,1199145601,1230767999,2016,1916,0,0,false\n");
     BOOST_CHECK(ReadForksCsv("main", is_1, params.GetModifiableConsensus()));
 
     std::istringstream is_2(
             "# deployment info for network 'main':\n"
-            "main,0,csv,1462060800,1493596800,2016,1916,0,0,true\n"
             "main,28,testdummy,1199145601,1230767999,2016,1916,0,0,false\n");
     BOOST_CHECK(ReadForksCsv("main", is_2, params.GetModifiableConsensus()));
 
     // dump forks testing
     BOOST_CHECK(NetworkDeploymentInfoCSV(CBaseChainParams::MAIN) == std::string(
             "# deployment info for network 'main':\n"
-            "main,0,csv,1462060800,1493596800,2016,1916,0,0,true\n"
             "main,28,testdummy,1199145601,1230767999,2016,1916,0,0,false\n"));
 
     BOOST_CHECK(NetworkDeploymentInfoCSV(CBaseChainParams::UNL) == std::string(
@@ -53,12 +51,10 @@ BOOST_AUTO_TEST_CASE(forkscsv_read_and_dumpforks_test)
 
     BOOST_CHECK(NetworkDeploymentInfoCSV(CBaseChainParams::TESTNET) == std::string(
             "# deployment info for network 'test':\n"
-            "test,0,csv,1456790400,1493596800,2016,1512,0,0,true\n"
             "test,28,testdummy,1199145601,1230767999,2016,1512,0,0,false\n"));
 
     BOOST_CHECK(NetworkDeploymentInfoCSV(CBaseChainParams::REGTEST) == std::string(
             "# deployment info for network 'regtest':\n"
-            "regtest,0,csv,0,999999999999,144,108,0,0,true\n"
             "regtest,28,testdummy,0,999999999999,144,108,0,0,false\n"));
 
     BOOST_CHECK_THROW( NetworkDeploymentInfoCSV("_foo_"), std::runtime_error );

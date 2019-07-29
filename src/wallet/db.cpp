@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -8,7 +8,7 @@
 
 #include "addrman.h"
 #include "fs.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "protocol.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -102,7 +102,10 @@ bool CDBEnv::Open(const fs::path &pathIn)
         DB_CREATE | DB_INIT_LOCK | DB_INIT_LOG | DB_INIT_MPOOL | DB_INIT_TXN | DB_THREAD | DB_RECOVER | nEnvFlags,
         S_IRUSR | S_IWUSR);
     if (ret != 0)
+    {
+        dbenv->close(0);
         return error("CDBEnv::Open: Error %d opening database environment: %s\n", ret, DbEnv::strerror(ret));
+    }
 
     fDbEnvInit = true;
     fMockDb = false;
@@ -365,6 +368,7 @@ bool CDB::Rewrite(const string &strFile, const char *pszSkip)
                     if (ret > 0)
                     {
                         LOGA("CDB::Rewrite: Can't create database file %s\n", strFileRes);
+                        pdbCopy->close(0);
                         fSuccess = false;
                     }
 
@@ -405,7 +409,13 @@ bool CDB::Rewrite(const string &strFile, const char *pszSkip)
                         db.Close();
                         bitdb.CloseDb(strFile);
                         if (pdbCopy->close(0))
+                        {
                             fSuccess = false;
+                        }
+                        else
+                        {
+                            pdbCopy->close(0);
+                        }
                         delete pdbCopy;
                     }
                 }

@@ -27,7 +27,8 @@ class CtorTest (BitcoinTestFramework):
         initialize_chain_clean(self.options.tmpdir, 7, bitcoinConfDict, wallets)
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(4, self.options.tmpdir)
+        self.nodes = start_nodes(4, self.options.tmpdir,[["-debug"],["-debug"],["-debug"],["-debug"]])
+        setup_connection_tracking(self.nodes)
         # Now interconnect the nodes
         connect_nodes_full(self.nodes[:3])
         connect_nodes_bi(self.nodes,2,3)
@@ -56,7 +57,7 @@ class CtorTest (BitcoinTestFramework):
             self.nodes[0].sendtoaddress(a, 5)
 
         # now send tx to myself that must reuse coins because I don't have enough
-        for i in range(1,20):
+        for i in range(1, 20):
             try:
                 self.nodes[0].sendtoaddress(addr[0], 21-i)
             except JSONRPCException as e: # an exception you don't catch is a testing error
@@ -70,6 +71,8 @@ class CtorTest (BitcoinTestFramework):
         # force CTOR on node 2,3
         self.nodes[2].set("consensus.enableCanonicalTxOrder=1")
         self.nodes[3].set("consensus.enableCanonicalTxOrder=1")
+        waitFor(5, lambda: "True" in str(self.nodes[2].get("consensus.enableCanonicalTxOrder")))
+        waitFor(5, lambda: "True" in str(self.nodes[3].get("consensus.enableCanonicalTxOrder")))
 
         waitFor(30, lambda: self.nodes[2].getmempoolinfo()["size"] >= 20)
 
@@ -81,14 +84,15 @@ class CtorTest (BitcoinTestFramework):
         assert_equal(self.nodes[1].getblockcount(), 102)
 
         # check that a CTOR node rejected the block
+        waitFor(30, lambda: "invalid" in str(self.nodes[2].getchaintips()))
         ct = self.nodes[2].getchaintips()
         tip = next(x for x in ct if x["status"] == "active")
         assert_equal(tip["height"], 101)
         try:
             invalid = next(x for x in ct if x["status"] == "invalid")
         except Exception as e:
-            pdb.set_trace()
-            print(str(e))
+            print(str(ct))
+            AssertionError("Incorrect chain status: " + str(e))
         assert_equal(invalid["height"], 102)
 
         # Now generate a CTOR block
@@ -97,11 +101,13 @@ class CtorTest (BitcoinTestFramework):
         # did the other CTOR node accept it?
         assert_equal(self.nodes[3].getblockcount(), 102)
         assert_equal(self.nodes[3].getbestblockhash(), ctorBlock)
+        waitFor(10, lambda: self.nodes[0].getblockcount() == 102)
         # did the original nodes reject it?
         # we need to generate another block so the CTOR chain exceeds the DTOR
         self.nodes[2].generate(1)
         sync_blocks_to(103, self.nodes[2:])
         waitFor(10, lambda: thereExists(self.nodes[0].getchaintips(), lambda x: x["height"] == 103 and x["status"] != "headers-only"))
+        waitFor(10, lambda: self.nodes[0].getblockcount() == 102)
         ct = self.nodes[0].getchaintips()
         tip = next(x for x in ct if x["status"] == "active")
         assert_equal(tip["height"], 102)
@@ -130,15 +136,16 @@ class CtorTest (BitcoinTestFramework):
             self.nodes[1].generate(1)
 
         connect_nodes_bi(self.nodes,0,1)
-
+        sync_blocks(self.nodes[0:2])
+        logging.info("Nodes 0,1 at block: %d " % self.nodes[2].getblockcount())
         # make n0 send coin to itself 4*3 times
         for j in range(4):
             for i in range(3):
                 self.nodes[0].sendtoaddress(addr[0], 4-i)
             self.nodes[0].generate(1)
-
         connect_nodes_bi(self.nodes,0,1)
-
+        sync_blocks(self.nodes[0:2])
+        logging.info("Nodes 0,1 at block: %d " % self.nodes[2].getblockcount())
         waitFor(10, lambda: self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
         # ctor rollback test
@@ -149,6 +156,8 @@ class CtorTest (BitcoinTestFramework):
             self.nodes[3].generate(1)
 
         connect_nodes_bi(self.nodes,2,3)
+        sync_blocks(self.nodes[2:])
+        logging.info("Nodes 2,3 at block: %d " % self.nodes[2].getblockcount())
 
         for j in range(4):
             for i in range(3):
@@ -156,13 +165,16 @@ class CtorTest (BitcoinTestFramework):
             self.nodes[2].generate(1)
 
         connect_nodes_bi(self.nodes,2,3)
-
+        sync_blocks(self.nodes[2:])
+        logging.info("Nodes 2,3 at block: %d " % self.nodes[2].getblockcount())
         waitFor(10, lambda: self.nodes[2].getbestblockhash() == self.nodes[3].getbestblockhash())
 
         # push the dtor chain beyond ctor by 29 blocks
         for i in range(0,30):
             self.nodes[0].sendtoaddress(addr[0], 1)
             self.nodes[0].generate(1)
+        sync_blocks(self.nodes[0:2])
+        logging.info("Nodes 0,1 at block: %d " % self.nodes[0].getblockcount())
 
         # Test that two new nodes that come up IBD and follow the appropriate chains
         ctorTip = self.nodes[3].getbestblockhash()
@@ -172,11 +184,14 @@ class CtorTest (BitcoinTestFramework):
 
         self.nodes.append(start_node(4, self.options.tmpdir))
         self.nodes[4].set("consensus.enableCanonicalTxOrder=1")
+        waitFor(5, lambda: "True" in str(self.nodes[4].get("consensus.enableCanonicalTxOrder")))
         for i in range(5):
             connect_nodes_bi(self.nodes,4,i)
 
-        self.nodes.append(start_node(5, self.options.tmpdir))
+        self.nodes.append(start_node(5, self.options.tmpdir, ["-debug"]))
         self.nodes[5].set("consensus.enableCanonicalTxOrder=0")
+        waitFor(5, lambda: "False" in str(self.nodes[5].get("consensus.enableCanonicalTxOrder")))
+
         # node 5 is non-ctor
         for i in range(5):
             connect_nodes_bi(self.nodes,5,i)
@@ -189,8 +204,9 @@ class CtorTest (BitcoinTestFramework):
         # Now run the rollback across fork test
 
         # first generate a competing ctor fork on our isolated node that is longer than the current fork
-
         rollbackNode.set("consensus.enableCanonicalTxOrder=1")
+        waitFor(5, lambda: "True" in str(rollbackNode.get("consensus.enableCanonicalTxOrder")))
+
         # make the new fork longer than current
         for n in range(10):
             time.sleep(.1)
@@ -205,6 +221,7 @@ class CtorTest (BitcoinTestFramework):
             rollbackNode.sendtoaddress(rollbackAddr, bal-Decimal(i*.01)) # a little less each time to account for fees
         ctorForkHash = rollbackNode.generate(1)[0]
         rollbackNode.generate(5)
+        time.sleep(3)
         ctorForkTipHash = rollbackNode.getbestblockhash()
         ctorForkTipCount = rollbackNode.getblockcount()
 
@@ -214,9 +231,11 @@ class CtorTest (BitcoinTestFramework):
         disconnect_all(self.nodes[3])
         self.nodes[2].set("consensus.enableCanonicalTxOrder=1")
         self.nodes[3].set("consensus.enableCanonicalTxOrder=1")
+        waitFor(5, lambda: "True" in str(self.nodes[2].get("consensus.enableCanonicalTxOrder")))
+        waitFor(5, lambda: "True" in str(self.nodes[3].get("consensus.enableCanonicalTxOrder")))
+
         connect_nodes(rollbackNode,2)
         connect_nodes(rollbackNode,3)
-
         waitFor(15, lambda: self.nodes[2].getblockcount() == ctorForkTipCount)
         waitFor(15, lambda: self.nodes[3].getblockcount() == ctorForkTipCount)
 

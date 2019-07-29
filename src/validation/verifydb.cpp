@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Copyright (c) 2016 Bitcoin Unlimited Developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -17,7 +17,7 @@ CVerifyDB::~CVerifyDB() { uiInterface.ShowProgress("", 100); }
 bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview, int nCheckLevel, int nCheckDepth)
 {
     LOCK(cs_main);
-    if (chainActive.Tip() == NULL || chainActive.Tip()->pprev == NULL)
+    if (chainActive.Tip() == nullptr || chainActive.Tip()->pprev == nullptr)
         return true;
 
     // Verify blocks in the best chain
@@ -29,7 +29,7 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
     LOGA("Verifying last %i blocks at level %i\n", nCheckDepth, nCheckLevel);
     CCoinsViewCache coins(coinsview);
     CBlockIndex *pindexState = chainActive.Tip();
-    CBlockIndex *pindexFailure = NULL;
+    CBlockIndex *pindexFailure = nullptr;
     int nGoodTransactions = 0;
     CValidationState state;
     for (CBlockIndex *pindex = chainActive.Tip(); pindex && pindex->pprev; pindex = pindex->pprev)
@@ -43,17 +43,22 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
                                            (nCheckLevel >= 4 ? 50 : 100)))));
         if (pindex->nHeight < chainActive.Height() - nCheckDepth)
             break;
-        if (fPruneMode && !(pindex->nStatus & BLOCK_HAVE_DATA))
         {
-            // If pruning, only go back as far as we have data.
-            LOGA("VerifyDB(): block verification stopping at height %d (pruning, no data)\n", pindex->nHeight);
-            break;
+            READLOCK(cs_mapBlockIndex); // for nStatus
+            if (fPruneMode && !(pindex->nStatus & BLOCK_HAVE_DATA))
+            {
+                // If pruning, only go back as far as we have data.
+                LOGA("VerifyDB(): block verification stopping at height %d (pruning, no data)\n", pindex->nHeight);
+                break;
+            }
         }
         CBlock block;
         // check level 0: read from disk
         if (!ReadBlockFromDisk(block, pindex, chainparams.GetConsensus()))
             return error("VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s", pindex->nHeight,
                 pindex->GetBlockHash().ToString());
+        nBlockSizeAtChainTip.store(block.GetBlockSize());
+
         // check level 1: verify block validity
         if (nCheckLevel >= 1 && !CheckBlock(block, state))
             return error(
@@ -74,7 +79,6 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
         if (nCheckLevel >= 3 && pindex == pindexState &&
             (int64_t)(coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <= nCoinCacheMaxSize)
         {
-            bool fClean = true;
             DisconnectResult res = DisconnectBlock(block, pindex, coins);
             if (res == DISCONNECT_FAILED)
             {
@@ -82,7 +86,7 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
                     pindex->nHeight, pindex->GetBlockHash().ToString());
             }
             pindexState = pindex->pprev;
-            if (!fClean)
+            if (res == DISCONNECT_UNCLEAN)
             {
                 nGoodTransactions = 0;
                 pindexFailure = pindex;

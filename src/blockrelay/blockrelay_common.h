@@ -1,4 +1,4 @@
-// Copyright (c) 2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -29,9 +29,6 @@ public:
     CCriticalSection cs_reconstruct;
 
 private:
-    /* The sum total of all bytes for thintype blocks currently in process of being reconstructed */
-    std::atomic<uint64_t> nTotalBlockBytes{0};
-
     // block relay timer
     CCriticalSection cs_blockrelaytimer;
     std::map<uint256, std::pair<uint64_t, bool> > mapBlockRelayTimer GUARDED_BY(cs_blockrelaytimer);
@@ -47,13 +44,21 @@ private:
     // attack surface.
     size_t MAX_THINTYPE_BLOCKS_IN_FLIGHT = 6;
 
-    // Counters for how many of each peer are currently connected.
+    // Counters for how many of each peer are currently connected.  We use the set to store the
+    // nodeid so that we can then get a unique count of peers with with to update the atomic counters.
+    CCriticalSection cs_addpeers;
+    std::set<NodeId> setThinBlockPeers;
+    std::set<NodeId> setGraphenePeers;
+    std::set<NodeId> setCompactBlockPeers;
     std::atomic<int32_t> nThinBlockPeers{0};
     std::atomic<int32_t> nGraphenePeers{0};
     std::atomic<int32_t> nCompactBlockPeers{0};
 
 public:
     void AddPeers(CNode *pfrom);
+    uint32_t GetGraphenePeers() { return nGraphenePeers.load(); }
+    uint32_t GetThinBlockPeers() { return nThinBlockPeers.load(); }
+    uint32_t GetCompactBlockPeers() { return nCompactBlockPeers.load(); }
     void AddCompactBlockPeer(CNode *pfrom);
     void RemovePeers(CNode *pfrom);
     bool HasBlockRelayTimerExpired(const uint256 &hash);
@@ -64,26 +69,23 @@ public:
     void BlockWasReceived(CNode *pfrom, const uint256 &hash);
     bool AddBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType);
     void ClearBlockInFlight(CNode *pfrom, const uint256 &hash);
+    void ClearAllBlocksInFlight(NodeId id);
     void CheckForDownloadTimeout(CNode *pfrom);
     void RequestBlock(CNode *pfrom, const uint256 &hash);
-
-    // Find the largest block being reconstructed and disconnect it.
-    bool ClearLargestBlockAndDisconnect(CNode *pfrom);
 
     // Accessor methods to the blocks that we're reconstructing from thintype blocks such as
     // xthins or graphene.
     std::shared_ptr<CBlockThinRelay> SetBlockToReconstruct(CNode *pfrom, const uint256 &hash);
     std::shared_ptr<CBlockThinRelay> GetBlockToReconstruct(CNode *pfrom);
-    void ClearBlockToReconstruct(CNode *pfrom);
+    void ClearBlockToReconstruct(NodeId id);
 
     // Accessor methods for tracking total block bytes for all blocks currently in the process
     // of being reconstructed.
-    uint64_t AddTotalBlockBytes(uint64_t, std::shared_ptr<CBlockThinRelay> &pblock);
-    void DeleteTotalBlockBytes(uint64_t bytes);
-    void ClearBlockBytes(std::shared_ptr<CBlockThinRelay> &pblock);
-    void ClearAllBlockData(CNode *pnode, std::shared_ptr<CBlockThinRelay> &pblock);
-    void ResetTotalBlockBytes();
-    uint64_t GetTotalBlockBytes();
+    void AddBlockBytes(uint64_t bytes, std::shared_ptr<CBlockThinRelay> pblock);
+    uint64_t GetMaxAllowedBlockSize();
+
+    // Clear all block data
+    void ClearAllBlockData(CNode *pnode, std::shared_ptr<CBlockThinRelay> pblock);
 };
 extern ThinTypeRelay thinrelay;
 

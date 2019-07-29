@@ -23,7 +23,7 @@ fs::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix)
 FILE *OpenDiskFile(const CDiskBlockPos &pos, const char *prefix, bool fReadOnly)
 {
     if (pos.IsNull())
-        return NULL;
+        return nullptr;
     fs::path path = GetBlockPosFilename(pos, prefix);
     fs::create_directories(path.parent_path());
     FILE *file = fsbridge::fopen(path, "rb+");
@@ -32,7 +32,7 @@ FILE *OpenDiskFile(const CDiskBlockPos &pos, const char *prefix, bool fReadOnly)
     if (!file)
     {
         LOGA("Unable to open file %s\n", path.string());
-        return NULL;
+        return nullptr;
     }
     if (pos.nPos)
     {
@@ -40,7 +40,7 @@ FILE *OpenDiskFile(const CDiskBlockPos &pos, const char *prefix, bool fReadOnly)
         {
             LOGA("Unable to seek to position %u of %s\n", pos.nPos, path.string());
             fclose(file);
-            return NULL;
+            return nullptr;
         }
     }
     return file;

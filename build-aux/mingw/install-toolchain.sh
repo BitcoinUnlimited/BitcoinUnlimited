@@ -22,13 +22,44 @@ check_hash() {
 	fi
 }
 
+# Dot (.) notation version compare pulled from https://stackoverflow.com/a/4025065
+vercomp () {
+    if [[ $1 == $2 ]]
+    then
+        return 0
+    fi
+    local IFS=.
+    local i ver1=($1) ver2=($2)
+    # fill empty fields in ver1 with zeros
+    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
+    do
+        ver1[i]=0
+    done
+    for ((i=0; i<${#ver1[@]}; i++))
+    do
+        if [[ -z ${ver2[i]} ]]
+        then
+            # fill empty fields in ver2 with zeros
+            ver2[i]=0
+        fi
+        if ((10#${ver1[i]} > 10#${ver2[i]}))
+        then
+            return 1
+        fi
+        if ((10#${ver1[i]} < 10#${ver2[i]}))
+        then
+            return 2
+        fi
+    done
+    return 0
+}
 
 # Install required msys shell packages
 mingw-get install msys-autoconf-bin
 mingw-get install msys-automake-bin
 mingw-get install msys-libtool-bin
 # NOTE: This is a very old version of wget (v1.12) and does not support TLSv1.2
-#       so we will only use this version to download the latest version v1.19.2
+#       so we will only use this version to download the latest version v1.20.3
 mingw-get install msys-wget-bin
 
 
@@ -36,26 +67,60 @@ mingw-get install msys-wget-bin
 mkdir -p "$DEPS_ROOT"
 cd "$DEPS_ROOT"
 
-# Use the v1.12 wget client to download & install the v1.19 version
-# don't download if already downloaded
-if [ ! -e wget-1.19.4-win32.zip ]
+# Check to see if we need to update WGet.  TLS v1.2 support wasn't added until v1.16.1
+# NOTE: TLSv1.3 support added in v1.20
+WGET_VERSION=$(wget --version | sed -nre 's/^GNU Wget [^0-9]*(([0-9]+\.)*[0-9]+).*/\1/p')
+vercomp $WGET_VERSION "1.16.1"
+case $? in
+	0) MUST_UPGRADE_WGET=0;;
+	1) MUST_UPGRADE_WGET=0;;
+	2) MUST_UPGRADE_WGET=1;;
+esac
+
+if [ "$MUST_UPGRADE_WGET" -eq "1" ]
 then
-	wget --no-check-certificate https://eternallybored.org/misc/wget/releases/wget-1.19.4-win32.zip -O "$DEPS_ROOT/wget-1.19.4-win32.zip"
-	# Verify downloaded file's hash
-	# NOTE: This hash was self computed as it was not provided by the author
-	# v1.19.4 win32 sha256=b1a7e4ba4ab7f78e588c1186f2a5d7e1726628a5a66c645e41f8105b7cf5f61c
-	check_hash b1a7e4ba4ab7f78e588c1186f2a5d7e1726628a5a66c645e41f8105b7cf5f61c "$DEPS_ROOT/wget-1.19.4-win32.zip"
+    echo "Upgrading WGet from version $WGET_VERSION"
+	# Use the v1.12 wget client to download & install the v1.20 version
+	# don't download if already downloaded
+	if [ ! -e wget-1.20.3-win32.zip ]
+	then
+		wget --no-check-certificate https://eternallybored.org/misc/wget/releases/wget-1.20.3-win32.zip -O "$DEPS_ROOT/wget-1.20.3-win32.zip"
+		# Verify downloaded file's hash
+		# NOTE: This hash was self computed as it was not provided by the author
+		# v1.19.4 win32 sha256=b1a7e4ba4ab7f78e588c1186f2a5d7e1726628a5a66c645e41f8105b7cf5f61c
+		# v1.20.3 win32 sha256=021F547BACA74FCA939D50951CE967502D160A7502F02FAB706F9293E1475FB8
+		check_hash 021F547BACA74FCA939D50951CE967502D160A7502F02FAB706F9293E1475FB8 "$DEPS_ROOT/wget-1.20.3-win32.zip"
+	fi
+	# don't extract if already extracted
+	if [ ! -d wget-1.20.3-win32 ]
+	then
+		"$CMD_7ZIP" x wget-1.20.3-win32.zip -aoa -o"$DEPS_ROOT/wget-1.20.3-win32"
+		cd "$DEPS_ROOT/wget-1.20.3-win32"
+		cp wget.exe "$MSYS_BIN/wget.exe"
+	fi
 fi
-# don't extract if already extracted
-if [ ! -d wget-1.19.4-win32 ]
+
+# Verify that we have a TLS v1.2 supporting version, if not fail out now.
+WGET_VERSION=$(wget --version | sed -nre 's/^GNU Wget [^0-9]*(([0-9]+\.)*[0-9]+).*/\1/p')
+vercomp $WGET_VERSION "1.16.1"
+case $? in
+	0) MUST_UPGRADE_WGET=0;;
+	1) MUST_UPGRADE_WGET=0;;
+	2) MUST_UPGRADE_WGET=1;;
+esac
+
+if [ "$MUST_UPGRADE_WGET" -eq "1" ]
 then
-	"$CMD_7ZIP" x wget-1.19.4-win32.zip -aoa -o"$DEPS_ROOT/wget-1.19.4-win32"
-	cd "$DEPS_ROOT/wget-1.19.4-win32"
-	cp wget.exe "$MSYS_BIN/wget.exe"
+	echo ""
+	echo "ERROR: Unable to upgrade wget to a version that supports TLS v1.2"
+	echo "       At a minimum, version 1.16.1 is required, though it is reccommended to install the latest version."
+	echo "       You may need to manually download and install wget to proceed."
+	echo "       Please visit https://eternallybored.org/misc/wget and download the latest 32-bit release version."
+	echo "       The wget.exe file should be placed in $MSYS_BIN overwriting the existing version (if present)."
+	exit -5
 fi
 #pause for debugging purposes
 #read -rsp $'Press any key to continue...\n' -n 1 key
-
 
 
 # Only install 32-bit tool chain if install path is provided

@@ -1,4 +1,7 @@
 #!/usr/bin/python3
+# Copyright (c) 2018-2019 The Bitcoin Unlimited developers
+# Distributed under the MIT software license, see the accompanying
+# file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 # This program generates fuzzing input scripts by converting the BCHScript programs specified
 # in fuzzScriptStarter.bch to binary input files needed for test_bitcoin_fuzzy.cpp and AFL.

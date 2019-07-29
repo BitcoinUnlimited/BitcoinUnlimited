@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -26,15 +26,21 @@ static const bool DEFAULT_TXINDEX = false;
 //! -dbcache default (MiB)
 static const int64_t nDefaultDbCache = 500;
 //! max. -dbcache in (MiB)
-static const int64_t nMaxDbCache = sizeof(void *) > 4 ? 16384 : 2048;
+static const int64_t nMaxDbCache = sizeof(void *) > 4 ? 32736 : 2048;
 //! min. -dbcache in (MiB)
 static const int64_t nMinDbCache = 4;
 //! % of available memory to leave unused by dbcache if/when we dynamically size the dbcache.
 static const int64_t nDefaultPcntMemUnused = 10;
 //! max increase in cache size since the last time we did a full flush
 static const uint64_t nMaxCacheIncreaseSinceLastFlush = 512 * 1000 * 1000;
+/** The cutoff dbcache size where a node becomes a high performance node and will keep all unspent coins in cache
+ *  after each block is processed. Lower performance nodes will purge these unspent coins from each block and
+ *  instead only keep coins in cache from incoming transactions that have been fully validated which gives these lower
+ *  performance and more marginal nodes, such as those run on rapberry pi's, a very small memory footprint.
+ */
+static const int64_t DEFAULT_HIGH_PERF_MEM_CUTOFF = 2048 * 1000 * 1000;
 //! the minimum system memory we always keep free when doing automatic dbcache sizing
-static const uint64_t nMinMemToKeepAvaialable = 300 * 1000 * 1000;
+static const uint64_t nMinMemToKeepAvailable = 300 * 1000 * 1000;
 //! the max size a batch can get before a write to the utxo is made
 static const size_t nMaxDBBatchSize = 16 << 20;
 //! Max memory allocated to block tree DB specific cache, if no -txindex (MiB)

@@ -1,4 +1,4 @@
-// Copyright (c) 2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,7 +7,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include "fastfilter.h"
-#include "hash.h"
+#include "hashwrapper.h"
 
 void TestVariableFastFilter(CVariableFastFilter filt, int buffer, int n, double fpr)
 {
@@ -53,6 +53,16 @@ void TestVariableFastFilter(CVariableFastFilter filt, int buffer, int n, double 
 }
 
 BOOST_FIXTURE_TEST_SUITE(fastfilter_tests, BasicTestingSetup)
+
+BOOST_AUTO_TEST_CASE(variablefastfilter_dummy_constructor)
+{
+    CVariableFastFilter filt;
+
+    uint256 t = ArithToUint256(1);
+    uint256 tmp = Hash(t.begin(), t.end());
+    filt.insert(tmp);
+    BOOST_CHECK(filt.contains(tmp));
+}
 
 BOOST_AUTO_TEST_CASE(variablefastfilter_many_hash_funcs)
 {

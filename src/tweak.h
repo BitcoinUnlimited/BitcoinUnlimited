@@ -1,18 +1,16 @@
-// Copyright (c) 2016-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef TWEAK_H
 #define TWEAK_H
 
-#include <boost/asio.hpp>
-#include <boost/bind.hpp>
-#include <boost/lexical_cast.hpp>
-// c++11 #include <type_traits>
-#include "univalue/include/univalue.h"
+#include <string>
 
 #include <mutex>
 #include <thread>
+
+#include "univalue/include/univalue.h"
 
 class CTweakBase;
 
@@ -40,21 +38,21 @@ public:
 inline void fill(const UniValue &v, double &output)
 {
     if (v.isStr())
-        output = boost::lexical_cast<double>(v.get_str());
+        output = std::stod(v.get_str());
     else
         output = v.get_real();
 }
 inline void fill(const UniValue &v, float &output)
 {
     if (v.isStr())
-        output = boost::lexical_cast<float>(v.get_str());
+        output = std::stof(v.get_str());
     else
         output = v.get_real();
 }
 inline void fill(const UniValue &v, int &output)
 {
     if (v.isStr())
-        output = boost::lexical_cast<int>(v.get_str());
+        output = std::stoi(v.get_str());
     else
         output = v.get_int();
 }
@@ -62,7 +60,7 @@ inline void fill(const UniValue &v, int &output)
 inline void fill(const UniValue &v, uint64_t &output)
 {
     if (v.isStr())
-        output = boost::lexical_cast<uint64_t>(v.get_str());
+        output = std::stoull(v.get_str());
     else
         output = v.get_int64();
 }
@@ -70,7 +68,7 @@ inline void fill(const UniValue &v, uint64_t &output)
 inline void fill(const UniValue &v, int64_t &output)
 {
     if (v.isStr())
-        output = boost::lexical_cast<int64_t>(v.get_str());
+        output = std::stoll(v.get_str());
     else
         output = v.get_int64();
 }
@@ -78,7 +76,7 @@ inline void fill(const UniValue &v, int64_t &output)
 inline void fill(const UniValue &v, uint32_t &output)
 {
     if (v.isStr())
-        output = boost::lexical_cast<uint32_t>(v.get_str());
+        output = (uint32_t)std::stoul(v.get_str());
     else
         output = (uint32_t)v.get_uint32();
 }
@@ -86,7 +84,7 @@ inline void fill(const UniValue &v, uint32_t &output)
 inline void fill(const UniValue &v, uint16_t &output)
 {
     if (v.isStr())
-        output = boost::lexical_cast<uint16_t>(v.get_str());
+        output = (uint16_t)std::stoul(v.get_str());
     else
         output = (uint16_t)v.get_uint16();
 }
@@ -94,7 +92,7 @@ inline void fill(const UniValue &v, uint16_t &output)
 inline void fill(const UniValue &v, uint8_t &output)
 {
     if (v.isStr())
-        output = boost::lexical_cast<uint8_t>(v.get_str());
+        output = (uint8_t)std::stoul(v.get_str());
     else
         output = (uint8_t)v.get_uint8();
 }

@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -185,7 +185,7 @@ void DoTest(const CScript &scriptPubKey,
     {
         BOOST_CHECK_MESSAGE(
             bitcoinconsensus_verify_script(begin_ptr(scriptPubKey), scriptPubKey.size(),
-                (const unsigned char *)&stream[0], stream.size(), 0, flags, MAX_OPS_PER_SCRIPT, NULL) == expect,
+                (const unsigned char *)&stream[0], stream.size(), 0, flags, MAX_OPS_PER_SCRIPT, nullptr) == expect,
             message);
     }
 #endif
@@ -521,9 +521,41 @@ std::string JSONPrettyPrint(const UniValue &univalue)
     }
     return ret;
 }
+
+void UpdateJSONTests(std::vector<TestBuilder> &tests)
+{
+    std::set<std::string> tests_set;
+    {
+        UniValue json_tests = read_json(
+            std::string(json_tests::script_tests, json_tests::script_tests + sizeof(json_tests::script_tests)));
+
+        for (unsigned int idx = 0; idx < json_tests.size(); idx++)
+        {
+            const UniValue &tv = json_tests[idx];
+            tests_set.insert(JSONPrettyPrint(tv.get_array()));
+        }
+    }
+
+    std::string strGen;
+
+    for (TestBuilder &test : tests)
+    {
+        test.Test();
+        std::string str = JSONPrettyPrint(test.GetJSON());
+#ifndef UPDATE_JSON_TESTS
+        if (tests_set.count(str) == 0)
+        {
+            BOOST_CHECK_MESSAGE(false, "Missing auto script_valid test: " + test.GetComment());
+        }
+#endif
+        strGen += str + ",\n";
+    }
+
+    return;
+}
 }
 
-BOOST_AUTO_TEST_CASE(script_build)
+BOOST_AUTO_TEST_CASE(script_build_1)
 {
     const KeyData keys;
 
@@ -1295,6 +1327,17 @@ BOOST_AUTO_TEST_CASE(script_build)
                         .Num(0)
                         .ScriptError(SCRIPT_ERR_PUBKEYTYPE));
 
+    // Update tests
+    UpdateJSONTests(tests);
+}
+
+BOOST_AUTO_TEST_CASE(script_build_2)
+{
+    const KeyData keys;
+
+    std::vector<TestBuilder> tests;
+
+
     // Test all six CHECK*SIG* opcodes with Schnorr signatures.
     // - Schnorr/ECDSA signatures with varying flags SCHNORR / STRICTENC.
     // - test with different key / mismatching key
@@ -1745,39 +1788,8 @@ BOOST_AUTO_TEST_CASE(script_build)
             .PushRedeem()
             .ScriptError(SCRIPT_ERR_CLEANSTACK));
 
-    std::set<std::string> tests_set;
-
-    {
-        UniValue json_tests = read_json(
-            std::string(json_tests::script_tests, json_tests::script_tests + sizeof(json_tests::script_tests)));
-
-        for (unsigned int idx = 0; idx < json_tests.size(); idx++)
-        {
-            const UniValue &tv = json_tests[idx];
-            tests_set.insert(JSONPrettyPrint(tv.get_array()));
-        }
-    }
-
-    std::string strGen;
-
-    for (TestBuilder &test : tests)
-    {
-        test.Test();
-        std::string str = JSONPrettyPrint(test.GetJSON());
-#ifndef UPDATE_JSON_TESTS
-        if (tests_set.count(str) == 0)
-        {
-            BOOST_CHECK_MESSAGE(false, "Missing auto script_valid test: " + test.GetComment());
-        }
-#endif
-        strGen += str + ",\n";
-    }
-
-#ifdef UPDATE_JSON_TESTS
-    FILE *file = fopen("script_tests.json.gen", "w");
-    fputs(strGen.c_str(), file);
-    fclose(file);
-#endif
+    // Update tests
+    UpdateJSONTests(tests);
 }
 
 BOOST_AUTO_TEST_CASE(script_json_test)
@@ -2529,6 +2541,24 @@ BOOST_AUTO_TEST_CASE(script_debugger)
     auto &stk = sm.getStack();
     BOOST_CHECK(stk.size() == 1);
     BOOST_CHECK(stk[0][0] == 4);
+}
+
+BOOST_AUTO_TEST_CASE(script_can_append_self)
+{
+    CScript s, d;
+
+    s = ScriptFromHex("00");
+    s += s;
+    d = ScriptFromHex("0000");
+    BOOST_CHECK(s == d);
+
+    // check doubling a script that's large enough to require reallocation
+    static const char hex[] = "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504"
+                              "e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f";
+    s = CScript() << ParseHex(hex) << OP_CHECKSIG;
+    d = CScript() << ParseHex(hex) << OP_CHECKSIG << ParseHex(hex) << OP_CHECKSIG;
+    s += s;
+    BOOST_CHECK(s == d);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

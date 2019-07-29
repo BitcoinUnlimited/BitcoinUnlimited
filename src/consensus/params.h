@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -97,6 +97,8 @@ struct Params
     int BIP65Height;
     /** Block height at which BIP66 becomes active */
     int BIP66Height;
+    /** Block height at which BIP68, BIP112 and BIP113 become active */
+    int BIP68Height;
     /**
      * Deployment parameters for the 29 bits (0..28) defined by bip135
      */
@@ -150,9 +152,10 @@ struct Params
     /** Nov 15, 2018 activation height */
     int nov2018Height;
     /** May 15, 2019 actication time will be 12:00:00 UTC */
-    int may2019ActivationTime;
-    /** Nov 15, 2018 SV activation height */
-    int sv2018Height;
+    // we still need this variable until we won't add Nov 2019 activation time
+    int may2019ActivationTime = 1557921600;
+    /** May 15, 2019 actication height */
+    int may2019Height;
 };
 } // namespace Consensus
 

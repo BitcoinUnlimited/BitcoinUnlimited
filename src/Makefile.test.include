@@ -80,6 +80,9 @@ BITCOIN_TESTS =\
   test/cuckoocache_tests.cpp \
   test/DoS_tests.cpp \
   test/dstencode_tests.cpp \
+  test/electrs_tests.cpp \
+  test/electrumrpcinfo_tests.cpp \
+  test/electrumserver_tests.cpp \
   test/exploit_tests.cpp \
   test/fastfilter_tests.cpp \
   test/forkscsv_tests.cpp \
@@ -134,12 +137,6 @@ BITCOIN_TESTS =\
   test/utilprocess_tests.cpp \
   test/xversionmessage_tests.cpp
 
-# recursive shared mutex tests #
-BITCOIN_TESTS += \
-  rsm/test/rsm_promotion_tests.cpp \
-  rsm/test/rsm_simple_tests.cpp \
-  rsm/test/rsm_starvation_tests.cpp
-
 if ENABLE_WALLET
 BITCOIN_TESTS += \
   wallet/test/accounting_tests.cpp \
@@ -155,7 +152,7 @@ endif
 test_test_bitcoin_SOURCES = $(BITCOIN_TEST_SUITE) $(BITCOIN_TESTS) $(JSON_TEST_FILES) $(RAW_TEST_FILES)
 test_test_bitcoin_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) -I$(builddir)/test/ $(TESTDEFS)
 test_test_bitcoin_LDADD = $(LIBBITCOIN_SERVER) $(LIBBITCOIN_CLI) $(LIBBITCOIN_COMMON) $(LIBBITCOIN_UTIL) $(LIBBITCOIN_CONSENSUS) $(LIBBITCOIN_CRYPTO) $(LIBUNIVALUE) \
-  $(LIBLEVELDB) $(LIBLEVELDB_SSE42) $(LIBMEMENV) $(EVENT_LIBS) $(BOOST_LIBS) $(BOOST_UNIT_TEST_FRAMEWORK_LIB) $(LIBSECP256K1)
+  $(LIBLEVELDB) $(LIBLEVELDB_SSE42) $(LIBMEMENV) $(EVENT_LIBS) $(BOOST_LIBS) $(BOOST_UNIT_TEST_FRAMEWORK_LIB) $(LIBSECP256K1) $(LIBRSM)
 test_test_bitcoin_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 
 if ENABLE_WALLET
@@ -188,7 +185,8 @@ test_test_bitcoin_fuzzy_LDADD = \
   $(LIBLEVELDB) \
   $(LIBLEVELDB_SSE42) \
   $(LIBMEMENV) \
-  $(LIBSECP256K1)
+  $(LIBSECP256K1) \
+  $(LIBRSM)
 
 test_test_bitcoin_fuzzy_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
 #

@@ -1,6 +1,6 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -53,6 +53,7 @@ bool EnsureWalletIsAvailable(bool avoidException)
 
 void EnsureWalletIsUnlocked()
 {
+    LOCK(pwalletMain->cs_wallet);
     if (pwalletMain->IsLocked())
         throw JSONRPCError(
             RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
@@ -1125,8 +1126,6 @@ UniValue sendmany(const UniValue &params, bool fHelp)
             HelpExampleRpc("sendmany", "\"\", "
                                        "\"{\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\\\":0.01,"
                                        "\\\"1353tsE8YMTA4EuV7dgUXGjNFf9KpVvKHz\\\":0.02}\", 6, \"testing\""));
-
-    LOCK2(cs_main, pwalletMain->cs_wallet);
 
     string strAccount = AccountFromValue(params[0]);
     UniValue sendTo = params[1].get_obj();

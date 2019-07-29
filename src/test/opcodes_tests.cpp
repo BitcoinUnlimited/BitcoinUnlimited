@@ -1,4 +1,5 @@
 // Copyright (c) 2018 The Bitcoin developers
+// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -24,8 +25,7 @@ std::array<uint32_t, 3> flagset{
  */
 static void CheckTestResultForAllFlags(const stacktype &original_stack,
                                        const CScript &script,
-                                       const stacktype &expected,
-                                       uint32_t upgradeFlag = 0)
+                                       const stacktype &expected)
 {
     BaseSignatureChecker sigchecker;
 
@@ -34,47 +34,27 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack,
         ScriptError err = SCRIPT_ERR_OK;
         stacktype stack{original_stack};
         bool r =
-            EvalScript(stack, script, flags | upgradeFlag, MAX_OPS_PER_SCRIPT, sigchecker, &err);
+            EvalScript(stack, script, flags, MAX_OPS_PER_SCRIPT, sigchecker, &err);
         BOOST_CHECK(r);
         BOOST_CHECK(stack == expected);
-
-        // Make sure that if we do not pass the upgrade flag, opcodes are still
-        // disabled.
-        if(upgradeFlag)
-        {
-            stack = original_stack;
-            r = EvalScript(stack, script, flags, MAX_OPS_PER_SCRIPT, sigchecker, &err);
-            BOOST_CHECK(!r);
-            BOOST_CHECK_EQUAL(err, SCRIPT_ERR_DISABLED_OPCODE);
-        }
     }
 }
 
 
 static void CheckError(uint32_t flags, const stacktype &original_stack,
-                       const CScript &script, ScriptError expected_error, uint32_t upgradeFlag = 0) {
+                       const CScript &script, ScriptError expected_error) {
     BaseSignatureChecker sigchecker;
     ScriptError err = SCRIPT_ERR_OK;
     stacktype stack{original_stack};
-    bool r = EvalScript(stack, script, flags | upgradeFlag, MAX_OPS_PER_SCRIPT, sigchecker, &err);
+    bool r = EvalScript(stack, script, flags, MAX_OPS_PER_SCRIPT, sigchecker, &err);
     BOOST_CHECK(!r);
     BOOST_CHECK_EQUAL(err, expected_error);
-
-    // Make sure that if we do not pass the opcodes flags, opcodes are still
-    // disabled.
-    if(upgradeFlag)
-    {
-        stack = original_stack;
-        r = EvalScript(stack, script, flags, MAX_OPS_PER_SCRIPT, sigchecker, &err);
-        BOOST_CHECK(!r);
-        BOOST_CHECK_EQUAL(err, SCRIPT_ERR_DISABLED_OPCODE);
-    }
 }
 
 static void CheckErrorForAllFlags(const stacktype &original_stack, const CScript &script,
-                                  ScriptError expected_error, uint32_t upgradeFlag = 0) {
+                                  ScriptError expected_error) {
     for (uint32_t flags : flagset) {
-        CheckError(flags, original_stack, script, expected_error, upgradeFlag);
+        CheckError(flags, original_stack, script, expected_error);
     }
 }
 
@@ -96,16 +76,6 @@ static void CheckBinaryOp(const valtype &a, const valtype &b, opcodetype op,
     CheckTestResultForAllFlags({a, b}, CScript() << op, {expected});
 }
 
-static void CheckMulShiftOp(const valtype &a, const valtype &b, opcodetype op,
-                          const valtype &expected) {
-    CheckTestResultForAllFlags({a, b}, CScript() << op, {expected}, SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES);
-}
-
-static void CheckInvOp(const valtype &a, opcodetype op, const valtype &expected)
-{
-    CheckTestResultForAllFlags({a}, CScript() << op, {expected}, SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES);
-}
-
 static valtype NegativeValtype(const valtype &v) {
     valtype r(v);
     if (r.size() > 0) {
@@ -119,25 +89,25 @@ static valtype NegativeValtype(const valtype &v) {
 // Expects str to contain 8*n bits.
 // see self_bitpattern_test for examples
 static valtype to_bitpattern(const char *str) {
-    size_t len = strlen(str); 
- 
-    valtype val((len - 1) / 8 + 1, 0); 
- 
-    const char *pin = &str[len - 1]; 
+    size_t len = strlen(str);
+
+    valtype val((len - 1) / 8 + 1, 0);
+
+    const char *pin = &str[len - 1];
     for (size_t i = 0; i < len; i++) {
         int byte_idx = (len - 1 - i) / 8;
-        int bit_idx = i % 8; 
- 
-        int8_t mask = 1 << bit_idx; 
- 
+        int bit_idx = i % 8;
+
+        int8_t mask = 1 << bit_idx;
+
         if (*pin == '0') {
-            val[byte_idx] &= ~mask; 
+            val[byte_idx] &= ~mask;
         } else {
-            val[byte_idx] |= mask; 
-        } 
-        pin--; 
-    } 
-    return val; 
+            val[byte_idx] |= mask;
+        }
+        pin--;
+    }
+    return val;
 }
 
 // test the bitpattern function
@@ -476,145 +446,6 @@ BOOST_AUTO_TEST_CASE(bitwise_opcodes_test) {
     CheckAllBitwiseOpErrors({b, {}}, SCRIPT_ERR_INVALID_OPERAND_SIZE);
 }
 
-BOOST_AUTO_TEST_CASE(invert_test)
-{ 
-    CheckInvOp({},     OP_INVERT, {});
-    CheckInvOp({0x00}, OP_INVERT, {0xFF});
-    CheckInvOp({0xFF}, OP_INVERT, {0x00});
-    CheckInvOp({0xFF, 0xA0, 0xCE, 0xA0, 0x96, 0x12}, OP_INVERT, {0x00, 0x5F, 0x31, 0x5F, 0x69, 0xED});
-} 
-
-static void CheckShiftOp(const valtype &x, const valtype &n, opcodetype op, const valtype &expected) {
-    CheckMulShiftOp(x, n, op, expected);
-}
-
-BOOST_AUTO_TEST_CASE(lshift_test)
-{ 
-    CheckShiftOp({}, {},     OP_LSHIFT, {}); 
-    CheckShiftOp({}, {0x01}, OP_LSHIFT, {}); 
-    CheckShiftOp({}, {0x02}, OP_LSHIFT, {}); 
-    CheckShiftOp({}, {0x07}, OP_LSHIFT, {}); 
-    CheckShiftOp({}, {0x08}, OP_LSHIFT, {}); 
-    CheckShiftOp({}, {0x09}, OP_LSHIFT, {}); 
-    CheckShiftOp({}, {0x0F}, OP_LSHIFT, {}); 
-    CheckShiftOp({}, {0x10}, OP_LSHIFT, {}); 
-    CheckShiftOp({}, {0x11}, OP_LSHIFT, {}); 
- 
-    CheckShiftOp({0xFF}, {},     OP_LSHIFT, to_bitpattern("11111111")); 
-    CheckShiftOp({0xFF}, {0x01}, OP_LSHIFT, to_bitpattern("11111110")); 
-    CheckShiftOp({0xFF}, {0x02}, OP_LSHIFT, to_bitpattern("11111100")); 
-    CheckShiftOp({0xFF}, {0x03}, OP_LSHIFT, to_bitpattern("11111000")); 
-    CheckShiftOp({0xFF}, {0x04}, OP_LSHIFT, to_bitpattern("11110000")); 
-    CheckShiftOp({0xFF}, {0x05}, OP_LSHIFT, to_bitpattern("11100000")); 
-    CheckShiftOp({0xFF}, {0x06}, OP_LSHIFT, to_bitpattern("11000000")); 
-    CheckShiftOp({0xFF}, {0x07}, OP_LSHIFT, to_bitpattern("10000000")); 
-    CheckShiftOp({0xFF}, {0x08}, OP_LSHIFT, to_bitpattern("00000000")); 
- 
-    CheckShiftOp({0xFF}, {0x01}, OP_LSHIFT, {0xFE}); 
-    CheckShiftOp({0xFF}, {0x02}, OP_LSHIFT, {0xFC}); 
-    CheckShiftOp({0xFF}, {0x03}, OP_LSHIFT, {0xF8}); 
-    CheckShiftOp({0xFF}, {0x04}, OP_LSHIFT, {0xF0}); 
-    CheckShiftOp({0xFF}, {0x05}, OP_LSHIFT, {0xE0}); 
-    CheckShiftOp({0xFF}, {0x06}, OP_LSHIFT, {0xC0}); 
-    CheckShiftOp({0xFF}, {0x07}, OP_LSHIFT, {0x80});
-
-    // bitpattern, not a number so not reduced to zero bytes
-    CheckShiftOp({0xFF}, {0x08}, OP_LSHIFT, {0x00});
-
-    // shift single bit over byte boundary
-    CheckShiftOp({0x00, 0x80}, {0x01}, OP_LSHIFT, {0x01, 0x00});
-    CheckShiftOp({0x00, 0x80, 0x00}, {0x01}, OP_LSHIFT, {0x01, 0x00, 0x00});
-    CheckShiftOp({0x00, 0x00, 0x80}, {0x01}, OP_LSHIFT, {0x00, 0x01, 0x00});
-    CheckShiftOp({0x80, 0x00, 0x00}, {0x01}, OP_LSHIFT, {0x00, 0x00, 0x00});
-
-    // {0x9F, 0x11, 0xF5, 0x55} is a sequence of bytes that is equal to the bit pattern
-    // "1001 1111 0001 0001 1111 0101 0101 0101"
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {},     OP_LSHIFT, to_bitpattern("10011111000100011111010101010101"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x01}, OP_LSHIFT, to_bitpattern("00111110001000111110101010101010"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x02}, OP_LSHIFT, to_bitpattern("01111100010001111101010101010100"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x03}, OP_LSHIFT, to_bitpattern("11111000100011111010101010101000"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x04}, OP_LSHIFT, to_bitpattern("11110001000111110101010101010000"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x05}, OP_LSHIFT, to_bitpattern("11100010001111101010101010100000"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x06}, OP_LSHIFT, to_bitpattern("11000100011111010101010101000000"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x07}, OP_LSHIFT, to_bitpattern("10001000111110101010101010000000"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x08}, OP_LSHIFT, to_bitpattern("00010001111101010101010100000000"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x09}, OP_LSHIFT, to_bitpattern("00100011111010101010101000000000"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0A}, OP_LSHIFT, to_bitpattern("01000111110101010101010000000000"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0B}, OP_LSHIFT, to_bitpattern("10001111101010101010100000000000"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0C}, OP_LSHIFT, to_bitpattern("00011111010101010101000000000000"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0D}, OP_LSHIFT, to_bitpattern("00111110101010101010000000000000"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0E}, OP_LSHIFT, to_bitpattern("01111101010101010100000000000000"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0F}, OP_LSHIFT, to_bitpattern("11111010101010101000000000000000"));
-
-    // second parameter, n < 0 - should produce error
-    CheckErrorForAllFlags({valtype{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_LSHIFT,
-                                  SCRIPT_ERR_INVALID_NUMBER_RANGE, SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES);
-} 
- 
-BOOST_AUTO_TEST_CASE(rshift_test) 
-{ 
-    CheckShiftOp({}, {},     OP_RSHIFT, {}); 
-    CheckShiftOp({}, {0x01}, OP_RSHIFT, {}); 
-    CheckShiftOp({}, {0x02}, OP_RSHIFT, {}); 
-    CheckShiftOp({}, {0x07}, OP_RSHIFT, {}); 
-    CheckShiftOp({}, {0x08}, OP_RSHIFT, {}); 
-    CheckShiftOp({}, {0x09}, OP_RSHIFT, {}); 
-    CheckShiftOp({}, {0x0F}, OP_RSHIFT, {}); 
-    CheckShiftOp({}, {0x10}, OP_RSHIFT, {}); 
-    CheckShiftOp({}, {0x11}, OP_RSHIFT, {}); 
- 
-    CheckShiftOp({0xFF}, {},     OP_RSHIFT, to_bitpattern("11111111")); 
-    CheckShiftOp({0xFF}, {0x01}, OP_RSHIFT, to_bitpattern("01111111")); 
-    CheckShiftOp({0xFF}, {0x02}, OP_RSHIFT, to_bitpattern("00111111")); 
-    CheckShiftOp({0xFF}, {0x03}, OP_RSHIFT, to_bitpattern("00011111")); 
-    CheckShiftOp({0xFF}, {0x04}, OP_RSHIFT, to_bitpattern("00001111")); 
-    CheckShiftOp({0xFF}, {0x05}, OP_RSHIFT, to_bitpattern("00000111")); 
-    CheckShiftOp({0xFF}, {0x06}, OP_RSHIFT, to_bitpattern("00000011")); 
-    CheckShiftOp({0xFF}, {0x07}, OP_RSHIFT, to_bitpattern("00000001")); 
-    CheckShiftOp({0xFF}, {0x08}, OP_RSHIFT, to_bitpattern("00000000")); 
-
- 
-    CheckShiftOp({0xFF}, {0x01}, OP_RSHIFT, {0x7F}); 
-    CheckShiftOp({0xFF}, {0x02}, OP_RSHIFT, {0x3F}); 
-    CheckShiftOp({0xFF}, {0x03}, OP_RSHIFT, {0x1F}); 
-    CheckShiftOp({0xFF}, {0x04}, OP_RSHIFT, {0x0F});
-    CheckShiftOp({0xFF}, {0x05}, OP_RSHIFT, {0x07}); 
-    CheckShiftOp({0xFF}, {0x06}, OP_RSHIFT, {0x03}); 
-    CheckShiftOp({0xFF}, {0x07}, OP_RSHIFT, {0x01});
-
-    // bitpattern, not a number so not reduced to zero bytes
-    CheckShiftOp({0xFF}, {0x08}, OP_RSHIFT, {0x00});
-
-    // shift single bit over byte boundary
-    CheckShiftOp({0x01, 0x00}, {0x01}, OP_RSHIFT, {0x00, 0x80});
-    CheckShiftOp({0x01, 0x00, 0x00}, {0x01}, OP_RSHIFT, {0x00, 0x80, 0x00});
-    CheckShiftOp({0x00, 0x01, 0x00}, {0x01}, OP_RSHIFT, {0x00, 0x00, 0x80});
-    CheckShiftOp({0x00, 0x00, 0x01}, {0x01}, OP_RSHIFT, {0x00, 0x00, 0x00});
-
-    // {0x9F, 0x11, 0xF5, 0x55} is a sequence of bytes that is equal to the bit pattern
-    // "1001 1111 0001 0001 1111 0101 0101 0101"
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {},     OP_RSHIFT, to_bitpattern("10011111000100011111010101010101"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x01}, OP_RSHIFT, to_bitpattern("01001111100010001111101010101010"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x02}, OP_RSHIFT, to_bitpattern("00100111110001000111110101010101"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x03}, OP_RSHIFT, to_bitpattern("00010011111000100011111010101010"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x04}, OP_RSHIFT, to_bitpattern("00001001111100010001111101010101"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x05}, OP_RSHIFT, to_bitpattern("00000100111110001000111110101010"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x06}, OP_RSHIFT, to_bitpattern("00000010011111000100011111010101"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x07}, OP_RSHIFT, to_bitpattern("00000001001111100010001111101010"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x08}, OP_RSHIFT, to_bitpattern("00000000100111110001000111110101"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x09}, OP_RSHIFT, to_bitpattern("00000000010011111000100011111010"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0A}, OP_RSHIFT, to_bitpattern("00000000001001111100010001111101"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0B}, OP_RSHIFT, to_bitpattern("00000000000100111110001000111110"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0C}, OP_RSHIFT, to_bitpattern("00000000000010011111000100011111"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0D}, OP_RSHIFT, to_bitpattern("00000000000001001111100010001111"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0E}, OP_RSHIFT, to_bitpattern("00000000000000100111110001000111"));
-    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0F}, OP_RSHIFT, to_bitpattern("00000000000000010011111000100011"));
-
-    // second parameter, n < 0 - should produce error
-    CheckErrorForAllFlags({valtype{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_RSHIFT,
-                                  SCRIPT_ERR_INVALID_NUMBER_RANGE, SCRIPT_ENABLE_MUL_SHIFT_INVERT_OPCODES);
-}
-
 /**
  * String opcodes.
  */
@@ -853,49 +684,6 @@ BOOST_AUTO_TEST_CASE(type_conversion_test) {
     // Check that the requested encoding is possible.
     CheckNum2BinError({{0xab, 0xcd, 0xef, 0x80}, {0x03}},
                       SCRIPT_ERR_IMPOSSIBLE_ENCODING);
-}
-
-/**
- * Arithmetic Opcodes
- */
-static void CheckMul(const valtype &a, const valtype &b, const valtype &expected) 
-{ 
-    // Negative values for multiplication
-    CheckMulShiftOp(a, b, OP_MUL, expected);
-    CheckMulShiftOp(a, NegativeValtype(b), OP_MUL, NegativeValtype(expected));
-    CheckMulShiftOp(NegativeValtype(a), b, OP_MUL, NegativeValtype(expected));
-    CheckMulShiftOp(NegativeValtype(a), NegativeValtype(b), OP_MUL, expected);
- 
-    // Commutativity 
-    CheckMulShiftOp(b, a, OP_MUL, expected);
-    CheckMulShiftOp(b, NegativeValtype(a), OP_MUL, NegativeValtype(expected));
-    CheckMulShiftOp(NegativeValtype(b), a, OP_MUL, NegativeValtype(expected));
-    CheckMulShiftOp(NegativeValtype(b), NegativeValtype(a), OP_MUL, expected);
-
-    // Multiplication identities 
-    CheckMulShiftOp(a, {0x01}, OP_MUL, a);
-    CheckMulShiftOp(a, {0x81}, OP_MUL, NegativeValtype(a));
-    CheckMulShiftOp(a, {}, OP_MUL, {});
-
-    CheckMulShiftOp({0x01}, b, OP_MUL, b);
-    CheckMulShiftOp({0x81}, b, OP_MUL, NegativeValtype(b));
-    CheckMulShiftOp({}, b, OP_MUL, {});
-}
-
-BOOST_AUTO_TEST_CASE(mul_test) 
-{
-    CheckMul({0x05}, {0x06}, {0x1E});
-    CheckMul({0x05}, {0x26}, {0xBE, 0x00});
-    CheckMul({0x45}, {0x26}, {0x3E, 0x0A});
-    CheckMul({0x02}, {0x56, 0x24}, {0xAC, 0x48});
-    CheckMul({0x05}, {0x26, 0x03, 0x32}, {0xBE, 0x0F, 0xFA, 0x00});
-    CheckMul({0x06}, {0x26, 0x03, 0x32, 0x04}, {0xE4, 0x12, 0x2C, 0x19});
-    CheckMul({0xA0, 0xA0}, {0xF5, 0xE4}, {0x20, 0xB9, 0xDD, 0x0C}); // -20A0*-64F5=0CDDB920
-    CheckMul({0x05, 0x26}, {0x26, 0x03, 0x32}, {0xBE, 0xB3, 0x71, 0x6D, 0x07});
-    CheckMul({0x06, 0x26}, {0x26, 0x03, 0x32, 0x04}, {0xE4, 0xB6, 0xA3, 0x85, 0x9F, 0x00});
-    CheckMul({0x05, 0x26, 0x09}, {0x26, 0x03, 0x32}, {0xBE, 0xB3, 0xC7, 0x89, 0xC9, 0x01});
-    CheckMul({0x06, 0x26, 0x09}, {0x26, 0x03, 0x32, 0x04}, {0xE4, 0xB6, 0xF9, 0xA1, 0x61, 0x26});
-    CheckMul({0x06, 0x26, 0x09, 0x34}, {0x26, 0x03, 0x32, 0x04}, {0xE4, 0xB6, 0xF9, 0x59, 0x05, 0x4F, 0xDA, 0x00});
 }
 
 static void CheckDivMod(const valtype &a, const valtype &b,

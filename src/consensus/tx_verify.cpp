@@ -1,4 +1,5 @@
 // Copyright (c) 2017-2017 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -164,7 +165,7 @@ bool CheckTransaction(const CTransactionRef &tx, CValidationState &state)
     if (tx->vout.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vout-empty");
     // Check that the transaction doesn't have an excessive number of sigops
-    unsigned int nSigOps = GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+    unsigned int nSigOps = GetLegacySigOpCount(tx, STANDARD_SCRIPT_VERIFY_FLAGS);
     if (nSigOps > MAX_TX_SIGOPS)
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-too-many-sigops");
 

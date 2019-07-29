@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -222,7 +222,7 @@ uint256 CCoinsViewCache::_GetBestBlock() const
 
 void CCoinsViewCache::SetBestBlock(const uint256 &hashBlockIn)
 {
-    READLOCK(cs_utxo);
+    WRITELOCK(cs_utxo);
     hashBlock = hashBlockIn;
 }
 

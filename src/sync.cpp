@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -142,7 +142,7 @@ static void potential_deadlock_detected(const std::pair<void *, void *> &mismatc
 
 static void push_lock(void *c, const CLockLocation &locklocation, bool fTry)
 {
-    if (lockstack.get() == NULL)
+    if (lockstack.get() == nullptr)
         lockstack.reset(new LockStack);
 
     dd_mutex.lock();
@@ -252,10 +252,24 @@ void AssertWriteLockHeldInternal(const char *pszName,
     }
 }
 
+void AssertRecursiveWriteLockHeldInternal(const char *pszName,
+    const char *pszFile,
+    unsigned int nLine,
+    CRecursiveSharedCriticalSection *cs)
+{
+    if (cs->try_lock()) // It would be better to check that this thread has the lock
+    {
+        fprintf(stderr, "Assertion failed: lock %s not held in %s:%i; locks held:\n%s", pszName, pszFile, nLine,
+            LocksHeld().c_str());
+        fflush(stderr);
+        abort();
+    }
+}
+
 // BU normally CCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical
 // section from the lockorder map
 #ifdef DEBUG_LOCKORDER
-CCriticalSection::CCriticalSection() : name(NULL) {}
+CCriticalSection::CCriticalSection() : name(nullptr) {}
 CCriticalSection::CCriticalSection(const char *n) : name(n)
 {
 // print the address of named critical sections so they can be found in the mutrace output
@@ -284,7 +298,7 @@ CCriticalSection::~CCriticalSection()
 // BU normally CSharedCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical
 // section from the lockorder map
 #ifdef DEBUG_LOCKORDER
-CSharedCriticalSection::CSharedCriticalSection() : name(NULL), exclusiveOwner(0) {}
+CSharedCriticalSection::CSharedCriticalSection() : name(nullptr), exclusiveOwner(0) {}
 CSharedCriticalSection::CSharedCriticalSection(const char *n) : name(n), exclusiveOwner(0)
 {
 // print the address of named critical sections so they can be found in the mutrace output
@@ -385,6 +399,5 @@ bool CSharedCriticalSection::try_lock()
     }
     return result;
 }
-
 
 #endif /* DEBUG_LOCKORDER */

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -27,6 +27,7 @@ enum StatOperation
     STAT_KEEP = 0x10, // Do not clear the value when it it moved into history
     STAT_KEEP_COUNT = 0x20, // do not reset the sample count when it it moved into history
     STAT_INDIVIDUAL = 0x40, // Every sample is a data point, do not aggregate by time
+    STAT_DELETED = 0x80, // This stat is in the process of being deleted
 };
 
 // typedef boost::reference_wrapper<std::string> CStatKey;
@@ -181,6 +182,7 @@ template <class DataType, class RecordType = DataType>
 class CStatHistory : public CStat<DataType, RecordType>
 {
 protected:
+    std::mutex cs;
     unsigned int op;
     boost::asio::steady_timer timer;
     RecordType history[STATISTICS_NUM_RANGES][STATISTICS_SAMPLES];
@@ -225,31 +227,40 @@ public:
 
     void Clear(bool fStart = true)
     {
-        timerCount = 0;
-        sampleCount = 0;
-        for (int i = 0; i < STATISTICS_NUM_RANGES; i++)
-            loc[i] = 0;
-        for (int i = 0; i < STATISTICS_NUM_RANGES; i++)
-            len[i] = 0;
-        for (int i = 0; i < STATISTICS_NUM_RANGES; i++)
-            for (int j = 0; j < STATISTICS_SAMPLES; j++)
-            {
-                history[i][j] = RecordType();
-                historyTime[i][j] = 0;
-            }
-        total = RecordType();
-        this->value = RecordType();
+        {
+            std::lock_guard<std::mutex> lock(cs);
+            timerCount = 0;
+            sampleCount = 0;
+            for (int i = 0; i < STATISTICS_NUM_RANGES; i++)
+                loc[i] = 0;
+            for (int i = 0; i < STATISTICS_NUM_RANGES; i++)
+                len[i] = 0;
+            for (int i = 0; i < STATISTICS_NUM_RANGES; i++)
+                for (int j = 0; j < STATISTICS_SAMPLES; j++)
+                {
+                    history[i][j] = RecordType();
+                    historyTime[i][j] = 0;
+                }
+            total = RecordType();
+            this->value = RecordType();
+        }
 
         if (fStart)
             Start();
     }
 
-    virtual ~CStatHistory() { Stop(); }
+    virtual ~CStatHistory()
+    {
+        op |= STAT_DELETED;
+        Stop();
+    }
     CStatHistory &operator<<(const DataType &rhs)
     {
+        // If each call is an individual datapoint, simulate a timeout every time data arrives to advance.
         if (op & STAT_INDIVIDUAL)
-            timeout(boost::system::error_code()); // If each call is an individual datapoint, simulate a timeout every
-        // time data arrives to advance.
+            timeout(boost::system::error_code());
+
+        std::lock_guard<std::mutex> lock(cs);
         if (op & STAT_OP_SUM)
         {
             this->value += rhs;
@@ -281,6 +292,7 @@ public:
 
     void Start()
     {
+        std::lock_guard<std::mutex> lock(cs);
         if (!(op & STAT_INDIVIDUAL))
         {
             timerStartSteady = std::chrono::steady_clock::now();
@@ -291,6 +303,7 @@ public:
 
     void Stop()
     {
+        std::lock_guard<std::mutex> lock(cs);
         if (!(op & STAT_INDIVIDUAL))
         {
             timer.cancel();
@@ -299,6 +312,7 @@ public:
 
     int Series(int series, DataType *array, int _len)
     {
+        std::lock_guard<std::mutex> lock(cs);
         assert(series < STATISTICS_NUM_RANGES);
         if (_len > STATISTICS_SAMPLES)
             _len = STATISTICS_SAMPLES;
@@ -318,6 +332,7 @@ public:
 
     virtual UniValue GetTotal()
     {
+        std::lock_guard<std::mutex> lock(cs);
         if ((op & STAT_OP_AVE) && (timerCount != 0))
             return UniValue(
                 total / timerCount); // If the metric is an average, calculate the average before returning it
@@ -326,6 +341,7 @@ public:
 
     virtual UniValue GetSeries(const std::string &_name, int count)
     {
+        std::lock_guard<std::mutex> lock(cs);
         for (int series = 0; series < STATISTICS_NUM_RANGES; series++)
         {
             if (_name == sampleNames[series])
@@ -349,6 +365,7 @@ public:
     // 0 is latest, then pass a negative number for prior
     const RecordType &History(int series, int ago)
     {
+        std::lock_guard<std::mutex> lock(cs);
         assert(ago <= 0);
         assert(series < STATISTICS_NUM_RANGES);
         assert(-1 * ago <= STATISTICS_SAMPLES);
@@ -361,6 +378,7 @@ public:
 
     virtual UniValue GetSeriesTime(const std::string &_name, int count)
     {
+        std::lock_guard<std::mutex> lock(cs);
         for (int series = 0; series < STATISTICS_NUM_RANGES; series++)
         {
             if (_name == sampleNames[series])
@@ -390,6 +408,7 @@ public:
     // 0 is latest, then pass a negative number for prior
     const int64_t &HistoryTime(int series, int ago)
     {
+        std::lock_guard<std::mutex> lock(cs);
         assert(ago <= 0);
         assert(series < STATISTICS_NUM_RANGES);
         assert(-1 * ago <= STATISTICS_SAMPLES);
@@ -411,8 +430,15 @@ public:
         if (e)
             return;
 
+        std::lock_guard<std::mutex> lock(cs);
+        // If this stat is in the process of being deleted, then just abort processing.
+        if ((op & STAT_DELETED) > 0)
+            return;
+
         // To avoid taking a mutex, I sample and compare.  This sort of thing isn't perfect but acceptable for
-        // statistics calc.
+        // statistics calc.  NOTE: a mutex is needed to fix timeouts after destruction.  But leaving this sampling
+        // code in until we analyze the performance hit of having one, because it should be possible to keep this
+        // sampling and leave the mutex out of the often-called stat increment code.
         volatile RecordType *sampler = &this->value;
         RecordType samples[2];
         do
@@ -506,7 +532,9 @@ public:
                     len[i + 1] = STATISTICS_SAMPLES; // full
             }
         }
-        if (!(op & STAT_INDIVIDUAL))
+
+        // If this is not an individual or deleted stat, schedule the next callback
+        if (!(op & (STAT_INDIVIDUAL | STAT_DELETED)))
             wait();
     }
 
@@ -676,7 +704,7 @@ public:
 };
 
 
-// Get the named statistic.  Returns NULL if it does not exist
+// Get the named statistic.  Returns nullptr if it does not exist
 CStatBase *GetStat(char *name);
 
 

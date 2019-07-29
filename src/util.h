@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -467,6 +467,10 @@ bool GetBoolArg(const std::string &strArg, bool fDefault);
  * @return none
  */
 void SetArg(const std::string &strArg, const std::string &strValue);
+/**
+ * Unset an argument, reverting to default value.
+ */
+void UnsetArg(const std::string &strArg);
 
 /**
  * Set a boolean argument

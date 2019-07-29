@@ -1,5 +1,10 @@
+// Copyright (c) 2015-2018 The Bitcoin Core developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "merkle.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "utilstrencodings.h"
 
 /*     WARNING! If you're reading this because you're learning about crypto
@@ -161,14 +166,14 @@ static void MerkleComputation(const std::vector<uint256> &leaves,
 uint256 ComputeMerkleRoot(const std::vector<uint256> &leaves, bool *mutated)
 {
     uint256 hash;
-    MerkleComputation(leaves, &hash, mutated, -1, NULL);
+    MerkleComputation(leaves, &hash, mutated, -1, nullptr);
     return hash;
 }
 
 std::vector<uint256> ComputeMerkleBranch(const std::vector<uint256> &leaves, uint32_t position)
 {
     std::vector<uint256> ret;
-    MerkleComputation(leaves, NULL, NULL, position, &ret);
+    MerkleComputation(leaves, nullptr, nullptr, position, &ret);
     return ret;
 }
 

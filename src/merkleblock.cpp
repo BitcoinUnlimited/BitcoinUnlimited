@@ -1,13 +1,13 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "merkleblock.h"
 
 #include "consensus/consensus.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "utilstrencodings.h"
 
 using namespace std;
@@ -22,16 +22,23 @@ CMerkleBlock::CMerkleBlock(const CBlock &block, CBloomFilter &filter)
     vMatch.reserve(block.vtx.size());
     vHashes.reserve(block.vtx.size());
 
-    for (unsigned int i = 0; i < block.vtx.size(); i++)
+    for (const auto &tx : block.vtx)
+    {
+        vMatch.push_back(filter.MatchAndInsertOutputs(tx));
+    }
+
+    for (size_t i = 0; i < block.vtx.size(); i++)
     {
         const uint256 &hash = block.vtx[i]->GetHash();
-        if (filter.IsRelevantAndUpdate(block.vtx[i]))
+        if (!vMatch[i])
         {
-            vMatch.push_back(true);
+            vMatch[i] = filter.MatchInputs(block.vtx[i]);
+        }
+        if (vMatch[i])
+        {
             vMatchedTxn.push_back(make_pair(i, hash));
         }
-        else
-            vMatch.push_back(false);
+
         vHashes.push_back(hash);
     }
 

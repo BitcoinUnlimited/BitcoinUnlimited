@@ -196,6 +196,8 @@ def get_rpc_proxy(url, node_number, timeout=None, miningCapable=True):
 
     proxy = AuthServiceProxy(url, **proxy_kwargs)
     proxy.url = url  # store URL on proxy for info
+    proxy.nodeNumber = node_number
+    proxy.p2pPort = p2p_port(node_number)
 
     coverage_logfile = coverage.get_filename(
         COVERAGE_DIR, node_number) if COVERAGE_DIR else None
@@ -247,10 +249,39 @@ def hex_str_to_bytes(hex_str):
 def str_to_b64str(string):
     return b64encode(string.encode('utf-8')).decode('ascii')
 
+
+connectionTracking = False
+
+def setup_connection_tracking(rpc_connections):
+    global connectionTracking
+    for c in rpc_connections:
+        c.set("net.subversionOverride=%d" % c.auth_service_proxy_instance.nodeNumber)
+    connectionTracking = True
+
+# credit: https://www.python-course.eu/graphs_python.php
+def is_connected(gdict, vertices_encountered = None, start_vertex=None):
+        """ determines if the graph is connected """
+        if vertices_encountered is None:
+            vertices_encountered = set()
+        vertices = list(gdict.keys()) # "list" necessary in Python 3 
+        if not start_vertex:
+            # chosse a vertex from graph as a starting point
+            start_vertex = vertices[0]
+        vertices_encountered.add(start_vertex)
+        if len(vertices_encountered) != len(vertices):
+            for vertex in gdict[start_vertex]:
+                if vertex not in vertices_encountered:
+                    if is_connected(gdict, vertices_encountered, vertex):
+                        return True
+        else:
+            return True
+        return False
+
 def sync_blocks(rpc_connections, wait=1,verbose=1):
     """
     Wait until everybody has the same block count
     """
+    iter=-1
     while True:
         counts = [ x.getblockcount() for x in rpc_connections ]
         if verbose:
@@ -258,6 +289,25 @@ def sync_blocks(rpc_connections, wait=1,verbose=1):
         if counts == [ counts[0] ]*len(counts):
             break
         time.sleep(wait)
+        iter+=1
+        if connectionTracking and iter&7==0:  # do some other checks to ensure that block sync is possible
+            cxnCount = 0
+            cnxns = [(x.url, x.get("net.subversionOverride")["net.subversionOverride"], x.getpeerinfo()) for x in rpc_connections]
+            graph = { }
+            cnxnCount = 0
+            interestingNodes=[]
+            for (url, node_idx, peers) in cnxns:  # We only care to check the nodes in our rpc_connections
+                interestingNodes.append(node_idx)
+
+            for (url, nodeIdx, peers) in cnxns:
+                connectedTo = []
+                for p in peers:
+                    peerIdx = p["subver"]
+                    if peerIdx in interestingNodes:
+                        connectedTo.append(peerIdx)
+                graph[nodeIdx] = connectedTo
+            if not is_connected(graph):
+                raise Exception('sync_blocks: bitcoind nodes cannot sync because they are not all connected.  Node connection graph: %s' % str(graph))
 
 def sync_blocks_to(height, rpc_connections, wait=1,verbose=1):
     """
@@ -437,6 +487,7 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
                     do_and_ignore_failure(lambda x: bitcoind_processes[i].kill())
                     traceback.print_exc(file=sys.stdout)
                     remap_ports(i)
+                    fixup_ports_in_configfile(i)
             else:
                 raise Exception("Couldn't start bitcoind even with retries on different ports (initialize_chain).")
 

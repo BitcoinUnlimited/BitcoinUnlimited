@@ -210,6 +210,22 @@ class BitcoinTestFramework(object):
 
         check_json_precision()
 
+        # By setting the environment variable BITCOIN_CONF_OVERRIDE to "key=value,key2=value2,..." you can inject bitcoin configuration into every test
+        baseConf = os.environ.get("BITCOIN_CONF_OVERRIDE")
+        if baseConf is None:
+            baseConf= {}
+        else:
+            lines = baseConf.split(",")
+            baseConf = {}
+            for line in lines:
+                (key,val) = line.split("=")
+                baseConf[key.strip()] = val.strip()
+
+        if bitcoinConfDict is None:
+            bitcoinConfDict = {}
+
+        bitcoinConfDict.update(baseConf)
+
         success = False
         try:
             try:

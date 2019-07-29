@@ -1,6 +1,6 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -11,7 +11,7 @@
 #include "checkpoints.h"
 #include "coins.h"
 #include "consensus/validation.h"
-#include "hash.h"
+#include "hashwrapper.h"
 #include "main.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
@@ -675,7 +675,7 @@ UniValue getblock(const UniValue &params, bool fHelp)
         if (h.bits() < 65)
         {
             LOCK(cs_main);
-            uint64_t height = boost::lexical_cast<unsigned int>(strHash);
+            uint64_t height = std::stoull(strHash);
             if (height > (uint64_t)chainActive.Height())
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block index out of range");
             pblockindex = chainActive[height];
@@ -686,8 +686,11 @@ UniValue getblock(const UniValue &params, bool fHelp)
 
     CBlock block;
 
-    if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Block not available (pruned data)");
+    {
+        READLOCK(cs_mapBlockIndex);
+        if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Block not available (pruned data)");
+    }
 
     if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
@@ -1118,8 +1121,11 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
     if (fPruneMode)
     {
         CBlockIndex *block = chainActive.Tip();
-        while (block && block->pprev && (block->pprev->nStatus & BLOCK_HAVE_DATA))
-            block = block->pprev;
+        {
+            READLOCK(cs_mapBlockIndex);
+            while (block && block->pprev && (block->pprev->nStatus & BLOCK_HAVE_DATA))
+                block = block->pprev;
+        }
 
         if (block != nullptr)
             obj.pushKV("pruneheight", block->nHeight);
@@ -1219,6 +1225,7 @@ UniValue getchaintips(const UniValue &params, bool fHelp)
     setTips = GetChainTips();
 
     /* Construct the output array.  */
+    WRITELOCK(cs_mapBlockIndex); // for nStatus
     UniValue res(UniValue::VARR);
     for (const CBlockIndex *block : setTips)
     {
@@ -1282,9 +1289,9 @@ UniValue mempoolInfoToJSON()
     ret.pushKV("mempoolminfee", ValueFromAmount(mempool.GetMinFee(maxmempool).GetFeePerK()));
     try
     {
-        ret.pushKV("tps", boost::lexical_cast<double>(strprintf("%.2f", mempool.TransactionsPerSecond())));
+        ret.pushKV("tps", std::stod(strprintf("%.2f", mempool.TransactionsPerSecond())));
     }
-    catch (boost::bad_lexical_cast &)
+    catch (...)
     {
         ret.pushKV("tps", "N/A");
     }

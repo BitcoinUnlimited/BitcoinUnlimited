@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -34,6 +34,7 @@
 #include "net.h"
 #include "parallel.h"
 #include "policy/policy.h"
+#include "requestManager.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
 #include "script/sigcache.h"
@@ -83,7 +84,7 @@ using namespace std;
 bool fFeeEstimatesInitialized = false;
 
 #if ENABLE_ZMQ
-static CZMQNotificationInterface *pzmqNotificationInterface = NULL;
+static CZMQNotificationInterface *pzmqNotificationInterface = nullptr;
 #endif
 
 #ifdef WIN32
@@ -166,7 +167,7 @@ public:
     // Writes do not need similar protection, as failure to write is handled by the caller.
 };
 
-static CCoinsViewErrorCatcher *pcoinscatcher = NULL;
+static CCoinsViewErrorCatcher *pcoinscatcher = nullptr;
 static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
 
 void Interrupt(thread_group &threadGroup)
@@ -246,16 +247,16 @@ void Shutdown()
 
     {
         LOCK(cs_main);
-        if (pcoinsTip != NULL)
+        if (pcoinsTip != nullptr)
         {
             FlushStateToDisk();
         }
         delete pcoinsTip;
-        pcoinsTip = NULL;
+        pcoinsTip = nullptr;
         delete pcoinscatcher;
-        pcoinscatcher = NULL;
+        pcoinscatcher = nullptr;
         delete pcoinsdbview;
-        pcoinsdbview = NULL;
+        pcoinsdbview = nullptr;
         delete pblocktree;
         pblocktree = nullptr;
         delete pblockdb;
@@ -271,7 +272,7 @@ void Shutdown()
     {
         UnregisterValidationInterface(pzmqNotificationInterface);
         delete pzmqNotificationInterface;
-        pzmqNotificationInterface = NULL;
+        pzmqNotificationInterface = nullptr;
     }
 #endif
 
@@ -288,12 +289,14 @@ void Shutdown()
     UnregisterAllValidationInterfaces();
 #ifdef ENABLE_WALLET
     delete pwalletMain;
-    pwalletMain = NULL;
+    pwalletMain = nullptr;
 #endif
     globalVerifyHandle.reset();
     ECC_Stop();
-
+    PV.reset(nullptr); // clean up scriptcheck threads
+    requester.Cleanup();
     NetCleanup();
+    connmgr.reset(nullptr); // clean up connection manager
     MainCleanup();
     UnlimitedCleanup();
     LOGA("%s: done\n", __func__);
@@ -591,7 +594,8 @@ void InitParameterInteraction()
     }
 
     // disable walletbroadcast and whitelistrelay in blocksonly mode
-    if (GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY))
+    fBlocksOnly = GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY);
+    if (fBlocksOnly)
     {
         if (SoftSetBoolArg("-whitelistrelay", false))
             LOGA("%s: parameter interaction: -blocksonly=1 -> setting -whitelistrelay=0\n", __func__);
@@ -633,7 +637,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 #ifdef _MSC_VER
     // Turn off Microsoft heap dump noise
     _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
-    _CrtSetReportFile(_CRT_WARN, CreateFileA("NUL", GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, 0));
+    _CrtSetReportFile(_CRT_WARN, CreateFileA("NUL", GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, 0));
 #endif
 #if _MSC_VER >= 1400
     // Disable confusing "helpful" text message on abort, Ctrl-C
@@ -651,7 +655,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     typedef BOOL(WINAPI * PSETPROCDEPPOL)(DWORD);
     PSETPROCDEPPOL setProcDEPPol =
         (PSETPROCDEPPOL)GetProcAddress(GetModuleHandleA("Kernel32.dll"), "SetProcessDEPPolicy");
-    if (setProcDEPPol != NULL)
+    if (setProcDEPPol != nullptr)
         setProcDEPPol(PROCESS_DEP_ENABLE);
 #endif
 
@@ -676,15 +680,15 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     sa.sa_handler = HandleSIGTERM;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
-    sigaction(SIGTERM, &sa, NULL);
-    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, nullptr);
+    sigaction(SIGINT, &sa, nullptr);
 
     // Reopen debug.log on SIGHUP
     struct sigaction sa_hup;
     sa_hup.sa_handler = HandleSIGHUP;
     sigemptyset(&sa_hup.sa_mask);
     sa_hup.sa_flags = 0;
-    sigaction(SIGHUP, &sa_hup, NULL);
+    sigaction(SIGHUP, &sa_hup, nullptr);
 
     // Ignore SIGPIPE, otherwise it will bring the daemon down if the client closes unexpectedly
     signal(SIGPIPE, SIG_IGN);
@@ -1242,18 +1246,8 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
 
-    // Set EB and MAX_OPS_PER_SCRIPT for the SV chain
-    if (AreWeOnSVChain() && IsSv2018Activated(Params().GetConsensus(), chainActive.Tip()))
-    {
-        maxScriptOps = SV_MAX_OPS_PER_SCRIPT;
-        excessiveBlockSize = SV_EXCESSIVE_BLOCK_SIZE;
-        settingsToUserAgentString();
-        enableCanonicalTxOrder = false;
-    }
-
     // Set enableCanonicalTxOrder for the BCH early in the bootstrap phase
-    if (AreWeOnBCHChain() && IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()) &&
-        chainparams.NetworkIDString() != "regtest")
+    if (IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()) && chainparams.NetworkIDString() != "regtest")
     {
         enableCanonicalTxOrder = true;
     }
@@ -1269,7 +1263,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 
     if (fDisableWallet)
     {
-        pwalletMain = NULL;
+        pwalletMain = nullptr;
         LOGA("Wallet disabled!\n");
     }
     else

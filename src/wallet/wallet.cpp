@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -1459,7 +1459,7 @@ void CWallet::ReacceptWalletTransactions()
     // If transactions aren't being broadcasted, don't let them into local mempool either
     if (!fBroadcastTransactions)
         return;
-    std::map<int64_t, CWalletTx *> mapSorted;
+    std::map<int64_t, CTransactionRef> mapSorted;
 
     {
         LOCK2(cs_main, cs_wallet);
@@ -1475,18 +1475,17 @@ void CWallet::ReacceptWalletTransactions()
 
             if (!wtx.IsCoinBase() && (nDepth == 0 && !wtx.isAbandoned()))
             {
-                mapSorted.insert(std::make_pair(wtx.nOrderPos, &wtx));
+                mapSorted.insert(std::make_pair(wtx.nOrderPos, MakeTransactionRef(wtx)));
             }
         }
     }
 
     // Try to add wallet transactions to memory pool
-    for (std::pair<const int64_t, CWalletTx *> &item : mapSorted)
+    for (std::pair<const int64_t, CTransactionRef> &item : mapSorted)
     {
-        CWalletTx &wtx = *(item.second);
-
-        wtx.AcceptToMemoryPool(false);
-        SyncWithWallets(MakeTransactionRef(wtx), nullptr, -1);
+        CValidationState state;
+        AcceptToMemoryPool(mempool, state, item.second, false, nullptr, false, true, TransactionClass::DEFAULT);
+        SyncWithWallets(item.second, nullptr, -1);
     }
     CommitTxToMempool();
 }
@@ -3582,27 +3581,14 @@ CWalletKey::CWalletKey(int64_t nExpires)
 int CMerkleTx::SetMerkleBranch(const CBlock &block, int txIdx)
 {
     AssertLockHeld(cs_main); // for chainActive
-    // if a bad txIdx is passed, then in release builds set the tx index to "I don't know". In debug builds assert.
-    DbgAssert(txIdx >= -1, txIdx = -1);
+    // txIdx never == -1 since the caller already know txIdx
+    assert(txIdx >= 0);
     CBlock blockTmp;
 
     // Update the tx's hashBlock
     hashBlock = block.GetHash();
-
-    if (txIdx != -1)
-    {
-        nIndex = txIdx;
-    }
-    else
-    {
-        // Locate the transaction
-        nIndex = block.find(((CTransactionRef) this)->GetHash());
-        if (nIndex == -1)
-        {
-            LOGA("ERROR: SetMerkleBranch(): couldn't find tx in block\n");
-            return 0;
-        }
-    }
+    // Set the position of the transaction in the block
+    nIndex = txIdx;
 
     // Is the tx in a block that's in the main chain
     const CBlockIndex *pindex = LookupBlockIndex(hashBlock);

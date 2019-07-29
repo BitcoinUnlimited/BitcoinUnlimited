@@ -1,11 +1,11 @@
 // Copyright (c) 2012-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "bloom.h"
 
-#include "hash.h"
+#include "hashwrapper.h"
 #include "primitives/transaction.h"
 #include "random.h"
 #include "script/script.h"
@@ -182,7 +182,7 @@ bool CBloomFilter::IsWithinSizeConstraints() const
     return vData.size() <= SMALLEST_MAX_BLOOM_FILTER_SIZE && nHashFuncs <= MAX_HASH_FUNCS;
 }
 
-bool CBloomFilter::IsRelevantAndUpdate(const CTransactionRef &tx)
+bool CBloomFilter::MatchAndInsertOutputs(const CTransactionRef &tx)
 {
     bool fFound = false;
     // Match if the filter contains the hash of tx
@@ -227,9 +227,13 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransactionRef &tx)
         }
     }
 
-    if (fFound)
-        return true;
+    return (fFound);
+}
 
+bool CBloomFilter::MatchInputs(const CTransactionRef &tx)
+{
+    if (isEmpty)
+        return false;
     for (const CTxIn &txin : tx->vin)
     {
         // Match if the filter contains an outpoint tx spends

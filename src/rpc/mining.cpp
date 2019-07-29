@@ -1,6 +1,6 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -49,7 +49,7 @@ UniValue GetNetworkHashPS(int lookup, int height)
     if (height >= 0 && height < chainActive.Height())
         pb = chainActive[height];
 
-    if (pb == NULL || !pb->nHeight)
+    if (pb == nullptr || !pb->nHeight)
         return 0;
 
     // If lookup is -1, then use blocks since last difficulty change.
@@ -157,7 +157,7 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
         PV->StopAllValidationThreads(pblock->GetBlockHeader().nBits);
 
         CValidationState state;
-        if (!ProcessNewBlock(state, Params(), NULL, pblock, true, NULL, false))
+        if (!ProcessNewBlock(state, Params(), nullptr, pblock, true, nullptr, false))
             throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
         ++nHeight;
         blockHashes.push_back(pblock->GetHash().GetHex());
@@ -530,8 +530,8 @@ params
 coinbaseSize -Set the size of coinbase if >=0
 
 Outputs:
-returns JSON if pblockOut is NULL
-pblockOut -A copy of the block if not NULL
+returns JSON if pblockOut is nullptr
+pblockOut -A copy of the block if not nullptr
 */
 
 bool forceTemplateRecalc GUARDED_BY(cs_main) = false;
@@ -577,6 +577,7 @@ UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *p
             {
                 uint256 hash = block.GetHash();
                 CBlockIndex *pindex = LookupBlockIndex(hash);
+                READLOCK(cs_mapBlockIndex);
                 if (pindex)
                 {
                     if (pindex->IsValid(BLOCK_VALID_SCRIPTS))
@@ -678,7 +679,7 @@ UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *p
     }
 
     // Update block
-    static CBlockIndex *pindexPrev = NULL;
+    static CBlockIndex *pindexPrev = nullptr;
     static int64_t nStart = 0;
     static std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
     if (pindexPrev != chainActive.Tip() || forceTemplateRecalc ||
@@ -686,7 +687,7 @@ UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *p
     {
         forceTemplateRecalc = false;
         // Clear pindexPrev so future calls make a new block, despite any failures from here on
-        pindexPrev = NULL;
+        pindexPrev = nullptr;
 
         // Store the pindexBest used before CreateNewBlock, to avoid races
         nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
@@ -853,6 +854,7 @@ UniValue SubmitBlock(CBlock &block)
     bool fBlockPresent = false;
     {
         CBlockIndex *pindex = LookupBlockIndex(hash);
+        READLOCK(cs_mapBlockIndex);
         if (pindex)
         {
             if (pindex->IsValid(BLOCK_VALID_SCRIPTS))
@@ -875,7 +877,7 @@ UniValue SubmitBlock(CBlock &block)
     // that has more work than our block.
     PV->StopAllValidationThreads(block.GetBlockHeader().nBits);
 
-    bool fAccepted = ProcessNewBlock(state, Params(), NULL, &block, true, NULL, false);
+    bool fAccepted = ProcessNewBlock(state, Params(), nullptr, &block, true, nullptr, false);
     UnregisterValidationInterface(&sc);
     if (fBlockPresent)
     {

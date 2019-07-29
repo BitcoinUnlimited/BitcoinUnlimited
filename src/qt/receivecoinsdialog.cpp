@@ -114,7 +114,7 @@ void ReceiveCoinsDialog::clear()
     ui->freezeCheck->setChecked(false);
     ui->freezeCheck->setText("Coin &Freeze");
     nFreezeLockTime = CScriptNum(0);
-    freezeDialog = NULL;
+    freezeDialog = nullptr;
     updateDisplayUnit();
 }
 

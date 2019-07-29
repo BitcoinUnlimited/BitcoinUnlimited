@@ -1,3 +1,7 @@
+// Copyright (c) 2019 The Bitcoin Unlimited developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #ifndef BITCOIN_THREAD_GROUP_H
 #define BITCOIN_THREAD_GROUP_H
 
@@ -34,15 +38,10 @@ public:
         threads.clear();
     }
 
-    // In the destructor, detach any threads that are still running.
-    // We expect that you've cleaned them up if you want to, probably via join_all()
     ~thread_group()
     {
-        for (auto &t : threads)
-        {
-            if (t.joinable())
-                t.detach();
-        }
+        interrupt_all();
+        join_all();
     }
 };
 

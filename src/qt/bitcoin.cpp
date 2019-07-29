@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -259,7 +259,7 @@ void BitcoinCore::initialize(Config *cfg)
     }
     catch (...)
     {
-        handleRunawayException(NULL);
+        handleRunawayException(nullptr);
     }
 }
 
@@ -281,7 +281,7 @@ void BitcoinCore::shutdown()
     }
     catch (...)
     {
-        handleRunawayException(NULL);
+        handleRunawayException(nullptr);
     }
 }
 
@@ -336,7 +336,7 @@ void BitcoinApplication::createPlatformStyle()
 
 void BitcoinApplication::createOptionsModel(bool resetSettings)
 {
-    optionsModel = new OptionsModel(NULL, resetSettings);
+    optionsModel = new OptionsModel(nullptr, resetSettings);
     unlimitedModel = new UnlimitedModel(); // BU
 }
 
@@ -714,7 +714,7 @@ int main(int argc, char *argv[])
     // but before showing splash screen.
     if (mapArgs.count("-?") || mapArgs.count("-h") || mapArgs.count("-help") || mapArgs.count("-version"))
     {
-        HelpMessageDialog help(NULL, mapArgs.count("-version"));
+        HelpMessageDialog help(nullptr, mapArgs.count("-version"));
         help.showOrPrint();
         return EXIT_SUCCESS;
     }
@@ -836,7 +836,7 @@ int main(int argc, char *argv[])
     }
     catch (...)
     {
-        PrintExceptionContinue(NULL, "Runaway exception");
+        PrintExceptionContinue(nullptr, "Runaway exception");
         app.handleRunawayException(QString::fromStdString(strMiscWarning));
     }
 

@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -1016,8 +1016,8 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
         {
             CValidationState state;
             // Use the largest maxOps since this code is not meant to validate that constraint
-            assert(CheckInputs(
-                it->GetSharedTx(), state, mempoolDuplicate, false, 0, SV_MAX_OPS_PER_SCRIPT, false, nullptr));
+            assert(
+                CheckInputs(it->GetSharedTx(), state, mempoolDuplicate, false, 0, MAX_OPS_PER_SCRIPT, false, nullptr));
             UpdateCoins(tx, state, mempoolDuplicate, 1000000);
         }
     }
@@ -1037,7 +1037,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
         {
             // Use the largest maxOps since this code is not meant to validate that constraint
             assert(CheckInputs(
-                entry->GetSharedTx(), state, mempoolDuplicate, false, 0, SV_MAX_OPS_PER_SCRIPT, false, nullptr));
+                entry->GetSharedTx(), state, mempoolDuplicate, false, 0, MAX_OPS_PER_SCRIPT, false, nullptr));
             UpdateCoins(entry->GetTx(), state, mempoolDuplicate, 1000000);
             stepsSinceLastRemove = 0;
         }

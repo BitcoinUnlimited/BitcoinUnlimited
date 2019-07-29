@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -187,7 +188,7 @@ unsigned int base_uint<BITS>::bits() const
         {
             for (int bits = 31; bits > 0; bits--)
             {
-                if (pn[pos] & 1 << bits)
+                if (pn[pos] & 1U << bits)
                     return 32 * pos + bits + 1;
             }
             return 32 * pos + 1;

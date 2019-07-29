@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -227,7 +227,7 @@ public:
      * @return True if handling succeeded
      */
     static bool HandleMessage(CDataStream &vRecv, CNode *pfrom);
-    bool process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pblock);
+    bool process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock);
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
     uint64_t GetShortID(const uint256 &txhash) const;
 
@@ -284,7 +284,7 @@ public:
     }
 };
 
-void validateCompactBlock(const CompactBlock &cmpctblock);
+void validateCompactBlock(std::shared_ptr<CompactBlock> cmpctblock);
 
 
 // This struct is so we can obtain a quick summar of stats for UI display purposes
@@ -303,13 +303,18 @@ struct CompactBlockQuickStats
     double fLast24hOutboundCompression;
     uint64_t nLast24hRerequestTx;
     double fLast24hRerequestTxPercent;
+    CompactBlockQuickStats()
+        : nTotalInbound(0), nTotalOutbound(0), nTotalBandwidthSavings(0), nLast24hInbound(0),
+          fLast24hInboundCompression(0.0), nLast24hOutbound(0), fLast24hOutboundCompression(0.0),
+          nLast24hRerequestTx(0), fLast24hRerequestTxPercent(0.0)
+    {
+    }
 };
 
 // This class stores statistics for compact block derived protocols.
 class CCompactBlockData
 {
 private:
-
     CCriticalSection cs_compactblockstats; // locks everything below this point
 
     CStatHistory<uint64_t> nOriginalSize;
@@ -404,7 +409,7 @@ extern CCompactBlockData compactdata; // Singleton class
 
 bool IsCompactBlocksEnabled();
 void SendCompactBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv);
-bool IsCompactBlockValid(CNode *pfrom, const CompactBlock &cmpctblock);
+bool IsCompactBlockValid(CNode *pfrom, std::shared_ptr<CompactBlock> compactBlock);
 
 // Xpress Validation: begin
 // Transactions that have already been accepted into the memory pool do not need to be

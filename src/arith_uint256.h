@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -282,7 +283,7 @@ public:
      * complexities of the sign bit and using base 256 are probably an
      * implementation accident.
      */
-    arith_uint256 &SetCompact(uint32_t nCompact, bool *pfNegative = NULL, bool *pfOverflow = NULL);
+    arith_uint256 &SetCompact(uint32_t nCompact, bool *pfNegative = nullptr, bool *pfOverflow = nullptr);
     uint32_t GetCompact(bool fNegative = false) const;
 
     friend uint256 ArithToUint256(const arith_uint256 &);

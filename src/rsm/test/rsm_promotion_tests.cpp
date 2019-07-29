@@ -4,14 +4,12 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "recursive_shared_mutex.h"
-#include "utiltime.h"
-
-#include "test/test_bitcoin.h"
+#include "test_cxx_rsm.h"
+#include "timer.h"
 
 #include <boost/test/unit_test.hpp>
 
-
-BOOST_FIXTURE_TEST_SUITE(rsm_promotion_tests, BasicTestingSetup)
+BOOST_FIXTURE_TEST_SUITE(rsm_promotion_tests, TestSetup)
 
 recursive_shared_mutex rsm;
 std::vector<int> rsm_guarded_vector;

@@ -199,6 +199,11 @@ void saveWindowGeometry(const QString &strSetting, QWidget *parent);
 /** Restore window size and position */
 void restoreWindowGeometry(const QString &strSetting, const QSize &defaultSizeIn, QWidget *parent);
 
+/** Save table column header configuration */
+void saveColumnConfiguration(const QString &strSetting, QHeaderView *header);
+/** Restore table column header configuration */
+bool restoreColumnConfiguration(const QString &strSetting, QHeaderView *header);
+
 /* Convert QString to OS specific boost path through UTF-8 */
 fs::path qstringToBoostPath(const QString &path);
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -63,7 +63,7 @@ public:
     }
 
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
-    bool process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> &pblock);
+    bool process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock);
 
     uint64_t GetSize() const
     {
@@ -121,7 +121,7 @@ public:
         READWRITE(vMissingTx);
     }
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
-    bool process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> &pblock);
+    bool process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> pblock);
     bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state);
 
     uint64_t GetSize() const
@@ -208,6 +208,12 @@ struct ThinBlockQuickStats
     double fLast24hOutboundCompression;
     uint64_t nLast24hRerequestTx;
     double fLast24hRerequestTxPercent;
+    ThinBlockQuickStats()
+        : nTotalInbound(0), nTotalOutbound(0), nTotalBandwidthSavings(0), nLast24hInbound(0),
+          fLast24hInboundCompression(0.0), nLast24hOutbound(0), fLast24hOutboundCompression(0.0),
+          nLast24hRerequestTx(0), fLast24hRerequestTxPercent(0.0)
+    {
+    }
 };
 
 // This class stores statistics for thin block derived protocols.
@@ -317,7 +323,10 @@ extern CThinBlockData thindata; // Singleton class
 bool IsThinBlocksEnabled();
 void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv);
 void RequestThinBlock(CNode *pfrom, const uint256 &hash);
-bool IsThinBlockValid(CNode *pfrom, const std::vector<CTransaction> &vMissingTx, const CBlockHeader &header);
+bool IsThinBlockValid(CNode *pfrom,
+    const std::vector<CTransaction> &vMissingTx,
+    const CBlockHeader &header,
+    const uint64_t nHashes);
 void BuildSeededBloomFilter(CBloomFilter &memPoolFilter,
     std::vector<uint256> &vOrphanHashes,
     uint256 hash,

@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2011-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -173,8 +173,8 @@ void UnlimitedDialog::validateBlockSize()
 {
     ui.statusLabel->setStyleSheet("QLabel { color: red; }");
 
-    int mmb = ui.miningMaxBlock->text().toInt();
-    int ebs = excessiveBlockSize;
+    uint64_t mmb = ui.miningMaxBlock->text().toInt();
+    uint64_t ebs = excessiveBlockSize;
 
     if (!MiningAndExcessiveBlockValidatorRule(ebs, mmb))
     {

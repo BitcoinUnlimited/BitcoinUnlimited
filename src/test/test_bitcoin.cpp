@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -41,6 +41,10 @@ extern void noui_connect();
 
 BasicTestingSetup::BasicTestingSetup(const std::string &chainName)
 {
+    // Do not place the data created by these unit tests on top of any existing chain,
+    // by overriding datadir to use a temporary if it isn't already overridden
+    if (mapArgs.count("-datadir") == 0)
+        mapArgs["-datadir"] = GetTempPath().string();
     SHA256AutoDetect();
     ECC_Start();
     SetupEnvironment();
@@ -135,7 +139,7 @@ CBlock TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransa
         ++block.nNonce;
 
     CValidationState state;
-    ProcessNewBlock(state, chainparams, NULL, &block, true, NULL, false);
+    ProcessNewBlock(state, chainparams, nullptr, &block, true, nullptr, false);
 
     CBlock result = block;
     return result;
