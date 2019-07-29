@@ -142,6 +142,8 @@ stat.h
 streams.h
 sync.cpp
 sync.h
+threaddeadlock.cpp
+threaddeadlock.h
 threadgroup.h
 threadsafety.h
 timedata.cpp

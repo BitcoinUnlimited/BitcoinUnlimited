@@ -200,6 +200,7 @@ BITCOIN_CORE_H = \
   support/cleanse.h \
   support/pagelocker.h \
   sync.h \
+  threaddeadlock.h \
   threadgroup.h \
   threadsafety.h \
   timedata.h \
@@ -511,6 +512,7 @@ libbitcoin_util_a_SOURCES = \
   rpc/protocol.cpp \
   support/cleanse.cpp \
   sync.cpp \
+  threaddeadlock.cpp \
   ui_interface.cpp \
   util.cpp \
   utilmoneystr.cpp \
