@@ -20,29 +20,6 @@ void PrintLockContention(const char *pszName, const char *pszFile, unsigned int 
 }
 #endif /* DEBUG_LOCKCONTENTION */
 
-#ifdef DEBUG_LOCKORDER
-
-#ifdef __linux__
-#include <sys/syscall.h>
-uint64_t getTid(void)
-{
-    // "native" thread id used so the number correlates with what is shown in gdb
-    pid_t tid = (pid_t)syscall(SYS_gettid);
-    return tid;
-}
-#else
-#include <functional>
-uint64_t getTid(void)
-{
-    // Note: there is no guaranteed way to turn the thread-id into an int
-    // since it's an opaque type. Just about the only operation it supports
-    // is std::hash (so that thread id's may be placed in maps).
-    // So we just do this.
-    static std::hash<std::thread::id> hasher;
-    return uint64_t(hasher(std::this_thread::get_id()));
-}
-#endif
-
 void EnterCritical(const char *pszName, const char *pszFile, unsigned int nLine, void *cs, bool fTry)
 {
 }
