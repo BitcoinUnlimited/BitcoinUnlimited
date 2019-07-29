@@ -11,6 +11,10 @@
 #include "sync.h"
 #include "util.h"
 
+#ifdef DEBUG_LOCKORDER
+LockData lockdata;
+#endif
+
 int main(int argc, char **argv)
 {
     SHA256AutoDetect();

@@ -32,6 +32,7 @@
 #include "rpc/server.h"
 #include "script/standard.h"
 #include "stat.h"
+#include "threaddeadlock.h"
 #include "timedata.h"
 #include "tinyformat.h"
 #include "tweak.h"
@@ -57,6 +58,7 @@
 using namespace std;
 
 #ifdef DEBUG_LOCKORDER
+LockData lockdata;
 #endif
 
 

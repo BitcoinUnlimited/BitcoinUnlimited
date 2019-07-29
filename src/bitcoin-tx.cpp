@@ -30,6 +30,10 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/assign/list_of.hpp>
 
+#ifdef DEBUG_LOCKORDER
+LockData lockdata;
+#endif
+
 using namespace std;
 
 static bool fCreateBlank;

@@ -27,6 +27,10 @@
 
 #include <univalue.h>
 
+#ifdef DEBUG_LOCKORDER
+LockData lockdata;
+#endif
+
 using namespace std;
 
 int CommandLineRPC(int argc, char *argv[])
