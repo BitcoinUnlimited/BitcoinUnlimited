@@ -1295,6 +1295,14 @@ UniValue mempoolInfoToJSON()
     {
         ret.pushKV("tps", "N/A");
     }
+    try
+    {
+        ret.pushKV("peak_tps", std::stod(strprintf("%.2f", mempool.GetPeakRate())));
+    }
+    catch (...)
+    {
+        ret.pushKV("peak_tps", "N/A");
+    }
 
     return ret;
 }
@@ -1312,6 +1320,7 @@ UniValue getmempoolinfo(const UniValue &params, bool fHelp)
                             "  \"maxmempool\": xxxxx,         (numeric) Maximum memory usage for the mempool\n"
                             "  \"mempoolminfee\": xxxxx       (numeric) Minimum fee for tx to be accepted\n"
                             "  \"tps\": xxxxx                 (numeric) Transactions per second accepted\n"
+                            "  \"peak_tps\": xxxxx            (numeric) Peak Transactions per second accepted\n"
                             "}\n"
                             "\nExamples:\n" +
                             HelpExampleCli("getmempoolinfo", "") + HelpExampleRpc("getmempoolinfo", ""));

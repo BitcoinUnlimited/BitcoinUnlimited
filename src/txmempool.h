@@ -469,7 +469,8 @@ private:
     void trackPackageRemoved(const CFeeRate &rate);
 
     std::mutex cs_txPerSec;
-    double nTxPerSec; // BU: tx's per second accepted into the mempool
+    double nTxPerSec GUARDED_BY(cs_txPerSec); //! txns per second accepted into the mempool
+    double nPeakRate GUARDED_BY(cs_txPerSec); //! peak rate since startup for txns per second
 
 public:
     static const int ROLLING_FEE_HALFLIFE = 60 * 60 * 12; // public only for testing
@@ -696,6 +697,12 @@ public:
     {
         std::lock_guard<std::mutex> lock(cs_txPerSec);
         return nTxPerSec;
+    }
+
+    double GetPeakRate()
+    {
+        std::lock_guard<std::mutex> lock(cs_txPerSec);
+        return nPeakRate;
     }
 
     bool exists(const COutPoint &outpoint) const
