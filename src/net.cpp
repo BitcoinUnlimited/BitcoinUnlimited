@@ -76,6 +76,8 @@ extern CTweak<bool> ignoreNetTimeouts;
 extern std::atomic<bool> fRescan;
 extern bool fReindex;
 
+bool ShutdownRequested();
+
 using namespace std;
 
 namespace
@@ -1493,45 +1495,44 @@ void ThreadMapPort()
 
         string strDesc = "Bitcoin " + FormatFullVersion();
 
-        try
+        while (true)
         {
-            while (true)
-            {
 #ifndef UPNPDISCOVER_SUCCESS
-                /* miniupnpc 1.5 */
-                r = UPNP_AddPortMapping(urls.controlURL, data.first.servicetype, port.c_str(), port.c_str(), lanaddr,
-                    strDesc.c_str(), "TCP", 0);
+            /* miniupnpc 1.5 */
+            r = UPNP_AddPortMapping(urls.controlURL, data.first.servicetype, port.c_str(), port.c_str(), lanaddr,
+                strDesc.c_str(), "TCP", 0);
 #else
-                /* miniupnpc 1.6 */
-                r = UPNP_AddPortMapping(urls.controlURL, data.first.servicetype, port.c_str(), port.c_str(), lanaddr,
-                    strDesc.c_str(), "TCP", 0, "0");
+            /* miniupnpc 1.6 */
+            r = UPNP_AddPortMapping(urls.controlURL, data.first.servicetype, port.c_str(), port.c_str(), lanaddr,
+                strDesc.c_str(), "TCP", 0, "0");
 #endif
+            if (r != UPNPCOMMAND_SUCCESS)
+                LOGA("AddPortMapping(%s, %s, %s) failed with code %d (%s)\n", port, port, lanaddr, r, strupnperror(r));
+            else
+                LOGA("UPnP Port Mapping successful.\n");
 
-                if (r != UPNPCOMMAND_SUCCESS)
-                    LOGA("AddPortMapping(%s, %s, %s) failed with code %d (%s)\n", port, port, lanaddr, r,
-                        strupnperror(r));
-                else
-                    LOGA("UPnP Port Mapping successful.\n");
-                ;
-
-                MilliSleep(20 * 60 * 1000); // Refresh every 20 minutes
+            // Refresh every 20 minutes
+            for (int i = 1; i < 20 * 60; i++)
+            {
+                MilliSleep(1000);
+                if (ShutdownRequested())
+                {
+                    LOGA("interrupt caught and deleting portmapping\n");
+                    r = UPNP_DeletePortMapping(urls.controlURL, data.first.servicetype, port.c_str(), "TCP", 0);
+                    LOGA("UPNP_DeletePortMapping() returned: %d\n", r);
+                    freeUPNPDevlist(devlist);
+                    devlist = nullptr;
+                    FreeUPNPUrls(&urls);
+                    return;
+                }
             }
-        }
-        catch (const boost::thread_interrupted &)
-        {
-            r = UPNP_DeletePortMapping(urls.controlURL, data.first.servicetype, port.c_str(), "TCP", 0);
-            LOGA("UPNP_DeletePortMapping() returned: %d\n", r);
-            freeUPNPDevlist(devlist);
-            devlist = 0;
-            FreeUPNPUrls(&urls);
-            throw;
         }
     }
     else
     {
         LOGA("No valid UPnP IGDs found\n");
         freeUPNPDevlist(devlist);
-        devlist = 0;
+        devlist = nullptr;
         if (r != 0)
             FreeUPNPUrls(&urls);
     }
