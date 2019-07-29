@@ -149,5 +149,30 @@ CSharedCriticalSection::~CSharedCriticalSection()
 }
 #endif
 
+CRecursiveSharedCriticalSection::CRecursiveSharedCriticalSection() : name(nullptr) {}
+CRecursiveSharedCriticalSection::CRecursiveSharedCriticalSection(const char *n) : name(n)
+{
+// print the address of named critical sections so they can be found in the mutrace output
+#ifdef ENABLE_MUTRACE
+    if (name)
+    {
+        printf("CRecursiveSharedCriticalSection %s at %p\n", name, this);
+        fflush(stdout);
+    }
+#endif
+}
+
+CRecursiveSharedCriticalSection::~CRecursiveSharedCriticalSection()
+{
+#ifdef ENABLE_MUTRACE
+    if (name)
+    {
+        printf("Destructing CRecursiveSharedCriticalSection %s\n", name);
+        fflush(stdout);
+    }
+#endif
+    DeleteCritical((void *)this);
+}
+
 
 #endif /* DEBUG_LOCKORDER */
