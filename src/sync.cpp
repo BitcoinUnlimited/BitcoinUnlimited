@@ -22,26 +22,18 @@ void PrintLockContention(const char *pszName, const char *pszFile, unsigned int 
 
 #ifdef DEBUG_LOCKORDER // this ifdef covers the rest of the file
 
-void EnterCritical(const char *pszName, const char *pszFile, unsigned int nLine, void *cs, bool fTry)
+void EnterCritical(const char *pszName,
+    const char *pszFile,
+    unsigned int nLine,
+    void *cs,
+    LockType type,
+    bool isExclusive,
+    bool fTry)
 {
-}
-void LeaveCritical()
-{
-}
-void DeleteCritical(const void *cs)
-{
-}
-
-void AssertLockHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs)
-{
-
+    push_lock(cs, CLockLocation(pszName, pszFile, nLine, fTry, isExclusive), type, isExclusive, fTry);
 }
 
-void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs)
-{
-
-}
-
+void LeaveCritical(void *cs) { remove_lock_critical_exit(cs); }
 void AssertWriteLockHeldInternal(const char *pszName,
     const char *pszFile,
     unsigned int nLine,

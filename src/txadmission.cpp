@@ -406,7 +406,7 @@ void ThreadTxAdmission()
         CTxInputData txd;
 
         {
-            CCriticalBlock lock(csTxInQ, "csTxInQ", __FILE__, __LINE__);
+            CCriticalBlock lock(csTxInQ, "csTxInQ", __FILE__, __LINE__, LockType::RECURSIVE);
             while (txInQ.empty() && shutdown_threads.load() == false)
             {
                 if (shutdown_threads.load() == true)
@@ -429,7 +429,7 @@ void ThreadTxAdmission()
                 // tx must be popped within the TX_PROCESSING corral or the state break between processing
                 // and commitment will not be clean
                 {
-                    CCriticalBlock lock(csTxInQ, "csTxInQ", __FILE__, __LINE__);
+                    CCriticalBlock lock(csTxInQ, "csTxInQ", __FILE__, __LINE__, LockType::RECURSIVE);
                     if (txInQ.empty())
                     {
                         // speed up tx chunk processing when there is nothing else to do

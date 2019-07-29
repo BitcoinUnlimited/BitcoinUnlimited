@@ -521,7 +521,7 @@ static const size_t nMaxOutputsPerBlock =
 
 CoinAccessor::CoinAccessor(const CCoinsViewCache &view, const uint256 &txid) : cache(&view), lock(cache->csCacheInsert)
 {
-    EnterCritical("CCoinsViewCache.cs_utxo", __FILE__, __LINE__, (void *)(&cache->cs_utxo));
+    EnterCritical("CCoinsViewCache.cs_utxo", __FILE__, __LINE__, (void *)(&cache->cs_utxo), LockType::SHARED, false);
     cache->cs_utxo.lock_shared();
     COutPoint iter(txid, 0);
     coin = &emptyCoin;
@@ -540,7 +540,7 @@ CoinAccessor::CoinAccessor(const CCoinsViewCache &view, const uint256 &txid) : c
 CoinAccessor::CoinAccessor(const CCoinsViewCache &cacheObj, const COutPoint &output)
     : cache(&cacheObj), lock(cache->csCacheInsert)
 {
-    EnterCritical("CCoinsViewCache.cs_utxo", __FILE__, __LINE__, (void *)(&cache->cs_utxo));
+    EnterCritical("CCoinsViewCache.cs_utxo", __FILE__, __LINE__, (void *)(&cache->cs_utxo), LockType::SHARED, false);
     cache->cs_utxo.lock_shared();
     it = cache->FetchCoin(output, &lock);
     if (it != cache->cacheCoins.end())
@@ -553,13 +553,13 @@ CoinAccessor::~CoinAccessor()
 {
     coin = nullptr;
     cache->cs_utxo.unlock_shared();
-    LeaveCritical();
+    LeaveCritical(&cache->cs_utxo);
 }
 
 
 CoinModifier::CoinModifier(const CCoinsViewCache &cacheObj, const COutPoint &output) : cache(&cacheObj)
 {
-    EnterCritical("CCoinsViewCache.cs_utxo", __FILE__, __LINE__, (void *)(&cache->cs_utxo));
+    EnterCritical("CCoinsViewCache.cs_utxo", __FILE__, __LINE__, (void *)(&cache->cs_utxo), LockType::SHARED, true);
     cache->cs_utxo.lock();
     it = cache->FetchCoin(output, nullptr);
     if (it != cache->cacheCoins.end())
@@ -572,7 +572,7 @@ CoinModifier::~CoinModifier()
 {
     coin = nullptr;
     cache->cs_utxo.unlock();
-    LeaveCritical();
+    LeaveCritical(&cache->cs_utxo);
 }
 
 void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight)
