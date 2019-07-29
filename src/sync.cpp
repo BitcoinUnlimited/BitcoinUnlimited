@@ -20,6 +20,8 @@ void PrintLockContention(const char *pszName, const char *pszFile, unsigned int 
 }
 #endif /* DEBUG_LOCKCONTENTION */
 
+#ifdef DEBUG_LOCKORDER // this ifdef covers the rest of the file
+
 void EnterCritical(const char *pszName, const char *pszFile, unsigned int nLine, void *cs, bool fTry)
 {
 }
@@ -70,7 +72,6 @@ void AssertRecursiveWriteLockHeldInternal(const char *pszName,
 
 // BU normally CCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical
 // section from the lockorder map
-#ifdef DEBUG_LOCKORDER
 CCriticalSection::CCriticalSection() : name(nullptr) {}
 CCriticalSection::CCriticalSection(const char *n) : name(n)
 {
@@ -95,11 +96,9 @@ CCriticalSection::~CCriticalSection()
 #endif
     DeleteCritical((void *)this);
 }
-#endif
 
 // BU normally CSharedCriticalSection is a typedef, but when lockorder debugging is on we need to delete the critical
 // section from the lockorder map
-#ifdef DEBUG_LOCKORDER
 CSharedCriticalSection::CSharedCriticalSection() : name(nullptr) {}
 CSharedCriticalSection::CSharedCriticalSection(const char *n) : name(n)
 {
@@ -124,7 +123,6 @@ CSharedCriticalSection::~CSharedCriticalSection()
 #endif
     DeleteCritical((void *)this);
 }
-#endif
 
 CRecursiveSharedCriticalSection::CRecursiveSharedCriticalSection() : name(nullptr) {}
 CRecursiveSharedCriticalSection::CRecursiveSharedCriticalSection(const char *n) : name(n)
