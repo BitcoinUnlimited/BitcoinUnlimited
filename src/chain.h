@@ -8,6 +8,7 @@
 #define BITCOIN_CHAIN_H
 
 #include "arith_uint256.h"
+#include "sync.h"
 #include "pow.h"
 #include "primitives/block.h"
 #include "tinyformat.h"
@@ -16,6 +17,8 @@
 
 #include <atomic>
 #include <vector>
+
+extern CSharedCriticalSection cs_mapBlockIndex;
 
 class CBlockFileInfo
 {
@@ -334,6 +337,7 @@ public:
     //! Returns true if the validity was changed.
     bool RaiseValidity(enum BlockStatus nUpTo)
     {
+        AssertWriteLockHeld(cs_mapBlockIndex);
         assert(!(nUpTo & ~BLOCK_VALID_MASK)); // Only validity flags allowed.
         if (nStatus & BLOCK_FAILED_MASK)
             return false;
