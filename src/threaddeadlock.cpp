@@ -131,6 +131,7 @@ static bool ReadRecursiveCheck(const uint64_t &tid,
     {
         if (threadId == lastTid)
         {
+            // this continue fixes an infinite looping problem
             continue;
         }
         auto other_iter = lockdata.locksheldbythread.find(threadId);
@@ -223,6 +224,7 @@ static bool WriteRecursiveCheck(const uint64_t &tid,
     {
         if (threadId == lastTid)
         {
+            // this continue fixes an infinite looping problem
             continue;
         }
         auto other_iter = lockdata.locksheldbythread.find(threadId);
