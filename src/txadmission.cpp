@@ -689,11 +689,16 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         }
     }
 
-    const uint32_t schnorr_musig_flag =
-        (IsNov2019Enabled(chainparams.GetConsensus(), chainActive.Tip())) ? SCRIPT_ENABLE_SCHNORR_MULTISIG : 0;
-    const uint32_t cds_flag =
-        (IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip())) ? SCRIPT_ENABLE_CHECKDATASIG : 0;
-    const uint32_t featureFlags = cds_flag | schnorr_musig_flag;
+    uint32_t featureFlags = 0;
+    if (IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip()))
+    {
+        featureFlags |= SCRIPT_ENABLE_CHECKDATASIG;
+    }
+    if (IsNov2019Enabled(chainparams.GetConsensus(), chainActive.Tip()))
+    {
+        featureFlags |= SCRIPT_ENABLE_SCHNORR_MULTISIG;
+        featureFlags |= SCRIPT_VERIFY_MINIMALDATA;
+    }
 
     uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;
 

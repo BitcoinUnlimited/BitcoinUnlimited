@@ -1834,6 +1834,7 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
     if (IsNov2019Enabled(consensusparams, pindex->pprev))
     {
         flags |= SCRIPT_ENABLE_SCHNORR_MULTISIG;
+        flags |= SCRIPT_VERIFY_MINIMALDATA;
     }
 
     return flags;
