@@ -47,7 +47,12 @@ void Thread3()
     BOOST_CHECK_THROW(WRITELOCK(mutexA), std::logic_error); // 6
 }
 
-
+// Thread 1 shared lock A
+// Thread 2 shared lock B
+// Thread 3 shared lock C
+// Thread 1 request exclusive lock on B
+// Thread 2 request exclusive lock on C
+// Thread 3 request exclusive lock on A, should deadlock here
 BOOST_AUTO_TEST_CASE(TEST_7)
 {
     std::thread thread1(Thread1);

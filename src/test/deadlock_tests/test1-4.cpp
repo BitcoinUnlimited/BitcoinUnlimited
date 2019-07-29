@@ -17,6 +17,9 @@
 
 BOOST_FIXTURE_TEST_SUITE(self_deadlock_tests, EmptySuite)
 
+// shared lock a shared mutex
+// then try to exclusive lock the same shared mutex while holding shared lock,
+// should self deadlock
 BOOST_AUTO_TEST_CASE(TEST_1_SM)
 {
     CSharedCriticalSection shared_mutex;
@@ -24,6 +27,9 @@ BOOST_AUTO_TEST_CASE(TEST_1_SM)
     BOOST_CHECK_THROW(WRITELOCK(shared_mutex), std::logic_error);
 }
 
+// shared lock a RSM
+// then try to exclusive lock the RSM while holding shared lock, no promotion,
+// should self deadlock
 BOOST_AUTO_TEST_CASE(TEST_1_RSM)
 {
     CRecursiveSharedCriticalSection rsm;
@@ -31,6 +37,9 @@ BOOST_AUTO_TEST_CASE(TEST_1_RSM)
     BOOST_CHECK_THROW(RECURSIVEWRITELOCK(rsm), std::logic_error);
 }
 
+// exclusive lock a shared mutex
+// then try to shared lock the same shared mutex while holding the exclusive
+// lock, should self deadlock
 BOOST_AUTO_TEST_CASE(TEST_2)
 {
     CSharedCriticalSection shared_mutex;
@@ -38,6 +47,9 @@ BOOST_AUTO_TEST_CASE(TEST_2)
     BOOST_CHECK_THROW(READLOCK(shared_mutex), std::logic_error);
 }
 
+// shared lock a shared mutex
+// then try to shared lock the same shared mutex while holding the original
+// shared lock, should self deadlock, no recursion allowed in a shared mutex
 BOOST_AUTO_TEST_CASE(TEST_3)
 {
     CSharedCriticalSection shared_mutex;
@@ -45,6 +57,9 @@ BOOST_AUTO_TEST_CASE(TEST_3)
     BOOST_CHECK_THROW(READLOCK(shared_mutex), std::logic_error);
 }
 
+// exclusive lock a shared mutex
+// then try to exclusive likc the same shared mutex while holding the original
+// exclusive lock, should self deadlock, no recursion allowed in a shared mutex
 BOOST_AUTO_TEST_CASE(TEST_4)
 {
     CSharedCriticalSection shared_mutex;
