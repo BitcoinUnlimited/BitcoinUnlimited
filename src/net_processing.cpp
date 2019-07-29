@@ -2517,7 +2517,19 @@ bool SendMessages(CNode *pto)
         }
 
         // If the chain is not entirely sync'd then look for new blocks to download.
-        if (!IsChainSyncd())
+        //
+        // Also check an edge condition, where we've invalidated a chain and set the pindexBestHeader to the
+        // new most work chain, as a result we may end up just connecting whatever blocks are in setblockindexcandidates
+        // resulting in pindexBestHeader equalling the chainActive.Tip() causing us to stop checking for more blocks to
+        // download (our chain will now not sync until the next block announcement is received). Therefore, if the
+        // best invalid chain work is still greater than our chaintip then we have to keep looking for more blocks
+        // to download.
+        //
+        // Use temporaries for the chain tip and best invalid because they are both atomics and either could
+        // be nullified between the two calls.
+        CBlockIndex *pTip = chainActive.Tip();
+        CBlockIndex *pBestInvalid = pindexBestInvalid.load();
+        if (!IsChainSyncd() || (pBestInvalid && pTip && pBestInvalid->nChainWork > pTip->nChainWork))
         {
             TRY_LOCK(cs_main, locked);
             if (locked)
