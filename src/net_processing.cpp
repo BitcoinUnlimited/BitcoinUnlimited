@@ -991,7 +991,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 // RE !IsInitialBlockDownload(): during IBD, its a waste of bandwidth to grab transactions, they will
                 // likely be included in blocks that we IBD download anyway.  This is especially important as
                 // transaction volumes increase.
-                else if (!fAlreadyHaveTx && !IsInitialBlockDownload())
+                else if (!fAlreadyHaveTx /* && !IsInitialBlockDownload()*/)
                     requester.AskFor(inv, pfrom);
             }
 
