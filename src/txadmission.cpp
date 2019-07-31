@@ -221,7 +221,7 @@ void ThreadCommitToMempool()
 
                 // The flush to disk above is only periodic therefore we need to check if we need to trim
                 // any excess from the cache.
-                if (pcoinsTip->DynamicMemoryUsage() > nCoinCacheMaxSize)
+                if (pcoinsTip->DynamicMemoryUsage() > (size_t)nCoinCacheMaxSize)
                     pcoinsTip->Trim(nCoinCacheMaxSize * .95);
             }
 
