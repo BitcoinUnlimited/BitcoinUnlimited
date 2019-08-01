@@ -193,7 +193,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     CTxProperties *txProps = nullptr);
 
 /** Checks the size of the mempool and trims it if needed */
-void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age);
+void LimitMempoolSize(CTxMemPool &pool, size_t limit, int64_t age);
 
 // Return > 0 if its likely that we have already dealt with this transaction. inv MUST be MSG_TX type.
 unsigned int TxAlreadyHave(const CInv &inv);

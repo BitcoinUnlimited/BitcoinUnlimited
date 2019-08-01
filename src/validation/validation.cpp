@@ -1462,7 +1462,7 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
     }
 
     LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
-        GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+        GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 1000000);
 
     // The resulting new best tip may not be in setBlockIndexCandidates anymore, so
     // add it again.
@@ -3553,7 +3553,7 @@ bool ActivateBestChainStep(CValidationState &state,
     if (fBlocksDisconnected)
     {
         LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
-            GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+            GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 1000000);
     }
     mempool.check(pcoinsTip);
 
