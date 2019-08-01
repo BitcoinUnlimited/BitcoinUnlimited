@@ -192,15 +192,15 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
 {
     std::unique_ptr<CBlockTemplate> tmpl(nullptr);
 
-    if (nBlockMaxSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
-        tmpl = CreateNewBlock(scriptPubKeyIn, false, coinbaseSize);
+    // if (nBlockMaxSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
+    tmpl = CreateNewBlock(scriptPubKeyIn, false, coinbaseSize);
 
     // If the block is too small we need to drop back to the 1MB ruleset
-    if ((!tmpl) || (tmpl->block->GetBlockSize() <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
-    {
-        nBlockMaxSize = BLOCKSTREAM_CORE_MAX_BLOCK_SIZE;
-        tmpl = CreateNewBlock(scriptPubKeyIn, true, coinbaseSize);
-    }
+    /*if ((!tmpl) || (tmpl->block->GetBlockSize() <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
+{
+    nBlockMaxSize = BLOCKSTREAM_CORE_MAX_BLOCK_SIZE;
+    tmpl = CreateNewBlock(scriptPubKeyIn, true, coinbaseSize);
+    }*/
 
     return tmpl;
 }
