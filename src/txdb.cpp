@@ -709,7 +709,6 @@ void GetCacheConfiguration(int64_t &_nBlockDBCache,
     int64_t &_nBlockUndoDBcache,
     int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
-    int64_t &_nCoinCacheMaxSize,
     bool fDefault)
 {
 #ifdef WIN32
@@ -749,16 +748,14 @@ void GetCacheConfiguration(int64_t &_nBlockDBCache,
     }
 
     // Now that we have the nTotalCache we can calculate all the various cache sizes.
-    CacheSizeCalculations(
-        nTotalCache, _nBlockDBCache, _nBlockUndoDBcache, _nBlockTreeDBCache, _nCoinDBCache, _nCoinCacheMaxSize);
+    CacheSizeCalculations(nTotalCache, _nBlockDBCache, _nBlockUndoDBcache, _nBlockTreeDBCache, _nCoinDBCache);
 }
 
 void CacheSizeCalculations(int64_t _nTotalCache,
     int64_t &_nBlockDBCache,
     int64_t &_nBlockUndoDBcache,
     int64_t &_nBlockTreeDBCache,
-    int64_t &_nCoinDBCache,
-    int64_t &_nCoinCacheMaxSize)
+    int64_t &_nCoinDBCache)
 {
     // make sure total cache is within limits
     _nTotalCache = std::max(_nTotalCache, nMinDbCache << 20); // total cache cannot be less than nMinDbCache
@@ -795,9 +792,9 @@ void CacheSizeCalculations(int64_t _nTotalCache,
     _nTotalCache -= _nBlockUndoDBcache;
     _nCoinDBCache = std::min(_nTotalCache / 2, (_nTotalCache / 4) + (1 << 23));
 
-    // the remainder goes to the in-memory utxo coins cache
+    // the remainder goes to the global in-memory utxo coins cache max size
     _nTotalCache -= _nCoinDBCache;
-    _nCoinCacheMaxSize = _nTotalCache;
+    nCoinCacheMaxSize = _nTotalCache;
 }
 
 void AdjustCoinCacheSize()
@@ -806,14 +803,10 @@ void AdjustCoinCacheSize()
 
     // If the operator has not set a dbcache and initial sync is complete then revert back to the default
     // value for dbcache. This will cause the current coins cache to be immediately trimmed to size.
-    if (!IsInitialBlockDownload() && !GetArg("-dbcache", 0) && chainActive.Tip())
+    if (!IsInitialBlockDownload() && IsChainSyncd() && !GetArg("-dbcache", 0) && chainActive.Tip())
     {
-        // Get the default value for nCoinCacheMaxSize.
-        int64_t dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache = 0;
-        CacheSizeCalculations(
-            nDefaultDbCache, dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
-        nCoinCacheMaxSize = nMaxCoinCache;
-
+        int64_t dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache = 0;
+        GetCacheConfiguration(dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, true);
         return;
     }
 
@@ -851,11 +844,11 @@ void AdjustCoinCacheSize()
         {
             // Get the lowest possible default coins cache configuration possible and use this value as a limiter
             // to prevent the nCoinCacheMaxSize from falling below this value.
-            int64_t dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache = 0;
-            GetCacheConfiguration(
-                dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache, true);
+            int64_t dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache = 0;
+            GetCacheConfiguration(dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, true);
 
-            nCoinCacheMaxSize = std::max(nDefaultCoinCache, nCoinCacheMaxSize - (nUnusedMem - nMemAvailable));
+            nCoinCacheMaxSize =
+                std::max((int64_t)nCoinCacheMaxSize, (int64_t)(nCoinCacheMaxSize - (nUnusedMem - nMemAvailable)));
             LOG(COINDB, "Current cache size: %ld MB, nCoinCacheMaxSize was reduced by %u MB\n",
                 nCoinCacheMaxSize / 1000000, (nUnusedMem - nMemAvailable) / 1000000);
             nLastDbAdjustment = nNow;
@@ -869,11 +862,12 @@ void AdjustCoinCacheSize()
         {
             // find the max coins cache possible for this configuration.  Use the max int possible for total cache
             // size to ensure you receive the max cache size possible.
-            int64_t dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache = 0;
+            int64_t dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache = 0;
             CacheSizeCalculations(std::numeric_limits<long long>::max(), dummyBlockCache, dummyUndoCache,
-                dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
+                dummyBIDiskCache, dummyUtxoDiskCache);
 
-            nCoinCacheMaxSize = std::min(nMaxCoinCache, nCoinCacheMaxSize + (nMemAvailable - nLastMemAvailable));
+            nCoinCacheMaxSize = std::min(
+                (int64_t)nCoinCacheMaxSize, (int64_t)(nCoinCacheMaxSize + (nMemAvailable - nLastMemAvailable)));
             LOG(COINDB, "Current cache size: %ld MB, nCoinCacheMaxSize was increased by %u MB\n",
                 nCoinCacheMaxSize / 1000000, (nMemAvailable - nLastMemAvailable) / 1000000);
             nLastDbAdjustment = nNow;
