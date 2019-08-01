@@ -1086,8 +1086,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     int64_t nBlockTreeDBCache = 0;
     int64_t nCoinDBCache = 0;
     int64_t nTxIndexCache = 0;
-    GetCacheConfiguration(
-        nBlockDBCache, nBlockUndoDBCache, nBlockTreeDBCache, nCoinDBCache, nCoinCacheMaxSize, nTxIndexCache);
+    GetCacheConfiguration(nBlockDBCache, nBlockUndoDBCache, nBlockTreeDBCache, nCoinDBCache, nTxIndexCache);
     LOGA("Cache configuration:\n");
     LOGA("* Using %.1fMiB for block database\n", nBlockDBCache * (1.0 / 1024 / 1024));
     LOGA("* Using %.1fMiB for block undo database\n", nBlockUndoDBCache * (1.0 / 1024 / 1024));
