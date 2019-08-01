@@ -1445,8 +1445,8 @@ void ThreadSocketHandler()
     }
 }
 
-
 #ifdef USE_UPNP
+static bool fShutdownUPnP = false;
 void ThreadMapPort()
 {
     std::string port = strprintf("%u", GetListenPort());
@@ -1515,7 +1515,7 @@ void ThreadMapPort()
             for (int i = 1; i < 20 * 60; i++)
             {
                 MilliSleep(1000);
-                if (ShutdownRequested())
+                if (ShutdownRequested() || fShutdownUPnP)
                 {
                     LOGA("interrupt caught and deleting portmapping\n");
                     r = UPNP_DeletePortMapping(urls.controlURL, data.first.servicetype, port.c_str(), "TCP", 0);
@@ -1546,13 +1546,16 @@ void MapPort(bool fUseUPnP)
     {
         if (upnp_thread)
         {
+            fShutdownUPnP = true;
             upnp_thread->join();
             delete upnp_thread;
         }
+        fShutdownUPnP = false;
         upnp_thread = new std::thread(std::bind(&TraceThread<void (*)()>, "upnp", &ThreadMapPort));
     }
     else if (upnp_thread)
     {
+        fShutdownUPnP = true;
         upnp_thread->join();
         delete upnp_thread;
         upnp_thread = nullptr;
