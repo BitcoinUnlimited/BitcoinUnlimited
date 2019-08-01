@@ -21,7 +21,7 @@
 
 #include <boost/test/unit_test.hpp>
 
-extern void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age);
+extern void LimitMempoolSize(CTxMemPool &pool, size_t limit, int64_t age);
 
 BOOST_AUTO_TEST_SUITE(txvalidationcache_tests) // BU harmonize suite name with filename
 

@@ -214,7 +214,7 @@ void ThreadCommitToMempool()
                 CommitTxToMempool();
                 LOG(MEMPOOL, "MemoryPool sz %u txn, %u kB\n", mempool.size(), mempool.DynamicMemoryUsage() / 1000);
                 LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
-                    GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+                    GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 1000000);
 
                 CValidationState state;
                 FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
@@ -228,10 +228,10 @@ void ThreadCommitToMempool()
     }
 }
 
-void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age)
+void LimitMempoolSize(CTxMemPool &pool, size_t limit, int64_t age)
 {
     std::vector<COutPoint> vCoinsToUncache;
-    int expired = pool.Expire(GetTime() - age, vCoinsToUncache);
+    int expired = pool.Expire(GetTimeMicros() - age, vCoinsToUncache);
     for (const COutPoint &txin : vCoinsToUncache)
         pcoinsTip->Uncache(txin);
     if (expired != 0)
@@ -565,7 +565,7 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     {
         CommitTxToMempool();
         LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
-            GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+            GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 1000000);
     }
     return res;
 }
