@@ -17,6 +17,8 @@
 
 BOOST_FIXTURE_TEST_SUITE(self_deadlock_tests, EmptySuite)
 
+#ifdef DEBUG_LOCKORDER // this ifdef covers the rest of the file
+
 // shared lock a shared mutex
 // then try to exclusive lock the same shared mutex while holding shared lock,
 // should self deadlock
@@ -66,5 +68,14 @@ BOOST_AUTO_TEST_CASE(TEST_4)
     WRITELOCK(shared_mutex);
     BOOST_CHECK_THROW(WRITELOCK(shared_mutex), std::logic_error);
 }
+
+#else
+
+BOOST_AUTO_TEST_CASE(EMPTY_TEST_1_4)
+{
+
+}
+
+#endif
 
 BOOST_AUTO_TEST_SUITE_END()
