@@ -230,41 +230,6 @@ void PrintLockContention(const char *pszName, const char *pszFile, unsigned int 
 
 #define LOCK_WARN_TIME (500ULL * 1000ULL * 1000ULL)
 
-// This class unlocks a shared lock for the duration of its life
-class CSharedUnlocker
-{
-    CSharedCriticalSection &cs;
-#ifdef DEBUG_LOCKORDER
-    const char *pszName;
-    const char *pszFile;
-    unsigned int nLine;
-#endif
-
-public:
-#ifdef DEBUG_LOCKORDER
-    CSharedUnlocker(CSharedCriticalSection &c) : cs(c), pszName(""), pszFile("")
-#else
-    CSharedUnlocker(CSharedCriticalSection &c) : cs(c)
-#endif
-    {
-#ifdef DEBUG_LOCKORDER
-        nLine = 0;
-        LeaveCritical((void *)(&cs));
-#endif
-        cs.unlock_shared();
-    }
-    ~CSharedUnlocker()
-    {
-#ifdef DEBUG_LOCKORDER
-        EnterCritical(pszName, pszFile, nLine, (void *)(&cs), LockType::SHARED, false, false);
-#endif
-        cs.lock_shared();
-#ifdef DEBUG_LOCKORDER
-        SetWaitingToHeld((void *)(&cs), false);
-#endif
-    }
-};
-
 /** Wrapper around boost::unique_lock<Mutex> */
 template <typename Mutex>
 class SCOPED_LOCKABLE CMutexLock

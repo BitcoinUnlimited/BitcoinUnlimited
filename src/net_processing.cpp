@@ -747,27 +747,22 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     // messages during the initial (x)version handshake).
     else if (strCommand == NetMsgType::PING)
     {
-        // take the lock exclusively to force a serialization point
-        CSharedUnlocker unl(pfrom->csMsgSerializer);
-        {
-            WRITELOCK(pfrom->csMsgSerializer);
-            uint64_t nonce = 0;
-            vRecv >> nonce;
-            // although PONG was enabled in BIP31, all clients should handle it at this point
-            // and unknown messages are silently dropped.  So for simplicity, always respond with PONG
-            // Echo the message back with the nonce. This allows for two useful features:
-            //
-            // 1) A remote node can quickly check if the connection is operational
-            // 2) Remote nodes can measure the latency of the network thread. If this node
-            //    is overloaded it won't respond to pings quickly and the remote node can
-            //    avoid sending us more work, like chain download requests.
-            //
-            // The nonce stops the remote getting confused between different pings: without
-            // it, if the remote node sends a ping once per second and this node takes 5
-            // seconds to respond to each, the 5th ping the remote sends would appear to
-            // return very quickly.
-            pfrom->PushMessage(NetMsgType::PONG, nonce);
-        }
+        uint64_t nonce = 0;
+        vRecv >> nonce;
+        // although PONG was enabled in BIP31, all clients should handle it at this point
+        // and unknown messages are silently dropped.  So for simplicity, always respond with PONG
+        // Echo the message back with the nonce. This allows for two useful features:
+        //
+        // 1) A remote node can quickly check if the connection is operational
+        // 2) Remote nodes can measure the latency of the network thread. If this node
+        //    is overloaded it won't respond to pings quickly and the remote node can
+        //    avoid sending us more work, like chain download requests.
+        //
+        // The nonce stops the remote getting confused between different pings: without
+        // it, if the remote node sends a ping once per second and this node takes 5
+        // seconds to respond to each, the 5th ping the remote sends would appear to
+        // return very quickly.
+        pfrom->PushMessage(NetMsgType::PONG, nonce);
     }
 
     // ------------------------- END INITIAL COMMAND SET PROCESSING
