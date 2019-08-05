@@ -37,11 +37,6 @@
 // SLAPI int myExportedFunc(unsigned char *buf, int num);
 #define SLAPI extern "C" __attribute__((visibility("default")))
 
-#ifdef DEBUG
-#define DEBUG_ASSERTION
-#define DEBUG_PAUSE
-#endif
-
 #ifdef DEBUG_ASSERTION
 /// If DEBUG_ASSERTION is enabled this asserts when the predicate is false.
 //  If DEBUG_ASSERTION is disabled and the predicate is false, it executes the execInRelease statements.

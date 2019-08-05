@@ -241,7 +241,7 @@ AC_LANG_PUSH([C++])
 AX_CHECK_COMPILE_FLAG([-Werror],[CXXFLAG_WERROR="-Werror"],[CXXFLAG_WERROR=""])
 
 if test "x$enable_debug" = xyes; then
-    CPPFLAGS="$CPPFLAGS -DDEBUG -DDEBUG_LOCKORDER -DRSM_DEBUG_ASSERTION"
+    CPPFLAGS="$CPPFLAGS -DDEBUG -DDEBUG_LOCKORDER -DRSM_DEBUG_ASSERTION -DDEBUG_ASSERTION -DDEBUG_PAUSE"
 
     # Clear default -g -O2 flags
     if test "x$CXXFLAGS_overridden" = xno; then
