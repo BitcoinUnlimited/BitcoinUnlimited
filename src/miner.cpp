@@ -42,6 +42,7 @@ std::atomic<int64_t> nTotalScore{0};
 
 /** Maximum number of failed attempts to insert a package into a block */
 static const unsigned int MAX_PACKAGE_FAILURES = 5;
+extern CTweak<unsigned int> xvalTweak;
 
 using namespace std;
 
@@ -326,7 +327,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     // All the transactions in this block are from the mempool and therefore we can use XVal to speed
     // up the testing of the block validity. Set XVal flag for new blocks to true unless otherwise
     // configured.
-    pblock->fXVal = GetBoolArg("-xval", true);
+    pblock->fXVal = xvalTweak.Value();
 
     CValidationState state;
     if (blockstreamCoreCompatible)
