@@ -159,6 +159,7 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
 
     CInv inv(MSG_BLOCK, compactBlock->header.GetHash());
+    requester.UpdateBlockAvailability(pfrom->GetId(), inv.hash);
     LOG(CMPCT, "received compact block %s from peer %s of %d bytes\n", inv.hash.ToString(), pfrom->GetLogName(),
         compactBlock->GetSize());
 

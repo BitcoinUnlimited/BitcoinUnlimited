@@ -95,6 +95,7 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
 
     CInv inv(MSG_BLOCK, thinBlock->header.GetHash());
+    requester.UpdateBlockAvailability(pfrom->GetId(), inv.hash);
     LOG(THIN, "received thinblock %s from peer %s of %d bytes\n", inv.hash.ToString(), pfrom->GetLogName(),
         thinBlock->GetSize());
 
