@@ -692,7 +692,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                     if (!ss.coins->HaveCoinInCache(txin.prevout, fSpent))
                     {
                         vCoinsToUncache.push_back(txin.prevout);
-                        if (!view.HaveCoin(txin.prevout))
+                        if (!view.GetCoinFromDB(txin.prevout))
                         {
                             fMissingOrSpent = true;
                         }

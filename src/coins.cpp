@@ -198,6 +198,31 @@ bool CCoinsViewCache::HaveCoin(const COutPoint &outpoint) const
     return (it != cacheCoins.end() && !it->second.coin.IsSpent());
 }
 
+bool CCoinsViewCache::GetCoinFromDB(const COutPoint &outpoint) const
+{
+    Coin coin;
+    if (!base->GetCoin(outpoint, coin))
+        return false;
+
+    WRITELOCK(cs_utxo);
+    CCoinsMap::iterator ret =
+        cacheCoins
+            .emplace(std::piecewise_construct, std::forward_as_tuple(outpoint), std::forward_as_tuple(std::move(coin)))
+            .first;
+    if (ret->second.coin.IsSpent())
+    {
+        // The parent only has an empty entry for this outpoint; we can consider our
+        // version as fresh.
+        ret->second.flags = CCoinsCacheEntry::FRESH;
+    }
+    cachedCoinsUsage += ret->second.coin.DynamicMemoryUsage();
+
+    if (nBestCoinHeight < ret->second.coin.nHeight)
+        nBestCoinHeight = ret->second.coin.nHeight;
+
+    return !ret->second.coin.IsSpent();
+}
+
 bool CCoinsViewCache::HaveCoinInCache(const COutPoint &outpoint, bool &fSpent) const
 {
     READLOCK(cs_utxo);

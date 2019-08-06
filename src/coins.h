@@ -293,6 +293,13 @@ public:
         size_t &nChildCachedCoinsUsage);
 
     /**
+     * Check if we have the given utxo on disk and load it into cache.
+     * The semantics are the same as HaveCoin(), but no calls to
+     * the backing CCoinsView are made.
+     */
+    bool GetCoinFromDB(const COutPoint &outpoint) const;
+
+    /**
      * Check if we have the given utxo already loaded in this cache.
      * The semantics are the same as HaveCoin(), but no calls to
      * the backing CCoinsView are made.
