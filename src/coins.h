@@ -297,7 +297,7 @@ public:
      * The semantics are the same as HaveCoin(), but no calls to
      * the backing CCoinsView are made.
      */
-    bool HaveCoinInCache(const COutPoint &outpoint) const;
+    bool HaveCoinInCache(const COutPoint &outpoint, bool &fSpent) const;
 
     /**
      * Return a reference to Coin in the cache, or a pruned one if not found. This is

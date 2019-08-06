@@ -210,7 +210,9 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
             COutPoint out(txids[insecure_rand() % txids.size()], 0);
             int cacheid = insecure_rand() % stack.size();
             stack[cacheid]->Uncache(out);
-            uncached_an_entry |= !stack[cacheid]->HaveCoinInCache(out);
+
+            bool fSpent = false;
+            uncached_an_entry |= !stack[cacheid]->HaveCoinInCache(out, fSpent);
         }
 
         // One every 500 iterations, trim a random cache to zero
@@ -240,7 +242,8 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
                 }
                 else
                 {
-                    BOOST_CHECK(stack.back()->HaveCoinInCache(it->first));
+                    bool fSpent = false;
+                    BOOST_CHECK(stack.back()->HaveCoinInCache(it->first, fSpent));
                     found_an_entry = true;
                 }
             }

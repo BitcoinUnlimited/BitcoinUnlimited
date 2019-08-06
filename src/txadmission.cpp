@@ -687,15 +687,18 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                     // We still want to keep orphantx coins in the event the orphantx is finally accepted into the
                     // mempool or shows up in a block that is mined.  Therefore if pfMissingInputs returns true then
                     // any coins in vCoinsToUncache will NOT be uncached.
-                    if (!ss.coins->HaveCoinInCache(txin.prevout))
+                    bool fSpent = false;
+                    bool fMissingOrSpent = false;
+                    if (!ss.coins->HaveCoinInCache(txin.prevout, fSpent))
                     {
                         vCoinsToUncache.push_back(txin.prevout);
+                        if (!view.HaveCoin(txin.prevout))
+                        {
+                            fMissingOrSpent = true;
+                        }
                     }
-
-                    if (!view.HaveCoin(txin.prevout))
+                    if (fSpent || fMissingOrSpent)
                     {
-                        // fMissingInputs and not state.IsInvalid() is used to detect this condition, don't set
-                        // state.Invalid()
                         *pfMissingInputs = true;
                         break; // There is no point checking any more once one fails, for orphans we will recheck
                     }
