@@ -978,6 +978,7 @@ bool CheckInputs(const CTransactionRef &tx,
                 }
                 else if (!check())
                 {
+                    ScriptError scriptError = check.GetScriptError();
                     // Compute flags without the optional standardness flags.
                     // This differs from MANDATORY_SCRIPT_VERIFY_FLAGS as it contains
                     // additional upgrade flags (see ParallelAcceptToMemoryPool variable
@@ -996,18 +997,19 @@ bool CheckInputs(const CTransactionRef &tx,
                         {
                             if (debugger)
                             {
-                                debugger->AddInputCheckError(strprintf("non-mandatory-script-verify-flag (%s)",
-                                    ScriptErrorString(check.GetScriptError())));
+                                debugger->AddInputCheckError(
+                                    strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(scriptError)));
                                 inputVerified = false;
                                 allPassed = false;
                             }
                             else
                             {
-                                return state.Invalid(
-                                    false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)",
-                                                                   ScriptErrorString(check.GetScriptError())));
+                                return state.Invalid(false, REJECT_NONSTANDARD,
+                                    strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(scriptError)));
                             }
                         }
+                        // update the error message to reflect the mandatory violation.
+                        scriptError = check2.GetScriptError();
                     }
 
                     // Before banning, we need to check whether the transaction would
@@ -1019,16 +1021,15 @@ bool CheckInputs(const CTransactionRef &tx,
                     {
                         if (debugger)
                         {
-                            debugger->AddInputCheckError(strprintf(
-                                "upgrade-conditional-script-failure (%s)", ScriptErrorString(check.GetScriptError())));
+                            debugger->AddInputCheckError(
+                                strprintf("upgrade-conditional-script-failure (%s)", ScriptErrorString(scriptError)));
                             inputVerified = false;
                             allPassed = false;
                         }
                         else
                         {
-                            return state.Invalid(
-                                false, REJECT_INVALID, strprintf("upgrade-conditional-script-failure (%s)",
-                                                           ScriptErrorString(check.GetScriptError())));
+                            return state.Invalid(false, REJECT_INVALID,
+                                strprintf("upgrade-conditional-script-failure (%s)", ScriptErrorString(scriptError)));
                         }
                     }
 
@@ -1043,14 +1044,13 @@ bool CheckInputs(const CTransactionRef &tx,
                     {
                         inputVerified = false;
                         allPassed = false;
-                        debugger->AddInputCheckError(strprintf(
-                            "non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
+                        debugger->AddInputCheckError(
+                            strprintf("mandatory-script-verify-flag (%s)", ScriptErrorString(scriptError)));
                     }
                     else
                     {
-                        return state.DoS(
-                            100, false, REJECT_INVALID, strprintf("mandatory-script-verify-flag-failed (%s)",
-                                                            ScriptErrorString(check.GetScriptError())));
+                        return state.DoS(100, false, REJECT_INVALID,
+                            strprintf("mandatory-script-verify-flag-failed (%s)", ScriptErrorString(scriptError)));
                     }
                 }
                 if (debugger)
