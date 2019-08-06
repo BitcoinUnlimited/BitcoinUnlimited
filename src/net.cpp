@@ -2687,7 +2687,9 @@ void RelayTransaction(const CTransactionRef &ptx, const bool fRespend)
     for (CNode *pnode : vNodes)
     {
         if (!pnode->fRelayTxes)
+        {
             continue;
+        }
 
         LOCK(pnode->cs_filter);
         // If the bloom filter is not empty then a peer must have sent us a filter
@@ -2697,10 +2699,14 @@ void RelayTransaction(const CTransactionRef &ptx, const bool fRespend)
             // Relaying double spends to SPV clients is an easy attack vector,
             // and therefore only relay txns that are not potential double spends.
             if (!fRespend && pnode->pfilter->IsRelevantAndUpdate(ptx))
+            {
                 pnode->PushInventory(inv);
+            }
         }
         else
+        {
             pnode->PushInventory(inv);
+        }
     }
 }
 

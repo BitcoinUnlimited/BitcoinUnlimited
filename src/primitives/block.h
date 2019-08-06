@@ -10,6 +10,7 @@
 #include "primitives/transaction.h"
 #include "serialize.h"
 #include "uint256.h"
+class arith_uint256;
 
 const uint32_t BIP_009_MASK = 0x20000000;
 const uint32_t BASE_VERSION = 0x20000000;
@@ -20,6 +21,9 @@ class CXThinBlock;
 class CThinBlock;
 class CompactBlock;
 class CGrapheneBlock;
+
+/** Get the work equivalent for the supplied nBits of difficulty */
+arith_uint256 GetWorkForDifficultyBits(uint32_t nBits);
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work

@@ -15,6 +15,8 @@
 #include <stdexcept>
 #include <vector>
 
+extern const uint32_t BIP32_HARDENED_KEY_LIMIT;
+
 
 /**
  * secp256k1:
@@ -201,5 +203,19 @@ void ECC_Stop(void);
 
 /** Check that required EC support is available at runtime. */
 bool ECC_InitSanityCheck(void);
+
+/** Derive a BIP-0032 heirarchial deterministic wallet key */
+int Hd32DeriveChildKey(CKey key, int externalChainCounter, CKey &secret, std::string *keypath);
+
+/** Derive a BIP-0044 heirarchial deterministic wallet key */
+int Hd44DeriveChildKey(CKey key,
+    int purpose,
+    int coinType,
+    int account,
+    bool change,
+    int index,
+    CKey &secret,
+    std::string *keypath);
+
 
 #endif // BITCOIN_KEY_H

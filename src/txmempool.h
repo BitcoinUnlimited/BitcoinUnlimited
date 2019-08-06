@@ -672,6 +672,10 @@ public:
      * transactions. */
     int Expire(int64_t time, std::vector<COutPoint> &vCoinsToUncache);
 
+    /** Remove a transaction from the mempool.  Returns the number of tx removed, 0 if the passed tx is not in the
+        mempool, 1, or > 1 if this tx had dependent tx that also had to be removed */
+    int Remove(const uint256 &txhash, std::vector<COutPoint> *vCoinsToUncache = nullptr);
+
     /** BU: Every transaction that is accepted into the mempool will call this method to update the current value*/
     void UpdateTransactionsPerSecond();
 

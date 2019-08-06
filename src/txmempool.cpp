@@ -1311,6 +1311,23 @@ int CTxMemPool::Expire(int64_t time, std::vector<COutPoint> &vCoinsToUncache)
     return stage.size();
 }
 
+int CTxMemPool::Remove(const uint256 &txhash, std::vector<COutPoint> *vCoinsToUncache)
+{
+    WRITELOCK(cs);
+    txiter removeit = mapTx.find(txhash);
+    if (removeit == mapTx.end())
+        return 0;
+
+    setEntries stage;
+    _CalculateDescendants(removeit, stage);
+    if (vCoinsToUncache)
+        for (txiter it2 : stage)
+            for (const CTxIn &txin : it2->GetTx().vin)
+                vCoinsToUncache->push_back(txin.prevout);
+    _RemoveStaged(stage, false);
+    return stage.size();
+}
+
 bool CTxMemPool::addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry, bool fCurrentEstimate)
 {
     WRITELOCK(cs);

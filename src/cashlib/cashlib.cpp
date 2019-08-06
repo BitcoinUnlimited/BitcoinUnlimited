@@ -1,26 +1,41 @@
 // Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 /* clang-format off */
 // must be first for windows
 #include "compat.h"
-
 /* clang-format on */
+
+#ifdef ANDROID // Workaround to fix gradle build
+#define SECP256K1_INLINE inline
+#endif
+
+#include "arith_uint256.h"
 #include "base58.h"
+#include "bloom.h"
+#include "cashaddrenc.h"
+#include "chainparams.h"
 #include "random.h"
+#include "script/sign.h"
 #include "streams.h"
 #include "uint256.h"
 #include "util.h"
 #include "utilstrencodings.h"
 
+#define MAX_SIG_LEN 100 // DER-encoded ECDSA is more like 72 but better to be safe
+
+#ifndef ANDROID
 #include <openssl/rand.h>
+#endif
+
+#include <algorithm>
 #include <string>
 #include <vector>
 
 static bool sigInited = false;
 
 ECCVerifyHandle *verifyContext = nullptr;
+CChainParams *cashlibParams = nullptr;
 
 // stop the logging
 int LogPrintStr(const std::string &str) { return str.size(); }
@@ -28,6 +43,21 @@ namespace Logging
 {
 uint64_t categoriesEnabled = 0; // 64 bit log id mask.
 };
+
+// I don't want to pull in the args stuff so always pick the defaults
+bool GetBoolArg(const std::string &strArg, bool fDefault) { return fDefault; }
+// cashlib does not support versionbits right now so just supply this which is used in chainparams
+struct ForkDeploymentInfo
+{
+    /** Deployment name */
+    const char *name;
+    /** Whether GBT clients can safely ignore this rule in simplified usage */
+    bool gbt_force;
+    /** What is this client's vote? */
+    bool myVote;
+};
+struct ForkDeploymentInfo VersionBitsDeploymentInfo[Consensus::MAX_VERSION_BITS_DEPLOYMENTS];
+
 
 // helper functions
 namespace
@@ -76,24 +106,13 @@ SLAPI int Bin2Hex(unsigned char *val, int length, char *result, unsigned int res
     return 1;
 }
 
-
-/** Return random bytes from cryptographically acceptable random sources */
-SLAPI int RandomBytes(unsigned char *buf, int num)
-{
-    if (RAND_bytes(buf, num) != 1)
-    {
-        memset(buf, 0, num);
-        return 0;
-    }
-    return num;
-}
-
 /** Given a private key, return its corresponding public key */
 SLAPI int GetPubKey(unsigned char *keyData, unsigned char *result, unsigned int resultLen)
 {
     if (!sigInited)
     {
         sigInited = true;
+        SHA256AutoDetect();
         ECC_Start();
         verifyContext = new ECCVerifyHandle();
     }
@@ -217,6 +236,7 @@ SLAPI int SignTxSchnorr(unsigned char *txData,
     if (!sigInited)
     {
         sigInited = true;
+        SHA256AutoDetect();
         ECC_Start();
         verifyContext = new ECCVerifyHandle();
     }
@@ -477,3 +497,551 @@ SLAPI unsigned int SmGetError(void *smId)
     ScriptMachineData *smd = (ScriptMachineData *)smId;
     return (unsigned int)smd->sm->getError();
 }
+
+// result must be 32 bytes
+extern "C" void sha256(const unsigned char *data, unsigned int len, unsigned char *result)
+{
+    CSHA256 sha;
+    sha.Write(data, len);
+    sha.Finalize(result);
+}
+
+
+// result must be 32 bytes
+extern "C" void hash256(const unsigned char *data, unsigned int len, unsigned char *result)
+{
+    CHash256 hash;
+    hash.Write(data, len);
+    hash.Finalize(result);
+}
+
+
+// result must be 20 bytes
+extern "C" void hash160(const unsigned char *data, unsigned int len, unsigned char *result)
+{
+    CHash160 hash;
+    hash.Write(data, len);
+    hash.Finalize(result);
+}
+
+
+#ifdef ANDROID
+#include <android/log.h>
+#else
+
+#ifdef JAVA
+#define __android_log_print(x, y, z, ...) \
+    do                                    \
+    {                                     \
+    } while (0)
+#endif
+
+#endif
+
+#ifdef JAVA
+#include <jni.h>
+
+#define APPNAME "BU.wallet.cashlib"
+
+jclass secRandomClass = nullptr;
+jmethodID secRandom = nullptr;
+JNIEnv *javaEnv = nullptr; // Only use for getting random numbers
+
+class ByteArrayAccessor
+{
+public:
+    JNIEnv *env;
+    jbyteArray &obj;
+    uint8_t *data;
+    size_t size;
+
+    std::vector<uint8_t> vec() { return std::vector<uint8_t>(data, data + size); }
+    ByteArrayAccessor(JNIEnv *e, jbyteArray &arg) : env(e), obj(arg)
+    {
+        size = env->GetArrayLength(obj);
+        data = (uint8_t *)env->GetByteArrayElements(obj, NULL);
+    }
+
+    ~ByteArrayAccessor()
+    {
+        size = 0;
+        if (data)
+            env->ReleaseByteArrayElements(obj, (jbyte *)data, 0);
+    }
+};
+
+// credit: https://stackoverflow.com/questions/41820039/jstringjni-to-stdstringc-with-utf8-characters
+std::string toString(JNIEnv *env, jstring jStr)
+{
+    if (!jStr)
+        return "";
+
+    const jclass stringClass = env->GetObjectClass(jStr);
+    const jmethodID getBytes = env->GetMethodID(stringClass, "getBytes", "(Ljava/lang/String;)[B");
+    const jbyteArray stringJbytes = (jbyteArray)env->CallObjectMethod(jStr, getBytes, env->NewStringUTF("UTF-8"));
+
+    size_t length = (size_t)env->GetArrayLength(stringJbytes);
+    jbyte *pBytes = env->GetByteArrayElements(stringJbytes, NULL);
+
+    std::string ret = std::string((char *)pBytes, length);
+    env->ReleaseByteArrayElements(stringJbytes, pBytes, JNI_ABORT);
+
+    env->DeleteLocalRef(stringJbytes);
+    env->DeleteLocalRef(stringClass);
+    return ret;
+}
+
+jint throwIllegalState(JNIEnv *env, const char *message)
+{
+    jclass exc = env->FindClass("java/lang/IllegalStateException");
+    if (nullptr == exc)
+        return 0;
+    return env->ThrowNew(exc, message);
+}
+
+/** converts a arith_uint256 into something that java BigInteger can grab */
+jbyteArray encodeUint256(JNIEnv *env, arith_uint256 value)
+{
+    const size_t size = 256 / 8;
+    jbyteArray result = env->NewByteArray(size);
+    if (result != NULL)
+    {
+        jbyte *data = env->GetByteArrayElements(result, NULL);
+        if (data != NULL)
+        {
+            int i;
+            for (i = (int)(size - 1); i >= 0; i--)
+            {
+                data[i] = (jbyte)(value.GetLow64() & 0xFF);
+                value >>= 8;
+            }
+            env->ReleaseByteArrayElements(result, data, 0);
+        }
+    }
+    return result;
+}
+
+
+jbyteArray makeJByteArray(JNIEnv *env, uint8_t *buf, size_t size)
+{
+    jbyteArray bArray = env->NewByteArray(size);
+    jbyte *dest = env->GetByteArrayElements(bArray, 0);
+    memcpy(dest, buf, size);
+    env->ReleaseByteArrayElements(bArray, dest, 0);
+    return bArray;
+}
+
+jbyteArray makeJByteArray(JNIEnv *env, std::string &buf)
+{
+    jbyteArray bArray = env->NewByteArray(buf.size());
+    jbyte *dest = env->GetByteArrayElements(bArray, 0);
+    memcpy(dest, buf.c_str(), buf.size());
+    env->ReleaseByteArrayElements(bArray, dest, 0);
+    return bArray;
+}
+
+jbyteArray makeJByteArray(JNIEnv *env, std::vector<unsigned char> &buf)
+{
+    jbyteArray bArray = env->NewByteArray(buf.size());
+    jbyte *dest = env->GetByteArrayElements(bArray, 0);
+    memcpy(dest, &buf[0], buf.size());
+    env->ReleaseByteArrayElements(bArray, dest, 0);
+    return bArray;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Wallet_signMessage(JNIEnv *env,
+    jobject ths,
+    jbyteArray jmessage,
+    jbyteArray secret)
+{
+    ByteArrayAccessor message(env, jmessage);
+    ByteArrayAccessor privkey(env, secret);
+    if (privkey.size != 32)
+        return jbyteArray();
+
+    CKey key = LoadKey((unsigned char *)privkey.data);
+
+    CHashWriter ss(SER_GETHASH, 0);
+    ss << strMessageMagic << message.vec();
+
+    std::vector<unsigned char> vchSig;
+    if (!key.SignCompact(ss.GetHash(), vchSig)) // signing will only fail if the key is bogus
+    {
+        return jbyteArray();
+    }
+    if (vchSig.size() == 0)
+        return jbyteArray();
+    return makeJByteArray(env, vchSig);
+}
+
+extern "C" JNIEXPORT jstring JNICALL Java_bitcoinunlimited_libbitcoincash_Codec_encode64(JNIEnv *env,
+    jobject ths,
+    jbyteArray jdata)
+{
+    ByteArrayAccessor data(env, jdata);
+    auto dataAsStr = EncodeBase64(data.data, data.size);
+    return env->NewStringUTF(dataAsStr.c_str());
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Codec_decode64(JNIEnv *env,
+    jobject ths,
+    jstring jdata)
+{
+    std::string data = toString(env, jdata);
+    bool valid = false;
+    auto dataBytes = DecodeBase64(data.c_str(), &valid);
+    if (!valid)
+    {
+        throwIllegalState(env, "bad encoding");
+        return jbyteArray();
+    }
+    return makeJByteArray(env, dataBytes);
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Wallet_signOneInputUsingECDSA(JNIEnv *env,
+    jobject ths,
+    jbyteArray txData,
+    jint sigHashType,
+    jlong inputIdx,
+    jlong inputAmount,
+    jbyteArray prevoutScript,
+    jbyteArray secret)
+{
+    ByteArrayAccessor tx(env, txData);
+    ByteArrayAccessor prevout(env, prevoutScript);
+    ByteArrayAccessor privkey(env, secret);
+    if (privkey.size != 32)
+        return jbyteArray();
+
+    unsigned char result[MAX_SIG_LEN];
+    uint32_t resultLen = SignTx(tx.data, tx.size, inputIdx, inputAmount, prevout.data, prevout.size, sigHashType,
+        privkey.data, result, MAX_SIG_LEN);
+
+    if (resultLen == 0)
+        return jbyteArray();
+    return makeJByteArray(env, result, resultLen);
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Wallet_signOneInputUsingSchnorr(
+    JNIEnv *env,
+    jobject ths,
+    jbyteArray txData,
+    jint sigHashType,
+    jlong inputIdx,
+    jlong inputAmount,
+    jbyteArray prevoutScript,
+    jbyteArray secret)
+{
+    ByteArrayAccessor tx(env, txData);
+    ByteArrayAccessor prevout(env, prevoutScript);
+    ByteArrayAccessor privkey(env, secret);
+    if (privkey.size != 32)
+        return jbyteArray();
+
+    unsigned char result[MAX_SIG_LEN];
+    uint32_t resultLen = SignTxSchnorr(tx.data, tx.size, inputIdx, inputAmount, prevout.data, prevout.size, sigHashType,
+        privkey.data, result, MAX_SIG_LEN);
+
+    if (resultLen == 0)
+        return jbyteArray();
+    return makeJByteArray(env, result, resultLen);
+}
+
+/** Create a bloom filter */
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Wallet_CreateBloomFilter(JNIEnv *env,
+    jobject ths,
+    jobjectArray arg,
+    jdouble falsePosRate,
+    jint maxSize,
+    jint flags,
+    jint tweak)
+{
+    size_t len = env->GetArrayLength(arg);
+
+    if (!((falsePosRate >= 0) && (falsePosRate <= 1.0)))
+    {
+        throwIllegalState(env, "unknown chain selection");
+        return nullptr;
+    }
+
+    CBloomFilter bloom(std::max((size_t)5, len), falsePosRate, tweak, flags, maxSize);
+
+    for (size_t i = 0; i < len; i++)
+    {
+        jbyteArray elem = (jbyteArray)env->GetObjectArrayElement(arg, i);
+        jbyte *elemData = env->GetByteArrayElements(elem, 0);
+        size_t elemLen = env->GetArrayLength(elem);
+        bloom.insert(std::vector<unsigned char>(elemData, elemData + elemLen));
+        env->ReleaseByteArrayElements(elem, elemData, 0);
+    }
+
+    CDataStream serializer(SER_NETWORK, PROTOCOL_VERSION);
+    serializer << bloom;
+    __android_log_print(ANDROID_LOG_INFO, APPNAME, "Bloom size: %d Bloom serialized size: %d numAddrs: %d\n",
+        (unsigned int)bloom.vDataSize(), (unsigned int)serializer.size(), (unsigned int)len);
+    jbyteArray ret = env->NewByteArray(serializer.size());
+    jbyte *retData = env->GetByteArrayElements(ret, 0);
+    if (!retData)
+        return ret; // failed
+    memcpy(retData, serializer.data(), serializer.size());
+    env->ReleaseByteArrayElements(ret, retData, 0);
+    return ret;
+}
+
+/** Get work from nbits */
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_bitcoinunlimited_libbitcoincash_Blockchain_getWorkFromDifficultyBits(JNIEnv *env, jobject ths, jlong nBits)
+{
+    arith_uint256 result = GetWorkForDifficultyBits((uint32_t)nBits);
+    return encodeUint256(env, result);
+}
+
+/** Given a private key, return its corresponding public key */
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_PayDestination_GetPubKey(JNIEnv *env,
+    jobject ths,
+    jbyteArray arg)
+{
+    size_t len = env->GetArrayLength(arg);
+    jbyte *data = env->GetByteArrayElements(arg, NULL);
+
+    if (len != 32)
+    {
+        __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "secret has incorrect length\n");
+    }
+    assert(len == 32);
+
+    CKey k = LoadKey((unsigned char *)data);
+    CPubKey pub = k.GetPubKey();
+    jbyteArray bArray = env->NewByteArray(pub.size());
+    jbyte *dest = env->GetByteArrayElements(bArray, 0);
+    memcpy(dest, pub.begin(), pub.size());
+
+    env->ReleaseByteArrayElements(arg, data, 0);
+    env->ReleaseByteArrayElements(bArray, dest, 0);
+    return bArray;
+}
+
+extern "C" JNIEXPORT jstring JNICALL Java_bitcoinunlimited_libbitcoincash_PayAddress_EncodeCashAddr(JNIEnv *env,
+    jobject ths,
+    jbyte typ,
+    jbyteArray arg)
+{
+    size_t len = env->GetArrayLength(arg);
+    if (len != 20)
+    {
+        throwIllegalState(env, "bad address argument length");
+        return env->NewStringUTF("bad address argument length");
+    }
+    jbyte *data = env->GetByteArrayElements(arg, 0);
+
+    uint160 tmp((const uint8_t *)data);
+    CTxDestination dst = CKeyID(tmp);
+
+    env->ReleaseByteArrayElements(arg, data, 0);
+
+    std::string addrAsStr(EncodeCashAddr(dst, *cashlibParams));
+    return env->NewStringUTF(addrAsStr.c_str());
+}
+
+class PubkeyExtractor : public boost::static_visitor<void>
+{
+protected:
+    const CChainParams &params;
+    jbyte *dest;
+
+public:
+    PubkeyExtractor(jbyte *destination, const CChainParams &p) : params(p), dest(destination) {}
+    void operator()(const CKeyID &id) const
+    {
+        dest[0] = 2;
+        memcpy(dest + 1, id.begin(), 20); // pubkey is 20 bytes
+    }
+    void operator()(const CScriptID &id) const
+    {
+        dest[0] = 3;
+        memcpy(dest + 1, id.begin(), 20); // pubkey is 20 bytes
+    }
+    void operator()(const CNoDestination &) const
+    {
+        memset(dest, 0, 21); // not a good address
+    }
+};
+
+
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_PayAddress_DecodeCashAddr(JNIEnv *env,
+    jobject ths,
+    jstring addrstr)
+{
+    CTxDestination dst = DecodeCashAddr(toString(env, addrstr), *cashlibParams);
+
+    jbyteArray bArray = env->NewByteArray(21);
+    jbyte *data = env->GetByteArrayElements(bArray, 0);
+    boost::apply_visitor(PubkeyExtractor(data, *cashlibParams), dst);
+    env->ReleaseByteArrayElements(bArray, data, 0);
+    return bArray;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Key_Hd44DeriveChildKey(JNIEnv *env,
+    jobject ths,
+    jbyteArray masterSecretBytes,
+    jint purpose,
+    jint coinType,
+    jint account,
+    jint change,
+    jint index)
+{
+    size_t mslen = env->GetArrayLength(masterSecretBytes);
+    if (mslen != 32)
+    {
+        throwIllegalState(env, "key derivation failure -- master secret is incorrect length");
+        return nullptr;
+    }
+
+    jbyte *msdata = env->GetByteArrayElements(masterSecretBytes, 0);
+    CKey masterSecret = LoadKey((unsigned char *)msdata);
+
+    CKey secret;
+    Hd44DeriveChildKey(masterSecret, purpose, coinType, account, change, index, secret, nullptr);
+
+    jbyteArray bArray = env->NewByteArray(32);
+    jbyte *data = env->GetByteArrayElements(bArray, 0);
+    if (secret.size() != 32)
+    {
+        throwIllegalState(env, "key derivation failure -- derived secret is incorrect length");
+        return nullptr;
+    }
+    memcpy(data, secret.begin(), 32);
+    env->ReleaseByteArrayElements(bArray, data, 0);
+    return bArray;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Hash_sha256(JNIEnv *env,
+    jobject ths,
+    jbyteArray arg)
+{
+    size_t len = env->GetArrayLength(arg);
+    jbyte *data = env->GetByteArrayElements(arg, 0);
+
+    jbyteArray bArray = env->NewByteArray(32);
+    jbyte *dest = env->GetByteArrayElements(bArray, 0);
+    sha256((unsigned char *)data, len, (unsigned char *)dest);
+
+    env->ReleaseByteArrayElements(arg, data, 0);
+    env->ReleaseByteArrayElements(bArray, dest, 0);
+    return bArray;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Hash_hash256(JNIEnv *env,
+    jobject ths,
+    jbyteArray arg)
+{
+    size_t len = env->GetArrayLength(arg);
+    jbyte *data = env->GetByteArrayElements(arg, 0);
+
+    jbyteArray bArray = env->NewByteArray(32);
+    jbyte *dest = env->GetByteArrayElements(bArray, 0);
+    hash256((unsigned char *)data, len, (unsigned char *)dest);
+
+    env->ReleaseByteArrayElements(arg, data, 0);
+    env->ReleaseByteArrayElements(bArray, dest, 0);
+    return bArray;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Hash_hash160(JNIEnv *env,
+    jobject ths,
+    jbyteArray arg)
+{
+    size_t len = env->GetArrayLength(arg);
+    jbyte *data = env->GetByteArrayElements(arg, 0);
+
+    jbyteArray bArray = env->NewByteArray(20);
+    jbyte *dest = env->GetByteArrayElements(bArray, 0);
+    hash160((unsigned char *)data, len, (unsigned char *)dest);
+
+    env->ReleaseByteArrayElements(arg, data, 0);
+    env->ReleaseByteArrayElements(bArray, dest, 0);
+    return bArray;
+}
+
+extern "C" JNIEXPORT jstring JNICALL Java_bitcoinunlimited_libbitcoincash_Initialize_LibBitcoinCash(JNIEnv *env,
+    jobject ths,
+    jbyte chainSelector)
+{
+    javaEnv = env;
+
+    if (chainSelector == 1)
+        cashlibParams = &Params(CBaseChainParams::MAIN);
+    else if (chainSelector == 2)
+        cashlibParams = &Params(CBaseChainParams::TESTNET);
+    else if (chainSelector == 3)
+        cashlibParams = &Params(CBaseChainParams::REGTEST);
+    else if (chainSelector == 4)
+        cashlibParams = &Params(CBaseChainParams::UNL);
+    else
+    {
+        throwIllegalState(env, "unknown chain selection");
+    }
+
+#ifdef ANDROID
+    // initialize the env globals and hook up the random number generator
+    jclass c = env->FindClass("bitcoinunlimited/libbitcoincash/Initialize");
+    if (c == nullptr)
+    {
+        __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "class not found\n");
+    }
+    else
+    {
+        secRandomClass = reinterpret_cast<jclass>(env->NewGlobalRef(c));
+        //__android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "class found: %x", secRandomClass);
+        // Get the method that you want to call
+        secRandom = env->GetStaticMethodID(c, "SecRandom", "([B)V");
+        //__android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "method ID: %x", secRandom);
+    }
+#endif
+
+    // must be below the random number generator hookup
+    if (!sigInited)
+    {
+        sigInited = true;
+        SHA256AutoDetect();
+        ECC_Start();
+    }
+
+    return env->NewStringUTF("");
+}
+
+#ifdef ANDROID
+void RandAddSeedPerfmon()
+{
+    // Android random # generator is already seeded so nothing to do
+}
+
+// Implement in Android by calling into the java SecureRandom implementation.
+// You must provide this Java API
+void GetRandBytes(unsigned char *buf, int num)
+{
+    jbyteArray bArray = javaEnv->NewByteArray(num);
+    javaEnv->CallStaticVoidMethod(secRandomClass, secRandom, bArray);
+    javaEnv->GetByteArrayRegion(bArray, 0, num, (jbyte *)buf);
+    javaEnv->DeleteLocalRef(bArray);
+}
+#endif
+
+extern "C" int RandomBytes(unsigned char *buf, int num)
+{
+    GetRandBytes(buf, num);
+    return num;
+}
+
+#else
+/** Return random bytes from cryptographically acceptable random sources */
+extern "C" int RandomBytes(unsigned char *buf, int num)
+{
+    if (RAND_bytes(buf, num) != 1)
+    {
+        memset(buf, 0, num);
+        return 0;
+    }
+    return num;
+}
+#endif
