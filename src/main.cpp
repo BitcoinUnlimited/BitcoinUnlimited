@@ -24,6 +24,7 @@
 #include "dosman.h"
 #include "expedited.h"
 #include "hashwrapper.h"
+#include "index/txindex.h"
 #include "init.h"
 #include "merkleblock.h"
 #include "net.h"
@@ -216,6 +217,7 @@ void UnregisterNodeSignals(CNodeSignals &nodeSignals)
 CBlockIndex *FindForkInGlobalIndex(const CChain &chain, const CBlockLocator &locator)
 {
     // Find the first block the caller has in the main chain
+    AssertLockHeld(cs_main); // for chain
     READLOCK(cs_mapBlockIndex);
     for (const uint256 &hash : locator.vHave)
     {
@@ -279,8 +281,6 @@ bool GetTransaction(const uint256 &hash,
 {
     const CBlockIndex *pindexSlow = blockIndex;
 
-    LOCK(cs_main);
-
     if (blockIndex == nullptr)
     {
         CTransactionRef ptx = mempool.get(hash);
@@ -292,28 +292,7 @@ bool GetTransaction(const uint256 &hash,
 
         if (fTxIndex)
         {
-            CDiskTxPos postx;
-            if (pblocktree->ReadTxIndex(hash, postx))
-            {
-                CAutoFile file(OpenBlockFile(postx, true), SER_DISK, CLIENT_VERSION);
-                if (file.IsNull())
-                    return error("%s: OpenBlockFile failed", __func__);
-                CBlockHeader header;
-                try
-                {
-                    file >> header;
-                    fseek(file.Get(), postx.nTxOffset, SEEK_CUR);
-                    file >> txOut;
-                }
-                catch (const std::exception &e)
-                {
-                    return error("%s: Deserialize or I/O error - %s", __func__, e.what());
-                }
-                hashBlock = header.GetHash();
-                if (txOut->GetHash() != hash)
-                    return error("%s: txid mismatch", __func__);
-                return true;
-            }
+            return g_txindex->FindTx(hash, hashBlock, txOut);
         }
 
         // use coin database to locate block that contains transaction, and scan it

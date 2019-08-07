@@ -93,6 +93,8 @@ httpserver.h
 iblt.cpp
 iblt.h
 iblt_params.h
+index/txindex.cpp
+index/txindex.h
 init.cpp
 init.h
 key.cpp

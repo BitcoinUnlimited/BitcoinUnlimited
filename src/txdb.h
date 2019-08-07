@@ -48,12 +48,6 @@ static const uint64_t nMinMemToKeepAvailable = 300 * 1000 * 1000;
 static const size_t nMaxDBBatchSize = 16 << 20;
 //! Max memory allocated to block tree DB specific cache, if no -txindex (MiB)
 static const int64_t nMaxBlockDBCache = 2;
-//! Max memory allocated to block tree DB specific cache, if -txindex (MiB)
-// Unlike for the UTXO database, for the txindex scenario the leveldb cache make
-// a meaningful difference: https://github.com/bitcoin/bitcoin/pull/8273#issuecomment-229601991
-static const int64_t nMaxBlockDBAndTxIndexCache = 1024;
-//! Max memory allocated to coin DB specific cache (MiB)
-static const int64_t nMaxCoinsDBCache = 8;
 
 /** Get the current available memory */
 uint64_t GetAvailableMemory();
@@ -66,6 +60,7 @@ void GetCacheConfiguration(int64_t &_nBlockDBCache,
     int64_t &_nBlockUndoDBcache,
     int64_t &_nBlockTreeDBCache,
     int64_t &_nCoinDBCache,
+    int64_t &_nTxIndexCache,
     bool fDefault = false);
 /** Calculate the various cache sizes. This is primarily used in GetCacheConfiguration() however during
  *  dynamic sizing of the coins cache we also need to use this function directly.
@@ -74,7 +69,8 @@ void CacheSizeCalculations(int64_t _nTotalCache,
     int64_t &_nBlockDBCache,
     int64_t &_nBlockUndoDBcache,
     int64_t &_nBlockTreeDBCache,
-    int64_t &_nCoinDBCache);
+    int64_t &_nCoinDBCache,
+    int64_t &_nTxIndexCache);
 /** This function is called during FlushStateToDisk.  The coins cache is dynamically sized before any
  *  checking is done for cache flushing and trimming
  */
@@ -194,4 +190,35 @@ public:
 /** Global variable that points to the coins database */
 extern CCoinsViewDB *pcoinsdbview;
 
+/**
+ * Access to the txindex database (indexes/txindex/)
+ *
+ * The database stores a block locator of the chain the database is synced to
+ * so that the TxIndex can efficiently determine the point it last stopped at.
+ * A locator is used instead of a simple hash of the chain tip because blocks
+ * and block index entries may not be flushed to disk until after this database
+ * is updated.
+ */
+class TxIndexDB : public CDBWrapper
+{
+public:
+    explicit TxIndexDB(size_t n_cache_size, bool f_memory = false, bool f_wipe = false);
+
+    /// Read the disk location of the transaction data with the given hash. Returns false if the
+    /// transaction hash is not indexed.
+    bool ReadTxPos(const uint256 &txid, CDiskTxPos &pos) const;
+
+    /// Write a batch of transaction positions to the DB.
+    bool WriteTxs(const std::vector<std::pair<uint256, CDiskTxPos> > &v_pos);
+
+    /// Read block locator of the chain that the txindex is in sync with.
+    bool ReadBestBlock(CBlockLocator &locator) const;
+
+    /// Write block locator of the chain that the txindex is in sync with.
+    bool WriteBestBlock(const CBlockLocator &locator);
+
+    /// Migrate txindex data from the block tree DB, where it may be for older nodes that have not
+    /// been upgraded yet to the new database.
+    bool MigrateData(CBlockTreeDB &block_tree_db, const CBlockLocator &best_locator);
+};
 #endif // BITCOIN_TXDB_H

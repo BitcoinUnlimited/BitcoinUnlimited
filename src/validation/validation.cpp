@@ -15,6 +15,7 @@
 #include "consensus/tx_verify.h"
 #include "dosman.h"
 #include "expedited.h"
+#include "index/txindex.h"
 #include "init.h"
 #include "requestManager.h"
 #include "sync.h"
@@ -486,10 +487,6 @@ bool LoadBlockIndexDB()
     if (fReindexing)
         fReindex = fReindexing;
 
-    // Check whether we have a transaction index
-    pblocktree->ReadFlag("txindex", fTxIndex);
-    LOGA("%s: transaction index %s\n", __func__, fTxIndex ? "enabled" : "disabled");
-
     // Load pointer to end of best chain
     uint256 bestblockhash = pcoinsdbview->GetBestBlock();
     BlockMap::iterator it = mapBlockIndex.find(bestblockhash);
@@ -577,9 +574,6 @@ bool InitBlockIndex(const CChainParams &chainparams)
     if (chainActive.Genesis() != nullptr)
         return true;
 
-    // Use the provided setting for -txindex in the new database
-    fTxIndex = GetBoolArg("-txindex", DEFAULT_TXINDEX);
-    pblocktree->WriteFlag("txindex", fTxIndex);
     LOGA("Initializing databases...\n");
 
     // Only add the genesis block if not reindexing (in which case we reuse the one already on disk)
@@ -2605,9 +2599,11 @@ bool ConnectBlock(const CBlock &block,
         }
     }
 
+    // Write transaction data to the txindex
     if (fTxIndex)
-        if (!pblocktree->WriteTxIndex(vPos))
-            return AbortNode(state, "Failed to write transaction index");
+    {
+        g_txindex->BlockConnected(block, pindex);
+    }
 
     // add this block to the view's block chain (the main UTXO in memory cache)
     view.SetBestBlock(pindex->GetBlockHash());
