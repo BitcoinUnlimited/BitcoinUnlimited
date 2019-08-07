@@ -30,6 +30,8 @@ TxIndex::TxIndex(std::unique_ptr<TxIndexDB> _db) : db(std::move(_db)), fSynced(f
 TxIndex::~TxIndex() {}
 bool TxIndex::Init()
 {
+    LOCK(cs_main);
+
     // Attempt to migrate txindex from the old database to the new one. Even if
     // chain_tip is null, the node could be reindexing and we still want to
     // delete txindex records in the old database.

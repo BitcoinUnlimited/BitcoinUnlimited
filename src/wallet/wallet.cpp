@@ -3450,7 +3450,10 @@ bool CWallet::InitLoadWallet()
         CWalletDB walletdb(walletFile);
         CBlockLocator locator;
         if (walletdb.ReadBestBlock(locator))
+        {
+            LOCK(cs_main);
             pindexRescan = FindForkInGlobalIndex(chainActive, locator);
+        }
         else
             pindexRescan = chainActive.Genesis();
     }
