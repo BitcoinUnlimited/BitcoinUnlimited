@@ -79,6 +79,9 @@ BOOST_AUTO_TEST_CASE(coin_selection_tests)
     // test multiple times to allow for differences in the shuffle order
     for (int i = 0; i < RUN_TESTS; i++)
     {
+        if (RUN_TESTS % 10 == 0)
+            BOOST_TEST_MESSAGE("Wallet test iteration: " << i);
+
         empty_wallet();
 
         // with an empty wallet we can't even pay one cent
