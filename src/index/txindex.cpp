@@ -26,7 +26,7 @@ static void FatalError(const char *fmt, const Args &... args)
         "Error: A fatal internal error occurred, see debug.log for details", "", CClientUIInterface::MSG_ERROR);
     StartShutdown();
 }
-TxIndex::TxIndex(std::unique_ptr<TxIndexDB> _db) : db(std::move(_db)), fSynced(false), pbestindex(nullptr) {}
+TxIndex::TxIndex(TxIndexDB *_db) : db(_db), fSynced(false), pbestindex(nullptr) {}
 TxIndex::~TxIndex() {}
 bool TxIndex::Init()
 {

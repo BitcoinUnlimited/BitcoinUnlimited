@@ -1285,8 +1285,8 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     // ********************************************************* Step 8: data directory maintenance
     if (GetBoolArg("-txindex", DEFAULT_TXINDEX))
     {
-        auto txindex_db = std::make_unique<TxIndexDB>(nTxIndexCache, false, fReindex);
-        g_txindex = std::make_unique<TxIndex>(std::move(txindex_db));
+        auto txindex_db = new TxIndexDB(nTxIndexCache, false, fReindex);
+        g_txindex = std::make_unique<TxIndex>(txindex_db);
         g_txindex->Start();
     }
 

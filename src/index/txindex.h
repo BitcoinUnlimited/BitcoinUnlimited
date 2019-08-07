@@ -56,7 +56,7 @@ public:
     bool WriteBestBlock(CBlockIndex *block_index);
 
     /// Constructs the TxIndex, which becomes available to be queried.
-    explicit TxIndex(std::unique_ptr<TxIndexDB> db);
+    explicit TxIndex(TxIndexDB *db);
 
     /// Destructor interrupts sync thread if running and blocks until it exits.
     ~TxIndex();
