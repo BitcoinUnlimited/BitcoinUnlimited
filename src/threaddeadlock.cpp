@@ -160,7 +160,7 @@ void potential_deadlock_detected(LockStackEntry now, LockStack &deadlocks, std::
     throw std::logic_error("potential deadlock detected");
 }
 
-static bool ReadRecursiveCheck(const uint64_t &tid,
+static bool RecursiveCheck(const uint64_t &tid,
     const void *c,
     uint64_t lastTid,
     void *lastLock,
@@ -173,116 +173,15 @@ static bool ReadRecursiveCheck(const uint64_t &tid,
         // we are back where we started, infinite loop means there is a deadlock
         return true;
     }
-    // first check if we currently have any exclusive ownerships
-    bool haveExclusives = false;
-    size_t selfOtherLockCount = 0;
+    // first check if we currently have any other ownerships
     auto self_iter = lockdata.locksheldbythread.find(lastTid);
     if (self_iter != lockdata.locksheldbythread.end())
     {
-        selfOtherLockCount = self_iter->second.size();
-        for (auto &lockStackLock : self_iter->second)
+        if(self_iter->second.size() == 0)
         {
-            if (lockStackLock.second.GetExclusive() == OwnershipType::EXCLUSIVE)
-            {
-                haveExclusives = true;
-                break;
-            }
-        }
-    }
-    // we cant deadlock if we dont own any other mutexs
-    if (selfOtherLockCount == 0)
-    {
-        return false;
-    }
-    // at this point we have at least 1 lock for a mutex somewhere
-
-    // if we do not have any exclusive locks and we arent requesting an exclusive lock...
-    if (!haveExclusives)
-    {
-        // then we cant block
-        return false;
-    }
-
-    // check if a thread has an ownership of c
-    auto writeiter = lockdata.writelocksheld.find(lastLock);
-
-    // NOTE: be careful when adjusting these booleans, the order of the checks is important
-    bool writeIsEnd = ((writeiter == lockdata.writelocksheld.end()) || writeiter->second.empty());
-    if (writeIsEnd)
-    {
-        // no exclusive owners, no deadlock possible
-        return false;
-    }
-
-    // we have other locks, so check if we have any in common with the holder(s) of the write lock
-    for (auto &threadId : writeiter->second)
-    {
-        if (threadId == lastTid)
-        {
-            // this continue fixes an infinite looping problem
-            continue;
-        }
-        auto other_iter = lockdata.locksheldbythread.find(threadId);
-        // we dont need to check empty here, other thread has at least 1 lock otherwise we wouldnt be checking it
-        if (other_iter->second.size() == 1)
-        {
-            // it does not have any locks aside from known exclusive, no deadlock possible
-            // we can just wait until that exclusive lock is released
+            // we cant deadlock if we dont own any other mutexs
             return false;
         }
-        // if the other thread has 1+ other locks aside from the known exclusive, check them for matches with our own
-        // locks
-        for (auto &lock : other_iter->second)
-        {
-            // if they have a lock that is on a lock that we have exclusive ownership for
-            if (HasAnyOwners(lock.first))
-            {
-                // and their lock is waiting...
-                if (lock.second.GetWaiting() == true)
-                {
-                    deadlocks.push_back(lock);
-                    threads.emplace(other_iter->first);
-                    if (other_iter->first == tid && lock.first == c)
-                    {
-                        // we are back where we started and there is a deadlock
-                        return true;
-                    }
-                    if (ReadRecursiveCheck(tid, c, other_iter->first, lock.first, false, deadlocks, threads))
-                    {
-                        return true;
-                    }
-                }
-                // no deadlock, other lock is not waiting, we simply have to wait until they release that lock
-            }
-        }
-    }
-    return false;
-}
-
-static bool WriteRecursiveCheck(const uint64_t &tid,
-    const void *c,
-    uint64_t lastTid,
-    void *lastLock,
-    bool firstRun,
-    LockStack &deadlocks,
-    std::set<uint64_t> &threads)
-{
-    if (!firstRun && c == lastLock && tid == lastTid)
-    {
-        // we are back where we started, infinite loop means there is a deadlock
-        return true;
-    }
-    // first check if we currently have any exclusive ownerships
-    size_t selfOtherLockCount = 0;
-    auto self_iter = lockdata.locksheldbythread.find(lastTid);
-    if (self_iter != lockdata.locksheldbythread.end() && self_iter->second.empty() == false)
-    {
-        selfOtherLockCount = self_iter->second.size();
-    }
-    // we cant deadlock if we dont own any other mutexs
-    if (selfOtherLockCount == 0)
-    {
-        return false;
     }
     // at this point we have at least 1 lock for a mutex somewhere
 
@@ -340,7 +239,7 @@ static bool WriteRecursiveCheck(const uint64_t &tid,
                         // we are back where we started and there is a deadlock
                         return true;
                     }
-                    if (WriteRecursiveCheck(tid, c, other_iter->first, lock.first, false, deadlocks, threads))
+                    if (RecursiveCheck(tid, c, other_iter->first, lock.first, false, deadlocks, threads))
                     {
                         return true;
                     }
@@ -577,34 +476,15 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
     // Begin general deadlock checks for all lock types
     AddNewLock(now, tid);
     AddNewWaitingLock(c, tid, ownership);
-
-    // if we have exclusive lock(s) and we arent requesting an exclusive lock...
-    if (ownership == OwnershipType::SHARED)
-    {
     TEST_5:
-    TEST_8:
-        std::vector<LockStackEntry> deadlocks;
-        std::set<uint64_t> threads;
-        // then we can only deadlock if we are locking a thread that is currently held in exclusive state by someone
-        // else
-        if (ReadRecursiveCheck(tid, c, tid, c, true, deadlocks, threads))
-        {
-            // we have a deadlock where we are requesting shared ownership on a mutex that is exclusively owned by
-            // another thread which has either a shared or exlcusive request on a mutex we have exclusive ownership over
-            potential_deadlock_detected(now, deadlocks, threads);
-        }
-    }
-    // if we have exclusive lock(s) and we are requesting another exclusive lock
-    if (ownership == OwnershipType::EXCLUSIVE)
-    {
     TEST_6:
     TEST_7:
-        std::vector<LockStackEntry> deadlocks;
-        std::set<uint64_t> threads;
-        if (WriteRecursiveCheck(tid, c, tid, c, true, deadlocks, threads))
-        {
-            potential_deadlock_detected(now, deadlocks, threads);
-        }
+    TEST_8:
+    std::vector<LockStackEntry> deadlocks;
+    std::set<uint64_t> threads;
+    if (RecursiveCheck(tid, c, tid, c, true, deadlocks, threads))
+    {
+        potential_deadlock_detected(now, deadlocks, threads);
     }
 }
 
