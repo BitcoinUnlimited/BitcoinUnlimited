@@ -472,6 +472,10 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
         // this lock can not deadlock itself
         // intentionally left blank
     }
+    else
+    {
+        DbgAssert(!"unsupported lock type", return);
+    }
 
     // Begin general deadlock checks for all lock types
     AddNewLock(now, tid);
