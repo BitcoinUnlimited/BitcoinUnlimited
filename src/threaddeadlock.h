@@ -22,9 +22,15 @@
 
 enum LockType
 {
-    RECURSIVE, // CCriticalSection
-    SHARED, // CSharedCriticalSection
-    RECRUSIVESHARED, // CRecursiveSharedCriticalSection
+    RECURSIVE_MUTEX, // CCriticalSection
+    SHARED_MUTEX, // CSharedCriticalSection
+    RECURSIVE_SHARED_MUTEX, // CRecursiveSharedCriticalSection
+};
+
+enum OwnershipType
+{
+    SHARED,
+    EXCLUSIVE
 };
 
 #ifdef DEBUG_LOCKORDER // this ifdef covers the rest of the file
@@ -52,24 +58,24 @@ uint64_t getTid(void)
 
 struct CLockLocation
 {
-    CLockLocation(const char *pszName, const char *pszFile, int nLine, bool fTryIn, bool fExclusiveIn)
+    CLockLocation(const char *pszName, const char *pszFile, int nLine, bool fTryIn, OwnershipType eOwnershipIn)
     {
         mutexName = pszName;
         sourceFile = pszFile;
         sourceLine = nLine;
         fTry = fTryIn;
-        fExclusive = fExclusiveIn;
+        eOwnership = eOwnershipIn;
         fWaiting = true;
     }
 
     std::string ToString() const
     {
         return mutexName + "  " + sourceFile + ":" + itostr(sourceLine) + (fTry ? " (TRY)" : "") +
-               (fExclusive ? " (EXCLUSIVE)" : "") + (fWaiting ? " (WAITING)" : "");
+               (eOwnership == OwnershipType::EXCLUSIVE ? " (EXCLUSIVE)" : "") + (fWaiting ? " (WAITING)" : "");
     }
 
     bool GetTry() const { return fTry; }
-    bool GetExclusive() const { return fExclusive; }
+    OwnershipType GetExclusive() const { return eOwnership; }
     bool GetWaiting() const { return fWaiting; }
     void ChangeWaitingToHeld() { fWaiting = false; }
 private:
@@ -77,7 +83,7 @@ private:
     std::string mutexName;
     std::string sourceFile;
     int sourceLine;
-    bool fExclusive; // signifies Exclusive Ownership, this is always true for a CCriticalSection
+    OwnershipType eOwnership; // determines if shared or exclusive ownership, locktype::mutex is always exclusive
     bool fWaiting; // determines if lock is held or is waiting to be held
 };
 
@@ -118,17 +124,16 @@ struct LockData
 };
 extern LockData lockdata;
 
-void push_lock(void *c, const CLockLocation &locklocation, LockType type, bool isExclusive, bool fTry);
+void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, OwnershipType ownership, bool fTry);
 void DeleteCritical(void *cs);
-void _remove_lock_critical_exit(void *cs);
 void remove_lock_critical_exit(void *cs);
 std::string LocksHeld();
-void SetWaitingToHeld(void *c, bool isExclusive);
+void SetWaitingToHeld(void *c, OwnershipType ownership);
 bool HasAnyOwners(void *c);
 
 #else // NOT DEBUG_LOCKORDER
 
-static inline void SetWaitingToHeld(void *c, bool isExclusive) {}
+static inline void SetWaitingToHeld(void *c, OwnershipType ownership) {}
 
 #endif // END DEBUG_LOCKORDER
 

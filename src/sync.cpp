@@ -26,11 +26,11 @@ void EnterCritical(const char *pszName,
     const char *pszFile,
     unsigned int nLine,
     void *cs,
-    LockType type,
-    bool isExclusive,
+    LockType locktype,
+    OwnershipType ownership,
     bool fTry)
 {
-    push_lock(cs, CLockLocation(pszName, pszFile, nLine, fTry, isExclusive), type, isExclusive, fTry);
+    push_lock(cs, CLockLocation(pszName, pszFile, nLine, fTry, ownership), locktype, ownership, fTry);
 }
 
 void LeaveCritical(void *cs) { remove_lock_critical_exit(cs); }
