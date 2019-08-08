@@ -24,17 +24,15 @@ void _remove_lock_critical_exit(void *cs)
     {
         throw std::logic_error("unlocking non-existant lock");
     }
-    else
+    if (it->second.back().first != cs)
     {
-        if (it->second.back().first != cs)
-        {
-            LOGA("got %s but was not expecting it\n", it->second.back().second.ToString().c_str());
-            throw std::logic_error("unlock order inconsistant with lock order");
-        }
-        ownership = it->second.back().second.GetExclusive();
-        fTry = it->second.back().second.GetTry();
-        it->second.pop_back();
+        LOGA("got %s but was not expecting it\n", it->second.back().second.ToString().c_str());
+        throw std::logic_error("unlock order inconsistant with lock order");
     }
+    ownership = it->second.back().second.GetExclusive();
+    fTry = it->second.back().second.GetTry();
+    // assuming we unlock in the reverse order of locks, we can simply pop back
+    it->second.pop_back();
     // remove from the other maps
     if (ownership == OwnershipType::EXCLUSIVE)
     {
@@ -177,7 +175,7 @@ static bool RecursiveCheck(const uint64_t &tid,
     auto self_iter = lockdata.locksheldbythread.find(lastTid);
     if (self_iter != lockdata.locksheldbythread.end())
     {
-        if(self_iter->second.size() == 0)
+        if (self_iter->second.size() == 0)
         {
             // we cant deadlock if we dont own any other mutexs
             return false;
@@ -190,20 +188,20 @@ static bool RecursiveCheck(const uint64_t &tid,
     auto readiter = lockdata.readlocksheld.find(lastLock);
 
     // NOTE: be careful when adjusting these booleans, the order of the checks is important
-    bool readIsEnd = ((readiter == lockdata.readlocksheld.end()) || readiter->second.empty());
-    bool writeIsEnd = ((writeiter == lockdata.writelocksheld.end()) || writeiter->second.empty());
-    if (writeIsEnd && readIsEnd)
+    bool isReadLocked = !((readiter == lockdata.readlocksheld.end()) || readiter->second.empty());
+    bool isWriteLocked = !((writeiter == lockdata.writelocksheld.end()) || writeiter->second.empty());
+    if (!isWriteLocked && !isReadLocked)
     {
         // no owners, no deadlock possible
         return false;
     }
     // we have other locks, so check if we have any in common with the holder(s) of the other lock
     std::set<uint64_t> otherLocks;
-    if (!writeIsEnd)
+    if (isWriteLocked)
     {
         otherLocks.insert(writeiter->second.begin(), writeiter->second.end());
     }
-    if (!readIsEnd)
+    if (isReadLocked)
     {
         otherLocks.insert(readiter->second.begin(), readiter->second.end());
     }
@@ -408,7 +406,8 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
     if (fTry)
     {
         // a try lock will either get it, or it wont. so just add it.
-        // if we dont get the lock this will be undone in destructor
+        // if we dont get the lock this will be undone in the destructor of the read or write block
+        // for whichever critical section made this function call.
         AddNewLock(now, tid);
         // AddNewWaitingLock(c, tid, isExclusive);
         return;
@@ -416,17 +415,9 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
     // first check lock specific issues
     if (locktype == LockType::SHARED_MUTEX)
     {
-    TEST_1_SM:
-    TEST_2:
-    TEST_3:
-    TEST_4:
         // shared mutexs cant recursively lock at all, check if we already have a lock on the mutex
         auto it = lockdata.locksheldbythread.find(tid);
-        if (it == lockdata.locksheldbythread.end() || it->second.empty())
-        {
-            // intentionally left blank
-        }
-        else
+        if (it != lockdata.locksheldbythread.end() && !it->second.empty())
         {
             for (auto &lockStackLock : it->second)
             {
@@ -440,16 +431,11 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
     }
     else if (locktype == LockType::RECURSIVE_SHARED_MUTEX)
     {
-    TEST_1_RSM:
         // we cannot lock exclusive if we already hold shared, check for this scenario
         if (ownership == OwnershipType::EXCLUSIVE)
         {
             auto it = lockdata.locksheldbythread.find(tid);
-            if (it == lockdata.locksheldbythread.end() || it->second.empty())
-            {
-                // intentionally left blank
-            }
-            else
+            if (it != lockdata.locksheldbythread.end() && !it->second.empty())
             {
                 for (auto &lockStackLock : it->second)
                 {
@@ -465,6 +451,7 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
         else
         {
             // intentionally left blank
+            // a single thread taking an exclusive lock then shared lock wont deadlock, only shared then exclusive
         }
     }
     else if (locktype == LockType::RECURSIVE_MUTEX)
@@ -474,16 +461,12 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
     }
     else
     {
-        DbgAssert(!"unsupported lock type", return);
+        DbgAssert(!"unsupported lock type", return );
     }
 
     // Begin general deadlock checks for all lock types
     AddNewLock(now, tid);
     AddNewWaitingLock(c, tid, ownership);
-    TEST_5:
-    TEST_6:
-    TEST_7:
-    TEST_8:
     std::vector<LockStackEntry> deadlocks;
     std::set<uint64_t> threads;
     if (RecursiveCheck(tid, c, tid, c, true, deadlocks, threads))
@@ -502,14 +485,10 @@ void DeleteCritical(void *cs)
         // lockdata was already deleted
         return;
     }
-    if (lockdata.readlockswaiting.count(cs))
-        lockdata.readlockswaiting.erase(cs);
-    if (lockdata.writelockswaiting.count(cs))
-        lockdata.writelockswaiting.erase(cs);
-    if (lockdata.readlocksheld.count(cs))
-        lockdata.readlocksheld.erase(cs);
-    if (lockdata.writelocksheld.count(cs))
-        lockdata.writelocksheld.erase(cs);
+    lockdata.readlockswaiting.erase(cs);
+    lockdata.writelockswaiting.erase(cs);
+    lockdata.readlocksheld.erase(cs);
+    lockdata.writelocksheld.erase(cs);
     for (auto &iter : lockdata.locksheldbythread)
     {
         LockStack newStack;
@@ -527,7 +506,6 @@ void DeleteCritical(void *cs)
 // removes 1 lock for a critical section
 void remove_lock_critical_exit(void *cs)
 {
-    // assuming we unlock in the reverse order of locks, we can simply pop back
     std::lock_guard<std::mutex> lock(lockdata.dd_mutex);
     _remove_lock_critical_exit(cs);
 }

@@ -2161,7 +2161,18 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         ret.pushKV("txCommitQ", (uint64_t)txCommitQ->size());
     ret.pushKV("txInQ", (uint64_t)txInQ.size());
     ret.pushKV("txDeferQ", (uint64_t)txDeferQ.size());
-
+#ifdef DEBUG_LOCKORDER
+    {
+        std::lock_guard<std::mutex> lock(lockdata.dd_mutex);
+        uint64_t lockorderssize = 0;
+        lockorderssize += lockdata.readlockswaiting.size();
+        lockorderssize += lockdata.writelockswaiting.size();
+        lockorderssize += lockdata.readlocksheld.size();
+        lockorderssize += lockdata.writelocksheld.size();
+        lockorderssize *= 2;
+        ret.pushKV("lockorders", lockorderssize);
+    }
+#endif
     LOCK(cs_vNodes);
     int disconnected = 0; // watch # of disconnected nodes to ensure they are being cleaned up
     for (std::vector<CNode *>::iterator it = vNodes.begin(); it != vNodes.end(); ++it)

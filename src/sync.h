@@ -478,7 +478,7 @@ typedef CMutexLock<CRecursiveSharedCriticalSection> CRecursiveWriteBlock;
     CRecursiveReadBlock UNIQUIFY(recursivereadblock)(cs, #cs, __FILE__, __LINE__, LockType::RECURSIVE_SHARED_MUTEX)
 #define RECURSIVEWRITELOCK(cs) \
     CRecursiveWriteBlock UNIQUIFY(writeblock)(cs, #cs, __FILE__, __LINE__, LockType::RECURSIVE_SHARED_MUTEX)
-#define RECURSIVEREADLOCK2(cs1, cs2)                                                                    \
+#define RECURSIVEREADLOCK2(cs1, cs2)                                                                           \
     CReadBlock UNIQUIFY(recursivereadblock1)(cs1, #cs1, __FILE__, __LINE__, LockType::RECURSIVE_SHARED_MUTEX), \
         UNIQUIFY(recursivereadblock2)(cs2, #cs2, __FILE__, __LINE__, LockType::RECURSIVE_SHARED_MUTEX)
 #define TRY_RECURSIVE_READ_LOCK(cs, name) \
@@ -490,21 +490,21 @@ typedef CMutexLock<CCriticalSection> CCriticalBlock;
 
 #define READLOCK(cs) CReadBlock UNIQUIFY(readblock)(cs, #cs, __FILE__, __LINE__, LockType::SHARED_MUTEX)
 #define WRITELOCK(cs) CWriteBlock UNIQUIFY(writeblock)(cs, #cs, __FILE__, __LINE__, LockType::SHARED_MUTEX)
-#define READLOCK2(cs1, cs2)                                                           \
+#define READLOCK2(cs1, cs2)                                                                 \
     CReadBlock UNIQUIFY(readblock1)(cs1, #cs1, __FILE__, __LINE__, LockType::SHARED_MUTEX), \
         UNIQUIFY(readblock2)(cs2, #cs2, __FILE__, __LINE__, LockType::SHARED_MUTEX)
 #define TRY_READ_LOCK(cs, name) CReadBlock name(cs, #cs, __FILE__, __LINE__, LockType::SHARED_MUTEX, true)
 
 #define LOCK(cs) CCriticalBlock UNIQUIFY(criticalblock)(cs, #cs, __FILE__, __LINE__, LockType::RECURSIVE_MUTEX)
-#define LOCK2(cs1, cs2)                                                                          \
+#define LOCK2(cs1, cs2)                                                                                \
     CCriticalBlock UNIQUIFY(criticalblock1)(cs1, #cs1, __FILE__, __LINE__, LockType::RECURSIVE_MUTEX), \
         UNIQUIFY(criticalblock2)(cs2, #cs2, __FILE__, __LINE__, LockType::RECURSIVE_MUTEX)
 #define TRY_LOCK(cs, name) CCriticalBlock name(cs, #cs, __FILE__, __LINE__, LockType::RECURSIVE_MUTEX, true)
 
-#define ENTER_CRITICAL_SECTION(cs)                                                        \
-    {                                                                                     \
+#define ENTER_CRITICAL_SECTION(cs)                                                                                  \
+    {                                                                                                               \
         EnterCritical(#cs, __FILE__, __LINE__, (void *)(&cs), LockType::RECURSIVE_MUTEX, OwnershipType::EXCLUSIVE); \
-        (cs).lock();                                                                      \
+        (cs).lock();                                                                                                \
     }
 
 #define LEAVE_CRITICAL_SECTION(cs) \

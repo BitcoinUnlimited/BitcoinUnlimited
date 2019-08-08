@@ -1,4 +1,5 @@
 // Copyright (c) 2019 Greg Griffith
+// Copyright (c) 2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -16,14 +17,14 @@
 #include <shared_mutex>
 #include <thread>
 
-BOOST_FIXTURE_TEST_SUITE(test6, EmptySuite)
+BOOST_FIXTURE_TEST_SUITE(deadlock_test6, EmptySuite)
 
 #ifdef DEBUG_LOCKORDER // this ifdef covers the rest of the file
 
 CSharedCriticalSection mutexA;
 CSharedCriticalSection mutexB;
 std::atomic<bool> done{false};
-std::atomic<int> lock_exceptions{false};
+std::atomic<int> lock_exceptions{0};
 std::atomic<int> writelocks{0};
 std::atomic<int> readlocks{0};
 

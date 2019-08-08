@@ -748,8 +748,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::PING)
     {
         LeaveCritical(&pfrom->csMsgSerializer);
-        EnterCritical("pfrom.csMsgSerializer", __FILE__, __LINE__, (void *)(&pfrom->csMsgSerializer), LockType::SHARED_MUTEX,
-            OwnershipType::EXCLUSIVE);
+        EnterCritical("pfrom.csMsgSerializer", __FILE__, __LINE__, (void *)(&pfrom->csMsgSerializer),
+            LockType::SHARED_MUTEX, OwnershipType::EXCLUSIVE);
         uint64_t nonce = 0;
         vRecv >> nonce;
         // although PONG was enabled in BIP31, all clients should handle it at this point
@@ -767,8 +767,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // return very quickly.
         pfrom->PushMessage(NetMsgType::PONG, nonce);
         LeaveCritical(&pfrom->csMsgSerializer);
-        EnterCritical("pfrom.csMsgSerializer", __FILE__, __LINE__, (void *)(&pfrom->csMsgSerializer), LockType::SHARED_MUTEX,
-            OwnershipType::SHARED);
+        EnterCritical("pfrom.csMsgSerializer", __FILE__, __LINE__, (void *)(&pfrom->csMsgSerializer),
+            LockType::SHARED_MUTEX, OwnershipType::SHARED);
     }
 
     // ------------------------- END INITIAL COMMAND SET PROCESSING
