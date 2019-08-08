@@ -22,32 +22,52 @@ BOOST_FIXTURE_TEST_SUITE(test6, EmptySuite)
 
 CSharedCriticalSection mutexA;
 CSharedCriticalSection mutexB;
+std::atomic<bool> done{false};
+std::atomic<int> lock_exceptions{false};
+std::atomic<int> writelocks{0};
+std::atomic<int> readlocks{0};
 
 void Thread1()
 {
     READLOCK(mutexA);
-    MilliSleep(100);
-    READLOCK(mutexB);
+    readlocks++;
+    while(writelocks != 1) ;
+    try
+    {
+        READLOCK(mutexB);
+    }
+    catch (const std::logic_error&)
+    {
+        lock_exceptions++;
+    }
+    while (!done) ;
 }
 
 void Thread2()
 {
-    MilliSleep(50);
+    while(readlocks != 1) ;
     WRITELOCK(mutexB);
-    MilliSleep(100);
-    BOOST_CHECK_THROW(WRITELOCK(mutexA), std::logic_error);
+    writelocks++;
+    try
+    {
+        WRITELOCK(mutexA);
+    }
+    catch (const std::logic_error&)
+    {
+        lock_exceptions++;
+    }
+    while (!done) ;
 }
 
-// Thread 1 shared lock A
-// Thread 2 exclusive lock B
-// Thread 1 request shared lock on B
-// Thread 2 request exclusive lock on A, should deadlock here
 BOOST_AUTO_TEST_CASE(TEST_6)
 {
     std::thread thread1(Thread1);
     std::thread thread2(Thread2);
+    while(!lock_exceptions) ;
+    done = true;
     thread1.join();
     thread2.join();
+    BOOST_CHECK(lock_exceptions == 1);
 }
 
 #else
