@@ -8,12 +8,7 @@
 
 struct EmptySuite
 {
-    EmptySuite()
-    {
-        ECC_Start();
-        SetupEnvironment();
-        SetupNetworking();
-    }
+    EmptySuite() {}
 
-    ~EmptySuite() { ECC_Stop(); }
+    ~EmptySuite() {}
 };
