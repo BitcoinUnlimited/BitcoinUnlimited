@@ -301,8 +301,11 @@ public:
 
     /**
      * Check if we have the given utxo already loaded in this cache.
-     * The semantics are the same as HaveCoin(), but no calls to
-     * the backing CCoinsView are made.
+     *
+     * @param[in]  outpoint   A reference to an outpoint in the coin we are checking
+     * @param[out] fSpent     A reference to an bool which indicates if the coin was spent or not
+     *                        NOTE: this value will not be set if the coin does not exist in cache.
+     * @return     bool       A return of true only indicates the coin is in cache, but not if it is spent/unspent
      */
     bool HaveCoinInCache(const COutPoint &outpoint, bool &fSpent) const;
 
