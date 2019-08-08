@@ -724,6 +724,7 @@ static void addElectrumOptions(AllowedArgs &allowedArgs)
             "Raw argument to pass directly to underlying electrum daemon "
             "(example: -electrum.rawarg=\"--server-banner=\\\"Welcome to my server!\\\"\"). "
             "This option can be specified multiple times.")
+        .addArg("electrum.shutdownonerror", optionalBool, "Shutdown if the electrum server exits unexpectedly")
         .addDebugArg("electrum.exec", requiredStr, "Path to electrum daemon executable")
         .addDebugArg("electrum.monitoring.port", requiredStr, "Port to bind monitoring service")
         .addDebugArg("electrum.monitoring.host", requiredStr, "Host to bind monitoring service")

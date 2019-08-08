@@ -263,7 +263,7 @@ def is_connected(gdict, vertices_encountered = None, start_vertex=None):
         """ determines if the graph is connected """
         if vertices_encountered is None:
             vertices_encountered = set()
-        vertices = list(gdict.keys()) # "list" necessary in Python 3 
+        vertices = list(gdict.keys()) # "list" necessary in Python 3
         if not start_vertex:
             # chosse a vertex from graph as a starting point
             start_vertex = vertices[0]
@@ -653,6 +653,10 @@ def wait_bitcoinds():
     for bitcoind in bitcoind_processes.values():
         bitcoind.wait(timeout=BITCOIND_PROC_WAIT_TIMEOUT)
     bitcoind_processes.clear()
+
+def is_bitcoind_running(i):
+    assert i in bitcoind_processes
+    return bitcoind_processes[i].poll() is None
 
 def connect_nodes(from_connection, node_num_or_str):
     """Connect the passed node to another node specified either by node index or by ip address:port string
