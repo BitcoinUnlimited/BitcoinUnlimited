@@ -124,7 +124,7 @@ uint256 GetRandHash()
 
 FastRandomContext::FastRandomContext(bool fDeterministic)
 {
-    FillBitBuffer();
+    bitbuf_size = 0;
     // The seed values have some unlikely fixed points which we avoid.
     if (fDeterministic)
     {
