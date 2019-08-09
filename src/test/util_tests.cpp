@@ -614,9 +614,18 @@ BOOST_AUTO_TEST_CASE(test_FormatSubVersion)
     std::string subver = FormatSubVersion("Test", 99900, BUComments);
     BOOST_CHECK_EQUAL(subver.size(), MAX_SUBVERSION_LENGTH);
 
-    // set EB?AD back to default value
+    // Check if displayArchInSubver Tweak is working
+    fDisplayArchInSubver = false;
+    settingsToUserAgentString();
+    const char *argv_test3[] = {"bitcoind", "-uacomment=comment1", "-uacomment=Comment2", "-uacomment=Comment3"};
+    ParseParameters(4, (char **)argv_test3, AllowedArgs::Bitcoind());
+    BOOST_CHECK_EQUAL(FormatSubVersion("Test", 99900, BUComments),
+        std::string("/Test:0.9.99(EB1; AD40; comment1; Comment2; Comment3)/"));
+
+    // set EB/AD back to default value
     excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
     excessiveAcceptDepth = DEFAULT_EXCESSIVE_ACCEPT_DEPTH;
+    fDisplayArchInSubver = true;
 }
 
 BOOST_AUTO_TEST_CASE(test_ParseFixedPoint)

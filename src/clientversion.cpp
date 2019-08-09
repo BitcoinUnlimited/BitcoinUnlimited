@@ -25,6 +25,11 @@ const std::string CLIENT_NAME("BUCash");
  */
 std::string subverOverride("");
 
+/**
+ * Tweak to turn on/off the display of node architecture on subver string
+ */
+bool fDisplayArchInSubver = true;
+
 // BU move instantiation to a single file
 const int CLIENT_VERSION = 1000000 * CLIENT_VERSION_MAJOR + 10000 * CLIENT_VERSION_MINOR +
                            100 * CLIENT_VERSION_REVISION + 1 * CLIENT_VERSION_BUILD;
@@ -126,7 +131,10 @@ std::string FormatSubVersion(const std::string &name, int nClientVersion, const 
         int temp = 0;
         int *ptemp = &temp;
         std::string arch = (sizeof(ptemp) == 4) ? "32bit" : "64bit";
-        uacomments.insert(std::begin(uacomments), arch);
+        if (fDisplayArchInSubver)
+        {
+            uacomments.insert(std::begin(uacomments), arch);
+        }
     }
 
     std::vector<std::string> vTotComments = comments;
