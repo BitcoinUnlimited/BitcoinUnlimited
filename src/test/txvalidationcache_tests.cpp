@@ -100,7 +100,7 @@ BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup)
 BOOST_FIXTURE_TEST_CASE(cache_configuration, TestChain100Setup)
 {
     // check that default values are returned
-    CacheConfig cacheConfig1 = SetCacheConfiguration(true);
+    CacheConfig cacheConfig1 = DiscoverCacheConfiguration(true);
     BOOST_CHECK(cacheConfig1.nBlockDBCache == 0);
     BOOST_CHECK(cacheConfig1.nBlockUndoDBCache == 0);
     BOOST_CHECK(cacheConfig1.nBlockTreeDBCache == 2097152);
@@ -109,7 +109,7 @@ BOOST_FIXTURE_TEST_CASE(cache_configuration, TestChain100Setup)
     BOOST_CHECK(nCoinCacheMaxSize == 383254528);
 
     // Check non-default values are returned
-    CacheConfig cacheConfig2 = SetCacheConfiguration();
+    CacheConfig cacheConfig2 = DiscoverCacheConfiguration();
     BOOST_CHECK(cacheConfig2.nBlockDBCache == 0);
     BOOST_CHECK(cacheConfig2.nBlockUndoDBCache == 0);
     BOOST_CHECK(cacheConfig2.nBlockTreeDBCache == 655360);
@@ -120,7 +120,7 @@ BOOST_FIXTURE_TEST_CASE(cache_configuration, TestChain100Setup)
 
     // check default values are honored if blockdb storage is on
     BLOCK_DB_MODE = LEVELDB_BLOCK_STORAGE;
-    cacheConfig1 = SetCacheConfiguration(true);
+    cacheConfig1 = DiscoverCacheConfiguration(true);
     BOOST_CHECK(cacheConfig1.nBlockDBCache == 26109542);
     BOOST_CHECK(cacheConfig1.nBlockUndoDBCache == 5221908);
     BOOST_CHECK(cacheConfig1.nBlockTreeDBCache == 2097152);
@@ -131,7 +131,7 @@ BOOST_FIXTURE_TEST_CASE(cache_configuration, TestChain100Setup)
     // check settings when txindex is on
     bool nTemp = GetBoolArg("-txindex", 0);
     SetBoolArg("-txindex", true);
-    cacheConfig1 = SetCacheConfiguration(true);
+    cacheConfig1 = DiscoverCacheConfiguration(true);
     BOOST_CHECK(cacheConfig1.nBlockDBCache == 26109542);
     BOOST_CHECK(cacheConfig1.nBlockUndoDBCache == 5221908);
     BOOST_CHECK(cacheConfig1.nBlockTreeDBCache == 2097152);
@@ -140,7 +140,7 @@ BOOST_FIXTURE_TEST_CASE(cache_configuration, TestChain100Setup)
     BOOST_CHECK(nCoinCacheMaxSize == 359755942);
 
     // Check non-default values are returned
-    cacheConfig2 = SetCacheConfiguration();
+    cacheConfig2 = DiscoverCacheConfiguration();
     BOOST_CHECK(cacheConfig2.nBlockDBCache == 655360);
     BOOST_CHECK(cacheConfig2.nBlockUndoDBCache == 655360);
     BOOST_CHECK(cacheConfig2.nBlockTreeDBCache == 655360);

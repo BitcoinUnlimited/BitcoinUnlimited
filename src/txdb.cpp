@@ -697,7 +697,7 @@ uint64_t GetTotalSystemMemory()
 }
 #endif
 
-CacheConfig SetCacheConfiguration(bool fDefault)
+CacheConfig DiscoverCacheConfiguration(bool fDefault)
 {
 #ifdef WIN32
     // If using WINDOWS then determine the actual physical memory that is currently available for dbcaching.
@@ -805,7 +805,7 @@ void AdjustCoinCacheSize()
     // value for dbcache. This will cause the current coins cache to be immediately trimmed to size.
     if (!IsInitialBlockDownload() && IsChainSyncd() && !GetArg("-dbcache", 0) && chainActive.Tip())
     {
-        SetCacheConfiguration(true);
+        DiscoverCacheConfiguration(true);
         return;
     }
 
@@ -843,7 +843,7 @@ void AdjustCoinCacheSize()
         {
             // Get the lowest possible default coins cache configuration possible and use this value as a limiter
             // to prevent the nCoinCacheMaxSize from falling below this value.
-            SetCacheConfiguration(true);
+            DiscoverCacheConfiguration(true);
 
             nCoinCacheMaxSize =
                 std::max((int64_t)nCoinCacheMaxSize, (int64_t)(nCoinCacheMaxSize - (nUnusedMem - nMemAvailable)));

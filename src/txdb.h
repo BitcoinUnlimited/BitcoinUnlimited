@@ -54,6 +54,14 @@ uint64_t GetAvailableMemory();
 /** Get the total physical memory */
 uint64_t GetTotalSystemMemory();
 
+/** Storage allocation settings are helod here for the various database caches
+ * @param nBlockDBCache       The total database size for the block read/write caches, used in blocksdb
+ * @param nBlockUndoDBCache   The total database size for the block undo read/write caches, used in blocksdb
+ * @param nBlockTreeDBCache   The total database size for the block index read/write caches
+ * @param nBlockTxIndexCache  The total database size for the transaction index read/write caches
+ * @param nCoinDBCache        The total database size for the on disk utxo read/write caches
+ * NOTE: the UTXO in memory cache size is a global var and so is not held in this struct
+ */
 struct CacheConfig
 {
     int64_t nBlockDBCache;
@@ -65,12 +73,12 @@ struct CacheConfig
     CacheConfig() : nBlockDBCache(0), nBlockUndoDBCache(0), nBlockTreeDBCache(0), nTxIndexCache(0), nCoinDBCache(0) {}
 };
 
-/** Get the sizes for each of the caches. This is done during init.cpp on startup but also
+/** Discover the sizes for each of the caches. This is done during init.cpp on startup but also
  *  later, during dynamic sizing of the coins cache, when need to know the initial startup values.
  */
-CacheConfig SetCacheConfiguration(bool fDefault = false);
+CacheConfig DiscoverCacheConfiguration(bool fDefault = false);
 
-/** Calculate the various cache sizes. This is primarily used in SetCacheConfiguration() however during
+/** Calculate the various cache sizes. This is primarily used in DisoverCacheConfiguration() however during
  *  dynamic sizing of the coins cache we also need to use this function directly.
  */
 CacheConfig CacheSizeCalculations(int64_t _nTotalCache);

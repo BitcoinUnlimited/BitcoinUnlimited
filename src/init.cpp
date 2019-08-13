@@ -1081,7 +1081,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     }
 
     // Return the initial values for the various in memory caches.
-    CacheConfig cacheConfig = SetCacheConfiguration();
+    CacheConfig cacheConfig = DiscoverCacheConfiguration();
     LOGA("Cache configuration:\n");
     LOGA("* Using %.1fMiB for block database\n", cacheConfig.nBlockDBCache * (1.0 / 1024 / 1024));
     LOGA("* Using %.1fMiB for block undo database\n", cacheConfig.nBlockUndoDBCache * (1.0 / 1024 / 1024));
