@@ -46,7 +46,7 @@ if sourcePath != outOfSourceBuildPath:
     sys.path.append(outOfSourceBuildPath)
 
 from tests_config import *
-from test_classes import RpcTest, Disabled, Skip
+from test_classes import RpcTest, Disabled, Skip, WhenElectrumFound
 
 BOLD = ("","")
 if os.name == 'posix':
@@ -246,8 +246,8 @@ testScripts = [ RpcTest(t) for t in [
     'sighashmatch',
     'getlogcategories',
     'getrawtransaction',
-    Disabled('electrum_basics', "Needs to be skipped if electrs is not built"),
-    Disabled('electrum_reorg', "Needs to be skipped if electrs is not built")
+    WhenElectrumFound('electrum_basics'),
+    WhenElectrumFound('electrum_reorg'),
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
