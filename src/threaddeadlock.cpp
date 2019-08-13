@@ -329,6 +329,8 @@ void AddNewWaitingLock(void *c, const uint64_t &tid, OwnershipType ownership)
 
 void SetWaitingToHeld(void *c, OwnershipType ownership)
 {
+    std::lock_guard<std::mutex> lock(lockdata.dd_mutex);
+
     const uint64_t tid = getTid();
     if (ownership == OwnershipType::EXCLUSIVE)
     {
