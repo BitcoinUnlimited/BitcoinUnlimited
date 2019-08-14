@@ -391,6 +391,10 @@ def runtests():
                     trimmed_tests_to_run.append(t)
             tests_to_run = trimmed_tests_to_run
 
+        # if all specified tests are disabled just quit
+        if len(tests_to_run) == 0:
+            quit()
+
         if len(tests_to_run) > 1 and run_parallel:
             # Populate cache
             subprocess.check_output([RPC_TESTS_DIR + 'create_cache.py'] + [flags]+
