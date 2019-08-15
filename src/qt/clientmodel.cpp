@@ -142,7 +142,10 @@ OptionsModel *ClientModel::getOptionsModel() { return optionsModel; }
 PeerTableModel *ClientModel::getPeerTableModel() { return peerTableModel; }
 BanTableModel *ClientModel::getBanTableModel() { return banTableModel; }
 QString ClientModel::formatFullVersion() const { return QString::fromStdString(FormatFullVersion()); }
-QString ClientModel::formatSubVersion() const { return QString::fromStdString(strSubVersion); }
+QString ClientModel::formatSubVersion() const
+{
+    return QString::fromStdString(FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, BUComments));
+}
 bool ClientModel::isReleaseVersion() const { return CLIENT_VERSION_IS_RELEASE; }
 QString ClientModel::clientName() const { return QString::fromStdString(CLIENT_NAME); }
 QString ClientModel::formatClientStartupTime() const
