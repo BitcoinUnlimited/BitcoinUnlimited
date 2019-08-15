@@ -592,8 +592,9 @@ bool FlushStateToDiskInternal(CValidationState &state,
     size_t cacheSize = pcoinsTip->DynamicMemoryUsage();
     static int64_t nSizeAfterLastFlush = 0;
     // The cache is close to the limit. Try to flush and trim.
-    bool fCacheCritical = ((mode == FLUSH_STATE_IF_NEEDED) && (cacheSize > (size_t)nCoinCacheMaxSize)) ||
-                          (cacheSize - nSizeAfterLastFlush > (int64_t)nMaxCacheIncreaseSinceLastFlush);
+    bool fCacheCritical =
+        ((mode == FLUSH_STATE_IF_NEEDED) && (cacheSize > (size_t)nCoinCacheMaxSize)) ||
+        (!GetArg("-dbcache", 0) && cacheSize - nSizeAfterLastFlush > (int64_t)nMaxCacheIncreaseSinceLastFlush);
     // It's been a while since we wrote the block index to disk. Do this frequently, so we don't need to redownload
     // after a crash.
     bool fPeriodicWrite =
@@ -683,8 +684,12 @@ bool FlushStateToDiskInternal(CValidationState &state,
         {
             pcoinsTip->Trim(nCoinCacheMaxSize * .95);
         }
-        else
+        else if (!GetArg("-dbcache", 0))
         {
+            // When no dbcache setting is in place then we default to flushing the cache
+            // more frequently to support the automatic cache sizing function. If we don't
+            // do this, then when flush time comes we can easily exceed the maxiumum memory,
+            // particularly on Windows systems.
             // Trim, but never trim more than nMaxCacheIncreaseSinceLastFlush
             size_t nTrimSize = nCoinCacheMaxSize * .90;
             if (nCoinCacheMaxSize - nMaxCacheIncreaseSinceLastFlush > nTrimSize)
@@ -694,6 +699,14 @@ bool FlushStateToDiskInternal(CValidationState &state,
             }
             pcoinsTip->Trim(nTrimSize);
         }
+        else
+        {
+            // During IBD this is gives optimal performance, particularly on systems with
+            // spinning disk. This is because we keep the number of databaase compactions
+            // to a minimum.
+            pcoinsTip->Trim(nCoinCacheMaxSize * .90);
+        }
+
         nSizeAfterLastFlush = pcoinsTip->DynamicMemoryUsage();
     }
     if (fDoFullFlush || ((mode == FLUSH_STATE_ALWAYS || mode == FLUSH_STATE_PERIODIC) &&
