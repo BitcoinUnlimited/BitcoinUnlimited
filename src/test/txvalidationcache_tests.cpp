@@ -3,6 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "blockstorage/blockstorage.h"
 #include "consensus/validation.h"
 #include "key.h"
 #include "keystore.h"
@@ -94,6 +95,61 @@ BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup)
     // block with spends[0] is accepted:
     BOOST_CHECK_EQUAL(mempool.size(), 0);
     mempool.clear();
+}
+
+BOOST_FIXTURE_TEST_CASE(cache_configuration, TestChain100Setup)
+{
+    // check that default values are returned
+    CacheConfig cacheConfig1 = DiscoverCacheConfiguration(true);
+    BOOST_CHECK(cacheConfig1.nBlockDBCache == 0);
+    BOOST_CHECK(cacheConfig1.nBlockUndoDBCache == 0);
+    BOOST_CHECK(cacheConfig1.nBlockTreeDBCache == 2097152);
+    BOOST_CHECK(cacheConfig1.nTxIndexCache == 0);
+    BOOST_CHECK(cacheConfig1.nCoinDBCache == 138936320);
+    BOOST_CHECK(nCoinCacheMaxSize == 383254528);
+
+    // Check non-default values are returned
+    CacheConfig cacheConfig2 = DiscoverCacheConfiguration();
+    BOOST_CHECK(cacheConfig2.nBlockDBCache == 0);
+    BOOST_CHECK(cacheConfig2.nBlockUndoDBCache == 0);
+    BOOST_CHECK(cacheConfig2.nBlockTreeDBCache == 655360);
+    BOOST_CHECK(cacheConfig2.nTxIndexCache == 0);
+    BOOST_CHECK(cacheConfig2.nCoinDBCache == 2293760);
+    BOOST_CHECK(nCoinCacheMaxSize == 2293760);
+
+
+    // check default values are honored if blockdb storage is on
+    BLOCK_DB_MODE = LEVELDB_BLOCK_STORAGE;
+    cacheConfig1 = DiscoverCacheConfiguration(true);
+    BOOST_CHECK(cacheConfig1.nBlockDBCache == 26109542);
+    BOOST_CHECK(cacheConfig1.nBlockUndoDBCache == 5221908);
+    BOOST_CHECK(cacheConfig1.nBlockTreeDBCache == 2097152);
+    BOOST_CHECK(cacheConfig1.nTxIndexCache == 0);
+    BOOST_CHECK(cacheConfig1.nCoinDBCache == 131103457);
+    BOOST_CHECK(nCoinCacheMaxSize == 359755941);
+
+    // check settings when txindex is on
+    bool nTemp = GetBoolArg("-txindex", 0);
+    SetBoolArg("-txindex", true);
+    cacheConfig1 = DiscoverCacheConfiguration(true);
+    BOOST_CHECK(cacheConfig1.nBlockDBCache == 26109542);
+    BOOST_CHECK(cacheConfig1.nBlockUndoDBCache == 5221908);
+    BOOST_CHECK(cacheConfig1.nBlockTreeDBCache == 2097152);
+    BOOST_CHECK(cacheConfig1.nTxIndexCache == 65551728);
+    BOOST_CHECK(cacheConfig1.nCoinDBCache == 65551728);
+    BOOST_CHECK(nCoinCacheMaxSize == 359755942);
+
+    // Check non-default values are returned
+    cacheConfig2 = DiscoverCacheConfiguration();
+    BOOST_CHECK(cacheConfig2.nBlockDBCache == 655360);
+    BOOST_CHECK(cacheConfig2.nBlockUndoDBCache == 655360);
+    BOOST_CHECK(cacheConfig2.nBlockTreeDBCache == 655360);
+    BOOST_CHECK(cacheConfig2.nTxIndexCache == 819200);
+    BOOST_CHECK(cacheConfig2.nCoinDBCache == 819200);
+    BOOST_CHECK(nCoinCacheMaxSize == 1638400);
+
+    // Cleanup
+    SetBoolArg("-txindex", nTemp);
 }
 
 BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
