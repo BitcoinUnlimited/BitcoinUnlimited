@@ -295,6 +295,38 @@ void AddNewLock(LockStackEntry newEntry, const uint64_t &tid)
     }
 }
 
+void AddNewHeldLock(void *c, const uint64_t &tid, OwnershipType ownership)
+{
+    if (ownership == OwnershipType::EXCLUSIVE)
+    {
+        auto it = lockdata.writelocksheld.find(c);
+        if (it == lockdata.writelocksheld.end())
+        {
+            std::set<uint64_t> holders;
+            holders.emplace(tid);
+            lockdata.writelocksheld.emplace(c, holders);
+        }
+        else
+        {
+            it->second.emplace(tid);
+        }
+    }
+    else //  !isExclusive
+    {
+        auto it = lockdata.readlocksheld.find(c);
+        if (it == lockdata.readlocksheld.end())
+        {
+            std::set<uint64_t> holders;
+            holders.emplace(tid);
+            lockdata.readlocksheld.emplace(c, holders);
+        }
+        else
+        {
+            it->second.emplace(tid);
+        }
+    }
+}
+
 void AddNewWaitingLock(void *c, const uint64_t &tid, OwnershipType ownership)
 {
     if (ownership == OwnershipType::EXCLUSIVE)
@@ -332,6 +364,22 @@ void SetWaitingToHeld(void *c, OwnershipType ownership)
     std::lock_guard<std::mutex> lock(lockdata.dd_mutex);
 
     const uint64_t tid = getTid();
+    // we do this first so changes are still made for trylocks which dont have
+    // a waiting lock to be edited
+    auto itheld = lockdata.locksheldbythread.find(tid);
+    if (itheld != lockdata.locksheldbythread.end())
+    {
+        for (auto rit = itheld->second.rbegin(); rit != itheld->second.rend(); ++rit)
+        {
+            if (rit->first == c)
+            {
+                rit->second.ChangeWaitingToHeld();
+                break;
+            }
+        }
+    }
+
+
     if (ownership == OwnershipType::EXCLUSIVE)
     {
         auto it = lockdata.writelockswaiting.find(c);
@@ -378,19 +426,6 @@ void SetWaitingToHeld(void *c, OwnershipType ownership)
             }
         }
     }
-
-    auto itheld = lockdata.locksheldbythread.find(tid);
-    if (itheld != lockdata.locksheldbythread.end())
-    {
-        for (auto rit = itheld->second.rbegin(); rit != itheld->second.rend(); ++rit)
-        {
-            if (rit->first == c)
-            {
-                rit->second.ChangeWaitingToHeld();
-                break;
-            }
-        }
-    }
 }
 
 // c = the cs
@@ -411,7 +446,8 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
         // if we dont get the lock this will be undone in the destructor of the read or write block
         // for whichever critical section made this function call.
         AddNewLock(now, tid);
-        // AddNewWaitingLock(c, tid, isExclusive);
+        // we need to add a held lock
+        AddNewHeldLock(c, tid, ownership);
         return;
     }
     // first check lock specific issues
