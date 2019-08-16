@@ -36,7 +36,7 @@ void _remove_lock_critical_exit(void *cs)
     {
         for (auto entry : it->second)
         {
-            if(entry.first == cs)
+            if (entry.first == cs)
             {
                 // we have another lock on this critical section
                 return;
@@ -497,7 +497,7 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
             for (auto &entry : it->second)
             {
                 // if we have locked this lock before...
-                if(entry.first == c)
+                if (entry.first == c)
                 {
                     // then we are locking recursively
                     lockingRecursively = true;

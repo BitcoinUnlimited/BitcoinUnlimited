@@ -58,7 +58,12 @@ uint64_t getTid(void)
 
 struct CLockLocation
 {
-    CLockLocation(const char *pszName, const char *pszFile, int nLine, bool fTryIn, OwnershipType eOwnershipIn, LockType eLockTypeIn)
+    CLockLocation(const char *pszName,
+        const char *pszFile,
+        int nLine,
+        bool fTryIn,
+        OwnershipType eOwnershipIn,
+        LockType eLockTypeIn)
     {
         mutexName = pszName;
         sourceFile = pszFile;
