@@ -292,12 +292,7 @@ private:
         else
             lockedTime = GetStopwatch();
 #endif
-        bool owned = lock.owns_lock();
-        if (owned)
-        {
-            SetWaitingToHeld((void *)(lock.mutex()), OwnershipType::EXCLUSIVE);
-        }
-        return owned;
+        return lock.owns_lock();
     }
 
 public:
@@ -412,12 +407,7 @@ private:
         else
             lockedTime = GetStopwatch();
 #endif
-        bool owned = lock.owns_lock();
-        if (owned)
-        {
-            SetWaitingToHeld((void *)(lock.mutex()), OwnershipType::SHARED);
-        }
-        return owned;
+        return lock.owns_lock();
     }
 
 public:
