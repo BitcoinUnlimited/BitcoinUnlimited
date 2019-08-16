@@ -29,7 +29,6 @@ void _remove_lock_critical_exit(void *cs)
     }
     LockType type = it->second.back().second.GetLockType();
     OwnershipType ownership = it->second.back().second.GetExclusive();
-    bool fTry = it->second.back().second.GetTry();
     // assuming we unlock in the reverse order of locks, we can simply pop back
     it->second.pop_back();
     // if we have no more locks on this critical section...
@@ -47,59 +46,27 @@ void _remove_lock_critical_exit(void *cs)
     // remove from the other maps
     if (ownership == OwnershipType::EXCLUSIVE)
     {
-        if (fTry)
+        auto iter = lockdata.writelocksheld.find(cs);
+        if (iter != lockdata.writelocksheld.end())
         {
-            auto iter = lockdata.writelockswaiting.find(cs);
-            if (iter != lockdata.writelockswaiting.end())
+            if (iter->second.empty())
+                return;
+            if (iter->second.count(tid) != 0)
             {
-                if (iter->second.empty())
-                    return;
-                if (iter->second.count(tid) != 0)
-                {
-                    iter->second.erase(tid);
-                }
-            }
-        }
-        else
-        {
-            auto iter = lockdata.writelocksheld.find(cs);
-            if (iter != lockdata.writelocksheld.end())
-            {
-                if (iter->second.empty())
-                    return;
-                if (iter->second.count(tid) != 0)
-                {
-                    iter->second.erase(tid);
-                }
+                iter->second.erase(tid);
             }
         }
     }
     else // !isExclusive
     {
-        if (fTry)
+        auto iter = lockdata.readlocksheld.find(cs);
+        if (iter != lockdata.readlocksheld.end())
         {
-            auto iter = lockdata.readlockswaiting.find(cs);
-            if (iter != lockdata.readlockswaiting.end())
+            if (iter->second.empty())
+                return;
+            if (iter->second.count(tid) != 0)
             {
-                if (iter->second.empty())
-                    return;
-                if (iter->second.count(tid) != 0)
-                {
-                    iter->second.erase(tid);
-                }
-            }
-        }
-        else
-        {
-            auto iter = lockdata.readlocksheld.find(cs);
-            if (iter != lockdata.readlocksheld.end())
-            {
-                if (iter->second.empty())
-                    return;
-                if (iter->second.count(tid) != 0)
-                {
-                    iter->second.erase(tid);
-                }
+                iter->second.erase(tid);
             }
         }
     }
@@ -439,6 +406,11 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
     std::lock_guard<std::mutex> lock(lockdata.dd_mutex);
 
     LockStackEntry now = std::make_pair(c, locklocation);
+    if (fTry)
+    {
+        // try locks can not be waiting
+        now.second.ChangeWaitingToHeld();
+    }
     // tid of the originating request
     const uint64_t tid = getTid();
     // If this is a blocking lock operation, we want to make sure that the locking order between 2 mutexes is consistent
