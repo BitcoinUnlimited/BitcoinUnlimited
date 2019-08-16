@@ -1914,7 +1914,7 @@ bool ConnectBlockPrevalidations(const CBlock &block,
     const CChainParams &chainparams,
     bool fJustCheck)
 {
-    int64_t nTimeStart = GetTimeMicros();
+    int64_t nTimeStart = GetStopwatchMicros();
 
     // Check it again in case a previous version let a bad block in
     if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
@@ -1926,7 +1926,7 @@ bool ConnectBlockPrevalidations(const CBlock &block,
     uint256 hashPrevBlock = pindex->pprev == nullptr ? uint256() : pindex->pprev->GetBlockHash();
     assert(hashPrevBlock == view.GetBestBlock());
 
-    int64_t nTime1 = GetTimeMicros();
+    int64_t nTime1 = GetStopwatchMicros();
     nTimeCheck += nTime1 - nTimeStart;
     LOG(BENCH, "    - Sanity checks: %.2fms [%.2fs]\n", 0.001 * (nTime1 - nTimeStart), nTimeCheck * 0.000001);
 
@@ -1983,7 +1983,7 @@ bool ConnectBlockPrevalidations(const CBlock &block,
         }
     }
 
-    int64_t nTime2 = GetTimeMicros();
+    int64_t nTime2 = GetStopwatchMicros();
     nTimeForks += nTime2 - nTime1;
     LOG(BENCH, "    - Fork checks: %.2fms [%.2fs]\n", 0.001 * (nTime2 - nTime1), nTimeForks * 0.000001);
 
@@ -2031,7 +2031,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
     std::vector<std::pair<uint256, CDiskTxPos> > &vPos)
 {
     nFees = 0;
-    int64_t nTime2 = GetTimeMicros();
+    int64_t nTime2 = GetStopwatchMicros();
     LOG(BLK, "Dependency ordering for %s MTP: %d\n", block.GetHash().ToString(), pindex->GetMedianTimePast());
 
     // Start enforcing BIP68 (sequence locks) and BIP112 (CHECKSEQUENCEVERIFY)
@@ -2209,13 +2209,13 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
         }
     }
 
-    int64_t nTime3 = GetTimeMicros();
+    int64_t nTime3 = GetStopwatchMicros();
     nTimeConnect += nTime3 - nTime2;
     LOG(BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n", (unsigned)block.vtx.size(),
         0.001 * (nTime3 - nTime2), 0.001 * (nTime3 - nTime2) / block.vtx.size(),
         nInputs <= 1 ? 0 : 0.001 * (nTime3 - nTime2) / (nInputs - 1), nTimeConnect * 0.000001);
 
-    int64_t nTime4 = GetTimeMicros();
+    int64_t nTime4 = GetStopwatchMicros();
     nTimeVerify += nTime4 - nTime2;
     LOG(BENCH, "    - Verify %u txins: %.2fms (%.3fms/txin) [%.2fs]\n", nInputs - 1, 0.001 * (nTime4 - nTime2),
         nInputs <= 1 ? 0 : 0.001 * (nTime4 - nTime2) / (nInputs - 1), nTimeVerify * 0.000001);
@@ -2237,7 +2237,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     std::vector<std::pair<uint256, CDiskTxPos> > &vPos)
 {
     nFees = 0;
-    int64_t nTime2 = GetTimeMicros();
+    int64_t nTime2 = GetStopwatchMicros();
     LOG(BLK, "Canonical ordering for %s MTP: %d\n", block.GetHash().ToString(), pindex->GetMedianTimePast());
 
     // Start enforcing BIP68 (sequence locks) and BIP112 (CHECKSEQUENCEVERIFY)
@@ -2448,13 +2448,13 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
         }
     }
 
-    int64_t nTime3 = GetTimeMicros();
+    int64_t nTime3 = GetStopwatchMicros();
     nTimeConnect += nTime3 - nTime2;
     LOG(BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n", (unsigned)block.vtx.size(),
         0.001 * (nTime3 - nTime2), 0.001 * (nTime3 - nTime2) / block.vtx.size(),
         nInputs <= 1 ? 0 : 0.001 * (nTime3 - nTime2) / (nInputs - 1), nTimeConnect * 0.000001);
 
-    int64_t nTime4 = GetTimeMicros();
+    int64_t nTime4 = GetStopwatchMicros();
     nTimeVerify += nTime4 - nTime2;
     LOG(BENCH, "    - Verify %u txins: %.2fms (%.3fms/txin) [%.2fs]\n", nInputs - 1, 0.001 * (nTime4 - nTime2),
         nInputs <= 1 ? 0 : 0.001 * (nTime4 - nTime2) / (nInputs - 1), nTimeVerify * 0.000001);
@@ -2552,7 +2552,7 @@ bool ConnectBlock(const CBlock &block,
     if (fJustCheck)
         return true;
 
-    int64_t nTime4 = GetTimeMicros();
+    int64_t nTime4 = GetStopwatchMicros();
 
     /*****************************************************************************************************************
      *                         Start update of UTXO, if this block wins the validation race *
@@ -2608,7 +2608,7 @@ bool ConnectBlock(const CBlock &block,
     // add this block to the view's block chain (the main UTXO in memory cache)
     view.SetBestBlock(pindex->GetBlockHash());
 
-    int64_t nTime5 = GetTimeMicros();
+    int64_t nTime5 = GetStopwatchMicros();
     nTimeIndex += nTime5 - nTime4;
     LOG(BENCH, "    - Index writing: %.2fms [%.2fs]\n", 0.001 * (nTime5 - nTime4), nTimeIndex * 0.000001);
 
@@ -2617,7 +2617,7 @@ bool ConnectBlock(const CBlock &block,
     GetMainSignals().UpdatedTransaction(hashPrevBestCoinBase);
     hashPrevBestCoinBase = block.vtx[0]->GetHash();
 
-    int64_t nTime6 = GetTimeMicros();
+    int64_t nTime6 = GetStopwatchMicros();
     nTimeCallbacks += nTime6 - nTime5;
     LOG(BENCH, "    - Callbacks: %.2fms [%.2fs]\n", 0.001 * (nTime6 - nTime5), nTimeCallbacks * 0.000001);
 
@@ -2875,7 +2875,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     if (!ReadBlockFromDisk(block, pindexDelete, consensusParams))
         return AbortNode(state, "DisconnectTip(): Failed to read block");
     // Apply the block atomically to the chain state.
-    int64_t nStart = GetTimeMicros();
+    int64_t nStart = GetStopwatchMicros();
     {
         CCoinsViewCache view(pcoinsTip);
         if (DisconnectBlock(block, pindexDelete, view) != DISCONNECT_OK)
@@ -2883,7 +2883,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
         bool result = view.Flush();
         assert(result);
     }
-    LOG(BENCH, "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * 0.001);
+    LOG(BENCH, "- Disconnect block: %.2fms\n", (GetStopwatchMicros() - nStart) * 0.001);
     // Write the chain state to disk, if necessary.
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
@@ -2958,7 +2958,7 @@ bool ConnectTip(CValidationState &state,
         return false;
 
     // Read block from disk.
-    int64_t nTime1 = GetTimeMicros();
+    int64_t nTime1 = GetStopwatchMicros();
     CBlock block;
     if (!pblock)
     {
@@ -2967,7 +2967,7 @@ bool ConnectTip(CValidationState &state,
         pblock = &block;
     }
     // Apply the block atomically to the chain state.
-    int64_t nTime2 = GetTimeMicros();
+    int64_t nTime2 = GetStopwatchMicros();
     nTimeReadFromDisk += nTime2 - nTime1;
     int64_t nTime3;
     LOG(BENCH, "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
@@ -2984,26 +2984,26 @@ bool ConnectTip(CValidationState &state,
             }
             return false;
         }
-        int64_t nStart = GetTimeMicros();
+        int64_t nStart = GetStopwatchMicros();
         bool result = view.Flush();
         nBlockSizeAtChainTip.store(pblock->GetBlockSize());
         assert(result);
-        LOG(BENCH, "      - Update Coins %.3fms\n", GetTimeMicros() - nStart);
+        LOG(BENCH, "      - Update Coins %.3fms\n", GetStopwatchMicros() - nStart);
 
         mapBlockSource.erase(pindexNew->GetBlockHash());
-        nTime3 = GetTimeMicros();
+        nTime3 = GetStopwatchMicros();
         nTimeConnectTotal += nTime3 - nTime2;
         LOG(BENCH, "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
     }
 
-    int64_t nTime4 = GetTimeMicros();
+    int64_t nTime4 = GetStopwatchMicros();
     nTimeFlush += nTime4 - nTime3;
     LOG(BENCH, "  - Flush: %.2fms [%.2fs]\n", (nTime4 - nTime3) * 0.001, nTimeFlush * 0.000001);
     // Write the chain state to disk, if necessary, and only during IBD, reindex, or importing.
     if (!IsChainNearlySyncd() || fReindex || fImporting)
         if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
             return false;
-    int64_t nTime5 = GetTimeMicros();
+    int64_t nTime5 = GetStopwatchMicros();
     nTimeChainState += nTime5 - nTime4;
     LOG(BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
 
@@ -3026,7 +3026,7 @@ bool ConnectTip(CValidationState &state,
         txIdx++;
     }
 
-    int64_t nTime6 = GetTimeMicros();
+    int64_t nTime6 = GetStopwatchMicros();
     nTimePostConnect += nTime6 - nTime5;
     nTimeTotal += nTime6 - nTime1;
     LOG(BENCH, "  - Connect postprocess: %.2fms [%.2fs]\n", (nTime6 - nTime5) * 0.001, nTimePostConnect * 0.000001);
@@ -3451,7 +3451,7 @@ bool ProcessNewBlock(CValidationState &state,
     CDiskBlockPos *dbp,
     bool fParallel)
 {
-    int64_t start = GetTimeMicros();
+    int64_t start = GetStopwatchMicros();
     LOG(THIN, "Processing new block %s from peer %s.\n", pblock->GetHash().ToString(),
         pfrom ? pfrom->GetLogName() : "myself");
     // Preliminary checks
@@ -3520,7 +3520,7 @@ bool ProcessNewBlock(CValidationState &state,
             return false;
     }
 
-    int64_t end = GetTimeMicros();
+    int64_t end = GetStopwatchMicros();
     if (Logging::LogAcceptCategory(BENCH))
     {
         uint64_t maxTxSizeLocal = 0;

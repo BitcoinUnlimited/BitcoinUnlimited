@@ -222,7 +222,8 @@ public:
     bool fRelayTxes;
     int64_t nLastSend;
     int64_t nLastRecv;
-    int64_t nTimeConnected;
+    int64_t nTimeConnected; /** Calendar time this node was connected */
+    uint64_t nStopwatchConnected; /** Stopwatch time this node was connected (in uSec) */
     int64_t nTimeOffset;
     std::string addrName;
     int nVersion;
@@ -254,7 +255,7 @@ public:
     CDataStream vRecv; // received message data
     unsigned int nDataPos;
 
-    int64_t nTime; // time (in microseconds) of message receipt.
+    int64_t nTime; // calendar time (in microseconds) of message receipt.
 
     // default constructor builds an empty message object to accept assignment of real messages
     CNetMessage() : hdrbuf(0, 0), hdr({0, 0, 0, 0}), vRecv(0, 0)
@@ -378,63 +379,66 @@ public:
     int nRecvVersion;
 
     // BU connection de-prioritization
-    //! Total bytes sent and received
+    //* Total bytes sent and received
     uint64_t nActivityBytes;
 
     int64_t nLastSend;
     int64_t nLastRecv;
-    int64_t nTimeConnected;
+    int64_t nTimeConnected; /** Calendar time this node was connected */
+    uint64_t nStopwatchConnected; /** Stopwatch time this node was connected */
     int64_t nTimeOffset;
-    //! The address of the remote peer
+    /** The address of the remote peer */
     CAddress addr;
 
-    //! set to true if this node is ok with no message checksum
+    /** set to true if this node is ok with no message checksum */
     bool skipChecksum;
 
-    //! The address the remote peer advertised in its version message
+    /** The address the remote peer advertised in its version message */
     CAddress addrFrom_advertised;
 
     std::string addrName;
     const char *currentCommand; // if in the middle of the send, this is the command type
-    //! The the remote peer sees us as this address (may be different than our IP due to NAT)
+    /** The the remote peer sees us as this address (may be different than our IP due to NAT) */
     CService addrLocal;
     int nVersion;
 
-    //! The state of informing the remote peer of our version information
+    /** The state of informing the remote peer of our version information */
     ConnectionStateOutgoing state_outgoing;
 
-    //! The state of being informed by the remote peer of his version information
+    /** The state of being informed by the remote peer of his version information */
     ConnectionStateIncoming state_incoming;
 
-    //! used to make processing serial when version handshake is taking place
+    /** used to make processing serial when version handshake is taking place */
     CCriticalSection csSerialPhase;
 
-    //! the intial xversion message sent in the handshake
+    /** the intial xversion message sent in the handshake */
     CCriticalSection cs_xversion;
     CXVersionMessage xVersion;
 
-    //! strSubVer is whatever byte array we read from the wire. However, this field is intended
-    //! to be printed out, displayed to humans in various forms and so on. So we sanitize it and
-    //! store the sanitized version in cleanSubVer. The original should be used when dealing with
-    //! the network or wire types and the cleaned string used when displayed or logged.
+    /** strSubVer is whatever byte array we read from the wire. However, this field is intended
+        to be printed out, displayed to humans in various forms and so on. So we sanitize it and
+        store the sanitized version in cleanSubVer. The original should be used when dealing with
+        the network or wire types and the cleaned string used when displayed or logged.
+    */
     std::string strSubVer, cleanSubVer;
 
-    //! This peer can bypass DoS banning.
+    /** This peer can bypass DoS banning. */
     bool fWhitelisted;
-    //! If true this node is being used as a short lived feeler.
+    /** If true this node is being used as a short lived feeler. */
     bool fFeeler;
     bool fOneShot;
     bool fClient;
 
-    //! after BIP159
+    /** after BIP159 */
     bool m_limited_node;
 
-    //! If true a remote node initiated the connection.  If false, we initiated.
-    //! The protocol is slightly asymmetric:
-    //! initial version exchange
-    //! stop ADDR flooding in preparation for a network-wide eclipse attack
-    //! stop connection slot attack via eviction of stale (connected but no data) inbound connections
-    //! stop fingerprinting by seeding fake addresses and checking for them later by ignoring outbound getaddr
+    /** If true a remote node initiated the connection.  If false, we initiated.
+        The protocol is slightly asymmetric:
+        initial version exchange
+        stop ADDR flooding in preparation for a network-wide eclipse attack
+        stop connection slot attack via eviction of stale (connected but no data) inbound connections
+        stop fingerprinting by seeding fake addresses and checking for them later by ignoring outbound getaddr
+    */
     bool fInbound;
     bool fAutoOutbound; // any outbound node not connected with -addnode, connect-thinblock or -connect
     bool fNetworkNode; // any outbound node

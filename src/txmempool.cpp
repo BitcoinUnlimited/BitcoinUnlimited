@@ -1611,7 +1611,7 @@ bool LoadMempool(void)
 
 bool DumpMempool(void)
 {
-    int64_t start = GetTimeMicros();
+    int64_t start = GetStopwatchMicros();
 
     std::map<uint256, CAmount> mapDeltas;
     std::vector<TxMempoolInfo> vInfo;
@@ -1625,7 +1625,7 @@ bool DumpMempool(void)
         vInfo = mempool.AllTxMempoolInfo();
     }
 
-    int64_t mid = GetTimeMicros();
+    int64_t mid = GetStopwatchMicros();
 
     try
     {
@@ -1653,7 +1653,7 @@ bool DumpMempool(void)
         FileCommit(file.Get());
         file.fclose();
         RenameOver(GetDataDir() / "mempool.dat.new", GetDataDir() / "mempool.dat");
-        int64_t last = GetTimeMicros();
+        int64_t last = GetStopwatchMicros();
         LOGA("Dumped mempool: %gs to copy, %gs to dump\n", (mid - start) * 0.000001, (last - mid) * 0.000001);
     }
     catch (const std::exception &e)

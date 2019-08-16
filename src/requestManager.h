@@ -80,7 +80,7 @@ public:
     CInv obj;
     bool rateLimited;
     bool fProcessing; // object was received but is still being processed
-    int64_t lastRequestTime; // In microseconds, 0 means no request
+    int64_t lastRequestTime; // In stopwatch time microseconds, 0 means no request
     unsigned int outstandingReqs;
     ObjectSourceList availableFrom;
     unsigned int priority;
@@ -101,7 +101,7 @@ public:
 struct QueuedBlock
 {
     uint256 hash;
-    int64_t nTime; //! Time of "getdata" request in microseconds.
+    int64_t nTime; // Stopwatch time of "getdata" request in microseconds.
 };
 struct CRequestManagerNodeState
 {

@@ -24,9 +24,9 @@ static void RollingBloom(benchmark::State& state)
         data[2] = count >> 16;
         data[3] = count >> 24;
         if (countnow == nEntriesPerGeneration) {
-            int64_t b = GetTimeMicros();
+            int64_t b = GetStopwatchMicros();
             filter.insert(data);
-            int64_t e = GetTimeMicros();
+            int64_t e = GetStopwatchMicros();
             std::cout << "RollingBloom-refresh,1," << (e-b)*0.000001 << "," << (e-b)*0.000001 << "," << (e-b)*0.000001 << "\n";
             countnow = 0;
         } else {

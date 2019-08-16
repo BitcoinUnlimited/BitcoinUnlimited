@@ -569,7 +569,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
     try
     {
         uint64_t nSizeBlock = pblock->GetBlockSize();
-        int64_t startTime = GetTimeMicros();
+        int64_t startTime = GetStopwatchMicros();
         CValidationState state;
 
         // Indicate that the block was fully received. At this point we have either a block or a fully reconstructed
@@ -600,12 +600,12 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
         {
             LargestBlockSeen(nSizeBlock); // update largest block seen
 
-            double nValidationTime = (double)(GetTimeMicros() - startTime) / 1000000.0;
+            double nValidationTime = (double)(GetStopwatchMicros() - startTime) / 1000000.0;
             if ((strCommand != NetMsgType::BLOCK) &&
                 (IsThinBlocksEnabled() || IsGrapheneBlockEnabled() || IsCompactBlocksEnabled()))
             {
                 LOG(THIN | GRAPHENE | CMPCT, "Processed Block %s reconstructed from (%s) in %.2f seconds, peer=%s\n",
-                    inv.hash.ToString(), strCommand, (double)(GetTimeMicros() - startTime) / 1000000.0,
+                    inv.hash.ToString(), strCommand, (double)(GetStopwatchMicros() - startTime) / 1000000.0,
                     pfrom->GetLogName());
 
                 if (strCommand == NetMsgType::GRAPHENEBLOCK || strCommand == NetMsgType::GRAPHENETX)
@@ -618,7 +618,7 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
             else
             {
                 LOG(THIN | GRAPHENE | CMPCT, "Processed Regular Block %s in %.2f seconds, peer=%s\n",
-                    inv.hash.ToString(), (double)(GetTimeMicros() - startTime) / 1000000.0, pfrom->GetLogName());
+                    inv.hash.ToString(), (double)(GetStopwatchMicros() - startTime) / 1000000.0, pfrom->GetLogName());
             }
         }
 
