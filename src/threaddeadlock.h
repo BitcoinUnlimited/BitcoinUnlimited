@@ -58,13 +58,14 @@ uint64_t getTid(void)
 
 struct CLockLocation
 {
-    CLockLocation(const char *pszName, const char *pszFile, int nLine, bool fTryIn, OwnershipType eOwnershipIn)
+    CLockLocation(const char *pszName, const char *pszFile, int nLine, bool fTryIn, OwnershipType eOwnershipIn, LockType eLockTypeIn)
     {
         mutexName = pszName;
         sourceFile = pszFile;
         sourceLine = nLine;
         fTry = fTryIn;
         eOwnership = eOwnershipIn;
+        eLockType = eLockTypeIn;
         fWaiting = true;
     }
 
@@ -78,11 +79,13 @@ struct CLockLocation
     OwnershipType GetExclusive() const { return eOwnership; }
     bool GetWaiting() const { return fWaiting; }
     void ChangeWaitingToHeld() { fWaiting = false; }
+    LockType GetLockType() const { return eLockType; }
 private:
     bool fTry;
     std::string mutexName;
     std::string sourceFile;
     int sourceLine;
+    LockType eLockType;
     OwnershipType eOwnership; // determines if shared or exclusive ownership, locktype::mutex is always exclusive
     bool fWaiting; // determines if lock is held or is waiting to be held
 };
