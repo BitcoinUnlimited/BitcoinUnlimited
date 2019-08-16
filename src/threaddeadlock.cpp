@@ -394,47 +394,39 @@ void SetWaitingToHeld(void *c, OwnershipType ownership)
     if (ownership == OwnershipType::EXCLUSIVE)
     {
         auto it = lockdata.writelockswaiting.find(c);
-        if (it == lockdata.writelockswaiting.end())
+        if (it != lockdata.writelockswaiting.end())
         {
-            return;
+            it->second.erase(tid);
+        }
+        auto iter = lockdata.writelocksheld.find(c);
+        if (iter == lockdata.writelocksheld.end())
+        {
+            std::set<uint64_t> holders;
+            holders.emplace(tid);
+            lockdata.writelocksheld.emplace(c, holders);
         }
         else
         {
-            it->second.erase(tid);
-            auto iter = lockdata.writelocksheld.find(c);
-            if (iter == lockdata.writelocksheld.end())
-            {
-                std::set<uint64_t> holders;
-                holders.emplace(tid);
-                lockdata.writelocksheld.emplace(c, holders);
-            }
-            else
-            {
-                iter->second.emplace(tid);
-            }
+            iter->second.emplace(tid);
         }
     }
     else //  !isExclusive
     {
         auto it = lockdata.readlockswaiting.find(c);
-        if (it == lockdata.readlockswaiting.end())
+        if (it != lockdata.readlockswaiting.end())
         {
-            return;
+            it->second.erase(tid);
+        }
+        auto iter = lockdata.readlocksheld.find(c);
+        if (iter == lockdata.readlocksheld.end())
+        {
+            std::set<uint64_t> holders;
+            holders.emplace(tid);
+            lockdata.readlocksheld.emplace(c, holders);
         }
         else
         {
-            it->second.erase(tid);
-            auto iter = lockdata.readlocksheld.find(c);
-            if (iter == lockdata.readlocksheld.end())
-            {
-                std::set<uint64_t> holders;
-                holders.emplace(tid);
-                lockdata.readlocksheld.emplace(c, holders);
-            }
-            else
-            {
-                iter->second.emplace(tid);
-            }
+            iter->second.emplace(tid);
         }
     }
 }
