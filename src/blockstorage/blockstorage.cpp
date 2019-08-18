@@ -843,22 +843,22 @@ bool FindBlockPos(CValidationState &state,
 
     if (!fKnown)
     {
-        unsigned int nOldChunks = (pos.nPos + BLOCKFILE_CHUNK_SIZE - 1) / BLOCKFILE_CHUNK_SIZE;
-        unsigned int nNewChunks = (vinfoBlockFile[nFile].nSize + BLOCKFILE_CHUNK_SIZE - 1) / BLOCKFILE_CHUNK_SIZE;
+        unsigned int nOldChunks = (pos.nPos + blockfile_chunk_size - 1) / blockfile_chunk_size;
+        unsigned int nNewChunks = (vinfoBlockFile[nFile].nSize + blockfile_chunk_size - 1) / blockfile_chunk_size;
         if (nNewChunks > nOldChunks)
         {
             if (fPruneMode)
             {
                 fCheckForPruning = true;
             }
-            if (CheckDiskSpace(nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos))
+            if (CheckDiskSpace(nNewChunks * blockfile_chunk_size - pos.nPos))
             {
                 FILE *file = OpenBlockFile(pos);
                 if (file)
                 {
-                    LOGA("Pre-allocating up to position 0x%x in blk%05u.dat\n", nNewChunks * BLOCKFILE_CHUNK_SIZE,
+                    LOGA("Pre-allocating up to position 0x%x in blk%05u.dat\n", nNewChunks * blockfile_chunk_size,
                         pos.nFile);
-                    AllocateFileRange(file, pos.nPos, nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos);
+                    AllocateFileRange(file, pos.nPos, nNewChunks * blockfile_chunk_size - pos.nPos);
                     fclose(file);
                 }
             }
@@ -893,22 +893,22 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
     nNewSize = vinfoBlockFile[nFile].nUndoSize += nAddSize;
     setDirtyFileInfo.insert(nFile);
 
-    unsigned int nOldChunks = (pos.nPos + UNDOFILE_CHUNK_SIZE - 1) / UNDOFILE_CHUNK_SIZE;
-    unsigned int nNewChunks = (nNewSize + UNDOFILE_CHUNK_SIZE - 1) / UNDOFILE_CHUNK_SIZE;
+    unsigned int nOldChunks = (pos.nPos + undofile_chunk_size - 1) / undofile_chunk_size;
+    unsigned int nNewChunks = (nNewSize + undofile_chunk_size - 1) / undofile_chunk_size;
     if (nNewChunks > nOldChunks)
     {
         if (fPruneMode)
         {
             fCheckForPruning = true;
         }
-        if (CheckDiskSpace(nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos))
+        if (CheckDiskSpace(nNewChunks * undofile_chunk_size - pos.nPos))
         {
             FILE *file = OpenUndoFile(pos);
             if (file)
             {
                 LOGA(
-                    "Pre-allocating up to position 0x%x in rev%05u.dat\n", nNewChunks * UNDOFILE_CHUNK_SIZE, pos.nFile);
-                AllocateFileRange(file, pos.nPos, nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos);
+                    "Pre-allocating up to position 0x%x in rev%05u.dat\n", nNewChunks * undofile_chunk_size, pos.nFile);
+                AllocateFileRange(file, pos.nPos, nNewChunks * undofile_chunk_size - pos.nPos);
                 fclose(file);
             }
         }
