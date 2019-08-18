@@ -744,7 +744,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             READLOCK(pool.cs);
             CCoinsViewMemPool &viewMemPool(*ss.cvMempool);
             view.SetBackend(viewMemPool);
-            bool txnAlreadyKnown = false;
             // do all inputs exist?
             if (pfMissingInputs)
             {
@@ -772,20 +771,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                     }
                     if (fSpent || fMissingOrSpent)
                     {
-                        // Are inputs missing because we already have the ptx?
-                        for (size_t out = 0; out < tx->vout.size(); out++)
-                        {
-                            // Optimistically just do efficient check of cache for
-                            // outputs.
-                            if (pcoinsTip->HaveCoinInCache(COutPoint(tx->GetHash(), out)))
-                            {
-                                // return state.Invalid(false, REJECT_DUPLICATE,
-                                //                     "txn-already-known");
-                                // debugger->AddInvalidReason("txn-already-known");
-                                txnAlreadyKnown = true;
-                                break;
-                            }
-                        }
                         if (debugger)
                         {
                             debugger->mineable = false;
