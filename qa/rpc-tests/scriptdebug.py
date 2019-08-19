@@ -179,14 +179,14 @@ class ScriptDebugTest (BitcoinTestFramework):
         prevTx = "0200000001f6d349ec2d50ed93679e53a6528a5e4e30180308c46c3c9651311b18d1dcf839000000006a4730440220669444f24fdd23ea476c4b527fa0f76d9d4d53028997b202223114a969166f33022070948ff2b5a7b39c725ffb88f9255fec4bc1b10e6463c7bf038f7358a593287e412103bbdece7959df8a1e3b22746d097fc4e06201e9f042ba4746481025966154bc35ffffffff01803801000000000070766b2103bbdece7959df8a1e3b22746d097fc4e06201e9f042ba4746481025966154bc35ba696c547f049339d05b766ba2696cb1750450c30000a26376a914c5d7f8f90e2b7d0dcedf7a49a524b25f3c340ab388ac6776a914b768b57134fbfa73fb6aa2fd7e1f5ffc10acb72c88ac6800000000"
         spendTx = unhexlify("02000000014dd4890a4c37a4057abe7fb2fd241127fcb534a26de5ce95cd412dbf68c82a8d00000000bc4830450221009e3ea2a539cad02f90aae92b0fb2bfdd42aedc7e6c4806ec9784a9c035f529b1022026ded0d0caaf20d3bf3abb95bb4394d5e5eb611a5c3e61eba7fe5c9f7376977b412103b0e8fbec8d97e7f6b966c656ce3cc2d01fad789757d7f07e6c3f8f8b9834f75f473045022100e223a63abf4155f59809d8daedff36109efb4f8d36677bbc708a808134906ae902201e94447f2f53bae329b20440c5e80cd56915bda98c57416765c3d1841533ec7d0850c300009339d05b000000000170110100000000001976a914c5d7f8f90e2b7d0dcedf7a49a524b25f3c340ab388ac9439d05b")
 
-        dbg = DebugSession(prevTx, spendTx, flags=cashlib.ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS | cashlib.ScriptFlags.SCRIPT_VERIFY_CHECKDATASIG_SIGOPS )
+        dbg = DebugSession(prevTx, spendTx, flags=cashlib.ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS | cashlib.ScriptFlags.SCRIPT_ENABLE_CHECKDATASIG )
         print("Evaluating spend script")
         dbg.evalSpendScript()
         print("Evaluating constraint script")
         result = dbg.evalConstraintScript()
         assert(result[0] == cashlib.ScriptError.SCRIPT_ERR_NUMBER_BAD_ENCODING)
 
-        dbg = DebugSession(prevTx, spendTx, flags= (cashlib.ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS | cashlib.ScriptFlags.SCRIPT_VERIFY_CHECKDATASIG_SIGOPS) & ~cashlib.ScriptFlags.SCRIPT_VERIFY_MINIMALDATA)
+        dbg = DebugSession(prevTx, spendTx, flags= (cashlib.ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS | cashlib.ScriptFlags.SCRIPT_ENABLE_CHECKDATASIG) & ~cashlib.ScriptFlags.SCRIPT_VERIFY_MINIMALDATA)
         print("Evaluating spend script")
         dbg.evalSpendScript()
         print("Evaluating constraint script")

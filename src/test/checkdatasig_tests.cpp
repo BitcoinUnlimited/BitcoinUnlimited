@@ -72,9 +72,9 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack,
     for (uint32_t flags : flagset)
     {
         // The script executes as expected regardless of whether or not
-        // SCRIPT_VERIFY_CHECKDATASIG_SIGOPS flag is passed.
-        CheckPass(flags & ~SCRIPT_VERIFY_CHECKDATASIG_SIGOPS, original_stack, script, expected);
-        CheckPass(flags | SCRIPT_VERIFY_CHECKDATASIG_SIGOPS, original_stack, script, expected);
+        // SCRIPT_ENABLE_CHECKDATASIG flag is passed.
+        CheckPass(flags & ~SCRIPT_ENABLE_CHECKDATASIG, original_stack, script, expected);
+        CheckPass(flags | SCRIPT_ENABLE_CHECKDATASIG, original_stack, script, expected);
     }
 }
 
@@ -83,9 +83,9 @@ static void CheckErrorForAllFlags(const stacktype &original_stack, const CScript
     for (uint32_t flags : flagset)
     {
         // The script generates the proper error regardless of whether or not
-        // SCRIPT_VERIFY_CHECKDATASIG_SIGOPS flag is passed.
-        CheckError(flags & ~SCRIPT_VERIFY_CHECKDATASIG_SIGOPS, original_stack, script, expected);
-        CheckError(flags | SCRIPT_VERIFY_CHECKDATASIG_SIGOPS, original_stack, script, expected);
+        // SCRIPT_ENABLE_CHECKDATASIG flag is passed.
+        CheckError(flags & ~SCRIPT_ENABLE_CHECKDATASIG, original_stack, script, expected);
+        CheckError(flags | SCRIPT_ENABLE_CHECKDATASIG, original_stack, script, expected);
     }
 }
 
@@ -144,7 +144,7 @@ BOOST_AUTO_TEST_CASE(checkdatasig_test)
     for (uint32_t flags = 0; flags < (1U << 17); flags++)
     {
         // Make sure we activate the opcodes.
-        flags |= SCRIPT_VERIFY_CHECKDATASIG_SIGOPS;
+        flags |= SCRIPT_ENABLE_CHECKDATASIG;
 
         if (flags & SCRIPT_VERIFY_STRICTENC)
         {
@@ -211,8 +211,8 @@ BOOST_AUTO_TEST_CASE(checkdatasig_test)
 
 BOOST_AUTO_TEST_CASE(checkdatasig_inclusion_in_standard_and_mandatory_flags)
 {
-    BOOST_CHECK(STANDARD_SCRIPT_VERIFY_FLAGS & SCRIPT_VERIFY_CHECKDATASIG_SIGOPS);
-    BOOST_CHECK(!(MANDATORY_SCRIPT_VERIFY_FLAGS & SCRIPT_VERIFY_CHECKDATASIG_SIGOPS));
+    BOOST_CHECK(STANDARD_SCRIPT_VERIFY_FLAGS & SCRIPT_ENABLE_CHECKDATASIG);
+    BOOST_CHECK(!(MANDATORY_SCRIPT_VERIFY_FLAGS & SCRIPT_ENABLE_CHECKDATASIG));
 }
 
 BOOST_AUTO_TEST_CASE(checkdatasig_opcode_formatting)

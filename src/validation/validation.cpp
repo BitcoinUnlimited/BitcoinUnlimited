@@ -1766,7 +1766,7 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
     {
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
         flags |= SCRIPT_VERIFY_CLEANSTACK;
-        flags |= SCRIPT_VERIFY_CHECKDATASIG_SIGOPS;
+        flags |= SCRIPT_ENABLE_CHECKDATASIG;
     }
 
     // if May 15th, 2019 protocol upgrade is activated we start accepting transactions

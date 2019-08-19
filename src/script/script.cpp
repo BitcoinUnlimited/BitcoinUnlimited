@@ -374,8 +374,7 @@ unsigned int CScript::GetSigOpCount(const uint32_t flags, bool fAccurate) const
             break;
         if (opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY)
             n++;
-        if ((flags & SCRIPT_VERIFY_CHECKDATASIG_SIGOPS) &&
-            (opcode == OP_CHECKDATASIG || opcode == OP_CHECKDATASIGVERIFY))
+        if ((flags & SCRIPT_ENABLE_CHECKDATASIG) && (opcode == OP_CHECKDATASIG || opcode == OP_CHECKDATASIGVERIFY))
             n++;
         else if (opcode == OP_CHECKMULTISIG || opcode == OP_CHECKMULTISIGVERIFY)
         {
