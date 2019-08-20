@@ -13,7 +13,9 @@ cd "build" || (echo "could not enter distdir build"; exit 1)
 
 if [ "$RUN_TESTS" = "true" ]; then
   BEGIN_FOLD unit-tests
-  DOCKER_EXEC LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/depends/$HOST/lib make $MAKEJOBS check VERBOSE=1;
+  if [ $HOST != "x86_64-w64-mingw32" ]; then
+    DOCKER_EXEC LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/depends/$HOST/lib make $MAKEJOBS check VERBOSE=1;
+  fi
   END_FOLD
 fi
 
