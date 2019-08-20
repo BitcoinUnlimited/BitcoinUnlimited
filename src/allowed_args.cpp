@@ -720,7 +720,10 @@ static void addElectrumOptions(AllowedArgs &allowedArgs)
         .addArg("electrum.dir", requiredStr, "Data directory for electrum database")
         .addArg("electrum.port", requiredStr, "Port electrum RPC listens on (default: mainnet 50001, testnet: 60001")
         .addArg("electrum.host", requiredStr, "Host electrum RPC listens on (default: 127.0.0.1)")
-        .addArg("electrum.addr.limit", requiredStr, "Max txs to look up per address (default: 500)")
+        .addArg("electrum.rawarg", optionalStr,
+            "Raw argument to pass directly to underlying electrum daemon "
+            "(example: -electrum.rawarg=\"--server-banner=\\\"Welcome to my server!\\\"\"). "
+            "This option can be specified multiple times.")
         .addDebugArg("electrum.exec", requiredStr, "Path to electrum daemon executable")
         .addDebugArg("electrum.monitoring.port", requiredStr, "Port to bind monitoring service")
         .addDebugArg("electrum.monitoring.host", requiredStr, "Host to bind monitoring service")

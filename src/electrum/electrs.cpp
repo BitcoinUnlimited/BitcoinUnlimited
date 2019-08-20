@@ -29,6 +29,32 @@ static std::string rpc_port(const std::string &network)
 
     return GetArg("-electrum.port", defaultPort->second);
 }
+static void remove_conflicting_arg(std::vector<std::string> &args, const std::string &override_arg)
+{
+    auto separator = override_arg.find_first_of("=");
+    if (separator == std::string::npos)
+    {
+        throw std::invalid_argument("Invalid format for argument '" + override_arg + "'");
+    }
+    separator++; // include '=' when matching argument names below
+
+    auto it = begin(args);
+    while (it != end(args))
+    {
+        if (it->size() < separator)
+        {
+            ++it;
+            continue;
+        }
+        if (it->substr(0, separator) != override_arg.substr(0, separator))
+        {
+            ++it;
+            continue;
+        }
+        LOGA("Electrum: Argument '%s' overrides '%s'", override_arg, *it);
+        it = args.erase(it);
+    }
+}
 namespace electrum
 {
 std::string electrs_path()
@@ -83,7 +109,7 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
 
     // Where to store electrs database files.
     const std::string defaultDir = (GetDataDir() / "electrs").string();
-    args.push_back("--db-dir=" + GetArg("-electrumdir", defaultDir));
+    args.push_back("--db-dir=" + GetArg("-electrum.dir", defaultDir));
 
     // Tell electrs what network we're on
     const std::map<std::string, std::string> netmapping = {
@@ -104,6 +130,12 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
 
     // max txs to look up per address
     args.push_back("--txid-limit=" + GetArg("-electrum.addr.limit", "500"));
+
+    for (auto &a : mapMultiArgs["-electrum.rawarg"])
+    {
+        remove_conflicting_arg(args, a);
+        args.push_back(a);
+    }
 
     return args;
 }
