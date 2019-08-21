@@ -88,12 +88,6 @@ static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 72;
 static const unsigned int DEFAULT_ORPHANPOOL_EXPIRY = 4;
 /** The maximum size of a blk?????.dat file (since 0.8) */
 static const unsigned int MAX_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
-/** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
-static const unsigned int DEFAULT_BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
-/** The pre-allocation chunk size for rev?????.dat files (since 0.8) */
-static const unsigned int DEFAULT_UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
-extern unsigned int blockfile_chunk_size;
-extern unsigned int undofile_chunk_size;
 
 /** Maximum number of script-checking threads allowed */
 static const int MAX_SCRIPTCHECK_THREADS = 16;

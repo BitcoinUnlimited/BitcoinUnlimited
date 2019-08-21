@@ -6,7 +6,8 @@
 
 #include "sequential_files.h"
 
-#include "main.h"
+#include "blockstorage.h"
+
 
 extern bool AbortNode(CValidationState &state, const std::string &strMessage, const std::string &userMessage = "");
 extern bool fCheckForPruning;

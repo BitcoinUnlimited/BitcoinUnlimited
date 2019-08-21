@@ -4,7 +4,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "blockstorage/blockstorage.h"
+#include "blockstorage.h"
 
 #include "blockleveldb.h"
 #include "chainparams.h"
@@ -24,6 +24,8 @@ extern std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
 extern CTweak<uint64_t> pruneIntervalTweak;
 
 CDatabaseAbstract *pblockdb = nullptr;
+unsigned int blockfile_chunk_size = DEFAULT_BLOCKFILE_CHUNK_SIZE;
+unsigned int undofile_chunk_size = DEFAULT_UNDOFILE_CHUNK_SIZE;
 
 /**
   * Config param to determine what DB type we are using

@@ -88,9 +88,6 @@ uint64_t nPruneTarget = 0;
 uint64_t nDBUsedSpace = 0;
 uint32_t nXthinBloomFilterSize = SMALLEST_MAX_BLOOM_FILTER_SIZE;
 
-unsigned int blockfile_chunk_size = DEFAULT_BLOCKFILE_CHUNK_SIZE;
-unsigned int undofile_chunk_size = DEFAULT_UNDOFILE_CHUNK_SIZE;
-
 // BU: Move global objects to a single file
 extern CTxMemPool mempool;
 
