@@ -304,7 +304,7 @@ bool CRequestManager::AlreadyAskedForBlock(const uint256 &hash)
 
 void CRequestManager::UpdateTxnResponseTime(const CInv &obj, CNode *pfrom)
 {
-    int64_t now = GetTimeMicros();
+    int64_t now = GetStopwatchMicros();
     LOCK(cs_objDownloader);
     if (pfrom && obj.type == MSG_TX)
     {
@@ -678,7 +678,7 @@ void CRequestManager::SendRequests()
     // Get Blocks
     while (sendBlkIter != mapBlkInfo.end())
     {
-        now = GetTimeMicros();
+        now = GetStopwatchMicros();
         OdMap::iterator itemIter = sendBlkIter;
         if (itemIter == mapBlkInfo.end())
             break;
@@ -836,7 +836,7 @@ void CRequestManager::SendRequests()
         sendIter = mapTxnInfo.begin();
     while ((sendIter != mapTxnInfo.end()) && requestPacer.try_leak(1))
     {
-        now = GetTimeMicros();
+        now = GetStopwatchMicros();
         OdMap::iterator itemIter = sendIter;
         if (itemIter == mapTxnInfo.end())
             break;
@@ -1209,7 +1209,7 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash)
         CRequestManagerNodeState *state = &it->second;
 
         // Add queued block to nodestate and add iterator for queued block to mapBlocksInFlight
-        int64_t nNow = GetTimeMicros();
+        int64_t nNow = GetStopwatchMicros();
         QueuedBlock newentry = {hash, nNow};
         std::list<QueuedBlock>::iterator it2 = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
         mapBlocksInFlight[hash][nodeid] = it2;
@@ -1219,7 +1219,7 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash)
         if (state->nBlocksInFlight == 1)
         {
             // We're starting a block download (batch) from this peer.
-            state->nDownloadingSince = GetTimeMicros();
+            state->nDownloadingSince = GetStopwatchMicros();
         }
     }
 }
@@ -1249,7 +1249,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         CRequestManagerNodeState *state = &it->second;
 
         int64_t getdataTime = itInFlight->second->nTime;
-        int64_t now = GetTimeMicros();
+        int64_t now = GetStopwatchMicros();
         double nResponseTime = (double)(now - getdataTime) / 1000000.0;
 
         // calculate avg block response time over a range of blocks to be used for IBD tuning.
@@ -1377,7 +1377,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         if (state->vBlocksInFlight.begin() == itInFlight->second)
         {
             // First block on the queue was received, update the start download time for the next one
-            state->nDownloadingSince = std::max(state->nDownloadingSince, GetTimeMicros());
+            state->nDownloadingSince = std::max(state->nDownloadingSince, (int64_t)GetStopwatchMicros());
         }
         // In order to prevent a dangling iterator we must erase from vBlocksInFlight after mapBlockInFlight
         // however that will invalidate the iterator held by mapBlocksInFlight. Use a temporary to work around this.

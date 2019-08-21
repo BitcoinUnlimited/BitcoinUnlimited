@@ -570,7 +570,7 @@ bool FlushStateToDiskInternal(CValidationState &state,
     static int64_t nLastWrite = 0;
     static int64_t nLastFlush = 0;
     static int64_t nLastSetChain = 0;
-    int64_t nNow = GetTimeMicros();
+    int64_t nNow = GetStopwatchMicros();
     // Avoid writing/flushing immediately after startup.
     if (nLastWrite == 0)
     {

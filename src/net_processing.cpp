@@ -1709,7 +1709,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (state != nullptr)
                 state->nSyncStartTime = now; // reset the time because more headers needed
         }
-        pfrom->nPingUsecStart = GetTimeMicros(); // Reset ping time because block can consume all bandwidth
+        pfrom->nPingUsecStart = GetStopwatchMicros(); // Reset ping time because block can consume all bandwidth
 
         // Message consistency checking
         // NOTE: consistency checking is handled by checkblock() which is called during
@@ -2168,7 +2168,7 @@ bool SendMessages(CNode *pto)
             // RPC ping request by user
             pingSend = true;
         }
-        if (pto->nPingNonceSent == 0 && pto->nPingUsecStart + PING_INTERVAL * 1000000 < GetTimeMicros())
+        if (pto->nPingNonceSent == 0 && pto->nPingUsecStart + PING_INTERVAL * 1000000 < (int64_t)GetStopwatchMicros())
         {
             // Ping automatically sent as a latency probe & keepalive.
             pingSend = true;
@@ -2181,7 +2181,7 @@ bool SendMessages(CNode *pto)
                 GetRandBytes((unsigned char *)&nonce, sizeof(nonce));
             }
             pto->fPingQueued = false;
-            pto->nPingUsecStart = GetTimeMicros();
+            pto->nPingUsecStart = GetStopwatchMicros();
             pto->nPingNonceSent = nonce;
             pto->PushMessage(NetMsgType::PING, nonce);
         }
@@ -2193,7 +2193,7 @@ bool SendMessages(CNode *pto)
         thinrelay.CheckForDownloadTimeout(pto);
 
         // Check for block download timeout and disconnect node if necessary. Does not require cs_main.
-        int64_t nNow = GetTimeMicros();
+        int64_t nNow = GetStopwatchMicros();
         requester.DisconnectOnDownloadTimeout(pto, consensusParams, nNow);
 
         // Address refresh broadcast
@@ -2473,7 +2473,8 @@ bool SendMessages(CNode *pto)
                 // while providing no value to the network.
                 // However we will still send them block inventory in the case they are a pruned node or wallet
                 // waiting for block announcements, therefore we have to check each inv in pto->vInventoryToSend.
-                bool fChokeTxInv = (pto->nActivityBytes == 0 && (nNow / 1000000 - pto->nTimeConnected) > 120);
+                bool fChokeTxInv =
+                    (pto->nActivityBytes == 0 && (GetStopwatchMicros() - pto->nStopwatchConnected) > 120 * 1000000);
 
                 // Find INV's which should be sent, save them to vInvSend, and then erase from vInventoryToSend.
                 int invsz = std::min((int)pto->vInventoryToSend.size(), MAX_INV_TO_SEND);

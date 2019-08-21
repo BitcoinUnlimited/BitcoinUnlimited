@@ -555,6 +555,7 @@ void CNode::copyStats(CNodeStats &stats)
     X(nLastSend);
     X(nLastRecv);
     X(nTimeConnected);
+    X(nStopwatchConnected);
     X(nTimeOffset);
     X(addrName);
     X(nVersion);
@@ -575,7 +576,7 @@ void CNode::copyStats(CNodeStats &stats)
     int64_t nPingUsecWait = 0;
     if ((0 != nPingNonceSent) && (0 != nPingUsecStart))
     {
-        nPingUsecWait = GetTimeMicros() - nPingUsecStart;
+        nPingUsecWait = GetStopwatchMicros() - nPingUsecStart;
     }
 
     // Raw ping time is in microseconds, but show it to user as whole seconds (Bitcoin users should be well used to
@@ -891,7 +892,8 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
 
             // on occasion a node will connect but not complete it's initial ping/pong in a reasonable amount of time
             // and will therefore be the lowest priority connection and disconnected first.
-            if (node->nPingNonceSent > 0 && node->nPingUsecTime == 0 && ((GetTime() - node->nTimeConnected) > 60))
+            if (node->nPingNonceSent > 0 && node->nPingUsecTime == 0 &&
+                ((GetStopwatchMicros() - node->nStopwatchConnected) > 60 * 1000000))
             {
                 LOG(NET, "node %s evicted, slow ping\n", node->GetLogName());
                 node->fDisconnect = true;
@@ -1399,9 +1401,10 @@ void ThreadSocketHandler()
             //
             // Inactivity checking
             //
-            int64_t nTime = GetTime();
-            if (nTime - pnode->nTimeConnected > 60)
+            int64_t stopwatchTime = GetStopwatchMicros();
+            if (stopwatchTime - pnode->nStopwatchConnected > 60 * 1000000)
             {
+                int64_t nTime = GetTime();
                 if (pnode->nLastRecv == 0 || pnode->nLastSend == 0)
                 {
                     LOG(NET, "Node %s socket no message in first 60 seconds, %d %d from %d\n", pnode->GetLogName(),
@@ -1421,10 +1424,11 @@ void ThreadSocketHandler()
                     if (ignoreNetTimeouts.Value() == false)
                         pnode->fDisconnect = true;
                 }
-                else if (pnode->nPingNonceSent && pnode->nPingUsecStart + TIMEOUT_INTERVAL * 1000000 < GetTimeMicros())
+                else if (pnode->nPingNonceSent &&
+                         pnode->nPingUsecStart + (TIMEOUT_INTERVAL * 1000000) < (int64_t)GetStopwatchMicros())
                 {
                     LOG(NET, "Node %s ping timeout: %fs\n", pnode->GetLogName(),
-                        0.000001 * (GetTimeMicros() - pnode->nPingUsecStart));
+                        0.000001 * (GetStopwatchMicros() - pnode->nPingUsecStart));
                     if (ignoreNetTimeouts.Value() == false)
                         pnode->fDisconnect = true;
                 }
@@ -1758,6 +1762,7 @@ void DumpData(int64_t seconds_between_runs)
                 break;
             }
             std::this_thread::sleep_for(std::chrono::seconds(2));
+            nStart = GetTime();
         }
         _DumpData();
     }
@@ -1817,10 +1822,10 @@ void ThreadOpenConnections()
     // is intended as "only make outbound connections to the configured nodes".
 
     // Initiate network connections
-    int64_t nStart = GetTime();
+    int64_t nStart = GetStopwatchMicros();
     unsigned int nDisconnects = 0;
     // Minimum time before next feeler connection (in microseconds).
-    int64_t nNextFeeler = PoissonNextSend(nStart * 1000 * 1000, FEELER_INTERVAL);
+    int64_t nNextFeeler = PoissonNextSend(nStart, FEELER_INTERVAL);
 
     while (shutdown_threads.load() == false)
     {
@@ -1885,10 +1890,10 @@ void ThreadOpenConnections()
             }
             // In the event that outbound nodes restart or drop off the network over time we need to
             // replenish the number of disconnects allowed once per day.
-            if (GetTime() - nStart > 86400)
+            if (GetStopwatchMicros() - nStart > 86400UL * 1000000UL)
             {
                 nDisconnects = 0;
-                nStart = GetTime();
+                nStart = GetStopwatchMicros();
             }
         }
 
@@ -1965,7 +1970,7 @@ void ThreadOpenConnections()
         bool fFeeler = false;
         if (nOutbound >= nMaxOutConnections)
         {
-            int64_t nTime = GetTimeMicros(); // The current time right now (in microseconds).
+            int64_t nTime = GetStopwatchMicros(); // The current time right now (in microseconds).
             if (nTime > nNextFeeler)
             {
                 nNextFeeler = PoissonNextSend(nTime, FEELER_INTERVAL);
@@ -2955,6 +2960,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nRecvBytes = 0;
     nActivityBytes = 0; // BU connection slot exhaustion mitigation
     nTimeConnected = GetTime();
+    nStopwatchConnected = GetStopwatchMicros();
     nTimeOffset = 0;
     addr = addrIn;
     addrName = addrNameIn == "" ? addr.ToStringIPPort() : addrNameIn;

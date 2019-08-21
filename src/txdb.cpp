@@ -811,7 +811,7 @@ void AdjustCoinCacheSize()
 
 #ifdef WIN32
     static int64_t nLastDbAdjustment = 0;
-    int64_t nNow = GetTimeMicros();
+    int64_t nNow = GetStopwatchMicros();
 
     if (nLastDbAdjustment == 0)
     {
