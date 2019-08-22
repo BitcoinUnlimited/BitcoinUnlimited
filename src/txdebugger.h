@@ -65,7 +65,14 @@ public:
      * @param string
      * @return none
      */
-    void AddError(const std::string &strRejectReasonIn) { vData[index].errors.push_back(strRejectReasonIn); }
+    void AddError(const std::string &strRejectReasonIn)
+    {
+        if (index >= vData.size())
+        {
+            vData.push_back(CInputData());
+        }
+        vData[index].errors.push_back(strRejectReasonIn);
+    }
     /**
      * Add metadata (key, value) for the input at Vdata[index]
      *
@@ -74,6 +81,10 @@ public:
      */
     void AddMetadata(const std::string &keyIn, const std::string &valueIn)
     {
+        if (index >= vData.size())
+        {
+            vData.push_back(CInputData());
+        }
         vData[index].metadata.emplace(keyIn, valueIn);
     }
     /**
@@ -179,6 +190,7 @@ public:
      */
     void SetInputCheckResult(bool state)
     {
+        DbgAssert(inputSession < 3, );
         if (inputSession == 1)
         {
             inputsCheck1.isValid = state;
@@ -197,6 +209,7 @@ public:
      */
     void AddInputCheckError(const std::string &strRejectReasonIn)
     {
+        DbgAssert(inputSession < 3, );
         if (inputSession == 1)
         {
             inputsCheck1.AddError(strRejectReasonIn);
@@ -215,6 +228,7 @@ public:
      */
     void AddInputCheckMetadata(const std::string &keyIn, const std::string &valueIn)
     {
+        DbgAssert(inputSession < 3, );
         if (inputSession == 1)
         {
             inputsCheck1.AddMetadata(keyIn, valueIn);
@@ -233,6 +247,7 @@ public:
      */
     void SetInputCheckValidity(bool state)
     {
+        DbgAssert(inputSession < 3, );
         if (inputSession == 1)
         {
             inputsCheck1.SetInputDataValidity(state);
@@ -252,6 +267,7 @@ public:
      */
     void IncrementCheckIndex()
     {
+        DbgAssert(inputSession < 3, );
         if (inputSession == 1)
         {
             inputsCheck1.IncrementIndex();
@@ -268,12 +284,7 @@ public:
      * @param none
      * @return none
      */
-    void FinishCheckInputSession()
-    {
-        inputSession = inputSession + 1;
-        DbgAssert(inputSession < 3, );
-    }
-
+    void FinishCheckInputSession() { inputSession = inputSession + 1; }
     /**
      * Gets validity for first round of input checks
      *

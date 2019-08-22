@@ -140,7 +140,7 @@ def createTx(dests, sources, node, maxx=None, fee=1, nextWallet=None, generatedT
             txhex = hexlify(tx.serialize()).decode("utf-8")
             txid = None
             try:
-                rawTxValid = node.validaterawtransaction(txhex)['valid']
+                rawTxValid = node.validaterawtransaction(txhex)['isValid']
                 txid = node.enqueuerawtransaction(txhex)
             except JSONRPCException as e:
                 logging.error("TX submission failed because %s" % str(e))
@@ -266,7 +266,7 @@ class MyTest (BitcoinTestFramework):
                 raised = True
                 if e.error["code"] != -26:  # txn-mempool-conflict
                     raise
-            assert(rawTxValid['valid'] != raised)
+            assert(rawTxValid['isValid'] != raised)
         wallet = wallet[NTX:]
 
         waitFor(30, lambda: True if self.nodes[0].getmempoolinfo()["size"] >= NTX else None)
