@@ -15,6 +15,9 @@
 #include <objc/objc.h>
 #include <objc/message.h>
 
+#include <AppKit/AppKit.h>
+#include <objc/runtime.h>
+
 static MacDockIconHandler *s_instance = nullptr;
 
 bool dockClickHandler(id self,SEL _cmd,...) {
@@ -100,4 +103,14 @@ MacDockIconHandler *MacDockIconHandler::instance()
 void MacDockIconHandler::cleanup()
 {
     delete s_instance;
+}
+
+/**
+ * Force application activation on macOS. With Qt 5.5.1 this is required when
+ * an action in the Dock menu is triggered.
+ * TODO: Define a Qt version where it's no-longer necessary.
+ */
+void ForceActivation()
+{
+    [[NSApplication sharedApplication] activateIgnoringOtherApps:YES];
 }
