@@ -9,6 +9,7 @@
 #include "main.h"
 #include "net.h"
 #include "threadgroup.h"
+#include "txdebugger.h"
 #include "txmempool.h"
 #include <queue>
 
@@ -182,7 +183,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     bool fRejectAbsurdFee,
     TransactionClass allowedTx,
     std::vector<COutPoint> &vCoinsToUncache,
-    bool *isRespend);
+    bool *isRespend,
+    CValidationDebugger *debugger = nullptr);
 
 /** Checks the size of the mempool and trims it if needed */
 void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age);

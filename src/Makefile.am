@@ -204,6 +204,7 @@ BITCOIN_CORE_H = \
   torcontrol.h \
   txadmission.h \
   txdb.h \
+  txdebugger.h \
   txmempool.h \
   txorphanpool.h \
   ui_interface.h \
@@ -669,7 +670,6 @@ CLEANFILES += consensus/*.gcda consensus/*.gcno
 CLEANFILES += crypto/*.gcda crypto/*.gcno
 CLEANFILES += policy/*.gcda policy/*.gcno
 CLEANFILES += primitives/*.gcda primitives/*.gcno
-CLEANFILES += rsm/*.gcda rsm/*.gcno
 CLEANFILES += script/*.gcda script/*.gcno
 CLEANFILES += support/*.gcda support/*.gcno
 CLEANFILES += univalue/*.gcda univalue/*.gcno

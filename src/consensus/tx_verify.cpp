@@ -299,3 +299,8 @@ bool Consensus::CheckTxInputs(const CTransactionRef &tx, CValidationState &state
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-fee-outofrange");
     return true;
 }
+
+uint64_t GetTransactionSigOpCount(const CTransaction &tx, const CCoinsViewCache &coins, const uint32_t flags)
+{
+    return GetLegacySigOpCount(MakeTransactionRef(tx), flags) + GetP2SHSigOpCount(MakeTransactionRef(tx), coins, flags);
+}

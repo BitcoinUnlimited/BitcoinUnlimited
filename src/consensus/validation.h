@@ -7,7 +7,9 @@
 #ifndef BITCOIN_CONSENSUS_VALIDATION_H
 #define BITCOIN_CONSENSUS_VALIDATION_H
 
+#include <map>
 #include <string>
+#include <vector>
 
 /** "reject" message codes */
 static const unsigned char REJECT_MALFORMED = 0x01;
