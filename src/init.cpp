@@ -1260,8 +1260,9 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 #ifdef ENABLE_WALLET
 
     // Encoded addresses using cashaddr instead of base58
-    // Activates by default on Jan, 14
-    config.SetCashAddrEncoding(GetBoolArg("-usecashaddr", GetAdjustedTime() > 1515900000));
+    // The default behaviour is to use this encoding. This will help
+    // to avoid confusion with other currencies the base58 encoding
+    config.SetCashAddrEncoding(GetBoolArg("-usecashaddr", true));
 
     if (fDisableWallet)
     {
