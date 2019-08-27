@@ -384,13 +384,13 @@ static void enableCompactBlocks(CNode *pfrom)
     }
 }
 
-bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived)
+bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nStopwatchTimeReceived)
 {
     int64_t receiptTime = GetTime();
     const CChainParams &chainparams = Params();
     RandAddSeedPerfmon();
     unsigned int msgSize = vRecv.size(); // BU for statistics
-    UpdateRecvStats(pfrom, strCommand, msgSize, nTimeReceived);
+    UpdateRecvStats(pfrom, strCommand, msgSize, nStopwatchTimeReceived);
     LOG(NET, "received: %s (%u bytes) peer=%s\n", SanitizeString(strCommand), msgSize, pfrom->GetLogName());
     if (mapArgs.count("-dropmessagestest") && GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
     {
@@ -1795,7 +1795,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
     else if (strCommand == NetMsgType::PONG)
     {
-        int64_t pingUsecEnd = nTimeReceived;
+        int64_t pingUsecEnd = nStopwatchTimeReceived;
         uint64_t nonce = 0;
         size_t nAvail = vRecv.in_avail();
         bool bPingFinished = false;
@@ -2081,7 +2081,7 @@ bool ProcessMessages(CNode *pfrom)
         bool fRet = false;
         try
         {
-            fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime);
+            fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nStopwatch);
             if (shutdown_threads.load() == true)
             {
                 return false;

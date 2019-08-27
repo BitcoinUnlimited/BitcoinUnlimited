@@ -665,7 +665,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                     LOG(THIN | GRAPHENE, "Receive Queue: pushed %s to the front of the queue\n", strFirstMsgCommand);
                 }
             }
-            // BU: end
+            msg.nStopwatch = GetStopwatchMicros();
             msg.nTime = GetTimeMicros();
             messageHandlerCondition.notify_one();
         }

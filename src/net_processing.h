@@ -13,8 +13,13 @@
 bool ProcessMessages(CNode *pfrom);
 
 
-/** Process a single protocol messages received from a given node */
-bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived);
+/** Process a single protocol messages received from a given node
+    @param pfrom The node this message originated from
+    @param strCommand The message type
+    @param vRecv The message contents
+    @param nStopwatchTimeReceived Stopwatch time in microseconds indicating when this message was received
+*/
+bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nStopwatchTimeReceived);
 
 /**
  * Send queued protocol messages to be sent to a give node.

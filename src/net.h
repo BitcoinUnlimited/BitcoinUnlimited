@@ -256,6 +256,7 @@ public:
     unsigned int nDataPos;
 
     int64_t nTime; // calendar time (in microseconds) of message receipt.
+    int64_t nStopwatch; // stopwatch time in microseconds of message receipt.  Used to calculate round trip latency.
 
     // default constructor builds an empty message object to accept assignment of real messages
     CNetMessage() : hdrbuf(0, 0), hdr({0, 0, 0, 0}), vRecv(0, 0)
