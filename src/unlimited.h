@@ -256,7 +256,7 @@ extern CCriticalSection cs_mapInboundConnectionTracker;
 // statistics
 void UpdateSendStats(CNode *pfrom, const char *strCommand, int msgSize, int64_t nTime);
 
-void UpdateRecvStats(CNode *pfrom, const std::string &strCommand, int msgSize, int64_t nTimeReceived);
+void UpdateRecvStats(CNode *pfrom, const std::string &strCommand, int msgSize, int64_t nStopwatchTimeReceived);
 // txn mempool statistics
 extern CStatHistory<unsigned int> txAdded;
 extern CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize;

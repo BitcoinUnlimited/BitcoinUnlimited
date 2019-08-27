@@ -262,7 +262,7 @@ void UpdateSendStats(CNode *pfrom, const char *strCommand, int msgSize, int64_t 
     }
 }
 
-void UpdateRecvStats(CNode *pfrom, const std::string &strCommand, int msgSize, int64_t nTimeReceived)
+void UpdateRecvStats(CNode *pfrom, const std::string &strCommand, int msgSize, int64_t nStopwatchTimeReceived)
 {
     recvAmt += msgSize;
     std::string name = "net/recv/msg/" + strCommand;
