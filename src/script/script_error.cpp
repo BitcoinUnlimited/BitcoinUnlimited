@@ -87,6 +87,14 @@ const char *ScriptErrorString(const ScriptError serror)
         return "Public key is neither compressed or uncompressed";
     case SCRIPT_ERR_NONCOMPRESSED_PUBKEY:
         return "Using non-compressed public key";
+    case SCRIPT_ERR_CLEANSTACK:
+        return "P2SH script evaluation of script does not result in a clean stack";
+    case SCRIPT_ERR_MUST_USE_FORKID:
+        return "Schnorr sigs must use forkid sighash if forkid flag set";
+    case SCRIPT_ERR_NUMBER_OVERFLOW:
+        return "Script number overflow";
+    case SCRIPT_ERR_NUMBER_BAD_ENCODING:
+        return "Non-minimally encoded script number";
     case SCRIPT_ERR_UNKNOWN_ERROR:
     case SCRIPT_ERR_ERROR_COUNT:
     default:
