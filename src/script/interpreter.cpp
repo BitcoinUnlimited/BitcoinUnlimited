@@ -13,6 +13,7 @@
 #include "pubkey.h"
 #include "script/script.h"
 #include "uint256.h"
+#include "util.h"
 const std::string strMessageMagic = "Bitcoin Signed Message:\n";
 
 extern uint256 SignatureHashLegacy(const CScript &scriptCode,
@@ -497,7 +498,7 @@ bool CheckPubKeyEncoding(const valtype &vchPubKey, unsigned int flags, ScriptErr
 bool static CheckMinimalPush(const valtype &data, opcodetype opcode)
 {
     // Excludes OP_1NEGATE, OP_1-16 since they are by definition minimal
-    assert(0 <= opcode && opcode <= OP_PUSHDATA4);
+    DbgAssert(0 <= opcode && opcode <= OP_PUSHDATA4, return true);
     if (data.size() == 0)
     {
         // Should have used OP_0.
