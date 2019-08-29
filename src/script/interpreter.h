@@ -35,6 +35,7 @@ enum
     SCRIPT_VERIFY_NONE = 0,
 
     // Evaluate P2SH subscripts (softfork safe, BIP16).
+    // Note: The Segwit Recovery feature is an exception to P2SH
     SCRIPT_VERIFY_P2SH = (1U << 0),
 
     // Passing a non-strict-DER signature or one with undefined hashtype to a checksig operation causes script failure.
@@ -77,6 +78,7 @@ enum
     // "Exactly one stack element must remain, and when interpreted as a boolean, it must be true".
     // (softfork safe, BIP62 rule 6)
     // Note: CLEANSTACK should never be used without P2SH.
+    // Note: The Segwit Recovery feature is an exception to CLEANSTACK
     SCRIPT_VERIFY_CLEANSTACK = (1U << 8),
 
     // Verify CHECKLOCKTIMEVERIFY
@@ -122,8 +124,9 @@ enum
     //
     SCRIPT_ENABLE_SCHNORR = (1U << 19),
 
-    // Allows the recovery of coins sent to p2sh segwit addresses
-    SCRIPT_ALLOW_SEGWIT_RECOVERY = (1U << 20),
+    // The exception to CLEANSTACK and P2SH for the recovery of coins sent
+    // to p2sh segwit addresses is not allowed.
+    SCRIPT_DISALLOW_SEGWIT_RECOVERY = (1U << 20),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);

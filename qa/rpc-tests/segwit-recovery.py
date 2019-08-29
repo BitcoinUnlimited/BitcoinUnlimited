@@ -4,25 +4,55 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """
-This test checks activation of the SCRIPT_ALLOW_SEGWIT_RECOVERY flag
+This test checks that blocks containing segwit recovery transactions will be accepted,
+that segwit recovery transactions are rejected from mempool acceptance (even with 
+-acceptnonstdtxn=1), and that segwit recovery transactions don't result in bans.
 """
 
+import time
+
+from test_framework.blocktools import (
+    create_block,
+    create_coinbase,
+    make_conform_to_ctor,
+)
+from test_framework.comptool import TestInstance, TestManager
+from test_framework.messages import (
+    COIN,
+    COutPoint,
+    CTransaction,
+    CTxIn,
+    CTxOut,
+    msg_tx,
+    ToHex,
+)
+from test_framework.mininode import (
+    mininode_lock,
+    network_thread_start,
+    P2PInterface,
+)
+from test_framework.script import (
+    CScript,
+    hash160,
+    OP_EQUAL,
+    OP_HASH160,
+    OP_TRUE,
+)
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal, assert_raises_rpc_error, sync_blocks
-from test_framework.comptool import TestManager, TestInstance, RejectResult
-from test_framework.blocktools import *
-from test_framework.script import *
+from test_framework.util import (
+    assert_raises_rpc_error,
+    sync_blocks,
+)
 
-# far into the future
-MAY_2019_FORK_TIME = 2000000000
-
-# First blocks (initial coinbases, pre-fork test blocks) happen 1 day before.
-FIRST_BLOCK_TIME = MAY_2019_FORK_TIME - 86400
+TEST_TIME = int(time.time())
 
 # Error due to non clean stack
 CLEANSTACK_ERROR = b'non-mandatory-script-verify-flag (Script did not clean its stack)'
 RPC_CLEANSTACK_ERROR = "64: " + \
     CLEANSTACK_ERROR.decode("utf-8")
+EVAL_FALSE_ERROR = b'non-mandatory-script-verify-flag (Script evaluated without error but finished with a false/empty top stack elem'
+RPC_EVAL_FALSE_ERROR = "64: " + \
+    EVAL_FALSE_ERROR.decode("utf-8")
 
 
 class PreviousSpendableOutput(object):
@@ -32,7 +62,7 @@ class PreviousSpendableOutput(object):
         self.n = n
 
 
-class SegwitRecoveryActivationTest(BitcoinTestFramework):
+class SegwitRecoveryTest(BitcoinTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 2
@@ -41,34 +71,32 @@ class SegwitRecoveryActivationTest(BitcoinTestFramework):
         self.tip = None
         self.blocks = {}
         # We have 2 nodes:
-        # 1) node_nonstd (nodes[0]) accepts non-standard txns. It's used to
-        #    test the activation itself via TestManager.
+        # 1) node_nonstd (nodes[0]) accepts non-standard txns. It does not
+        #    accept Segwit recovery transactions, since it is included in
+        #    standard flags, and transactions that violate these flags are
+        #    never accepted into the mempool.
         # 2) node_std (nodes[1]) doesn't accept non-standard txns and
         #    doesn't have us whitelisted. It's used to test for bans, as we
         #    connect directly to it via mininode and send a segwit spending
-        #    txn. This transaction is non-standard and, before activation,
-        #    also invalid. We check, before and after activation, that
-        #    sending this transaction doesn't result in a ban.
+        #    txn. This transaction is non-standard. We check that sending
+        #    this transaction doesn't result in a ban.
         # Nodes are connected to each other, so node_std receives blocks and
         # transactions that node_nonstd has accepted. Since we are checking
         # that segwit spending txn are not resulting in bans, node_nonstd
         # doesn't get banned when forwarding this kind of transactions to
         # node_std.
         self.extra_args = [['-whitelist=127.0.0.1',
-                            "-acceptnonstdtxn",
-                            "-consensus.forkMay2019Time={}".format(MAY_2019_FORK_TIME)],
-                           ["-acceptnonstdtxn=0",
-                            "-consensus.forkMay2019Time={}".format(MAY_2019_FORK_TIME)]]
+                            "-acceptnonstdtxn"],
+                           ["-acceptnonstdtxn=0"]]
 
     def run_test(self):
         # Move the mocktime up to activation
         for node in self.nodes:
-            node.setmocktime(MAY_2019_FORK_TIME)
+            node.setmocktime(TEST_TIME)
         test = TestManager(self, self.options.tmpdir)
         # TestManager only connects to node_nonstd (nodes[0])
         test.add_all_connections([self.nodes[0]])
         # We connect directly to node_std (nodes[1])
-        # FIXME we need to find a way to connect node[1] to TestManager
         self.nodes[1].add_p2p_connection(P2PInterface())
         network_thread_start()
         test.run()
@@ -76,7 +104,7 @@ class SegwitRecoveryActivationTest(BitcoinTestFramework):
     def next_block(self, number):
         if self.tip == None:
             base_block_hash = self.genesis_hash
-            block_time = FIRST_BLOCK_TIME
+            block_time = TEST_TIME
         else:
             base_block_hash = self.tip.sha256
             block_time = self.tip.nTime + 1
@@ -144,20 +172,26 @@ class SegwitRecoveryActivationTest(BitcoinTestFramework):
             self.blocks[block_number] = block
             return block
 
+        # checks the mempool has exactly the same txns as in the provided list
+        def check_mempool_equal(node, txns):
+            assert set(node.getrawmempool()) == set(tx.hash for tx in txns)
+
         # Returns 2 transactions:
         # 1) txfund: create outputs in segwit addresses
         # 2) txspend: spends outputs from segwit addresses
-        def create_segwit_fund_and_spend_tx(spend):
-            # To make sure we'll be able to recover coins sent to segwit addresses,
-            # we test using historical recoveries from btc.com:
-            # Spending from a P2SH-P2WPKH coin,
-            #   txhash:a45698363249312f8d3d93676aa714be59b0bd758e62fa054fb1ea6218480691
-            redeem_script0 = bytearray.fromhex(
-                '0014fcf9969ce1c98a135ed293719721fb69f0b686cb')
-            # Spending from a P2SH-P2WSH coin,
-            #   txhash:6b536caf727ccd02c395a1d00b752098ec96e8ec46c96bee8582be6b5060fa2f
-            redeem_script1 = bytearray.fromhex(
-                '0020fc8b08ed636cb23afcb425ff260b3abd03380a2333b54cfa5d51ac52d803baf4')
+        def create_segwit_fund_and_spend_tx(spend, case0=False):
+            if not case0:
+                # Spending from a P2SH-P2WPKH coin,
+                #   txhash:a45698363249312f8d3d93676aa714be59b0bd758e62fa054fb1ea6218480691
+                redeem_script0 = bytearray.fromhex(
+                    '0014fcf9969ce1c98a135ed293719721fb69f0b686cb')
+                # Spending from a P2SH-P2WSH coin,
+                #   txhash:6b536caf727ccd02c395a1d00b752098ec96e8ec46c96bee8582be6b5060fa2f
+                redeem_script1 = bytearray.fromhex(
+                    '0020fc8b08ed636cb23afcb425ff260b3abd03380a2333b54cfa5d51ac52d803baf4')
+            else:
+                redeem_script0 = bytearray.fromhex('51020000')
+                redeem_script1 = bytearray.fromhex('53020080')
             redeem_scripts = [redeem_script0, redeem_script1]
 
             # Fund transaction to segwit addresses
@@ -221,7 +255,7 @@ class SegwitRecoveryActivationTest(BitcoinTestFramework):
 
         # Now we need that block to mature so we can spend the coinbase.
         test = TestInstance(sync_every_block=False)
-        for i in range(99):
+        for i in range(100):
             block(5000 + i)
             test.blocks_and_transactions.append([self.tip, True])
             save_spendable_output()
@@ -234,91 +268,41 @@ class SegwitRecoveryActivationTest(BitcoinTestFramework):
 
         # Create segwit funding and spending transactions
         txfund, txspend = create_segwit_fund_and_spend_tx(out[0])
+        txfund_case0, txspend_case0 = create_segwit_fund_and_spend_tx(
+            out[1], True)
 
-        # Create blocks to get closer to activate the fork.
         # Mine txfund, as it can't go into node_std mempool because it's
         # nonstandard.
         b = block(5555)
-        b.nTime = MAY_2019_FORK_TIME - 1
-        update_block(5555, [txfund])
+        update_block(5555, [txfund, txfund_case0])
         yield accepted()
-
-        for i in range(5):
-            block(5100 + i)
-            test.blocks_and_transactions.append([self.tip, True])
-        yield test
 
         # Since the TestManager is not connected to node_std, we must check
         # both nodes are synchronized before continuing.
         sync_blocks(self.nodes)
 
-        # Check we are just before the activation time
-        assert_equal(node_nonstd.getblockheader(
-            node_nonstd.getbestblockhash())['mediantime'], MAY_2019_FORK_TIME - 1)
-        assert_equal(node_std.getblockheader(
-            node_std.getbestblockhash())['mediantime'], MAY_2019_FORK_TIME - 1)
-
-        # Before the fork, segwit spending txns are rejected.
-        assert_raises_rpc_error(-26, RPC_CLEANSTACK_ERROR,
-                                node_nonstd.sendrawtransaction, ToHex(txspend))
-        assert_raises_rpc_error(-26, RPC_CLEANSTACK_ERROR,
-                                node_std.sendrawtransaction, ToHex(txspend))
-
-        # Blocks containing segwit spending txns are rejected as well.
-        block(2)
-        update_block(2, [txspend])
-        yield rejected(RejectResult(16, b'blk-bad-inputs'))
-
-        # Rewind bad block
-        tip(5104)
-
-        # Check that non-upgraded nodes checking for standardness are not
-        # banning nodes sending segwit spending txns.
-        check_for_no_ban_on_rejected_tx(txspend, 64, CLEANSTACK_ERROR)
-
-        # Activate the fork in both nodes!
-        forkblock = block(5556)
-        yield accepted()
-        sync_blocks(self.nodes)
-
-        # Check we just activated the fork
-        assert_equal(node_nonstd.getblockheader(
-            node_nonstd.getbestblockhash())['mediantime'], MAY_2019_FORK_TIME)
-        assert_equal(node_std.getblockheader(
-            node_std.getbestblockhash())['mediantime'], MAY_2019_FORK_TIME)
-
-        # Segwit spending txns are accepted in the mempool of nodes not checking
-        # for standardness, but rejected in nodes that check.
-        node_nonstd.sendrawtransaction(ToHex(txspend))
-        assert(txspend.hash in node_nonstd.getrawmempool())
-        assert_raises_rpc_error(-26, RPC_CLEANSTACK_ERROR,
-                                node_std.sendrawtransaction, ToHex(txspend))
-
         # Check that upgraded nodes checking for standardness are not banning
         # nodes sending segwit spending txns.
         check_for_no_ban_on_rejected_tx(txspend, 64, CLEANSTACK_ERROR)
+        check_for_no_ban_on_rejected_tx(txspend_case0, 64, EVAL_FALSE_ERROR)
 
-        # Blocks containing segwit spending txns are now accepted in both
-        # nodes.
+        # Segwit recovery txns are never accepted into the mempool,
+        # as they are included in standard flags.
+        assert_raises_rpc_error(-26, RPC_CLEANSTACK_ERROR,
+                                node_nonstd.sendrawtransaction, ToHex(txspend))
+        assert_raises_rpc_error(-26, RPC_EVAL_FALSE_ERROR,
+                                node_nonstd.sendrawtransaction, ToHex(txspend_case0))
+        assert_raises_rpc_error(-26, RPC_CLEANSTACK_ERROR,
+                                node_std.sendrawtransaction, ToHex(txspend))
+        assert_raises_rpc_error(-26, RPC_EVAL_FALSE_ERROR,
+                                node_std.sendrawtransaction, ToHex(txspend_case0))
+
+        # Blocks containing segwit spending txns are accepted in both nodes.
         block(5)
-        postforkblock = update_block(5, [txspend])
+        postforkblock = update_block(5, [txspend, txspend_case0])
         yield accepted()
         sync_blocks(self.nodes)
 
-        # Ok, now we check if a reorg work properly accross the activation.
-        node_nonstd.invalidateblock(postforkblock.hash)
-        assert(txspend.hash in node_nonstd.getrawmempool())
-
-        # Also check that nodes checking for standardness don't return a segwit
-        # spending txn into the mempool when disconnecting a block.
-        node_std.invalidateblock(postforkblock.hash)
-        assert(txspend.hash not in node_std.getrawmempool())
-
-        # Deactivate the fork. The spending tx has been evicted from the
-        # mempool
-        node_nonstd.invalidateblock(forkblock.hash)
-        assert(len(node_nonstd.getrawmempool()) == 0)
-
 
 if __name__ == '__main__':
-    SegwitRecoveryActivationTest().main()
+    SegwitRecoveryTest().main()
