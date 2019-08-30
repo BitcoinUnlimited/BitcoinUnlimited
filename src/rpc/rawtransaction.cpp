@@ -1572,7 +1572,7 @@ UniValue validaterawtransaction(const UniValue &params, bool fHelp)
             "             ]\n"
             "       ]\n"
             "    },\n"
-            "  \"inputs_mandatoyFlags\" : {\n"
+            "  \"inputs_mandatoryFlags\" : {\n"
             "       \"isValid\" : true|false,        (boolean) Are all of the tx inputs valid with mandatory flags\n"
             "       \"inputs\" : [\n"
             "           \"isValid\" : true|false,        (boolean) is this input valid with mandatory flags\n"
@@ -1704,7 +1704,7 @@ UniValue validaterawtransaction(const UniValue &params, bool fHelp)
     UniValue uv_inputCheck2(UniValue::VOBJ);
     CInputDebugger input2 = debugger.GetInputCheck2();
     InputDebuggerToJSON(input2, uv_inputCheck2);
-    result.pushKV("inputs_mandatoyFlags", uv_inputCheck2);
+    result.pushKV("inputs_mandatoryFlags", uv_inputCheck2);
     return result;
 }
 
