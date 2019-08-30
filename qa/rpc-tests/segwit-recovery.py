@@ -299,7 +299,7 @@ class SegwitRecoveryTest(BitcoinTestFramework):
 
         # Blocks containing segwit spending txns are accepted in both nodes.
         block(5)
-        postforkblock = update_block(5, [txspend, txspend_case0])
+        update_block(5, [txspend, txspend_case0])
         yield accepted()
         sync_blocks(self.nodes)
 
