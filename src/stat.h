@@ -353,7 +353,7 @@ public:
                     count = len[series];
                 for (int i = -1 * (count - 1); i <= 0; i++)
                 {
-                    const RecordType &sample = History(series, i);
+                    const RecordType &sample = _History(series, i);
                     ret.push_back((UniValue)sample);
                 }
                 return ret;
@@ -366,6 +366,11 @@ public:
     const RecordType &History(int series, int ago)
     {
         std::lock_guard<std::mutex> lock(cs);
+        return _History(series, ago);
+    }
+
+    const RecordType &_History(int series, int ago)
+    {
         assert(ago <= 0);
         assert(series < STATISTICS_NUM_RANGES);
         assert(-1 * ago <= STATISTICS_SAMPLES);
@@ -392,8 +397,8 @@ public:
                     count = len[series];
                 for (int i = -1 * (count - 1); i <= 0; i++)
                 {
-                    const RecordType &sample = History(series, i);
-                    const int64_t &sample_time = HistoryTime(series, i);
+                    const RecordType &sample = _History(series, i);
+                    const int64_t &sample_time = _HistoryTime(series, i);
                     data.push_back((UniValue)sample);
                     times.push_back((UniValue)sample_time);
                 }
@@ -409,6 +414,11 @@ public:
     const int64_t &HistoryTime(int series, int ago)
     {
         std::lock_guard<std::mutex> lock(cs);
+        return _HistoryTime(series, ago);
+    }
+
+    const int64_t &_HistoryTime(int series, int ago)
+    {
         assert(ago <= 0);
         assert(series < STATISTICS_NUM_RANGES);
         assert(-1 * ago <= STATISTICS_SAMPLES);

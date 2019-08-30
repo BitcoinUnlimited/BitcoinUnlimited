@@ -393,6 +393,23 @@ class MyTest (BitcoinTestFramework):
         end = time.monotonic()
         logging.info("synced %d tx in %s seconds.  Speed %f tx/sec" % (NTX, end - start, float(NTX) / (end - start)))
 
+        # Regression test the stats now.  Ideally this would be in an isolated test, but this can be done here quickly
+        # and Travis runs out of time often.
+        for n in self.nodes:
+            result = n.getstatlist()
+            # logging.info(result)
+            result = n.getstat("memPool/txAdded", "sec10", 100)
+            logging.info(result)
+            result = n.getstat("memPool/size", "min5")
+            logging.info(result)
+            result = n.getstat("net/recv/msg/inv", "sec10", 20)
+            logging.info(result)
+            result = n.getstat("net/recv/total", "sec10", 20)
+            logging.info(result)
+            result = n.getstat("net/send/total", "sec10")
+            logging.info(result)
+
+
         if self.bigTest:
             # Start up node 4
             self.nodes.append(start_node(3, self.options.tmpdir))
