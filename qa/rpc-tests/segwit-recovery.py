@@ -256,7 +256,7 @@ class SegwitRecoveryTest(BitcoinTestFramework):
 
         # Mine txfund, as it can't go into node_std mempool because it's
         # nonstandard.
-        b = block(5555)
+        block(5555)
         update_block(5555, [txfund, txfund_case0])
         accepted(node_nonstd)
 
