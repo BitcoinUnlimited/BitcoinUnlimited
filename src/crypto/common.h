@@ -54,6 +54,13 @@ void static inline WriteLE64(unsigned char* ptr, uint64_t x)
     memcpy(ptr, (char*)&v, 8);
 }
 
+uint32_t static inline ReadBE16(const unsigned char* ptr)
+{
+    uint16_t x;
+    memcpy((char*)&x, ptr, 2);
+    return be16toh(x);
+}
+
 uint32_t static inline ReadBE32(const unsigned char* ptr)
 {
     uint32_t x;
