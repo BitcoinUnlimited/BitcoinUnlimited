@@ -126,6 +126,51 @@ ScriptError_t ParseScriptError(const std::string &name)
 
 BOOST_FIXTURE_TEST_SUITE(script_tests, BasicTestingSetup)
 
+BOOST_AUTO_TEST_CASE(minimaldata_creation)
+{
+    std::vector<unsigned char> vec(1);
+
+    // Check every encoding of a single byte vector since they are irksome
+    for (CAmount qty = 0; qty < 256; qty++)
+    {
+        vec[0] = qty;
+        CScript script = CScript() << vec << OP_DROP << OP_1;
+
+        // Verify that the script passes standard checks, especially the data coding
+        std::vector<std::vector<uint8_t> > stack;
+        BaseSignatureChecker sigchecker;
+        ScriptError err = SCRIPT_ERR_OK;
+        bool r = EvalScript(stack, script, MANDATORY_SCRIPT_VERIFY_FLAGS | SCRIPT_VERIFY_MINIMALDATA,
+            MAX_OPS_PER_SCRIPT, sigchecker, &err);
+        BOOST_CHECK(r);
+        BOOST_CHECK(err != SCRIPT_ERR_MINIMALDATA);
+    }
+
+    // Check weird vector sizes
+    for (int size = 0x0; size < 0xffff + 2; size++)
+    {
+        // Skip regions that are not weird
+        if (size == 1)
+            size = 0xff;
+        if (size == 0x101)
+            size = 0xffff;
+
+        vec.resize(size);
+        CScript script = CScript() << vec << OP_DROP << OP_1;
+        std::vector<std::vector<uint8_t> > stack;
+        BaseSignatureChecker sigchecker;
+        ScriptError err = SCRIPT_ERR_OK;
+        bool r = EvalScript(stack, script, MANDATORY_SCRIPT_VERIFY_FLAGS | SCRIPT_VERIFY_MINIMALDATA,
+            MAX_OPS_PER_SCRIPT, sigchecker, &err);
+
+        // We know large scripts will fail the eval -- this is not interesting WRT this test
+        if (size <= MAX_SCRIPT_SIZE)
+            BOOST_CHECK(r);
+        BOOST_CHECK(err != SCRIPT_ERR_MINIMALDATA);
+    }
+}
+
+
 CMutableTransaction BuildCreditingTransaction(const CScript &scriptPubKey, CAmount nValue)
 {
     CMutableTransaction txCredit;
