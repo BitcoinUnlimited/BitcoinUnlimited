@@ -262,8 +262,6 @@ void CommitTxToMempool()
         CTxCommitData &data = it.second;
         mempool.addUnchecked(it.first, data.entry, !IsInitialBlockDownload());
         vWhatChanged.push_back(data.hash);
-        // Update txn per second only when a txn is valid and accepted to the mempool
-        mempool.UpdateTransactionsPerSecond();
 
         // Indicate that this tx was fully processed/accepted and can now be removed from the
         // request manager.
@@ -1195,6 +1193,11 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         interval, tx->GetHash().ToString(), nSize, resourceTracker.GetSigOps(), (unsigned int)nSigOps,
         resourceTracker.GetSighashBytes(), tx->vin.size(), tx->vout.size());
     nTxValidationTime << interval;
+
+    // Update txn per second. We must do it here although technically the txn isn't in the mempool yet but
+    // rather in the CommitQ. However, if we don't do it here then we'll end up with very bursty and not very
+    // realistic processing throughput data.
+    mempool.UpdateTransactionsPerSecond();
 
     return true;
 }
