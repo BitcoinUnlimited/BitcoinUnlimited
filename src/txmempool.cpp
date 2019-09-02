@@ -1524,8 +1524,8 @@ void CTxMemPool::UpdateTransactionsPerSecond()
         if (nRate > nPeakRate)
             nPeakRate = nRate;
         nCount = 0;
+        nLastSampleTime = nCurrentSampleTime;
     }
-    nLastSampleTime = nCurrentSampleTime;
 }
 
 SaltedTxidHasher::SaltedTxidHasher()
