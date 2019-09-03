@@ -4,8 +4,9 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """
 This test checks that blocks containing segwit recovery transactions will be accepted,
-that segwit recovery transactions are rejected from mempool acceptance (even with 
--acceptnonstdtxn=1), and that segwit recovery transactions don't result in bans.
+that segwit recovery transactions are rejected from mempool acceptance by default, that
+segit recovery transactions are accepted in case of -acceptnonstdtxn=1, and that segwit recovery
+transactions don't result in bans.
 """
 
 import time
@@ -44,12 +45,10 @@ from test_framework.util import (
 TEST_TIME = int(time.time())
 
 # Error due to non clean stack
-CLEANSTACK_ERROR = b'non-mandatory-script-verify-flag (Script did not clean its stack)'
-RPC_CLEANSTACK_ERROR = "64: " + \
-    CLEANSTACK_ERROR.decode("utf-8")
-EVAL_FALSE_ERROR = b'non-mandatory-script-verify-flag (Script evaluated without error but finished with a false/empty top stack elem'
-RPC_EVAL_FALSE_ERROR = "64: " + \
-    EVAL_FALSE_ERROR.decode("utf-8")
+CLEANSTACK_ERROR = b'non-mandatory-script-verify-flag (P2SH script evaluation of script does not result in a clean stack)'
+RPC_CLEANSTACK_ERROR = CLEANSTACK_ERROR + " (code 64)"
+EVAL_FALSE_ERROR = b'non-mandatory-script-verify-flag (Script evaluated without error but finished with a false/empty top stack element)'
+RPC_EVAL_FALSE_ERROR = EVAL_FALSE_ERROR + " (code 64)"
 
 
 class PreviousSpendableOutput(object):
@@ -68,10 +67,8 @@ class SegwitRecoveryTest(BitcoinTestFramework):
         self.tip = None
         self.blocks = {}
         # We have 2 nodes:
-        # 1) node_nonstd (nodes[0]) accepts non-standard txns. It does not
-        #    accept Segwit recovery transactions, since it is included in
-        #    standard flags, and transactions that violate these flags are
-        #    never accepted into the mempool.
+        # 1) node_nonstd (nodes[0]) accepts non-standard txns. It does
+        #    accept Segwit recovery transactions.
         # 2) node_std (nodes[1]) doesn't accept non-standard txns and
         #    doesn't have us whitelisted. It's used to test for bans, as we
         #    connect directly to it via mininode and send a segwit spending
@@ -83,7 +80,7 @@ class SegwitRecoveryTest(BitcoinTestFramework):
         # doesn't get banned when forwarding this kind of transactions to
         # node_std.
         self.extra_args = [['-whitelist=127.0.0.1',
-                            "-acceptnonstdtxn"],
+                            "-acceptnonstdtxn=1"],
                            ["-acceptnonstdtxn=0"]]
 
     def next_block(self, number):
