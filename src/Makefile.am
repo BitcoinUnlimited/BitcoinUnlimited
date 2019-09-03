@@ -351,11 +351,10 @@ libbitcoin_wallet_a_SOURCES = \
 libbitcoincash_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoincash_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 
-# base58.cpp
-#  base58.h
-
 libbitcoincash_a_SOURCES = \
   cashlib/cashlib.cpp \
+  base58.cpp \
+  base58.h \
   chainparams.cpp \
   chainparams.h \
   chainparamsbase.cpp \
