@@ -1053,7 +1053,7 @@ void CWallet::MarkConflicted(const uint256 &hashBlock, const uint256 &hashTx)
 
 void CWallet::SyncTransaction(const CTransactionRef &ptx, const CBlock *pblock, int txIdx)
 {
-    LOCK2(cs_main, cs_wallet);
+    LOCK(cs_wallet);
 
     if (!AddToWalletIfInvolvingMe(ptx, pblock, true, txIdx))
         return; // Not one of ours

@@ -227,11 +227,19 @@ CCond cvTxInQ;
 // Finds transactions that may conflict with other pending transactions
 CFastFilter<4 * 1024 * 1024> incomingConflicts GUARDED_BY(csTxInQ);
 
+// Finds transactions that may conflict with transactions being processed (currently only those in a block)
+// This filter is not cleared during the periodic tx mempool commitment.
+CFastFilter<4 * 1024 * 1024> baseConflicts;
+
 // Tranactions that are waiting for validation and are known not to conflict with others
 std::queue<CTxInputData> txInQ GUARDED_BY(csTxInQ);
 
 // Transaction that cannot be processed in this round (may potentially conflict with other tx)
 std::queue<CTxInputData> txDeferQ GUARDED_BY(csTxInQ);
+
+// Transactions that cannot be processed given the current contents of baseConflicts
+// Guarded by csTxInQ
+std::queue<CTxInputData> baseDeferQ;
 
 // Transactions that arrive when the chain is not syncd can be place here at times when we've received
 // the block announcement but havn't yet downloaded the block and updated the tip. In this case there can

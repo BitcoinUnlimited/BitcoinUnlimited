@@ -1794,7 +1794,6 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
 {
     UniValue rcvd;
     CBlock block;
-    LOCK(cs_main);
 
     if (fHelp || params.size() != 1)
     {
@@ -1814,15 +1813,17 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
 
     int64_t id = rcvd["id"].get_int64();
 
-    // Needs LOCK(cs_main); above:
-    if (miningCandidatesMap.count(id) == 1)
     {
-        block = miningCandidatesMap[id].block;
-        miningCandidatesMap.erase(id);
-    }
-    else
-    {
-        return UniValue("id not found");
+        LOCK(cs_main);
+        if (miningCandidatesMap.count(id) == 1)
+        {
+            block = miningCandidatesMap[id].block;
+            miningCandidatesMap.erase(id);
+        }
+        else
+        {
+            return UniValue("id not found");
+        }
     }
 
     UniValue nonce = rcvd["nonce"];

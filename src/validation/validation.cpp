@@ -3375,7 +3375,7 @@ bool ActivateBestChain(CValidationState &state,
     bool result = true;
     CBlockIndex *pindexMostWork = nullptr;
 
-    TxAdmissionPause txlock;
+    TxFilteredAdmission txlock(pblock);
     LOCK(cs_main);
 
     bool fOneDone = false;

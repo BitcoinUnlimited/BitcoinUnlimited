@@ -125,6 +125,9 @@ extern CTweak<unsigned int> numTxAdmissionThreads;
 extern CRollingFastFilter<4 * 1024 * 1024> recentRejects;
 extern CRollingFastFilter<4 * 1024 * 1024> txRecentlyInBlock;
 
+// Finds transactions that may conflict with transactions being processed in a block
+// This filter is not cleared during the periodic tx mempool commitment.
+extern CFastFilter<4 * 1024 * 1024> baseConflicts;
 // Finds transactions that may conflict with other pending transactions
 extern CFastFilter<4 * 1024 * 1024> incomingConflicts;
 
@@ -137,6 +140,9 @@ extern std::queue<CTxInputData> txInQ;
 // Transactions that cannot be processed in this round (may potentially conflict with other tx)
 // Guarded by csTxInQ
 extern std::queue<CTxInputData> txDeferQ;
+// Transactions that cannot be processed given the current contents of baseConflicts
+// Guarded by csTxInQ
+extern std::queue<CTxInputData> baseDeferQ;
 
 // Transactions that arrive when the chain is not syncd can be place here at times when we've received
 // the block announcement but havn't yet downloaded the block and updated the tip. In this case there can
@@ -237,6 +243,48 @@ public:
     ~TxAdmissionPause()
     {
         txHandlerSnap.Load(); // Load the new block into the transaction processor's state snapshot
+        txProcessingCorral.Exit(CORRAL_TX_PAUSE);
+    }
+};
+
+// This allows transactions to be accepted that do not potentially conflict with the passed block.
+class TxFilteredAdmission
+{
+public:
+    TxFilteredAdmission(const CBlock *block)
+    {
+        txProcessingCorral.Enter(CORRAL_TX_PAUSE);
+        CommitTxToMempool();
+
+        LOCK(csTxInQ);
+        baseConflicts.reset();
+        while (!baseDeferQ.empty())
+            baseDeferQ.pop(); // Should be empty anyway
+        if (block)
+        {
+            for (auto &tx : block->vtx)
+            {
+                for (auto &inp : tx->vin)
+                {
+                    baseConflicts.insert(inp.prevout.hash);
+                }
+            }
+        }
+        txProcessingCorral.Exit(CORRAL_TX_PAUSE);
+    }
+
+    ~TxFilteredAdmission()
+    {
+        txProcessingCorral.Enter(CORRAL_TX_PAUSE);
+        txHandlerSnap.Load(); // Load the new block into the transaction processor's state snapshot
+
+        LOCK(csTxInQ);
+        baseConflicts.reset();
+        while (!baseDeferQ.empty())
+        {
+            txDeferQ.push(baseDeferQ.front());
+            baseDeferQ.pop();
+        }
         txProcessingCorral.Exit(CORRAL_TX_PAUSE);
     }
 };
