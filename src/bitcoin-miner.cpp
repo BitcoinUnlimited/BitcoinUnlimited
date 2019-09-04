@@ -30,6 +30,10 @@
 
 #include <univalue.h>
 
+// below two require C++11
+#include <random>
+#include <functional>
+
 using namespace std;
 
 #ifdef DEBUG_LOCKORDER
@@ -40,6 +44,10 @@ boost::mutex dd_mutex;
 std::map<std::pair<void *, void *>, LockStack> lockorders;
 boost::thread_specific_ptr<LockStack> lockstack;
 #endif
+
+// Lambda used to generate entropy, per-thread (see CpuMiner, et al below)
+typedef std::function<uint32_t(void)> RandFunc;
+
 
 // Internal miner
 //
@@ -147,9 +155,10 @@ static uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uin
 
 static bool CpuMineBlockHasher(CBlockHeader *pblock,
     vector<unsigned char> &coinbaseBytes,
-    const std::vector<uint256> &merkleproof)
+    const std::vector<uint256> &merkleproof,
+    const RandFunc & randFunc)
 {
-    uint32_t nExtraNonce = std::rand();
+    uint32_t nExtraNonce = randFunc();  // Grab random 4-bytes from thread-safe generator we were passed
     uint32_t nNonce = pblock->nNonce;
     arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
     bool found = false;
@@ -221,7 +230,7 @@ static double GetDifficulty(uint64_t nBits)
     return dDiff;
 }
 
-static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params, bool &found)
+static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params, bool &found, const RandFunc & randFunc)
 {
     UniValue tmp(UniValue::VOBJ);
     UniValue ret(UniValue::VARR);
@@ -254,7 +263,7 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
         header.nVersion = blockversion;
     }
 
-    uint32_t startNonce = header.nNonce = std::rand();
+    uint32_t startNonce = header.nNonce = randFunc();
 
     printf("Mining: id: %x parent: %s bits: %x difficulty: %3.2f time: %d\n", (unsigned int)params["id"].get_int64(),
         header.hashPrevBlock.ToString().c_str(), header.nBits, GetDifficulty(header.nBits), header.nTime);
@@ -268,7 +277,7 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
         // and the block will be rejected.  So do not advance time (let it be advanced by bitcoind every time we
         // request a new block).
         // header.nTime = (header.nTime < GetTime()) ? GetTime() : header.nTime;
-        found = CpuMineBlockHasher(&header, coinbaseBytes, merkleproof);
+        found = CpuMineBlockHasher(&header, coinbaseBytes, merkleproof, randFunc);
     }
 
     // Leave if not found:
@@ -334,6 +343,16 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
 
 int CpuMiner(void)
 {
+    // Initialize random number generator lambda. This is per-thread and
+    // is thread-safe.  std::rand() is not thread-safe and can result
+    // in multiple threads doing redundant proof-of-work.
+    std::random_device rd;
+    std::default_random_engine e1(rd());  // seed random number generator from system entropy source (implementation defined: usually HW)
+    std::uniform_int_distribution<uint32_t> uniformGen(0); // returns a uniformly distributed random number in the inclusive range: [0, UINT_MAX]
+    auto randFunc = [&](void) -> uint32_t {
+        return uniformGen(e1);
+    };
+
     int searchDuration = GetArg("-duration", 30);
     int nblocks = GetArg("-nblocks", -1); //-1 mine forever
     int coinbasesize = GetArg("-coinbasesize", 0);
@@ -461,7 +480,7 @@ int CpuMiner(void)
             else
             {
                 found = false;
-                mineresult = CpuMineBlock(searchDuration, result, found);
+                mineresult = CpuMineBlock(searchDuration, result, found, randFunc);
                 if (!found)
                 {
                     // printf("Mining did not succeed\n");
