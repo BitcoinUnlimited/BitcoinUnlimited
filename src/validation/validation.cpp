@@ -1010,31 +1010,6 @@ bool CheckInputs(const CTransactionRef &tx,
                         }
                     }
 
-                    // We also, regardless, need to check whether the transaction would
-                    // be valid on the other side of the upgrade, so as to avoid
-                    // splitting the network between upgraded and non-upgraded nodes.
-                    // Note that this will create strange error messages like
-                    // "upgrade-conditional-script-failure (Non-canonical DER ...)"
-                    // -- the tx was refused entry due to STRICTENC, a mandatory flag,
-                    // but after the upgrade the signature would have been interpreted
-                    // as valid Schnorr and thus STRICTENC would not happen.
-                    CScriptCheck check3(nullptr, scriptPubKey, amount, *tx, i, mandatoryFlags ^ SCRIPT_ENABLE_SCHNORR,
-                        maxOps, cacheStore);
-                    if (check3())
-                    {
-                        if (debugger)
-                        {
-                            debugger->AddInputCheckError(strprintf(
-                                "upgrade-conditional-script-failure (%s)", ScriptErrorString(check.GetScriptError())));
-                        }
-                        else
-                        {
-                            return state.Invalid(
-                                false, REJECT_INVALID, strprintf("upgrade-conditional-script-failure (%s)",
-                                                           ScriptErrorString(check.GetScriptError())));
-                        }
-                    }
-
                     // Failures of other flags indicate a transaction that is
                     // invalid in new blocks, e.g. a invalid P2SH. We DoS ban
                     // such nodes as they are not following the protocol. That
@@ -1832,14 +1807,11 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
         flags |= SCRIPT_ENABLE_CHECKDATASIG;
     }
 
-    // if May 15th, 2019 protocol upgrade is activated we also start accepting
-    // 65/64-byte Schnorr signatures in CHECKSIG and CHECKDATASIG respectively,
-    // and their verify variants. We also stop accepting 65 byte signatures in
-    // CHECKMULTISIG and its verify variant.
-    if (IsMay2019Activated(consensusparams, pindex->pprev))
-    {
-        flags |= SCRIPT_ENABLE_SCHNORR;
-    }
+    // Permanently and retroactively, we start accepting 65/64-byte Schnorr
+    // signatures in CHECKSIG and CHECKDATASIG respectively, and their verify
+    // variants. We also stop accepting 65 byte signatures in CHECKMULTISIG
+    // and its verify variant.
+    flags |= SCRIPT_ENABLE_SCHNORR;
 
     return flags;
 }

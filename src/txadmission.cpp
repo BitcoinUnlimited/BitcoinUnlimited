@@ -650,9 +650,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
     const uint32_t cds_flag =
         (IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip())) ? SCRIPT_ENABLE_CHECKDATASIG : 0;
-    const uint32_t schnorrflag =
-        (IsMay2019Activated(chainparams.GetConsensus(), chainActive.Tip())) ? SCRIPT_ENABLE_SCHNORR : 0;
-    const uint32_t featureFlags = cds_flag | schnorrflag;
+    const uint32_t featureFlags = cds_flag;
 
     uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;
 
