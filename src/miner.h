@@ -55,9 +55,10 @@ struct CompareCTxMemPoolIter
     bool operator()(const CTxMemPool::txiter &a, const CTxMemPool::txiter &b) const { return &(*a) < &(*b); }
 };
 
-// A comparator that sorts transactions based on number of ancestors.
-// This is sufficient to sort an ancestor package in an order that is valid
-// to appear in a block.
+/** A comparator that sorts transactions based on number of ancestors.
+ * This is sufficient to sort an ancestor package in an order that is valid
+ * to appear in a block.
+ */
 struct CompareTxIterByAncestorCount
 {
     bool operator()(const CTxMemPool::txiter &a, const CTxMemPool::txiter &b)
@@ -131,8 +132,8 @@ private:
     CTransactionRef coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue);
 
     // helper functions for addPackageTxs()
-    /** Test if a new package would "fit" in the block */
-    bool TestPackage(uint64_t packageSize, unsigned int packageSigOps);
+    /** Test whether a package, if added to the block, would make the block exceed the sigops limits */
+    bool TestPackageSigOps(uint64_t packageSize, unsigned int packageSigOps);
     /** Test if a set of transactions are all final */
     bool TestPackageFinality(const CTxMemPool::setEntries &package);
     /** Return true if given transaction from mapTx has already been evaluated,

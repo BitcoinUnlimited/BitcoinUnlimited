@@ -798,7 +798,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     // Do a performance test of package selection. This will typically be commented out unless one wants
     // to run the testing.
     mempool.clear();
-    //PerformanceTest_PackageSelection(chainparams, scriptPubKey, txFirst);
+    // PerformanceTest_PackageSelection(chainparams, scriptPubKey, txFirst);
 
     fCheckpointsEnabled = true;
 }

@@ -275,7 +275,7 @@ CTweakRef<bool> displayArchInSubver("net.displayArchInSubver",
     "Show box architecture, 32/64bit, in node user agent string (subver)",
     &fDisplayArchInSubver);
 
-CTweak<bool> miningCPFP("mining.cpfp",
+CTweak<bool> miningCPFP("mining.childPaysForParent",
     "If enabled then we will mine ancestor packages and allow child pays for parent.",
     true);
 CTweak<uint64_t> blockMiningSigopsPerMb("mining.excessiveSigopsPerMb",

@@ -36,9 +36,12 @@
 #include <queue>
 #include <thread>
 
-// Track timing information for Score and Pacakge mining.
+// Track timing information for Score and Package mining.
 int64_t nTotalPackage = 0;
 int64_t nTotalScore = 0;
+
+/** Maximum number of failed attempts to insert a package into a block */
+static const unsigned int MAX_PACKAGE_FAILURES = 5;
 
 using namespace std;
 
@@ -340,7 +343,7 @@ bool BlockAssembler::isStillDependent(CTxMemPool::txiter iter)
     return false;
 }
 
-bool BlockAssembler::TestPackage(uint64_t packageSize, unsigned int packageSigOps)
+bool BlockAssembler::TestPackageSigOps(uint64_t packageSize, unsigned int packageSigOps)
 {
     uint64_t blockMbSize = 1 + (nBlockSize + packageSize - 1) / 1000000;
     uint64_t nMaxSigOpsAllowed = blockMiningSigopsPerMb.Value() * blockMbSize;
@@ -539,11 +542,11 @@ void BlockAssembler::SortForBlock(const CTxMemPool::setEntries &package, std::ve
 // on feerate of a transaction including all unconfirmed ancestors.
 //
 // This is accomplished by considering a group of ancestors as a single transaction. We can call these
-// transations, Ancestor Grouped Transactions (AGT). This approach to grouping allows us to process
+// transactions, Ancestor Grouped Transactions (AGT). This approach to grouping allows us to process
 // packages orders of magnitude faster than other methods of package mining since we no longer have
 // to continuously update the descendant state as we mine part of an unconfirmed chain.
 //
-// There is a theorical flaw in this approach which could happen when a block is almost full. We
+// There is a theoretical flaw in this approach which could happen when a block is almost full. We
 // could for instance end up including a lower fee transaction as part of an ancestor group when
 // in fact it would be better, in terms of fees, to include some other single transaction. This
 // would result in slightly less fees (perhaps a few hundred satoshis) rewarded to the miner. However,
@@ -612,14 +615,14 @@ void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, b
             }
 
             // If we keep failing then the block must be almost full so bail out here.
-            if (nPackageFailures >= 5)
+            if (nPackageFailures >= MAX_PACKAGE_FAILURES)
                 return;
             else
                 continue;
         }
 
-        // Test the package
-        if (!TestPackage(packageSize, packageSigOps))
+        // Test that the package does not exceed sigops limits
+        if (!TestPackageSigOps(packageSize, packageSigOps))
         {
             continue;
         }
@@ -629,7 +632,7 @@ void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, b
             continue;
         }
 
-        // Package can be added.
+        // The Package can now be added to the block.
         if (fCanonical)
         {
             for (auto &it : ancestors)
