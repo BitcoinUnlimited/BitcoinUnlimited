@@ -1807,12 +1807,6 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
         flags |= SCRIPT_ENABLE_CHECKDATASIG;
     }
 
-    // Permanently and retroactively, we start accepting 65/64-byte Schnorr
-    // signatures in CHECKSIG and CHECKDATASIG respectively, and their verify
-    // variants. We also stop accepting 65 byte signatures in CHECKMULTISIG
-    // and its verify variant.
-    flags |= SCRIPT_ENABLE_SCHNORR;
-
     return flags;
 }
 
