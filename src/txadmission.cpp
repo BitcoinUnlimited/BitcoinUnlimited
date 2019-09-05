@@ -652,13 +652,15 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         (IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip())) ? SCRIPT_ENABLE_CHECKDATASIG : 0;
     const uint32_t schnorrflag =
         (IsMay2019Activated(chainparams.GetConsensus(), chainActive.Tip())) ? SCRIPT_ENABLE_SCHNORR : 0;
-    const uint32_t segwit_flag =
-        (IsMay2019Activated(chainparams.GetConsensus(), chainActive.Tip()) && !fRequireStandard) ?
-            SCRIPT_ALLOW_SEGWIT_RECOVERY :
-            0;
+    const uint32_t featureFlags = cds_flag | schnorrflag;
 
-    const uint32_t featureFlags = cds_flag | schnorrflag | segwit_flag;
-    const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;
+    uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;
+
+    // Disable DISALLOW_SEGWIT in case we accept non standard transactions.
+    if (!fRequireStandard)
+    {
+        flags &= ~SCRIPT_DISALLOW_SEGWIT_RECOVERY;
+    }
 
     // Only accept nLockTime-using transactions that can be mined in the next
     // block; we don't want our mempool filled up with transactions that can't

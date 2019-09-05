@@ -982,12 +982,7 @@ bool CheckInputs(const CTransactionRef &tx,
                     // This differs from MANDATORY_SCRIPT_VERIFY_FLAGS as it contains
                     // additional upgrade flags (see ParallelAcceptToMemoryPool variable
                     // featureFlags).
-                    // Even though it is not a mandatory flag,SCRIPT_ALLOW_SEGWIT_RECOVERY
-                    // is strictly more permissive than the set of standard flags.
-                    // It therefore needs to be added in order to check if we need to penalize
-                    // the peer that sent us the transaction or not.
-                    uint32_t mandatoryFlags =
-                        (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS) | SCRIPT_ALLOW_SEGWIT_RECOVERY;
+                    uint32_t mandatoryFlags = (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
                     if (flags != mandatoryFlags)
                     {
                         // Check whether the failure was caused by a
@@ -1837,14 +1832,12 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
         flags |= SCRIPT_ENABLE_CHECKDATASIG;
     }
 
-    // if May 15th, 2019 protocol upgrade is activated we start accepting transactions
-    // recovering coins sent to segwit addresses. We also start accepting
+    // if May 15th, 2019 protocol upgrade is activated we also start accepting
     // 65/64-byte Schnorr signatures in CHECKSIG and CHECKDATASIG respectively,
     // and their verify variants. We also stop accepting 65 byte signatures in
     // CHECKMULTISIG and its verify variant.
     if (IsMay2019Activated(consensusparams, pindex->pprev))
     {
-        flags |= SCRIPT_ALLOW_SEGWIT_RECOVERY;
         flags |= SCRIPT_ENABLE_SCHNORR;
     }
 

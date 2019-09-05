@@ -1919,9 +1919,10 @@ bool VerifyScript(const CScript &scriptSig,
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
         popstack(stack);
 
-        // Bail out early if ALLOW_SEGWIT_RECOVERY is set, the redeem script is
-        // a p2sh segwit program and it was the only item pushed into the stack
-        if ((flags & SCRIPT_ALLOW_SEGWIT_RECOVERY) != 0 && stack.empty() && pubKey2.IsWitnessProgram())
+        // Bail out early if SCRIPT_DISALLOW_SEGWIT_RECOVERY is not set, the
+        // redeem script is a p2sh segwit program, and it was the only item
+        // pushed onto the stack.
+        if ((flags & SCRIPT_DISALLOW_SEGWIT_RECOVERY) == 0 && stack.empty() && pubKey2.IsWitnessProgram())
         {
             return set_success(serror);
         }
