@@ -558,15 +558,11 @@ void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, b
 {
     AssertLockHeld(mempool.cs);
 
-    CTxMemPool::indexed_transaction_set::index<ancestor_score>::type::iterator mi =
-        mempool.mapTx.get<ancestor_score>().begin();
     CTxMemPool::txiter iter;
-
     uint64_t nPackageFailures = 0;
-    while (mi != mempool.mapTx.get<ancestor_score>().end())
+    for (auto mi = mempool.mapTx.get<ancestor_score>().begin(); mi != mempool.mapTx.get<ancestor_score>().end(); mi++)
     {
         iter = mempool.mapTx.project<0>(mi);
-        ++mi;
 
         uint64_t packageSize = iter->GetSizeWithAncestors();
         CAmount packageFees = iter->GetModFeesWithAncestors();
