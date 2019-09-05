@@ -31,8 +31,8 @@
 #include <univalue.h>
 
 // below two require C++11
-#include <random>
 #include <functional>
+#include <random>
 
 using namespace std;
 
@@ -156,9 +156,9 @@ static uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uin
 static bool CpuMineBlockHasher(CBlockHeader *pblock,
     vector<unsigned char> &coinbaseBytes,
     const std::vector<uint256> &merkleproof,
-    const RandFunc & randFunc)
+    const RandFunc &randFunc)
 {
-    uint32_t nExtraNonce = randFunc();  // Grab random 4-bytes from thread-safe generator we were passed
+    uint32_t nExtraNonce = randFunc(); // Grab random 4-bytes from thread-safe generator we were passed
     uint32_t nNonce = pblock->nNonce;
     arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
     bool found = false;
@@ -230,7 +230,7 @@ static double GetDifficulty(uint64_t nBits)
     return dDiff;
 }
 
-static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params, bool &found, const RandFunc & randFunc)
+static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params, bool &found, const RandFunc &randFunc)
 {
     UniValue tmp(UniValue::VOBJ);
     UniValue ret(UniValue::VARR);
@@ -347,11 +347,11 @@ int CpuMiner(void)
     // is thread-safe.  std::rand() is not thread-safe and can result
     // in multiple threads doing redundant proof-of-work.
     std::random_device rd;
-    std::default_random_engine e1(rd());  // seed random number generator from system entropy source (implementation defined: usually HW)
-    std::uniform_int_distribution<uint32_t> uniformGen(0); // returns a uniformly distributed random number in the inclusive range: [0, UINT_MAX]
-    auto randFunc = [&](void) -> uint32_t {
-        return uniformGen(e1);
-    };
+    // seed random number generator from system entropy source (implementation defined: usually HW)
+    std::default_random_engine e1(rd());
+    // returns a uniformly distributed random number in the inclusive range: [0, UINT_MAX]
+    std::uniform_int_distribution<uint32_t> uniformGen(0);
+    auto randFunc = [&](void) -> uint32_t { return uniformGen(e1); };
 
     int searchDuration = GetArg("-duration", 30);
     int nblocks = GetArg("-nblocks", -1); //-1 mine forever
