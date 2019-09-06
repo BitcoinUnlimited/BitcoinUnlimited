@@ -20,7 +20,7 @@
 #include "chainparamsseeds.h"
 
 // FIXME This need to be update every new fork
-uint64_t nMiningForkTime = 1557921600;
+uint64_t nMiningForkTime = 1573819200;
 
 CBlock CreateGenesisBlock(CScript prefix,
     const std::string &comment,
@@ -136,6 +136,8 @@ public:
         consensus.nov2018Height = 556766;
         // May, 15 2019 hard fork
         consensus.may2019Height = 582679;
+        // Nov, 15 2019 12:00:00 UTC fork activation time
+        consensus.nov2019ActivationTime = 1573819200;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -277,6 +279,8 @@ public:
         consensus.nov2018Height = 0;
         // May, 15 2019 hard fork
         consensus.may2019Height = 0;
+        // Nov, 15 2019 12:00:00 UTC fork activation time
+        consensus.nov2019ActivationTime = 1573819200;
 
         vFixedSeeds.clear();
         vSeeds.clear();
@@ -344,6 +348,8 @@ public:
         consensus.nov2018Height = 1267996;
         // May, 15 2019 hard fork
         consensus.may2019Height = 1303884;
+        // Nov, 15 2019 12:00:00 UTC fork activation time
+        consensus.nov2019ActivationTime = 1573819200;
 
 
         pchMessageStart[0] = 0x0b;
@@ -459,6 +465,8 @@ public:
         consensus.nov2018Height = 0;
         // May, 15 2019 hard fork
         consensus.may2019Height = 0;
+        // Nov, 15 2019 12:00:00 UTC fork activation time
+        consensus.nov2019ActivationTime = 1573819200;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;

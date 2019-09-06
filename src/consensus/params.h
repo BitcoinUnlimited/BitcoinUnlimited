@@ -151,11 +151,10 @@ struct Params
     int may2018Height;
     /** Nov 15, 2018 activation height */
     int nov2018Height;
-    /** May 15, 2019 actication time will be 12:00:00 UTC */
-    // we still need this variable until we won't add Nov 2019 activation time
-    int may2019ActivationTime = 1557921600;
     /** May 15, 2019 actication height */
     int may2019Height;
+    /** Nov 15, 2019 MTP activation time will be 12:00:00 UTC */
+    uint64_t nov2019ActivationTime;
 };
 } // namespace Consensus
 
