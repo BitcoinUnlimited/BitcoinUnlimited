@@ -2915,14 +2915,6 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
 
-    // If this block enabled the may152019 protocol upgrade, then we need to clear the mempool of any transaction using
-    // not previously avaiable features (e.g. OP_CHECKDATASIGVERIFY).
-
-    if (IsMay2019Activated(consensusParams, pindexDelete) && !IsMay2019Activated(consensusParams, pindexDelete->pprev))
-    {
-        mempool.clear();
-    }
-
     // these bloom filters stop us from doing duplicate work on tx we already know about.
     // but since we rewound, we need to do this duplicate work -- clear them so tx we have already processed
     // can be processed again.

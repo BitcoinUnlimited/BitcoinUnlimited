@@ -95,17 +95,3 @@ bool IsNov2018Activated(const Consensus::Params &consensusparams, const CBlockIn
     }
     return IsNov2018Activated(consensusparams, pindexTip->nHeight);
 }
-
-bool IsMay2019Activated(const Consensus::Params &consensusparams, const int32_t nHeight)
-{
-    return nHeight >= consensusparams.may2019Height;
-}
-
-bool IsMay2019Activated(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
-{
-    if (pindexTip == nullptr)
-    {
-        return false;
-    }
-    return IsMay2019Activated(consensusparams, pindexTip->nHeight);
-}
