@@ -259,8 +259,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         std::vector<const CTxMemPoolEntry *> vtxe;
         addPriorityTxs(&vtxe);
 
-        // Mine by package (CPFP) or by score. Score mining is done following this so that we can fill any
-        // remaining space in the block.
+        // Mine by package (CPFP) or by score.
         if (miningCPFP.Value() == true)
         {
             int64_t nStartPackage = GetStopwatchMicros();
@@ -518,15 +517,6 @@ void BlockAssembler::addScoreTxs(std::vector<const CTxMemPoolEntry *> *vtxe)
     }
 }
 
-// Skip entries in mapTx that are already in a block.
-bool BlockAssembler::SkipMapTxEntry(CTxMemPool::txiter it)
-{
-    assert(it != mempool.mapTx.end());
-    if (inBlock.count(it))
-        return true;
-    return false;
-}
-
 void BlockAssembler::SortForBlock(const CTxMemPool::setEntries &package, std::vector<CTxMemPool::txiter> &sortedEntries)
 {
     // Sort package by ancestor count
@@ -569,7 +559,7 @@ void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, b
         unsigned int packageSigOps = iter->GetSigOpCountWithAncestors();
 
         // Skip txns we know are in the block
-        if (SkipMapTxEntry(iter))
+        if (inBlock.count(iter))
         {
             continue;
         }

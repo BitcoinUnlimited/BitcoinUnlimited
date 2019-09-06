@@ -136,9 +136,6 @@ private:
     bool TestPackageSigOps(uint64_t packageSize, unsigned int packageSigOps);
     /** Test if a set of transactions are all final */
     bool TestPackageFinality(const CTxMemPool::setEntries &package);
-    /** Return true if given transaction from mapTx has already been evaluated,
-      * or if the transaction's cached data in mapTx is incorrect. */
-    bool SkipMapTxEntry(CTxMemPool::txiter it);
     /** Sort the package in an order that is valid to appear in a block */
     void SortForBlock(const CTxMemPool::setEntries &package, std::vector<CTxMemPool::txiter> &sortedEntries);
 };
