@@ -25,8 +25,8 @@ class CWallet;
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_coinbaseFlags;
 
-extern int64_t nTotalPackage;
-extern int64_t nTotalScore;
+extern std::atomic<int64_t> nTotalPackage;
+extern std::atomic<int64_t> nTotalScore;
 extern CTweak<bool> miningCPFP;
 
 namespace Consensus

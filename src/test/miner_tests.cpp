@@ -201,8 +201,8 @@ void TestPackageSelection(const CChainParams &chainparams, CScript scriptPubKey,
     BOOST_CHECK(pblocktemplate->block.vtx[8]->GetHash() == hashLowFeeTx2);
 
     // Test CPFP with AGT (ancestor grouped transactions)
-    // Add another 0 fee tx to higher fe tx chain. This should also get mined
-    // because the total package fees will still be above the minrelaytxfe
+    // Add another 0 fee tx to higher fee tx chain. This should also get mined
+    // because the total package fees will still be above the minrelaytxfee
     tx.vin[0].prevout.n = 0;
     tx.vin[0].prevout.hash = hashHighFeeTx2;
     feeToUse = 0;

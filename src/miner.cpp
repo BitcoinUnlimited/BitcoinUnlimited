@@ -37,8 +37,8 @@
 #include <thread>
 
 // Track timing information for Score and Package mining.
-int64_t nTotalPackage = 0;
-int64_t nTotalScore = 0;
+std::atomic<int64_t> nTotalPackage{0};
+std::atomic<int64_t> nTotalScore{0};
 
 /** Maximum number of failed attempts to insert a package into a block */
 static const unsigned int MAX_PACKAGE_FAILURES = 5;
