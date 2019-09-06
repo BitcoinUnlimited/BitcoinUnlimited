@@ -1152,7 +1152,7 @@ def findBitcoind():
 def standardFlags():
     flags = [] # ["--nocleanup", "--noshutdown"]
     if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmppfx=/ramdisk/test")
+        flags.append("--tmpdir=/ramdisk/test/t")
     binpath = findBitcoind()
     flags.append("--srcdir=%s" % binpath)
     return flags
