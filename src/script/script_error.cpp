@@ -92,7 +92,7 @@ const char *ScriptErrorString(const ScriptError serror)
     case SCRIPT_ERR_CLEANSTACK:
         return "P2SH script evaluation of script does not result in a clean stack";
     case SCRIPT_ERR_MUST_USE_FORKID:
-        return "Schnorr sigs must use forkid sighash if forkid flag set";
+        return "All signatures must include SCRIPT_ENABLE_SIGHASH_FORKID";
     case SCRIPT_ERR_NUMBER_OVERFLOW:
         return "Script number overflow";
     case SCRIPT_ERR_NUMBER_BAD_ENCODING:
