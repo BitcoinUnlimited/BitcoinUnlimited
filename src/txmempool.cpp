@@ -210,7 +210,7 @@ bool CTxMemPool::CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
     READLOCK(cs);
     setEntries setAncestors;
     return _CalculateMemPoolAncestors(entry, setAncestors, limitAncestorCount, limitAncestorSize, limitDescendantCount,
-        limitDescendantSize, errString, fSearchForParents);
+        limitDescendantSize, errString, nullptr, fSearchForParents);
 }
 
 
@@ -221,9 +221,15 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
     uint64_t limitDescendantCount,
     uint64_t limitDescendantSize,
     std::string &errString,
+    setEntries *inBlock /* = nullptr */,
     bool fSearchForParents /* = true */) const
 {
     AssertLockHeld(cs);
+
+    // inBlock and fSearchForParents can not both be true.
+    bool fBothTrue = (inBlock && fSearchForParents);
+    DbgAssert(!fBothTrue, );
+
     setEntries parentHashes;
     const CTransaction &tx = entry.GetTx();
 
@@ -261,8 +267,20 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
     {
         txiter stageit = *parentHashes.begin();
 
-        setAncestors.insert(stageit);
-        // parentHashes.erase(stageit);  // BU: Core bug, use after free, moved below
+        // If inBlock then we only return a set of ancestors that have not yet been added to a block.
+        //
+        // Once we find a parent that is in a block we stop looking further on that ancestor chain, because
+        // if that parent is in the block then all of it's ancestors must also be in the block.
+        if (inBlock)
+        {
+            if (!inBlock->count(stageit))
+                setAncestors.insert(stageit);
+        }
+        else
+        {
+            setAncestors.insert(stageit);
+        }
+
         totalSizeWithAncestors += stageit->GetTxSize();
 
         if (stageit->GetSizeWithDescendants() + entry.GetTxSize() > limitDescendantSize)
@@ -290,8 +308,17 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
             // If this is a new ancestor, add it.
             if (setAncestors.count(phash) == 0)
             {
-                parentHashes.insert(phash);
+                if (inBlock)
+                {
+                    if (!inBlock->count(phash))
+                        parentHashes.insert(phash);
+                }
+                else
+                {
+                    parentHashes.insert(phash);
+                }
             }
+
             // removed +1 from test below as per BU: Fix use after free bug
             if (parentHashes.size() + setAncestors.size() > limitAncestorCount)
             {
@@ -301,7 +328,7 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
             }
         }
 
-        parentHashes.erase(stageit); // BU: Fix use after free bug by moving this last
+        parentHashes.erase(stageit); // BU: Fix use after free bug by removing this last
     }
 
     return true;
@@ -482,7 +509,7 @@ void CTxMemPool::_UpdateForRemoveFromMempool(const setEntries &entriesToRemove, 
         // differ from the set of mempool parents we'd calculate by searching,
         // and it's important that we use the mapLinks[] notion of ancestor
         // transactions as the set of things to update for removal.
-        _CalculateMemPoolAncestors(entry, setAncestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy, false);
+        _CalculateMemPoolAncestors(entry, setAncestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy, nullptr, false);
         // Note that UpdateAncestorsOf severs the child links that point to
         // removeIt in the entries for the parents of removeIt.  This is
         // fine since we don't need to use the mempool children of any entries
@@ -662,9 +689,9 @@ void CTxMemPool::_CalculateDescendants(txiter entryit, setEntries &setDescendant
     // already been walked, or will be walked in this iteration).
     while (!stage.empty())
     {
-        txiter it = *stage.begin();
+        const txiter it = *stage.begin();
         setDescendants.insert(it);
-        stage.erase(it); // BU its ok to erase here because GetMemPoolChildren does not dereference it
+        stage.erase(it); // It's ok to erase here because GetMemPoolChildren does not dereference it
 
         const setEntries &setChildren = GetMemPoolChildren(it);
         for (const txiter &childiter : setChildren)
@@ -1189,7 +1216,8 @@ void CTxMemPool::PrioritiseTransaction(const uint256 hash,
             setEntries setAncestors;
             uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
             std::string dummy;
-            _CalculateMemPoolAncestors(*it, setAncestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy, false);
+            _CalculateMemPoolAncestors(
+                *it, setAncestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy, nullptr, false);
             for (txiter ancestorIt : setAncestors)
             {
                 mapTx.modify(ancestorIt, update_descendant_state(0, nFeeDelta, 0));
