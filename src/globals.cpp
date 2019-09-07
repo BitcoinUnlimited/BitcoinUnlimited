@@ -62,6 +62,7 @@ std::map<std::pair<void *, void *>, LockStack> lockorders;
 boost::thread_specific_ptr<LockStack> lockstack;
 #endif
 
+
 // this flag is set to true when a wallet rescan has been invoked.
 std::atomic<bool> fRescan{false};
 
@@ -274,6 +275,9 @@ CTweakRef<bool> displayArchInSubver("net.displayArchInSubver",
     "Show box architecture, 32/64bit, in node user agent string (subver)",
     &fDisplayArchInSubver);
 
+CTweak<bool> miningCPFP("mining.childPaysForParent",
+    "If enabled then we will mine ancestor packages and allow child pays for parent.",
+    true);
 CTweak<uint64_t> blockMiningSigopsPerMb("mining.excessiveSigopsPerMb",
     "Excessive effort per block, denoted in cost (# inputs * txsize) per MB",
     BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);

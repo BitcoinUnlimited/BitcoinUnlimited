@@ -298,7 +298,7 @@ public:
 
         if (f1 == f2)
         {
-            return a.GetTx().GetHash() < b.GetTx().GetHash();
+            return a.GetTime() < b.GetTime();
         }
 
         return f1 > f2;
@@ -636,6 +636,7 @@ public:
         uint64_t limitDescendantCount,
         uint64_t limitDescendantSize,
         std::string &errString,
+        setEntries *inBlock = nullptr,
         bool fSearchForParents = true) const;
 
     /** Populate setDescendants with all in-mempool descendants of hash.
