@@ -35,6 +35,10 @@ inline bool AllowFree(double dPriority)
 
 /** Fake height value used in Coin to signify they are only in the memory pool (since 0.8) */
 static const uint32_t MEMPOOL_HEIGHT = 0x7FFFFFFF;
+/** Length of time in seconds over which to smooth the tx rate */
+static const double TX_RATE_SMOOTHING_SEC = 60;
+/** Sample resolution in milliseconds over which to compute the instantaneous transaction rate */
+static const int TX_RATE_RESOLUTION_MILLIS = 1000;
 
 /** Dump the mempool to disk. */
 bool DumpMempool();
@@ -470,6 +474,7 @@ private:
 
     std::mutex cs_txPerSec;
     double nTxPerSec GUARDED_BY(cs_txPerSec); //! txns per second accepted into the mempool
+    double nInstantaneousTxPerSec GUARDED_BY(cs_txPerSec); //! instantaneous (1-second resolution) txns per second
     double nPeakRate GUARDED_BY(cs_txPerSec); //! peak rate since startup for txns per second
 
 public:
