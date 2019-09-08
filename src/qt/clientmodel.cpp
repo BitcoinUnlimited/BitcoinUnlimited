@@ -30,7 +30,7 @@ static int64_t nLastBlockTipUpdateNotification = 0;
 
 ClientModel::ClientModel(OptionsModel *_optionsModel, UnlimitedModel *ul, QObject *parent)
     : QObject(parent), unlimitedModel(ul), lastBlockTime(0), optionsModel(_optionsModel), peerTableModel(0),
-      banTableModel(0), pollTimer1(0), pollTimer2(0)
+      banTableModel(0), pollTimer1(0), pollTimer2(0), pollTimer3(0)
 {
     peerTableModel = new PeerTableModel(this);
     banTableModel = new BanTableModel(this);
@@ -42,6 +42,10 @@ ClientModel::ClientModel(OptionsModel *_optionsModel, UnlimitedModel *ul, QObjec
     pollTimer2 = new QTimer(this);
     connect(pollTimer2, SIGNAL(timeout()), this, SLOT(updateTimer2()));
     pollTimer2->start(MODEL_UPDATE_DELAY2);
+
+    pollTimer3 = new QTimer(this);
+    connect(pollTimer3, SIGNAL(timeout()), this, SLOT(updateTimerTransactionRate()));
+    pollTimer3->start(TX_RATE_RESOLUTION_MILLIS);
 
     subscribeToCoreSignals();
 }
@@ -93,10 +97,6 @@ void ClientModel::updateTimer1()
     // the following calls will acquire the required lock
     Q_EMIT mempoolSizeChanged(getMempoolSize(), getMempoolDynamicUsage());
 
-    double smoothedTps = 0.0, instantaneousTps = 0.0, peakTps = 0.0;
-    mempool.GetTransactionRateStatistics(smoothedTps, instantaneousTps, peakTps);
-    Q_EMIT transactionsPerSecondChanged(smoothedTps, instantaneousTps, peakTps);
-
     // only request updates to time since last block if we aren't in initial sync
     if (IsChainNearlySyncd())
         Q_EMIT timeSinceLastBlockChanged(lastBlockTime);
@@ -120,6 +120,20 @@ void ClientModel::updateTimer2()
 
     uiInterface.BannedListChanged();
 }
+
+void ClientModel::updateTimerTransactionRate()
+{
+    double smoothedTps = 0.0, instantaneousTps = 0.0, peakTps = 0.0;
+    mempool.GetTransactionRateStatistics(smoothedTps, instantaneousTps, peakTps);
+
+    // This is a bit of a hack, but don't emit this signal until peakTps is > 0
+    // This will prevent us from registering empty samples in the transaction graph
+    // as there is presently a 10 second window where the statistics aren't updated
+    // to avoid a large spike when mempool.dat is loaded from disk during start-up
+    if (peakTps > 0.0)
+        Q_EMIT transactionsPerSecondChanged(smoothedTps, instantaneousTps, peakTps);
+}
+
 
 void ClientModel::updateNumConnections(int numConnections) { Q_EMIT numConnectionsChanged(numConnections); }
 void ClientModel::updateAlert() { Q_EMIT alertsChanged(getStatusBarWarnings()); }

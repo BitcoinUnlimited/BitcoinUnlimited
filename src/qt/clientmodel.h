@@ -105,6 +105,7 @@ private:
 
     QTimer *pollTimer1;
     QTimer *pollTimer2;
+    QTimer *pollTimer3;
 
     void subscribeToCoreSignals();
     void unsubscribeFromCoreSignals();
@@ -131,6 +132,7 @@ Q_SIGNALS:
 public Q_SLOTS:
     void updateTimer1();
     void updateTimer2();
+    void updateTimerTransactionRate();
     void updateNumConnections(int numConnections);
     void updateAlert();
     void updateBanlist();

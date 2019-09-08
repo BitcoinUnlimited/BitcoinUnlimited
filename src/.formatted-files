@@ -279,6 +279,8 @@ qt/transactiondescdialog.h
 qt/transactiondesc.h
 qt/transactionfilterproxy.cpp
 qt/transactionfilterproxy.h
+qt/transactiongraphwidget.cpp
+qt/transactiongraphwidget.h
 qt/transactionrecord.cpp
 qt/transactionrecord.h
 qt/transactiontablemodel.cpp

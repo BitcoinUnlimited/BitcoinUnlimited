@@ -47,6 +47,7 @@
 
 const int CONSOLE_HISTORY = 50;
 const int INITIAL_TRAFFIC_GRAPH_MINS = 30;
+const int INITIAL_TRANSACTION_GRAPH_MINS = 1440;
 const QSize FONT_RANGE(4, 40);
 const char fontSizeSettingsKey[] = "consoleFontSize";
 const QString duration_format = "H:mm:ss";
@@ -306,6 +307,7 @@ RPCConsole::RPCConsole(const PlatformStyle *_platformStyle, QWidget *parent)
 
     startExecutor();
     setTrafficGraphRange(INITIAL_TRAFFIC_GRAPH_MINS);
+    setTransactionGraphRange(INITIAL_TRANSACTION_GRAPH_MINS);
 
     ui->detailWidget->hide();
     ui->peerHeading->setText(tr("Select a peer to view detailed information."));
@@ -384,6 +386,10 @@ void RPCConsole::setClientModel(ClientModel *model)
 {
     clientModel = model;
     ui->trafficGraph->setClientModel(model);
+    ui->transactionGraph->setClientModel(model);
+    ui->groupBoxInstantaneous->setTitle(
+        "Instantaneous Rate (" + QString::number(TX_RATE_RESOLUTION_MILLIS / 1000) + "s)");
+    ui->groupBoxSmoothed->setTitle("Smoothed Rate (" + QString::number(TX_RATE_SMOOTHING_SEC, 'f', 0) + "s)");
     if (model && clientModel->getPeerTableModel() && clientModel->getBanTableModel())
     {
         // Keep up to date with client
@@ -682,6 +688,26 @@ QString FormatTps(double tps)
 void RPCConsole::setTransactionsPerSecond(double smoothedTps, double instantaneousTps, double peakTps)
 {
     ui->transactionsPerSecond->setText(FormatTps(smoothedTps) + "  (peak: " + FormatTps(peakTps) + ")");
+
+    QString displayWindowText = ui->transactionGraph->getDisplayWindowLabelText();
+    ui->labelInstantaneousPeakDisplayed->setText(displayWindowText);
+    ui->labelInstantaneousAvgDisplayed->setText(displayWindowText);
+    ui->labelSmoothedPeakDisplayed->setText(displayWindowText);
+    ui->labelSmoothedAvgDisplayed->setText(displayWindowText);
+
+    ui->instantaneousPeakRuntime->setText(FormatTps(ui->transactionGraph->getInstantaneousTpsPeak_Runtime()));
+    ui->instantaneousPeakSampled->setText(FormatTps(ui->transactionGraph->getInstantaneousTpsPeak_Sampled()));
+    ui->instantaneousPeakDisplayed->setText(FormatTps(ui->transactionGraph->getInstantaneousTpsPeak_Displayed()));
+    ui->instantaneousAvgRuntime->setText(FormatTps(ui->transactionGraph->getInstantaneousTpsAverage_Runtime()));
+    ui->instantaneousAvgSampled->setText(FormatTps(ui->transactionGraph->getInstantaneousTpsAverage_Sampled()));
+    ui->instantaneousAvgDisplayed->setText(FormatTps(ui->transactionGraph->getInstantaneousTpsAverage_Displayed()));
+
+    ui->smoothedPeakRuntime->setText(FormatTps(ui->transactionGraph->getSmoothedTpsPeak_Runtime()));
+    ui->smoothedPeakSampled->setText(FormatTps(ui->transactionGraph->getSmoothedTpsPeak_Sampled()));
+    ui->smoothedPeakDisplayed->setText(FormatTps(ui->transactionGraph->getSmoothedTpsPeak_Displayed()));
+    ui->smoothedAvgRuntime->setText(FormatTps(ui->transactionGraph->getSmoothedTpsAverage_Runtime()));
+    ui->smoothedAvgSampled->setText(FormatTps(ui->transactionGraph->getSmoothedTpsAverage_Sampled()));
+    ui->smoothedAvgDisplayed->setText(FormatTps(ui->transactionGraph->getSmoothedTpsAverage_Displayed()));
 }
 
 void RPCConsole::setThinBlockPropagationStats(const ThinBlockQuickStats &thin)
@@ -876,6 +902,27 @@ void RPCConsole::updateTrafficStats(quint64 totalBytesIn, quint64 totalBytesOut)
 {
     ui->lblBytesIn->setText(FormatBytes(totalBytesIn));
     ui->lblBytesOut->setText(FormatBytes(totalBytesOut));
+}
+
+void RPCConsole::on_sldTpsGraphRange_valueChanged(int value)
+{
+    // The first hour is in 5 minute steps
+    static const int firstMultiplier = 5;
+    // All subsequent hours are in 15 minute steps
+    static const int secondMultiplier = 15;
+
+    int mins;
+    if (value <= 12)
+        mins = value * firstMultiplier;
+    else
+        mins = 60 + (value - 12) * secondMultiplier;
+    setTransactionGraphRange(mins);
+}
+
+void RPCConsole::setTransactionGraphRange(int mins)
+{
+    ui->transactionGraph->setTpsGraphRangeMins(mins);
+    ui->lblTpsGraphRange->setText(GUIUtil::formatDurationStr(mins * 60));
 }
 
 void RPCConsole::peerSelected(const QItemSelection &selected, const QItemSelection &deselected)
