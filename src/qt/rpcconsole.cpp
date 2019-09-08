@@ -400,7 +400,8 @@ void RPCConsole::setClientModel(ClientModel *model)
 
         connect(model, SIGNAL(mempoolSizeChanged(long, size_t)), this, SLOT(setMempoolSize(long, size_t)));
         connect(model, SIGNAL(orphanPoolSizeChanged(long)), this, SLOT(setOrphanPoolSize(long)));
-        connect(model, SIGNAL(transactionsPerSecondChanged(double)), this, SLOT(setTransactionsPerSecond(double)));
+        connect(model, SIGNAL(transactionsPerSecondChanged(double, double, double)), this,
+            SLOT(setTransactionsPerSecond(double, double, double)));
         connect(model, SIGNAL(thinBlockPropagationStatsChanged(const ThinBlockQuickStats &)), this,
             SLOT(setThinBlockPropagationStats(const ThinBlockQuickStats &)));
         connect(model, SIGNAL(compactBlockPropagationStatsChanged(const CompactBlockQuickStats &)), this,
@@ -669,15 +670,18 @@ void RPCConsole::setMempoolSize(long numberOfTxs, size_t dynUsage)
 }
 
 void RPCConsole::setOrphanPoolSize(long numberOfTxs) { ui->orphanPoolNumberTxs->setText(QString::number(numberOfTxs)); }
-void RPCConsole::setTransactionsPerSecond(double nTxPerSec)
+QString FormatTps(double tps)
 {
     // Format the output
-    if (nTxPerSec < 100)
-        ui->transactionsPerSecond->setText(
-            QString::number(nTxPerSec, 'f', 2) + "  (peak: " + QString::number(mempool.GetPeakRate(), 'f', 2) + ")");
+    if (tps < 100)
+        return QString::number(tps, 'f', 2);
     else
-        ui->transactionsPerSecond->setText(QString::number((uint64_t)nTxPerSec) + "  (peak: " +
-                                           QString::number((uint64_t)mempool.GetPeakRate()) + ")");
+        return QString::number((uint64_t)tps);
+}
+
+void RPCConsole::setTransactionsPerSecond(double smoothedTps, double instantaneousTps, double peakTps)
+{
+    ui->transactionsPerSecond->setText(FormatTps(smoothedTps) + "  (peak: " + FormatTps(peakTps) + ")");
 }
 
 void RPCConsole::setThinBlockPropagationStats(const ThinBlockQuickStats &thin)

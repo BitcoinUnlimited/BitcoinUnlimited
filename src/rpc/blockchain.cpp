@@ -1336,9 +1336,12 @@ UniValue mempoolInfoToJSON()
     size_t maxmempool = GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
     ret.pushKV("maxmempool", (int64_t)maxmempool);
     ret.pushKV("mempoolminfee", ValueFromAmount(mempool.GetMinFee(maxmempool).GetFeePerK()));
+
+    double smoothedTps = 0.0, instantaneousTps = 0.0, peakTps = 0.0;
+    mempool.GetTransactionRateStatistics(smoothedTps, instantaneousTps, peakTps);
     try
     {
-        ret.pushKV("tps", std::stod(strprintf("%.2f", mempool.TransactionsPerSecond())));
+        ret.pushKV("tps", std::stod(strprintf("%.2f", smoothedTps)));
     }
     catch (...)
     {
@@ -1346,7 +1349,7 @@ UniValue mempoolInfoToJSON()
     }
     try
     {
-        ret.pushKV("peak_tps", std::stod(strprintf("%.2f", mempool.GetPeakRate())));
+        ret.pushKV("peak_tps", std::stod(strprintf("%.2f", peakTps)));
     }
     catch (...)
     {

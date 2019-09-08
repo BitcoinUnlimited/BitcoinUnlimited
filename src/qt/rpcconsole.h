@@ -101,7 +101,7 @@ public Q_SLOTS:
     /** Set number of transactions in ophan pool in the UI */
     void setOrphanPoolSize(long numberOfTxs);
     /** Set tx's per second in the UI */
-    void setTransactionsPerSecond(double nTxPerSec);
+    void setTransactionsPerSecond(double smoothedTps, double instantaneousTps, double peakTps);
     /** Set block propagation statistics in the UI */
     void setThinBlockPropagationStats(const ThinBlockQuickStats &thin);
     /** Set block propagation statistics in the UI */

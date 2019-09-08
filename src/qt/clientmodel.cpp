@@ -77,10 +77,6 @@ QDateTime ClientModel::getLastBlockDate() const
 long ClientModel::getMempoolSize() const { return mempool.size(); }
 long ClientModel::getOrphanPoolSize() const { return orphanpool.GetOrphanPoolSize(); }
 size_t ClientModel::getMempoolDynamicUsage() const { return mempool.DynamicMemoryUsage(); }
-// BU: begin
-double ClientModel::getTransactionsPerSecond() const { return mempool.TransactionsPerSecond(); }
-// BU: end
-
 double ClientModel::getVerificationProgress(const CBlockIndex *tipIn) const
 {
     CBlockIndex *tip = const_cast<CBlockIndex *>(tipIn);
@@ -96,7 +92,10 @@ void ClientModel::updateTimer1()
     // no locking required at this point
     // the following calls will acquire the required lock
     Q_EMIT mempoolSizeChanged(getMempoolSize(), getMempoolDynamicUsage());
-    Q_EMIT transactionsPerSecondChanged(getTransactionsPerSecond());
+
+    double smoothedTps = 0.0, instantaneousTps = 0.0, peakTps = 0.0;
+    mempool.GetTransactionRateStatistics(smoothedTps, instantaneousTps, peakTps);
+    Q_EMIT transactionsPerSecondChanged(smoothedTps, instantaneousTps, peakTps);
 
     // only request updates to time since last block if we aren't in initial sync
     if (IsChainNearlySyncd())
