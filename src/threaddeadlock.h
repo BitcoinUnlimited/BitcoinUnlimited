@@ -132,10 +132,35 @@ struct LockData
 };
 extern LockData lockdata;
 
+/**
+ * Adds a new lock to LockData tracking
+ *
+ * Should only be called by EnterCritical
+ */
 void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, OwnershipType ownership, bool fTry);
+
+/**
+ * Removes a critical section and all locks related to it from LockData
+ *
+ * Should only be called by a critical section destructor
+ */
 void DeleteCritical(void *cs);
+
+/**
+ * Removes the most recent instance of locks from LockData
+ *
+ * Should only be called by LeaveCritical
+ */
 void remove_lock_critical_exit(void *cs);
+
+/**
+ * Prints all of the locks held by the calling thread
+ */
 std::string LocksHeld();
+
+/**
+ * Moves a lock that is currently in one of the waiting maps to the corresponding held map
+ */
 void SetWaitingToHeld(void *c, OwnershipType ownership);
 
 #else // NOT DEBUG_LOCKORDER
