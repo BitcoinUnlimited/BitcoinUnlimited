@@ -568,6 +568,13 @@ int64_t GetArg(const std::string &strArg, int64_t nDefault)
     return nDefault;
 }
 
+double GetDoubleArg(const std::string &strArg, double dDefault)
+{
+    if (mapArgs.count(strArg))
+        return atof(mapArgs[strArg].c_str()); // returns 0.0 on conversion failure
+    return dDefault;
+}
+
 bool GetBoolArg(const std::string &strArg, bool fDefault)
 {
     if (mapArgs.count(strArg))

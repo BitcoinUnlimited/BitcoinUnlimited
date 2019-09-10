@@ -453,6 +453,9 @@ std::string GetArg(const std::string &strArg, const std::string &strDefault);
  */
 int64_t GetArg(const std::string &strArg, int64_t nDefault);
 
+// Same as above, but for doubles (returns 0.0 on conversion failure)
+double GetDoubleArg(const std::string &strArg, double dDefault);
+
 /**
  * Return boolean argument or default value
  *
