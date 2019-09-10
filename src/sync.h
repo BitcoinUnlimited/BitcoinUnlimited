@@ -180,7 +180,6 @@ void EnterCritical(const char *pszName,
     OwnershipType ownership,
     bool fTry = false);
 void LeaveCritical(void *cs);
-std::string LocksHeld();
 /** Asserts in debug builds if a critical section is not held. */
 void AssertLockHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs);
 void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs);
