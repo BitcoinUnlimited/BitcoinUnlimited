@@ -21,9 +21,9 @@ void PrintLockContention(const char *pszName, const char *pszFile, unsigned int 
 #endif /* DEBUG_LOCKCONTENTION */
 
 #ifdef DEBUG_LOCKORDER
-#include <sys/syscall.h>
 
 #ifdef __linux__
+#include <sys/syscall.h>
 uint64_t getTid(void)
 {
     // "native" thread id used so the number correlates with what is shown in gdb
@@ -31,10 +31,15 @@ uint64_t getTid(void)
     return tid;
 }
 #else
+#include <functional>
 uint64_t getTid(void)
 {
-    uint64_t tid = boost::lexical_cast<uint64_t>(boost::this_thread::get_id());
-    return tid;
+    // Note: there is no guaranteed way to turn the thread-id into an int
+    // since it's an opaque type. Just about the only operation it supports
+    // is std::hash (so that thread id's may be placed in maps).
+    // So we just do this.
+    static std::hash<std::thread::id> hasher;
+    return uint64_t(hasher(std::this_thread::get_id()));
 }
 #endif
 
