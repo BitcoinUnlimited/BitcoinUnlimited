@@ -32,6 +32,18 @@
 
 #include <univalue.h>
 
+
+// below two require C++11
+#include <functional>
+#include <random>
+
+#ifdef DEBUG_LOCKORDER
+LockData lockdata;
+#endif
+
+// Lambda used to generate entropy, per-thread (see CpuMiner, et al below)
+typedef std::function<uint32_t(void)> RandFunc;
+
 using namespace std;
 
 // Internal miner
