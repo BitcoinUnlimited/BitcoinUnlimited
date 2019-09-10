@@ -136,6 +136,28 @@ void potential_deadlock_detected(LockStackEntry now, LockStack &deadlocks, std::
     throw std::logic_error("potential deadlock detected");
 }
 
+bool HasAnyOwners(void *c)
+{
+    auto iter = lockdata.writelocksheld.find(c);
+    if (iter != lockdata.writelocksheld.end())
+    {
+        if (!iter->second.empty())
+        {
+            return true;
+        }
+    }
+    auto iter2 = lockdata.readlocksheld.find(c);
+    if (iter2 != lockdata.readlocksheld.end())
+    {
+        if (!iter2->second.empty())
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static bool RecursiveCheck(const uint64_t &tid,
     const void *c,
     uint64_t lastTid,
@@ -234,28 +256,6 @@ static void self_deadlock_detected(LockStackEntry now, LockStackEntry previous)
     LOGA("Previous lock was: %s\n", previous.second.ToString());
     LOGA("Current lock is: %s\n", now.second.ToString());
     throw std::logic_error("self_deadlock_detected");
-}
-
-bool HasAnyOwners(void *c)
-{
-    auto iter = lockdata.writelocksheld.find(c);
-    if (iter != lockdata.writelocksheld.end())
-    {
-        if (!iter->second.empty())
-        {
-            return true;
-        }
-    }
-    auto iter2 = lockdata.readlocksheld.find(c);
-    if (iter2 != lockdata.readlocksheld.end())
-    {
-        if (!iter2->second.empty())
-        {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 void AddNewLock(LockStackEntry newEntry, const uint64_t &tid)

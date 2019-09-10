@@ -137,7 +137,6 @@ void DeleteCritical(void *cs);
 void remove_lock_critical_exit(void *cs);
 std::string LocksHeld();
 void SetWaitingToHeld(void *c, OwnershipType ownership);
-bool HasAnyOwners(void *c);
 
 #else // NOT DEBUG_LOCKORDER
 
