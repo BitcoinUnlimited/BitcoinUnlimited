@@ -84,8 +84,6 @@ typedef enum ScriptError_t {
 
 const char *ScriptErrorString(const ScriptError error);
 
-namespace
-{
 inline bool set_success(ScriptError *ret)
 {
     if (ret)
@@ -100,5 +98,4 @@ inline bool set_error(ScriptError *ret, const ScriptError serror)
     return false;
 }
 
-} // anon namespace
 #endif // BITCOIN_SCRIPT_SCRIPT_ERROR_H
