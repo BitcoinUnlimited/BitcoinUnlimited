@@ -10,7 +10,6 @@
 #include <cstdint>
 #include <vector>
 
-bool DecodeBitfield(const std::vector<uint8_t> &vch, unsigned size,
-                    uint32_t &bitfield, ScriptError *serror);
+bool DecodeBitfield(const std::vector<uint8_t> &vch, unsigned size, uint32_t &bitfield, ScriptError *serror);
 
 #endif // BITCOIN_SCRIPT_BITFIELD_H
