@@ -151,7 +151,10 @@ int64_t UpdateTime(CBlockHeader *pblock, const Consensus::Params &consensusParam
 UniValue SubmitBlock(CBlock &block);
 /** Make a block template to send to miners. */
 // implemented in mining.cpp
-UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize = -1, CBlock *pblockOut = nullptr);
+UniValue mkblocktemplate(const UniValue &params,
+    int64_t coinbaseSize = -1,
+    CBlock *pblockOut = nullptr,
+    boost::shared_ptr<CReserveScript> coinbaseScript = boost::shared_ptr<CReserveScript>());
 
 // Force block template recalculation the next time a template is requested
 void SignalBlockTemplateChange();

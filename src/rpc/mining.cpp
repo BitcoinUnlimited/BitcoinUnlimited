@@ -28,6 +28,7 @@
 #include "validation/validation.h"
 #include "validationinterface.h"
 
+#include <cstdlib>
 #include <stdint.h>
 
 #include <boost/assign/list_of.hpp>
@@ -542,7 +543,10 @@ void SignalBlockTemplateChange()
 
     forceTemplateRecalc = true;
 }
-UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *pblockOut)
+UniValue mkblocktemplate(const UniValue &params,
+    int64_t coinbaseSize,
+    CBlock *pblockOut,
+    boost::shared_ptr<CReserveScript> coinbaseScript)
 {
     LOCK(cs_main);
 
@@ -678,16 +682,38 @@ UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *p
         // miners?
     }
 
+    const Consensus::Params &consensusParams = Params().GetConsensus();
+
     // Update block
     static CBlockIndex *pindexPrev = nullptr;
     static int64_t nStart = 0;
     static std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
-    if (pindexPrev != chainActive.Tip() || forceTemplateRecalc ||
-        (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5))
+    static boost::shared_ptr<CReserveScript> prevCoinbaseScript;
+    static int64_t prevCoinbaseSize = -1;
+    // We cache the previous block templates returned, but we invalidate the
+    // cache below (generate a new block) if any of:
+    // 1. Global forceTemplateRecalc is true.
+    // 2. Cached block points to a different chaintip.
+    // 3. Is testnet and 30 seconds have elapsed (so we pick up the testnet
+    //    minimum difficulty -> 1.0 after 20 mins).
+    // 4. Mempool has changed and 5 seconds has elapsed.
+    // 5. Passed-in coinbaseSize differs from cached.
+    // 6. Passed-in coinbaseScript differs from cached.
+    if (pindexPrev != chainActive.Tip() || forceTemplateRecalc || // 1 & 2 above
+        (consensusParams.fPowAllowMinDifficultyBlocks && std::abs(GetTime() - nStart) > 30) || // 3 above
+        // 4 above
+        (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && std::abs(GetTime() - nStart) > 5) ||
+        prevCoinbaseSize != coinbaseSize || bool(prevCoinbaseScript) != bool(coinbaseScript) || // 5 above
+        // 6 above
+        (prevCoinbaseScript && coinbaseScript && prevCoinbaseScript->reserveScript != coinbaseScript->reserveScript))
     {
         forceTemplateRecalc = false;
         // Clear pindexPrev so future calls make a new block, despite any failures from here on
         pindexPrev = nullptr;
+
+        // Saved passed-in values for coinbase (also used to determine if we need to create new block)
+        prevCoinbaseScript = coinbaseScript;
+        prevCoinbaseSize = coinbaseSize;
 
         // Store the pindexBest used before CreateNewBlock, to avoid races
         nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
@@ -695,8 +721,11 @@ UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *p
         nStart = GetTime();
 
         // Create new block
-        boost::shared_ptr<CReserveScript> coinbaseScript;
-        GetMainSignals().ScriptForMining(coinbaseScript);
+        if (!coinbaseScript)
+        {
+            // if they didn't pass in a coinbaseScript, grab an address from wallet
+            GetMainSignals().ScriptForMining(coinbaseScript);
+        }
 
         // If the keypool is exhausted, no script is returned at all.  Catch this.
         if (!coinbaseScript)
@@ -720,7 +749,6 @@ UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *p
             mempool.GetTransactionsUpdated(), nTransactionsUpdatedLast, GetTime(), nStart);
     }
     CBlock *pblock = &pblocktemplate->block; // pointer for convenience
-    const Consensus::Params &consensusParams = Params().GetConsensus();
 
     // Update nTime
     UpdateTime(pblock, consensusParams, pindexPrev);
