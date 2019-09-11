@@ -2,6 +2,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifndef CASHLIB_H
+#define CASHLIB_H
+
 #include "stdint.h"
 /** Convert binary data to a hex string.  The provided result buffer must be 2*length+1 bytes.
  */
@@ -39,3 +42,4 @@ extern void hash160(const unsigned char* data, unsigned char len, unsigned char*
 /** Return random bytes from cryptographically acceptable random sources */
 extern int RandomBytes(unsigned char *buf, int num);
 
+#endif /* CASHLIB_H */
