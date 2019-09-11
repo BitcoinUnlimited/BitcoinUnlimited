@@ -1,3 +1,7 @@
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "stdint.h"
 /** Convert binary data to a hex string.  The provided result buffer must be 2*length+1 bytes.
  */
