@@ -85,6 +85,7 @@ BITCOIN_TESTS =\
   test/deadlock_tests/test6.cpp \
   test/deadlock_tests/test7.cpp \
   test/deadlock_tests/test8.cpp \
+  test/deadlock_tests/test9.cpp \
   test/deadlock_tests/suite.h \
   test/DoS_tests.cpp \
   test/dstencode_tests.cpp \
