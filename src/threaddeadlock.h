@@ -76,7 +76,7 @@ struct CLockLocation
 
     std::string ToString() const
     {
-        return mutexName + "  " + sourceFile + ":" + itostr(sourceLine) + (fTry ? " (TRY)" : "") +
+        return mutexName + "  " + sourceFile + ":" + std::to_string(sourceLine) + (fTry ? " (TRY)" : "") +
                (eOwnership == OwnershipType::EXCLUSIVE ? " (EXCLUSIVE)" : "") + (fWaiting ? " (WAITING)" : "");
     }
 
@@ -85,6 +85,9 @@ struct CLockLocation
     bool GetWaiting() const { return fWaiting; }
     void ChangeWaitingToHeld() { fWaiting = false; }
     LockType GetLockType() const { return eLockType; }
+    std::string GetFileName() const { return sourceFile; }
+    int GetLineNumber() const { return sourceLine; }
+    std::string GetMutexName() const { return mutexName; }
 private:
     bool fTry;
     std::string mutexName;
@@ -112,6 +115,9 @@ typedef std::map<void *, std::set<uint64_t> > WriteLocksWaiting;
 // thread id : vector of locks held (both shared and exclusive, waiting and held)
 typedef std::map<uint64_t, LockStack> LocksHeldByThread;
 
+// tracks the globally seen lock ordering
+// key is lockname, value is vector of locknames that have ever been locked while key was locked
+typedef std::map<std::string, std::set<std::string> > SeenLockOrders;
 
 struct LockData
 {
@@ -128,6 +134,7 @@ struct LockData
     ReadLocksHeld readlocksheld;
     WriteLocksHeld writelocksheld;
     LocksHeldByThread locksheldbythread;
+    SeenLockOrders seenlockorders;
     std::mutex dd_mutex;
 };
 extern LockData lockdata;
