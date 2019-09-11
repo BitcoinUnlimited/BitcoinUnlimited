@@ -7,6 +7,7 @@
 #include "blockstorage/blockstorage.h"
 #include "connmgr.h"
 #include "consensus/tx_verify.h"
+#include "core_io.h"
 #include "dosman.h"
 #include "fastfilter.h"
 #include "init.h"
@@ -31,6 +32,15 @@
 
 using namespace std;
 
+static void TestConflictEnqueueTx(CTxInputData &txd);
+
+// The average commit batch size is used to limit the quantity of transactions that are moved from the defer queue
+// onto the inqueue.  Without this, if received transactions far outstrip processing capacity, transactions can be
+// shuffled between the in queue and the defer queue with little progress being made.
+const uint64_t minCommitBatchSize = 10000;
+
+// avgCommitBatchSize is write protected by csCommitQ and is wrapped in std::atomic for reads.
+std::atomic<uint64_t> avgCommitBatchSize(0);
 
 Snapshot txHandlerSnap;
 
@@ -127,6 +137,19 @@ void FlushTxAdmission()
 void EnqueueTxForAdmission(CTxInputData &txd)
 {
     LOCK(csTxInQ);
+    // If I have lots of deferred tx, its probably because there's too much volume, so defer new ones right away
+    if (txDeferQ.size() > 1000)
+    {
+        txDeferQ.push(txd);
+        return;
+    }
+
+    // Otherwise go ahead and put them on the queue
+    TestConflictEnqueueTx(txd);
+}
+
+static void TestConflictEnqueueTx(CTxInputData &txd)
+{
     bool conflict = false;
     for (auto &inp : txd.tx->vin)
     {
@@ -251,6 +274,7 @@ void CommitTxToMempool()
     std::map<uint256, CTxCommitData> *q;
     {
         boost::unique_lock<boost::mutex> lock(csCommitQ);
+        avgCommitBatchSize = (avgCommitBatchSize * 24 + txCommitQ->size()) / 25;
         LOG(MEMPOOL, "txadmission committing %d tx\n", txCommitQ->size());
         q = txCommitQ;
         txCommitQ = new std::map<uint256, CTxCommitData>();
@@ -325,22 +349,27 @@ void CommitTxToMempool()
         // from re-requests.
         LOG(MEMPOOL, "popping txdeferQ, size %d\n", txDeferQ.size());
         // this could be a lot more efficient
-        while (!txDeferQ.empty())
+        uint64_t count = 0;
+        uint64_t maxmove = max(avgCommitBatchSize * 2, minCommitBatchSize);
+        while ((!txDeferQ.empty()) && (count < maxmove))
         {
+            count++;
             const uint256 &hash = txDeferQ.front().tx->GetHash();
             mapWasDeferred.emplace(hash, txDeferQ.front());
-
             txDeferQ.pop();
         }
     }
 
     if (!mapWasDeferred.empty())
-        LOG(MEMPOOL, "%d tx were deferred\n", mapWasDeferred.size());
+        LOG(MEMPOOL, "Enqueueing %d deferred tx\n", mapWasDeferred.size());
 
-    for (auto &it : mapWasDeferred)
     {
-        LOG(MEMPOOL, "attempt enqueue deferred %s\n", it.first.ToString());
-        EnqueueTxForAdmission(it.second);
+        LOCK(csTxInQ);
+        for (auto &it : mapWasDeferred)
+        {
+            // LOG(MEMPOOL, "attempt enqueue deferred %s\n", it.first.ToString());
+            TestConflictEnqueueTx(it.second);
+        }
     }
     ProcessOrphans(vWhatChanged);
 }
@@ -495,8 +524,8 @@ void ThreadTxAdmission()
                     int nDoS = 0;
                     if (state.IsInvalid(nDoS) && state.GetRejectCode() != REJECT_WAITING)
                     {
-                        LOG(MEMPOOL, "%s from peer=%s was not accepted: %s\n", tx->GetHash().ToString(), txd.nodeName,
-                            FormatStateMessage(state));
+                        LOG(MEMPOOL, "%s from peer=%s was not accepted: %s\ntx: %s", tx->GetHash().ToString(),
+                            txd.nodeName, FormatStateMessage(state), EncodeHexTx(*tx));
                         if (state.GetRejectCode() <
                             REJECT_INTERNAL) // Never send AcceptToMemoryPool's internal codes over P2P
                         {
@@ -1013,9 +1042,10 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
 
             minRelayTxFee = CFeeRate(nMinRelay * 1000);
-            LOG(MEMPOOL, "MempoolBytes:%d  LimitFreeRelay:%.5g  nMinRelay:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d  "
-                         "TxFees:%d\n",
-                poolBytes, nFreeLimit, nMinRelay, ((double)nFees) / nSize, nSize, nFees);
+            // useful but spammy
+            // LOG(MEMPOOL, "MempoolBytes:%d  LimitFreeRelay:%.5g  nMinRelay:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d "
+            //                         "TxFees:%d\n",
+            //                poolBytes, nFreeLimit, nMinRelay, ((double)nFees) / nSize, nSize, nFees);
             if ((fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize)) ||
                 (nLimitFreeRelay == 0 && nFees < ::minRelayTxFee.GetFee(nSize)))
             {
