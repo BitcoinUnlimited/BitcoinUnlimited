@@ -51,7 +51,7 @@ class GetblockstatsTest(BitcoinTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 2
-        self.extra_args = [['-txindex', '-printtoconsole'], ['-paytxfee=0.003']]
+        self.extra_args = [['-txindex'], ['-paytxfee=0.003']]
         self.setup_clean_chain = True
 
     def get_stats(self):
@@ -95,7 +95,6 @@ class GetblockstatsTest(BitcoinTestFramework):
 
     def load_test_data(self, filename):
         with open(filename, 'r') as f:
-            print(f)
             d = json.load(f)
             blocks = d['blocks']
             mocktime = d['mocktime']
@@ -149,7 +148,6 @@ class GetblockstatsTest(BitcoinTestFramework):
                 if result[stat] != self.expected_stats[i][stat]:
                     logging.info('result[%s] (%d) failed, %r != %r' % (
                         stat, i, result[stat], self.expected_stats[i][stat]))
-                print(stat)
                 assert_equal(result[stat], self.expected_stats[i][stat])
 
         # Make sure only the selected statistics are included (more than one)

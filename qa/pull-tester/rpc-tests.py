@@ -249,7 +249,8 @@ testScripts = [ RpcTest(t) for t in [
     'getrawtransaction',
     WhenElectrumFound('electrum_basics'),
     WhenElectrumFound('electrum_reorg'),
-    WhenElectrumFound('electrum_shutdownonerror')
+    WhenElectrumFound('electrum_shutdownonerror'),
+    'rpc_getblockstats'
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
