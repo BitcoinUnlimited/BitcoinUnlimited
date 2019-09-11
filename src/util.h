@@ -454,6 +454,15 @@ std::string GetArg(const std::string &strArg, const std::string &strDefault);
 int64_t GetArg(const std::string &strArg, int64_t nDefault);
 
 /**
+ * Return double argument or default value
+ *
+ * @param strArg Argument to get (e.g. "-foo")
+ * @param default (e.g. 3.14)
+ * @return command-line argument (0.0 if invalid number) or default value
+ */
+double GetDoubleArg(const std::string &strArg, double dDefault);
+
+/**
  * Return boolean argument or default value
  *
  * @param strArg Argument to get (e.g. "-foo")

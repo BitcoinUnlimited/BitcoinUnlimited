@@ -1759,18 +1759,28 @@ UniValue getminingcandidate(const UniValue &params, bool fHelp)
     CMiningCandidate candid;
     int64_t coinbaseSize = -1; // If -1 then not used to set coinbase size
 
-    if (fHelp || params.size() > 1)
+    if (fHelp || params.size() > 2)
     {
-        throw runtime_error("getminingcandidate"
-                            "\nReturns Mining-Candidate protocol data.\n"
-                            "\nArguments:\n"
-                            "1. \"coinbasesize\" (int, optional) Get a fixed size coinbase transaction.\n" +
-                            HelpExampleCli("", "") + HelpExampleCli("coinbasesize", "100"));
+        throw runtime_error(
+            "getminingcandidate"
+            "\nReturns Mining-Candidate protocol data.\n"
+            "\nArguments:\n"
+            "1. \"coinbasesize\" (int, optional) Get a fixed size coinbase transaction.\n"
+            "                                  Default: null (null indicates unspecified / use daemon defaults)\n"
+            "2. \"address\"      (string, optional) The address to send the newly generated bitcoin to.\n"
+            "                                     Default: an address in daemon's wallet.\n" +
+            HelpExampleCli("getminingcandidate", "") + HelpExampleCli("getminingcandidate", "1000") +
+            HelpExampleCli("getminingcandidate", "1000 bchtest:qq9rw090p2eu9drv6ptztwx4ghpftwfa0gyqvlvx2q") +
+            HelpExampleCli("getminingcandidate", "null bchtest:qq9rw090p2eu9drv6ptztwx4ghpftwfa0gyqvlvx2q"));
     }
 
-    if (params.size() == 1)
+    boost::shared_ptr<CReserveScript> coinbaseScript;
+    std::string destStr;
+
+    // we accept: param1, param2 or just param1 by itself or null,param2 to only specify param2
+    if (params.size() >= 1 && !params[0].isNull() && !params[0].getValStr().empty())
     {
-        coinbaseSize = params[0].get_int64();
+        coinbaseSize = params[0].get_int64(); // may throw, which is what we want
         if (coinbaseSize < 0)
         {
             throw std::runtime_error("Requested coinbase size is less than 0");
@@ -1782,8 +1792,24 @@ UniValue getminingcandidate(const UniValue &params, bool fHelp)
                 strprintf("Requested coinbase size too big. Max allowed: %u", BLOCKSTREAM_CORE_MAX_BLOCK_SIZE));
         }
     }
+    if (params.size() == 2)
+    {
+        destStr = params[1].get_str();
+    }
 
-    mkblocktemplate(UniValue(UniValue::VARR), coinbaseSize, &candid.block);
+    // validate destination address (if supplied)
+    if (!destStr.empty())
+    {
+        CTxDestination destination = DecodeDestination(destStr);
+        if (!IsValidDestination(destination))
+        {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("Error: Invalid address \"%s\"", destStr));
+        }
+        coinbaseScript = boost::shared_ptr<CReserveScript>(new CReserveScript());
+        coinbaseScript->reserveScript = GetScriptForDestination(destination);
+    }
+
+    mkblocktemplate(UniValue(UniValue::VARR), coinbaseSize, &candid.block, coinbaseScript);
 
     ret = MkMiningCandidateJson(candid);
     return ret;
