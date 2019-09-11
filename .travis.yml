@@ -136,7 +136,7 @@ script:
     - export CONTINUE=1
     - if [ $SECONDS -gt 1980 ]; then export CONTINUE=0; fi  # Likely the depends build took very long
     - if [ $CONTINUE = "1" ]; then set -o errexit; source .travis/script_a.sh; else set +o errexit; echo "$CACHE_ERR_MSG"; false; fi
-    - if [ $SECONDS -gt 2000 -a "$RUN_TESTS"="true"]; then export CONTINUE=0; fi  # Likely the build took very long
+    - if [ $SECONDS -gt 2000 -a "$RUN_TESTS"="true" ]; then export CONTINUE=0; fi  # Likely the build took very long
     - if [ $CONTINUE = "1" ]; then set -o errexit; source .travis/script_b.sh; else set +o errexit; echo "$CACHE_ERR_MSG"; false; fi
 
 after_script:

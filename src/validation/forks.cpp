@@ -95,3 +95,21 @@ bool IsNov2018Activated(const Consensus::Params &consensusparams, const CBlockIn
     }
     return IsNov2018Activated(consensusparams, pindexTip->nHeight);
 }
+
+bool IsNov2019Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
+{
+    if (pindexTip == nullptr)
+    {
+        return false;
+    }
+    return pindexTip->IsforkActiveOnNextBlock(miningForkTime.Value());
+}
+
+bool IsNov2019Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
+{
+    if (pindexTip == nullptr)
+    {
+        return false;
+    }
+    return pindexTip->forkAtNextBlock(miningForkTime.Value());
+}

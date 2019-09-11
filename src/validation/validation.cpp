@@ -2915,6 +2915,21 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
 
+    // If this block enabled the Nov 15th 2019 protocol upgrade, then we
+    // need to clear the mempool and transactions commit queue of any transaction
+    // using not previously avaiable features (e.g. Schnorr enabled OP_CHECKMULTISIG)
+    if (IsNov2019Enabled(consensusParams, pindexDelete) && !IsNov2019Enabled(consensusParams, pindexDelete->pprev))
+    {
+        // FIXME if #1902 got merged there's no need for this code cause
+        // this step will be perfomred unconditionally for all reorg modulo
+        // the ones initiated by RPC command. Other than this #1902 will
+        // also resubmit all txs in the queue so that hey could be re-validated
+        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        txCommitQ->clear();
+        mempool.clear();
+    }
+
+
     // these bloom filters stop us from doing duplicate work on tx we already know about.
     // but since we rewound, we need to do this duplicate work -- clear them so tx we have already processed
     // can be processed again.
