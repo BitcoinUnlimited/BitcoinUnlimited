@@ -37,7 +37,7 @@ enum OwnershipType
 #include <sys/syscall.h>
 #ifdef __linux__
 #include <sys/syscall.h>
-uint64_t getTid(void)
+inline uint64_t getTid(void)
 {
     // "native" thread id used so the number correlates with what is shown in gdb
     pid_t tid = (pid_t)syscall(SYS_gettid);
@@ -45,7 +45,7 @@ uint64_t getTid(void)
 }
 #else
 #include <functional>
-uint64_t getTid(void)
+inline uint64_t getTid(void)
 {
     // Note: there is no guaranteed way to turn the thread-id into an int
     // since it's an opaque type. Just about the only operation it supports
