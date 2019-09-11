@@ -116,7 +116,7 @@ class InvalidateTest(BitcoinTestFramework):
         self.nodes[0].invalidateblock(block)
         mp = self.nodes[0].getrawmempool()
         assert(tx1hash in mp)
-        # tx2 won't be in the mempool because of its nLockTime (see fee sniping)
+        # tx2 probably won't be in the mempool because of the probabilistic setting of nLockTime (see fee sniping)
 
         # Next set up 2 dependent tx as above.  Rollback and make sure both are removed from the mempool.
         block2 = self.nodes[0].generate(1)[0]

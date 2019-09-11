@@ -2931,7 +2931,9 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     }
 
     // Clear mempool if rolling back the chain using the "rollbackchain" rpc command, otherwise clear and
-    // place all tx back into the admission queue.
+    // place all tx back into the admission queue. "Rollbackchain" is used for significant manually triggered
+    // reorganizations, such as switching between forks, so it makes no sense to keep the transactions because
+    // they will likely be invalid or already confirmed on the other fork.
     if (fRollBack)
     {
         mempool.clear();
@@ -2968,7 +2970,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
 
         {
             boost::unique_lock<boost::mutex> lock(csCommitQ);
-            for (auto& kv: *txCommitQ)
+            for (auto &kv : *txCommitQ)
             {
                 CTxInputData txd;
                 txd.tx = kv.second.entry.GetSharedTx();
