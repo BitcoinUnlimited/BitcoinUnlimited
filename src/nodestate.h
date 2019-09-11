@@ -54,8 +54,8 @@ class CState
 {
 protected:
     /** Map maintaining per-node state. */
-    CCriticalSection cs;
-    std::map<NodeId, CNodeState> mapNodeState GUARDED_BY(cs);
+    CCriticalSection cs_cstate;
+    std::map<NodeId, CNodeState> mapNodeState GUARDED_BY(cs_cstate);
     friend class CNodeStateAccessor;
 
 public:
@@ -74,22 +74,25 @@ public:
     /** Is mapNodestate empty */
     bool Empty()
     {
-        LOCK(cs);
+        LOCK(cs_cstate);
         return mapNodeState.empty();
     }
 };
 
 class CNodeStateAccessor
 {
-    CCriticalSection *cs;
+    CCriticalSection *cs_ns_accessor;
     CNodeState *obj;
 
 public:
-    CNodeStateAccessor(CCriticalSection *_cs, CNodeState *_obj) : cs(_cs), obj(_obj) { cs->lock(); }
+    CNodeStateAccessor(CCriticalSection *_cs, CNodeState *_obj) : cs_ns_accessor(_cs), obj(_obj)
+    {
+        cs_ns_accessor->lock();
+    }
     CNodeStateAccessor(CState &ns, const NodeId id)
     {
-        cs = &ns.cs;
-        cs->lock();
+        cs_ns_accessor = &ns.cs_cstate;
+        cs_ns_accessor->lock();
         obj = ns._GetNodeState(id);
     }
 
@@ -100,7 +103,7 @@ public:
     ~CNodeStateAccessor()
     {
         obj = nullptr;
-        cs->unlock();
+        cs_ns_accessor->unlock();
     }
 };
 

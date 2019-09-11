@@ -2145,7 +2145,7 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     ret.pushKV("vNodes", (int64_t)vNodes.size());
     ret.pushKV("vNodesDisconnected", (int64_t)vNodesDisconnected.size());
     {
-        READLOCK(orphanpool.cs);
+        READLOCK(orphanpool.cs_orphanpool);
         ret.pushKV("mapOrphanTransactions", (int64_t)orphanpool.mapOrphanTransactions.size());
         ret.pushKV("mapOrphanTransactionsByPrev", (int64_t)orphanpool.mapOrphanTransactionsByPrev.size());
     }
@@ -2323,7 +2323,7 @@ UniValue getaddressforms(const UniValue &params, bool fHelp)
 
 std::string CStatusString::GetPrintable() const
 {
-    LOCK(cs);
+    LOCK(cs_status_string);
     if (strSet.empty())
         return "ready";
     std::string ret;
@@ -2339,12 +2339,12 @@ std::string CStatusString::GetPrintable() const
 
 void CStatusString::Set(const std::string &yourStatus)
 {
-    LOCK(cs);
+    LOCK(cs_status_string);
     strSet.insert(yourStatus);
 }
 
 void CStatusString::Clear(const std::string &yourStatus)
 {
-    LOCK(cs);
+    LOCK(cs_status_string);
     strSet.erase(yourStatus);
 }

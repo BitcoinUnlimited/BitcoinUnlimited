@@ -459,7 +459,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     bool fMerkleRootCorrect = true;
     {
         {
-            READLOCK(orphanpool.cs);
+            READLOCK(orphanpool.cs_orphanpool);
             for (auto &kv : orphanpool.mapOrphanTransactions)
             {
                 uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, kv.first, version);
@@ -718,7 +718,7 @@ static bool ReconstructBlock(CNode *pfrom,
                     }
                     else
                     {
-                        READLOCK(orphanpool.cs);
+                        READLOCK(orphanpool.cs_orphanpool);
                         std::map<uint256, CTxOrphanPool::COrphanTx>::iterator iter3 =
                             orphanpool.mapOrphanTransactions.find(hash);
                         if (iter3 != orphanpool.mapOrphanTransactions.end())
@@ -1368,7 +1368,7 @@ void RequestFailoverBlock(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
 
         std::vector<uint256> vOrphanHashes;
         {
-            READLOCK(orphanpool.cs);
+            READLOCK(orphanpool.cs_orphanpool);
             for (auto &mi : orphanpool.mapOrphanTransactions)
                 vOrphanHashes.emplace_back(mi.first);
         }

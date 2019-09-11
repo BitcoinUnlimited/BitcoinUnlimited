@@ -506,7 +506,7 @@ bool LoadBlockIndexDB()
 void UnloadBlockIndex()
 {
     {
-        WRITELOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs_orphanpool);
         orphanpool.mapOrphanTransactions.clear();
         orphanpool.mapOrphanTransactionsByPrev.clear();
         orphanpool.nBytesOrphanPool = 0;

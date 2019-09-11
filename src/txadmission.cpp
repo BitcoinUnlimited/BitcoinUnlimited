@@ -482,7 +482,7 @@ void ThreadTxAdmission()
 
                         if (fMissingInputs)
                         {
-                            WRITELOCK(orphanpool.cs);
+                            WRITELOCK(orphanpool.cs_orphanpool);
                             orphanpool.AddOrphanTx(tx, txd.nodeId);
 
                             // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
@@ -780,7 +780,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         CAmount nValueIn = 0;
         LockPoints lp;
         {
-            READLOCK(pool.cs);
+            READLOCK(pool.cs_txmempool);
             CCoinsViewMemPool &viewMemPool(*ss.cvMempool);
             view.SetBackend(viewMemPool);
             // do all inputs exist?
@@ -1196,7 +1196,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         }
 
         {
-            READLOCK(pool.cs);
+            READLOCK(pool.cs_txmempool);
             CTxMemPool::setEntries setAncestors;
             // note we could resolve ancestors to hashes and return those if that saves time in the txc thread
             if (!pool._CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize,
@@ -1272,7 +1272,7 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
     // NOTE: you must not return early since EraseOrphansByTime() must always be checked
     std::map<uint256, CTxInputData> mapEnqueue;
     {
-        READLOCK(orphanpool.cs);
+        READLOCK(orphanpool.cs_orphanpool);
         std::set<NodeId> setMisbehaving;
         for (unsigned int i = 0; i < vWorkQueue.size(); i++)
         {
@@ -1316,7 +1316,7 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
     // First delete the orphans before enqueuing them otherwise we may end up putting them
     // in the queue twice.
     {
-        WRITELOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs_orphanpool);
         for (auto it = mapEnqueue.begin(); it != mapEnqueue.end(); it++)
         {
             // If the orphan was not erased then it must already have been erased/enqueued by another thread
@@ -1333,7 +1333,7 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
 
 void Snapshot::Load(void)
 {
-    LOCK(cs);
+    LOCK(cs_snapshot);
     tipHeight = chainActive.Height();
     tip = chainActive.Tip();
     if (tip)
@@ -1349,7 +1349,7 @@ void Snapshot::Load(void)
     if (cvMempool)
         delete cvMempool;
 
-    READLOCK(mempool.cs);
+    READLOCK(mempool.cs_txmempool);
     // ss.coins contains the UTXO set for the tip in ss
     cvMempool = new CCoinsViewMemPool(coins, mempool);
 }
@@ -1362,7 +1362,7 @@ bool CheckSequenceLocks(const CTransactionRef &tx,
 {
     if (ss == nullptr)
         AssertLockHeld(cs_main);
-    AssertLockHeld(mempool.cs);
+    AssertLockHeld(mempool.cs_txmempool);
 
     CBlockIndex *tip = (ss != nullptr) ? ss->tip : chainActive.Tip();
     CBlockIndex index;

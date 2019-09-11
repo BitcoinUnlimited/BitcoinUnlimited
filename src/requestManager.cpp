@@ -581,7 +581,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                 inv2.type = MSG_XTHINBLOCK;
                 std::vector<uint256> vOrphanHashes;
                 {
-                    READLOCK(orphanpool.cs);
+                    READLOCK(orphanpool.cs_orphanpool);
                     for (auto &mi : orphanpool.mapOrphanTransactions)
                         vOrphanHashes.emplace_back(mi.first);
                 }

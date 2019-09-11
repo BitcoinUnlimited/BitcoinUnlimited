@@ -57,7 +57,7 @@ class CChainParams;
 /** Add or remove a string to indicate ongoing status */
 class CStatusString
 {
-    mutable CCriticalSection cs;
+    mutable CCriticalSection cs_status_string;
     std::set<std::string> strSet;
 
 public:

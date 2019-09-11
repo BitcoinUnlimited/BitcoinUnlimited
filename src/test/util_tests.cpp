@@ -28,11 +28,11 @@ BOOST_FIXTURE_TEST_SUITE(util_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(util_criticalsection)
 {
-    CCriticalSection cs;
+    CCriticalSection test_cs;
 
     do
     {
-        LOCK(cs);
+        LOCK(test_cs);
         break;
 
         BOOST_ERROR("break was swallowed!");
@@ -40,7 +40,7 @@ BOOST_AUTO_TEST_CASE(util_criticalsection)
 
     do
     {
-        TRY_LOCK(cs, lockTest);
+        TRY_LOCK(test_cs, lockTest);
         if (lockTest)
             break;
 
@@ -64,11 +64,11 @@ void ThreadSharedCritTest(CSharedCriticalSection *cs)
 
 BOOST_AUTO_TEST_CASE(util_sharedcriticalsection)
 {
-    CSharedCriticalSection cs;
+    CSharedCriticalSection test_cs;
 
     do
     {
-        READLOCK(cs);
+        READLOCK(test_cs);
         break;
 
         BOOST_ERROR("break was swallowed!");
@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE(util_sharedcriticalsection)
 
     do
     {
-        WRITELOCK(cs);
+        WRITELOCK(test_cs);
         break;
 
         BOOST_ERROR("break was swallowed!");
@@ -84,8 +84,8 @@ BOOST_AUTO_TEST_CASE(util_sharedcriticalsection)
 
     { // If the read lock does not allow simultaneous locking, this code will hang in the join_all
         boost::thread_group thrds;
-        READLOCK(cs);
-        thrds.create_thread(boost::bind(ThreadSharedCritTest, &cs));
+        READLOCK(test_cs);
+        thrds.create_thread(boost::bind(ThreadSharedCritTest, &test_cs));
         thrds.join_all();
     }
 
@@ -96,8 +96,8 @@ BOOST_AUTO_TEST_CASE(util_sharedcriticalsection)
         critVal = 1;
         boost::thread_group thrds;
         {
-            WRITELOCK(cs);
-            thrds.create_thread(boost::bind(ThreadSharedCritTest, &cs));
+            WRITELOCK(test_cs);
+            thrds.create_thread(boost::bind(ThreadSharedCritTest, &test_cs));
             MilliSleep(250); // give thread a chance to run.
             BOOST_CHECK(threadStarted == true);
             BOOST_CHECK(threadExited == false);

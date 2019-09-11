@@ -225,7 +225,7 @@ std::string EntryDescriptionString()
 
 void entryToJSON(UniValue &info, const CTxMemPoolEntry &e)
 {
-    AssertLockHeld(mempool.cs);
+    AssertLockHeld(mempool.cs_txmempool);
 
     info.pushKV("size", (int)e.GetTxSize());
     info.pushKV("fee", ValueFromAmount(e.GetFee()));
@@ -269,7 +269,7 @@ UniValue mempoolToJSON(bool fVerbose = false)
 {
     if (fVerbose)
     {
-        READLOCK(mempool.cs);
+        READLOCK(mempool.cs_txmempool);
         UniValue o(UniValue::VOBJ);
         for (const CTxMemPoolEntry &e : mempool.mapTx)
         {
@@ -382,7 +382,7 @@ UniValue getmempoolancestors(const UniValue &params, bool fHelp)
 
     uint256 paramhash = ParseHashV(params[0], "parameter 1");
 
-    READLOCK(mempool.cs);
+    READLOCK(mempool.cs_txmempool);
 
     CTxMemPool::txiter it = mempool.mapTx.find(paramhash);
     if (it == mempool.mapTx.end())
@@ -452,7 +452,7 @@ UniValue getmempooldescendants(const UniValue &params, bool fHelp)
 
     uint256 paramhash = ParseHashV(params[0], "parameter 1");
 
-    WRITELOCK(mempool.cs);
+    WRITELOCK(mempool.cs_txmempool);
 
     CTxMemPool::txiter it = mempool.mapTx.find(paramhash);
     if (it == mempool.mapTx.end())
@@ -508,7 +508,7 @@ UniValue getmempoolentry(const UniValue &params, bool fHelp)
 
     uint256 hash = ParseHashV(params[0], "parameter 1");
 
-    READLOCK(mempool.cs);
+    READLOCK(mempool.cs_txmempool);
 
     CTxMemPool::txiter it = mempool.mapTx.find(hash);
     if (it == mempool.mapTx.end())
@@ -888,7 +888,7 @@ UniValue gettxout(const UniValue &params, bool fHelp)
     Coin coin;
     if (fMempool)
     {
-        READLOCK(mempool.cs);
+        READLOCK(mempool.cs_txmempool);
         CCoinsViewMemPool view(pcoinsTip, mempool);
         // TODO: filtering spent coins should be done by the CCoinsViewMemPool
         if (!view.GetCoin(out, coin) || mempool.isSpent(out))

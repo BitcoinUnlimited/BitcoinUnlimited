@@ -65,7 +65,7 @@ class WorkQueue
 {
 private:
     /** Mutex protects entire object */
-    std::mutex cs;
+    std::mutex cs_workQueue;
     std::condition_variable cond;
     std::deque<std::unique_ptr<WorkItem> > queue;
     bool running;
@@ -79,12 +79,12 @@ private:
         WorkQueue &wq;
         ThreadCounter(WorkQueue &w) : wq(w)
         {
-            std::lock_guard<std::mutex> lock(wq.cs);
+            std::lock_guard<std::mutex> lock(wq.cs_workQueue);
             wq.numThreads += 1;
         }
         ~ThreadCounter()
         {
-            std::lock_guard<std::mutex> lock(wq.cs);
+            std::lock_guard<std::mutex> lock(wq.cs_workQueue);
             wq.numThreads -= 1;
             wq.cond.notify_all();
         }
@@ -98,7 +98,7 @@ public:
     /** Enqueue a work item */
     bool Enqueue(WorkItem *item)
     {
-        std::unique_lock<std::mutex> lock(cs);
+        std::unique_lock<std::mutex> lock(cs_workQueue);
         if (queue.size() >= maxDepth)
         {
             return false;
@@ -115,7 +115,7 @@ public:
         {
             std::unique_ptr<WorkItem> i;
             {
-                std::unique_lock<std::mutex> lock(cs);
+                std::unique_lock<std::mutex> lock(cs_workQueue);
                 while (running && queue.empty())
                     cond.wait(lock);
                 if (!running)
@@ -129,7 +129,7 @@ public:
     /** Interrupt and exit loops */
     void Interrupt()
     {
-        std::unique_lock<std::mutex> lock(cs);
+        std::unique_lock<std::mutex> lock(cs_workQueue);
         running = false;
         cond.notify_all();
     }

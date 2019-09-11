@@ -182,7 +182,7 @@ template <class DataType, class RecordType = DataType>
 class CStatHistory : public CStat<DataType, RecordType>
 {
 protected:
-    std::mutex cs;
+    std::mutex cs_statHistory;
     unsigned int op;
     boost::asio::steady_timer timer;
     RecordType history[STATISTICS_NUM_RANGES][STATISTICS_SAMPLES];
@@ -228,7 +228,7 @@ public:
     void Clear(bool fStart = true)
     {
         {
-            std::lock_guard<std::mutex> lock(cs);
+            std::lock_guard<std::mutex> lock(cs_statHistory);
             timerCount = 0;
             sampleCount = 0;
             for (int i = 0; i < STATISTICS_NUM_RANGES; i++)
@@ -260,7 +260,7 @@ public:
         if (op & STAT_INDIVIDUAL)
             timeout(boost::system::error_code());
 
-        std::lock_guard<std::mutex> lock(cs);
+        std::lock_guard<std::mutex> lock(cs_statHistory);
         if (op & STAT_OP_SUM)
         {
             this->value += rhs;
@@ -292,7 +292,7 @@ public:
 
     void Start()
     {
-        std::lock_guard<std::mutex> lock(cs);
+        std::lock_guard<std::mutex> lock(cs_statHistory);
         if (!(op & STAT_INDIVIDUAL))
         {
             timerStartSteady = std::chrono::steady_clock::now();
@@ -303,7 +303,7 @@ public:
 
     void Stop()
     {
-        std::lock_guard<std::mutex> lock(cs);
+        std::lock_guard<std::mutex> lock(cs_statHistory);
         if (!(op & STAT_INDIVIDUAL))
         {
             timer.cancel();
@@ -312,7 +312,7 @@ public:
 
     int Series(int series, DataType *array, int _len)
     {
-        std::lock_guard<std::mutex> lock(cs);
+        std::lock_guard<std::mutex> lock(cs_statHistory);
         assert(series < STATISTICS_NUM_RANGES);
         if (_len > STATISTICS_SAMPLES)
             _len = STATISTICS_SAMPLES;
@@ -332,7 +332,7 @@ public:
 
     virtual UniValue GetTotal()
     {
-        std::lock_guard<std::mutex> lock(cs);
+        std::lock_guard<std::mutex> lock(cs_statHistory);
         if ((op & STAT_OP_AVE) && (timerCount != 0))
             return UniValue(
                 total / timerCount); // If the metric is an average, calculate the average before returning it
@@ -341,7 +341,7 @@ public:
 
     virtual UniValue GetSeries(const std::string &_name, int count)
     {
-        std::lock_guard<std::mutex> lock(cs);
+        std::lock_guard<std::mutex> lock(cs_statHistory);
         for (int series = 0; series < STATISTICS_NUM_RANGES; series++)
         {
             if (_name == sampleNames[series])
@@ -365,7 +365,7 @@ public:
     // 0 is latest, then pass a negative number for prior
     const RecordType &History(int series, int ago)
     {
-        std::lock_guard<std::mutex> lock(cs);
+        std::lock_guard<std::mutex> lock(cs_statHistory);
         return _History(series, ago);
     }
 
@@ -383,7 +383,7 @@ public:
 
     virtual UniValue GetSeriesTime(const std::string &_name, int count)
     {
-        std::lock_guard<std::mutex> lock(cs);
+        std::lock_guard<std::mutex> lock(cs_statHistory);
         for (int series = 0; series < STATISTICS_NUM_RANGES; series++)
         {
             if (_name == sampleNames[series])
@@ -413,7 +413,7 @@ public:
     // 0 is latest, then pass a negative number for prior
     const int64_t &HistoryTime(int series, int ago)
     {
-        std::lock_guard<std::mutex> lock(cs);
+        std::lock_guard<std::mutex> lock(cs_statHistory);
         return _HistoryTime(series, ago);
     }
 
@@ -440,7 +440,7 @@ public:
         if (e)
             return;
 
-        std::lock_guard<std::mutex> lock(cs);
+        std::lock_guard<std::mutex> lock(cs_statHistory);
         // If this stat is in the process of being deleted, then just abort processing.
         if ((op & STAT_DELETED) > 0)
             return;
