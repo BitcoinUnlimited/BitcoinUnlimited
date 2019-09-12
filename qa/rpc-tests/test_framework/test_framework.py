@@ -82,6 +82,15 @@ class BitcoinTestFramework(object):
         if self.num_nodes == 1:
             return
 
+        if self.num_nodes == 2:
+            if split:
+                raise Exception("split option for 2 nodes NYI")
+
+            connect_nodes_bi(self.nodes, 0, 1)
+            self.is_network_split = False
+            self.sync_all()
+            return
+
         if self.num_nodes != 4:
             raise Exception("Default setup_network for %d nodes NYI" % self.num_nodes)
 
