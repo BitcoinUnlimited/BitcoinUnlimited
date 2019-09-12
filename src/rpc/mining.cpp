@@ -546,7 +546,7 @@ void SignalBlockTemplateChange()
 UniValue mkblocktemplate(const UniValue &params,
     int64_t coinbaseSize,
     CBlock *pblockOut,
-    boost::shared_ptr<CReserveScript> coinbaseScript)
+    const CScript &coinbaseScriptIn)
 {
     LOCK(cs_main);
 
@@ -554,6 +554,8 @@ UniValue mkblocktemplate(const UniValue &params,
     UniValue lpval = NullUniValue;
     std::set<std::string> setClientRules;
     int64_t nMaxVersionPreVB = -1;
+    CScript coinbaseScript(coinbaseScriptIn); // non-const copy (we may modify this below)
+
     if (params.size() > 0)
     {
         const UniValue &oparam = params[0].get_obj();
@@ -688,7 +690,7 @@ UniValue mkblocktemplate(const UniValue &params,
     static CBlockIndex *pindexPrev = nullptr;
     static int64_t nStart = 0;
     static std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
-    static boost::shared_ptr<CReserveScript> prevCoinbaseScript;
+    static CScript prevCoinbaseScript;
     static int64_t prevCoinbaseSize = -1;
     // We cache the previous block templates returned, but we invalidate the
     // cache below (generate a new block) if any of:
@@ -703,9 +705,7 @@ UniValue mkblocktemplate(const UniValue &params,
         (consensusParams.fPowAllowMinDifficultyBlocks && std::abs(GetTime() - nStart) > 30) || // 3 above
         // 4 above
         (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && std::abs(GetTime() - nStart) > 5) ||
-        prevCoinbaseSize != coinbaseSize || bool(prevCoinbaseScript) != bool(coinbaseScript) || // 5 above
-        // 6 above
-        (prevCoinbaseScript && coinbaseScript && prevCoinbaseScript->reserveScript != coinbaseScript->reserveScript))
+        prevCoinbaseSize != coinbaseSize || prevCoinbaseScript != coinbaseScript) // 5 & 6 above
     {
         forceTemplateRecalc = false;
         // Clear pindexPrev so future calls make a new block, despite any failures from here on
@@ -720,23 +720,34 @@ UniValue mkblocktemplate(const UniValue &params,
         CBlockIndex *pindexPrevNew = chainActive.Tip();
         nStart = GetTime();
 
-        // Create new block
-        if (!coinbaseScript)
+        // If client code didn't specify a coinbase address for the mining reward, grab one from the wallet.
+        if (coinbaseScript.empty())
         {
-            // if they didn't pass in a coinbaseScript, grab an address from wallet
-            GetMainSignals().ScriptForMining(coinbaseScript);
+            // Note that we don't cache the exact script from this to the prevCoinbaseScript -- it's sufficient
+            // to cache the fact that client code didn't specify a coinbase address (by caching the empty script).
+            boost::shared_ptr<CReserveScript> tmpScriptPtr;
+            GetMainSignals().ScriptForMining(tmpScriptPtr);
+
+            // throw an error if shared_ptr is not valid -- this means no wallet support was compiled-in
+            if (!tmpScriptPtr)
+                throw JSONRPCError(RPC_INTERNAL_ERROR,
+                    "Wallet support is not compiled-in, please specify an address for the coinbase tx");
+
+            // If the keypool is exhausted, the shared_ptr is valid but no actual script is generated; catch this.
+            if (tmpScriptPtr->reserveScript.empty())
+                throw JSONRPCError(
+                    RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
+
+            // Everything checks out, proceed with the wallet-generated address. Note that we don't tell the wallet to
+            // "KeepKey" this address -- which means future calls will return the same address from the wallet for
+            // future mining candidates, which is fine and good (since these are, after all, mining *candidates*).
+            // This also means that the bitcoin-miner program will continue to mine to the same key for all blocks,
+            // which is fine. If client code wants something more sophisticated, it can always specify coinbaseScript.
+            coinbaseScript = tmpScriptPtr->reserveScript;
         }
 
-        // If the keypool is exhausted, no script is returned at all.  Catch this.
-        if (!coinbaseScript)
-            throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
-
-        // throw an error if no script was provided
-        if (coinbaseScript->reserveScript.empty())
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
-
-
-        pblocktemplate = BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript, coinbaseSize);
+        // Create new block
+        pblocktemplate = BlockAssembler(Params()).CreateNewBlock(coinbaseScript, coinbaseSize);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 

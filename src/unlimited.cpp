@@ -1774,7 +1774,7 @@ UniValue getminingcandidate(const UniValue &params, bool fHelp)
             HelpExampleCli("getminingcandidate", "null bchtest:qq9rw090p2eu9drv6ptztwx4ghpftwfa0gyqvlvx2q"));
     }
 
-    boost::shared_ptr<CReserveScript> coinbaseScript;
+    CScript coinbaseScript;
     std::string destStr;
 
     // we accept: param1, param2 or just param1 by itself or null,param2 to only specify param2
@@ -1805,8 +1805,7 @@ UniValue getminingcandidate(const UniValue &params, bool fHelp)
         {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("Error: Invalid address \"%s\"", destStr));
         }
-        coinbaseScript = boost::shared_ptr<CReserveScript>(new CReserveScript());
-        coinbaseScript->reserveScript = GetScriptForDestination(destination);
+        coinbaseScript = GetScriptForDestination(destination);
     }
 
     mkblocktemplate(UniValue(UniValue::VARR), coinbaseSize, &candid.block, coinbaseScript);
