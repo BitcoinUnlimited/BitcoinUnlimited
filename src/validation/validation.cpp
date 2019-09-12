@@ -2945,10 +2945,26 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
         SyncWithWallets(ptx, nullptr, -1);
     }
 
-    // Resurrect mempool transactions from the disconnected block but do not do this step if we are
-    // rolling back the chain using the "rollbackchain" rpc command.
-    if (!fRollBack)
+    // Clear mempool if rolling back the chain using the "rollbackchain" rpc command, otherwise clear and
+    // place all tx back into the admission queue. "Rollbackchain" is used for significant manually triggered
+    // reorganizations, such as switching between forks, so it makes no sense to keep the transactions because
+    // they will likely be invalid or already confirmed on the other fork.
+    if (fRollBack)
     {
+        mempool.clear();
+        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        txCommitQ->clear();
+    }
+    else
+    {
+        // To be very safe let's force everything in the mempool to be re-admitted.  This reduces this rare case
+        // quickly to a very common operation mode.  If we do not do this, we must guarantee that all tx coming from
+        // the block get injected into the mempool to ensure that any mempool tx that relies on an input from this
+        // block doesn't get orphaned but remain in the mempool.
+        // The performance of doing it this way is surprisingly ok, even though it seems like more work,
+        // because the readmission code is multithreaded and very efficient, yet the code to slip a tx back into a
+        // dependency chain in the mempool performed terribly.
+
         for (const auto &ptx : block.vtx)
         {
             if (!ptx->IsCoinBase())
@@ -2958,6 +2974,25 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
                 txd.nodeName = "rollback";
                 EnqueueTxForAdmission(txd);
             }
+        }
+
+        mempool.forEachThenClear([](const auto &entry) {
+            CTxInputData txd;
+            txd.tx = entry.GetSharedTx();
+            txd.nodeName = "rollback";
+            EnqueueTxForAdmission(txd);
+        });
+
+        {
+            boost::unique_lock<boost::mutex> lock(csCommitQ);
+            for (auto &kv : *txCommitQ)
+            {
+                CTxInputData txd;
+                txd.tx = kv.second.entry.GetSharedTx();
+                txd.nodeName = "rollback";
+                EnqueueTxForAdmission(txd);
+            }
+            txCommitQ->clear();
         }
     }
 

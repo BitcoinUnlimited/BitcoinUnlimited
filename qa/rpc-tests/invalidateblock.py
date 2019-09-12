@@ -89,6 +89,43 @@ class InvalidateTest(BitcoinTestFramework):
 
         self.testChainSyncWithLongerInvalid()
 
+        self.testMempoolDuringInvalidate()
+
+    def testMempoolDuringInvalidate(self):
+        """ This test checks dependent transactions committed and in the mempool during block invalidates and verifies that the dependent one does not
+            stay in the mempool if the dependency is removed.
+        """
+        # start this test connected
+        connect_nodes_bi(self.nodes,1,2)
+        # Get something to spend
+        nBlocks = self.nodes[0].getblockcount()
+        self.nodes[0].generate(101-nBlocks)
+        nBlocks = 101
+
+        sync_blocks(self.nodes)
+
+        # Set up 2 dependent tx, 1 committed the other in mempool.  invalidate the committed block and make sure that we don't end up
+        # with tx 2 alone in the mempool.
+        addr = self.nodes[1].getnewaddress()
+        tx1hash = self.nodes[0].sendtoaddress(addr, 20)
+        waitFor(10, lambda: self.nodes[0].getmempoolinfo()["size"] > 0)
+        block = self.nodes[0].generate(1)[0]
+        waitFor(5, lambda: self.nodes[1].getblockcount() == nBlocks+1)
+        tx2hash = self.nodes[1].sendtoaddress(addr, 10)  # This must be dependent on the prior send because node 1 has no other money
+        waitFor(10, lambda: self.nodes[0].getmempoolinfo()["size"] == 1)
+        self.nodes[0].invalidateblock(block)
+        mp = self.nodes[0].getrawmempool()
+        assert(tx1hash in mp)
+        # tx2 probably won't be in the mempool because of the probabilistic setting of nLockTime (see fee sniping)
+
+        # Next set up 2 dependent tx as above.  Rollback and make sure both are removed from the mempool.
+        block2 = self.nodes[0].generate(1)[0]
+        self.nodes[1].abandontransaction(tx2hash) # clean up the old tx because wallet won't attempt resend for awhile
+        tx3hash = self.nodes[1].sendtoaddress(addr, 11)
+        waitFor(10, lambda: self.nodes[0].getmempoolinfo()["size"] == 1)
+        self.nodes[0].rollbackchain(101)
+        time.sleep(1)  # sleep is unreliable but in this case we are waiting for something to NOT happen so no choice.
+        assert(self.nodes[0].getmempoolinfo()["size"] == 0)  # After a rollback mempool should be emptied.
 
     def testChainSyncWithLongerInvalid(self):
         print("verify that IBD continues on a separate chain after a block is invalidated")
@@ -145,4 +182,5 @@ def Test():
     "debug":["net","blk","thin","mempool","req","bench","evict"], # "lck"
     "blockprioritysize":2000000  # we don't want any transactions rejected due to insufficient fees...
      }
-    t.main(["--nocleanup","--noshutdown", "--tmppfx=/ramdisk/test"],bitcoinConf,None)
+    flags = standardFlags()
+    t.main(flags, bitcoinConf, None)
