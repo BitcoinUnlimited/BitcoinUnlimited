@@ -1710,39 +1710,30 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
 
     LOCK(cs_main);
 
-    CBlockIndex *pindex;
-    if (params[0].isNum())
+    std::string strHash = params[0].get_str();
+    uint256 hash(uint256S(strHash));
+    CBlockIndex *pindex = LookupBlockIndex(hash);
+    if (!pindex)
     {
-        const int height = params[0].get_int();
-        const int current_tip = chainActive.Height();
-        if (height < 0)
+        arith_uint256 h = UintToArith256(hash);
+        if (h.bits() < 65)
         {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Target block height %d is negative", height));
+            uint64_t height = std::stoull(strHash);
+            if (height < 0)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Target block height %d is negative", height));
+            }
+            if (height > (uint64_t)chainActive.Height())
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block index out of range");
+            pindex = chainActive[height];
         }
-        if (height > current_tip)
-        {
-            throw JSONRPCError(
-                RPC_INVALID_PARAMETER, strprintf("Target block height %d after current tip %d", height, current_tip));
-        }
-
-        pindex = chainActive[height];
-    }
-    else
-    {
-        const std::string strHash = params[0].get_str();
-        const uint256 hash(uint256S(strHash));
-        pindex = LookupBlockIndex(hash);
-        if (!pindex)
-        {
+        else
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-        }
-        if (!chainActive.Contains(pindex))
-        {
-            throw JSONRPCError(
-                RPC_INVALID_PARAMETER, strprintf("Block is not in chain %s", Params().NetworkIDString()));
-        }
     }
-
+    if (!chainActive.Contains(pindex))
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Block is not in chain %s", Params().NetworkIDString()));
+    }
     DbgAssert(pindex != nullptr, throw std::runtime_error(__func__));
 
     std::set<std::string> stats;
