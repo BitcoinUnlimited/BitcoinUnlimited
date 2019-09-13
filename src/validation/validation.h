@@ -167,4 +167,7 @@ bool ProcessNewBlock(CValidationState &state,
     CDiskBlockPos *dbp,
     bool fParallel);
 
+//! Check whether the block associated with this index entry is pruned or not.
+bool IsBlockPruned(const CBlockIndex *pblockindex);
+
 #endif

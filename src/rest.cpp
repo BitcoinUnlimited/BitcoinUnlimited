@@ -230,11 +230,8 @@ static bool rest_block(HTTPRequest *req, const std::string &strURIPart, bool sho
     if (!pblockindex)
         return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
 
-    {
-        READLOCK(cs_mapBlockIndex); // for nStatus
-        if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
-            return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not available (pruned data)");
-    }
+    if (IsBlockPruned(pblockindex))
+        return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not available (pruned data)");
 
     if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
         return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
