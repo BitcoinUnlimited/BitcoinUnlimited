@@ -52,7 +52,7 @@ BOOST_AUTO_TEST_CASE(bit_count) {
     }
 
     // Check random values against a naive implementation.
-    for (int i = 0; i < COUNT; i++) {
+    for (size_t i = 0; i < COUNT; i++) {
         uint32_t v = insecure_rand();
         CheckBitCount(v, countBitsNaive(v));
     }
