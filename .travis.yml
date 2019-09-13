@@ -98,13 +98,13 @@ matrix:
         - DEP_OPTS="NO_QT=1" RUN_TESTS=true GOAL="install"
         - BITCOIN_CONFIG="--enable-zmq --enable-glibc-back-compat --enable-reduce-exports LDFLAGS=-static-libstdc++"
         - USE_SHELL="/bin/dash"
-    #x86_64 Linux, No wallet (uses qt5 dev package instead of depends Qt to speed up build and avoid timeout)
+    #x86_64 Linux + deps as via system lib
     - compiler: gcc
       env:
         - CXX=g++ CC=gcc
         - HOST=x86_64-unknown-linux-gnu
-        - PACKAGES="python3 qtbase5-dev qttools5-dev-tools protobuf-compiler libdbus-1-dev libharfbuzz-dev libprotobuf-dev libdb5.3++-dev"
-        - DEP_OPTS="NO_WALLET=1 NO_QT=1 ALLOW_HOST_PACKAGES=1"
+        - PACKAGES="python3-zmq libzmq3-dev qttools5-dev-tools qttools5-dev libssl1.0-dev libevent-dev bsdmainutils libboost-system-dev libboost-program-options-dev libboost-filesystem-dev libboost-chrono-dev libboost-test-dev libboost-thread-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libprotobuf-dev protobuf-compiler libqrencode-dev"
+        - NODEPENDS=true
         - RUN_TESTS=true GOAL="install" BITCOIN_CONFIG="--enable-debug --with-incompatible-bdb --with-gui=qt5 --enable-glibc-back-compat --enable-reduce-exports"
     #Cross-Mac
     - compiler: gcc
