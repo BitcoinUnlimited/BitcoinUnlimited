@@ -12,6 +12,7 @@
 #include "primitives/transaction.h"
 #include "pubkey.h"
 #include "script/script.h"
+#include "script/script_error.h"
 #include "uint256.h"
 #include "util.h"
 const std::string strMessageMagic = "Bitcoin Signed Message:\n";
@@ -26,24 +27,6 @@ extern uint256 SignatureHashLegacy(const CScript &scriptCode,
 using namespace std;
 
 typedef vector<unsigned char> valtype;
-
-namespace
-{
-inline bool set_success(ScriptError *ret)
-{
-    if (ret)
-        *ret = SCRIPT_ERR_OK;
-    return true;
-}
-
-inline bool set_error(ScriptError *ret, const ScriptError serror)
-{
-    if (ret)
-        *ret = serror;
-    return false;
-}
-
-} // anon namespace
 
 bool CastToBool(const valtype &vch)
 {

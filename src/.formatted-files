@@ -345,6 +345,7 @@ test/sanity_tests.cpp
 test/scriptnum10.h
 test/scriptnum_tests.cpp
 test/script_P2SH_tests.cpp
+test/script_bitfield_tests.cpp
 test/script_tests.cpp
 test/serialize_tests.cpp
 test/sighash_tests.cpp
@@ -392,6 +393,8 @@ zmq/zmqpublishnotifier.cpp
 zmq/zmqpublishnotifier.h
 script/bitcoinconsensus.cpp
 script/bitcoinconsensus.h
+script/bitfield.cpp
+script/bitfield.h
 script/interpreter.cpp
 script/interpreter.h
 script/ismine.cpp

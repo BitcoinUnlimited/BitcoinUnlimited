@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -63,6 +63,10 @@ const char *ScriptErrorString(const ScriptError serror)
         return "Division by zero error";
     case SCRIPT_ERR_MOD_BY_ZERO:
         return "Modulo by zero error";
+    case SCRIPT_ERR_INVALID_BITFIELD_SIZE:
+        return "Bitfield of unexpected size error";
+    case SCRIPT_ERR_INVALID_BIT_RANGE:
+        return "Bitfield's bit out of the expected range";
     case SCRIPT_ERR_NEGATIVE_LOCKTIME:
         return "Negative locktime";
     case SCRIPT_ERR_UNSATISFIED_LOCKTIME:
