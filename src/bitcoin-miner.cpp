@@ -338,7 +338,7 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
     if (!found)
     {
         const auto elapsed = GetTimeMillis() - start;
-        printf("Checked %d possibilities in %lld secs, %3.3f MH/s\n", nChecked, elapsed / 1000,
+        printf("Checked %d possibilities in %ld secs, %3.3f MH/s\n", nChecked, elapsed / 1000,
             (nChecked / 1e6) / (elapsed / 1e3));
         return ret;
     }
