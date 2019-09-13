@@ -154,7 +154,7 @@ UniValue SubmitBlock(CBlock &block);
 UniValue mkblocktemplate(const UniValue &params,
     int64_t coinbaseSize = -1,
     CBlock *pblockOut = nullptr,
-    boost::shared_ptr<CReserveScript> coinbaseScript = boost::shared_ptr<CReserveScript>());
+    const CScript &coinbaseScript = CScript());
 
 // Force block template recalculation the next time a template is requested
 void SignalBlockTemplateChange();
