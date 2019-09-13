@@ -992,6 +992,9 @@ QString formatServicesStr(quint64 mask, const QStringList &additionalServices)
             case NODE_CF:
                 strList.append("CF");
                 break;
+            case NODE_NETWORK_LIMITED:
+                strList.append("LIMITED");
+                break;
             default:
                 strList.append(QString("%1[%2]").arg("UNKNOWN").arg(check));
             }
