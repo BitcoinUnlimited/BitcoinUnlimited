@@ -1710,10 +1710,50 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
 
     LOCK(cs_main);
 
-    CBlockIndex *pindex;
-    if (params[0].isNum())
+    CBlockIndex *pindex = nullptr;
+    bool isNumber = true;
+    int height = -1;
+    if (!params[0].isNum())
     {
-        const int height = params[0].get_int();
+        // determine if string is the height or block hash
+        const std::string param0 = params[0].get_str();
+        std::string::const_iterator it = param0.begin();
+        while (it != param0.end())
+        {
+            if (!std::isdigit(*it))
+            {
+                isNumber = false;
+                break;
+            }
+            ++it;
+        }
+        if (isNumber)
+        {
+            // if it was a number as a string, convert it to an int
+            height = std::stoi(param0);
+        }
+        else
+        {
+            // if not grab the block by hash
+            const uint256 hash(uint256S(param0));
+            pindex = LookupBlockIndex(hash);
+            if (!pindex)
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found by block hash");
+            }
+            if (!chainActive.Contains(pindex))
+            {
+                throw JSONRPCError(
+                    RPC_INVALID_PARAMETER, strprintf("Block is not in chain %s", Params().NetworkIDString()));
+            }
+        }
+    }
+    else
+    {
+        height = params[0].get_int();
+    }
+    if (isNumber)
+    {
         const int current_tip = chainActive.Height();
         if (height < 0)
         {
@@ -1724,23 +1764,7 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
             throw JSONRPCError(
                 RPC_INVALID_PARAMETER, strprintf("Target block height %d after current tip %d", height, current_tip));
         }
-
         pindex = chainActive[height];
-    }
-    else
-    {
-        const std::string strHash = params[0].get_str();
-        const uint256 hash(uint256S(strHash));
-        pindex = LookupBlockIndex(hash);
-        if (!pindex)
-        {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-        }
-        if (!chainActive.Contains(pindex))
-        {
-            throw JSONRPCError(
-                RPC_INVALID_PARAMETER, strprintf("Block is not in chain %s", Params().NetworkIDString()));
-        }
     }
 
     DbgAssert(pindex != nullptr, throw std::runtime_error(__func__));
