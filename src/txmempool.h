@@ -542,7 +542,7 @@ public:
     template <typename Lambda>
     void forEachThenClear(const Lambda &f)
     {
-        WRITELOCK(cs);
+        AssertWriteLockHeld(cs);
         for (CTxMemPool::indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++)
         {
             f(*it);
@@ -574,6 +574,7 @@ public:
     // addUnchecked can be used to have it call CalculateMemPoolAncestors(), and
     // then invoke the second version.
     bool addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry, bool fCurrentEstimate = true);
+    bool _addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry, bool fCurrentEstimate = true);
     bool addUnchecked(const uint256 &hash,
         const CTxMemPoolEntry &entry,
         setEntries &setAncestors,

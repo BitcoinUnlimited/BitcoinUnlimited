@@ -148,6 +148,8 @@ extern std::queue<CTxInputData> txWaitNextBlockQ;
 extern CWaitableCriticalSection csCommitQ;
 extern CConditionVariable cvCommitQ;
 extern std::map<uint256, CTxCommitData> *txCommitQ;
+extern CCriticalSection csCommitQFinal;
+extern std::map<uint256, CTxCommitData> *txCommitQFinal;
 
 // returns a transaction ref, if it exists in the commitQ
 CTransactionRef CommitQGet(uint256 hash);

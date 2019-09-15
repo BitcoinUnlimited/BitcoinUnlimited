@@ -271,38 +271,47 @@ void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age)
 void CommitTxToMempool()
 {
     std::vector<uint256> vWhatChanged;
-    std::map<uint256, CTxCommitData> *q;
     {
         boost::unique_lock<boost::mutex> lock(csCommitQ);
         avgCommitBatchSize = (avgCommitBatchSize * 24 + txCommitQ->size()) / 25;
         LOG(MEMPOOL, "txadmission committing %d tx\n", txCommitQ->size());
-        q = txCommitQ;
+
+        LOCK(csCommitQFinal);
+        txCommitQFinal = txCommitQ;
         txCommitQ = new std::map<uint256, CTxCommitData>();
     }
 
     // These transactions have already been validated so store them directly into the mempool.
-    for (auto &it : *q)
+    //
+    // We must hold the mempool lock for the duration because we want to be sure that we don't end up
+    // doing this loop in the middle of a reorg where we might be clearing the mempool.
     {
-        CTxCommitData &data = it.second;
-        mempool.addUnchecked(it.first, data.entry, !IsInitialBlockDownload());
-        vWhatChanged.push_back(data.hash);
+        WRITELOCK(mempool.cs);
+        LOCK(csCommitQFinal);
+        for (auto &it : *txCommitQFinal)
+        {
+            CTxCommitData &data = it.second;
+            mempool._addUnchecked(it.first, data.entry, !IsInitialBlockDownload());
+            vWhatChanged.push_back(data.hash);
 
-        // Indicate that this tx was fully processed/accepted and can now be removed from the
-        // request manager.
-        CInv inv(MSG_TX, data.hash);
-        requester.Received(inv, nullptr);
+            // Indicate that this tx was fully processed/accepted and can now be removed from the
+            // request manager.
+            CInv inv(MSG_TX, data.hash);
+            requester.Received(inv, nullptr);
+        }
     }
 
+    {
+        LOCK(csCommitQFinal);
 #ifdef ENABLE_WALLET
-    for (auto &it : *q)
-    {
-        CTxCommitData &data = it.second;
-        SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
-    }
+        for (auto &it : *txCommitQFinal)
+        {
+            CTxCommitData &data = it.second;
+            SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
+        }
 #endif
-    q->clear();
-    delete q;
-
+        txCommitQFinal->clear();
+    }
 
     std::map<uint256, CTxInputData> mapWasDeferred;
     {
