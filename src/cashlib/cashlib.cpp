@@ -499,7 +499,7 @@ SLAPI unsigned int SmGetError(void *smId)
 }
 
 // result must be 32 bytes
-extern "C" void sha256(const unsigned char *data, unsigned int len, unsigned char *result)
+SLAPI void sha256(const unsigned char *data, unsigned int len, unsigned char *result)
 {
     CSHA256 sha;
     sha.Write(data, len);
@@ -508,7 +508,7 @@ extern "C" void sha256(const unsigned char *data, unsigned int len, unsigned cha
 
 
 // result must be 32 bytes
-extern "C" void hash256(const unsigned char *data, unsigned int len, unsigned char *result)
+SLAPI void hash256(const unsigned char *data, unsigned int len, unsigned char *result)
 {
     CHash256 hash;
     hash.Write(data, len);
@@ -517,7 +517,7 @@ extern "C" void hash256(const unsigned char *data, unsigned int len, unsigned ch
 
 
 // result must be 20 bytes
-extern "C" void hash160(const unsigned char *data, unsigned int len, unsigned char *result)
+SLAPI void hash160(const unsigned char *data, unsigned int len, unsigned char *result)
 {
     CHash160 hash;
     hash.Write(data, len);
@@ -1018,24 +1018,22 @@ void RandAddSeedPerfmon()
 
 // Implement in Android by calling into the java SecureRandom implementation.
 // You must provide this Java API
-void GetRandBytes(unsigned char *buf, int num)
+SLAPI int RandomBytes(unsigned char *buf, int num)
 {
     jbyteArray bArray = javaEnv->NewByteArray(num);
     javaEnv->CallStaticVoidMethod(secRandomClass, secRandom, bArray);
     javaEnv->GetByteArrayRegion(bArray, 0, num, (jbyte *)buf);
     javaEnv->DeleteLocalRef(bArray);
-}
-#endif
-
-extern "C" int RandomBytes(unsigned char *buf, int num)
-{
-    GetRandBytes(buf, num);
     return num;
 }
+#define JAVA_ANDROID
 
-#else
+#endif
+#endif
+
+#ifndef JAVA_ANDROID
 /** Return random bytes from cryptographically acceptable random sources */
-extern "C" int RandomBytes(unsigned char *buf, int num)
+SLAPI int RandomBytes(unsigned char *buf, int num)
 {
     if (RAND_bytes(buf, num) != 1)
     {
