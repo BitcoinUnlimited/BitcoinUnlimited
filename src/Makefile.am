@@ -373,6 +373,8 @@ libbitcoincash_a_SOURCES = \
   pubkey.h \
   random.cpp \
   random.h \
+  script/bitfield.cpp \
+  script/bitfield.h \
   script/interpreter.cpp \
   script/interpreter.h \
   script/standard.cpp \

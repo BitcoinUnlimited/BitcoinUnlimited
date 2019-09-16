@@ -137,13 +137,6 @@ bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned i
  */
 bool CheckDataSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags, ScriptError *serror);
 
-/**
- * Check that the signature provided to authentify a transaction is properly
- * encoded Schnorr signature (or null). Signatures passed to the new-mode
- * OP_CHECKMULTISIG and its verify variant must be checked using this function.
- */
-bool CheckTransactionSchnorrSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags, ScriptError *serror);
-
 // WARNING:
 // SIGNATURE_HASH_ERROR represents the special value of uint256(1) that is used by the legacy SignatureHash
 // function to signal errors in calculating the signature hash. This export is ONLY meant to check for the

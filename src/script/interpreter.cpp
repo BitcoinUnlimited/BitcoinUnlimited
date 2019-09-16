@@ -471,15 +471,20 @@ bool CheckDataSignatureEncoding(const valtype &vchSig, uint32_t flags, ScriptErr
     return CheckSignatureEncodingSigHashChoice(vchSig, flags, serror, false);
 }
 
-bool CheckTransactionECDSASignatureEncoding(const valtype &vchSig, uint32_t flags, ScriptError *serror)
+static bool CheckTransactionECDSASignatureEncoding(const valtype &vchSig, uint32_t flags, ScriptError *serror)
 {
-    // Insist that this sig is Schnorr
+    // In an ECDSA-only context, 64-byte signatures + 1 sighash type bit are forbidden since they are Schnorr.
     if (vchSig.size() == 65)
         return set_error(serror, SCRIPT_ERR_SIG_BADLENGTH);
     return CheckSignatureEncodingSigHashChoice(vchSig, flags, serror, true);
 }
 
-bool CheckTransactionSchnorrSignatureEncoding(const valtype &vchSig, uint32_t flags, ScriptError *serror)
+/**
+ * Check that the signature provided to authentify a transaction is properly
+ * encoded Schnorr signature (or null). Signatures passed to the new-mode
+ * OP_CHECKMULTISIG and its verify variant must be checked using this function.
+ */
+static bool CheckTransactionSchnorrSignatureEncoding(const valtype &vchSig, uint32_t flags, ScriptError *serror)
 {
     // Insist that this sig is Schnorr
     if (vchSig.size() != 65)
@@ -1435,7 +1440,7 @@ bool ScriptMachine::Step()
                     nOpCount += nKeysCount;
                     if (nOpCount > maxOps)
                         return set_error(serror, SCRIPT_ERR_OP_COUNT);
-                    int idxTopKey = idxKeyCount + 1; // Was ++i here
+                    int idxTopKey = idxKeyCount + 1;
 
                     // stack depth of nSigsCount
                     const size_t idxSigCount = idxTopKey + nKeysCount;
@@ -1444,20 +1449,10 @@ bool ScriptMachine::Step()
                     {
                         return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                     }
-                    // ikey2 is the position of last non-signature item in the stack. Top stack item = 1.
-                    // With SCRIPT_VERIFY_NULLFAIL, this is used for cleanup if operation fails.
-                    // int ikey2 = nKeysCount + 2;
-                    // i += nKeysCount;
-                    // if ((int)stack.size() < i)
-                    //    return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
 
                     const int nSigsCount = CScriptNum(stacktop(-idxSigCount), fRequireMinimal).getint();
                     if (nSigsCount < 0 || nSigsCount > nKeysCount)
                         return set_error(serror, SCRIPT_ERR_SIG_COUNT);
-                    // int isig = ++i;
-                    // i += nSigsCount;
-                    // if ((int)stack.size() < i)
-                    //    return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
 
                     // stack depth of the top signature
                     const size_t idxTopSig = idxSigCount + 1;
@@ -1473,8 +1468,7 @@ bool ScriptMachine::Step()
                     // Subset of script starting at the most recent codeseparator
                     CScript scriptCode(pbegincodehash, pend);
 
-                    // Assuming success is usually a bad idea, but the
-                    // schnorr path can only succeed.
+                    // Assuming success is usually a bad idea, but the schnorr path can only succeed.
                     bool fSuccess = true;
 
                     if ((flags & SCRIPT_ENABLE_SCHNORR_MULTISIG) && stacktop(-idxDummy).size() != 0)
@@ -1507,8 +1501,9 @@ bool ScriptMachine::Step()
                         {
                             if ((checkBits >> iKey) == 0)
                             {
-                                // This is a sanity check and should be
-                                // unrecheable.
+                                // This is a sanity check and should be unreacheable because we've checked above that
+                                // the number of bits in checkBits == the number of signatures.
+                                // But just in case this check ensures termination of the subsequent while loop.
                                 return set_error(serror, SCRIPT_ERR_INVALID_BIT_RANGE);
                             }
 
@@ -1520,8 +1515,7 @@ bool ScriptMachine::Step()
 
                             if (iKey >= nKeysCount)
                             {
-                                // This is a sanity check and should be
-                                // unrecheable.
+                                // This is a sanity check and should be unreacheable.
                                 return set_error(serror, SCRIPT_ERR_PUBKEY_COUNT);
                             }
 
@@ -1529,8 +1523,7 @@ bool ScriptMachine::Step()
                             valtype &vchSig = stacktop(-idxBottomSig + iSig);
                             valtype &vchPubKey = stacktop(-idxBottomKey + iKey);
 
-                            // Note that only pubkeys associated with a
-                            // signature are checked for validity.
+                            // Note that only pubkeys associated with a signature are checked for validity.
                             if (!CheckTransactionSchnorrSignatureEncoding(vchSig, flags, serror) ||
                                 !CheckPubKeyEncoding(vchPubKey, flags, serror))
                             {
@@ -1541,30 +1534,25 @@ bool ScriptMachine::Step()
                             // Check signature
                             if (!checker.CheckSig(vchSig, vchPubKey, scriptCode))
                             {
-                                // This can fail if the signature is empty,
-                                // which also is a NULLFAIL error as the
-                                // bitfield should have been null in this
-                                // situation.
+                                // This can fail if the signature is empty, which also is a NULLFAIL error as the
+                                // bitfield should have been null in this situation.
                                 return set_error(serror, SCRIPT_ERR_SIG_NULLFAIL);
                             }
                         }
 
                         if ((checkBits >> iKey) != 0)
                         {
-                            // This is a sanity check and should be
-                            // unrecheable.
+                            // This is a sanity check and should be unreacheable.
                             return set_error(serror, SCRIPT_ERR_INVALID_BIT_COUNT);
                         }
                     }
                     else
                     {
                         // LEGACY MULTISIG (ECDSA / NULL)
-                        // A bug causes CHECKMULTISIG to consume one extra
-                        // argument whose contents were not checked in any
-                        // way.
+                        // A bug causes CHECKMULTISIG to consume one extra argument whose contents were not checked in
+                        // any way.
                         //
-                        // Unfortunately this is a potential source of
-                        // mutability, so optionally verify it is exactly
+                        // Unfortunately this is a potential source of mutability, so optionally verify it is exactly
                         // equal to zero.
                         if ((flags & SCRIPT_VERIFY_NULLDUMMY) && stacktop(-idxDummy).size())
                         {
@@ -1585,10 +1573,8 @@ bool ScriptMachine::Step()
                             valtype &vchSig = stacktop(-idxTopSig - (nSigsCount - nSigsRemaining));
                             valtype &vchPubKey = stacktop(-idxTopKey - (nKeysCount - nKeysRemaining));
 
-                            // Note how this makes the exact order of
-                            // pubkey/signature evaluation distinguishable
-                            // by CHECKMULTISIG NOT if the STRICTENC flag is
-                            // set. See the script_(in)valid tests for
+                            // Note how this makes the exact order of pubkey/signature evaluation distinguishable
+                            // by CHECKMULTISIG NOT if the STRICTENC flag is set. See the script_(in)valid tests for
                             // details.
                             if (!CheckTransactionECDSASignatureEncoding(vchSig, flags, serror) ||
                                 !CheckPubKeyEncoding(vchPubKey, flags, serror))
@@ -1606,10 +1592,8 @@ bool ScriptMachine::Step()
                             }
                             nKeysRemaining--;
 
-                            // If there are more signatures left than keys
-                            // left, then too many signatures have failed.
-                            // Exit early, without checking any further
-                            // signatures.
+                            // If there are more signatures left than keys left, then too many signatures have failed.
+                            // Exit early, without checking any further signatures.
                             if (nSigsRemaining > nKeysRemaining)
                             {
                                 fSuccess = false;
@@ -1617,8 +1601,7 @@ bool ScriptMachine::Step()
                         }
                     }
 
-                    // If the operation failed, we require that all
-                    // signatures must be empty vector
+                    // If the operation failed, we require that all signatures must be empty vector
                     if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL))
                     {
                         for (int i = 0; i < nSigsCount; i++)
@@ -1636,17 +1619,16 @@ bool ScriptMachine::Step()
                         popstack(stack);
                     }
 
-                    stack.push_back(fSuccess ? vchTrue : vchFalse);
                     if (opcode == OP_CHECKMULTISIGVERIFY)
                     {
-                        if (fSuccess)
-                        {
-                            popstack(stack);
-                        }
-                        else
+                        if (!fSuccess)
                         {
                             return set_error(serror, SCRIPT_ERR_CHECKMULTISIGVERIFY);
                         }
+                    }
+                    else
+                    {
+                        stack.push_back(fSuccess ? vchTrue : vchFalse);
                     }
                 }
                 break;
