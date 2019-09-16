@@ -1717,20 +1717,19 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
     {
         // determine if string is the height or block hash
         const std::string param0 = params[0].get_str();
-        std::string::const_iterator it = param0.begin();
-        while (it != param0.end())
-        {
-            if (!std::isdigit(*it))
-            {
-                isNumber = false;
-                break;
-            }
-            ++it;
-        }
+        isNumber = (param0.size() <= 20);
         if (isNumber)
         {
-            // if it was a number as a string, convert it to an int
-            height = std::stoi(param0);
+            // if it was a number as a string, try to convert it to an int
+            try
+            {
+                height = std::stoi(param0);
+            }
+            catch (const std::invalid_argument& ia)
+            {
+                throw JSONRPCError(
+                    RPC_INVALID_PARAMETER, strprintf("Invalid argument: %s. Block height %s is not a valid value", ia.what(), param0.c_str()));
+            }
         }
         else
         {
