@@ -542,6 +542,16 @@ public:
     template <typename Lambda>
     void forEachThenClear(const Lambda &f)
     {
+        WRITELOCK(cs);
+        for (CTxMemPool::indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++)
+        {
+            f(*it);
+        }
+        _clear();
+    }
+    template <typename Lambda>
+    void _forEachThenClear(const Lambda &f)
+    {
         AssertWriteLockHeld(cs);
         for (CTxMemPool::indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++)
         {

@@ -2916,7 +2916,7 @@ static void ResubmitTransactions(CBlock &block)
         }
 
         // Resubmit and clear the mempool
-        mempool.forEachThenClear([](const auto &entry) {
+        mempool._forEachThenClear([](const auto &entry) {
             CTxInputData txd;
             txd.tx = entry.GetSharedTx();
             txd.nodeName = "rollback";
