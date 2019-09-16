@@ -243,7 +243,11 @@ std::queue<CTxInputData> txWaitNextBlockQ GUARDED_BY(csTxInQ);
 // Transactions that have been validated and are waiting to be committed into the mempool
 CWaitableCriticalSection csCommitQ;
 CConditionVariable cvCommitQ GUARDED_BY(csCommitQ);
-std::map<uint256, CTxCommitData> *txCommitQ = nullptr;
+std::map<uint256, CTxCommitData> *txCommitQ GUARDED_BY(csCommitQ) = nullptr;
+// Before the transactions are finally commited to the mempool the txCommitQ pointer is copied
+// to txCommitQFinal so that the lock on txCommitQ can be released and processing can continue.
+CCriticalSection csCommitQFinal;
+std::map<uint256, CTxCommitData> *txCommitQFinal GUARDED_BY(csCommitQFinal) = nullptr;
 
 // Control the execution of the parallel tx validation and serial mempool commit phases
 CThreadCorral txProcessingCorral;
