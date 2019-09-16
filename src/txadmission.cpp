@@ -285,6 +285,7 @@ void CommitTxToMempool()
     //
     // We must hold the mempool lock for the duration because we want to be sure that we don't end up
     // doing this loop in the middle of a reorg where we might be clearing the mempool.
+    std::map<uint256, CTxCommitData> *q;
     {
         WRITELOCK(mempool.cs);
         LOCK(csCommitQFinal);
@@ -299,19 +300,21 @@ void CommitTxToMempool()
             CInv inv(MSG_TX, data.hash);
             requester.Received(inv, nullptr);
         }
+
+        // Copy the queue pointer. This is so we avoid a deadlock below when/if we SyncWithWallets()
+        q = txCommitQFinal;
+        txCommitQFinal = new std::map<uint256, CTxCommitData>;
     }
 
-    {
-        LOCK(csCommitQFinal);
 #ifdef ENABLE_WALLET
-        for (auto &it : *txCommitQFinal)
-        {
-            CTxCommitData &data = it.second;
-            SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
-        }
-#endif
-        txCommitQFinal->clear();
+    for (auto &it : *q)
+    {
+        CTxCommitData &data = it.second;
+        SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
     }
+#endif
+    q->clear();
+    delete q;
 
     std::map<uint256, CTxInputData> mapWasDeferred;
     {
