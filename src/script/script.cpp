@@ -274,6 +274,48 @@ const char *GetOpName(opcodetype opcode)
     }
 }
 
+bool CheckMinimalPush(const std::vector<uint8_t> &data, opcodetype opcode)
+{
+    // Excludes OP_1NEGATE, OP_1-16 since they are by definition minimal.
+    // Returns true if the passed code is legal with respect to minimal push
+    // by definition.
+    if (0 <= opcode && opcode <= OP_PUSHDATA4)
+    {
+        return true;
+    }
+    if (data.size() == 0)
+    {
+        // Should have used OP_0.
+        return opcode == OP_0;
+    }
+    else if (data.size() == 1 && data[0] >= 1 && data[0] <= 16)
+    {
+        // Should have used OP_1 .. OP_16.
+        return false;
+    }
+    else if (data.size() == 1 && data[0] == 0x81)
+    {
+        // Should have used OP_1NEGATE.
+        return false;
+    }
+    else if (data.size() <= 75)
+    {
+        // Must have used a direct push (opcode indicating number of bytes pushed + those bytes).
+        return opcode == data.size();
+    }
+    else if (data.size() <= 255)
+    {
+        // Must have used OP_PUSHDATA.
+        return opcode == OP_PUSHDATA1;
+    }
+    else if (data.size() <= 65535)
+    {
+        // Must have used OP_PUSHDATA2.
+        return opcode == OP_PUSHDATA2;
+    }
+    return true;
+}
+
 bool CScriptNum::IsMinimallyEncoded(const std::vector<uint8_t> &vch, const size_t nMaxNumSize)
 {
     if (vch.size() > nMaxNumSize)
