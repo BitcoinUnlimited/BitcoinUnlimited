@@ -1725,10 +1725,10 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
             {
                 height = std::stoi(param0);
             }
-            catch (const std::invalid_argument& ia)
+            catch (const std::invalid_argument &ia)
             {
-                throw JSONRPCError(
-                    RPC_INVALID_PARAMETER, strprintf("Invalid argument: %s. Block height %s is not a valid value", ia.what(), param0.c_str()));
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    strprintf("Invalid argument: %s. Block height %s is not a valid value", ia.what(), param0.c_str()));
             }
         }
         else
