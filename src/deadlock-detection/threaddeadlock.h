@@ -11,7 +11,7 @@
 #include <memory>
 #include <mutex>
 
-#include "locklocation.h"
+#include "lockorder.h"
 #include "utilstrencodings.h"
 
 #ifdef DEBUG_LOCKORDER // this ifdef covers the rest of the file
@@ -51,7 +51,7 @@ struct LockData
     ReadLocksHeld readlocksheld;
     WriteLocksHeld writelocksheld;
     LocksHeldByThread locksheldbythread;
-    SeenLockOrders seenlockorders;
+    CLockOrderTracker ordertracker;
     std::mutex dd_mutex;
 };
 extern LockData lockdata;

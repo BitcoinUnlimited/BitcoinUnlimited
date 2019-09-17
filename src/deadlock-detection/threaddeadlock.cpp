@@ -136,14 +136,6 @@ void potential_deadlock_detected(LockStackEntry now, LockStack &deadlocks, std::
     throw std::logic_error("potential deadlock detected");
 }
 
-void potential_lock_order_issue_detected(std::string thisLock, std::string otherLock)
-{
-    LOGA("POTENTIAL LOCK ORDER ISSUE DETECTED\n");
-    LOGA("This occurred while trying to lock: %s after %s \n", thisLock.c_str(), otherLock.c_str());
-    LOGA("We have previously locked this locks in the reverse order\n");
-    throw std::logic_error("potential lock order issue detected");
-}
-
 bool HasAnyOwners(void *c)
 {
     auto iter = lockdata.writelocksheld.find(c);
@@ -519,49 +511,38 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
     if (lockingRecursively == false)
     {
         // caluclate this locks name
-        std::string lockname = locklocation.GetMutexName();
+        const std::string lockname = locklocation.GetMutexName();
+        std::vector<CLockLocation> heldLocks;
         // get a list of locks we have locked using this threads id
         auto holdingIter = lockdata.locksheldbythread.find(tid);
         if (holdingIter != lockdata.locksheldbythread.end())
         {
             // get the names of those locks
-            std::vector<std::string> nameHeldLocks;
             for (auto &entry : holdingIter->second)
             {
-                std::string entryLockName = entry.second.GetMutexName();
-                nameHeldLocks.push_back(entryLockName);
+                heldLocks.push_back(entry.second);
             }
-            // check for lock ordering issues using the held locks list
-            auto locknameIter = lockdata.seenlockorders.find(lockname);
-            if (locknameIter != lockdata.seenlockorders.end())
+            if (lockdata.ordertracker.CanCheckForConflicts(lockname))
             {
                 // we have seen the lock we are trying to lock before, check ordering
-                for (auto &heldLock : nameHeldLocks)
-                {
-                    if (locknameIter->second.count(heldLock))
-                    {
-                        potential_lock_order_issue_detected(lockname, heldLock);
-                    }
-                }
+                lockdata.ordertracker.CheckForConflict(locklocation, heldLocks, tid);
             }
             else
             {
-                // we have not seen the lock we are trying to lock before, add data for it
-                for (auto &heldLock : nameHeldLocks)
-                {
-                    auto heldLockIter = lockdata.seenlockorders.find(heldLock);
-                    if (heldLockIter != lockdata.seenlockorders.end())
-                    {
-                        // add information about this lock
-                        heldLockIter->second.emplace(lockname);
-                    }
-                }
-                // add a new key to track locks locked after this one
-                lockdata.seenlockorders.emplace(lockname, std::set<std::string>());
+                // we havent seen this lock before, add generic data for it
+                lockdata.ordertracker.AddNewLockInfo(lockname, heldLocks);
             }
+            // track this locks exactly locking order info
+            lockdata.ordertracker.TrackLockOrderHistory(locklocation, heldLocks, tid);
+        }
+        else
+        {
+            // we havent seen this lock before, add generic data for it
+            lockdata.ordertracker.AddNewLockInfo(lockname, heldLocks);
+            // track this locks exactly locking order info
+            lockdata.ordertracker.TrackLockOrderHistory(locklocation, heldLocks, tid);
         }
     }
-
     AddNewLock(now, tid);
     if (lockingRecursively == true)
     {
