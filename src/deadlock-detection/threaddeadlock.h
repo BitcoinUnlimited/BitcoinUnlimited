@@ -14,7 +14,6 @@
 #include <mutex>
 #include <set>
 #include <string>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -34,7 +33,6 @@ enum OwnershipType
 };
 
 #ifdef DEBUG_LOCKORDER // this ifdef covers the rest of the file
-#include <sys/syscall.h>
 #ifdef __linux__
 #include <sys/syscall.h>
 inline uint64_t getTid(void)
