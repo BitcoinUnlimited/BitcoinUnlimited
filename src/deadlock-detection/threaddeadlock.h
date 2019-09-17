@@ -8,29 +8,11 @@
 
 #include <boost/lexical_cast.hpp>
 #include <boost/thread.hpp>
-#include <inttypes.h>
-#include <map>
 #include <memory>
 #include <mutex>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
 
+#include "locklocation.h"
 #include "utilstrencodings.h"
-
-enum LockType
-{
-    RECURSIVE_MUTEX, // CCriticalSection
-    SHARED_MUTEX, // CSharedCriticalSection
-    RECURSIVE_SHARED_MUTEX, // CRecursiveSharedCriticalSection
-};
-
-enum OwnershipType
-{
-    SHARED,
-    EXCLUSIVE
-};
 
 #ifdef DEBUG_LOCKORDER // this ifdef covers the rest of the file
 #ifdef __linux__
@@ -53,69 +35,6 @@ inline uint64_t getTid(void)
     return uint64_t(hasher(std::this_thread::get_id()));
 }
 #endif
-
-struct CLockLocation
-{
-    CLockLocation(const char *pszName,
-        const char *pszFile,
-        int nLine,
-        bool fTryIn,
-        OwnershipType eOwnershipIn,
-        LockType eLockTypeIn)
-    {
-        mutexName = pszName;
-        sourceFile = pszFile;
-        sourceLine = nLine;
-        fTry = fTryIn;
-        eOwnership = eOwnershipIn;
-        eLockType = eLockTypeIn;
-        fWaiting = true;
-    }
-
-    std::string ToString() const
-    {
-        return mutexName + "  " + sourceFile + ":" + std::to_string(sourceLine) + (fTry ? " (TRY)" : "") +
-               (eOwnership == OwnershipType::EXCLUSIVE ? " (EXCLUSIVE)" : "") + (fWaiting ? " (WAITING)" : "");
-    }
-
-    bool GetTry() const { return fTry; }
-    OwnershipType GetExclusive() const { return eOwnership; }
-    bool GetWaiting() const { return fWaiting; }
-    void ChangeWaitingToHeld() { fWaiting = false; }
-    LockType GetLockType() const { return eLockType; }
-    std::string GetFileName() const { return sourceFile; }
-    int GetLineNumber() const { return sourceLine; }
-    std::string GetMutexName() const { return mutexName; }
-private:
-    bool fTry;
-    std::string mutexName;
-    std::string sourceFile;
-    int sourceLine;
-    LockType eLockType;
-    OwnershipType eOwnership; // determines if shared or exclusive ownership, locktype::mutex is always exclusive
-    bool fWaiting; // determines if lock is held or is waiting to be held
-};
-
-// pair ( cs : lock location )
-typedef std::pair<void *, CLockLocation> LockStackEntry;
-typedef std::vector<LockStackEntry> LockStack;
-
-// cs : set of thread ids
-typedef std::map<void *, std::set<uint64_t> > ReadLocksHeld;
-// cs : set of thread ids
-typedef std::map<void *, std::set<uint64_t> > WriteLocksHeld;
-
-// cs : set of thread ids
-typedef std::map<void *, std::set<uint64_t> > ReadLocksWaiting;
-// cs : set of thread ids
-typedef std::map<void *, std::set<uint64_t> > WriteLocksWaiting;
-
-// thread id : vector of locks held (both shared and exclusive, waiting and held)
-typedef std::map<uint64_t, LockStack> LocksHeldByThread;
-
-// tracks the globally seen lock ordering
-// key is lockname, value is vector of locknames that have ever been locked while key was locked
-typedef std::map<std::string, std::set<std::string> > SeenLockOrders;
 
 struct LockData
 {
