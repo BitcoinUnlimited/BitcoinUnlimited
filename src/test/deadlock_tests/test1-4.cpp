@@ -68,6 +68,7 @@ BOOST_AUTO_TEST_CASE(TEST_4)
     CSharedCriticalSection shared_mutex;
     WRITELOCK(shared_mutex);
     BOOST_CHECK_THROW(WRITELOCK(shared_mutex), std::logic_error);
+    lockdata.ordertracker.clear();
 }
 
 #else

@@ -46,6 +46,13 @@ public:
     void TrackLockOrderHistory(const CLockLocation &locklocation,
         const std::vector<CLockLocation> &heldLocks,
         const uint64_t &tid);
+
+    // should only be called in the test suite
+    void clear()
+    {
+        SeenLockOrders.clear();
+        SeenLockLocations.clear();
+    }
 };
 
 #endif // END DEBUG_LOCKORDER

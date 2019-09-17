@@ -69,6 +69,7 @@ BOOST_AUTO_TEST_CASE(TEST_6)
     thread1.join();
     thread2.join();
     BOOST_CHECK(lock_exceptions == 1);
+    lockdata.ordertracker.clear();
 }
 
 #else

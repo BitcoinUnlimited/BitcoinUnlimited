@@ -47,6 +47,7 @@ BOOST_AUTO_TEST_CASE(TEST_10)
     thread1.join();
     std::thread thread2(Thread2);
     thread2.join();
+    lockdata.ordertracker.clear();
 }
 
 #else
