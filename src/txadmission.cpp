@@ -287,7 +287,7 @@ void CommitTxToMempool()
     // doing this loop in the middle of a reorg where we might be clearing the mempool.
     std::map<uint256, CTxCommitData> *q;
     {
-        WRITELOCK(mempool.cs);
+        WRITELOCK(mempool.cs_txmempool);
         LOCK(csCommitQFinal);
         for (auto &it : *txCommitQFinal)
         {

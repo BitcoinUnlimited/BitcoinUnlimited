@@ -1368,7 +1368,7 @@ bool CTxMemPool::addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
 
 bool CTxMemPool::_addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry, bool fCurrentEstimate)
 {
-    AssertWriteLockHeld(cs);
+    AssertWriteLockHeld(cs_txmempool);
     setEntries setAncestors;
     uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
     std::string dummy;

@@ -2901,7 +2901,7 @@ static void ResubmitTransactions(CBlock &block)
     //
     // We must hold the mempool lock throughout otherwise it would be possible for some txns to slip back into
     // the mempool from the csCommitQFinal.
-    WRITELOCK(mempool.cs);
+    WRITELOCK(mempool.cs_txmempool);
     {
         // Resubmit the block first
         for (const auto &ptx : block.vtx)

@@ -552,7 +552,7 @@ public:
     template <typename Lambda>
     void _forEachThenClear(const Lambda &f)
     {
-        AssertWriteLockHeld(cs);
+        AssertWriteLockHeld(cs_txmempool);
         for (CTxMemPool::indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++)
         {
             f(*it);
