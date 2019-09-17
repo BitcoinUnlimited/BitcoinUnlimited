@@ -39,10 +39,8 @@ void CLockOrderTracker::potential_lock_order_issue_detected(const CLockLocation 
             const uint64_t storedTid = std::get<2>(entry);
             if (storedTid != tid)
             {
-                LOGA("Thread with id %" PRIu64
-                     " previously locked %s on %s after locking %s on %s\n",
-                    storedTid, key.first.c_str(), std::get<0>(entry).c_str(), key.second.c_str(),
-                    std::get<1>(entry).c_str());
+                LOGA("Thread with id %" PRIu64 " previously locked %s on %s after locking %s on %s\n", storedTid,
+                    key.first.c_str(), std::get<0>(entry).c_str(), key.second.c_str(), std::get<1>(entry).c_str());
             }
         }
         LOGA("\n\n");

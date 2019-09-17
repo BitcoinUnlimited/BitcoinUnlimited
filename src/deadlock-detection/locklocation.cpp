@@ -28,17 +28,10 @@ std::string CLockLocation::ToString() const
 }
 
 bool CLockLocation::GetTry() const { return fTry; }
-
 OwnershipType CLockLocation::GetExclusive() const { return eOwnership; }
-
 bool CLockLocation::GetWaiting() const { return fWaiting; }
-
 void CLockLocation::ChangeWaitingToHeld() { fWaiting = false; }
-
 LockType CLockLocation::GetLockType() const { return eLockType; }
-
 std::string CLockLocation::GetFileName() const { return sourceFile; }
-
 int CLockLocation::GetLineNumber() const { return sourceLine; }
-
 std::string CLockLocation::GetMutexName() const { return mutexName; }

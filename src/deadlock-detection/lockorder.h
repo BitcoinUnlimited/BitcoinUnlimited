@@ -27,19 +27,25 @@ private:
     std::map<std::string, std::set<std::string> > SeenLockOrders;
     // we track every time a lock ordering has taken place, key is the two locknames
     // value is the lock file+lines respectivly and the id of the thread that locked them
-    std::map<std::pair<std::string, std::string>, std::set<std::tuple<std::string, std::string, uint64_t> > > SeenLockLocations;
+    std::map<std::pair<std::string, std::string>, std::set<std::tuple<std::string, std::string, uint64_t> > >
+        SeenLockLocations;
 
-    void potential_lock_order_issue_detected(const CLockLocation &thisLock, const CLockLocation &otherLock, const uint64_t &tid);
+    void potential_lock_order_issue_detected(const CLockLocation &thisLock,
+        const CLockLocation &otherLock,
+        const uint64_t &tid);
 
 public:
     bool CanCheckForConflicts(const std::string &lockname);
 
-    void CheckForConflict(const CLockLocation &locklocation, const std::vector<CLockLocation> &heldLocks, const uint64_t &tid);
+    void CheckForConflict(const CLockLocation &locklocation,
+        const std::vector<CLockLocation> &heldLocks,
+        const uint64_t &tid);
 
     void AddNewLockInfo(const std::string &lockname, const std::vector<CLockLocation> &heldLocks);
 
-    void TrackLockOrderHistory(const CLockLocation &locklocation, const std::vector<CLockLocation> &heldLocks, const uint64_t &tid);
-
+    void TrackLockOrderHistory(const CLockLocation &locklocation,
+        const std::vector<CLockLocation> &heldLocks,
+        const uint64_t &tid);
 };
 
 #endif // END DEBUG_LOCKORDER

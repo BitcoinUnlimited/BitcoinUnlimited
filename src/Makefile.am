@@ -142,6 +142,9 @@ BITCOIN_CORE_H = \
   core_io.h \
   core_memusage.h \
   cuckoocache.h \
+  deadlock-detection/locklocation.h \
+  deadlock-detection/lockorder.h \
+  deadlock-detection/threaddeadlock.h \
   dosman.h \
   dstencode.h \
   expedited.h \
@@ -200,7 +203,6 @@ BITCOIN_CORE_H = \
   support/cleanse.h \
   support/pagelocker.h \
   sync.h \
-  threaddeadlock.h \
   threadgroup.h \
   threadsafety.h \
   timedata.h \
@@ -507,12 +509,14 @@ libbitcoin_util_a_SOURCES = \
   compat/glibc_sanity.cpp \
   compat/glibcxx_sanity.cpp \
   compat/strnlen.cpp \
+  deadlock-detection/locklocation.cpp \
+  deadlock-detection/lockorder.cpp \  
+  deadlock-detection/threaddeadlock.cpp \
   fs.cpp \
   random.cpp \
   rpc/protocol.cpp \
   support/cleanse.cpp \
   sync.cpp \
-  threaddeadlock.cpp \
   ui_interface.cpp \
   util.cpp \
   utilmoneystr.cpp \
