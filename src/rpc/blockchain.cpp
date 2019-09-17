@@ -1879,32 +1879,32 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
     UniValue feerates_res(UniValue::VARR);
     for (int64_t i = 0; i < NUM_GETBLOCKSTATS_PERCENTILES; i++)
     {
-        feerates_res.push_back(feerate_percentiles[i]);
+        feerates_res.push_back(ValueFromAmount(feerate_percentiles[i]));
     }
 
     UniValue ret_all(UniValue::VOBJ);
-    ret_all.pushKV("avgfee", (block.vtx.size() > 1) ? totalfee / (block.vtx.size() - 1) : 0);
-    ret_all.pushKV("avgfeerate", total_size ? totalfee / total_size : 0); // Unit: sat/byte
+    ret_all.pushKV("avgfee", ValueFromAmount((block.vtx.size() > 1) ? totalfee / (block.vtx.size() - 1) : 0));
+    ret_all.pushKV("avgfeerate", ValueFromAmount(total_size ? totalfee / total_size : 0)); // Unit: sat/byte
     ret_all.pushKV("avgtxsize", (block.vtx.size() > 1) ? total_size / (block.vtx.size() - 1) : 0);
     ret_all.pushKV("blockhash", pindex->GetBlockHash().GetHex());
     ret_all.pushKV("feerate_percentiles", feerates_res);
     ret_all.pushKV("height", (int64_t)pindex->nHeight);
     ret_all.pushKV("ins", inputs);
-    ret_all.pushKV("maxfee", maxfee);
-    ret_all.pushKV("maxfeerate", maxfeerate);
+    ret_all.pushKV("maxfee", ValueFromAmount(maxfee));
+    ret_all.pushKV("maxfeerate", ValueFromAmount(maxfeerate));
     ret_all.pushKV("maxtxsize", maxtxsize);
-    ret_all.pushKV("medianfee", CalculateTruncatedMedian(fee_array));
+    ret_all.pushKV("medianfee", ValueFromAmount(CalculateTruncatedMedian(fee_array)));
     ret_all.pushKV("mediantime", pindex->GetMedianTimePast());
     ret_all.pushKV("mediantxsize", CalculateTruncatedMedian(txsize_array));
-    ret_all.pushKV("minfee", (minfee == MAX_MONEY) ? 0 : minfee);
-    ret_all.pushKV("minfeerate", (minfeerate == MAX_MONEY) ? 0 : minfeerate);
+    ret_all.pushKV("minfee", ValueFromAmount((minfee == MAX_MONEY) ? 0 : minfee));
+    ret_all.pushKV("minfeerate", ValueFromAmount((minfeerate == MAX_MONEY) ? 0 : minfeerate));
     ret_all.pushKV("mintxsize", mintxsize == std::numeric_limits<int64_t>::max() ? 0 : mintxsize);
     ret_all.pushKV("outs", outputs);
-    ret_all.pushKV("subsidy", GetBlockSubsidy(pindex->nHeight, Params().GetConsensus()));
+    ret_all.pushKV("subsidy", ValueFromAmount(GetBlockSubsidy(pindex->nHeight, Params().GetConsensus())));
     ret_all.pushKV("time", pindex->GetBlockTime());
-    ret_all.pushKV("total_out", total_out);
+    ret_all.pushKV("total_out", ValueFromAmount(total_out));
     ret_all.pushKV("total_size", total_size);
-    ret_all.pushKV("totalfee", totalfee);
+    ret_all.pushKV("totalfee", ValueFromAmount(totalfee));
     ret_all.pushKV("txs", (int64_t)block.vtx.size());
     ret_all.pushKV("utxo_increase", outputs - inputs);
     ret_all.pushKV("utxo_size_inc", utxo_size_inc);
