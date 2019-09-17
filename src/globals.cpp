@@ -32,7 +32,7 @@
 #include "rpc/server.h"
 #include "script/standard.h"
 #include "stat.h"
-#include "threaddeadlock.h"
+#include "sync.h"
 #include "timedata.h"
 #include "tinyformat.h"
 #include "tweak.h"
