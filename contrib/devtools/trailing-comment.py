@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Searches for all instances of trailing single line comments where the total line
 length exceeds the provided line length, and converts to a separate comment line
@@ -26,15 +26,15 @@ def main(files, cutoff,verbose=False):
         files.append(sys.stdin)
     for f in files:
         changed = False
-        if type(f) in types.StringTypes:
+        if isinstance(f, str):
             fo = open(f,"r")
             if verbose:
                 print("Processing %s" % f)
         else:
             fo = f
             verbose = False # if using stdin/stdout, don't clutter it with logging
-            
-        lines = fo.readlines()      
+
+        lines = fo.readlines()
         output = []
         for line in lines:
             #print len(line), "//" in line, line
@@ -42,10 +42,9 @@ def main(files, cutoff,verbose=False):
             if len(line) > cutoff and "//" in line:
                 try:
                     (code, comment) = line.rsplit("//",1)
-                except ValueError:
-                    print line
-                    pdb.set_trace()
-                # If there is a quote both the code and the comment, the // is likely in a comment    
+                except ValueError as e:
+                    print("Unhandled error %s at %s" % (str(e), str(line)))
+                # If there is a quote both the code and the comment, the // is likely in a comment
                 if comment.count('"')%2==1 and code.count('"')%2==1:
                     print("Warning, this line is weird, not touching...")
                     print(line)
@@ -70,9 +69,9 @@ def main(files, cutoff,verbose=False):
                     output.append(line)
             else:
                 output.append(line)
-        if type(f) in types.StringTypes:
+        if isinstance(f, str):
             if changed:
-                print("%s changed" % f)        
+                print("%s changed" % f)
                 fo = open(f,"w")
                 fo.writelines(output)
         else:

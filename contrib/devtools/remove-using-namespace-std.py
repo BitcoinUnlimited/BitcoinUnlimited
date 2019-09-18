@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 This tool eliminates the need for "using namespace std" from c++ files by
 prepending "std::" in front of all standard library types
@@ -127,17 +127,17 @@ def remove_includes_comments_and_strings(string):
 		if match.group(3) is not None:
 			comments.append(match.group(3))
 			return commentTemp # return the temp comment string
-			
+
 		# if the 2nd group (capturing quoted string) is not None,
 		# it means we have captured a quoted string.
 		elif match.group(2) is not None:
 			strings.append(match.group(2))
 			return stringTemp # return the temp string string
-			
+
 		else: # otherwise, we will return the 1st group
 			includes.append(match.group(1))
 			return includeTemp # return the temp include string
-			
+
 	return regex.sub(_replacer, string)
 
 # Replaces comments one-at-a-time in the order we stored them during initial replacement
@@ -165,29 +165,29 @@ if __name__ == "__main__":
 		callback_strings.v=iter(strings)
 		comments[:] = []
 		callback_comments.v=iter(comments)
-		
+
 		# Read in file content as one string
 		file = open(filename, mode='r').read()
-		
+
 		# Remove comments, strings, and includes as we don't want to
 		# replace std:: types within these areas
 		noComment = remove_includes_comments_and_strings(file)
-		
+
 		# Before we continue with replacement, and while all the comments and
 		# strings are removed, check to make sure the `using namespace std` line
 		# is actually in this code file.  If it is not then changing the
 		# keywords to std:: is changing the definition of working non-std
 		# references, which isn't what we want.
 		if re.search(usingNamespace, noComment) is None:
-			print 'SKIPPED:  %s' % filename
+			print('SKIPPED:  %s' % filename)
 			continue
-		
+
 		# Now perform std:: replacement
 		replaced = re.sub(keywords, replacement, noComment)
-		
+
 		# Also remove the `using namespace std;` line
 		replacedNamespace = re.sub(usingNamespace, "", replaced)
-		
+
 		# Now we need to restore the comments and strings
 		reComment = re.sub(commentTemp, callback_comments, replacedNamespace)
 		reString =  re.sub(stringTemp, callback_strings, reComment)
@@ -197,4 +197,4 @@ if __name__ == "__main__":
 		with open(filename, mode='w') as f:
 			f.seek(0)
 			f.write(reInclude)
-		print 'COMPLETE: %s' % filename
+		print('COMPLETE: %s' % filename)
