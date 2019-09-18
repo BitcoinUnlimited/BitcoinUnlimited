@@ -12,6 +12,8 @@
 
 #include <boost/filesystem.hpp>
 
+constexpr char ELECTRSCASH_BIN[] = "electrscash";
+
 static std::string monitoring_port() { return GetArg("-electrum.monitoring.port", "4224"); }
 static std::string monitoring_host() { return GetArg("-electrum.monitoring.host", "127.0.0.1"); }
 static std::string rpc_host() { return GetArg("-electrum.host", "127.0.0.1"); }
@@ -63,7 +65,7 @@ std::string electrs_path()
     boost::filesystem::path bitcoind_dir(this_process_path());
     bitcoind_dir = bitcoind_dir.remove_filename();
 
-    auto default_path = bitcoind_dir / "electrs";
+    auto default_path = bitcoind_dir / ELECTRSCASH_BIN;
     const std::string path = GetArg("-electrum.exec", default_path.string());
 
     if (path.empty())
@@ -108,12 +110,12 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
     args.push_back("--jsonrpc-import");
 
     // Where to store electrs database files.
-    const std::string defaultDir = (GetDataDir() / "electrs").string();
+    const std::string defaultDir = (GetDataDir() / ELECTRSCASH_BIN).string();
     args.push_back("--db-dir=" + GetArg("-electrum.dir", defaultDir));
 
     // Tell electrs what network we're on
     const std::map<std::string, std::string> netmapping = {
-        {"main", "mainnet"}, {"test", "testnet"}, {"regtest", "regtest"}};
+        {"main", "bitcoin"}, {"test", "testnet"}, {"regtest", "regtest"}};
     if (!netmapping.count(network))
     {
         std::stringstream ss;

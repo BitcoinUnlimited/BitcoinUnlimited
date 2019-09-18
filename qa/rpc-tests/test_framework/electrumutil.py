@@ -12,7 +12,7 @@ def compare(node, key, expected, is_debug_data = False):
     info = node.getelectruminfo()
     if is_debug_data:
         info = info['debuginfo']
-        key = "electrs_" + key
+        key = "electrscash_" + key
     logging.debug("expecting %s == %s from %s", key, expected, info)
     if key not in info:
         return False
@@ -27,8 +27,9 @@ def bitcoind_electrum_args():
             "-electrum.monitoring.port=" + str(random.randint(40000, 60000))]
 
 class ElectrumConnection:
-    def __init__(self):
+    def __init__(self, timeout_seconds = 60.0):
         self.s = socket.create_connection(("127.0.0.1", ELECTRUM_PORT))
+        self.s.settimeout(timeout_seconds)
         self.f = self.s.makefile('r')
         self.id = 0
 
