@@ -4,13 +4,15 @@ import logging
 import os
 import sys
 import shutil
-GIT_REPO = "https://github.com/BitcoinUnlimited/electrs.git"
-GIT_BRANCH = "v0.7.0bu"
-EXPECT_HEAD = "8e1734d5d54339cc469ea6230b0e02395f2ab82d"
+PROJECT_NAME = "ElectrsCash"
+GIT_REPO = "https://github.com/BitcoinUnlimited/{}.git".format(PROJECT_NAME)
+GIT_BRANCH = "v1.0.0"
+EXPECT_HEAD = "aa95d64d050c286356dadb78d19c2e687dec85cf"
 
 ROOT_DIR = os.path.realpath(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
-ELECTRS_DIR = os.path.join(ROOT_DIR, "electrs")
+ELECTRS_DIR = os.path.join(ROOT_DIR, PROJECT_NAME)
+ELECTRS_BIN = "electrscash"
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--allow-modified', help='Allow building modified/dirty repo',
@@ -47,7 +49,7 @@ def check_dependencies():
 
     import shutil
     if shutil.which("cargo") is None:
-        logging.error("Cannot find 'cargo', will not be able to build electrs")
+        logging.error("Cannot find 'cargo', will not be able to build {}".format(PROJECT_NAME))
         logging.error("You need to install rust (1.28+) https://rustup.rs/")
         bail("rust not found")
 
@@ -63,13 +65,13 @@ def verify_repo(allow_modified):
     import git
     repo = git.Repo(ELECTRS_DIR)
     if repo.is_dirty():
-        logging.error("Validation failed - electrs has local modifications.")
+        logging.error("Validation failed - %s has local modifications.", ELECTRS_DIR)
         allow_modified or bail("Bailing")
 
     if repo.head.object.hexsha != EXPECT_HEAD:
         # TODO: Add command line option to reset HEAD to GIT_BRANCH at EXPECT_HEAD
-        logging.error("Validation failed - electrs HEAD differs from expected (%s vs %s)",
-                repo.head.object.hexsha, EXPECT_HEAD)
+        logging.error("Validation failed - %s HEAD differs from expected (%s vs %s)",
+                PROJECT_NAME, repo.head.object.hexsha, EXPECT_HEAD)
         allow_modified or bail("Bailing")
 
 def output_reader(pipe, queue):
@@ -113,8 +115,13 @@ def get_target(makefile_target):
             'x86_64-pc-linux-gnu' : 'x86_64-unknown-linux-gnu',
             'i686-pc-linux-gnu' : 'i686-unknown-linux-gnu'
     }
+
     if makefile_target in target_map:
         return target_map[makefile_target]
+
+    if makefile_target in target_map.values():
+        return makefile_target
+
     logging.warn("Target %s is not mapped, passing it rust and hoping it works"
             % makefile_target)
     return makefile_target
@@ -129,7 +136,7 @@ verify_repo(args.allow_modified)
 cargo_run(["build", "--verbose", "--locked", "--release", "--target=%s" % get_target(args.target)])
 cargo_run(["test", "--verbose", "--locked", "--release", "--target=%s" % get_target(args.target)])
 
-src = os.path.join(ELECTRS_DIR, "target", get_target(args.target), "release", "electrs")
+src = os.path.join(ELECTRS_DIR, "target", get_target(args.target), "release", ELECTRS_BIN)
 logging.info("Copying %s to %s", src, args.dst)
 shutil.copy(src, args.dst)
 

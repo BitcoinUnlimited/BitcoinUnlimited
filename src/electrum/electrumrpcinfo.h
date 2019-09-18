@@ -9,7 +9,7 @@
 
 namespace electrum
 {
-static constexpr const char *INDEX_HEIGHT_KEY = "electrs_index_height";
+static constexpr const char *INDEX_HEIGHT_KEY = "electrscash_index_height";
 class ElectrumRPCInfo
 {
 public:
