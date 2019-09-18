@@ -118,7 +118,7 @@ matrix:
       env:
         - CXX=g++ CC=gcc
         - HOST=x86_64-unknown-linux-gnu
-        - DOCKER_NAME_TAG=centos:latest
+        - DOCKER_NAME_TAG=centos:7.6
         - DIST=RPM
         - DEP_OPTS="ALLOW_HOST_PACKAGES=1"
         - PACKAGES="libtool libevent-devel autoconf automake openssl-devel python36u libdb4-devel libdb4-cxx-devel devtoolset-7-gcc* miniupnpc-devel zeromq-devel"
