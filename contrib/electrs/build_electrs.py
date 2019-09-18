@@ -23,6 +23,7 @@ parser.add_argument('--dst', help='Where to copy produced binary',
     default=os.path.join(ROOT_DIR, "src"))
 parser.add_argument('--target', help='Target platform (e.g. x86_64-pc-linux-gnu)',
     default="x86_64-unknown-linux-gnu")
+parser.add_argument('--debug', help="Do a debug build", action = "store_true")
 args = parser.parse_args()
 
 level = logging.DEBUG if args.verbose else logging.INFO
@@ -133,10 +134,21 @@ if not os.path.exists(ELECTRS_DIR):
     clone_repo()
 verify_repo(args.allow_modified)
 
-cargo_run(["build", "--verbose", "--locked", "--release", "--target=%s" % get_target(args.target)])
-cargo_run(["test", "--verbose", "--locked", "--release", "--target=%s" % get_target(args.target)])
+def build_flags(debug, target):
+    flags = ["--target={}".format(get_target(target))]
+    if debug:
+        return flags
+    return flags + ["--release"]
 
-src = os.path.join(ELECTRS_DIR, "target", get_target(args.target), "release", ELECTRS_BIN)
+cargo_run(["build", "--verbose", "--locked"] + build_flags(args.debug, args.target))
+cargo_run(["test", "--verbose", "--locked"] + build_flags(args.debug, args.target))
+
+def build_dir(debug):
+    if debug:
+        return "debug"
+    return "release"
+
+src = os.path.join(ELECTRS_DIR, "target", get_target(args.target), build_dir(args.debug), ELECTRS_BIN)
 logging.info("Copying %s to %s", src, args.dst)
 shutil.copy(src, args.dst)
 
