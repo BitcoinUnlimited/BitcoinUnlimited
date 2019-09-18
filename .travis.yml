@@ -98,13 +98,13 @@ matrix:
         - DEP_OPTS="NO_QT=1" RUN_TESTS=true GOAL="install"
         - BITCOIN_CONFIG="--enable-zmq --enable-glibc-back-compat --enable-reduce-exports LDFLAGS=-static-libstdc++"
         - USE_SHELL="/bin/dash"
-    #x86_64 Linux + deps as via system lib
+    #x86_64 Linux, No wallet (uses qt5 dev package instead of depends Qt to speed up build and avoid timeout)
     - compiler: gcc
       env:
         - CXX=g++ CC=gcc
         - HOST=x86_64-unknown-linux-gnu
-        - PACKAGES="python3-zmq libzmq3-dev qttools5-dev-tools qttools5-dev libssl1.0-dev libevent-dev bsdmainutils libboost-system-dev libboost-program-options-dev libboost-filesystem-dev libboost-chrono-dev libboost-test-dev libboost-thread-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libprotobuf-dev protobuf-compiler libqrencode-dev"
-        - NODEPENDS=true
+        - PACKAGES="python3 qtbase5-dev qttools5-dev-tools protobuf-compiler libdbus-1-dev libharfbuzz-dev libprotobuf-dev libdb5.3++-dev"
+        - DEP_OPTS="NO_WALLET=1 NO_QT=1 ALLOW_HOST_PACKAGES=1"
         - RUN_TESTS=true GOAL="install" BITCOIN_CONFIG="--enable-debug --with-incompatible-bdb --with-gui=qt5 --enable-glibc-back-compat --enable-reduce-exports"
     #Cross-Mac
     - compiler: gcc
@@ -121,7 +121,7 @@ matrix:
         - DOCKER_NAME_TAG=centos:latest
         - DIST=RPM
         - DEP_OPTS="ALLOW_HOST_PACKAGES=1"
-        - PACKAGES="libtool libevent-devel autoconf automake openssl-devel python36u libdb4-devel libdb4-cxx-devel devtoolset-6-gcc* miniupnpc-devel zeromq-devel"
+        - PACKAGES="libtool libevent-devel autoconf automake openssl-devel python36u libdb4-devel libdb4-cxx-devel devtoolset-7-gcc* miniupnpc-devel zeromq-devel"
         - RUN_TESTS=false GOAL="install"
         - BITCOIN_CONFIG="--enable-zmq --with-gui=no --disable-bench"
         - NODEPENDS=true
@@ -136,7 +136,7 @@ script:
     - export CONTINUE=1
     - if [ $SECONDS -gt 1980 ]; then export CONTINUE=0; fi  # Likely the depends build took very long
     - if [ $CONTINUE = "1" ]; then set -o errexit; source .travis/script_a.sh; else set +o errexit; echo "$CACHE_ERR_MSG"; false; fi
-    - if [ $SECONDS -gt 2300 -a "$RUN_TESTS"="true" ]; then export CONTINUE=0; echo "$SECONDS"; fi  # Likely the build took very long
+    - if [ $SECONDS -gt 2000 -a "$RUN_TESTS"="true"]; then export CONTINUE=0; fi  # Likely the build took very long
     - if [ $CONTINUE = "1" ]; then set -o errexit; source .travis/script_b.sh; else set +o errexit; echo "$CACHE_ERR_MSG"; false; fi
 
 after_script:

@@ -35,7 +35,7 @@ if [ $DIST = "RPM" ]; then
   travis_retry DOCKER_EXEC yum install -y centos-release-scl
   travis_retry DOCKER_EXEC yum install -y $PACKAGES $DOCKER_PACKAGES
   # this is temporary until the default compiler on centos/rhel supports c++14
-  travis_retry DOCKER_EXEC scl enable devtoolset-6 bash
+  travis_retry DOCKER_EXEC scl enable devtoolset-7 bash
 fi
 if [ $RUN_FORMATTING_CHECK = "true" ]; then
   curl --location $LINTER_DEB_URL/libllvm3.8_3.8.1-27ubuntu1_amd64.deb -o llvm-3.8.deb;
