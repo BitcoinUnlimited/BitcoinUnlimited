@@ -27,6 +27,7 @@ env:
     - PYTHON_DEBUG=1
     - WINEDEBUG=fixme-all
     - DOCKER_PACKAGES="build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git ca-certificates ccache python3"
+    - DOCKER_PACKAGES_RPM="build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git ca-certificates ccache"
     - DIST=DEB
     - CACHE_ERR_MSG="Error! Initial build successful, but not enough time remains to run later build stages and tests. Please manually re-run this job by using the travis restart button or asking a bitcoin maintainer to restart.  The next run should not time out because the build cache has been saved."
 
@@ -118,10 +119,10 @@ matrix:
       env:
         - CXX=g++ CC=gcc
         - HOST=x86_64-unknown-linux-gnu
-        - DOCKER_NAME_TAG=centos:latest
+        - DOCKER_NAME_TAG=centos:7.6.1810
         - DIST=RPM
         - DEP_OPTS="ALLOW_HOST_PACKAGES=1"
-        - PACKAGES="libtool libevent-devel autoconf automake openssl-devel python36u libdb4-devel libdb4-cxx-devel devtoolset-6-gcc* miniupnpc-devel zeromq-devel"
+        - PACKAGES="libtool libevent-devel autoconf automake openssl-devel python36u libdb4-devel libdb4-cxx-devel devtoolset-7-gcc* miniupnpc-devel zeromq-devel"
         - RUN_TESTS=false GOAL="install"
         - BITCOIN_CONFIG="--enable-zmq --with-gui=no --disable-bench"
         - NODEPENDS=true
