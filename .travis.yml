@@ -27,6 +27,7 @@ env:
     - PYTHON_DEBUG=1
     - WINEDEBUG=fixme-all
     - DOCKER_PACKAGES="build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git ca-certificates ccache python3"
+    - DOCKER_PACKAGES_RPM="build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git ca-certificates ccache"
     - DIST=DEB
     - CACHE_ERR_MSG="Error! Initial build successful, but not enough time remains to run later build stages and tests. Please manually re-run this job by using the travis restart button or asking a bitcoin maintainer to restart.  The next run should not time out because the build cache has been saved."
 

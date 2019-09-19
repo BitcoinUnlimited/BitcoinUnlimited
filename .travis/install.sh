@@ -33,7 +33,7 @@ if [ $DIST = "RPM" ]; then
   travis_retry DOCKER_EXEC yum install -y boost166-devel
   # this is temporary until the default compiler on centos/rhel supports c++14
   travis_retry DOCKER_EXEC yum install -y centos-release-scl
-  travis_retry DOCKER_EXEC yum install -y $PACKAGES $DOCKER_PACKAGES
+  travis_retry DOCKER_EXEC yum install -y $PACKAGES $DOCKER_PACKAGES_RPM
   # this is temporary until the default compiler on centos/rhel supports c++14
   travis_retry DOCKER_EXEC scl enable devtoolset-6 bash
 fi
