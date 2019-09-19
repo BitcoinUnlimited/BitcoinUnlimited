@@ -6,6 +6,8 @@
 #include "lockorder.h"
 #include "util.h"
 
+#ifdef DEBUG_LOCKORDER // this ifdef covers the rest of the file
+
 void CLockOrderTracker::potential_lock_order_issue_detected(const CLockLocation &thisLock,
     const CLockLocation &otherLock,
     const uint64_t &tid)
@@ -119,3 +121,5 @@ void CLockOrderTracker::TrackLockOrderHistory(const CLockLocation &locklocation,
         }
     }
 }
+
+#endif // end DEBUG_LOCKORDER

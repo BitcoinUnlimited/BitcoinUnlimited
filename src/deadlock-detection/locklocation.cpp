@@ -5,6 +5,8 @@
 
 #include "locklocation.h"
 
+#ifdef DEBUG_LOCKORDER // this ifdef covers the rest of the file
+
 CLockLocation::CLockLocation(const char *pszName,
     const char *pszFile,
     int nLine,
@@ -35,3 +37,4 @@ LockType CLockLocation::GetLockType() const { return eLockType; }
 std::string CLockLocation::GetFileName() const { return sourceFile; }
 int CLockLocation::GetLineNumber() const { return sourceLine; }
 std::string CLockLocation::GetMutexName() const { return mutexName; }
+#endif // end DEBUG_LOCKORDER

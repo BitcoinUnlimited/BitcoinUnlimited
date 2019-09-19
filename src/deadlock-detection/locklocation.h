@@ -26,6 +26,8 @@ enum OwnershipType
     EXCLUSIVE
 };
 
+#ifdef DEBUG_LOCKORDER // this ifdef covers the rest of the file
+
 struct CLockLocation
 {
     CLockLocation(const char *pszName,
@@ -72,5 +74,7 @@ typedef std::map<void *, std::set<uint64_t> > WriteLocksWaiting;
 
 // thread id : vector of locks held (both shared and exclusive, waiting and held)
 typedef std::map<uint64_t, LockStack> LocksHeldByThread;
+
+#endif // end DEBUG_LOCKORDER
 
 #endif
