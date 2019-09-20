@@ -29,6 +29,7 @@
 #include "ui_interface.h"
 #include "unlimited.h"
 #include "utilstrencodings.h"
+#include "xversionkeys.h"
 
 extern CTweak<bool> ignoreNetTimeouts;
 
@@ -75,6 +76,7 @@ extern CTweak<bool> ignoreNetTimeouts;
 
 extern std::atomic<bool> fRescan;
 extern bool fReindex;
+extern CTxMemPool mempool;
 
 bool ShutdownRequested();
 
@@ -2664,7 +2666,7 @@ void NetCleanup()
 }
 
 
-void RelayTransaction(const CTransactionRef &ptx, const bool fRespend)
+void RelayTransaction(const CTransactionRef &ptx, const bool fRespend, const CTxProperties *txProperties)
 {
     if (ptx->GetTxSize() > maxTxSize.Value())
     {
@@ -2687,10 +2689,17 @@ void RelayTransaction(const CTransactionRef &ptx, const bool fRespend)
         mapRelay.insert(std::make_pair(inv, ptx));
         vRelayExpiration.push_back(std::make_pair(GetTime() + 15 * 60, inv));
     }
+
     LOCK(cs_vNodes);
     for (CNode *pnode : vNodes)
     {
         if (!pnode->fRelayTxes)
+        {
+            continue;
+        }
+        // If the transaction won't be acceptable to the target node, then don't send it.  This avoids poisoning
+        // the node against this tx (via the node's alreadyHave() logic), so that it can be sent later.
+        if (txProperties && (!pnode->IsTxAcceptable(*txProperties)))
         {
             continue;
         }
@@ -3214,6 +3223,29 @@ void CNode::DisconnectIfBanned()
             dosMan.Ban(addr, BanReasonNodeMisbehaving);
         }
     }
+}
+
+void CNode::ReadConfigFromXVersion()
+{
+    skipChecksum = (xVersion.as_u64c(XVer::BU_MSG_IGNORE_CHECKSUM) == 1);
+    if (addrFromPort == 0)
+    {
+        addrFromPort = xVersion.as_u64c(XVer::BU_LISTEN_PORT) & 0xffff;
+    }
+
+    uint64_t num = xVersion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT);
+    if (num)
+        nLimitAncestorCount = num; // num == 0 means the field was not provided.
+    num = xVersion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT);
+    if (num)
+        nLimitAncestorSize = num;
+
+    num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT);
+    if (num)
+        nLimitDescendantCount = num;
+    num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT);
+    if (num)
+        nLimitDescendantSize = num;
 }
 
 

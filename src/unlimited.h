@@ -17,6 +17,7 @@
 #include "script/script_error.h"
 #include "stat.h"
 #include "tweak.h"
+#include "txmempool.h"
 #include "univalue/include/univalue.h"
 #include "validation/forks.h"
 
@@ -75,6 +76,11 @@ extern uint64_t maxGeneratedBlock;
 extern uint64_t excessiveBlockSize;
 extern unsigned int excessiveAcceptDepth;
 extern unsigned int maxMessageSizeMultiplier;
+
+/** This function searches the mempool for transactions that are recently acceptable into the mempools of other
+nodes and forwards any found to those nodes.
+*/
+void ForwardAcceptableTransactions(const std::vector<CTxChange> &changeSet);
 
 // Fork configuration
 /** This specifies the MTP time of the next fork */
@@ -279,6 +285,7 @@ extern CTweak<unsigned int> maxTxSize;
 extern CTweak<uint64_t> blockSigopsPerMb;
 extern CTweak<uint64_t> coinbaseReserve;
 extern CTweak<uint64_t> blockMiningSigopsPerMb;
+extern CTweak<unsigned int> unconfPushAction;
 
 extern std::list<CStatBase *> mallocedStats;
 

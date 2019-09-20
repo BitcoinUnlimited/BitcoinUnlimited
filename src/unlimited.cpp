@@ -784,6 +784,59 @@ void GenerateBitcoins(bool fGenerate, int nThreads, const CChainParams &chainpar
         minerThreads->create_thread(boost::bind(&BitcoinMiner, boost::cref(chainparams)));
 }
 
+/** This function searches the mempool for transactions that are recently acceptable into the mempools of other
+nodes and forwards any found to those nodes.
+*/
+void ForwardAcceptableTransactions(const std::vector<CTxChange> &changeSet)
+{
+    // Start by grabbing node refs to minimize the time that the list is locked.
+    std::vector<CNodeRef> nodes;
+    nodes.reserve(vNodes.size());
+
+    {
+        LOCK(cs_vNodes);
+
+        for (CNode *pNode : vNodes)
+        {
+            if (pNode)
+                nodes.push_back(CNodeRef(pNode));
+        }
+    }
+
+    LOG(MEMPOOL | NET, "Check %d TX applicability to %d nodes\n", changeSet.size(), nodes.size());
+    for (auto &txc : changeSet)
+    {
+        LOG(MEMPOOL | NET, "%s: A:%d->%d, D:%d->%d, AS:%d->%d, DS:%d->%d\n", txc.tx->GetHash().ToString(),
+            txc.prior.countWithAncestors, txc.now.countWithAncestors, txc.prior.countWithDescendants,
+            txc.now.countWithDescendants, txc.prior.sizeWithAncestors, txc.now.sizeWithAncestors,
+            txc.prior.sizeWithDescendants, txc.now.sizeWithDescendants);
+    }
+    // Iterate through all changed transactions and all nodes to see if the tx crosses the nodes reject/accept boundary
+    for (auto &txc : changeSet)
+    {
+        for (auto &node : nodes)
+        {
+            if (!node->IsTxAcceptable(txc.prior))
+            {
+                if (node->IsTxAcceptable(txc.now))
+                {
+                    // forward this tx to this node
+                    LOG(MEMPOOL | NET, "TX %s is now acceptable to node %s\n", txc.tx->GetHash().ToString(),
+                        node->GetLogName());
+                    if (unconfPushAction.Value() == 2)
+                        node->PushMessage(NetMsgType::TX, *(txc.tx));
+                    else if (unconfPushAction.Value() == 1)
+                    {
+                        // I may have relayed this INV to this node before it was willing to accept it so "force" push
+                        // this INV -- that is, ignore the bloom filter that stops repeat INVs
+                        node->PushInventory(CInv(MSG_TX, txc.tx->GetHash()), true);
+                    }
+                }
+            }
+        }
+    }
+}
+
 // RPC read mining status
 UniValue getgenerate(const UniValue &params, bool fHelp)
 {

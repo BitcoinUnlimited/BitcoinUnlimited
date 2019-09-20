@@ -578,6 +578,17 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         xver.set_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED, grapheneMinVersionSupported.Value());
         xver.set_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF, grapheneFastFilterCompatibility.Value());
         xver.set_u64c(XVer::BU_XTHIN_VERSION, 2); // xthin version
+
+        size_t nLimitAncestors = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
+        size_t nLimitAncestorSize = GetArg("-limitancestorsize", BU_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
+        size_t nLimitDescendants = GetArg("-limitdescendantcount", BU_DEFAULT_DESCENDANT_LIMIT);
+        size_t nLimitDescendantSize = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
+
+        xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT, nLimitAncestors);
+        xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT, nLimitAncestorSize);
+        xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT, nLimitDescendants);
+        xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT, nLimitDescendantSize);
+
         pfrom->PushMessage(NetMsgType::XVERSION, xver);
 
 
@@ -655,17 +666,15 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 ConnectionStateOutgoing::ANY, pfrom))
             return false;
         vRecv >> pfrom->xVersion;
-        pfrom->skipChecksum = (pfrom->xVersion.as_u64c(XVer::BU_MSG_IGNORE_CHECKSUM) == 1);
-        if (pfrom->addrFromPort == 0)
-        {
-            pfrom->addrFromPort = pfrom->xVersion.as_u64c(XVer::BU_LISTEN_PORT) & 0xffff;
-        }
-        else
+
+        if (pfrom->addrFromPort != 0)
         {
             LOG(NET, "Encountered odd node that sent BUVERSION before XVERSION. Ignoring duplicate addrFromPort "
                      "setting. peer=%s version=%s\n",
                 pfrom->GetLogName(), pfrom->cleanSubVer);
         }
+
+        pfrom->ReadConfigFromXVersion();
 
         pfrom->PushMessage(NetMsgType::XVERACK);
         pfrom->state_incoming = ConnectionStateIncoming::READY;

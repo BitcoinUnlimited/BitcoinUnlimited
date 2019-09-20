@@ -450,11 +450,15 @@ void ThreadTxAdmission()
                 {
                     std::vector<COutPoint> vCoinsToUncache;
                     bool isRespend = false;
+                    CTxProperties txProperties;
+                    // If mempool policy aware relay is on, then supply a structure to gather the needed data,
+                    // otherwise nullptr turns it off.
+                    CTxProperties *txProps = (unconfPushAction.Value() == 0) ? nullptr : &txProperties;
                     if (ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, tx, true, &fMissingInputs, false,
-                            false, TransactionClass::DEFAULT, vCoinsToUncache, &isRespend))
+                            false, TransactionClass::DEFAULT, vCoinsToUncache, &isRespend, nullptr, txProps))
                     {
                         acceptedSomething = true;
-                        RelayTransaction(tx);
+                        RelayTransaction(tx, false, txProps);
 
                         // LOG(MEMPOOL, "Accepted tx: peer=%s: accepted %s onto Q\n", txd.nodeName,
                         //     tx->GetHash().ToString());
@@ -579,11 +583,15 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
 
     bool isRespend = false;
     bool missingInputs = false;
+    CTxProperties txProperties;
+    // If mempool policy aware relay is on, then supply a structure to gather the needed data,
+    // otherwise nullptr turns it off.
+    CTxProperties *txProps = (unconfPushAction.Value() == 0) ? nullptr : &txProperties;
     res = ParallelAcceptToMemoryPool(txHandlerSnap, pool, state, tx, fLimitFree, &missingInputs, fOverrideMempoolLimit,
-        fRejectAbsurdFee, allowedTx, vCoinsToUncache, &isRespend, nullptr);
+        fRejectAbsurdFee, allowedTx, vCoinsToUncache, &isRespend, nullptr, txProps);
     if (res)
     {
-        RelayTransaction(tx);
+        RelayTransaction(tx, false, txProps);
     }
 
     // Uncache any coins for txns that failed to enter the mempool but were NOT orphan txns
@@ -616,7 +624,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     TransactionClass allowedTx,
     std::vector<COutPoint> &vCoinsToUncache,
     bool *isRespend,
-    CValidationDebugger *debugger)
+    CValidationDebugger *debugger,
+    CTxProperties *txProps)
 {
     if (isRespend)
         *isRespend = false;
@@ -1116,10 +1125,10 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         }
 
         // Calculate in-mempool ancestors, up to a limit.
-        size_t nLimitAncestors = GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
-        size_t nLimitAncestorSize = GetArg("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
-        size_t nLimitDescendants = GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT);
-        size_t nLimitDescendantSize = GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
+        size_t nLimitAncestors = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
+        size_t nLimitAncestorSize = GetArg("-limitancestorsize", BU_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
+        size_t nLimitDescendants = GetArg("-limitdescendantcount", BU_DEFAULT_DESCENDANT_LIMIT);
+        size_t nLimitDescendantSize = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
         std::string errString;
 
         // Check against previous transactions
@@ -1222,6 +1231,21 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                     else
                         return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
                 }
+            }
+
+            if (txProps) // This is inefficient since _CalculateMemPoolAncestors also calculates this
+            {
+                txProps->countWithAncestors = setAncestors.size();
+                uint64_t size = tx->GetTxSize();
+                for (auto ancestor : setAncestors)
+                {
+                    size += ancestor->GetTxSize();
+                }
+                txProps->sizeWithAncestors = size;
+
+                // How can something we are just adding have any descendants?  It can't so these values are just this tx
+                txProps->countWithDescendants = 1;
+                txProps->sizeWithDescendants = tx->GetTxSize();
             }
         }
 

@@ -358,6 +358,19 @@ class CNode
 #endif
 
 public:
+    /** This node's max acceptable number ancestor transactions.  Used to decide whether this node will accept a
+     * particular transaction. */
+    size_t nLimitAncestorCount = BCH_DEFAULT_ANCESTOR_LIMIT;
+    /** This node's max acceptable sum of all ancestor transaction sizes.  Used to decide whether this node will accept
+     * a particular transaction. */
+    size_t nLimitAncestorSize = BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000;
+    /** This node's max acceptable number of descendants.  Used to decide whether this node will accept a particular
+     * transaction. */
+    size_t nLimitDescendantCount = BCH_DEFAULT_DESCENDANT_LIMIT;
+    /** This node's max acceptable sum of all descendant transaction sizes.  Used to decide whether this node will
+     * accept a particular transaction. */
+    size_t nLimitDescendantSize = BCH_DEFAULT_DESCENDANT_SIZE_LIMIT * 1000;
+
     // This is shared-locked whenever messages are processed.
     // Take it exclusive-locked to finish all ongoing processing
     CSharedCriticalSection csMsgSerializer;
@@ -590,6 +603,21 @@ public:
         return nRefCount;
     }
 
+    /** Returns true if a transaction with the passed properties will likely get accepted into this node's mempool */
+    bool IsTxAcceptable(const CTxProperties &props)
+    {
+        // Checking the descendants makes no sense -- the target node can't have descendants in its mempool if it
+        // doesn't have this transaction!
+        if (props.countWithAncestors > nLimitAncestorCount)
+            return false;
+        if (props.sizeWithAncestors > nLimitAncestorSize)
+            return false;
+        return true;
+    }
+
+    /** Updates node configuration variables based on XVERSION data in the xVersion member variable */
+    void ReadConfigFromXVersion();
+
     // requires LOCK(cs_vRecvMsg)
     unsigned int GetTotalRecvSize()
     {
@@ -686,10 +714,10 @@ public:
         filterInventoryKnown.insert(inv.hash);
     }
 
-    void PushInventory(const CInv &inv)
+    void PushInventory(const CInv &inv, bool force = false)
     {
         LOCK(cs_inventory);
-        if (inv.type == MSG_TX && filterInventoryKnown.contains(inv.hash))
+        if (!force && inv.type == MSG_TX && filterInventoryKnown.contains(inv.hash))
             return;
         vInventoryToSend.push_back(inv);
     }
@@ -1019,7 +1047,9 @@ private:
 typedef std::vector<CNodeRef> VNodeRefs;
 
 class CTransaction;
-void RelayTransaction(const CTransactionRef &ptx, const bool fRespend = false);
+void RelayTransaction(const CTransactionRef &ptx,
+    const bool fRespend = false,
+    const CTxProperties *txproperties = nullptr);
 
 /** Access to the (IP) address database (peers.dat) */
 class CAddrDB

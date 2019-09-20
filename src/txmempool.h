@@ -24,6 +24,8 @@
 
 class CAutoFile;
 class CBlockIndex;
+class TxMempoolOriginalState;
+class CTxChange;
 
 inline double AllowFreeThreshold() { return COIN * 144 / 250; }
 inline bool AllowFree(double dPriority)
@@ -506,6 +508,9 @@ public:
         bool operator()(const txiter &a, const txiter &b) const { return a->GetTx().GetHash() < b->GetTx().GetHash(); }
     };
     typedef std::set<txiter, CompareIteratorByHash> setEntries;
+    typedef std::map<CTxMemPool::txiter, TxMempoolOriginalState, CTxMemPool::CompareIteratorByHash>
+        TxMempoolOriginalStateMap;
+
 
     const setEntries &GetMemPoolParents(txiter entry) const;
     const setEntries &GetMemPoolChildren(txiter entry) const;
@@ -598,7 +603,8 @@ public:
     void removeForBlock(const std::vector<CTransactionRef> &vtx,
         unsigned int nBlockHeight,
         std::list<CTransactionRef> &conflicted,
-        bool fCurrentEstimate = true);
+        bool fCurrentEstimate = true,
+        std::vector<CTxChange> *txChange = nullptr);
     void clear();
     void _clear(); // lock free
     void queryHashes(std::vector<uint256> &vtxid) const;
@@ -630,7 +636,7 @@ public:
      *  Set updateDescendants to true when removing a tx that was in a block, so
      *  that any in-mempool descendants have their ancestor state updated.
      */
-    void _RemoveStaged(setEntries &stage, bool updateDescendants);
+    void _RemoveStaged(setEntries &stage, bool updateDescendants, TxMempoolOriginalStateMap *changeSet = nullptr);
 
     /** When adding transactions from a disconnected block back to the mempool,
      *  new mempool entries may have children in the mempool (which is generally
@@ -673,9 +679,8 @@ public:
         setEntries *inBlock = nullptr,
         bool fSearchForParents = true) const;
 
-    /** Populate setDescendants with all in-mempool descendants of hash.
- *  Assumes that setDescendants includes all in-mempool descendants of anything
- *  already in it.  */
+    /** Populate setDescendants with all in-mempool descendants of hash.  Assumes that setDescendants includes
+     *  all in-mempool descendants of anything already in it.  */
     void _CalculateDescendants(txiter it, setEntries &setDescendants);
 
     /** Similar to CalculateMemPoolAncestors, except only requires the inputs and just returns true/false depending on
@@ -687,6 +692,20 @@ public:
         uint64_t limitDescendantSize,
         std::string &errString);
 
+    /** Get tx properties, returns true if tx in mempool and fills fields */
+    bool GetTxProperties(const uint256 &hash, CTxProperties *txProps) const
+    {
+        DbgAssert(txProps, return false);
+        READLOCK(cs_txmempool);
+        auto entryPtr = mapTx.find(hash);
+        if (entryPtr == mapTx.end())
+            return false;
+        txProps->countWithAncestors = entryPtr->GetCountWithAncestors();
+        txProps->sizeWithAncestors = entryPtr->GetSizeWithAncestors();
+        txProps->countWithDescendants = entryPtr->GetCountWithDescendants();
+        txProps->sizeWithDescendants = entryPtr->GetSizeWithDescendants();
+        return true;
+    }
 
     /** The minimum fee to get into the mempool, which may itself not be enough
       *  for larger-sized transactions.
@@ -803,7 +822,9 @@ private:
     /** For each transaction being removed, update ancestors and any direct children.
       * If updateDescendants is true, then also update in-mempool descendants'
       * ancestor state. */
-    void _UpdateForRemoveFromMempool(const setEntries &entriesToRemove, bool updateDescendants);
+    void _UpdateForRemoveFromMempool(const setEntries &entriesToRemove,
+        bool updateDescendants,
+        TxMempoolOriginalStateMap *changeSet);
     /** Sever link between specified transaction and direct children. */
     void UpdateChildrenForRemoval(txiter entry);
 
@@ -816,6 +837,52 @@ private:
      *  removal.
      */
     void removeUnchecked(txiter entry);
+};
+
+/** This internal class holds the original state of mempool state values.
+*/
+class TxMempoolOriginalState
+{
+public:
+    /** remember the prior values so we can determine if the change is material for a particular node */
+    CTxProperties prior;
+    CTxMemPool::txiter txEntry;
+
+    TxMempoolOriginalState(CTxMemPool::txiter &entry)
+    {
+        txEntry = entry;
+        prior.countWithDescendants = txEntry->GetCountWithDescendants();
+        prior.sizeWithDescendants = txEntry->GetSizeWithDescendants();
+        prior.countWithAncestors = txEntry->GetCountWithAncestors();
+        prior.sizeWithAncestors = txEntry->GetSizeWithAncestors();
+    }
+};
+
+
+/** This class tracks changes to the mempool that may allow this transaction to be accepted into other node's
+    mempools.
+*/
+class CTxChange
+{
+public:
+    /** remember the prior values so we can determine if the change is material for a particular node */
+
+    CTxProperties prior;
+    CTxProperties now;
+    CTransactionRef tx;
+
+    CTxChange(TxMempoolOriginalState &mc)
+    {
+        // Extract the relevant fields and the transaction reference from the mempool entry so that use of this
+        // structure does not require the mempool to remain unchanged.
+        prior = mc.prior;
+
+        now.countWithDescendants = mc.txEntry->GetCountWithDescendants();
+        now.sizeWithDescendants = mc.txEntry->GetSizeWithDescendants();
+        now.countWithAncestors = mc.txEntry->GetCountWithAncestors();
+        now.sizeWithAncestors = mc.txEntry->GetSizeWithAncestors();
+        tx = mc.txEntry->GetSharedTx();
+    }
 };
 
 /**

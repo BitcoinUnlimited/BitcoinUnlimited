@@ -27,6 +27,8 @@
 
 #include <boost/scope_exit.hpp>
 
+extern CTweak<unsigned int> unconfPushAction;
+
 struct CBlockIndexWorkComparator
 {
     bool operator()(CBlockIndex *pa, CBlockIndex *pb) const
@@ -3116,9 +3118,13 @@ bool ConnectTip(CValidationState &state,
     nTimeChainState += nTime5 - nTime4;
     LOG(BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
 
-    // Remove conflicting transactions from the mempool.
+    // Remove transactions from the mempool, both those confirmed in the block and conflicting transactions.
     std::list<CTransactionRef> txConflicted;
-    mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload());
+    std::vector<CTxChange> txChanges;
+    // txChanges: only if some unconfirmed tx push is turned on, track what transactions may need to be pushed while
+    // confirmed transactions are removed from the mempool.
+    mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload(),
+        (unconfPushAction.Value() == 0) ? nullptr : &txChanges);
     // Update chainActive & related variables.
     UpdateTip(pindexNew);
     // Tell wallet about transactions that went from mempool
@@ -3140,6 +3146,10 @@ bool ConnectTip(CValidationState &state,
     nTimeTotal += nTime6 - nTime1;
     LOG(BENCH, "  - Connect postprocess: %.2fms [%.2fs]\n", (nTime6 - nTime5) * 0.001, nTimePostConnect * 0.000001);
     LOG(BENCH, "- Connect block: %.2fms [%.2fs]\n", (nTime6 - nTime1) * 0.001, nTimeTotal * 0.000001);
+
+    // If some kind of unconfirmed push is turned on, then do the forwarding.
+    if (unconfPushAction.Value() != 0)
+        ForwardAcceptableTransactions(txChanges);
     return true;
 }
 

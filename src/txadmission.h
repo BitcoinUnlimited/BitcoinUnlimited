@@ -186,7 +186,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     TransactionClass allowedTx,
     std::vector<COutPoint> &vCoinsToUncache,
     bool *isRespend,
-    CValidationDebugger *debugger = nullptr);
+    CValidationDebugger *debugger = nullptr,
+    CTxProperties *txProps = nullptr);
 
 /** Checks the size of the mempool and trims it if needed */
 void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age);
