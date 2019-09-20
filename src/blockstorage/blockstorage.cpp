@@ -809,9 +809,9 @@ bool FindBlockPos(CValidationState &state,
             FILE *file = OpenBlockFile(pos);
             if (file)
             {
-                LOGA("Pre-allocating up to position 0x%x in blk%05u.dat\n", nNewChunks * BLOCKFILE_CHUNK_SIZE,
+                LOGA("Pre-allocating up to position 0x%x in blk%05u.dat\n", nNewChunks * blockfile_chunk_size,
                     pos.nFile);
-                AllocateFileRange(file, pos.nPos, nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos);
+                AllocateFileRange(file, pos.nPos, nNewChunks * blockfile_chunk_size - pos.nPos);
                 fclose(file);
             }
         }
@@ -858,8 +858,8 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
         FILE *file = OpenUndoFile(pos);
         if (file)
         {
-            LOGA("Pre-allocating up to position 0x%x in rev%05u.dat\n", nNewChunks * UNDOFILE_CHUNK_SIZE, pos.nFile);
-            AllocateFileRange(file, pos.nPos, nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos);
+            LOGA("Pre-allocating up to position 0x%x in rev%05u.dat\n", nNewChunks * undofile_chunk_size, pos.nFile);
+            AllocateFileRange(file, pos.nPos, nNewChunks * undofile_chunk_size - pos.nPos);
             fclose(file);
         }
     }
