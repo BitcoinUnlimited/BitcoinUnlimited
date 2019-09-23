@@ -14,8 +14,16 @@ from test_framework.util import (
 import json
 import os
 import logging
+import decimal
 
 TESTSDIR = os.path.dirname(os.path.realpath(__file__))
+
+def EncodeDecimal(o):
+    if isinstance(o, decimal.Decimal):
+        # json.load will read a quoted float as a string and not convert it back
+        # to decimal, so store the value as unquoted float instead.
+        return float(o)
+    raise TypeError(repr(o) + " is not JSON serializable")
 
 class GetblockstatsTest(BitcoinTestFramework):
 
@@ -84,11 +92,11 @@ class GetblockstatsTest(BitcoinTestFramework):
             'stats': self.expected_stats,
         }
         with open(filename, 'w') as f:
-            json.dump(to_dump, f, sort_keys=True, indent=2)
+            json.dump(to_dump, f, sort_keys=True, indent=2, default=EncodeDecimal)
 
     def load_test_data(self, filename):
         with open(filename, 'r') as f:
-            d = json.load(f)
+            d = json.load(f, parse_float=decimal.Decimal)
             blocks = d['blocks']
             mocktime = d['mocktime']
             self.expected_stats = d['stats']
