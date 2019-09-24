@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2017 The Zcash developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -55,7 +56,7 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
     if (lenbyte & 0x80)
     {
         lenbyte -= 0x80;
-        if (pos + lenbyte > inputlen)
+        if (lenbyte > inputlen - pos)
         {
             return 0;
         }
@@ -78,7 +79,7 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
     if (lenbyte & 0x80)
     {
         lenbyte -= 0x80;
-        if (pos + lenbyte > inputlen)
+        if (lenbyte > inputlen - pos)
         {
             return 0;
         }
@@ -87,7 +88,8 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
             pos++;
             lenbyte--;
         }
-        if (lenbyte >= sizeof(size_t))
+        static_assert(sizeof(size_t) >= 4, "size_t too small");
+        if (lenbyte >= 4)
         {
             return 0;
         }
@@ -126,7 +128,7 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
     if (lenbyte & 0x80)
     {
         lenbyte -= 0x80;
-        if (pos + lenbyte > inputlen)
+        if (lenbyte > inputlen - pos)
         {
             return 0;
         }
@@ -135,7 +137,8 @@ static int ecdsa_signature_parse_der_lax(const secp256k1_context *ctx,
             pos++;
             lenbyte--;
         }
-        if (lenbyte >= sizeof(size_t))
+        static_assert(sizeof(size_t) >= 4, "size_t too small");
+        if (lenbyte >= 4)
         {
             return 0;
         }
@@ -309,7 +312,7 @@ bool CPubKey::Derive(CPubKey &pubkeyChild, ChainCode &ccChild, unsigned int _nCh
 {
     assert(IsValid());
     assert((_nChild >> 31) == 0);
-    assert(begin() + 33 == end());
+    assert(size() == 33);
     unsigned char out[64];
     BIP32Hash(cc, _nChild, *begin(), begin() + 1, out);
     memcpy(ccChild.begin(), out + 32, 32);
