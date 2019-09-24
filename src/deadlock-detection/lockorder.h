@@ -24,11 +24,11 @@ class CLockOrderTracker
 protected:
     std::mutex lot_mutex;
     // key is lockname, value is vector of locknames that have ever been locked while key was locked
-    std::map<std::string, std::set<std::string> > SeenLockOrders;
+    std::map<std::string, std::set<std::string> > seenLockOrders;
     // we track every time a lock ordering has taken place, key is the two locknames
     // value is the lock file+lines respectivly and the id of the thread that locked them
     std::map<std::pair<std::string, std::string>, std::set<std::tuple<std::string, std::string, uint64_t> > >
-        SeenLockLocations;
+        seenLockLocations;
 
 private:
     void potential_lock_order_issue_detected(const CLockLocation &thisLock,
@@ -51,8 +51,8 @@ public:
     // should only be called in the test suite
     void clear()
     {
-        SeenLockOrders.clear();
-        SeenLockLocations.clear();
+        seenLockOrders.clear();
+        seenLockLocations.clear();
     }
 };
 

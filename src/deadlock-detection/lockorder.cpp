@@ -23,8 +23,8 @@ void CLockOrderTracker::potential_lock_order_issue_detected(const CLockLocation 
     LOGA("\n\nOur historical lock orderings containing these two locks by thread %" PRIu64 " include: \n", tid);
 
     std::pair<std::string, std::string> key = std::make_pair(otherLock.GetMutexName(), thisLock.GetMutexName());
-    auto iter = SeenLockLocations.find(key);
-    if (iter != SeenLockLocations.end())
+    auto iter = seenLockLocations.find(key);
+    if (iter != seenLockLocations.end())
     {
         for (auto &entry : iter->second)
         {
@@ -53,7 +53,7 @@ void CLockOrderTracker::potential_lock_order_issue_detected(const CLockLocation 
 bool CLockOrderTracker::CanCheckForConflicts(const std::string &lockname)
 {
     std::lock_guard<std::mutex> lock(lot_mutex);
-    return (SeenLockOrders.find(lockname) != SeenLockOrders.end());
+    return (seenLockOrders.find(lockname) != seenLockOrders.end());
 }
 
 // this function assumes you already checked if lockname exists
@@ -71,11 +71,11 @@ void CLockOrderTracker::CheckForConflict(const CLockLocation &locklocation,
             // if they are the same then continue
             continue;
         }
-        if (SeenLockOrders[newlock].count(lockheldname))
+        if (seenLockOrders[newlock].count(lockheldname))
         {
             potential_lock_order_issue_detected(locklocation, heldLock, tid);
         }
-        SeenLockOrders[lockheldname].emplace(newlock);
+        seenLockOrders[lockheldname].emplace(newlock);
     }
 }
 
@@ -85,17 +85,17 @@ void CLockOrderTracker::AddNewLockInfo(const std::string &lockname, const std::v
     // we have not seen the lock we are trying to lock before, add data for it
     for (auto &heldLock : heldLocks)
     {
-        auto heldLockIter = SeenLockOrders.find(heldLock.GetMutexName());
-        if (heldLockIter != SeenLockOrders.end())
+        auto heldLockIter = seenLockOrders.find(heldLock.GetMutexName());
+        if (heldLockIter != seenLockOrders.end())
         {
             // add information about this lock
             heldLockIter->second.emplace(lockname);
         }
     }
     // add a new key to track locks locked after this one
-    if (SeenLockOrders.find(lockname) == SeenLockOrders.end())
+    if (seenLockOrders.find(lockname) == seenLockOrders.end())
     {
-        SeenLockOrders.emplace(lockname, std::set<std::string>());
+        seenLockOrders.emplace(lockname, std::set<std::string>());
     }
 }
 
@@ -110,10 +110,10 @@ void CLockOrderTracker::TrackLockOrderHistory(const CLockLocation &locklocation,
     {
         std::string key2 = heldLock.GetMutexName();
         std::string value2 = heldLock.GetFileName() + ":" + std::to_string(heldLock.GetLineNumber());
-        auto iter = SeenLockLocations.find(std::make_pair(key1, key2));
-        if (iter == SeenLockLocations.end())
+        auto iter = seenLockLocations.find(std::make_pair(key1, key2));
+        if (iter == seenLockLocations.end())
         {
-            SeenLockLocations.emplace(std::make_pair(key1, key2),
+            seenLockLocations.emplace(std::make_pair(key1, key2),
                 std::set<std::tuple<std::string, std::string, uint64_t> >{std::make_tuple(value1, value2, tid)});
         }
         else
