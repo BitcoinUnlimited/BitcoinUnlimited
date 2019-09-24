@@ -52,6 +52,7 @@ void CLockOrderTracker::potential_lock_order_issue_detected(const CLockLocation 
 
 bool CLockOrderTracker::CanCheckForConflicts(const std::string &lockname)
 {
+    std::lock_guard<std::mutex> lock(lot_mutex);
     return (SeenLockOrders.find(lockname) != SeenLockOrders.end());
 }
 
