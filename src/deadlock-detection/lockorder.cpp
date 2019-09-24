@@ -30,7 +30,7 @@ void CLockOrderTracker::potential_lock_order_issue_detected(const CLockLocation 
         {
             if (std::get<2>(entry) == tid)
             {
-                LOGA("this thread previously locked %s on %s after locking %s on %s\n", key.first.c_str(),
+                LOGA("This thread previously locked %s on %s after locking %s on %s\n", key.first.c_str(),
                     std::get<0>(entry).c_str(), key.second.c_str(), std::get<1>(entry).c_str());
             }
         }

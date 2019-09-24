@@ -72,11 +72,11 @@ void _remove_lock_critical_exit(void *cs)
     }
 }
 
-void potential_deadlock_detected(LockStackEntry now, LockStack &deadlocks, std::set<uint64_t> &threads)
+void deadlock_detected(LockStackEntry now, LockStack &deadlocks, std::set<uint64_t> &threads)
 {
-    LOGA("POTENTIAL DEADLOCK DETECTED\n");
+    LOGA("DEADLOCK DETECTED\n");
     LOGA("This occurred while trying to lock: %s ", now.second.ToString().c_str());
-    LOGA("which has:\n");
+    LOGA("Which has:\n");
 
     auto rlw = lockdata.readlockswaiting.find(now.first);
     if (rlw != lockdata.readlockswaiting.end())
@@ -555,7 +555,7 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
     std::set<uint64_t> threads;
     if (RecursiveCheck(tid, c, tid, c, true, deadlocks, threads))
     {
-        potential_deadlock_detected(now, deadlocks, threads);
+        deadlock_detected(now, deadlocks, threads);
     }
 }
 
