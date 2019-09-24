@@ -48,7 +48,7 @@ struct CLockLocation
     int GetLineNumber() const;
     std::string GetMutexName() const;
 
-private:
+protected:
     bool fTry;
     std::string mutexName;
     std::string sourceFile;

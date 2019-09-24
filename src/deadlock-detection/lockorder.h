@@ -21,7 +21,7 @@
 // tracks the globally seen lock ordering
 class CLockOrderTracker
 {
-private:
+protected:
     std::mutex lot_mutex;
     // key is lockname, value is vector of locknames that have ever been locked while key was locked
     std::map<std::string, std::set<std::string> > SeenLockOrders;
@@ -30,6 +30,7 @@ private:
     std::map<std::pair<std::string, std::string>, std::set<std::tuple<std::string, std::string, uint64_t> > >
         SeenLockLocations;
 
+private:
     void potential_lock_order_issue_detected(const CLockLocation &thisLock,
         const CLockLocation &otherLock,
         const uint64_t &tid);
