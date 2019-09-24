@@ -11,11 +11,6 @@
 // removes 1 lock for a critical section
 void _remove_lock_critical_exit(void *cs)
 {
-    if (!lockdata.available)
-    {
-        // lockdata was already deleted
-        return;
-    }
     uint64_t tid = getTid();
     auto it = lockdata.locksheldbythread.find(tid);
     if (it == lockdata.locksheldbythread.end())
@@ -564,11 +559,6 @@ void DeleteCritical(void *cs)
 {
     // remove all instances of the critical section from lockdata
     std::lock_guard<std::mutex> lock(lockdata.dd_mutex);
-    if (!lockdata.available)
-    {
-        // lockdata was already deleted
-        return;
-    }
     lockdata.readlockswaiting.erase(cs);
     lockdata.writelockswaiting.erase(cs);
     lockdata.readlocksheld.erase(cs);
