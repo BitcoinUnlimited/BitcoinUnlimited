@@ -16,10 +16,12 @@
 
 /**
  * secp256k1:
- * const unsigned int PRIVATE_KEY_SIZE = 279;
- * const unsigned int PUBLIC_KEY_SIZE  = 65;
- * const unsigned int SIGNATURE_SIZE   = 72;
- *
+ */
+const unsigned int PUBLIC_KEY_SIZE = 65;
+const unsigned int COMPRESSED_PUBLIC_KEY_SIZE = 33;
+const unsigned int SIGNATURE_SIZE = 72;
+const unsigned int COMPACT_SIGNATURE_SIZE = 65;
+/**
  * see www.keylength.com
  * script supports up to 75 for single byte push
  */
@@ -47,15 +49,15 @@ private:
      * Just store the serialized data.
      * Its length can very cheaply be computed from the first byte.
      */
-    unsigned char vch[65];
+    unsigned char vch[PUBLIC_KEY_SIZE];
 
     //! Compute the length of a pubkey with a given first byte.
     unsigned int static GetLen(unsigned char chHeader)
     {
         if (chHeader == 2 || chHeader == 3)
-            return 33;
+            return COMPRESSED_PUBLIC_KEY_SIZE;
         if (chHeader == 4 || chHeader == 6 || chHeader == 7)
-            return 65;
+            return PUBLIC_KEY_SIZE;
         return 0;
     }
 
@@ -112,7 +114,7 @@ public:
     void Unserialize(Stream &s)
     {
         unsigned int len = ::ReadCompactSize(s);
-        if (len <= 65)
+        if (len <= PUBLIC_KEY_SIZE)
         {
             s.read((char *)vch, len);
         }
@@ -140,7 +142,7 @@ public:
     bool IsFullyValid() const;
 
     //! Check whether this is a compressed public key.
-    bool IsCompressed() const { return size() == 33; }
+    bool IsCompressed() const { return size() == COMPRESSED_PUBLIC_KEY_SIZE; }
     /**
      * Verify a DER-serialized ECDSA signature (~72 bytes).
      * If this public key is not fully valid, the return value will be false.

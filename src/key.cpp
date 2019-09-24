@@ -171,6 +171,9 @@ static int ec_privkey_import_der(const secp256k1_context *ctx,
  * <http://www.secg.org/sec1-v2.pdf>. The optional parameters and publicKey fields are
  * included.
  *
+ * privkey must point to an output buffer of length at least PRIVATE_KEY_SIZE bytes.
+ * privkeylen must initially be set to the size of the privkey buffer. Upon return it
+ * will be set to the number of bytes used in the buffer.
  * key32 must point to a 32-byte raw private key.
  */
 static int ec_privkey_export_der(const secp256k1_context *ctx,
@@ -179,6 +182,7 @@ static int ec_privkey_export_der(const secp256k1_context *ctx,
     const unsigned char *key32,
     int compressed)
 {
+    assert(*privkeylen >= PRIVATE_KEY_SIZE);
     secp256k1_pubkey pubkey;
     size_t pubkeylen = 0;
     if (!secp256k1_ec_pubkey_create(ctx, &pubkey, key32))
@@ -205,10 +209,11 @@ static int ec_privkey_export_der(const secp256k1_context *ctx,
         ptr += 32;
         memcpy(ptr, middle, sizeof(middle));
         ptr += sizeof(middle);
-        pubkeylen = 33;
+        pubkeylen = COMPRESSED_PUBLIC_KEY_SIZE;
         secp256k1_ec_pubkey_serialize(ctx, ptr, &pubkeylen, &pubkey, SECP256K1_EC_COMPRESSED);
         ptr += pubkeylen;
         *privkeylen = ptr - privkey;
+        assert(*privkeylen == COMPRESSED_PRIVATE_KEY_SIZE);
     }
     else
     {
@@ -230,10 +235,11 @@ static int ec_privkey_export_der(const secp256k1_context *ctx,
         ptr += 32;
         memcpy(ptr, middle, sizeof(middle));
         ptr += sizeof(middle);
-        pubkeylen = 65;
+        pubkeylen = PUBLIC_KEY_SIZE;
         secp256k1_ec_pubkey_serialize(ctx, ptr, &pubkeylen, &pubkey, SECP256K1_EC_UNCOMPRESSED);
         ptr += pubkeylen;
         *privkeylen = ptr - privkey;
+        assert(*privkeylen == PRIVATE_KEY_SIZE);
     }
     return 1;
 }
@@ -265,8 +271,8 @@ CPrivKey CKey::GetPrivKey() const
     CPrivKey privkey;
     int ret;
     size_t privkeylen;
-    privkey.resize(279);
-    privkeylen = 279;
+    privkey.resize(PRIVATE_KEY_SIZE);
+    privkeylen = PRIVATE_KEY_SIZE;
     ret = ec_privkey_export_der(secp256k1_context_sign, (unsigned char *)&privkey[0], &privkeylen, begin(),
         fCompressed ? SECP256K1_EC_COMPRESSED : SECP256K1_EC_UNCOMPRESSED);
     assert(ret);
@@ -278,7 +284,7 @@ CPubKey CKey::GetPubKey() const
 {
     assert(fValid);
     secp256k1_pubkey pubkey;
-    size_t clen = 65;
+    size_t clen = PUBLIC_KEY_SIZE;
     CPubKey result;
     int ret = secp256k1_ec_pubkey_create(secp256k1_context_sign, &pubkey, begin());
     assert(ret);
@@ -293,8 +299,8 @@ bool CKey::SignECDSA(const uint256 &hash, std::vector<uint8_t> &vchSig, uint32_t
 {
     if (!fValid)
         return false;
-    vchSig.resize(72);
-    size_t nSigLen = 72;
+    vchSig.resize(SIGNATURE_SIZE);
+    size_t nSigLen = SIGNATURE_SIZE;
     unsigned char extra_entropy[32] = {0};
     WriteLE32(extra_entropy, test_case);
     secp256k1_ecdsa_signature sig;
@@ -342,7 +348,7 @@ bool CKey::SignCompact(const uint256 &hash, std::vector<uint8_t> &vchSig) const
 {
     if (!fValid)
         return false;
-    vchSig.resize(65);
+    vchSig.resize(COMPACT_SIGNATURE_SIZE);
     int rec = -1;
     secp256k1_ecdsa_recoverable_signature sig;
     int ret = secp256k1_ecdsa_sign_recoverable(
@@ -378,7 +384,7 @@ bool CKey::Derive(CKey &keyChild, ChainCode &ccChild, unsigned int nChild, const
     if ((nChild >> 31) == 0)
     {
         CPubKey pubkey = GetPubKey();
-        assert(pubkey.size() == 33);
+        assert(pubkey.size() == COMPRESSED_PUBLIC_KEY_SIZE);
         BIP32Hash(cc, nChild, *pubkey.begin(), pubkey.begin() + 1, out);
     }
     else
