@@ -132,7 +132,7 @@ def WhenElectrumFound(test_name):
     import os
     electrs_path = os.path.join(
         os.path.dirname(os.environ["BITCOIND"]),
-        "electrs")
+        "electrscash")
 
     if os.path.exists(electrs_path):
         return test_name
