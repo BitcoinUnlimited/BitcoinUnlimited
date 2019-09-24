@@ -38,15 +38,30 @@ inline uint64_t getTid(void)
 
 struct LockData
 {
-    LockData() { }
-    ~LockData() { }
+    /// @var ReadLocksWaiting readlockswaiting
+    /// holds information about threads waiting on shared ownership of mutexes
     ReadLocksWaiting readlockswaiting;
+    /// @var WriteLocksWaiting writelockswaiting
+    /// holds information about threads waiting on exclusive ownership of mutexes
     WriteLocksWaiting writelockswaiting;
 
+    /// @var ReadLocksHeld readlocksheld
+    /// holds information about threads holding shared ownership of mutexes
     ReadLocksHeld readlocksheld;
+    /// @var WriteLocksHeld writelocksheld
+    /// holds information about threads holding exclusive ownership of mutexes
     WriteLocksHeld writelocksheld;
+
+    /// @var LocksHeldByThread locksheldbythread
+    /// holds information about which locks are held by which threads
     LocksHeldByThread locksheldbythread;
+
+    /// @var CLockOrderTracker ordertracker
+    /// holds information about the global ordering of locking
     CLockOrderTracker ordertracker;
+
+    /// @var std::mutex dd_mutex
+    /// a mutex that protects all other data members of this struct
     std::mutex dd_mutex;
 };
 extern LockData lockdata;
@@ -55,6 +70,12 @@ extern LockData lockdata;
  * Adds a new lock to LockData tracking
  *
  * Should only be called by EnterCritical
+ *
+ * @param void pointer to the critical section that was locked
+ * @param CLockLocation struct containing information about the critical section that was locked
+ * @param LockType enum value that describes what type of critical section was locked
+ * @param OwnershipType enum value that describes what type of ownership was claimed on the critical section
+ * @param boolean that describes if the lock was made by a lock() or try_lock() call
  */
 void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, OwnershipType ownership, bool fTry);
 
@@ -62,6 +83,8 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
  * Removes a critical section and all locks related to it from LockData
  *
  * Should only be called by a critical section destructor
+ *
+ * @param void pointer to the critical section that is to be removed
  */
 void DeleteCritical(void *cs);
 
@@ -69,16 +92,23 @@ void DeleteCritical(void *cs);
  * Removes the most recent instance of locks from LockData
  *
  * Should only be called by LeaveCritical
+ *
+ * @param void pointer to the critical section that is to be removed
  */
 void remove_lock_critical_exit(void *cs);
 
 /**
  * Prints all of the locks held by the calling thread
+ *
+ * @return std::string of all locks held by the calling thread
  */
 std::string LocksHeld();
 
 /**
  * Moves a lock that is currently in one of the waiting maps to the corresponding held map
+ *
+ * @param void pointer to the critical section that is to be moved from waiting to held
+ * @param OwnershipType enum value that is the OwnershipType for the critical section
  */
 void SetWaitingToHeld(void *c, OwnershipType ownership);
 
