@@ -80,14 +80,14 @@ static void CleanupScriptCode(CScript &scriptCode, const std::vector<uint8_t> &v
 
 bool static IsCompressedOrUncompressedPubKey(const valtype &vchPubKey)
 {
-    if (vchPubKey.size() < 33)
+    if (vchPubKey.size() < CPubKey::COMPRESSED_PUBLIC_KEY_SIZE)
     {
         //  Non-canonical public key: too short
         return false;
     }
     if (vchPubKey[0] == 0x04)
     {
-        if (vchPubKey.size() != 65)
+        if (vchPubKey.size() != CPubKey::PUBLIC_KEY_SIZE)
         {
             //  Non-canonical public key: invalid length for uncompressed key
             return false;
@@ -111,7 +111,7 @@ bool static IsCompressedOrUncompressedPubKey(const valtype &vchPubKey)
 
 static bool IsCompressedPubKey(const valtype &vchPubKey)
 {
-    if (vchPubKey.size() != 33)
+    if (vchPubKey.size() != CPubKey::COMPRESSED_PUBLIC_KEY_SIZE)
     {
         //  Non-canonical public key: invalid length for compressed key
         return false;

@@ -68,6 +68,7 @@ private:
     //! Set this key data to be invalid
     void Invalidate() { vch[0] = 0xFF; }
 public:
+    bool static ValidSize(const std::vector<uint8_t> &vch) { return vch.size() > 0 && GetLen(vch[0]) == vch.size(); }
     //! Construct an invalid public key.
     CPubKey() { Invalidate(); }
     //! Initialize a public key using begin/end iterators to byte data.
