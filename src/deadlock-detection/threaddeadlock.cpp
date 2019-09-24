@@ -420,9 +420,8 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
     // across the program
     if (fTry)
     {
-        // a try lock will either get it, or it wont. so just add it.
-        // if we dont get the lock this will be undone in the destructor of the read or write block
-        // for whichever critical section made this function call.
+        // a try lock will either get it, or it wont. so just add it for now.
+        // if we dont get the lock these added locks will be removed before the end of the TRY_LOCK function
         AddNewLock(now, tid);
         // we need to add a held lock
         AddNewHeldLock(c, tid, ownership);
