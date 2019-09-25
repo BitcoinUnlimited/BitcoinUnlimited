@@ -1474,7 +1474,8 @@ bool ScriptMachine::Step()
                     if ((flags & SCRIPT_ENABLE_SCHNORR_MULTISIG) && stacktop(-idxDummy).size() != 0)
                     {
                         // SCHNORR MULTISIG
-                        static_assert(MAX_PUBKEYS_PER_MULTISIG < 32);
+                        static_assert(MAX_PUBKEYS_PER_MULTISIG < 32,
+                            "Multisig dummy element decoded as bitfield can't represent more than 32 keys");
                         uint32_t checkBits = 0;
 
                         // Dummy element is to be interpreted as a bitfield
