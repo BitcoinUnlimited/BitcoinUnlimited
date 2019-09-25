@@ -626,6 +626,12 @@ void InitParameterInteraction()
 void InitLogging()
 {
     fPrintToConsole = GetBoolArg("-printtoconsole", DEFAULT_PRINTTOCONSOLE);
+
+    // Some QA tests depend on debug.log being written to, so default
+    // to always print to log file on regtest.
+    const bool regtest = Params().NetworkIDString() == CBaseChainParams::REGTEST;
+    fPrintToDebugLog = GetBoolArg("-printtologfile", !fPrintToConsole || regtest);
+
     fLogTimestamps = GetBoolArg("-logtimestamps", DEFAULT_LOGTIMESTAMPS);
     fLogTimeMicros = GetBoolArg("-logtimemicros", DEFAULT_LOGTIMEMICROS);
     fLogIPs = GetBoolArg("-logips", DEFAULT_LOGIPS);
