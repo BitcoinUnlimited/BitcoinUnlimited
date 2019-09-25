@@ -30,9 +30,10 @@ protected:
     /// @var std::map<std::string, std::set<std::string> > seenLockOrders
     /// key is lockname, value is vector of locknames that have ever been locked while key was locked
     std::map<std::string, std::set<std::string> > seenLockOrders;
-     /// @var std::map<std::pair<std::string, std::string>, std::set<std::tuple<std::string, std::string, uint64_t> > > seenLockLocations
-     /// we track every time a lock ordering has taken place, key is the two locknames
-     /// value is the lock file+lines respectivly and the id of the thread that locked them
+    /// @var std::map<std::pair<std::string, std::string>, std::set<std::tuple<std::string, std::string, uint64_t> > >
+    /// seenLockLocations
+    /// we track every time a lock ordering has taken place, key is the two locknames
+    /// value is the lock file+lines respectivly and the id of the thread that locked them
     std::map<std::pair<std::string, std::string>, std::set<std::tuple<std::string, std::string, uint64_t> > >
         seenLockLocations;
 
