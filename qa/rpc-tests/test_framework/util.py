@@ -29,6 +29,7 @@ import urllib.parse as urlparse
 import errno
 import logging
 import traceback
+from . import test_node
 
 from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
@@ -604,7 +605,7 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
     if COVERAGE_DIR:
         coverage.write_all_rpc_commands(COVERAGE_DIR, proxy)
 
-    return proxy
+    return test_node.TestNode(proxy, datadir)
 
 def start_nodes(num_nodes, dirname, extra_args=None, rpchost=None, binary=None,timewait=None):
     """
