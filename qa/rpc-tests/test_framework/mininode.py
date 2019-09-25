@@ -195,6 +195,7 @@ class SingleNodeConnCB(NodeConnCB):
 
     # Wrapper for the NodeConn's send_message function
     def send_message(self, message, pushbuf = False):
+        assert self.connection is not None, 'forgot to .add_connection'
         self.connection.send_message(message, pushbuf)
 
     def send_and_ping(self, message):

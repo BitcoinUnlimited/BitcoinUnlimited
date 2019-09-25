@@ -607,7 +607,11 @@ UniValue CRPCTable::execute(const std::string &strMethod, const UniValue &prepar
     // Find method
     const CRPCCommand *pcmd = tableRPC[strMethod];
     if (!pcmd)
-        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Method not found");
+    {
+        std::stringstream ss;
+        ss << "Method '" << strMethod << "' not found";
+        throw JSONRPCError(RPC_METHOD_NOT_FOUND, ss.str());
+    }
 
     g_rpcSignals.PreCommand(*pcmd);
 
