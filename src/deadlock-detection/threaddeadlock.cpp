@@ -8,6 +8,8 @@
 
 #ifdef DEBUG_LOCKORDER // this ifdef covers the rest of the file
 
+bool lockdataDestructed = false;
+
 // removes 1 lock for a critical section
 void _remove_lock_critical_exit(void *cs)
 {
@@ -556,6 +558,8 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
 // removes all instances of the critical section
 void DeleteCritical(void *cs)
 {
+    if (lockdataDestructed)
+        return;
     // remove all instances of the critical section from lockdata
     std::lock_guard<std::mutex> lock(lockdata.dd_mutex);
     lockdata.readlockswaiting.erase(cs);
