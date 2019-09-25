@@ -853,9 +853,19 @@ class CBlockHeader(object):
             self.hash = encode(hash256(r)[::-1], 'hex_codec').decode('ascii')
         return self.hash
 
-    def gethash(self):
+    def gethashprevblock(self, encoding = 'int'):
+        assert encoding == 'hex' or encoding == 'int'
+        if encoding == 'int':
+            return self.hashPrevBlock
+        return hex(self.hashPrevBlock)
+
+
+    def gethash(self, encoding = 'int'):
+        assert encoding == 'hex' or encoding == 'int'
         self.calc_sha256()
-        return self.sha256
+        if encoding == 'int':
+            return self.sha256
+        return hex(self.sha256)
 
     def rehash(self):
         self.sha256 = None
