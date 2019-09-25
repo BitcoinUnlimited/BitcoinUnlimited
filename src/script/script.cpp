@@ -276,10 +276,11 @@ const char *GetOpName(opcodetype opcode)
 
 bool CheckMinimalPush(const std::vector<uint8_t> &data, opcodetype opcode)
 {
+    // Returns true if the passed code is legal with respect to minimal push by definition.
+
     // Excludes OP_1NEGATE, OP_1-16 since they are by definition minimal.
-    // Returns true if the passed code is legal with respect to minimal push
-    // by definition.
-    if (0 <= opcode && opcode <= OP_PUSHDATA4)
+    // Any other opcodes outside of this range have nothing to do with data push so are pedantically "minimal".
+    if ((OP_0 > opcode) || (opcode > OP_PUSHDATA4))
     {
         return true;
     }
