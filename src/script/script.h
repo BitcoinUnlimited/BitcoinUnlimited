@@ -202,6 +202,12 @@ enum opcodetype
 
 const char *GetOpName(opcodetype opcode);
 
+/**
+ * Check whether the given stack element data would be minimally pushed using
+ * the given opcode.
+ */
+bool CheckMinimalPush(const std::vector<uint8_t> &data, opcodetype opcode);
+
 class scriptnum_error : public std::runtime_error
 {
 public:
