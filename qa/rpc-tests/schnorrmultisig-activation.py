@@ -10,8 +10,6 @@ which signatures are being checked.
 - check non-banning for peers who send invalid txns that would have been valid
 on the other side of the upgrade.
 - check banning of peers for some fully-invalid transactions.
-
-Derived from abc-schnorr.py
 """
 
 from test_framework.blocktools import (
@@ -21,7 +19,7 @@ from test_framework.blocktools import (
     make_conform_to_ctor,
 )
 from test_framework.key import CECKey
-from test_framework.messages import (
+from test_framework.nodemessages import (
     CBlock,
     COutPoint,
     CTransaction,
@@ -31,9 +29,9 @@ from test_framework.messages import (
     ToHex,
 )
 from test_framework.mininode import (
-    network_thread_join,
-    network_thread_start,
     P2PDataStore,
+    NodeConn,
+    NetworkThread,
 )
 from test_framework import schnorr
 from test_framework.script import (
@@ -47,14 +45,15 @@ from test_framework.script import (
     SignatureHashForkId,
 )
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal, assert_raises_rpc_error
+from test_framework.util import assert_equal, assert_raises_rpc_error, p2p_port, waitFor
+import logging
 
 # the upgrade activation time, which we artificially set far into the future
-GRAVITON_START_TIME = 2000000000
+NOV2019_START_TIME = 2000000000
 
 # If we don't do this, autoreplay protection will activate before graviton and
 # all our sigs will mysteriously fail.
-REPLAY_PROTECTION_START_TIME = GRAVITON_START_TIME * 2
+REPLAY_PROTECTION_START_TIME = NOV2019_START_TIME * 2
 
 
 # Before the upgrade, Schnorr checkmultisig is rejected but forgiven if it
@@ -73,7 +72,7 @@ POSTUPGRADE_ECDSA_NULLDUMMY_ERROR = 'upgrade-conditional-script-failure (Only Sc
 SCHNORR_LEGACY_MULTISIG_ERROR = 'mandatory-script-verify-flag-failed (Signature cannot be 65 bytes in CHECKMULTISIG)'
 
 # Blocks with invalid scripts give this error:
-BADINPUTS_ERROR = 'blk-bad-inputs'
+BADSIG_ERROR = 'bad-blk-signatures'
 
 
 # This 64-byte signature is used to test exclusion & banning according to
@@ -81,34 +80,32 @@ BADINPUTS_ERROR = 'blk-bad-inputs'
 # Tests of real 64 byte ECDSA signatures can be found in script_tests.
 sig64 = b'\0'*64
 
+class P2PNode(P2PDataStore):
+    pass
 
 class SchnorrTest(BitcoinTestFramework):
+    def __init__(self):
+        super().__init__()
+        self.set_test_params()
 
     def set_test_params(self):
         self.num_nodes = 1
         self.block_heights = {}
-        self.extra_args = [["-gravitonactivationtime={}".format(
-            GRAVITON_START_TIME),
-            "-replayprotectionactivationtime={}".format(
-            REPLAY_PROTECTION_START_TIME)]]
+        self.extra_args = [[
+            "-consensus.forkNov2019Time={}".format(NOV2019_START_TIME),
+            "-debug=mempool",
+        ]]
 
-    def bootstrap_p2p(self, *, num_connections=1):
+    def bootstrap_p2p(self):
         """Add a P2P connection to the node.
 
         Helper to connect and wait for version handshake."""
-        for _ in range(num_connections):
-            self.nodes[0].add_p2p_connection(P2PDataStore())
-        network_thread_start()
-        self.nodes[0].p2p.wait_for_verack()
-
-    def reconnect_p2p(self, **kwargs):
-        """Tear down and bootstrap the P2P connection to the node.
-
-        The node gets disconnected several times in this test. This helper
-        method reconnects the p2p and restarts the network thread."""
-        self.nodes[0].disconnect_p2ps()
-        network_thread_join()
-        self.bootstrap_p2p(**kwargs)
+        self.p2p = P2PNode()
+        self.connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], self.p2p)
+        self.p2p.add_connection(self.connection)
+        NetworkThread().start()
+        self.p2p.wait_for_verack()
+        assert(self.p2p.connection.state == "connected")
 
     def getbestblock(self, node):
         """Get the best block. Register its height so we can use build_block."""
@@ -128,7 +125,7 @@ class SchnorrTest(BitcoinTestFramework):
         block_time = (parent.nTime + 1) if nTime is None else nTime
 
         block = create_block(
-            parent.sha256, create_coinbase(block_height), block_time)
+            parent.sha256, create_coinbase(block_height, scriptPubKey = CScript([OP_TRUE])), block_time)
         block.vtx.extend(transactions)
         make_conform_to_ctor(block)
         block.hashMerkleRoot = block.calc_merkle_root()
@@ -137,47 +134,45 @@ class SchnorrTest(BitcoinTestFramework):
         return block
 
     def check_for_ban_on_rejected_tx(self, tx, reject_reason=None):
-        """Check we are disconnected when sending a txn that the node rejects.
+        """Check we are banned when sending a txn that the node rejects.
 
         (Can't actually get banned, since bitcoind won't ban local peers.)"""
-        self.nodes[0].p2p.send_txs_and_test(
-            [tx], self.nodes[0], success=False, expect_disconnect=True, reject_reason=reject_reason)
-        self.reconnect_p2p()
+        self.p2p.send_txs_and_test(
+            [tx], self.nodes[0], success=False, expect_ban=True, reject_reason=reject_reason)
 
     def check_for_no_ban_on_rejected_tx(self, tx, reject_reason):
-        """Check we are not disconnected when sending a txn that the node rejects."""
-        self.nodes[0].p2p.send_txs_and_test(
+        """Check we are not banned when sending a txn that the node rejects."""
+        self.p2p.send_txs_and_test(
             [tx], self.nodes[0], success=False, reject_reason=reject_reason)
 
     def check_for_ban_on_rejected_block(self, block, reject_reason=None):
-        """Check we are disconnected when sending a block that the node rejects.
+        """Check we are banned when sending a block that the node rejects.
 
         (Can't actually get banned, since bitcoind won't ban local peers.)"""
-        self.nodes[0].p2p.send_blocks_and_test(
-            [block], self.nodes[0], success=False, reject_reason=reject_reason, expect_disconnect=True)
-        self.reconnect_p2p()
+        self.p2p.send_blocks_and_test(
+            [block], self.nodes[0], success=False, reject_reason=reject_reason, expect_ban=True)
 
     def run_test(self):
-        node, = self.nodes
+        node = self.nodes[0]
 
         self.bootstrap_p2p()
 
         tip = self.getbestblock(node)
 
-        self.log.info("Create some blocks with OP_1 coinbase for spending.")
+        logging.info("Create some blocks with OP_1 coinbase for spending.")
         blocks = []
         for _ in range(10):
             tip = self.build_block(tip)
             blocks.append(tip)
-        node.p2p.send_blocks_and_test(blocks, node, success=True)
+        self.p2p.send_blocks_and_test(blocks, node, success=True)
         spendable_outputs = [block.vtx[0] for block in blocks]
 
-        self.log.info("Mature the blocks and get out of IBD.")
+        logging.info("Mature the blocks and get out of IBD.")
         node.generate(100)
 
         tip = self.getbestblock(node)
 
-        self.log.info("Setting up spends to test and mining the fundings.")
+        logging.info("Setting up spends to test and mining the fundings.")
         fundings = []
 
         # Generate a key pair
@@ -235,11 +230,12 @@ class SchnorrTest(BitcoinTestFramework):
         schnorr1tx = create_fund_and_spend_tx(OP_1, 'schnorr')
 
         tip = self.build_block(tip, fundings)
-        node.p2p.send_blocks_and_test([tip], node)
+        self.p2p.send_blocks_and_test([tip], node)
 
-        self.log.info("Start preupgrade tests")
+        logging.info("Start preupgrade tests")
+        assert node.getblockheader(node.getbestblockhash())['mediantime'] < NOV2019_START_TIME
 
-        self.log.info("Sending rejected transactions via RPC")
+        logging.info("Sending rejected transactions via RPC")
         assert_raises_rpc_error(-26, PREUPGRADE_ECDSA_NULLDUMMY_ERROR,
                                 node.sendrawtransaction, ToHex(ecdsa1tx))
         assert_raises_rpc_error(-26, SCHNORR_LEGACY_MULTISIG_ERROR,
@@ -247,7 +243,7 @@ class SchnorrTest(BitcoinTestFramework):
         assert_raises_rpc_error(-26, PREUPGRADE_SCHNORR_MULTISIG_ERROR,
                                 node.sendrawtransaction, ToHex(schnorr1tx))
 
-        self.log.info(
+        logging.info(
             "Sending rejected transactions via net (banning depending on situation)")
         self.check_for_no_ban_on_rejected_tx(
             ecdsa1tx, PREUPGRADE_ECDSA_NULLDUMMY_ERROR)
@@ -256,125 +252,130 @@ class SchnorrTest(BitcoinTestFramework):
         self.check_for_no_ban_on_rejected_tx(
             schnorr1tx, PREUPGRADE_SCHNORR_MULTISIG_ERROR)
 
-        self.log.info(
+        logging.info(
             "Sending invalid transactions in blocks (and get banned!)")
         self.check_for_ban_on_rejected_block(
-            self.build_block(tip, [schnorr0tx]), BADINPUTS_ERROR)
+            self.build_block(tip, [schnorr0tx]), BADSIG_ERROR)
         self.check_for_ban_on_rejected_block(
-            self.build_block(tip, [schnorr1tx]), BADINPUTS_ERROR)
+            self.build_block(tip, [schnorr1tx]), BADSIG_ERROR)
 
-        self.log.info("Sending valid transaction via net, then mining it")
-        node.p2p.send_txs_and_test([ecdsa0tx], node)
+        logging.info("Sending valid transaction via net, then mining it")
+        self.p2p.send_txs_and_test([ecdsa0tx], node)
         assert_equal(node.getrawmempool(), [ecdsa0tx.hash])
         tip = self.build_block(tip, [ecdsa0tx])
-        node.p2p.send_blocks_and_test([tip], node)
+        self.p2p.send_blocks_and_test([tip], node)
         assert_equal(node.getrawmempool(), [])
 
         # Activation tests
 
-        self.log.info("Approach to just before upgrade activation")
+        logging.info("Approach to just before upgrade activation")
         # Move our clock to the uprade time so we will accept such future-timestamped blocks.
-        node.setmocktime(GRAVITON_START_TIME)
-        # Mine six blocks with timestamp starting at GRAVITON_START_TIME-1
+        node.setmocktime(NOV2019_START_TIME)
+        # Mine six blocks with timestamp starting at NOV2019_START_TIME-1
         blocks = []
         for i in range(-1, 5):
-            tip = self.build_block(tip, nTime=GRAVITON_START_TIME + i)
+            tip = self.build_block(tip, nTime=NOV2019_START_TIME + i)
             blocks.append(tip)
-        node.p2p.send_blocks_and_test(blocks, node)
+        self.p2p.send_blocks_and_test(blocks, node)
         assert_equal(node.getblockchaininfo()[
-                     'mediantime'], GRAVITON_START_TIME - 1)
+                     'mediantime'], NOV2019_START_TIME - 1)
 
-        self.log.info(
+        logging.info(
             "The next block will activate, but the activation block itself must follow old rules")
         self.check_for_ban_on_rejected_block(
-            self.build_block(tip, [schnorr0tx]), BADINPUTS_ERROR)
+            self.build_block(tip, [schnorr0tx]), BADSIG_ERROR)
 
-        self.log.info(
+        logging.info(
             "Send a lecacy ECDSA multisig into mempool, we will check after upgrade to make sure it didn't get cleaned out unnecessarily.")
-        node.p2p.send_txs_and_test([ecdsa0tx_2], node)
+        self.p2p.send_txs_and_test([ecdsa0tx_2], node)
         assert_equal(node.getrawmempool(), [ecdsa0tx_2.hash])
 
         # save this tip for later
         preupgrade_block = tip
 
-        self.log.info(
+        logging.info(
             "Mine the activation block itself, including a legacy nulldummy violation at the last possible moment")
         tip = self.build_block(tip, [ecdsa1tx])
-        node.p2p.send_blocks_and_test([tip], node)
+        self.p2p.send_blocks_and_test([tip], node)
 
-        self.log.info("We have activated!")
+        logging.info("We have activated!")
         assert_equal(node.getblockchaininfo()[
-                     'mediantime'], GRAVITON_START_TIME)
+                     'mediantime'], NOV2019_START_TIME)
         assert_equal(node.getrawmempool(), [ecdsa0tx_2.hash])
 
         # save this tip for later
         upgrade_block = tip
 
-        self.log.info(
+        logging.info(
             "Trying to mine a legacy nulldummy violation, but we are just barely too late")
         self.check_for_ban_on_rejected_block(
-            self.build_block(tip, [ecdsa1tx_2]), BADINPUTS_ERROR)
-        self.log.info(
+            self.build_block(tip, [ecdsa1tx_2]), BADSIG_ERROR)
+        logging.info(
             "If we try to submit it by mempool or RPC, the error code has changed but we still aren't banned")
         assert_raises_rpc_error(-26, POSTUPGRADE_ECDSA_NULLDUMMY_ERROR,
                                 node.sendrawtransaction, ToHex(ecdsa1tx_2))
         self.check_for_no_ban_on_rejected_tx(
             ecdsa1tx_2, POSTUPGRADE_ECDSA_NULLDUMMY_ERROR)
 
-        self.log.info(
+        logging.info(
             "Submitting a new Schnorr-multisig via net, and mining it in a block")
-        node.p2p.send_txs_and_test([schnorr1tx], node)
+        self.p2p.send_txs_and_test([schnorr1tx], node)
         assert_equal(set(node.getrawmempool()), {
                      ecdsa0tx_2.hash, schnorr1tx.hash})
         tip = self.build_block(tip, [schnorr1tx])
-        node.p2p.send_blocks_and_test([tip], node)
+        self.p2p.send_blocks_and_test([tip], node)
 
         # save this tip for later
         postupgrade_block = tip
 
-        self.log.info(
+        logging.info(
             "That legacy ECDSA multisig is still in mempool, let's mine it")
         assert_equal(node.getrawmempool(), [ecdsa0tx_2.hash])
         tip = self.build_block(tip, [ecdsa0tx_2])
-        node.p2p.send_blocks_and_test([tip], node)
+        self.p2p.send_blocks_and_test([tip], node)
         assert_equal(node.getrawmempool(), [])
 
-        self.log.info(
+        logging.info(
             "Trying Schnorr in legacy multisig remains invalid and banworthy as ever")
         self.check_for_ban_on_rejected_tx(
             schnorr0tx, SCHNORR_LEGACY_MULTISIG_ERROR)
         self.check_for_ban_on_rejected_block(
-            self.build_block(tip, [schnorr0tx]), BADINPUTS_ERROR)
+            self.build_block(tip, [schnorr0tx]), BADSIG_ERROR)
 
         # Deactivation tests
 
-        self.log.info(
+        logging.info(
             "Invalidating the post-upgrade blocks returns the transactions to mempool")
         node.invalidateblock(postupgrade_block.hash)
-        assert_equal(set(node.getrawmempool()), {
-                     ecdsa0tx_2.hash, schnorr1tx.hash})
-        self.log.info(
+        waitFor(10, lambda: set(node.getrawmempool()) == {ecdsa0tx_2.hash, schnorr1tx.hash})
+        logging.info(
             "Invalidating the upgrade block evicts the transactions valid only after upgrade")
         node.invalidateblock(upgrade_block.hash)
-        assert_equal(set(node.getrawmempool()), {ecdsa0tx_2.hash})
+        waitFor(10, lambda: set(node.getrawmempool()) == {ecdsa0tx_2.hash})
 
-        self.log.info("Return to our tip")
-        node.reconsiderblock(upgrade_block.hash)
-        node.reconsiderblock(postupgrade_block.hash)
+        logging.info("Return to our tip")
+        try:
+            node.reconsiderblock(upgrade_block.hash)
+            node.reconsiderblock(postupgrade_block.hash)
+        except Exception as e:
+            # Workaround for reconsiderblock bug;
+            # Even though the block reconsidered was valid, if another block
+            # is also reconsidered and fails, the call will return failure.
+            pass
         assert_equal(node.getbestblockhash(), tip.hash)
         assert_equal(node.getrawmempool(), [])
 
-        self.log.info(
+        logging.info(
             "Create an empty-block reorg that forks from pre-upgrade")
         tip = preupgrade_block
         blocks = []
         for _ in range(10):
             tip = self.build_block(tip)
             blocks.append(tip)
-        node.p2p.send_blocks_and_test(blocks, node)
+        self.p2p.send_blocks_and_test(blocks, node)
 
-        self.log.info("Transactions from orphaned blocks are sent into mempool ready to be mined again, including upgrade-dependent ones even though the fork deactivated and reactivated the upgrade.")
-        assert_equal(set(node.getrawmempool()), {
+        logging.info("Transactions from orphaned blocks are sent into mempool ready to be mined again, including upgrade-dependent ones even though the fork deactivated and reactivated the upgrade.")
+        waitFor(10, lambda: set(node.getrawmempool()) == {
                      ecdsa0tx_2.hash, schnorr1tx.hash})
         node.generate(1)
         tip = self.getbestblock(node)
