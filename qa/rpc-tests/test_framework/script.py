@@ -883,3 +883,11 @@ def testScriptRepr():
     x = CScript([OP_CHECKDATASIG])+b"\x11\x22\x33"
     # make sure repr doesn't fail
     assert "112233" in repr(x)
+
+# Wrapper function to ease porting ABC tests.
+def SignatureHashForkId(script, txTo, inIdx, hashtype, amount):
+    return txTo.SignatureHash(
+        scriptCode = script,
+        in_number = inIdx,
+        nValue = amount,
+        hashcode = hashtype)
