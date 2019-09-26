@@ -3205,6 +3205,7 @@ void CNode::DisconnectIfBanned()
         }
         else if (addr.IsLocal())
         {
+            nMisbehavior.store(0);
             LOGA("Warning: not banning local peer %s!\n", GetLogName());
         }
         else

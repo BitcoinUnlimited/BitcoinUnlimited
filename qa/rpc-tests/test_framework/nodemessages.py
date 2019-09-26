@@ -626,6 +626,7 @@ class CTransaction(object):
     def rehash(self):
         self.sha256 = None
         self.calc_sha256()
+        return self.hash
 
     def calc_sha256(self):
         if self.sha256 is None:
