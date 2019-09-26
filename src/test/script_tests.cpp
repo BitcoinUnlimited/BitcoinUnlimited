@@ -130,6 +130,54 @@ ScriptError_t ParseScriptError(const std::string &name)
 
 BOOST_FIXTURE_TEST_SUITE(script_tests, BasicTestingSetup)
 
+BOOST_AUTO_TEST_CASE(minimalpush)
+{
+    // Ensure that CheckMinimalPush always return true for non "pushing" opcodes
+    std::vector<uint8_t> dummy{};
+    for (const auto opcode : {OP_1NEGATE, OP_1, OP_2, OP_3, OP_4, OP_5, OP_6, OP_7, OP_8, OP_9, OP_10, OP_11, OP_12,
+             OP_13, OP_14, OP_15, OP_16})
+    {
+        BOOST_CHECK_EQUAL(CheckMinimalPush(dummy, opcode), true);
+    }
+
+    // Ensure that CheckMinimalPush return false in case we are try use a push opcodes operator whereas
+    // we should have use OP_0 instead (i.e. data array is empty array)
+    for (const auto opcode_b : {OP_PUSHDATA1, OP_PUSHDATA2, OP_PUSHDATA4})
+    {
+        BOOST_CHECK_EQUAL(CheckMinimalPush(dummy, opcode_b), false);
+    }
+
+    // If data.size() is equal to 1 we should have used OP_1 .. OP_16.
+    dummy = {0};
+    BOOST_CHECK_EQUAL(CheckMinimalPush(dummy, OP_PUSHDATA4), false);
+
+    // Initialize the vector s to that its size is between 2 and 75
+    for (int i = 0; i <= 10; i++)
+    {
+        dummy.push_back(1);
+    }
+    // In this case we should a direct push (opcode indicating number of bytes  pushed + those bytes)
+    BOOST_CHECK_EQUAL(CheckMinimalPush(dummy, OP_PUSHDATA4), false);
+
+    // extend it to have the length between 76 and 255
+    for (int i = 11; i < 240; i++)
+    {
+        dummy.push_back(1);
+    }
+    // in this case we must have used OP_PUSHDATA1
+    BOOST_CHECK_EQUAL(CheckMinimalPush(dummy, OP_PUSHDATA4), false);
+    BOOST_CHECK_EQUAL(CheckMinimalPush(dummy, OP_PUSHDATA1), true);
+
+    // extend it to have the length between 256 and 65535
+    for (int i = 241; i < 300; i++)
+    {
+        dummy.push_back(1);
+    }
+    // in this case we must have used OP_PUSHDATA2
+    BOOST_CHECK_EQUAL(CheckMinimalPush(dummy, OP_PUSHDATA4), false);
+    BOOST_CHECK_EQUAL(CheckMinimalPush(dummy, OP_PUSHDATA2), true);
+}
+
 BOOST_AUTO_TEST_CASE(minimaldata_creation)
 {
     std::vector<unsigned char> vec(1);
