@@ -260,7 +260,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock
     bool fMerkleRootCorrect = true;
     {
         {
-            READLOCK(orphanpool.cs);
+            READLOCK(orphanpool.cs_orphanpool);
             for (auto &mi : orphanpool.mapOrphanTransactions)
             {
                 uint64_t cheapHash = GetShortID(mi.first);
@@ -633,7 +633,7 @@ static bool ReconstructBlock(CNode *pfrom,
                 }
                 else
                 {
-                    READLOCK(orphanpool.cs);
+                    READLOCK(orphanpool.cs_orphanpool);
                     std::map<uint256, CTxOrphanPool::COrphanTx>::iterator iter2 =
                         orphanpool.mapOrphanTransactions.find(hash);
                     if (iter2 != orphanpool.mapOrphanTransactions.end())

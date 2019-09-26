@@ -7,6 +7,7 @@
 #ifndef BITCOIN_SYNC_H
 #define BITCOIN_SYNC_H
 
+#include "deadlock-detection/threaddeadlock.h"
 #include "recursive_shared_mutex.h"
 #include "threadsafety.h"
 #include "util.h"
@@ -19,44 +20,6 @@
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/thread/thread.hpp>
 
-////////////////////////////////////////////////
-//                                            //
-// THE SIMPLE DEFINITION, EXCLUDING DEBUG CODE //
-//                                            //
-////////////////////////////////////////////////
-
-/*
-CCriticalSection mutex;
-    boost::recursive_mutex mutex;
-
-LOCK(mutex);
-    boost::unique_lock<boost::recursive_mutex> criticalblock(mutex);
-
-LOCK2(mutex1, mutex2);
-    boost::unique_lock<boost::recursive_mutex> criticalblock1(mutex1);
-    boost::unique_lock<boost::recursive_mutex> criticalblock2(mutex2);
-
-TRY_LOCK(mutex, name);
-    boost::unique_lock<boost::recursive_mutex> name(mutex, boost::try_to_lock_t);
-
-ENTER_CRITICAL_SECTION(mutex); // no RAII
-    mutex.lock();
-
-LEAVE_CRITICAL_SECTION(mutex); // no RAII
-    mutex.unlock();
- */
-
-///////////////////////////////
-//                           //
-// THE ACTUAL IMPLEMENTATION //
-//                           //
-///////////////////////////////
-
-#ifdef DEBUG_LOCKORDER
-// BU if a CCriticalSection is allocated on the heap we need to clean it from the lockorder map upon destruction because
-// another CCriticalSection could be created on top of it.
-void DeleteCritical(const void *cs);
-#endif
 
 /**
  * Template mixin that adds -Wthread-safety locking
@@ -93,58 +56,6 @@ public:
 #endif
 
 #ifndef DEBUG_LOCKORDER
-typedef recursive_shared_mutex CRecursiveSharedCriticalSection;
-/** Define a named, shared critical section that is named in debug builds.
-    Named critical sections are useful in conjunction with a lock analyzer to discover bottlenecks. */
-#define RSCRITSEC(x) CRecursiveSharedCriticalSection x
-#else
-
-/** A shared critical section allows multiple entities to recursively take the critical section in a "shared" mode,
-    but only one entity to recursively take the critical section exclusively.
-
-    A RecursiveSharedCriticalSection IS recursive.
-*/
-class CRecursiveSharedCriticalSection : public recursive_shared_mutex
-{
-public:
-    const char *name;
-    CRecursiveSharedCriticalSection() : name(nullptr) {}
-    CRecursiveSharedCriticalSection(const char *n) : name(n)
-    {
-// print the address of named critical sections so they can be found in the mutrace output
-#ifdef ENABLE_MUTRACE
-        if (name)
-        {
-            printf("CRecursiveSharedCriticalSection %s at %p\n", name, this);
-            fflush(stdout);
-        }
-#endif
-    }
-
-    ~CRecursiveSharedCriticalSection()
-    {
-#ifdef ENABLE_MUTRACE
-        if (name)
-        {
-            printf("Destructing CRecursiveSharedCriticalSection %s\n", name);
-            fflush(stdout);
-        }
-#endif
-        DeleteCritical((void *)this);
-    }
-    // shared lock functions
-    void lock_shared() SHARED_LOCK_FUNCTION() { recursive_shared_mutex::lock_shared(); }
-    bool try_lock_shared() SHARED_TRYLOCK_FUNCTION(true) { return recursive_shared_mutex::try_lock_shared(); }
-    void unlock_shared() UNLOCK_FUNCTION() { recursive_shared_mutex::unlock_shared(); }
-    // exclusive lock functions
-    void lock() EXCLUSIVE_LOCK_FUNCTION() { recursive_shared_mutex::lock(); }
-    bool try_lock() EXCLUSIVE_TRYLOCK_FUNCTION(true) { return recursive_shared_mutex::try_lock(); }
-    void unlock() UNLOCK_FUNCTION() { recursive_shared_mutex::unlock(); }
-};
-#define RSCRITSEC(zzname) CRecursiveSharedCriticalSection zzname(#zzname)
-#endif
-
-#ifndef DEBUG_LOCKORDER
 typedef AnnotatedMixin<boost::shared_mutex> CSharedCriticalSection;
 /** Define a named, shared critical section that is named in debug builds.
     Named critical sections are useful in conjunction with a lock analyzer to discover bottlenecks. */
@@ -161,30 +72,49 @@ typedef AnnotatedMixin<boost::shared_mutex> CSharedCriticalSection;
 class CSharedCriticalSection : public AnnotatedMixin<boost::shared_mutex>
 {
 public:
-    class LockInfo
-    {
-    public:
-        const char *file;
-        unsigned int line;
-        LockInfo() : file(""), line(0) {}
-        LockInfo(const char *f, unsigned int l) : file(f), line(l) {}
-    };
-
-    std::mutex setlock;
-    std::map<uint64_t, LockInfo> sharedowners;
     const char *name;
-    uint64_t exclusiveOwner;
-    CSharedCriticalSection(const char *name);
     CSharedCriticalSection();
+    CSharedCriticalSection(const char *name);
     ~CSharedCriticalSection();
-    void lock_shared();
-    bool try_lock_shared();
-    void unlock_shared();
-    void lock();
-    void unlock();
-    bool try_lock();
+    void lock_shared() { boost::shared_mutex::lock_shared(); }
+    void unlock_shared() { boost::shared_mutex::unlock_shared(); }
+    bool try_lock_shared() { return boost::shared_mutex::try_lock_shared(); }
+    void lock() { boost::shared_mutex::lock(); }
+    void unlock() { boost::shared_mutex::unlock(); }
+    bool try_lock() { return boost::shared_mutex::try_lock(); }
 };
 #define SCRITSEC(zzname) CSharedCriticalSection zzname(#zzname)
+#endif
+
+#ifndef DEBUG_LOCKORDER
+typedef recursive_shared_mutex CRecursiveSharedCriticalSection;
+/** Define a named, shared critical section that is named in debug builds.
+    Named critical sections are useful in conjunction with a lock analyzer to discover bottlenecks. */
+#define RSCRITSEC(x) CRecursiveSharedCriticalSection x
+#else
+
+/** A shared critical section allows multiple entities to recursively take the critical section in a "shared" mode,
+    but only one entity to recursively take the critical section exclusively.
+
+    A RecursiveSharedCriticalSection IS recursive.
+*/
+class CRecursiveSharedCriticalSection : public recursive_shared_mutex
+{
+public:
+    const char *name;
+    CRecursiveSharedCriticalSection();
+    CRecursiveSharedCriticalSection(const char *n);
+    ~CRecursiveSharedCriticalSection();
+    // shared lock functions
+    void lock_shared() SHARED_LOCK_FUNCTION() { recursive_shared_mutex::lock_shared(); }
+    bool try_lock_shared() SHARED_TRYLOCK_FUNCTION(true) { return recursive_shared_mutex::try_lock_shared(); }
+    void unlock_shared() UNLOCK_FUNCTION() { recursive_shared_mutex::unlock_shared(); }
+    // exclusive lock functions
+    void lock() EXCLUSIVE_LOCK_FUNCTION() { recursive_shared_mutex::lock(); }
+    bool try_lock() EXCLUSIVE_TRYLOCK_FUNCTION(true) { return recursive_shared_mutex::try_lock(); }
+    void unlock() UNLOCK_FUNCTION() { recursive_shared_mutex::unlock(); }
+};
+#define RSCRITSEC(zzname) CRecursiveSharedCriticalSection zzname(#zzname)
 #endif
 
 // This object can be locked or shared locked some time during its lifetime.
@@ -231,16 +161,6 @@ public:
     ~CDeferredSharedLocker() { unlock(); }
 };
 
-// This class unlocks a shared lock for the duration of its life
-class CSharedUnlocker
-{
-    CSharedCriticalSection &cs;
-
-public:
-    CSharedUnlocker(CSharedCriticalSection &c) : cs(c) { cs.unlock_shared(); }
-    ~CSharedUnlocker() { cs.lock_shared(); }
-};
-
 
 /** Wrapped boost mutex: supports waiting but not recursive locking */
 typedef AnnotatedMixin<boost::mutex> CWaitableCriticalSection;
@@ -252,9 +172,14 @@ typedef boost::condition_variable CConditionVariable;
 typedef boost::condition_variable_any CCond;
 
 #ifdef DEBUG_LOCKORDER
-void EnterCritical(const char *pszName, const char *pszFile, unsigned int nLine, void *cs, bool fTry = false);
-void LeaveCritical();
-std::string LocksHeld();
+void EnterCritical(const char *pszName,
+    const char *pszFile,
+    unsigned int nLine,
+    void *cs,
+    LockType locktype,
+    OwnershipType ownership,
+    bool fTry = false);
+void LeaveCritical(void *cs);
 /** Asserts in debug builds if a critical section is not held. */
 void AssertLockHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs);
 void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs);
@@ -272,10 +197,12 @@ void static inline EnterCritical(const char *pszName,
     const char *pszFile,
     unsigned int nLine,
     void *cs,
+    LockType locktype,
+    OwnershipType ownership,
     bool fTry = false)
 {
 }
-void static inline LeaveCritical() {}
+void static inline LeaveCritical(void *cs) {}
 void static inline AssertLockHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs) {}
 void static inline AssertLockNotHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs) {}
 void static inline AssertWriteLockHeldInternal(const char *pszName,
@@ -317,7 +244,7 @@ private:
     const char *file = "unknown-file";
     unsigned int line = 0;
 
-    void Enter(const char *pszName, const char *pszFile, unsigned int nLine)
+    void Enter(const char *pszName, const char *pszFile, unsigned int nLine, LockType type)
     {
 #ifdef DEBUG_LOCKTIME
         uint64_t startWait = GetStopwatch();
@@ -325,13 +252,14 @@ private:
         name = pszName;
         file = pszFile;
         line = nLine;
-        EnterCritical(pszName, pszFile, nLine, (void *)(lock.mutex()));
+        EnterCritical(pszName, pszFile, nLine, (void *)(lock.mutex()), type, OwnershipType::EXCLUSIVE, false);
 #ifdef DEBUG_LOCKCONTENTION
         if (!lock.try_lock())
         {
             PrintLockContention(pszName, pszFile, nLine);
 #endif
             lock.lock();
+            SetWaitingToHeld((void *)(lock.mutex()), OwnershipType::EXCLUSIVE);
 #ifdef DEBUG_LOCKCONTENTION
         }
 #endif
@@ -345,19 +273,19 @@ private:
 #endif
     }
 
-    bool TryEnter(const char *pszName, const char *pszFile, unsigned int nLine)
+    bool TryEnter(const char *pszName, const char *pszFile, unsigned int nLine, LockType type)
     {
         name = pszName;
         file = pszFile;
         line = nLine;
-        EnterCritical(pszName, pszFile, nLine, (void *)(lock.mutex()), true);
+        EnterCritical(pszName, pszFile, nLine, (void *)(lock.mutex()), type, OwnershipType::EXCLUSIVE, true);
         lock.try_lock();
         if (!lock.owns_lock())
         {
 #ifdef DEBUG_LOCKTIME
             lockedTime = 0;
 #endif
-            LeaveCritical();
+            LeaveCritical((void *)(lock.mutex()));
         }
 #ifdef DEBUG_LOCKTIME
         else
@@ -367,34 +295,46 @@ private:
     }
 
 public:
-    CMutexLock(Mutex &mutexIn, const char *pszName, const char *pszFile, unsigned int nLine, bool fTry = false)
-        EXCLUSIVE_LOCK_FUNCTION(mutexIn)
+    CMutexLock(Mutex &mutexIn,
+        const char *pszName,
+        const char *pszFile,
+        unsigned int nLine,
+        LockType type,
+        bool fTry = false) EXCLUSIVE_LOCK_FUNCTION(mutexIn)
         : lock(mutexIn, boost::defer_lock)
     {
+        // we no longer allow naming critical sections cs, please name it something more meaningful
+        assert(std::string(pszName) != "cs");
         if (fTry)
-            TryEnter(pszName, pszFile, nLine);
+            TryEnter(pszName, pszFile, nLine, type);
         else
-            Enter(pszName, pszFile, nLine);
+            Enter(pszName, pszFile, nLine, type);
     }
 
-    CMutexLock(Mutex *pmutexIn, const char *pszName, const char *pszFile, unsigned int nLine, bool fTry = false)
-        EXCLUSIVE_LOCK_FUNCTION(pmutexIn)
+    CMutexLock(Mutex *pmutexIn,
+        const char *pszName,
+        const char *pszFile,
+        unsigned int nLine,
+        LockType type,
+        bool fTry = false) EXCLUSIVE_LOCK_FUNCTION(pmutexIn)
     {
         if (!pmutexIn)
             return;
 
+        // we no longer allow naming critical sections cs, please name it something more meaningful
+        assert(std::string(pszName) != "cs");
         lock = boost::unique_lock<Mutex>(*pmutexIn, boost::defer_lock);
         if (fTry)
-            TryEnter(pszName, pszFile, nLine);
+            TryEnter(pszName, pszFile, nLine, type);
         else
-            Enter(pszName, pszFile, nLine);
+            Enter(pszName, pszFile, nLine, type);
     }
 
     ~CMutexLock() UNLOCK_FUNCTION()
     {
         if (lock.owns_lock())
         {
-            LeaveCritical();
+            LeaveCritical((void *)(lock.mutex()));
 #ifdef DEBUG_LOCKTIME
             uint64_t doneTime = GetStopwatch();
             if (doneTime - lockedTime > LOCK_WARN_TIME)
@@ -423,7 +363,7 @@ private:
     const char *file = "unknown-file";
     unsigned int line = 0;
 
-    void Enter(const char *pszName, const char *pszFile, unsigned int nLine)
+    void Enter(const char *pszName, const char *pszFile, unsigned int nLine, LockType type)
     {
 #ifdef DEBUG_LOCKTIME
         uint64_t startWait = GetStopwatch();
@@ -431,7 +371,7 @@ private:
         name = pszName;
         file = pszFile;
         line = nLine;
-        EnterCritical(pszName, pszFile, nLine, (void *)(lock.mutex()));
+        EnterCritical(pszName, pszFile, nLine, (void *)(lock.mutex()), type, OwnershipType::SHARED, false);
 // LOG(LCK,"try ReadLock %p %s by %d\n", lock.mutex(), name ? name : "", boost::this_thread::get_id());
 #ifdef DEBUG_LOCKCONTENTION
         if (!lock.try_lock())
@@ -439,6 +379,7 @@ private:
             PrintLockContention(pszName, pszFile, nLine);
 #endif
             lock.lock();
+            SetWaitingToHeld((void *)(lock.mutex()), OwnershipType::SHARED);
 #ifdef DEBUG_LOCKCONTENTION
         }
 #endif
@@ -452,18 +393,18 @@ private:
 #endif
     }
 
-    bool TryEnter(const char *pszName, const char *pszFile, unsigned int nLine)
+    bool TryEnter(const char *pszName, const char *pszFile, unsigned int nLine, LockType type)
     {
         name = pszName;
         file = pszFile;
         line = nLine;
-        EnterCritical(pszName, pszFile, nLine, (void *)(lock.mutex()), true);
+        EnterCritical(pszName, pszFile, nLine, (void *)(lock.mutex()), type, OwnershipType::SHARED, true);
         if (!lock.try_lock())
         {
 #ifdef DEBUG_LOCKTIME
             lockedTime = 0;
 #endif
-            LeaveCritical();
+            LeaveCritical((void *)(lock.mutex()));
         }
 #ifdef DEBUG_LOCKTIME
         else
@@ -473,34 +414,46 @@ private:
     }
 
 public:
-    CMutexReadLock(Mutex &mutexIn, const char *pszName, const char *pszFile, unsigned int nLine, bool fTry = false)
-        SHARED_LOCK_FUNCTION(mutexIn)
+    CMutexReadLock(Mutex &mutexIn,
+        const char *pszName,
+        const char *pszFile,
+        unsigned int nLine,
+        LockType type,
+        bool fTry = false) SHARED_LOCK_FUNCTION(mutexIn)
         : lock(mutexIn, boost::defer_lock)
     {
+        // we no longer allow naming critical sections cs, please name it something more meaningful
+        assert(std::string(pszName) != "cs");
         if (fTry)
-            TryEnter(pszName, pszFile, nLine);
+            TryEnter(pszName, pszFile, nLine, type);
         else
-            Enter(pszName, pszFile, nLine);
+            Enter(pszName, pszFile, nLine, type);
     }
 
-    CMutexReadLock(Mutex *pmutexIn, const char *pszName, const char *pszFile, unsigned int nLine, bool fTry = false)
-        SHARED_LOCK_FUNCTION(pmutexIn)
+    CMutexReadLock(Mutex *pmutexIn,
+        const char *pszName,
+        const char *pszFile,
+        unsigned int nLine,
+        LockType type,
+        bool fTry = false) SHARED_LOCK_FUNCTION(pmutexIn)
     {
         if (!pmutexIn)
             return;
 
+        // we no longer allow naming critical sections cs, please name it something more meaningful
+        assert(std::string(pszName) != "cs");
         lock = boost::shared_lock<Mutex>(*pmutexIn, boost::defer_lock);
         if (fTry)
-            TryEnter(pszName, pszFile, nLine);
+            TryEnter(pszName, pszFile, nLine, type);
         else
-            Enter(pszName, pszFile, nLine);
+            Enter(pszName, pszFile, nLine, type);
     }
 
     ~CMutexReadLock() UNLOCK_FUNCTION()
     {
         if (lock.owns_lock())
         {
-            LeaveCritical();
+            LeaveCritical((void *)(lock.mutex()));
 #ifdef DEBUG_LOCKTIME
             int64_t doneTime = GetStopwatch();
             if (doneTime - lockedTime > LOCK_WARN_TIME)
@@ -518,39 +471,43 @@ public:
 typedef CMutexReadLock<CRecursiveSharedCriticalSection> CRecursiveReadBlock;
 typedef CMutexLock<CRecursiveSharedCriticalSection> CRecursiveWriteBlock;
 
-#define RECURSIVEREADLOCK(cs) CRecursiveReadBlock UNIQUIFY(recursivereadblock)(cs, #cs, __FILE__, __LINE__)
-#define RECURSIVEWRITELOCK(cs) CRecursiveWriteBlock UNIQUIFY(writeblock)(cs, #cs, __FILE__, __LINE__)
-#define RECURSIVEREADLOCK2(cs1, cs2)                                         \
-    CReadBlock UNIQUIFY(recursivereadblock1)(cs1, #cs1, __FILE__, __LINE__), \
-        UNIQUIFY(recursivereadblock2)(cs2, #cs2, __FILE__, __LINE__)
-#define TRY_RECURSIVE_READ_LOCK(cs, name) CRecursiveReadBlock name(cs, #cs, __FILE__, __LINE__, true)
+#define RECURSIVEREADLOCK(cs) \
+    CRecursiveReadBlock UNIQUIFY(recursivereadblock)(cs, #cs, __FILE__, __LINE__, LockType::RECURSIVE_SHARED_MUTEX)
+#define RECURSIVEWRITELOCK(cs) \
+    CRecursiveWriteBlock UNIQUIFY(writeblock)(cs, #cs, __FILE__, __LINE__, LockType::RECURSIVE_SHARED_MUTEX)
+#define RECURSIVEREADLOCK2(cs1, cs2)                                                                           \
+    CReadBlock UNIQUIFY(recursivereadblock1)(cs1, #cs1, __FILE__, __LINE__, LockType::RECURSIVE_SHARED_MUTEX), \
+        UNIQUIFY(recursivereadblock2)(cs2, #cs2, __FILE__, __LINE__, LockType::RECURSIVE_SHARED_MUTEX)
+#define TRY_RECURSIVE_READ_LOCK(cs, name) \
+    CRecursiveReadBlock name(cs, #cs, __FILE__, __LINE__, LockType::RECURSIVE_SHARED_MUTEX, true)
 
 typedef CMutexReadLock<CSharedCriticalSection> CReadBlock;
 typedef CMutexLock<CSharedCriticalSection> CWriteBlock;
 typedef CMutexLock<CCriticalSection> CCriticalBlock;
 
-#define READLOCK(cs) CReadBlock UNIQUIFY(readblock)(cs, #cs, __FILE__, __LINE__)
-#define WRITELOCK(cs) CWriteBlock UNIQUIFY(writeblock)(cs, #cs, __FILE__, __LINE__)
-#define READLOCK2(cs1, cs2) \
-    CReadBlock UNIQUIFY(readblock1)(cs1, #cs1, __FILE__, __LINE__), UNIQUIFY(readblock2)(cs2, #cs2, __FILE__, __LINE__)
-#define TRY_READ_LOCK(cs, name) CReadBlock name(cs, #cs, __FILE__, __LINE__, true)
+#define READLOCK(cs) CReadBlock UNIQUIFY(readblock)(cs, #cs, __FILE__, __LINE__, LockType::SHARED_MUTEX)
+#define WRITELOCK(cs) CWriteBlock UNIQUIFY(writeblock)(cs, #cs, __FILE__, __LINE__, LockType::SHARED_MUTEX)
+#define READLOCK2(cs1, cs2)                                                                 \
+    CReadBlock UNIQUIFY(readblock1)(cs1, #cs1, __FILE__, __LINE__, LockType::SHARED_MUTEX), \
+        UNIQUIFY(readblock2)(cs2, #cs2, __FILE__, __LINE__, LockType::SHARED_MUTEX)
+#define TRY_READ_LOCK(cs, name) CReadBlock name(cs, #cs, __FILE__, __LINE__, LockType::SHARED_MUTEX, true)
 
-#define LOCK(cs) CCriticalBlock UNIQUIFY(criticalblock)(cs, #cs, __FILE__, __LINE__)
-#define LOCK2(cs1, cs2)                                                     \
-    CCriticalBlock UNIQUIFY(criticalblock1)(cs1, #cs1, __FILE__, __LINE__), \
-        UNIQUIFY(criticalblock2)(cs2, #cs2, __FILE__, __LINE__)
-#define TRY_LOCK(cs, name) CCriticalBlock name(cs, #cs, __FILE__, __LINE__, true)
+#define LOCK(cs) CCriticalBlock UNIQUIFY(criticalblock)(cs, #cs, __FILE__, __LINE__, LockType::RECURSIVE_MUTEX)
+#define LOCK2(cs1, cs2)                                                                                \
+    CCriticalBlock UNIQUIFY(criticalblock1)(cs1, #cs1, __FILE__, __LINE__, LockType::RECURSIVE_MUTEX), \
+        UNIQUIFY(criticalblock2)(cs2, #cs2, __FILE__, __LINE__, LockType::RECURSIVE_MUTEX)
+#define TRY_LOCK(cs, name) CCriticalBlock name(cs, #cs, __FILE__, __LINE__, LockType::RECURSIVE_MUTEX, true)
 
-#define ENTER_CRITICAL_SECTION(cs)                             \
-    {                                                          \
-        EnterCritical(#cs, __FILE__, __LINE__, (void *)(&cs)); \
-        (cs).lock();                                           \
+#define ENTER_CRITICAL_SECTION(cs)                                                                                  \
+    {                                                                                                               \
+        EnterCritical(#cs, __FILE__, __LINE__, (void *)(&cs), LockType::RECURSIVE_MUTEX, OwnershipType::EXCLUSIVE); \
+        (cs).lock();                                                                                                \
     }
 
 #define LEAVE_CRITICAL_SECTION(cs) \
     {                              \
         (cs).unlock();             \
-        LeaveCritical();           \
+        LeaveCritical(&cs);        \
     }
 
 class CSemaphore
@@ -643,24 +600,6 @@ public:
     ~CSemaphoreGrant() { Release(); }
     operator bool() { return fHaveGrant; }
 };
-
-// BU move from sync.c because I need to create these in globals.cpp
-struct CLockLocation
-{
-    CLockLocation(const char *pszName, const char *pszFile, unsigned int nLine, bool fTryIn);
-    std::string ToString() const;
-    std::string MutexName() const;
-
-    bool fTry;
-
-private:
-    std::string mutexName;
-    std::string sourceFile;
-    unsigned int sourceLine;
-};
-
-typedef std::vector<std::pair<void *, CLockLocation> > LockStack;
-typedef std::map<std::pair<void *, void *>, LockStack> LockStackMap;
 
 /** A thread corral is a granular thread organization technique.
 Code is assigned to a corral via Enter(...) and Exit(...) APIs (but use the scoped CCorralLock object instead of direct

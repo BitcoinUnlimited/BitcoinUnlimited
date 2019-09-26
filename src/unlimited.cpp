@@ -2093,9 +2093,6 @@ UniValue validateblocktemplate(const UniValue &params, bool fHelp)
 }
 
 #ifdef DEBUG
-#ifdef DEBUG_LOCKORDER
-extern std::map<std::pair<void *, void *>, LockStack> lockorders;
-#endif
 
 extern std::vector<std::string> vUseDNSSeeds;
 extern std::list<CNode *> vNodesDisconnected;
@@ -2148,7 +2145,7 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     ret.pushKV("vNodes", (int64_t)vNodes.size());
     ret.pushKV("vNodesDisconnected", (int64_t)vNodesDisconnected.size());
     {
-        READLOCK(orphanpool.cs);
+        READLOCK(orphanpool.cs_orphanpool);
         ret.pushKV("mapOrphanTransactions", (int64_t)orphanpool.mapOrphanTransactions.size());
         ret.pushKV("mapOrphanTransactionsByPrev", (int64_t)orphanpool.mapOrphanTransactionsByPrev.size());
     }
@@ -2164,11 +2161,18 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         ret.pushKV("txCommitQ", (uint64_t)txCommitQ->size());
     ret.pushKV("txInQ", (uint64_t)txInQ.size());
     ret.pushKV("txDeferQ", (uint64_t)txDeferQ.size());
-
 #ifdef DEBUG_LOCKORDER
-    ret.pushKV("lockorders", (uint64_t)lockorders.size());
+    {
+        std::lock_guard<std::mutex> lock(lockdata.dd_mutex);
+        uint64_t lockorderssize = 0;
+        lockorderssize += lockdata.readlockswaiting.size();
+        lockorderssize += lockdata.writelockswaiting.size();
+        lockorderssize += lockdata.readlocksheld.size();
+        lockorderssize += lockdata.writelocksheld.size();
+        lockorderssize *= 2;
+        ret.pushKV("lockorders", lockorderssize);
+    }
 #endif
-
     LOCK(cs_vNodes);
     int disconnected = 0; // watch # of disconnected nodes to ensure they are being cleaned up
     for (std::vector<CNode *>::iterator it = vNodes.begin(); it != vNodes.end(); ++it)
@@ -2319,7 +2323,7 @@ UniValue getaddressforms(const UniValue &params, bool fHelp)
 
 std::string CStatusString::GetPrintable() const
 {
-    LOCK(cs);
+    LOCK(cs_status_string);
     if (strSet.empty())
         return "ready";
     std::string ret;
@@ -2335,12 +2339,12 @@ std::string CStatusString::GetPrintable() const
 
 void CStatusString::Set(const std::string &yourStatus)
 {
-    LOCK(cs);
+    LOCK(cs_status_string);
     strSet.insert(yourStatus);
 }
 
 void CStatusString::Clear(const std::string &yourStatus)
 {
-    LOCK(cs);
+    LOCK(cs_status_string);
     strSet.erase(yourStatus);
 }

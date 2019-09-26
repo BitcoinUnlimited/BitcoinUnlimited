@@ -36,7 +36,7 @@ public:
     {
         unsigned int size = pDoubleSpend->GetTxSize();
 
-        std::lock_guard<std::mutex> lock(cs);
+        std::lock_guard<std::mutex> lock(cs_relayLimiter);
         int64_t limit = GetArg("-limitrespendrelay", DEFAULT_LIMITRESPENDRELAY);
         if (RateLimitExceeded(respendCount, lastRespendTime, limit, size))
         {
@@ -51,7 +51,7 @@ public:
 private:
     double respendCount;
     int64_t lastRespendTime;
-    std::mutex cs;
+    std::mutex cs_relayLimiter;
 };
 
 } // ns anon

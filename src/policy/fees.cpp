@@ -544,7 +544,7 @@ CFeeRate CBlockPolicyEstimator::estimateFee(int confTarget)
 
 CFeeRate CBlockPolicyEstimator::estimateSmartFee(int confTarget, int *answerFoundAtTarget, const CTxMemPool &pool)
 {
-    AssertLockHeld(pool.cs);
+    AssertLockHeld(pool.cs_txmempool);
     if (answerFoundAtTarget)
         *answerFoundAtTarget = confTarget;
     // Return failure if trying to analyze a target we're not tracking
@@ -582,7 +582,7 @@ double CBlockPolicyEstimator::estimatePriority(int confTarget)
 
 double CBlockPolicyEstimator::estimateSmartPriority(int confTarget, int *answerFoundAtTarget, const CTxMemPool &pool)
 {
-    AssertLockHeld(pool.cs);
+    AssertLockHeld(pool.cs_txmempool);
     if (answerFoundAtTarget)
         *answerFoundAtTarget = confTarget;
     // Return failure if trying to analyze a target we're not tracking

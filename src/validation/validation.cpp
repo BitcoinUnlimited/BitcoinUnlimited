@@ -506,7 +506,7 @@ bool LoadBlockIndexDB()
 void UnloadBlockIndex()
 {
     {
-        WRITELOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs_orphanpool);
         orphanpool.mapOrphanTransactions.clear();
         orphanpool.mapOrphanTransactionsByPrev.clear();
         orphanpool.nBytesOrphanPool = 0;
@@ -2931,7 +2931,7 @@ static void ResubmitTransactions(CBlock &block)
     //
     // We must hold the mempool lock throughout otherwise it would be possible for some txns to slip back into
     // the mempool from the csCommitQFinal.
-    WRITELOCK(mempool.cs);
+    WRITELOCK(mempool.cs_txmempool);
     {
         // Resubmit the block first
         for (const auto &ptx : block.vtx)

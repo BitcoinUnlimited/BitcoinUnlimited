@@ -70,6 +70,12 @@ core_write.cpp
 cuckoocache.h
 dbwrapper.cpp
 dbwrapper.h
+deadlock-detection/locklocation.cpp
+deadlock-detection/locklocation.h
+deadlock-detection/lockorder.cpp
+deadlock-detection/lockorder.h
+deadlock-detection/threaddeadlock.cpp
+deadlock-detection/threaddeadlock.h
 dosman.cpp
 dosman.h
 dstencode.cpp

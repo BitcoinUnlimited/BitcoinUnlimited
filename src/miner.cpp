@@ -232,7 +232,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     assert(pindexPrev); // can't make a new block if we don't even have the genesis block
 
     {
-        READLOCK(mempool.cs);
+        READLOCK(mempool.cs_txmempool);
         nHeight = pindexPrev->nHeight + 1;
 
         pblock->nTime = GetAdjustedTime();
@@ -546,7 +546,7 @@ void BlockAssembler::SortForBlock(const CTxMemPool::setEntries &package, std::ve
 // cause any loss of fees with this mining algorithm, when the block is nearly full.
 void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, bool fCanonical)
 {
-    AssertLockHeld(mempool.cs);
+    AssertLockHeld(mempool.cs_txmempool);
 
     CTxMemPool::txiter iter;
     uint64_t nPackageFailures = 0;

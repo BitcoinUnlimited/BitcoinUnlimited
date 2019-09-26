@@ -32,6 +32,7 @@
 #include "rpc/server.h"
 #include "script/standard.h"
 #include "stat.h"
+#include "sync.h"
 #include "timedata.h"
 #include "tinyformat.h"
 #include "tweak.h"
@@ -47,7 +48,6 @@
 
 #include <atomic>
 #include <boost/lexical_cast.hpp>
-#include <boost/thread/tss.hpp> // for boost::thread_specific_ptr
 #include <inttypes.h>
 #include <iomanip>
 #include <list>
@@ -57,9 +57,7 @@
 using namespace std;
 
 #ifdef DEBUG_LOCKORDER
-boost::mutex dd_mutex;
-std::map<std::pair<void *, void *>, LockStack> lockorders;
-boost::thread_specific_ptr<LockStack> lockstack;
+LockData lockdata;
 #endif
 
 

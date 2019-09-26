@@ -377,7 +377,7 @@ bool AbortNode(CValidationState &state, const std::string &strMessage, const std
 // too slowly or too quickly).
 //
 void PartitionCheck(bool (*initialDownloadCheck)(),
-    CCriticalSection &cs,
+    CCriticalSection &cs_partitionCheck,
     const CBlockIndex *const &bestHeader,
     int64_t nPowTargetSpacing)
 {
@@ -398,7 +398,7 @@ void PartitionCheck(bool (*initialDownloadCheck)(),
     std::string strWarning;
     int64_t startTime = GetAdjustedTime() - SPAN_SECONDS;
 
-    LOCK(cs);
+    LOCK(cs_partitionCheck);
     const CBlockIndex *i = bestHeader;
     int nBlocks = 0;
     while (i->GetBlockTime() >= startTime)
@@ -700,7 +700,7 @@ void MainCleanup()
 
     {
         // orphan transactions
-        WRITELOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs_orphanpool);
         orphanpool.mapOrphanTransactions.clear();
         orphanpool.mapOrphanTransactionsByPrev.clear();
     }

@@ -265,16 +265,16 @@ CTranslationInterface translationInterface;
 // None of this is needed with OpenSSL 1.1.0
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 /** Init OpenSSL library multithreading support */
-static CCriticalSection **ppmutexOpenSSL;
+static std::mutex **ppmutexOpenSSL;
 void locking_callback(int mode, int i, const char *file, int line) NO_THREAD_SAFETY_ANALYSIS
 {
     if (mode & CRYPTO_LOCK)
     {
-        ENTER_CRITICAL_SECTION(*ppmutexOpenSSL[i]);
+        (*ppmutexOpenSSL[i]).lock();
     }
     else
     {
-        LEAVE_CRITICAL_SECTION(*ppmutexOpenSSL[i]);
+        (*ppmutexOpenSSL[i]).unlock();
     }
 }
 #endif
@@ -287,9 +287,9 @@ public:
     {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
         // Init OpenSSL library multithreading support
-        ppmutexOpenSSL = (CCriticalSection **)OPENSSL_malloc(CRYPTO_num_locks() * sizeof(CCriticalSection *));
+        ppmutexOpenSSL = (std::mutex **)OPENSSL_malloc(CRYPTO_num_locks() * sizeof(std::mutex *));
         for (int i = 0; i < CRYPTO_num_locks(); i++)
-            ppmutexOpenSSL[i] = new CCriticalSection();
+            ppmutexOpenSSL[i] = new std::mutex();
         CRYPTO_set_locking_callback(locking_callback);
 
         // OpenSSL can optionally load a config file which lists optional loadable modules and engines.

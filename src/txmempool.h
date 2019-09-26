@@ -498,7 +498,7 @@ public:
                 CompareTxMemPoolEntryByAncestorFee> > >
         indexed_transaction_set;
 
-    mutable CSharedCriticalSection cs;
+    mutable CSharedCriticalSection cs_txmempool;
     indexed_transaction_set mapTx;
     typedef indexed_transaction_set::nth_index<0>::type::iterator txiter;
     struct CompareIteratorByHash
@@ -542,7 +542,7 @@ public:
     template <typename Lambda>
     void forEachThenClear(const Lambda &f)
     {
-        WRITELOCK(cs);
+        WRITELOCK(cs_txmempool);
         for (CTxMemPool::indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++)
         {
             f(*it);
@@ -552,7 +552,7 @@ public:
     template <typename Lambda>
     void _forEachThenClear(const Lambda &f)
     {
-        AssertWriteLockHeld(cs);
+        AssertWriteLockHeld(cs_txmempool);
         for (CTxMemPool::indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++)
         {
             f(*it);
@@ -564,7 +564,7 @@ public:
     template <typename Lambda>
     void forEach(const Lambda &f)
     {
-        WRITELOCK(cs);
+        WRITELOCK(cs_txmempool);
         for (CTxMemPool::indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++)
         {
             f(*it);
@@ -716,19 +716,19 @@ public:
 
     unsigned long size() const
     {
-        READLOCK(cs);
+        READLOCK(cs_txmempool);
         return mapTx.size();
     }
     unsigned long _size() const { return mapTx.size(); }
     uint64_t GetTotalTxSize()
     {
-        READLOCK(cs);
+        READLOCK(cs_txmempool);
         return totalTxSize;
     }
 
     bool exists(const uint256 &hash) const
     {
-        READLOCK(cs);
+        READLOCK(cs_txmempool);
         return (mapTx.count(hash) != 0);
     }
     bool _exists(const uint256 &hash) const { return (mapTx.count(hash) != 0); }
@@ -746,7 +746,7 @@ public:
 
     bool exists(const COutPoint &outpoint) const
     {
-        READLOCK(cs);
+        READLOCK(cs_txmempool);
         auto it = mapTx.find(outpoint.hash);
         return (it != mapTx.end() && outpoint.n < it->GetTx().vout.size());
     }
