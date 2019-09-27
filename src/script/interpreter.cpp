@@ -80,14 +80,14 @@ static void CleanupScriptCode(CScript &scriptCode, const std::vector<uint8_t> &v
 
 bool static IsCompressedOrUncompressedPubKey(const valtype &vchPubKey)
 {
-    if (vchPubKey.size() < 33)
+    if (vchPubKey.size() < CPubKey::COMPRESSED_PUBLIC_KEY_SIZE)
     {
         //  Non-canonical public key: too short
         return false;
     }
     if (vchPubKey[0] == 0x04)
     {
-        if (vchPubKey.size() != 65)
+        if (vchPubKey.size() != CPubKey::PUBLIC_KEY_SIZE)
         {
             //  Non-canonical public key: invalid length for uncompressed key
             return false;
@@ -111,7 +111,7 @@ bool static IsCompressedOrUncompressedPubKey(const valtype &vchPubKey)
 
 static bool IsCompressedPubKey(const valtype &vchPubKey)
 {
-    if (vchPubKey.size() != 33)
+    if (vchPubKey.size() != CPubKey::COMPRESSED_PUBLIC_KEY_SIZE)
     {
         //  Non-canonical public key: invalid length for compressed key
         return false;
@@ -384,7 +384,13 @@ bool static IsLowDERSignature(const valtype &vchSig, ScriptError *serror, const 
         if (!IsValidSignatureEncodingWithoutSigHash(vchSig))
             return set_error(serror, SCRIPT_ERR_SIG_DER);
     }
+    // https://bitcoin.stackexchange.com/a/12556:
+    //     Also note that inside transaction signatures, an extra hashtype byte
+    //     follows the actual signature data.
     std::vector<unsigned char> vchSigCopy(vchSig.begin(), vchSig.begin() + vchSig.size() - (check_sighash ? 1 : 0));
+    // If the S value is above the order of the curve divided by two, its
+    // complement modulo the order could have been used instead, which is
+    // one byte shorter when encoded correctly.
     if (!CPubKey::CheckLowS(vchSigCopy))
     {
         return set_error(serror, SCRIPT_ERR_SIG_HIGH_S);
