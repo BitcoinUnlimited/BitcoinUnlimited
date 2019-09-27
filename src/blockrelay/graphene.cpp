@@ -95,24 +95,13 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     CGrapheneBlockTx grapheneBlockTx;
     vRecv >> grapheneBlockTx;
 
-    auto pblock = thinrelay.GetBlockToReconstruct(pfrom);
-    if (pblock == nullptr)
-        return error("No block available to reconstruct for graphenetx");
-    DbgAssert(pblock->grapheneblock != nullptr, return false);
-    std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
-
     // Message consistency checking
     CInv inv(MSG_GRAPHENEBLOCK, grapheneBlockTx.blockhash);
-    if (grapheneBlockTx.vMissingTx.empty() || grapheneBlockTx.blockhash.IsNull() ||
-        grapheneBlock->vTxHashes256.size() < grapheneBlockTx.vMissingTx.size())
+    if (grapheneBlockTx.vMissingTx.empty() || grapheneBlockTx.blockhash.IsNull())
     {
-        thinrelay.ClearAllBlockData(pfrom, pblock);
-
         dosMan.Misbehaving(pfrom, 100);
-        return error("Incorrectly constructed grblocktx or inconsistent graphene block data received.  Banning peer=%s",
-            pfrom->GetLogName());
+        return error("Incorrectly constructed grblocktx  data received.  Banning peer=%s", pfrom->GetLogName());
     }
-
     LOG(GRAPHENE, "Received grblocktx for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
     {
         // Do not process unrequested grblocktx unless from an expedited node.
@@ -122,6 +111,17 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
             return error(
                 "Received grblocktx %s from peer %s but was unrequested", inv.hash.ToString(), pfrom->GetLogName());
         }
+    }
+
+    auto pblock = thinrelay.GetBlockToReconstruct(pfrom, grapheneBlockTx.blockhash);
+    if (pblock == nullptr)
+        return error("No block available to reconstruct for graphenetx");
+    DbgAssert(pblock->grapheneblock != nullptr, return false);
+    std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
+    if (grapheneBlock->vTxHashes256.size() < grapheneBlockTx.vMissingTx.size())
+    {
+        dosMan.Misbehaving(pfrom, 100);
+        return error("Inconsistent graphene block data received.  Banning peer=%s", pfrom->GetLogName());
     }
 
     // Check if we've already received this block and have it on disk

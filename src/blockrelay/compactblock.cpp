@@ -447,23 +447,16 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     size_t msgSize = vRecv.size();
     CompactReReqResponse compactReReqResponse;
     vRecv >> compactReReqResponse;
-    auto pblock = thinrelay.GetBlockToReconstruct(pfrom);
-    if (pblock == nullptr)
-        return error("No block available to reconstruct for blocktxn");
-    std::shared_ptr<CompactBlock> cmpctBlock = pblock->cmpctblock;
 
     // Message consistency checking
     CInv inv(MSG_CMPCT_BLOCK, compactReReqResponse.blockhash);
     if (compactReReqResponse.txn.empty() || compactReReqResponse.blockhash.IsNull())
     {
-        thinrelay.ClearAllBlockData(pfrom, pblock);
-
         dosMan.Misbehaving(pfrom, 100);
         return error(
             "incorrectly constructed compactReReqResponse or inconsistent compactblock data received.  Banning peer=%s",
             pfrom->GetLogName());
     }
-
     LOG(CMPCT, "received compactReReqResponse for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
     {
         // Do not process unrequested xblocktx unless from an expedited node.
@@ -474,6 +467,11 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
                 pfrom->GetLogName());
         }
     }
+
+    auto pblock = thinrelay.GetBlockToReconstruct(pfrom, compactReReqResponse.blockhash);
+    if (pblock == nullptr)
+        return error("No block available to reconstruct for blocktxn");
+    std::shared_ptr<CompactBlock> cmpctBlock = pblock->cmpctblock;
 
     // Check if we've already received this block and have it on disk
     if (AlreadyHaveBlock(inv))
