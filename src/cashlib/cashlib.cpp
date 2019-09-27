@@ -65,6 +65,12 @@ namespace
 CKey LoadKey(unsigned char *src)
 {
     CKey secret;
+    if (!sigInited)
+    {
+        sigInited = true;
+        ECC_Start();
+        verifyContext = new ECCVerifyHandle();
+    }
     secret.Set(src, src + 32, true);
     return secret;
 }
@@ -1026,6 +1032,8 @@ SLAPI int RandomBytes(unsigned char *buf, int num)
     javaEnv->DeleteLocalRef(bArray);
     return num;
 }
+// Implement API normally provided by random.cpp calling openssl
+void GetRandBytes(unsigned char *buf, int num) { RandomBytes(buf, num); }
 #define JAVA_ANDROID
 
 #endif
