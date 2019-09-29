@@ -164,7 +164,7 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         compactBlock->GetSize());
 
     // Ban a node for sending unrequested compact blocks
-    if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::CMPCTBLOCK))
+    if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::CMPCTBLOCK, inv.hash))
     {
         dosMan.Misbehaving(pfrom, 100);
         return error("unrequested compact block from peer %s", pfrom->GetLogName());
@@ -460,7 +460,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     LOG(CMPCT, "received compactReReqResponse for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
     {
         // Do not process unrequested xblocktx unless from an expedited node.
-        if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::CMPCTBLOCK) && !connmgr->IsExpeditedUpstream(pfrom))
+        if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::CMPCTBLOCK, inv.hash) && !connmgr->IsExpeditedUpstream(pfrom))
         {
             dosMan.Misbehaving(pfrom, 10);
             return error("Received compactReReqResponse %s from peer %s but was unrequested", inv.hash.ToString(),

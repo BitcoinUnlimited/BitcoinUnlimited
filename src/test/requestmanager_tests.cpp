@@ -793,10 +793,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.RemovePeers(&dummyNodeNone);
 
     /******************************
-     * Check an Xthin is downloaded when Graphene timer is exceeded but then we get an announcement
+     * Check another graphene block is downloaded when Graphene timer is exceeded and then we get an announcement
      * from a graphene peer (thinblocks is ON), and then request from that graphene peer before we
      * request from any others.
-     * However this time we already have a grapheneblock in flight for this peer so we end up downloading a thinblock.
+     * However this time we already have a grapheneblock in flight but we end up downloading another graphene block
+     * because we haven't exceeded the limit on number of thintype blocks in flight.
      */
 
     // Chains IS sync'd,  HAVE graphene nodes, HAVE Thinblock nodes, Thinblocks ON, Graphene ON, Cmpct OFF
@@ -815,7 +816,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     // The first request should fail but the timers should be triggered for both xthin and graphene
     randhash = GetRandHash();
     thinrelay.AddBlockInFlight(&dummyNodeGraphene, randhash, NetMsgType::GRAPHENEBLOCK);
-    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == false);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
 
     // Now move the clock ahead so that the timers are exceeded and we should now
     // download an xthin

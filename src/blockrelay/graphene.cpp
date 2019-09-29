@@ -105,7 +105,8 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     LOG(GRAPHENE, "Received grblocktx for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
     {
         // Do not process unrequested grblocktx unless from an expedited node.
-        if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::GRAPHENEBLOCK) && !connmgr->IsExpeditedUpstream(pfrom))
+        if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::GRAPHENEBLOCK, inv.hash) &&
+            !connmgr->IsExpeditedUpstream(pfrom))
         {
             dosMan.Misbehaving(pfrom, 10);
             return error(
@@ -411,7 +412,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
                 pfrom->GetLogName(), grapheneBlock->GetSize());
 
             // Do not process unrequested grapheneblocks.
-            if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::GRAPHENEBLOCK))
+            if (!thinrelay.IsBlockInFlight(pfrom, NetMsgType::GRAPHENEBLOCK, inv.hash))
             {
                 dosMan.Misbehaving(pfrom, 10);
                 return error(
