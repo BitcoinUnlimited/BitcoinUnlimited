@@ -122,8 +122,8 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     uint64_t nTime = GetTime();
     dosMan.ClearBanned();
 
-    // Test the Generaal Case: Chain synced, graphene ON, Thinblocks ON, Cmpct ON
-    // This should return a Graphene.
+    // Test the General Case: Chain synced, graphene ON, Thinblocks ON, Cmpct ON
+    // This should return a Graphene block.
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", true);
@@ -160,7 +160,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.RemovePeers(&dummyNodeNone);
 
     // Test the General Case: Chain synced, graphene ON, Thinblocks ON, Cmpct ON
-    // This should return a Graphene.
+    // This should return a Graphene block.
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", true);
@@ -197,7 +197,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.RemovePeers(&dummyNodeNone);
 
     // Thin timer disabled: Chain synced, graphene ON, Thinblocks OFF, Cmpct ON
-    // Although the timer would have been on because on rely type was off, here we explicity turn off
+    // Although the timer would have been on because one relay type was off, here we explicity turn off
     // the timer. We should still be able to request a Graphene, or Cmpct or regular block
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
@@ -210,7 +210,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddPeers(&dummyNodeNone);
 
     // This test would generally cause a request for a "get_xthin", however xthins is not on and
-    // the timer is off which results in a full block to be requested.
+    // the timer is off which results in a full block request.
     requester.RequestBlock(&dummyNodeXthin, inv);
     BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg).compare("getdata") != 0);
     requester.MapBlocksInFlightClear();
@@ -237,7 +237,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.RemovePeers(&dummyNodeCmpct);
     thinrelay.RemovePeers(&dummyNodeNone);
 
-    // Chain NOT sync'd with any nodes, graphene ON, Thinblocks ON, Cmpct ON
+    // Chain NOT synced with any nodes, graphene ON, Thinblocks ON, Cmpct ON
     IsChainNearlySyncdSet(false);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", true);
@@ -756,7 +756,6 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
      * Check a full block is downloaded when Graphene timer is exceeded but then we get an announcement
      * from a graphene peer (thinblocks is OFF), and then request from that graphene peer before we
      * request from any others.
-     * However this time we already have a grapheneblock in flight for this peer so we end up downloading a full block.
      */
 
     // Chains IS sync'd,  HAVE graphene nodes, HAVE Thinblock nodes, Thinblocks OFF, Graphene ON
@@ -798,6 +797,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
      * request from any others.
      * However this time we already have a grapheneblock in flight but we end up downloading another graphene block
      * because we haven't exceeded the limit on number of thintype blocks in flight.
+     * Then proceed to request more thintype blocks until the limit is exceeded.
      */
 
     // Chains IS sync'd,  HAVE graphene nodes, HAVE Thinblock nodes, Thinblocks ON, Graphene ON, Cmpct OFF
@@ -813,17 +813,39 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     nTime = GetTime();
     SetMockTime(nTime);
 
-    // The first request should fail but the timers should be triggered for both xthin and graphene
-    randhash = GetRandHash();
-    thinrelay.AddBlockInFlight(&dummyNodeGraphene, randhash, NetMsgType::GRAPHENEBLOCK);
+    // The first request should suceed as should successive requests up until the limit of thintype requests in flight
+    inv.hash = GetRandHash();
     BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 1);
+
+    inv.hash = GetRandHash();
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 2);
+
+    inv.hash = GetRandHash();
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 3);
+
+    inv.hash = GetRandHash();
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 4);
+
+    inv.hash = GetRandHash();
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 5);
 
     // Now move the clock ahead so that the timers are exceeded and we should now
     // download an xthin
     SetMockTime(nTime + 20);
-    requester.RequestBlock(&dummyNodeXthin, inv);
-    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg).compare("get_xthin") != 0);
-    thinrelay.ClearBlockInFlight(&dummyNodeGraphene, randhash);
+    dummyNodeXthin.vSendMsg.clear();
+    inv.hash = GetRandHash();
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeXthin, inv) == true);
+    BOOST_CHECK(dummyNodeXthin.vSendMsg.size() == 1);
+
+    // Try to send a 7th block. It should fail to send as it's above the limit of thintype blocks in flight.
+    inv.hash = GetRandHash();
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == false);
+    BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 5);
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
     ClearThinBlocksInFlight(dummyNodeGraphene, inv);
