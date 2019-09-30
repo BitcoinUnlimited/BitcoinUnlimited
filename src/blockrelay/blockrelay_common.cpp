@@ -143,6 +143,9 @@ bool ThinTypeRelay::HasBlockRelayTimerExpired(const uint256 &hash)
 
 bool ThinTypeRelay::IsBlockRelayTimerEnabled()
 {
+    if (GetArg("-preferential-timer", DEFAULT_PREFERENTIAL_TIMER) == 0)
+        return false;
+
     // Only engage the timer if one or more, but not all, thin type relays are active.
     // If all types are active, or all inactive, then we do not need the timer.
     // Generally speaking all types will be active and we can return early.
