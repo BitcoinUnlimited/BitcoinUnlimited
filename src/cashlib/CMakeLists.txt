@@ -29,6 +29,8 @@ add_library( # Sets the name of the library.
              ../support/pagelocker.cpp
              ../support/cleanse.cpp
              ../script/sigcommon.cpp
+             ../script/bitfield.cpp
+             ../script/bitfield.h
              ../crypto/sha256.cpp
              ../crypto/hmac_sha512.cpp
              ../crypto/hmac_sha512.h
@@ -97,12 +99,12 @@ set( Boost_INCLUDE_DIRS ${CMAKE_CURRENT_LIST_DIR}/boost_1_70_0)
 set( Boost_LIBRARIES )
 
 include_directories( .
+  ..
+  ../rsm/include
+  ../script
   ../secp256k1/include
   ../secp256k1
   ../secp256k1/src
-  ../rsm/include
-  ../script
-  ..
   ${Boost_INCLUDE_DIRS}
   )
 

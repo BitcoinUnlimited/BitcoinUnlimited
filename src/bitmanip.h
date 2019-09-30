@@ -5,7 +5,7 @@
 #ifndef BITCOIN_UTIL_BITMANIP_H
 #define BITCOIN_UTIL_BITMANIP_H
 
-#include <config/bitcoin-config.h>
+#include "config/bitcoin-config.h"
 
 #include <cstdint>
 
