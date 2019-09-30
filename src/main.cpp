@@ -144,7 +144,7 @@ void InitializeNode(const CNode *pnode)
 void FinalizeNode(NodeId nodeid)
 {
     // Clear thintype block data if we have any.
-    thinrelay.ClearBlockToReconstruct(nodeid);
+    thinrelay.ClearAllBlocksToReconstruct(nodeid);
     thinrelay.ClearAllBlocksInFlight(nodeid);
 
     // Update block sync counters

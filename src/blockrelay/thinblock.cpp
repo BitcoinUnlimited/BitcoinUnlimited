@@ -278,25 +278,14 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     CXThinBlockTx thinBlockTx;
     vRecv >> thinBlockTx;
 
-    // Get already partially reconstructed block from memory. This block was created when the xthinblock
-    // was first received.
-    std::shared_ptr<CBlockThinRelay> pblock = thinrelay.GetBlockToReconstruct(pfrom);
-    if (pblock == nullptr)
-        return error("No block available to reconstruct for xblocktx");
-    DbgAssert(pblock->xthinblock != nullptr, return false);
-    std::shared_ptr<CXThinBlock> thinBlock = pblock->xthinblock;
-
     // Message consistency checking
     CInv inv(MSG_XTHINBLOCK, thinBlockTx.blockhash);
     if (thinBlockTx.vMissingTx.empty() || thinBlockTx.blockhash.IsNull())
     {
-        thinrelay.ClearAllBlockData(pfrom, pblock);
-
         dosMan.Misbehaving(pfrom, 100);
         return error("incorrectly constructed xblocktx or inconsistent thinblock data received.  Banning peer=%s",
             pfrom->GetLogName());
     }
-
     LOG(THIN, "received xblocktx for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
     {
         // Do not process unrequested xblocktx unless from an expedited node.
@@ -307,6 +296,14 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
                 "Received xblocktx %s from peer %s but was unrequested", inv.hash.ToString(), pfrom->GetLogName());
         }
     }
+
+    // Get already partially reconstructed block from memory. This block was created when the xthinblock
+    // was first received.
+    std::shared_ptr<CBlockThinRelay> pblock = thinrelay.GetBlockToReconstruct(pfrom, thinBlockTx.blockhash);
+    if (pblock == nullptr)
+        return error("No block available to reconstruct for xblocktx");
+    DbgAssert(pblock->xthinblock != nullptr, return false);
+    std::shared_ptr<CXThinBlock> thinBlock = pblock->xthinblock;
 
     // Check if we've already received this block and have it on disk
     if (AlreadyHaveBlock(inv))

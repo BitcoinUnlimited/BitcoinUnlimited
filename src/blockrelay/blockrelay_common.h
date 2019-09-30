@@ -37,7 +37,7 @@ private:
     std::multimap<const NodeId, CThinTypeBlockInFlight> mapThinTypeBlocksInFlight GUARDED_BY(cs_inflight);
 
     // blocks that are currently being reconstructed.
-    std::map<NodeId, std::pair<uint256, std::shared_ptr<CBlockThinRelay> > > mapBlocksReconstruct GUARDED_BY(
+    std::multimap<NodeId, std::pair<uint256, std::shared_ptr<CBlockThinRelay> > > mapBlocksReconstruct GUARDED_BY(
         cs_reconstruct);
 
     // put a cap on the total number of thin type blocks we can have in flight. This lowers any possible
@@ -76,8 +76,9 @@ public:
     // Accessor methods to the blocks that we're reconstructing from thintype blocks such as
     // xthins or graphene.
     std::shared_ptr<CBlockThinRelay> SetBlockToReconstruct(CNode *pfrom, const uint256 &hash);
-    std::shared_ptr<CBlockThinRelay> GetBlockToReconstruct(CNode *pfrom);
-    void ClearBlockToReconstruct(NodeId id);
+    std::shared_ptr<CBlockThinRelay> GetBlockToReconstruct(CNode *pfrom, const uint256 &hash);
+    void ClearBlockToReconstruct(NodeId id, const uint256 &hash);
+    void ClearAllBlocksToReconstruct(NodeId id);
 
     // Accessor methods for tracking total block bytes for all blocks currently in the process
     // of being reconstructed.
