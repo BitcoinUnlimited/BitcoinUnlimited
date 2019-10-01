@@ -32,7 +32,9 @@ JSON_TEST_FILES = \
   test/data/base58_keys_invalid.json \
   test/data/tx_invalid.json \
   test/data/tx_valid.json \
-  test/data/sighash.json
+  test/data/sighash.json \
+  test/data/slp_script_tests.json \
+  test/data/slp_tx_input_tests.json
 
 RAW_TEST_FILES =
 
@@ -133,6 +135,7 @@ BITCOIN_TESTS =\
   test/sighashtype_tests.cpp \
   test/sigopcount_tests.cpp \
   test/skiplist_tests.cpp \
+  test/slptoken_tests.cpp \
   test/streams_tests.cpp \
   test/thinblock_tests.cpp \
   test/thinblock_data_tests.cpp \
