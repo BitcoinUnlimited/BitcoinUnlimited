@@ -261,10 +261,10 @@ class SchnorrTest(BitcoinTestFramework):
 
         logging.info("Sending valid transaction via net, then mining it")
         self.p2p.send_txs_and_test([ecdsa0tx], node)
-        assert_equal(node.getrawmempool(), [ecdsa0tx.hash])
+        waitFor(10, lambda: node.getrawmempool() == [ecdsa0tx.hash])
         tip = self.build_block(tip, [ecdsa0tx])
         self.p2p.send_blocks_and_test([tip], node)
-        assert_equal(node.getrawmempool(), [])
+        waitFor(10, lambda: node.getrawmempool() == [])
 
         # Activation tests
 
@@ -277,9 +277,8 @@ class SchnorrTest(BitcoinTestFramework):
             tip = self.build_block(tip, nTime=NOV2019_START_TIME + i)
             blocks.append(tip)
         self.p2p.send_blocks_and_test(blocks, node)
-        assert_equal(node.getblockchaininfo()[
-                     'mediantime'], NOV2019_START_TIME - 1)
-
+        waitFor(10, lambda: node.getblockchaininfo()[
+                     'mediantime'] == NOV2019_START_TIME - 1)
         logging.info(
             "The next block will activate, but the activation block itself must follow old rules")
         self.check_for_ban_on_rejected_block(
@@ -288,7 +287,7 @@ class SchnorrTest(BitcoinTestFramework):
         logging.info(
             "Send a lecacy ECDSA multisig into mempool, we will check after upgrade to make sure it didn't get cleaned out unnecessarily.")
         self.p2p.send_txs_and_test([ecdsa0tx_2], node)
-        assert_equal(node.getrawmempool(), [ecdsa0tx_2.hash])
+        waitFor(10, lambda: node.getrawmempool() == [ecdsa0tx_2.hash])
 
         # save this tip for later
         preupgrade_block = tip
@@ -299,9 +298,9 @@ class SchnorrTest(BitcoinTestFramework):
         self.p2p.send_blocks_and_test([tip], node)
 
         logging.info("We have activated!")
-        assert_equal(node.getblockchaininfo()[
-                     'mediantime'], NOV2019_START_TIME)
-        assert_equal(node.getrawmempool(), [ecdsa0tx_2.hash])
+        waitFor(10, lambda: node.getblockchaininfo()[
+                     'mediantime'] == NOV2019_START_TIME)
+        waitFor(10, lambda: node.getrawmempool() == [ecdsa0tx_2.hash])
 
         # save this tip for later
         upgrade_block = tip
@@ -320,8 +319,7 @@ class SchnorrTest(BitcoinTestFramework):
         logging.info(
             "Submitting a new Schnorr-multisig via net, and mining it in a block")
         self.p2p.send_txs_and_test([schnorr1tx], node)
-        assert_equal(set(node.getrawmempool()), {
-                     ecdsa0tx_2.hash, schnorr1tx.hash})
+        waitFor(10, lambda: set(node.getrawmempool()) == {ecdsa0tx_2.hash, schnorr1tx.hash})
         tip = self.build_block(tip, [schnorr1tx])
         self.p2p.send_blocks_and_test([tip], node)
 
@@ -330,10 +328,10 @@ class SchnorrTest(BitcoinTestFramework):
 
         logging.info(
             "That legacy ECDSA multisig is still in mempool, let's mine it")
-        assert_equal(node.getrawmempool(), [ecdsa0tx_2.hash])
+        waitFor(10, lambda: node.getrawmempool() == [ecdsa0tx_2.hash])
         tip = self.build_block(tip, [ecdsa0tx_2])
         self.p2p.send_blocks_and_test([tip], node)
-        assert_equal(node.getrawmempool(), [])
+        waitFor(10, lambda: node.getrawmempool() == [])
 
         logging.info(
             "Trying Schnorr in legacy multisig remains invalid and banworthy as ever")
@@ -362,8 +360,8 @@ class SchnorrTest(BitcoinTestFramework):
             # Even though the block reconsidered was valid, if another block
             # is also reconsidered and fails, the call will return failure.
             pass
-        assert_equal(node.getbestblockhash(), tip.hash)
-        assert_equal(node.getrawmempool(), [])
+        waitFor(10, lambda: node.getbestblockhash() == tip.hash)
+        waitFor(10, lambda: node.getrawmempool() == [])
 
         logging.info(
             "Create an empty-block reorg that forks from pre-upgrade")
