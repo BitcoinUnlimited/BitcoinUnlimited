@@ -1262,10 +1262,10 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
 
-    // Set enableCanonicalTxOrder for the BCH early in the bootstrap phase
+    // Set fCanonicalTxsOrder for the BCH early in the bootstrap phase
     if (IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()) && chainparams.NetworkIDString() != "regtest")
     {
-        enableCanonicalTxOrder = true;
+        fCanonicalTxsOrder = true;
     }
 
 

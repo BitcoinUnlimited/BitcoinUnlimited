@@ -76,6 +76,7 @@ extern uint64_t maxGeneratedBlock;
 extern uint64_t excessiveBlockSize;
 extern unsigned int excessiveAcceptDepth;
 extern unsigned int maxMessageSizeMultiplier;
+extern bool fCanonicalTxsOrder;
 
 /** This function searches the mempool for transactions that are recently acceptable into the mempools of other
 nodes and forwards any found to those nodes.

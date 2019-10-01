@@ -122,7 +122,6 @@ struct BlockHasher
     size_t operator()(const uint256 &hash) const { return hash.GetCheapHash(); }
 };
 
-extern CTweak<bool> enableCanonicalTxOrder;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
 typedef boost::unordered_map<uint256, CBlockIndex *, BlockHasher> BlockMap;

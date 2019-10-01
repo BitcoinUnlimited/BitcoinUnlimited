@@ -246,8 +246,8 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         nLockTimeCutoff =
             (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : pblock->GetBlockTime();
 
-        bool canonical = enableCanonicalTxOrder.Value();
-        // On BCH always allow overwite of enableCanonicalTxOrder but not for regtest
+        bool canonical = fCanonicalTxsOrder;
+        // On BCH always allow overwite of fCanonicalTxsOrder but not for regtest
         if (IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()))
         {
             if (chainparams.NetworkIDString() != "regtest")

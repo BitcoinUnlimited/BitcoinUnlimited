@@ -180,7 +180,7 @@ uint64_t excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
 unsigned int excessiveAcceptDepth = DEFAULT_EXCESSIVE_ACCEPT_DEPTH;
 unsigned int maxMessageSizeMultiplier = DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER;
 int nMaxOutConnections = DEFAULT_MAX_OUTBOUND_CONNECTIONS;
-
+bool fCanonicalTxsOrder = true;
 uint32_t blockVersion = 0; // Overrides the mined block version if non-zero
 
 std::vector<std::string> BUComments = std::vector<std::string>();
@@ -341,10 +341,10 @@ CTweakRef<std::string> subverOverrideTweak("net.subversionOverride",
     &subverOverride,
     &SubverValidator);
 
-CTweak<bool> enableCanonicalTxOrder("consensus.enableCanonicalTxOrder",
+CTweakRef<bool> enableCanonicalTxOrder("consensus.enableCanonicalTxOrder",
     "True if canonical transaction ordering is enabled.  Reflects the actual state so may be switched on or off by"
     " fork time flags and blockchain reorganizations.",
-    false);
+    &fCanonicalTxsOrder);
 
 CTweak<unsigned int> numMsgHandlerThreads("net.msgHandlerThreads", "Max message handler threads", 0);
 CTweak<unsigned int> numTxAdmissionThreads("net.txAdmissionThreads", "Max transaction mempool admission threads", 0);

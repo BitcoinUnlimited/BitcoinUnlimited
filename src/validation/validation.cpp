@@ -2579,8 +2579,8 @@ bool ConnectBlock(const CBlock &block,
     vPos.reserve(block.vtx.size());
 
     // Discover how to handle this block
-    bool canonical = enableCanonicalTxOrder.Value();
-    // Always allow overwite of enableCanonicalTxOrder but for regtest on BCH
+    bool canonical = fCanonicalTxsOrder;
+    // Always allow overwite of fCanonicalTxsOrder but for regtest on BCH
     if (IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip()))
     {
         if (!(chainparams.NetworkIDString() == "regtest"))
@@ -2911,12 +2911,12 @@ void UpdateTip(CBlockIndex *pindexNew)
     }
 
     // Set the global variables based on the fork state of the NEXT block
-    // Always allow overwite of enableCanonicalTxOrder but for regtest)
+    // Always allow overwite of fCanonicalTxsOrder but for regtest)
     if (IsNov2018Activated(chainParams.GetConsensus(), chainActive.Tip()))
     {
         if (chainParams.NetworkIDString() != "regtest")
         {
-            enableCanonicalTxOrder = true;
+            fCanonicalTxsOrder = true;
         }
     }
 }
