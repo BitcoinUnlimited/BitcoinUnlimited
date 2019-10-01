@@ -144,6 +144,8 @@ requestManager.h
 rest.cpp
 reverselock.h
 serialize.h
+slptokens/token.cpp
+slptokens/token.h
 stat.h
 streams.h
 sync.cpp
@@ -361,6 +363,7 @@ test/sighashtype_tests.cpp
 test/sigopcount_tests.cpp
 test/sigencoding_tests.cpp
 test/skiplist_tests.cpp
+test/slptoken_tests.cpp
 test/stat_tests.cpp
 test/streams_tests.cpp
 test/test_bitcoin.cpp

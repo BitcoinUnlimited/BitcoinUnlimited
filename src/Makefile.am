@@ -122,6 +122,7 @@ BITCOIN_CORE_H = \
   bloom.h \
   cashaddr.h \
   cashaddrenc.h \
+  cash_protocols.h \
   chain.h \
   chainparams.h \
   chainparamsbase.h \
@@ -198,6 +199,7 @@ BITCOIN_CORE_H = \
   script/sign.h \
   script/standard.h \
   script/ismine.h \
+  slptokens/token.h \
   streams.h \
   support/allocators/secure.h \
   support/allocators/zeroafterfree.h \
@@ -313,6 +315,7 @@ libbitcoin_server_a_SOURCES = \
   respend/respenddetector.cpp \
   script/sigcache.cpp \
   script/ismine.cpp \
+  slptokens/token.cpp \
   timedata.cpp \
   torcontrol.cpp \
   txadmission.cpp \
