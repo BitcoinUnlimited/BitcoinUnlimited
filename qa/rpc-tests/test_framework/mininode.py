@@ -588,7 +588,7 @@ class P2PDataStore(SingleNodeConnCB):
                     lambda: blocks[-1].sha256 in self.getdata_requests, timeout=timeout)
                 assert ok, "did not receive getdata for {}".format(blocks[-1].sha256)
 
-            assert self.sync_with_ping()
+            self.sync_with_ping()
 
             if success:
                 ok = wait_until(lambda: node.getbestblockhash() ==
@@ -626,7 +626,7 @@ class P2PDataStore(SingleNodeConnCB):
             for tx in txs:
                 self.send_message(msg_tx(tx))
 
-            assert self.sync_with_ping()
+            self.sync_with_ping()
 
             if success:
                 # Check that all txs are now in the mempool
