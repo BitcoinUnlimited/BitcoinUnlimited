@@ -547,12 +547,14 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
         return;
     }
     AddNewWaitingLock(c, tid, ownership);
+    /*
     std::vector<LockStackEntry> deadlocks;
     std::set<uint64_t> threads;
     if (RecursiveCheck(tid, c, tid, c, true, deadlocks, threads))
     {
         deadlock_detected(now, deadlocks, threads);
     }
+    */
 }
 
 // removes all instances of the critical section
