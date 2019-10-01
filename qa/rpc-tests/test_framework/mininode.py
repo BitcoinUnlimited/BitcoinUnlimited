@@ -38,6 +38,7 @@ import logging
 import copy
 import traceback
 
+from test_framework.util import waitFor
 from .nodemessages import *
 from .bumessages import *
 
@@ -625,16 +626,15 @@ class P2PDataStore(SingleNodeConnCB):
             for tx in txs:
                 self.send_message(msg_tx(tx))
 
-            assert self.sync_with_ping(), "failed to sync with node with ping"
+            assert self.sync_with_ping()
 
-            raw_mempool = node.getrawmempool()
             if success:
                 # Check that all txs are now in the mempool
                 for tx in txs:
-                    assert tx.hash in raw_mempool, "{} not found in mempool".format(
-                        tx.hash)
+                    waitFor(10, lambda: tx.hash in node.getrawmempool(), onError="{} tx not found in mempool".format(
+                        tx.hash))
             else:
                 # Check that none of the txs are now in the mempool
                 for tx in txs:
-                    assert tx.hash not in raw_mempool, "{} tx found in mempool".format(
-                        tx.hash)
+                    waitFor(10, lambda: tx.hash not in node.getrawmempool(), onError="{} tx not found in mempool".format(
+                        tx.hash))
