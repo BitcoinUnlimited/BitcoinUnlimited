@@ -181,6 +181,7 @@ if ENABLE_ZMQ:
 #Tests
 testScripts = [ RpcTest(t) for t in [
     'txindex',
+    'mempool_push',
     Disabled('schnorr-activation', 'Need to be updated to work with BU'),
     'schnorrsig',
     Disabled('segwit-recovery-activation','Need to be updated to work with BU'),
@@ -200,7 +201,7 @@ testScripts = [ RpcTest(t) for t in [
     'wallet',
     'wallet-hd',
     'wallet-dump',
-    'excessive',
+    Disabled('excessive', "Reduce Travis execution time"),
     Disabled('uahf', 'temporary disable while waiting, to use as a template for future tests'),
     'listtransactions',
     'receivedby',

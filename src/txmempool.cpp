@@ -459,7 +459,9 @@ void CTxMemPool::UpdateChildrenForRemoval(txiter it)
     }
 }
 
-void CTxMemPool::_UpdateForRemoveFromMempool(const setEntries &entriesToRemove, bool updateDescendants)
+void CTxMemPool::_UpdateForRemoveFromMempool(const setEntries &entriesToRemove,
+    bool updateDescendants,
+    CTxMemPool::TxMempoolOriginalStateMap *changeSet)
 {
     AssertWriteLockHeld(cs_txmempool);
     // For each entry, walk back all ancestors and decrement size associated with this
@@ -473,6 +475,25 @@ void CTxMemPool::_UpdateForRemoveFromMempool(const setEntries &entriesToRemove, 
         // Here we only update statistics and not data in mapLinks (which
         // we need to preserve until we're finished with all operations that
         // need to traverse the mempool).
+
+        // I need to do this loop separately from the next because a chain of tx with multiple confirmed means
+        // that I need to get all the original values before changing any of them.  A map (ensuring just one copy
+        // of each txiter) is used because a chain could cause double entries.
+        if (changeSet)
+        {
+            for (txiter removeIt : entriesToRemove)
+            {
+                setEntries setDescendants;
+                _CalculateDescendants(removeIt, setDescendants);
+                setDescendants.erase(removeIt); // don't update state for self
+                for (txiter dit : setDescendants)
+                {
+                    if (changeSet->count(dit) == 0)
+                        changeSet->insert({dit, TxMempoolOriginalState(dit)});
+                }
+            }
+        }
+
         for (txiter removeIt : entriesToRemove)
         {
             setEntries setDescendants;
@@ -829,7 +850,8 @@ void CTxMemPool::_removeConflicts(const CTransaction &tx, std::list<CTransaction
 void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
     unsigned int nBlockHeight,
     std::list<CTransactionRef> &conflicts,
-    bool fCurrentEstimate)
+    bool fCurrentEstimate,
+    std::vector<CTxChange> *txChanges)
 {
     typedef std::map<txiter, std::vector<txiter>, CompareIteratorByHash> DeferredMap;
 
@@ -839,6 +861,8 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
 
     DeferredMap deferred;
     std::queue<txiter> ready;
+
+    CTxMemPool::TxMempoolOriginalStateMap changeSet;
 
     for (const auto &tx : vtx)
     {
@@ -878,7 +902,7 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
             // Remove this tx from the mempool
             setEntries stage;
             stage.insert(nextTx); // nextTx is invalid now
-            _RemoveStaged(stage, true);
+            _RemoveStaged(stage, true, (txChanges) ? &changeSet : nullptr);
         }
         else // This tx has ancestors, so put it in the deferred queue waiting for them
         {
@@ -912,6 +936,20 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
             }
             deferred.clear();
         }
+    }
+
+    // process changeSet into a list of tx and mempool change
+    if (txChanges)
+    {
+        txChanges->reserve(changeSet.size());
+        // Create the change set list and sort into dependency order
+        for (auto &mc : changeSet)
+        {
+            txChanges->push_back(CTxChange(mc.second));
+        }
+        sort(txChanges->begin(), txChanges->end(), [](const CTxChange &a, const CTxChange &b) {
+            return a.now.countWithDescendants > b.now.countWithDescendants;
+        });
     }
 
     // Remove conflicting tx
@@ -1307,13 +1345,18 @@ size_t CTxMemPool::_DynamicMemoryUsage() const
            cachedInnerUsage;
 }
 
-void CTxMemPool::_RemoveStaged(setEntries &stage, bool updateDescendants)
+void CTxMemPool::_RemoveStaged(setEntries &stage,
+    bool updateDescendants,
+    CTxMemPool::TxMempoolOriginalStateMap *changeSet)
 {
     {
         AssertWriteLockHeld(cs_txmempool);
-        _UpdateForRemoveFromMempool(stage, updateDescendants);
+        _UpdateForRemoveFromMempool(stage, updateDescendants, changeSet);
         for (const txiter &it : stage)
         {
+            // If a different tx commitment added this one remove it now because its confirmed
+            if (changeSet)
+                changeSet->erase(it);
             removeUnchecked(it);
         }
     }

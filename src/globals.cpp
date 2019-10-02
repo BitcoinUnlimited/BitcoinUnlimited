@@ -348,6 +348,10 @@ CTweak<bool> enableCanonicalTxOrder("consensus.enableCanonicalTxOrder",
 
 CTweak<unsigned int> numMsgHandlerThreads("net.msgHandlerThreads", "Max message handler threads", 0);
 CTweak<unsigned int> numTxAdmissionThreads("net.txAdmissionThreads", "Max transaction mempool admission threads", 0);
+CTweak<unsigned int> unconfPushAction("net.unconfChainResendAction",
+    "Action to take when this node thinks that a peer will now accept a previously unacceptable unconfirmed transaction"
+    "0: do not resend, 1: send an INV, 2: send the TX",
+    0);
 
 CTweak<CAmount> maxTxFee("wallet.maxTxFee",
     "Maximum total fees to use in a single wallet transaction or raw transaction; setting this too low may abort large "
