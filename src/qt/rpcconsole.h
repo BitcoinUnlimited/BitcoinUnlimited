@@ -69,6 +69,8 @@ private Q_SLOTS:
     void on_openDebugLogfileButton_clicked();
     /** change the time range of the network traffic graph */
     void on_sldGraphRange_valueChanged(int value);
+    /** change the time range of the transaction rate graph */
+    void on_sldTpsGraphRange_valueChanged(int value);
     /** update traffic statistics */
     void updateTrafficStats(quint64 totalBytesIn, quint64 totalBytesOut);
     void resizeEvent(QResizeEvent *event);
@@ -101,7 +103,7 @@ public Q_SLOTS:
     /** Set number of transactions in ophan pool in the UI */
     void setOrphanPoolSize(long numberOfTxs);
     /** Set tx's per second in the UI */
-    void setTransactionsPerSecond(double nTxPerSec);
+    void setTransactionsPerSecond(double smoothedTps, double instantaneousTps, double peakTps);
     /** Set block propagation statistics in the UI */
     void setThinBlockPropagationStats(const ThinBlockQuickStats &thin);
     /** Set block propagation statistics in the UI */
@@ -134,6 +136,7 @@ private:
     static QString FormatBytes(quint64 bytes);
     void startExecutor();
     void setTrafficGraphRange(int mins);
+    void setTransactionGraphRange(int mins);
     /** show detailed information on ui about selected node */
     void updateNodeDetail(const CNodeCombinedStats *stats);
 

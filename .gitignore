@@ -126,3 +126,7 @@ libbitcoinconsensus.pc
 # IDE files
 *.sublime-project
 *.sublime-workspace
+
+# Visual Studio 2015/2017/2019 cache/options directory
+.vs/
+src/.vs/

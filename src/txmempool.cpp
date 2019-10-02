@@ -584,6 +584,7 @@ CTxMemPool::CTxMemPool(const CFeeRate &_minReasonableRelayFee) : nTransactionsUp
     rollingMinimumFeeRate = 0;
 
     nTxPerSec = 0;
+    nInstantaneousTxPerSec = 0;
     nPeakRate = 0;
 }
 
@@ -1564,12 +1565,27 @@ void CTxMemPool::UpdateTransactionsPerSecond()
 {
     std::lock_guard<std::mutex> lock(cs_txPerSec);
 
+    UpdateTransactionsPerSecondImpl(true, lock);
+}
+
+void CTxMemPool::GetTransactionRateStatistics(double &smoothedTps, double &instantaneousTps, double &peakTps)
+{
+    std::lock_guard<std::mutex> lock(cs_txPerSec);
+
+    UpdateTransactionsPerSecondImpl(false, lock);
+
+    smoothedTps = nTxPerSec;
+    instantaneousTps = nInstantaneousTxPerSec;
+    peakTps = nPeakRate;
+}
+
+void CTxMemPool::UpdateTransactionsPerSecondImpl(bool fAddTxn, const std::lock_guard<std::mutex> &lock)
+    EXCLUSIVE_LOCKS_REQUIRED(cs_txPerSec)
+{
     static uint64_t nCount = 0;
     static int64_t nLastTime = GetTime();
-    const static double nSecondsToAverage = 60; // Length of time in seconds to smooth the tx rate over
 
     int64_t nNow = GetTime();
-    nCount++;
 
     // Don't report the transaction rate for 10 seconds after startup. This gives time for any
     // transations to be processed, from the mempool.dat file stored on disk, which would skew the
@@ -1578,6 +1594,7 @@ void CTxMemPool::UpdateTransactionsPerSecond()
     if (nStartTime > nNow)
     {
         nTxPerSec = 0;
+        nInstantaneousTxPerSec = 0;
         nCount = 0;
         return;
     }
@@ -1586,24 +1603,29 @@ void CTxMemPool::UpdateTransactionsPerSecond()
     int64_t nDeltaTime = nNow - nLastTime;
     if (nDeltaTime > 0)
     {
-        nTxPerSec -= (nTxPerSec / nSecondsToAverage) * nDeltaTime;
+        nTxPerSec -= (nTxPerSec / TX_RATE_SMOOTHING_SEC) * nDeltaTime;
         nLastTime = nNow;
     }
 
     // Add the new tx to the rate
-    nTxPerSec += 1 / nSecondsToAverage; // The amount that the new tx will add to the tx rate
-    if (nTxPerSec < 0)
-        nTxPerSec = 0;
+    if (fAddTxn)
+    {
+        nCount++;
+        // The amount that the new tx will add to the tx rate
+        nTxPerSec += 1 / TX_RATE_SMOOTHING_SEC;
+        if (nTxPerSec < 0)
+            nTxPerSec = 0;
+    }
 
     // Calculate the peak rate if we've gone more that 1 second beyond the last sample time.
     // This will give us the finest grain peak rate possible for txns per second.
     static int64_t nLastSampleTime = GetTimeMillis();
     int64_t nCurrentSampleTime = GetTimeMillis();
-    if (nCurrentSampleTime > nLastSampleTime + 1000)
+    if (nCurrentSampleTime > nLastSampleTime + TX_RATE_RESOLUTION_MILLIS)
     {
-        double nRate = (double)(nCount * 1000) / (nCurrentSampleTime - nLastSampleTime);
-        if (nRate > nPeakRate)
-            nPeakRate = nRate;
+        nInstantaneousTxPerSec = (double)(nCount * TX_RATE_RESOLUTION_MILLIS) / (nCurrentSampleTime - nLastSampleTime);
+        if (nInstantaneousTxPerSec > nPeakRate)
+            nPeakRate = nInstantaneousTxPerSec;
         nCount = 0;
         nLastSampleTime = nCurrentSampleTime;
     }

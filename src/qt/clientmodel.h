@@ -69,9 +69,6 @@ public:
     //! Return the dynamic memory usage of the mempool
     size_t getMempoolDynamicUsage() const;
 
-    //! BU: Return the transactions per second that are accepted into the mempool
-    double getTransactionsPerSecond() const;
-
     quint64 getTotalBytesRecv() const;
     quint64 getTotalBytesSent() const;
 
@@ -108,6 +105,7 @@ private:
 
     QTimer *pollTimer1;
     QTimer *pollTimer2;
+    QTimer *pollTimer3;
 
     void subscribeToCoreSignals();
     void unsubscribeFromCoreSignals();
@@ -120,7 +118,7 @@ Q_SIGNALS:
     void orphanPoolSizeChanged(long count);
     void alertsChanged(const QString &warnings);
     void bytesChanged(quint64 totalBytesIn, quint64 totalBytesOut);
-    void transactionsPerSecondChanged(double tansactionsPerSecond); // BU:
+    void transactionsPerSecondChanged(double smoothedTps, double instantaneousTps, double peakTps);
     void thinBlockPropagationStatsChanged(const ThinBlockQuickStats &thin);
     void compactBlockPropagationStatsChanged(const CompactBlockQuickStats &compact);
     void grapheneBlockPropagationStatsChanged(const GrapheneQuickStats &graphene);
@@ -134,6 +132,7 @@ Q_SIGNALS:
 public Q_SLOTS:
     void updateTimer1();
     void updateTimer2();
+    void updateTimerTransactionRate();
     void updateNumConnections(int numConnections);
     void updateAlert();
     void updateBanlist();
