@@ -206,7 +206,7 @@ class BitcoinTestFramework(object):
         logging.info("Random seed: %s" % self.randomseed)
 
         if self.options.tmpdir is None:
-            self.options.tmpdir = os.path.join(self.options.tmppfx, str(self.options.port_seed))
+            self.options.tmpdir = self.options.tmppfx
 
         if self.options.trace_rpc:
             logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
