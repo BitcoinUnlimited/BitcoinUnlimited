@@ -285,10 +285,10 @@ def sync_blocks(rpc_connections, wait=1,verbose=1):
     iter=-1
     while True:
         counts = [ x.getblockcount() for x in rpc_connections ]
-        if verbose:
-            logging.info("sync blocks: " + str(counts))
         if counts == [ counts[0] ]*len(counts):
             break
+        if verbose and iter>2:
+            logging.info("sync blocks (" + str(iter) +"): " + str(counts))
         time.sleep(wait)
         iter+=1
         if connectionTracking and iter&7==0:  # do some other checks to ensure that block sync is possible
@@ -315,12 +315,14 @@ def sync_blocks_to(height, rpc_connections, wait=1,verbose=1):
     Wait until all passed nodes have the passed "height" block count
     """
     heights = [ height ]*len(rpc_connections)
+    iter = 0
     while True:
         counts = [ x.getblockcount() for x in rpc_connections ]
-        if verbose:
-            logging.info("sync blocks to %d: %s" % (height, str(counts)))
         if counts == heights:
             break
+        if verbose and iter>2:
+            logging.info("sync blocks (" + str(iter) + ") to %d: %s" % (height, str(counts)))
+        iter+=1
         time.sleep(wait)
 
 def hub_is_running(node_num):
