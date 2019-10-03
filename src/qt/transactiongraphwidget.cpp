@@ -37,12 +37,12 @@ TransactionGraphWidget::TransactionGraphWidget(QWidget *parent)
       fInstantaneousTpsAverage_Runtime(0.0f), fInstantaneousTpsAverage_Sampled(0.0f),
       fInstantaneousTpsAverage_Displayed(0.0f), fSmoothedTpsPeak_Runtime(0.0f), fSmoothedTpsPeak_Sampled(0.0f),
       fSmoothedTpsPeak_Displayed(0.0f), fSmoothedTpsAverage_Runtime(0.0f), fSmoothedTpsAverage_Sampled(0.0f),
-      fSmoothedTpsAverage_Displayed(0.0f), nTotalSamplesRuntime(0L), vInstantaneousSamples(), vSmoothedSamples(),
+      fSmoothedTpsAverage_Displayed(0.0f), nTotalSamplesRuntime(0), vInstantaneousSamples(), vSmoothedSamples(),
       clientModel(0)
 {
 }
 
-long TransactionGraphWidget::getSamplesInDisplayWindow() const
+size_t TransactionGraphWidget::getSamplesInDisplayWindow() const
 {
     return (nMinutes * MINUTES_TO_MILLIS) / SAMPLE_RATE_MILLIS;
 }
@@ -59,6 +59,10 @@ void TransactionGraphWidget::setClientModel(ClientModel *model)
 
 void TransactionGraphWidget::paintPath(QPainterPath &avgPath, QPainterPath &peakPath)
 {
+    // This shouldn't be possible as the only place that sets fDisplayMax ensures it is at least MINIMUM_DISPLAY_YVALUE
+    // This is just protection agasinst future changes potentially allowing an invalid value
+    assert(fDisplayMax > 0.0f);
+
     int h = height() - YMARGIN * 2, w = width() - XMARGIN * 2;
     int x = XMARGIN + w, yAvg, yPeak;
     int samplesInWindow = getSamplesInDisplayWindow();
@@ -66,7 +70,7 @@ void TransactionGraphWidget::paintPath(QPainterPath &avgPath, QPainterPath &peak
     if (sampleCount > vInstantaneousSamples.size())
         sampleCount = vInstantaneousSamples.size();
 
-    if (sampleCount > 0)
+    if (sampleCount > 0 && samplesInWindow > 0)
     {
         // Computes the maximum and average of all sample points which fall under the same pixel
         avgPath.moveTo(x, YMARGIN + h);
@@ -124,6 +128,10 @@ void TransactionGraphWidget::paintPath(QPainterPath &avgPath, QPainterPath &peak
 
 void TransactionGraphWidget::paintEvent(QPaintEvent *)
 {
+    // This shouldn't be possible as the only place that sets fDisplayMax ensures it is at least MINIMUM_DISPLAY_YVALUE
+    // This is just protection agasinst future changes potentially allowing an invalid value
+    assert(fDisplayMax > 0.0f);
+
     QPainter painter(this);
     painter.fillRect(rect(), Qt::black);
 
@@ -196,17 +204,25 @@ void TransactionGraphWidget::paintEvent(QPaintEvent *)
   Computes the arithmetic mean based on the current mean at n-1, adding a new sample
   NOTE: newSampleCount includes the new sample to be added
 */
-double AddToArithmeticMean(double currentMean, long newSampleCount, double newSample)
+double AddToArithmeticMean(double currentMean, size_t newSampleCount, double newSample)
 {
+    // newSampleCount MUST include the current sample being added, so 0 is not valid
+    assert(newSampleCount > 0);
+
     return currentMean + ((newSample - currentMean) / newSampleCount);
 }
 
 /*
   Computes the arithmetic mean based on the current mean at n, subtracting one sample
+  This implementation is only valid for sample sets where sample values are guaranteed to be >= 0.0
   NOTE: currentSampleCount includes the sample to be removed
 */
-double SubtractFromArithmeticMean(double currentMean, long currentSampleCount, double removingSample)
+double SubtractFromArithmeticMean(double currentMean, size_t currentSampleCount, double removingSample)
 {
+    // NOTE: This check is only valid for sample sets where all values are guaranteed to be >= 0.0
+    if (currentSampleCount <= 1)
+        return 0.0;
+
     return ((currentMean * currentSampleCount) - removingSample) / (currentSampleCount - 1);
 }
 
@@ -288,14 +304,14 @@ void TransactionGraphWidget::setTransactionsPerSecond(double nTxPerSec,
 
 void TransactionGraphWidget::updateTransactionsPerSecondLabelValues()
 {
-    int numSamples = getSamplesInDisplayWindow();
+    size_t numSamples = getSamplesInDisplayWindow();
 
     // Recompute the instantaneous peak for the current sample set and the average for the display window
     // Runtime peak is computed in the add sample method because that tracks the peak even beyond the maintained sample
     // set
     float tSumAll = 0.0f, tSumDisplay = 0.0f;
-    int countAll = vSmoothedSamples.size();
-    int countDisplay = countAll < numSamples ? countAll : numSamples;
+    size_t countAll = vSmoothedSamples.size();
+    size_t countDisplay = countAll < numSamples ? countAll : numSamples;
     float tMaxSamples = 0.0f, tMaxDisplay = 0.0f;
     for (int i = 0; i < vInstantaneousSamples.size(); i++)
     {
@@ -313,7 +329,10 @@ void TransactionGraphWidget::updateTransactionsPerSecondLabelValues()
     }
     fInstantaneousTpsPeak_Sampled = tMaxSamples;
     fInstantaneousTpsPeak_Displayed = tMaxDisplay;
-    fInstantaneousTpsAverage_Displayed = tSumDisplay / countDisplay;
+    if (countDisplay > 0)
+        fInstantaneousTpsAverage_Displayed = tSumDisplay / countDisplay;
+    else
+        fInstantaneousTpsAverage_Displayed = 0.0f;
 
     // Adjust the y-axis scaling factor based on the highest peak currently visible
     float tmax = fInstantaneousTpsPeak_Displayed;
@@ -345,11 +364,17 @@ void TransactionGraphWidget::updateTransactionsPerSecondLabelValues()
     }
     fSmoothedTpsPeak_Sampled = tMaxSamples;
     fSmoothedTpsPeak_Displayed = tMaxDisplay;
-    fSmoothedTpsAverage_Displayed = tSumDisplay / countDisplay;
+    if (countDisplay > 0)
+        fSmoothedTpsAverage_Displayed = tSumDisplay / countDisplay;
+    else
+        fSmoothedTpsAverage_Displayed = 0.0f;
 }
 
 void TransactionGraphWidget::setTpsGraphRangeMins(int mins)
 {
+    // input value must be >= 1
+    assert(mins > 0);
+
     nMinutes = mins;
 
     if (mins < 60)
