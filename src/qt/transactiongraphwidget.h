@@ -45,11 +45,11 @@ public:
     QString getDisplayWindowLabelText() const { return displayWindowLabelText; }
 private:
     void paintPath(QPainterPath &avgPath, QPainterPath &peakPath);
-    long getSamplesInDisplayWindow() const;
+    size_t getSamplesInDisplayWindow() const;
     void updateTransactionsPerSecondLabelValues();
 
-    int nMinutes;
-    int nRedrawRateMillis;
+    size_t nMinutes;
+    size_t nRedrawRateMillis;
     float fDisplayMax;
 
     float fInstantaneousTpsPeak_Runtime;
@@ -68,7 +68,7 @@ private:
 
     QString displayWindowLabelText;
 
-    long nTotalSamplesRuntime;
+    size_t nTotalSamplesRuntime;
     QQueue<float> vInstantaneousSamples;
     QQueue<float> vSmoothedSamples;
 
