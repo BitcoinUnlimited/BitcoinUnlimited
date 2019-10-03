@@ -4,9 +4,8 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """
 This test checks that blocks containing segwit recovery transactions will be accepted,
-that segwit recovery transactions are rejected from mempool acceptance by default, that
-segit recovery transactions are accepted in case of -acceptnonstdtxn=1, and that segwit recovery
-transactions don't result in bans.
+that segwit recovery transactions are rejected from mempool acceptance, but that are
+accepted with -acceptnonstdtxn=1, and that segwit recovery transactions don't result in bans.
 """
 
 import time
@@ -14,9 +13,10 @@ import time
 from test_framework.blocktools import (
     create_block,
     create_coinbase,
+    hash160,
     make_conform_to_ctor,
 )
-from test_framework.messages import (
+from test_framework.nodemessages import (
     COIN,
     COutPoint,
     CTransaction,
@@ -25,30 +25,33 @@ from test_framework.messages import (
     ToHex,
 )
 from test_framework.mininode import (
-    network_thread_join,
-    network_thread_start,
     P2PDataStore,
+    NodeConn,
+    NetworkThread,
 )
 from test_framework.script import (
     CScript,
-    hash160,
     OP_EQUAL,
     OP_HASH160,
     OP_TRUE,
 )
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
+    assert_equal,
     assert_raises_rpc_error,
     sync_blocks,
+    p2p_port,
 )
 
 TEST_TIME = int(time.time())
 
 # Error due to non clean stack
-CLEANSTACK_ERROR = b'non-mandatory-script-verify-flag (P2SH script evaluation of script does not result in a clean stack)'
-RPC_CLEANSTACK_ERROR = CLEANSTACK_ERROR + " (code 64)"
-EVAL_FALSE_ERROR = b'non-mandatory-script-verify-flag (Script evaluated without error but finished with a false/empty top stack element)'
-RPC_EVAL_FALSE_ERROR = EVAL_FALSE_ERROR + " (code 64)"
+CLEANSTACK_ERROR = 'non-mandatory-script-verify-flag (P2SH script evaluation of script does not result in a clean stack)'
+EVAL_FALSE_ERROR = 'non-mandatory-script-verify-flag (Script evaluated without error but finished with a false/empty top stack element)'
+
+
+class P2PNode(P2PDataStore):
+    pass
 
 
 class PreviousSpendableOutput(object):
@@ -60,6 +63,10 @@ class PreviousSpendableOutput(object):
 
 class SegwitRecoveryTest(BitcoinTestFramework):
 
+    def __init__(self):
+        super().__init__()
+        self.set_test_params()
+
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
@@ -68,7 +75,7 @@ class SegwitRecoveryTest(BitcoinTestFramework):
         self.blocks = {}
         # We have 2 nodes:
         # 1) node_nonstd (nodes[0]) accepts non-standard txns. It does
-        #    accept Segwit recovery transactions.
+        #    accept Segwit recovery transactions
         # 2) node_std (nodes[1]) doesn't accept non-standard txns and
         #    doesn't have us whitelisted. It's used to test for bans, as we
         #    connect directly to it via mininode and send a segwit spending
@@ -79,12 +86,28 @@ class SegwitRecoveryTest(BitcoinTestFramework):
         # that segwit spending txn are not resulting in bans, node_nonstd
         # doesn't get banned when forwarding this kind of transactions to
         # node_std.
-        self.extra_args = [['-whitelist=127.0.0.1',
-                            "-acceptnonstdtxn=1"],
-                           ["-acceptnonstdtxn=0"]]
+        # NB debug categories need to be specified otherwise test will fail
+        # because it will look for error message in debug.log
+        self.extra_args = [['-acceptnonstdtxn=1',
+                            '-whitelist=127.0.0.1'],
+                           ['-acceptnonstdtxn=0',
+                            '-debug=mempool']]
+
+    def bootstrap_p2p(self):
+        """Add a P2P connection to the node.
+
+        Helper to connect and wait for version handshake."""
+        self.p2p = P2PNode()
+        self.connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], self.p2p)
+        self.connection2 = NodeConn('127.0.0.1', p2p_port(1), self.nodes[1], self.p2p)
+        self.p2p.add_connection(self.connection)
+        self.p2p.add_connection(self.connection2)
+        NetworkThread().start()
+        self.p2p.wait_for_verack()
+        assert(self.p2p.connection.state == "connected")
 
     def next_block(self, number):
-        if self.tip == None:
+        if self.tip is None:
             base_block_hash = self.genesis_hash
             block_time = TEST_TIME
         else:
@@ -92,7 +115,7 @@ class SegwitRecoveryTest(BitcoinTestFramework):
             block_time = self.tip.nTime + 1
         # First create the coinbase
         height = self.block_heights[base_block_hash] + 1
-        coinbase = create_coinbase(height)
+        coinbase = create_coinbase(height, scriptPubKey = CScript([OP_TRUE]))
         coinbase.rehash()
         block = create_block(base_block_hash, coinbase, block_time)
 
@@ -103,27 +126,6 @@ class SegwitRecoveryTest(BitcoinTestFramework):
         assert number not in self.blocks
         self.blocks[number] = block
         return block
-
-    def bootstrap_p2p(self, *, num_connections=1):
-        """Add a P2P connection to the node.
-
-        Helper to connect and wait for version handshake."""
-        for node in self.nodes:
-            for _ in range(num_connections):
-                node.add_p2p_connection(P2PDataStore())
-        network_thread_start()
-        for node in self.nodes:
-            node.p2p.wait_for_verack()
-
-    def reconnect_p2p(self, **kwargs):
-        """Tear down and bootstrap the P2P connection to the node.
-
-        The node gets disconnected several times in this test. This helper
-        method reconnects the p2p and restarts the network thread."""
-        for node in self.nodes:
-            node.disconnect_p2ps()
-        network_thread_join()
-        self.bootstrap_p2p(**kwargs)
 
     def run_test(self):
         self.bootstrap_p2p()
@@ -145,15 +147,8 @@ class SegwitRecoveryTest(BitcoinTestFramework):
             return PreviousSpendableOutput(spendable_outputs.pop(0).vtx[0], 0)
 
         # submit current tip and check it was accepted
-        def accepted(node):
-            node.p2p.send_blocks_and_test([self.tip], node)
-
-        # submit current tip and check it was rejected (and we are banned)
-        def rejected(node, reject_code, reject_reason):
-            node.p2p.send_blocks_and_test(
-                [self.tip], node, success=False, reject_code=reject_code, reject_reason=reject_reason)
-            node.p2p.wait_for_disconnect()
-            self.reconnect_p2p()
+        def accepted(self, node):
+            self.p2p.send_blocks_and_test([self.tip], node)
 
         # move the tip back to a previous block
         def tip(number):
@@ -224,14 +219,16 @@ class SegwitRecoveryTest(BitcoinTestFramework):
             return txfund, txspend
 
         # Check we are not banned when sending a txn that is rejected.
-        def check_for_no_ban_on_rejected_tx(node, tx, reject_code, reject_reason):
-            node.p2p.send_txs_and_test(
-                [tx], node, success=False, reject_code=reject_code, reject_reason=reject_reason)
+        def check_for_no_ban_on_rejected_tx(self, node, tx, reject_reason):
+            self.p2p.send_txs_and_test(
+                [tx], node, success=False, reject_reason=reject_reason)
+        def check_for_accepted_tx(self, node, tx):
+            self.p2p.send_txs_and_test([tx], node, success=True)
 
         # Create a new block
         block(0)
         save_spendable_output()
-        accepted(node_nonstd)
+        accepted(self, node_nonstd)
 
         # Now we need that block to mature so we can spend the coinbase.
         matureblocks = []
@@ -239,7 +236,7 @@ class SegwitRecoveryTest(BitcoinTestFramework):
             block(5000 + i)
             matureblocks.append(self.tip)
             save_spendable_output()
-        node_nonstd.p2p.send_blocks_and_test(matureblocks, node_nonstd)
+        self.p2p.send_blocks_and_test(matureblocks, node_nonstd)
 
         # collect spendable outputs now to avoid cluttering the code later on
         out = []
@@ -255,7 +252,8 @@ class SegwitRecoveryTest(BitcoinTestFramework):
         # nonstandard.
         block(5555)
         update_block(5555, [txfund, txfund_case0])
-        accepted(node_nonstd)
+        # check that current tip is accepted by node0 (nonstd)
+        accepted(self, node_nonstd)
 
         # Check both nodes are synchronized before continuing.
         sync_blocks(self.nodes)
@@ -263,29 +261,27 @@ class SegwitRecoveryTest(BitcoinTestFramework):
         # Check that upgraded nodes checking for standardness are not banning
         # nodes sending segwit spending txns.
         check_for_no_ban_on_rejected_tx(
-            node_nonstd, txspend, 64, CLEANSTACK_ERROR)
+            self, node_std, txspend, CLEANSTACK_ERROR)
         check_for_no_ban_on_rejected_tx(
-            node_nonstd, txspend_case0, 64, EVAL_FALSE_ERROR)
-        check_for_no_ban_on_rejected_tx(
-            node_std, txspend, 64, CLEANSTACK_ERROR)
-        check_for_no_ban_on_rejected_tx(
-            node_std, txspend_case0, 64, EVAL_FALSE_ERROR)
+            self, node_std, txspend_case0, EVAL_FALSE_ERROR)
 
-        # Segwit recovery txns are never accepted into the mempool,
-        # as they are included in standard flags.
-        assert_raises_rpc_error(-26, RPC_CLEANSTACK_ERROR,
-                                node_nonstd.sendrawtransaction, ToHex(txspend))
-        assert_raises_rpc_error(-26, RPC_EVAL_FALSE_ERROR,
-                                node_nonstd.sendrawtransaction, ToHex(txspend_case0))
-        assert_raises_rpc_error(-26, RPC_CLEANSTACK_ERROR,
+        txspend_id = node_nonstd.decoderawtransaction(ToHex(txspend))["txid"]
+        txspend_case0_id = node_nonstd.decoderawtransaction(ToHex(txspend_case0))["txid"]
+
+        # Segwit recovery txns are accept from node that accept not standard txs
+        assert_equal(node_nonstd.sendrawtransaction(ToHex(txspend)), txspend_id)
+        assert_equal(node_nonstd.sendrawtransaction(ToHex(txspend_case0)), txspend_case0_id)
+
+        # Segwit recovery txs are reject if node does not accept stansard txs
+        assert_raises_rpc_error(-26, CLEANSTACK_ERROR,
                                 node_std.sendrawtransaction, ToHex(txspend))
-        assert_raises_rpc_error(-26, RPC_EVAL_FALSE_ERROR,
+        assert_raises_rpc_error(-26, EVAL_FALSE_ERROR,
                                 node_std.sendrawtransaction, ToHex(txspend_case0))
 
         # Blocks containing segwit spending txns are accepted in both nodes.
-        block(5)
+        self.next_block(5)
         update_block(5, [txspend, txspend_case0])
-        accepted(node_nonstd)
+        accepted(self, node_nonstd)
         sync_blocks(self.nodes)
 
 
