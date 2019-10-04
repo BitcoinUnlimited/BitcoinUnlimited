@@ -643,6 +643,12 @@ public:
      */
     void _RemoveStaged(setEntries &stage, bool updateDescendants, TxMempoolOriginalStateMap *changeSet = nullptr);
 
+    /** Resumbit and clear all txns currently in the txCommitQ and txCommitQFinal.
+     *  This has the effect of removing and descendants for txns that were already removed
+     *  from the mempool
+     */
+    void ResubmitCommitQ();
+
     /** When adding transactions from a disconnected block back to the mempool,
      *  new mempool entries may have children in the mempool (which is generally
      *  not the case when otherwise adding transactions).

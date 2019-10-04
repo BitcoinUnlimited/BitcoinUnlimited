@@ -732,9 +732,41 @@ void CTxMemPool::removeRecursive(const CTransaction &origTx, std::list<CTransact
     _removeRecursive(origTx, removed);
 }
 
+void CTxMemPool::ResubmitCommitQ()
+{
+    AssertWriteLockHeld(cs_txmempool);
+
+    // Clear txCommitQ
+    {
+        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        for (auto &kv : *txCommitQ)
+        {
+            CTxInputData txd;
+            txd.tx = kv.second.entry.GetSharedTx();
+            txd.nodeName = "rollback";
+            EnqueueTxForAdmission(txd);
+        }
+        txCommitQ->clear();
+    }
+
+    // Clear txCommitQFinal
+    {
+        LOCK(csCommitQFinal);
+        for (auto &kv : *txCommitQFinal)
+        {
+            CTxInputData txd;
+            txd.tx = kv.second.entry.GetSharedTx();
+            txd.nodeName = "rollback";
+            EnqueueTxForAdmission(txd);
+        }
+        txCommitQFinal->clear();
+    }
+}
+
 void CTxMemPool::_removeRecursive(const CTransaction &origTx, std::list<CTransactionRef> &removed)
 {
     AssertWriteLockHeld(cs_txmempool);
+
     // Remove transaction from memory pool
     setEntries txToRemove;
     txiter origit = mapTx.find(origTx.GetHash());
@@ -768,6 +800,10 @@ void CTxMemPool::_removeRecursive(const CTransaction &origTx, std::list<CTransac
         removed.push_back(it->GetSharedTx());
     }
     _RemoveStaged(setAllRemoves, false);
+
+    // As a final step we must resubmit whatever is in the CommitQ and CommitQFinal in case
+    // there are any anscestors that were removed from the mempool above.
+    ResubmitCommitQ();
 }
 
 void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMemPoolHeight, int flags)

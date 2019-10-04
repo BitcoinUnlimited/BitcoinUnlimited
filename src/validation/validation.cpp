@@ -1351,7 +1351,6 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
             // unconditionally valid already, so force disconnect away from it.
             if (!DisconnectTip(state, consensusParams))
             {
-                mempool.removeForReorg(pcoinsTip, chainActive.Tip()->nHeight + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
                 return false;
             }
         }
@@ -1388,7 +1387,6 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
         pindexBestHeader = mostWork;
     }
 
-    mempool.removeForReorg(pcoinsTip, chainActive.Tip()->nHeight + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
     uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev);
     return true;
 }
@@ -2962,31 +2960,8 @@ static void ResubmitTransactions(CBlock &block)
             EnqueueTxForAdmission(txd);
         });
 
-        // Clear txCommitQ
-        {
-            boost::unique_lock<boost::mutex> lock(csCommitQ);
-            for (auto &kv : *txCommitQ)
-            {
-                CTxInputData txd;
-                txd.tx = kv.second.entry.GetSharedTx();
-                txd.nodeName = "rollback";
-                EnqueueTxForAdmission(txd);
-            }
-            txCommitQ->clear();
-        }
-
-        // Clear txCommitQFinal
-        {
-            LOCK(csCommitQFinal);
-            for (auto &kv : *txCommitQFinal)
-            {
-                CTxInputData txd;
-                txd.tx = kv.second.entry.GetSharedTx();
-                txd.nodeName = "rollback";
-                EnqueueTxForAdmission(txd);
-            }
-            txCommitQFinal->clear();
-        }
+        // Resumbit and clear all txns currently in the txCommitQ and txCommitQFinal
+        mempool.ResubmitCommitQ();
     }
 }
 /** Disconnect chainActive's tip. You probably want to call mempool.removeForReorg and manually re-limit mempool size
@@ -3401,7 +3376,6 @@ bool ActivateBestChainStep(CValidationState &state,
 
     if (fBlocksDisconnected)
     {
-        mempool.removeForReorg(pcoinsTip, chainActive.Tip()->nHeight + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
         LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
             GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
     }
