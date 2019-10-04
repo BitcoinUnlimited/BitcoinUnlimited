@@ -2288,7 +2288,7 @@ void ThreadMessageHandler()
         {
             // select node from whom to request mempool sync
             CNode *syncPeer = SelectMempoolSyncPeer(vNodesCopy);
-            if (!(syncPeer == nullptr))
+            if (syncPeer && IsChainNearlySyncd())
                 requester.RequestMempoolSync(syncPeer);
         }
 
