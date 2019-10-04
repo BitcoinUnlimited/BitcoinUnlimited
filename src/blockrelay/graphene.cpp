@@ -60,7 +60,7 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
             vAdditionalTxs.push_back(tx);
     }
 
-    if (enableCanonicalTxOrder.Value())
+    if (fCanonicalTxsOrder)
         pGrapheneSet =
             std::make_shared<CGrapheneSet>(CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes,
                 shorttxidk0, shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, computeOptimized, false));
@@ -149,7 +149,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // If canonical ordering is activated, locate empty indexes in vTxHashes256 to be used in sorting
     std::vector<size_t> missingTxIdxs;
-    if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
+    if (fCanonicalTxsOrder && NegotiateGrapheneVersion(pfrom) >= 1)
     {
         uint256 nullhash;
         for (size_t idx = 0; idx < grapheneBlock->vTxHashes256.size(); idx++)
@@ -170,14 +170,14 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
             GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash, NegotiateGrapheneVersion(pfrom));
 
         // Insert in arbitrary order if canonical ordering is enabled and xversion is recent enough
-        if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
+        if (fCanonicalTxsOrder && NegotiateGrapheneVersion(pfrom) >= 1)
             grapheneBlock->vTxHashes256[missingTxIdxs[idx++]] = hash;
         // Otherwise, use ordering information
         else
             grapheneBlock->vTxHashes256[grapheneBlock->mapHashOrderIndex[cheapHash]] = hash;
     }
     // Sort order transactions if canonical ordering is enabled and xversion is recent enough
-    if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
+    if (fCanonicalTxsOrder && NegotiateGrapheneVersion(pfrom) >= 1)
     {
         // coinbase is always first
         std::sort(grapheneBlock->vTxHashes256.begin() + 1, grapheneBlock->vTxHashes256.end());
@@ -526,7 +526,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
 
                 // If canonical order is not enabled or xversion is less than 1, update mapHashOrderIndex so
                 // it is available if we later receive missing txs
-                if (!enableCanonicalTxOrder.Value() || NegotiateGrapheneVersion(pfrom) < 1)
+                if (!fCanonicalTxsOrder || NegotiateGrapheneVersion(pfrom) < 1)
                     grapheneBlock->mapHashOrderIndex[cheapHash] = i;
 
                 const auto &elem = mapPartialTxHash.find(cheapHash);
@@ -543,7 +543,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
             }
 
             // Sort order transactions if canonical order is enabled and graphene version is late enough
-            if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
+            if (fCanonicalTxsOrder && NegotiateGrapheneVersion(pfrom) >= 1)
             {
                 // coinbase is always first
                 std::sort(grapheneBlock->vTxHashes256.begin() + 1, grapheneBlock->vTxHashes256.end());

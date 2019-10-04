@@ -96,6 +96,7 @@ void TestPackageSelection(const CChainParams &chainparams, CScript scriptPubKey,
     dMinLimiterTxFee.Set(1.0);
     dMaxLimiterTxFee.Set(1.0);
     excessiveBlockSize = maxGeneratedBlock;
+    fCanonicalTxsOrder = false;
 
     // Test that a medium fee transaction will be selected after a higher fee
     // rate package with a low fee rate parent.
@@ -219,6 +220,9 @@ void TestPackageSelection(const CChainParams &chainparams, CScript scriptPubKey,
     BOOST_CHECK(pblocktemplate->block.vtx[5]->GetHash() == hashHighFeeTx2);
     BOOST_CHECK(pblocktemplate->block.vtx[6]->GetHash() == hashFreeTx3);
     BOOST_CHECK(pblocktemplate->block.vtx[9]->GetHash() == hashLowFeeTx2);
+
+    // reset back to ctor
+    fCanonicalTxsOrder = true;
 }
 
 void GenerateBlocks(const CChainParams &chainparams,
