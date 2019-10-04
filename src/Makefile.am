@@ -512,7 +512,7 @@ libbitcoin_util_a_SOURCES = \
   compat/glibcxx_sanity.cpp \
   compat/strnlen.cpp \
   deadlock-detection/locklocation.cpp \
-  deadlock-detection/lockorder.cpp \  
+  deadlock-detection/lockorder.cpp \
   deadlock-detection/threaddeadlock.cpp \
   fs.cpp \
   random.cpp \

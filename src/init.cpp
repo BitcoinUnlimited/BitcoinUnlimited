@@ -1574,8 +1574,11 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     uiInterface.InitMessage(_("Reaccepting Wallet Transactions"));
     if (pwalletMain)
     {
-        // Add wallet transactions that aren't already in a block to mapTransactions
-        pwalletMain->ReacceptWalletTransactions();
+        {
+            TxAdmissionPause pause; // Get an initial state to use during wallet tx acceptance
+            // Add wallet transactions that aren't already in a block to mapTransactions
+            pwalletMain->ReacceptWalletTransactions();
+        }
 
         // Run a thread to flush wallet periodically
         threadGroup.create_thread(&ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile));

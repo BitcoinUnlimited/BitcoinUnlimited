@@ -310,10 +310,10 @@ class BitcoinTestFramework(object):
 
         if success:
             logging.info("Tests successful")
-            sys.exit(0)
+            return 0
         else:
             logging.error("Failed")
-            sys.exit(1)
+            return 1
 
 
 # Test framework for doing p2p comparison testing, which sets up some bitcoind
