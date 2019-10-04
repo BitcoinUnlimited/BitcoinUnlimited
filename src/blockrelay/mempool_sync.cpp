@@ -155,9 +155,8 @@ bool HandleMempoolSyncRequest(CDataStream &vRecv, CNode *pfrom)
 bool CMempoolSync::ReceiveMempoolSync(CDataStream &vRecv, CNode *pfrom, std::string strCommand)
 {
     // Deserialize mempool sync payload
-    CMempoolSync tmp;
-    vRecv >> tmp;
-    auto mempoolSync = std::make_shared<CMempoolSync>(std::forward<CMempoolSync>(tmp));
+    CMempoolSync mempoolSync;
+    vRecv >> mempoolSync;
     NodeId nodeId = pfrom->GetId();
 
     LOG(MPOOLSYNC, "Received mempool sync from peer %s\n", pfrom->GetLogName());
@@ -181,7 +180,7 @@ bool CMempoolSync::ReceiveMempoolSync(CDataStream &vRecv, CNode *pfrom, std::str
         }
     }
 
-    return mempoolSync->process(pfrom);
+    return mempoolSync.process(pfrom);
 }
 
 bool CMempoolSync::process(CNode *pfrom)
@@ -197,7 +196,6 @@ bool CMempoolSync::process(CNode *pfrom)
     // Collect cheap hashes
     {
         LOCK(cs_mempoolsync);
-
         for (const uint256 &hash : mempoolTxHashes)
         {
             uint64_t cheapHash = GetShortID(mempoolSyncRequested[nodeId].shorttxidk0,
@@ -208,13 +206,11 @@ bool CMempoolSync::process(CNode *pfrom)
 
     try
     {
-        std::vector<uint64_t> blockCheapHashes = pGrapheneSet->Reconcile(mapPartialTxHash);
+        std::vector<uint64_t> mempoolCheapHashes = pGrapheneSet->Reconcile(mapPartialTxHash);
 
         // Sort out what hashes we have from the complete set of cheapHashes
-        for (size_t i = 0; i < blockCheapHashes.size(); i++)
+        for (uint64_t cheapHash : mempoolCheapHashes)
         {
-            uint64_t cheapHash = blockCheapHashes[i];
-
             const auto &elem = mapPartialTxHash.find(cheapHash);
             if (elem == mapPartialTxHash.end())
                 setHashesToRequest.insert(cheapHash);
@@ -230,7 +226,7 @@ bool CMempoolSync::process(CNode *pfrom)
         setHashesToRequest.size(), pfrom->GetLogName());
 
     // If there are any missing transactions then we request them here.
-    if (setHashesToRequest.size() > 0)
+    if (!setHashesToRequest.empty())
     {
         CRequestMempoolSyncTx mempoolSyncTx(setHashesToRequest);
         pfrom->PushMessage(NetMsgType::GET_MEMPOOLSYNCTX, mempoolSyncTx);
@@ -243,12 +239,10 @@ bool CMempoolSync::process(CNode *pfrom)
     // If there are no transactions to request, then synchronization is complete
     {
         LOCK(cs_mempoolsync);
-
         mempoolSyncRequested[nodeId].completed = true;
     }
 
     LOG(MPOOLSYNC, "Completeing mempool sync with %s; no missing transactions\n", pfrom->GetLogName());
-
     return true;
 }
 
@@ -333,7 +327,6 @@ bool CRequestMempoolSyncTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // We should not receive any future messages related to this synchronization round
     {
         LOCK(cs_mempoolsync);
-
         mempoolSyncResponded[nodeId].completed = true;
     }
 
