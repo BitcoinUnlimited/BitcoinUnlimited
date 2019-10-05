@@ -1122,8 +1122,7 @@ void CleanupDisconnectedNodes()
         vector<CNode *> vNodesCopy = vNodes;
         for (CNode *pnode : vNodesCopy)
         {
-            if (pnode->fDisconnect || (pnode->GetRefCount() <= 0 && pnode->vRecvMsg.empty() && pnode->nSendSize == 0 &&
-                                          pnode->ssSend.empty()))
+            if (pnode->fDisconnect || pnode->GetRefCount() <= 0)
             {
                 // remove from vNodes
                 vNodes.erase(remove(vNodes.begin(), vNodes.end(), pnode), vNodes.end());
