@@ -2288,13 +2288,9 @@ void ThreadMessageHandler()
         {
             // select node from whom to request mempool sync
             CNode *syncPeer = SelectMempoolSyncPeer(vNodesCopy);
-            if (!(syncPeer == nullptr))
+            if (syncPeer && IsChainNearlySyncd())
                 requester.RequestMempoolSync(syncPeer);
         }
-
-        // Periodically clear mempool sync maps in case peers have disconnected
-        if (GetStopwatchMicros() - lastMempoolSyncClear > MEMPOOLSYNC_CLEAR_FREQ_US)
-            ClearDisconnectedFromMempoolSyncMaps();
 
         for (CNode *pnode : vNodesCopy)
         {
