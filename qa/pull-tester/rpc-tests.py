@@ -184,7 +184,7 @@ testScripts = [ RpcTest(t) for t in [
     'mempool_push',
     Disabled('schnorr-activation', 'Need to be updated to work with BU'),
     'schnorrsig',
-    Disabled('segwit-recovery-activation','Need to be updated to work with BU'),
+    'segwit-recovery',
     'bip135basic',
     'ctor',
     'mining_ctor',
