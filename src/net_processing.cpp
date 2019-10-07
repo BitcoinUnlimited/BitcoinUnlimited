@@ -10,6 +10,7 @@
 #include "blockrelay/blockrelay_common.h"
 #include "blockrelay/compactblock.h"
 #include "blockrelay/graphene.h"
+#include "blockrelay/mempool_sync.h"
 #include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
 #include "chain.h"
@@ -34,6 +35,11 @@ extern CTweak<unsigned int> maxBlocksInTransitPerPeer;
 extern CTweak<uint64_t> grapheneMinVersionSupported;
 extern CTweak<uint64_t> grapheneMaxVersionSupported;
 extern CTweak<uint64_t> grapheneFastFilterCompatibility;
+extern CTweak<uint64_t> mempoolSyncMinVersionSupported;
+extern CTweak<uint64_t> mempoolSyncMaxVersionSupported;
+extern CTweak<uint64_t> syncMempoolWithPeers;
+
+extern CTweak<uint32_t> randomlyDontInv;
 
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
@@ -577,6 +583,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         xver.set_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED, grapheneMaxVersionSupported.Value());
         xver.set_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED, grapheneMinVersionSupported.Value());
         xver.set_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF, grapheneFastFilterCompatibility.Value());
+        xver.set_u64c(XVer::BU_MEMPOOL_SYNC, syncMempoolWithPeers.Value());
+        xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED, mempoolSyncMaxVersionSupported.Value());
+        xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED, mempoolSyncMinVersionSupported.Value());
         xver.set_u64c(XVer::BU_XTHIN_VERSION, 2); // xthin version
 
         size_t nLimitAncestors = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
@@ -1688,6 +1697,29 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         return CompactReReqResponse::HandleMessage(vRecv, pfrom);
     }
 
+    // Mempool synchronization request
+    else if (strCommand == NetMsgType::GET_MEMPOOLSYNC)
+    {
+        return HandleMempoolSyncRequest(vRecv, pfrom);
+    }
+
+    else if (strCommand == NetMsgType::MEMPOOLSYNC)
+    {
+        return CMempoolSync::ReceiveMempoolSync(vRecv, pfrom, strCommand);
+    }
+
+    // Mempool synchronization transaction request
+    else if (strCommand == NetMsgType::GET_MEMPOOLSYNCTX)
+    {
+        return CRequestMempoolSyncTx::HandleMessage(vRecv, pfrom);
+    }
+
+    else if (strCommand == NetMsgType::MEMPOOLSYNCTX)
+    {
+        return CMempoolSyncTx::HandleMessage(vRecv, pfrom);
+    }
+
+
     // Handle full blocks
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) // Ignore blocks received while importing
     {
@@ -2491,6 +2523,7 @@ bool SendMessages(CNode *pto)
                 vInvSend.reserve(invsz);
 
                 LOCK(pto->cs_inventory);
+                FastRandomContext rnd;
                 for (const CInv &inv : pto->vInventoryToSend)
                 {
                     nToErase++;
@@ -2503,8 +2536,11 @@ bool SendMessages(CNode *pto)
                         if (pto->filterInventoryKnown.contains(inv.hash))
                             continue;
                     }
-                    vInvSend.push_back(inv);
-                    pto->filterInventoryKnown.insert(inv.hash);
+                    if ((rnd.rand32() % 100) < (100 - randomlyDontInv.Value()))
+                    {
+                        vInvSend.push_back(inv);
+                        pto->filterInventoryKnown.insert(inv.hash);
+                    }
 
                     if (vInvSend.size() >= MAX_INV_TO_SEND)
                         break;
