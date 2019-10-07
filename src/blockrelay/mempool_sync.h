@@ -196,6 +196,6 @@ void GetMempoolTxHashes(std::vector<uint256> &mempoolTxHashes);
 CMempoolSyncInfo GetMempoolSyncInfo();
 uint64_t NegotiateMempoolSyncVersion(CNode *pfrom);
 CNode *SelectMempoolSyncPeer(std::vector<CNode *> vNodesCopy);
-void ClearDisconnectedFromMempoolSyncMaps();
+void ClearDisconnectedFromMempoolSyncMaps(NodeId nodeid);
 
 #endif // BITCOIN_MEMPOOL_SYNC_H

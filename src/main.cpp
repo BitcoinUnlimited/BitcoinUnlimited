@@ -10,6 +10,7 @@
 #include "arith_uint256.h"
 #include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene.h"
+#include "blockrelay/mempool_sync.h"
 #include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
 #include "blockstorage/sequential_files.h"
@@ -143,6 +144,9 @@ void InitializeNode(const CNode *pnode)
 
 void FinalizeNode(NodeId nodeid)
 {
+    // Clean up the sync maps
+    ClearDisconnectedFromMempoolSyncMaps(nodeid);
+
     // Clear thintype block data if we have any.
     thinrelay.ClearAllBlocksToReconstruct(nodeid);
     thinrelay.ClearAllBlocksInFlight(nodeid);

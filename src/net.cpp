@@ -2292,10 +2292,6 @@ void ThreadMessageHandler()
                 requester.RequestMempoolSync(syncPeer);
         }
 
-        // Periodically clear mempool sync maps in case peers have disconnected
-        if (GetStopwatchMicros() - lastMempoolSyncClear > MEMPOOLSYNC_CLEAR_FREQ_US)
-            ClearDisconnectedFromMempoolSyncMaps();
-
         for (CNode *pnode : vNodesCopy)
         {
             if (pnode->fDisconnect)

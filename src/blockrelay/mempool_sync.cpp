@@ -502,32 +502,9 @@ CNode *SelectMempoolSyncPeer(std::vector<CNode *> vNodesCopy)
         return nullptr;
 }
 
-void ClearDisconnectedFromMempoolSyncMaps()    
+void ClearDisconnectedFromMempoolSyncMaps(NodeId nodeid)    
 {
     LOCK(cs_mempoolsync);
-
-    std::set<NodeId> toRemove;
-    for (auto idPair : mempoolSyncRequested)
-    {
-        if (!connmgr->FindNodeFromId(idPair.first))
-            toRemove.insert(idPair.first);
-    }
-
-    for (auto idPair : mempoolSyncResponded)
-    {
-        if (!connmgr->FindNodeFromId(idPair.first))
-            toRemove.insert(idPair.first);
-    }
-
-    if (toRemove.size() > 0)
-        LOG(MPOOLSYNC, "Mempool sync removing %d disconnected peers from sync maps\n", toRemove.size());
-
-    for (auto nId : toRemove)
-    {
-        if (mempoolSyncRequested.count(nId) > 0)
-            mempoolSyncRequested.erase(nId);
-
-        if (mempoolSyncResponded.count(nId) > 0)
-            mempoolSyncResponded.erase(nId);
-    }
+    mempoolSyncRequested.erase(nodeid);
+    mempoolSyncResponded.erase(nodeid);
 }
