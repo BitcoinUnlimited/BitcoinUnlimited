@@ -3,37 +3,10 @@
 ; MODIFY AT OWN RISK - EXERCISE EXTREME CARE
 ; Line format:
 ; chainname,bit,name,starttime,timeout,windowsize,threshold,minlockedblocks,minlockedtime,gbtforce
-; main network, 95% @ 2016 blocks:
-; start sep 1, 2018, end sep 1, 2019, 90 day window, 75% threshold, 0, 90 day locked time
-main,1,block_max_size_128mb,1535760000,1567296000, 12960, 9720, 0, 7776000, true
-main,2,opcodes_mul_shift_invert,1535760000,1567296000, 12960, 9720, 0, 7776000, true
-main,3,unrestricted_script_instructions,1535760000,1567296000, 12960, 9720, 0, 7776000, true
-main,4,op_checkdatasig,1535760000,1567296000, 12960, 9720, 0, 7776000, true
-main,5,tx_min_size_100,1535760000,1567296000, 12960, 9720, 0, 7776000, true
-main,6,enforce_CTOR,1535760000,1567296000, 12960, 9720, 0, 7776000, true
-main,7,enforce_scriptsig_push_only,1535760000,1567296000, 12960, 9720, 0, 7776000, true
 ;
 ; test network (testnet), 75% @ 2016 blocks:
 ;
-; start sep 1, 2018, end sep 1, 2019, 14 day window, 75% threshold, 0, 7 day locked time
-test,1,block_max_size_128mb,1535760000,1567296000, 2016, 1512, 0, 604800, true
-test,2,opcodes_mul_shift_invert,1535760000,1567296000, 2016, 1512, 0, 604800, true
-test,3,unrestricted_script_instructions,1535760000,1567296000, 2016, 1512, 0, 604800, true
-test,4,op_checkdatasig,1535760000,1567296000, 2016, 1512, 0, 604800, true
-test,5,tx_min_size_100,1535760000,1567296000, 2016, 1512, 0, 604800, true
-test,6,enforce_CTOR,1535760000,1567296000, 2016, 1512, 0, 604800, true
-test,7,enforce_scriptsig_push_only,1535760000,1567296000, 2016, 1512, 0, 604800, true
-;
 test,28,testdummy,1199145601,1230767999,2016,1512,2016,0,true
 ; regtest chain 75% @ 144 blocks:
-;
-; start Aug 29, 2018, end sep 1, 2019, 100 block window, 75% threshold, 0, 60 second
-regtest,1,block_max_size_128mb,1535566484,1567296000, 100, 75, 0, 60, true
-regtest,2,opcodes_mul_shift_invert,1535566484,1567296000, 100, 75, 0, 60, true
-regtest,3,unrestricted_script_instructions,1535566484,1567296000, 100, 75, 0, 60, true
-regtest,4,op_checkdatasig,1535566484,1567296000, 100, 75, 0, 60, true
-regtest,5,tx_min_size_100,1535566484,1567296000, 100, 75, 0, 60, true
-regtest,6,enforce_CTOR,1535566484,1567296000, 100, 75, 0, 60, true
-regtest,7,enforce_scriptsig_push_only,1535566484,1567296000, 100, 75, 0, 60, true
 ;
 regtest,28,testdummy,0,999999999999,144,108,108,0,true
