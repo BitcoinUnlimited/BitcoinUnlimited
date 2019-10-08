@@ -255,6 +255,13 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
                 canonical = true;
             }
         }
+        else
+        {
+            if (chainparams.NetworkIDString() != "regtest")
+            {
+                canonical = false;
+            }
+        }
 
         std::vector<const CTxMemPoolEntry *> vtxe;
         addPriorityTxs(&vtxe);
