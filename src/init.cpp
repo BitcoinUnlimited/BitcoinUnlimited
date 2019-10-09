@@ -210,6 +210,16 @@ void Shutdown()
     RenameThread("shutoff");
     mempool.AddTransactionsUpdated(1);
 
+    // Call every async stop function before flushing to disk
+    StopHTTPRPC();
+    StopREST();
+    StopRPC();
+    StopHTTPServer();
+    StopTxAdmission();
+    StopNode();
+    PV.reset(nullptr); // clean up scriptcheck threads
+
+    // This is the longest running shutdown procedure
     {
         LOCK(cs_main);
         if (pcoinsTip != nullptr)
@@ -220,18 +230,13 @@ void Shutdown()
         }
     }
 
-    StopHTTPRPC();
-    StopREST();
-    StopRPC();
-    StopHTTPServer();
     electrum::ElectrumServer::Instance().Stop();
 #ifdef ENABLE_WALLET
     if (pwalletMain)
         pwalletMain->Flush(false);
 #endif
     GenerateBitcoins(false, 0, Params());
-    StopTxAdmission();
-    StopNode();
+
     if (g_txindex)
     {
         g_txindex.reset();
@@ -303,7 +308,6 @@ void Shutdown()
 #endif
     globalVerifyHandle.reset();
     ECC_Stop();
-    PV.reset(nullptr); // clean up scriptcheck threads
     requester.Cleanup();
     NetCleanup();
     connmgr.reset(nullptr); // clean up connection manager
