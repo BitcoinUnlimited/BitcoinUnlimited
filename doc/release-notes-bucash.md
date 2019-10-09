@@ -39,9 +39,9 @@ Main Changes in 1.7.0
 
 This is list of the main changes that have been merged in this release:
 
-- Mempool synchronization via Graphene primitives
+- [Mempool synchronization via Graphene](#mempool-synchronization-via-graphene) primitives
 - Intelligent unconfirmed transaction forwarding
-- Child-Pay-For-Parent implementation based on Ancestor Grouped Transactions (AGT)
+- Child-Pay-For-Parent implementation based on [Ancestor Grouped Transactions](#new-cpfp-and-long-chains-of-unconfirmed-transactions) (AGT)
 - Graphene ver 2.1 and IBLT specifications
 - New dead-lock detection mechanism
 - New getblockstats rpc call
@@ -49,6 +49,8 @@ This is list of the main changes that have been merged in this release:
 - QA improvements
 - Schnorr multisignature (Nov 15th' 2019 upgrade)
 - Enforce minimal data push at the consensus layer (Nov 15th' 2019 upgrade).
+- Transaction index database improvements
+- Add transaction rate trend graph in Qt debug dialog
 
 Features Details
 ----------------
@@ -69,7 +71,7 @@ An example of this undesirable is increasing the chance of success of double spe
 
 Intelligent unconfirmed transaction forwarding is delivered as an "experimental" (off by default) feature.  To enable this feature, an operator would add configuration into bitcoin.conf.  Set both new unconfirmed limits (these config fields have existed for a long time) and turn on the new intelligent unconfirmed transaction forwarding:
 limitancestorsize=<KB of RAM>
-limitdescendantsize=<KB of ram>
+limitdescendantsize=<KB of RAM>
 limitancestorcount=<number of allowed ancestors>
 limitdescendantcount=<number of allowed ancestors>
 net.unconfChainResendAction=2
