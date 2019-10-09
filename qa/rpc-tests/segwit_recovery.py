@@ -9,8 +9,6 @@ accepted with -acceptnonstdtxn=1, and that segwit recovery transactions don't re
 """
 
 import time
-from test_framework.util import *
-
 
 from test_framework.blocktools import (
     create_block,

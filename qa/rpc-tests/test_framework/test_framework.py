@@ -175,10 +175,10 @@ class BitcoinTestFramework(object):
 
         default_tempdir = tempfile.mkdtemp(prefix="test_"+testname+"_")
 
-        parser.add_option("--tmppfx", dest="tmppfx", default=default_tempdir,
-                          help="Directory prefix for data directories")
-        parser.add_option("--tmpdir", dest="tmpdir", default=None,
-                          help="Root directory for data directories. If specified, overrides tmppfx.")
+        parser.add_option("--tmppfx", dest="tmppfx", default=None,
+                          help="Directory custom prefix for data directories, if specified, overrides tmpdir")
+        parser.add_option("--tmpdir", dest="tmpdir", default=default_tempdir,
+                          help="Root directory for data directories.")
         parser.add_option("--tracerpc", dest="trace_rpc", default=False, action="store_true",
                           help="Print out all RPC calls as they are made")
         parser.add_option("--portseed", dest="port_seed", default=os.getpid(), type='int',
@@ -205,8 +205,8 @@ class BitcoinTestFramework(object):
         random.seed(self.randomseed)
         logging.info("Random seed: %s" % self.randomseed)
 
-        if self.options.tmpdir is None:
-            self.options.tmpdir = os.path.join(self.options.tmppfx, str(self.options.port_seed))
+        if self.options.tmppfx is not None:
+            self.options.tmpdir = tempfile.mkdtemp(dir=self.options.tmppfx, prefix="test_"+testname+"_")
 
         if self.options.trace_rpc:
             logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
