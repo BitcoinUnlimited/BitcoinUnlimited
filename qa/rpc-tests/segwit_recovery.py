@@ -289,6 +289,7 @@ if __name__ == '__main__':
     SegwitRecoveryTest().main()
 
 def Test():
+    from test_framework.util import standardFlags
     t = SegwitRecoveryTest()
     bitcoinConf = {
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],

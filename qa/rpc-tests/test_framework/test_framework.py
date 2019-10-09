@@ -206,7 +206,11 @@ class BitcoinTestFramework(object):
         logging.info("Random seed: %s" % self.randomseed)
 
         if self.options.tmppfx is not None:
-            self.options.tmpdir = tempfile.mkdtemp(dir=self.options.tmppfx, prefix="test_"+testname+"_")
+            i = self.options.port_seed
+            # find a short path that's easy to remember compared to mkdtemp
+            while os.path.exists(self.options.tmppfx + os.sep + testname[0:-2] + str(i)):
+                i+=1
+            self.options.tmpdir = self.options.tmppfx + os.sep + testname[0:-2] + str(i)
 
         if self.options.trace_rpc:
             logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)

@@ -90,6 +90,9 @@ class WalletHDTest(BitcoinTestFramework):
         self.nodes[1] = start_node(1, self.options.tmpdir, self.node_args[1] + ['-rescan'])
         assert_equal(self.nodes[1].getbalance(), num_hd_adds + 1)
 
+        # cleanup backup file
+        os.remove(tmpdir + "hd.bak")
+
 
 if __name__ == '__main__':
     WalletHDTest().main ()
