@@ -1263,9 +1263,19 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     fFeeEstimatesInitialized = true;
 
     // Set fCanonicalTxsOrder for the BCH early in the bootstrap phase
-    if (IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()) && chainparams.NetworkIDString() != "regtest")
+    if (IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()))
     {
-        fCanonicalTxsOrder = true;
+        if (chainparams.NetworkIDString() != "regtest")
+        {
+            fCanonicalTxsOrder = true;
+        }
+    }
+    else
+    {
+        if (chainparams.NetworkIDString() != "regtest")
+        {
+            fCanonicalTxsOrder = false;
+        }
     }
 
 

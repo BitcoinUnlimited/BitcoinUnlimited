@@ -2588,6 +2588,13 @@ bool ConnectBlock(const CBlock &block,
             canonical = true;
         }
     }
+    else
+    {
+        if (!(chainparams.NetworkIDString() == "regtest"))
+        {
+            canonical = false;
+        }
+    }
 
     if (canonical)
     {
