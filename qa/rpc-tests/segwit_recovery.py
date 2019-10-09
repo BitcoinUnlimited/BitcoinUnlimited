@@ -287,3 +287,13 @@ class SegwitRecoveryTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     SegwitRecoveryTest().main()
+
+def Test():
+    from test_framework.util import standardFlags
+    t = SegwitRecoveryTest()
+    bitcoinConf = {
+        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
+        "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
+    }
+    flags = standardFlags()
+    t.main(flags, bitcoinConf, None)
