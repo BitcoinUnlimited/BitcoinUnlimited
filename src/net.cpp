@@ -1595,7 +1595,12 @@ static void DNSAddressSeed()
     // goal: only query DNS seeds if address need is acute
     if ((addrman.size() > 0) && (!GetBoolArg("-forcednsseed", DEFAULT_FORCEDNSSEED)))
     {
-        MilliSleep(11 * 1000);
+        for (int j = 0; j < 22; j++)
+        {
+            MilliSleep(500);
+            if (shutdown_threads.load() == true)
+                return;
+        }
 
         LOCK(cs_vNodes);
         if (vNodes.size() >= 2)
@@ -1936,7 +1941,8 @@ void ThreadOpenConnections()
             // If the try_wait() fails, meaning all grants are currently in use, then we wait for one minute
             // to check again whether we should disconnect any nodes.  We don't have to check this too often
             // as this is most relevant during IBD.
-            MilliSleep(60000);
+            for (auto j = 0; (j < 120) && (shutdown_threads.load() == false); j++)
+                MilliSleep(500);
             continue;
         }
         if (shutdown_threads.load() == true)
@@ -2062,7 +2068,12 @@ void ThreadOpenAddedConnections()
     // BU: This intial sleep fixes a timing issue where a remote peer may be trying to connect using addnode
     //     at the same time this thread is starting up causing both an outbound and an inbound -addnode connection
     //     to be possible, when it should not be.
-    MilliSleep(15000);
+    for (int j = 0; j < 30; j++)
+    {
+        MilliSleep(500);
+        if (shutdown_threads.load() == true)
+            return;
+    }
 
     // BU: we need our own separate semaphore for -addnodes otherwise we won't be able to reconnect
     //     after a remote node restarts, becuase all the outgoing connection slots will already be filled.
@@ -2101,7 +2112,12 @@ void ThreadOpenAddedConnections()
             }
             // Retry every 15 seconds.  It is important to check often to make sure the Xpedited Relay network
             // nodes reconnect quickly after the remote peers restart
-            MilliSleep(15000);
+            for (int j = 0; j < 30; j++)
+            {
+                MilliSleep(500);
+                if (shutdown_threads.load() == true)
+                    return;
+            }
         }
     }
 
@@ -2167,11 +2183,11 @@ void ThreadOpenAddedConnections()
         }
         // Retry every 15 seconds.  It is important to check often to make sure the Xpedited Relay network
         // nodes reconnect quickly after the remote peers restart
-        MilliSleep(15000);
-
-        if (shutdown_threads.load() == true)
+        for (int j = 0; j < 30; j++)
         {
-            return;
+            MilliSleep(500);
+            if (shutdown_threads.load() == true)
+                return;
         }
     }
 }
