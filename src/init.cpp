@@ -1106,6 +1106,13 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 
     bool fLoaded = false;
     StartTxAdmission(threadGroup);
+
+    if (fTxIndex)
+    {
+        auto txindex_db = new TxIndexDB(cacheConfig.nTxIndexCache, false, fReindex);
+        g_txindex = std::make_unique<TxIndex>(txindex_db);
+    }
+
     while (!fLoaded)
     {
         bool fReset = fReindex;
@@ -1304,10 +1311,8 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 #endif // !ENABLE_WALLET
 
     // ********************************************************* Step 8: data directory maintenance
-    if (GetBoolArg("-txindex", DEFAULT_TXINDEX))
+    if (g_txindex)
     {
-        auto txindex_db = new TxIndexDB(cacheConfig.nTxIndexCache, false, fReindex);
-        g_txindex = std::make_unique<TxIndex>(txindex_db);
         g_txindex->Start();
     }
 

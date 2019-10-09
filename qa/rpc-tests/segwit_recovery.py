@@ -9,6 +9,8 @@ accepted with -acceptnonstdtxn=1, and that segwit recovery transactions don't re
 """
 
 import time
+from test_framework.util import *
+
 
 from test_framework.blocktools import (
     create_block,
@@ -287,3 +289,12 @@ class SegwitRecoveryTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     SegwitRecoveryTest().main()
+
+def Test():
+    t = SegwitRecoveryTest()
+    bitcoinConf = {
+        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
+        "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
+    }
+    flags = standardFlags()
+    t.main(flags, bitcoinConf, None)
