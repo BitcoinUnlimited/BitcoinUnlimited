@@ -371,11 +371,11 @@ public:
      * accept a particular transaction. */
     size_t nLimitDescendantSize = BCH_DEFAULT_DESCENDANT_SIZE_LIMIT * 1000;
     // Does this node support mempool synchronization?
-    bool canSyncMempoolWithPeers;
+    bool canSyncMempoolWithPeers = false;
     // Minimum supported mempool synchronization version
-    uint64_t nMempoolSyncMinVersionSupported;
+    uint64_t nMempoolSyncMinVersionSupported = 0;
     // Maximum supported mempool synchronization version
-    uint64_t nMempoolSyncMaxVersionSupported;
+    uint64_t nMempoolSyncMaxVersionSupported = 0;
 
     // This is shared-locked whenever messages are processed.
     // Take it exclusive-locked to finish all ongoing processing
