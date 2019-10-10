@@ -51,8 +51,14 @@ def check_dependencies():
     import shutil
     if shutil.which("cargo") is None:
         logging.error("Cannot find 'cargo', will not be able to build {}".format(PROJECT_NAME))
-        logging.error("You need to install rust (1.28+) https://rustup.rs/")
+        logging.error("You need to install rust (1.34+) https://rustup.rs/")
+        logging.error("Tip: On Debian/Ubuntu you need to install cargo")
         bail("rust not found")
+
+    if shutil.which("clang") is None:
+        logging.error("Cannot find 'clang', will not be able to build {}".format(PROJECT_NAME))
+        logging.error("Tip: On Debian/Ubuntu you need to install clang")
+        bail("clang not found")
 
     if not os.path.isdir(args.dst):
         bail("--dst provided '%s' is not a directory", args.dst)
