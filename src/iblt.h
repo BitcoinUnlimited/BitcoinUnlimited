@@ -40,7 +40,10 @@ SOFTWARE.
 // Mitzenmacher
 //
 
-class HashTableEntry
+const uint64_t IBLT_MAX_VERSION_SUPPORTED = 2;
+const uint32_t MAX_CHECKSUM_MASK = 0xffffffff;
+
+class BaseHashTableEntry
 {
 public:
     int32_t count;
@@ -48,11 +51,45 @@ public:
     uint32_t keyCheck;
     std::vector<uint8_t> valueSum;
 
-    HashTableEntry() : count(0), keySum(0), keyCheck(0) {}
-    bool isPure() const;
+    BaseHashTableEntry() : count(0), keySum(0), keyCheck(0) {}
+    bool isPure(uint32_t keycheckMask) const;
     bool empty() const;
     void addValue(const std::vector<uint8_t> &v);
+};
 
+class HashTableEntry : public BaseHashTableEntry
+{
+public:
+    uint64_t keyCheck64;
+    uint64_t count64;
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream &s, Operation ser_action)
+    {
+        READWRITE(keySum);
+
+        if (!ser_action.ForRead())
+        {
+            keyCheck64 = (uint64_t)keyCheck;
+            count64 = (uint64_t)count;
+        }
+        READWRITE(COMPACTSIZE(keyCheck64));
+        READWRITE(COMPACTSIZE(count64));
+        if (ser_action.ForRead())
+        {
+            keyCheck = (uint32_t)keyCheck64;
+            count = (uint64_t)count64;
+        }
+
+        READWRITE(valueSum);
+    }
+};
+
+class HashTableEntryStaticChk : public BaseHashTableEntry
+{
+public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
@@ -76,6 +113,8 @@ public:
     CIblt(size_t _expectedNumEntries, uint64_t _version);
     // The salt value is used to create a distinct hash seed for each hash function.
     CIblt(size_t _expectedNumEntries, uint32_t salt, uint64_t _version);
+    // keycheckMask dictates the number of bits used for HashTableEntry checksum.
+    CIblt(size_t _expectedNumEntries, uint32_t salt, uint64_t _version, uint32_t _keycheckMask);
     // Copy constructor
     CIblt(const CIblt &other);
     ~CIblt();
@@ -130,8 +169,8 @@ public:
             READWRITE(salt);
         }
 
-        if (ser_action.ForRead() && version > 1)
-            throw std::ios_base::failure("No IBLT version exceeding 1 is currently known.");
+        if (ser_action.ForRead() && version > IBLT_MAX_VERSION_SUPPORTED)
+            throw std::ios_base::failure("No IBLT version exceeding 2 is currently known.");
 
         READWRITE(n_hash);
         if (ser_action.ForRead() && n_hash == 0)
@@ -139,7 +178,49 @@ public:
             throw std::ios_base::failure("Number of IBLT hash functions needs to be > 0");
         }
         READWRITE(is_modified);
-        READWRITE(hashTable);
+
+        if (version >= 2)
+        {
+            READWRITE(keycheckMask);
+            READWRITE(hashTable);
+            // Ensure that keyChecks do not exceed keycheckMask
+            if (ser_action.ForRead())
+            {
+                for (auto entry : hashTable)
+                    entry.keyCheck = entry.keyCheck & keycheckMask;
+            }
+        }
+        else
+        {
+            std::vector<HashTableEntryStaticChk> hashTableChk;
+            if (ser_action.ForRead())
+            {
+                keycheckMask = MAX_CHECKSUM_MASK;
+                READWRITE(hashTableChk);
+                for (auto entryChk : hashTableChk)
+                {
+                    HashTableEntry entry;
+                    entry.count = entryChk.count;
+                    entry.keySum = entryChk.keySum;
+                    entry.keyCheck = entryChk.keyCheck;
+                    entry.valueSum = entryChk.valueSum;
+                    hashTable.push_back(entry);
+                }
+            }
+            else
+            {
+                for (auto entry : hashTable)
+                {
+                    HashTableEntryStaticChk entryChk;
+                    entryChk.count = entry.count;
+                    entryChk.keySum = entry.keySum;
+                    entryChk.keyCheck = entry.keyCheck;
+                    entryChk.valueSum = entry.valueSum;
+                    hashTableChk.push_back(entryChk);
+                }
+                READWRITE(hashTableChk);
+            }
+        }
     }
 
     // Returns true if any elements have been inserted into the IBLT since creation or reset
@@ -153,6 +234,7 @@ protected:
     uint64_t version;
     uint8_t n_hash;
     bool is_modified;
+    uint32_t keycheckMask;
 
     std::vector<HashTableEntry> hashTable;
     std::map<uint8_t, uint32_t> mapHashIdxSeeds;

@@ -1,0 +1,41 @@
+diff --git a/src/secp256k1/src/num.h b/src/secp256k1/src/num.h
+index 49f2dd791..3ce1eb578 100644
+--- a/src/secp256k1/src/num.h
++++ b/src/secp256k1/src/num.h
+@@ -7,12 +7,12 @@
+ #ifndef SECP256K1_NUM_H
+ #define SECP256K1_NUM_H
+ 
+-#ifndef USE_NUM_NONE
+-
+ #if defined HAVE_CONFIG_H
+ #include "libsecp256k1-config.h"
+ #endif
+ 
++#ifndef USE_NUM_NONE
++
+ #if defined(USE_NUM_GMP)
+ #include "num_gmp.h"
+ #else
+diff --git a/src/secp256k1/src/util.h b/src/secp256k1/src/util.h
+index e0147500f..a47891cac 100644
+--- a/src/secp256k1/src/util.h
++++ b/src/secp256k1/src/util.h
+@@ -85,6 +85,9 @@ static SECP256K1_INLINE void *checked_realloc(const secp256k1_callback* cb, void
+ }
+ 
+ /* Macro for restrict, when available and not in a VERIFY build. */
++#ifdef __ANDROID__
++#  define SECP256K1_RESTRICT restrict
++#else
+ #if defined(SECP256K1_BUILD) && defined(VERIFY)
+ # define SECP256K1_RESTRICT
+ #else
+@@ -100,6 +103,7 @@ static SECP256K1_INLINE void *checked_realloc(const secp256k1_callback* cb, void
+ #  define SECP256K1_RESTRICT restrict
+ # endif
+ #endif
++#endif
+ 
+ #if defined(_WIN32)
+ # define I64FORMAT "I64d"

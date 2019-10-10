@@ -13,7 +13,7 @@ CTxOrphanPool::CTxOrphanPool() : nLastOrphanCheck(GetTime()), nBytesOrphanPool(0
 
 bool CTxOrphanPool::AlreadyHaveOrphan(const uint256 &hash)
 {
-    READLOCK(cs);
+    READLOCK(cs_orphanpool);
     if (mapOrphanTransactions.count(hash))
         return true;
     return false;
@@ -21,7 +21,7 @@ bool CTxOrphanPool::AlreadyHaveOrphan(const uint256 &hash)
 
 bool CTxOrphanPool::AddOrphanTx(const CTransactionRef &ptx, NodeId peer)
 {
-    AssertWriteLockHeld(cs);
+    AssertWriteLockHeld(cs_orphanpool);
 
     if (mapOrphanTransactions.empty())
         DbgAssert(nBytesOrphanPool == 0, nBytesOrphanPool = 0);
@@ -50,7 +50,7 @@ bool CTxOrphanPool::AddOrphanTx(const CTransactionRef &ptx, NodeId peer)
 
 bool CTxOrphanPool::EraseOrphanTx(uint256 hash)
 {
-    AssertWriteLockHeld(cs);
+    AssertWriteLockHeld(cs_orphanpool);
 
     std::map<uint256, COrphanTx>::iterator it = mapOrphanTransactions.find(hash);
     if (it == mapOrphanTransactions.end())
@@ -74,7 +74,7 @@ bool CTxOrphanPool::EraseOrphanTx(uint256 hash)
 
 void CTxOrphanPool::EraseOrphansByTime()
 {
-    AssertWriteLockHeld(cs);
+    AssertWriteLockHeld(cs_orphanpool);
     // Because we have to iterate through the entire orphan cache which can be large we don't want to check this
     // every time a tx enters the mempool but just once every 5 minutes is good enough.
     if (GetTime() < nLastOrphanCheck + 5 * 60)
@@ -102,7 +102,7 @@ void CTxOrphanPool::EraseOrphansByTime()
 
 unsigned int CTxOrphanPool::LimitOrphanTxSize(unsigned int nMaxOrphans, uint64_t nMaxBytes)
 {
-    AssertWriteLockHeld(cs);
+    AssertWriteLockHeld(cs_orphanpool);
 
     // Limit the orphan pool size by either number of transactions or the max orphan pool size allowed.
     // Limiting by pool size to 1/10th the size of the maxmempool alone is not enough because the total number
@@ -127,7 +127,7 @@ unsigned int CTxOrphanPool::LimitOrphanTxSize(unsigned int nMaxOrphans, uint64_t
 
 void CTxOrphanPool::QueryHashes(std::vector<uint256> &vHashes)
 {
-    READLOCK(cs);
+    READLOCK(cs_orphanpool);
     for (auto &it : mapOrphanTransactions)
         vHashes.push_back(it.first);
 }

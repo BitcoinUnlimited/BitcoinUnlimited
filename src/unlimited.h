@@ -17,8 +17,10 @@
 #include "script/script_error.h"
 #include "stat.h"
 #include "tweak.h"
+#include "txmempool.h"
 #include "univalue/include/univalue.h"
 #include "validation/forks.h"
+
 #include <list>
 #include <thread>
 #include <vector>
@@ -56,7 +58,7 @@ class CChainParams;
 /** Add or remove a string to indicate ongoing status */
 class CStatusString
 {
-    mutable CCriticalSection cs;
+    mutable CCriticalSection cs_status_string;
     std::set<std::string> strSet;
 
 public:
@@ -74,6 +76,12 @@ extern uint64_t maxGeneratedBlock;
 extern uint64_t excessiveBlockSize;
 extern unsigned int excessiveAcceptDepth;
 extern unsigned int maxMessageSizeMultiplier;
+extern bool fCanonicalTxsOrder;
+
+/** This function searches the mempool for transactions that are recently acceptable into the mempools of other
+nodes and forwards any found to those nodes.
+*/
+void ForwardAcceptableTransactions(const std::vector<CTxChange> &changeSet);
 
 // Fork configuration
 /** This specifies the MTP time of the next fork */
@@ -256,7 +264,7 @@ extern CCriticalSection cs_mapInboundConnectionTracker;
 // statistics
 void UpdateSendStats(CNode *pfrom, const char *strCommand, int msgSize, int64_t nTime);
 
-void UpdateRecvStats(CNode *pfrom, const std::string &strCommand, int msgSize, int64_t nTimeReceived);
+void UpdateRecvStats(CNode *pfrom, const std::string &strCommand, int msgSize, int64_t nStopwatchTimeReceived);
 // txn mempool statistics
 extern CStatHistory<unsigned int> txAdded;
 extern CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize;
@@ -278,6 +286,7 @@ extern CTweak<unsigned int> maxTxSize;
 extern CTweak<uint64_t> blockSigopsPerMb;
 extern CTweak<uint64_t> coinbaseReserve;
 extern CTweak<uint64_t> blockMiningSigopsPerMb;
+extern CTweak<unsigned int> unconfPushAction;
 
 extern std::list<CStatBase *> mallocedStats;
 

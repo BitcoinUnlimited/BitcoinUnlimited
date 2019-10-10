@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "electrum/electrumserver.h"
 #include "electrum/electrs.h"
+#include "init.h"
 #include "util.h"
 #include "utilprocess.h"
 
@@ -42,7 +43,7 @@ static void log_args(const std::string &path, const std::vector<std::string> &ar
 
 namespace electrum
 {
-ElectrumServer::ElectrumServer() : started(false) {}
+ElectrumServer::ElectrumServer() : started(false), stop_requested(false) {}
 ElectrumServer::~ElectrumServer()
 {
     if (started)
@@ -67,6 +68,7 @@ bool ElectrumServer::Start(int rpcport, const std::string &network)
 }
 bool ElectrumServer::Start(const std::string &path, const std::vector<std::string> &args)
 {
+    stop_requested = false;
     DbgAssert(!started, return false);
     log_args(path, args);
     std::unique_lock<std::mutex> lock(process_cs);
@@ -88,6 +90,16 @@ bool ElectrumServer::Start(const std::string &path, const std::vector<std::strin
             LOGA("Electrum: Unknown error running server");
         }
         this->started = false;
+
+        if (!stop_requested && GetBoolArg("-electrum.shutdownonerror", false))
+        {
+            // The electrum server exit was not initiated by us, so it
+            // must have stopped due to some error.
+
+            LOGA("Electrum: Bitcoin Unlimited is configured to exit when "
+                 "electrum exits on error. Initiating shutdown.");
+            StartShutdown();
+        }
     });
     started = startup_check(*process);
     return started;
@@ -132,6 +144,7 @@ static void stop_server(SubProcess &p)
 
 void ElectrumServer::Stop()
 {
+    stop_requested = true;
     if (!started)
     {
         return;

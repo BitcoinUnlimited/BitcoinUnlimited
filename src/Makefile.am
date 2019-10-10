@@ -28,8 +28,11 @@ AM_CXXFLAGS += -O0 -g -rdynamic
 AM_CPPFLAGS += -O0 -g -rdynamic
 AM_LDFLAGS  += -O0 -g -rdynamic
 endif
+if ENABLE_JAVACASHLIB
+JNI_CXXFLAGS = -I$(JAVA_HOME)/include/linux -I$(JAVA_HOME)/include -DJAVA
+endif
+
 EXTRA_LIBRARIES =
-# libtcmalloc.a
 
 BITCOIN_CONFIG_INCLUDES=-I$(builddir)/config
 BITCOIN_INCLUDES=-I$(builddir) -I$(builddir)/obj $(BDB_CPPFLAGS) $(BOOST_CPPFLAGS) $(LEVELDB_CPPFLAGS) $(CRYPTO_CFLAGS) $(SSL_CFLAGS)
@@ -104,10 +107,12 @@ BITCOIN_CORE_H = \
   base58.h \
   bandb.h \
   banentry.h \
+  bitmanip.h \
   blockrelay/blockrelay_common.h \
   blockrelay/compactblock.h \
   blockrelay/graphene.h \
   blockrelay/graphene_set.h \
+  blockrelay/mempool_sync.h \
   blockrelay/thinblock.h \
   blockstorage/blockleveldb.h \
   blockstorage/blockstorage.h \
@@ -138,6 +143,9 @@ BITCOIN_CORE_H = \
   core_io.h \
   core_memusage.h \
   cuckoocache.h \
+  deadlock-detection/locklocation.h \
+  deadlock-detection/lockorder.h \
+  deadlock-detection/threaddeadlock.h \
   dosman.h \
   dstencode.h \
   expedited.h \
@@ -152,6 +160,7 @@ BITCOIN_CORE_H = \
   httpserver.h \
   iblt.h \
   iblt_params.h \
+  index/txindex.h \
   init.h \
   key.h \
   keystore.h \
@@ -176,6 +185,7 @@ BITCOIN_CORE_H = \
   random.h \
   reverse_iterator.h \
   reverselock.h \
+  rpc/blockchain.h \
   rpc/client.h \
   rpc/protocol.h \
   rpc/server.h \
@@ -200,6 +210,7 @@ BITCOIN_CORE_H = \
   torcontrol.h \
   txadmission.h \
   txdb.h \
+  txdebugger.h \
   txmempool.h \
   txorphanpool.h \
   ui_interface.h \
@@ -255,6 +266,7 @@ libbitcoin_server_a_SOURCES = \
   blockrelay/compactblock.cpp \
   blockrelay/graphene.cpp \
   blockrelay/graphene_set.cpp \
+  blockrelay/mempool_sync.cpp \
   blockrelay/thinblock.cpp \
   blockstorage/blockleveldb.cpp \
   blockstorage/sequential_files.cpp \
@@ -273,6 +285,7 @@ libbitcoin_server_a_SOURCES = \
   httprpc.cpp \
   httpserver.cpp \
   iblt.cpp \
+  index/txindex.cpp \
   init.cpp \
   dbwrapper.cpp \
   main.cpp \
@@ -345,26 +358,37 @@ libbitcoin_wallet_a_SOURCES = \
 libbitcoincash_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoincash_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 
-# base58.cpp
-#  base58.h
-
 libbitcoincash_a_SOURCES = \
   cashlib/cashlib.cpp \
+  base58.cpp \
+  base58.h \
+  chainparams.cpp \
+  chainparams.h \
+  chainparamsbase.cpp \
+  chainparamsbase.h \
   script/sigcommon.cpp \
   hashwrapper.cpp \
   hashwrapper.h \
   key.cpp \
   key.h \
+  primitives/block.cpp \
+  primitives/block.h \
   primitives/transaction.cpp \
   primitives/transaction.h \
   pubkey.cpp \
   pubkey.h \
   random.cpp \
   random.h \
+  script/bitfield.cpp \
+  script/bitfield.h \
   script/interpreter.cpp \
   script/interpreter.h \
+  script/standard.cpp \
+  script/standard.h \
   script/script.cpp \
   script/script.h \
+  script/sign.cpp \
+  script/sign.h \
   support/pagelocker.cpp \
   support/pagelocker.h \
   support/cleanse.cpp \
@@ -373,8 +397,19 @@ libbitcoincash_a_SOURCES = \
   uint256.h \
   utilstrencodings.cpp \
   utilstrencodings.h \
+  cashaddrenc.cpp \
+  cashaddrenc.h \
+  cashaddr.cpp \
+  cashaddr.h \
   utiltime.cpp \
-  utiltime.h
+  utiltime.h \
+  consensus/merkle.cpp \
+  arith_uint256.cpp \
+  arith_uint256.h \
+  bloom.cpp \
+  bloom.h \
+  streams.h
+
 
 # crypto primitives library
 crypto_libbitcoin_crypto_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_CONFIG_INCLUDES)
@@ -421,6 +456,8 @@ libbitcoin_consensus_a_SOURCES = \
   pubkey.cpp \
   pubkey.h \
   script/bitcoinconsensus.cpp \
+  script/bitfield.cpp \
+  script/bitfield.h \
   script/interpreter.cpp \
   script/interpreter.h \
   script/sigcommon.cpp \
@@ -476,6 +513,9 @@ libbitcoin_util_a_SOURCES = \
   compat/glibc_sanity.cpp \
   compat/glibcxx_sanity.cpp \
   compat/strnlen.cpp \
+  deadlock-detection/locklocation.cpp \
+  deadlock-detection/lockorder.cpp \
+  deadlock-detection/threaddeadlock.cpp \
   fs.cpp \
   random.cpp \
   rpc/protocol.cpp \
@@ -607,7 +647,7 @@ endif
 
 libbitcoincash_la_LDFLAGS = $(AM_LDFLAGS) $(SSL_LIBS) $(CRYPTO_LIBS) $(BOOST_LIBS) -no-undefined $(RELDFLAGS)
 libbitcoincash_la_LIBADD = $(LIBSECP256K1)
-libbitcoincash_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(BOOST_CPPFLAGS) -I$(builddir)/obj -I$(srcdir)/secp256k1/include -DBUILD_BITCOIN_INTERNAL
+libbitcoincash_la_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) -I$(BOOST_CPPFLAGS) -I$(builddir)/obj -I$(srcdir)/secp256k1/include $(JNI_CXXFLAGS) -DBUILD_BITCOIN_INTERNAL
 libbitcoincash_la_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 
 endif
@@ -643,7 +683,6 @@ CLEANFILES += consensus/*.gcda consensus/*.gcno
 CLEANFILES += crypto/*.gcda crypto/*.gcno
 CLEANFILES += policy/*.gcda policy/*.gcno
 CLEANFILES += primitives/*.gcda primitives/*.gcno
-CLEANFILES += rsm/*.gcda rsm/*.gcno
 CLEANFILES += script/*.gcda script/*.gcno
 CLEANFILES += support/*.gcda support/*.gcno
 CLEANFILES += univalue/*.gcda univalue/*.gcno

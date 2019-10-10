@@ -80,6 +80,16 @@ class BitcoinTestFramework(object):
         self.nodes = self.setup_nodes()
 
         if self.num_nodes == 1:
+            self.is_network_split = False
+            return
+
+        if self.num_nodes == 2:
+            if split:
+                raise Exception("split option for 2 nodes NYI")
+
+            connect_nodes_bi(self.nodes, 0, 1)
+            self.is_network_split = False
+            self.sync_all()
             return
 
         if self.num_nodes != 4:
@@ -165,10 +175,10 @@ class BitcoinTestFramework(object):
 
         default_tempdir = tempfile.mkdtemp(prefix="test_"+testname+"_")
 
-        parser.add_option("--tmppfx", dest="tmppfx", default=default_tempdir,
-                          help="Directory prefix for data directories")
-        parser.add_option("--tmpdir", dest="tmpdir", default=None,
-                          help="Root directory for data directories. If specified, overrides tmppfx.")
+        parser.add_option("--tmppfx", dest="tmppfx", default=None,
+                          help="Directory custom prefix for data directories, if specified, overrides tmpdir")
+        parser.add_option("--tmpdir", dest="tmpdir", default=default_tempdir,
+                          help="Root directory for data directories.")
         parser.add_option("--tracerpc", dest="trace_rpc", default=False, action="store_true",
                           help="Print out all RPC calls as they are made")
         parser.add_option("--portseed", dest="port_seed", default=os.getpid(), type='int',
@@ -195,8 +205,12 @@ class BitcoinTestFramework(object):
         random.seed(self.randomseed)
         logging.info("Random seed: %s" % self.randomseed)
 
-        if self.options.tmpdir is None:
-            self.options.tmpdir = os.path.join(self.options.tmppfx, str(self.options.port_seed))
+        if self.options.tmppfx is not None:
+            i = self.options.port_seed
+            # find a short path that's easy to remember compared to mkdtemp
+            while os.path.exists(self.options.tmppfx + os.sep + testname[0:-2] + str(i)):
+                i+=1
+            self.options.tmpdir = self.options.tmppfx + os.sep + testname[0:-2] + str(i)
 
         if self.options.trace_rpc:
             logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
@@ -300,10 +314,10 @@ class BitcoinTestFramework(object):
 
         if success:
             logging.info("Tests successful")
-            sys.exit(0)
+            return 0
         else:
             logging.error("Failed")
-            sys.exit(1)
+            return 1
 
 
 # Test framework for doing p2p comparison testing, which sets up some bitcoind

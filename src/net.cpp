@@ -17,6 +17,7 @@
 #include "addrman.h"
 #include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene.h"
+#include "blockrelay/mempool_sync.h"
 #include "chainparams.h"
 #include "connmgr.h"
 #include "consensus/consensus.h"
@@ -29,6 +30,7 @@
 #include "ui_interface.h"
 #include "unlimited.h"
 #include "utilstrencodings.h"
+#include "xversionkeys.h"
 
 extern CTweak<bool> ignoreNetTimeouts;
 
@@ -46,6 +48,7 @@ extern CTweak<bool> ignoreNetTimeouts;
 #endif
 
 #include <boost/filesystem.hpp>
+#include <chrono>
 #include <thread>
 
 #include <math.h>
@@ -75,6 +78,9 @@ extern CTweak<bool> ignoreNetTimeouts;
 
 extern std::atomic<bool> fRescan;
 extern bool fReindex;
+extern CTxMemPool mempool;
+
+bool ShutdownRequested();
 
 using namespace std;
 
@@ -108,7 +114,6 @@ int nMaxConnections = DEFAULT_MAX_PEER_CONNECTIONS;
 int nMinXthinNodes = MIN_XTHIN_NODES;
 
 bool fAddressesInitialized = false;
-std::string strSubVersion;
 
 // BU moved to global.cpp
 // extern vector<CNode*> vNodes;
@@ -137,6 +142,10 @@ boost::condition_variable messageHandlerCondition;
 // BU  Connection Slot mitigation - used to determine how many connection attempts over time
 extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
 extern CCriticalSection cs_mapInboundConnectionTracker;
+
+// Mempool synchronization
+extern uint64_t lastMempoolSync;
+extern uint64_t lastMempoolSyncClear;
 
 // Signals for message handling
 extern CNodeSignals g_signals;
@@ -554,6 +563,7 @@ void CNode::copyStats(CNodeStats &stats)
     X(nLastSend);
     X(nLastRecv);
     X(nTimeConnected);
+    X(nStopwatchConnected);
     X(nTimeOffset);
     X(addrName);
     X(nVersion);
@@ -574,7 +584,7 @@ void CNode::copyStats(CNodeStats &stats)
     int64_t nPingUsecWait = 0;
     if ((0 != nPingNonceSent) && (0 != nPingUsecStart))
     {
-        nPingUsecWait = GetTimeMicros() - nPingUsecStart;
+        nPingUsecWait = GetStopwatchMicros() - nPingUsecStart;
     }
 
     // Raw ping time is in microseconds, but show it to user as whole seconds (Bitcoin users should be well used to
@@ -663,7 +673,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                     LOG(THIN | GRAPHENE, "Receive Queue: pushed %s to the front of the queue\n", strFirstMsgCommand);
                 }
             }
-            // BU: end
+            msg.nStopwatch = GetStopwatchMicros();
             msg.nTime = GetTimeMicros();
             messageHandlerCondition.notify_one();
         }
@@ -890,7 +900,8 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
 
             // on occasion a node will connect but not complete it's initial ping/pong in a reasonable amount of time
             // and will therefore be the lowest priority connection and disconnected first.
-            if (node->nPingNonceSent > 0 && node->nPingUsecTime == 0 && ((GetTime() - node->nTimeConnected) > 60))
+            if (node->nPingNonceSent > 0 && node->nPingUsecTime == 0 &&
+                ((GetStopwatchMicros() - node->nStopwatchConnected) > 60 * 1000000))
             {
                 LOG(NET, "node %s evicted, slow ping\n", node->GetLogName());
                 node->fDisconnect = true;
@@ -1117,8 +1128,7 @@ void CleanupDisconnectedNodes()
         vector<CNode *> vNodesCopy = vNodes;
         for (CNode *pnode : vNodesCopy)
         {
-            if (pnode->fDisconnect || (pnode->GetRefCount() <= 0 && pnode->vRecvMsg.empty() && pnode->nSendSize == 0 &&
-                                          pnode->ssSend.empty()))
+            if (pnode->fDisconnect || pnode->GetRefCount() <= 0)
             {
                 // remove from vNodes
                 vNodes.erase(remove(vNodes.begin(), vNodes.end(), pnode), vNodes.end());
@@ -1398,9 +1408,10 @@ void ThreadSocketHandler()
             //
             // Inactivity checking
             //
-            int64_t nTime = GetTime();
-            if (nTime - pnode->nTimeConnected > 60)
+            int64_t stopwatchTime = GetStopwatchMicros();
+            if (stopwatchTime - pnode->nStopwatchConnected > 60 * 1000000)
             {
+                int64_t nTime = GetTime();
                 if (pnode->nLastRecv == 0 || pnode->nLastSend == 0)
                 {
                     LOG(NET, "Node %s socket no message in first 60 seconds, %d %d from %d\n", pnode->GetLogName(),
@@ -1420,10 +1431,11 @@ void ThreadSocketHandler()
                     if (ignoreNetTimeouts.Value() == false)
                         pnode->fDisconnect = true;
                 }
-                else if (pnode->nPingNonceSent && pnode->nPingUsecStart + TIMEOUT_INTERVAL * 1000000 < GetTimeMicros())
+                else if (pnode->nPingNonceSent &&
+                         pnode->nPingUsecStart + (TIMEOUT_INTERVAL * 1000000) < (int64_t)GetStopwatchMicros())
                 {
                     LOG(NET, "Node %s ping timeout: %fs\n", pnode->GetLogName(),
-                        0.000001 * (GetTimeMicros() - pnode->nPingUsecStart));
+                        0.000001 * (GetStopwatchMicros() - pnode->nPingUsecStart));
                     if (ignoreNetTimeouts.Value() == false)
                         pnode->fDisconnect = true;
                 }
@@ -1443,8 +1455,8 @@ void ThreadSocketHandler()
     }
 }
 
-
 #ifdef USE_UPNP
+static bool fShutdownUPnP = false;
 void ThreadMapPort()
 {
     std::string port = strprintf("%u", GetListenPort());
@@ -1493,45 +1505,44 @@ void ThreadMapPort()
 
         string strDesc = "Bitcoin " + FormatFullVersion();
 
-        try
+        while (true)
         {
-            while (true)
-            {
 #ifndef UPNPDISCOVER_SUCCESS
-                /* miniupnpc 1.5 */
-                r = UPNP_AddPortMapping(urls.controlURL, data.first.servicetype, port.c_str(), port.c_str(), lanaddr,
-                    strDesc.c_str(), "TCP", 0);
+            /* miniupnpc 1.5 */
+            r = UPNP_AddPortMapping(urls.controlURL, data.first.servicetype, port.c_str(), port.c_str(), lanaddr,
+                strDesc.c_str(), "TCP", 0);
 #else
-                /* miniupnpc 1.6 */
-                r = UPNP_AddPortMapping(urls.controlURL, data.first.servicetype, port.c_str(), port.c_str(), lanaddr,
-                    strDesc.c_str(), "TCP", 0, "0");
+            /* miniupnpc 1.6 */
+            r = UPNP_AddPortMapping(urls.controlURL, data.first.servicetype, port.c_str(), port.c_str(), lanaddr,
+                strDesc.c_str(), "TCP", 0, "0");
 #endif
+            if (r != UPNPCOMMAND_SUCCESS)
+                LOGA("AddPortMapping(%s, %s, %s) failed with code %d (%s)\n", port, port, lanaddr, r, strupnperror(r));
+            else
+                LOGA("UPnP Port Mapping successful.\n");
 
-                if (r != UPNPCOMMAND_SUCCESS)
-                    LOGA("AddPortMapping(%s, %s, %s) failed with code %d (%s)\n", port, port, lanaddr, r,
-                        strupnperror(r));
-                else
-                    LOGA("UPnP Port Mapping successful.\n");
-                ;
-
-                MilliSleep(20 * 60 * 1000); // Refresh every 20 minutes
+            // Refresh every 20 minutes
+            for (int i = 1; i < 20 * 60; i++)
+            {
+                MilliSleep(1000);
+                if (ShutdownRequested() || fShutdownUPnP)
+                {
+                    LOGA("interrupt caught and deleting portmapping\n");
+                    r = UPNP_DeletePortMapping(urls.controlURL, data.first.servicetype, port.c_str(), "TCP", 0);
+                    LOGA("UPNP_DeletePortMapping() returned: %d\n", r);
+                    freeUPNPDevlist(devlist);
+                    devlist = nullptr;
+                    FreeUPNPUrls(&urls);
+                    return;
+                }
             }
-        }
-        catch (const boost::thread_interrupted &)
-        {
-            r = UPNP_DeletePortMapping(urls.controlURL, data.first.servicetype, port.c_str(), "TCP", 0);
-            LOGA("UPNP_DeletePortMapping() returned: %d\n", r);
-            freeUPNPDevlist(devlist);
-            devlist = 0;
-            FreeUPNPUrls(&urls);
-            throw;
         }
     }
     else
     {
         LOGA("No valid UPnP IGDs found\n");
         freeUPNPDevlist(devlist);
-        devlist = 0;
+        devlist = nullptr;
         if (r != 0)
             FreeUPNPUrls(&urls);
     }
@@ -1539,21 +1550,22 @@ void ThreadMapPort()
 
 void MapPort(bool fUseUPnP)
 {
-    static boost::thread *upnp_thread = nullptr;
+    static std::thread *upnp_thread = nullptr;
 
     if (fUseUPnP)
     {
         if (upnp_thread)
         {
-            upnp_thread->interrupt();
+            fShutdownUPnP = true;
             upnp_thread->join();
             delete upnp_thread;
         }
-        upnp_thread = new boost::thread(boost::bind(&TraceThread<void (*)()>, "upnp", &ThreadMapPort));
+        fShutdownUPnP = false;
+        upnp_thread = new std::thread(std::bind(&TraceThread<void (*)()>, "upnp", &ThreadMapPort));
     }
     else if (upnp_thread)
     {
-        upnp_thread->interrupt();
+        fShutdownUPnP = true;
         upnp_thread->join();
         delete upnp_thread;
         upnp_thread = nullptr;
@@ -1583,7 +1595,12 @@ static void DNSAddressSeed()
     // goal: only query DNS seeds if address need is acute
     if ((addrman.size() > 0) && (!GetBoolArg("-forcednsseed", DEFAULT_FORCEDNSSEED)))
     {
-        MilliSleep(11 * 1000);
+        for (int j = 0; j < 22; j++)
+        {
+            MilliSleep(500);
+            if (shutdown_threads.load() == true)
+                return;
+        }
 
         LOCK(cs_vNodes);
         if (vNodes.size() >= 2)
@@ -1757,6 +1774,7 @@ void DumpData(int64_t seconds_between_runs)
                 break;
             }
             std::this_thread::sleep_for(std::chrono::seconds(2));
+            nStart = GetTime();
         }
         _DumpData();
     }
@@ -1816,10 +1834,10 @@ void ThreadOpenConnections()
     // is intended as "only make outbound connections to the configured nodes".
 
     // Initiate network connections
-    int64_t nStart = GetTime();
+    int64_t nStart = GetStopwatchMicros();
     unsigned int nDisconnects = 0;
     // Minimum time before next feeler connection (in microseconds).
-    int64_t nNextFeeler = PoissonNextSend(nStart * 1000 * 1000, FEELER_INTERVAL);
+    int64_t nNextFeeler = PoissonNextSend(nStart, FEELER_INTERVAL);
 
     while (shutdown_threads.load() == false)
     {
@@ -1884,10 +1902,10 @@ void ThreadOpenConnections()
             }
             // In the event that outbound nodes restart or drop off the network over time we need to
             // replenish the number of disconnects allowed once per day.
-            if (GetTime() - nStart > 86400)
+            if (GetStopwatchMicros() - nStart > 86400UL * 1000000UL)
             {
                 nDisconnects = 0;
-                nStart = GetTime();
+                nStart = GetStopwatchMicros();
             }
         }
 
@@ -1923,7 +1941,8 @@ void ThreadOpenConnections()
             // If the try_wait() fails, meaning all grants are currently in use, then we wait for one minute
             // to check again whether we should disconnect any nodes.  We don't have to check this too often
             // as this is most relevant during IBD.
-            MilliSleep(60000);
+            for (auto j = 0; (j < 120) && (shutdown_threads.load() == false); j++)
+                MilliSleep(500);
             continue;
         }
         if (shutdown_threads.load() == true)
@@ -1964,7 +1983,7 @@ void ThreadOpenConnections()
         bool fFeeler = false;
         if (nOutbound >= nMaxOutConnections)
         {
-            int64_t nTime = GetTimeMicros(); // The current time right now (in microseconds).
+            int64_t nTime = GetStopwatchMicros(); // The current time right now (in microseconds).
             if (nTime > nNextFeeler)
             {
                 nNextFeeler = PoissonNextSend(nTime, FEELER_INTERVAL);
@@ -2049,7 +2068,12 @@ void ThreadOpenAddedConnections()
     // BU: This intial sleep fixes a timing issue where a remote peer may be trying to connect using addnode
     //     at the same time this thread is starting up causing both an outbound and an inbound -addnode connection
     //     to be possible, when it should not be.
-    MilliSleep(15000);
+    for (int j = 0; j < 30; j++)
+    {
+        MilliSleep(500);
+        if (shutdown_threads.load() == true)
+            return;
+    }
 
     // BU: we need our own separate semaphore for -addnodes otherwise we won't be able to reconnect
     //     after a remote node restarts, becuase all the outgoing connection slots will already be filled.
@@ -2088,7 +2112,12 @@ void ThreadOpenAddedConnections()
             }
             // Retry every 15 seconds.  It is important to check often to make sure the Xpedited Relay network
             // nodes reconnect quickly after the remote peers restart
-            MilliSleep(15000);
+            for (int j = 0; j < 30; j++)
+            {
+                MilliSleep(500);
+                if (shutdown_threads.load() == true)
+                    return;
+            }
         }
     }
 
@@ -2154,11 +2183,11 @@ void ThreadOpenAddedConnections()
         }
         // Retry every 15 seconds.  It is important to check often to make sure the Xpedited Relay network
         // nodes reconnect quickly after the remote peers restart
-        MilliSleep(15000);
-
-        if (shutdown_threads.load() == true)
+        for (int j = 0; j < 30; j++)
         {
-            return;
+            MilliSleep(500);
+            if (shutdown_threads.load() == true)
+                return;
         }
     }
 }
@@ -2269,6 +2298,14 @@ void ThreadMessageHandler()
         }
 
         bool fSleep = true;
+
+        if (((GetStopwatchMicros() - lastMempoolSync) > MEMPOOLSYNC_FREQ_US) && vNodesCopy.size() > 0)
+        {
+            // select node from whom to request mempool sync
+            CNode *syncPeer = SelectMempoolSyncPeer(vNodesCopy);
+            if (syncPeer && IsChainNearlySyncd())
+                requester.RequestMempoolSync(syncPeer);
+        }
 
         for (CNode *pnode : vNodesCopy)
         {
@@ -2658,7 +2695,7 @@ void NetCleanup()
 }
 
 
-void RelayTransaction(const CTransactionRef &ptx, const bool fRespend)
+void RelayTransaction(const CTransactionRef &ptx, const bool fRespend, const CTxProperties *txProperties)
 {
     if (ptx->GetTxSize() > maxTxSize.Value())
     {
@@ -2681,11 +2718,20 @@ void RelayTransaction(const CTransactionRef &ptx, const bool fRespend)
         mapRelay.insert(std::make_pair(inv, ptx));
         vRelayExpiration.push_back(std::make_pair(GetTime() + 15 * 60, inv));
     }
+
     LOCK(cs_vNodes);
     for (CNode *pnode : vNodes)
     {
         if (!pnode->fRelayTxes)
+        {
             continue;
+        }
+        // If the transaction won't be acceptable to the target node, then don't send it.  This avoids poisoning
+        // the node against this tx (via the node's alreadyHave() logic), so that it can be sent later.
+        if (txProperties && (!pnode->IsTxAcceptable(*txProperties)))
+        {
+            continue;
+        }
 
         LOCK(pnode->cs_filter);
         // If the bloom filter is not empty then a peer must have sent us a filter
@@ -2695,10 +2741,14 @@ void RelayTransaction(const CTransactionRef &ptx, const bool fRespend)
             // Relaying double spends to SPV clients is an easy attack vector,
             // and therefore only relay txns that are not potential double spends.
             if (!fRespend && pnode->pfilter->IsRelevantAndUpdate(ptx))
+            {
                 pnode->PushInventory(inv);
+            }
         }
         else
+        {
             pnode->PushInventory(inv);
+        }
     }
 }
 
@@ -2948,6 +2998,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nRecvBytes = 0;
     nActivityBytes = 0; // BU connection slot exhaustion mitigation
     nTimeConnected = GetTime();
+    nStopwatchConnected = GetStopwatchMicros();
     nTimeOffset = 0;
     addr = addrIn;
     addrName = addrNameIn == "" ? addr.ToStringIPPort() : addrNameIn;
@@ -3192,6 +3243,7 @@ void CNode::DisconnectIfBanned()
         }
         else if (addr.IsLocal())
         {
+            nMisbehavior.store(0);
             LOGA("Warning: not banning local peer %s!\n", GetLogName());
         }
         else
@@ -3200,6 +3252,33 @@ void CNode::DisconnectIfBanned()
             dosMan.Ban(addr, BanReasonNodeMisbehaving);
         }
     }
+}
+
+void CNode::ReadConfigFromXVersion()
+{
+    skipChecksum = (xVersion.as_u64c(XVer::BU_MSG_IGNORE_CHECKSUM) == 1);
+    if (addrFromPort == 0)
+    {
+        addrFromPort = xVersion.as_u64c(XVer::BU_LISTEN_PORT) & 0xffff;
+    }
+
+    uint64_t num = xVersion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT);
+    if (num)
+        nLimitAncestorCount = num; // num == 0 means the field was not provided.
+    num = xVersion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT);
+    if (num)
+        nLimitAncestorSize = num;
+
+    num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT);
+    if (num)
+        nLimitDescendantCount = num;
+    num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT);
+    if (num)
+        nLimitDescendantSize = num;
+
+    canSyncMempoolWithPeers = (xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC) == 1);
+    nMempoolSyncMinVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED);
+    nMempoolSyncMaxVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED);
 }
 
 

@@ -33,9 +33,9 @@ public:
         uint64_t nOrphanTxSize;
     };
 
-    CSharedCriticalSection cs;
-    std::map<uint256, COrphanTx> mapOrphanTransactions GUARDED_BY(cs);
-    std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED_BY(cs);
+    CSharedCriticalSection cs_orphanpool;
+    std::map<uint256, COrphanTx> mapOrphanTransactions GUARDED_BY(cs_orphanpool);
+    std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED_BY(cs_orphanpool);
 
     CTxOrphanPool();
 
@@ -63,14 +63,14 @@ public:
     //! Orphan pool current number of transactions
     uint64_t GetOrphanPoolSize()
     {
-        READLOCK(cs);
+        READLOCK(cs_orphanpool);
         return mapOrphanTransactions.size();
     }
 
     //! Orphan pool bytes used
     uint64_t GetOrphanPoolBytes()
     {
-        READLOCK(cs);
+        READLOCK(cs_orphanpool);
         return nBytesOrphanPool;
     }
 };

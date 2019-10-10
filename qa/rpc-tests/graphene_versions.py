@@ -56,8 +56,24 @@ class GrapheneOptimizedTest(GrapheneBlockTest):
         self.is_network_split = False
         self.sync_all()
 
+def main(flags=None):
+    t = GrapheneOptimizedTest('1', '3', '3', '4', 'success')
+    t.main(flags)
+    stop_nodes(t.nodes)
+
+    t = GrapheneOptimizedTest('0', '4', '1', '3', 'success')
+    t.main(flags)
+    stop_nodes(t.nodes)
+
+    t = GrapheneOptimizedTest('1', '2', '3', '4', 'failure')
+    t.main(flags)
+    stop_nodes(t.nodes)
 
 if __name__ == '__main__':
-    GrapheneOptimizedTest('1', '3', '3', '4', 'success').main()
-    GrapheneOptimizedTest('0', '4', '1', '3', 'success').main()
-    GrapheneOptimizedTest('1', '2', '3', '4', 'failure').main()
+    sys.exit(main())
+
+# Create a convenient function for an interactive python debugging session
+def Test():
+    flags = standardFlags()
+    main(flags)
+

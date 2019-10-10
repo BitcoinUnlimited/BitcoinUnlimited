@@ -12,6 +12,8 @@
 
 #include <boost/filesystem.hpp>
 
+constexpr char ELECTRSCASH_BIN[] = "electrscash";
+
 static std::string monitoring_port() { return GetArg("-electrum.monitoring.port", "4224"); }
 static std::string monitoring_host() { return GetArg("-electrum.monitoring.host", "127.0.0.1"); }
 static std::string rpc_host() { return GetArg("-electrum.host", "127.0.0.1"); }
@@ -29,6 +31,51 @@ static std::string rpc_port(const std::string &network)
 
     return GetArg("-electrum.port", defaultPort->second);
 }
+static void remove_conflicting_arg(std::vector<std::string> &args, const std::string &override_arg)
+{
+    // special case: verboseness argument
+    const std::regex verbose("^-v+$");
+    if (std::regex_search(override_arg, verbose))
+    {
+        auto it = begin(args);
+        while (it != end(args))
+        {
+            if (!std::regex_search(*it, verbose))
+            {
+                ++it;
+                continue;
+            }
+            LOGA("Electrum: Argument '%s' overrides '%s'", override_arg, *it);
+            it = args.erase(it);
+        }
+        return;
+    }
+
+    // normal case
+    auto separator = override_arg.find_first_of("=");
+    if (separator == std::string::npos)
+    {
+        throw std::invalid_argument("Invalid format for argument '" + override_arg + "'");
+    }
+    separator++; // include '=' when matching argument names below
+
+    auto it = begin(args);
+    while (it != end(args))
+    {
+        if (it->size() < separator)
+        {
+            ++it;
+            continue;
+        }
+        if (it->substr(0, separator) != override_arg.substr(0, separator))
+        {
+            ++it;
+            continue;
+        }
+        LOGA("Electrum: Argument '%s' overrides '%s'", override_arg, *it);
+        it = args.erase(it);
+    }
+}
 namespace electrum
 {
 std::string electrs_path()
@@ -37,7 +84,7 @@ std::string electrs_path()
     boost::filesystem::path bitcoind_dir(this_process_path());
     bitcoind_dir = bitcoind_dir.remove_filename();
 
-    auto default_path = bitcoind_dir / "electrs";
+    auto default_path = bitcoind_dir / ELECTRSCASH_BIN;
     const std::string path = GetArg("-electrum.exec", default_path.string());
 
     if (path.empty())
@@ -82,12 +129,12 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
     args.push_back("--jsonrpc-import");
 
     // Where to store electrs database files.
-    const std::string defaultDir = (GetDataDir() / "electrs").string();
-    args.push_back("--db-dir=" + GetArg("-electrumdir", defaultDir));
+    const std::string defaultDir = (GetDataDir() / ELECTRSCASH_BIN).string();
+    args.push_back("--db-dir=" + GetArg("-electrum.dir", defaultDir));
 
     // Tell electrs what network we're on
     const std::map<std::string, std::string> netmapping = {
-        {"main", "mainnet"}, {"test", "testnet"}, {"regtest", "regtest"}};
+        {"main", "bitcoin"}, {"test", "testnet"}, {"regtest", "regtest"}};
     if (!netmapping.count(network))
     {
         std::stringstream ss;
@@ -104,6 +151,12 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
 
     // max txs to look up per address
     args.push_back("--txid-limit=" + GetArg("-electrum.addr.limit", "500"));
+
+    for (auto &a : mapMultiArgs["-electrum.rawarg"])
+    {
+        remove_conflicting_arg(args, a);
+        args.push_back(a);
+    }
 
     return args;
 }

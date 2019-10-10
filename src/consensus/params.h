@@ -24,15 +24,16 @@ enum DeploymentPos
     // When a bit goes back to being unused, it should be renamed to
     // DEPLOYMENT_UNASSIGNED_BIT_x .
     // NOTE: Also add new deployments to VersionBitsDeploymentInfo in versionbits.cpp
-    DEPLOYMENT_CSV = 0, // bit 0 - deployment of BIP68, BIP112, and BIP113.
+
     // begin unassigned bits. Rename bits when allocated.
-    DEPLOYMENT_128MB_BLOCK,
-    DEPLOYMENT_MUL_SHIFT_INVERT,
-    DEPLOYMENT_UNLIMITED_SCRIPT_OPCODES,
-    DEPLOYMENT_CHECKDATASIG,
-    DEPLOYMENT_100BYTE_MIN_TX,
-    DEPLOYMENT_CTOR,
-    DEPLOYMENT_SCRIPTSIG_PUSH_ONLY,
+    DEPLOYMENT_UNASSIGNED_BIT_0 = 0,
+    DEPLOYMENT_UNASSIGNED_BIT_1,
+    DEPLOYMENT_UNASSIGNED_BIT_2,
+    DEPLOYMENT_UNASSIGNED_BIT_3,
+    DEPLOYMENT_UNASSIGNED_BIT_4,
+    DEPLOYMENT_UNASSIGNED_BIT_5,
+    DEPLOYMENT_UNASSIGNED_BIT_6,
+    DEPLOYMENT_UNASSIGNED_BIT_7,
     DEPLOYMENT_UNASSIGNED_BIT_8,
     DEPLOYMENT_UNASSIGNED_BIT_9,
     DEPLOYMENT_UNASSIGNED_BIT_10,
@@ -151,11 +152,10 @@ struct Params
     int may2018Height;
     /** Nov 15, 2018 activation height */
     int nov2018Height;
-    /** May 15, 2019 actication time will be 12:00:00 UTC */
-    // we still need this variable until we won't add Nov 2019 activation time
-    int may2019ActivationTime = 1557921600;
     /** May 15, 2019 actication height */
     int may2019Height;
+    /** Nov 15, 2019 MTP activation time will be 12:00:00 UTC */
+    uint64_t nov2019ActivationTime;
 };
 } // namespace Consensus
 

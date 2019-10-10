@@ -12,6 +12,7 @@
 #include "blockrelay/blockrelay_common.h"
 #include "blockrelay/compactblock.h"
 #include "blockrelay/graphene.h"
+#include "blockrelay/mempool_sync.h"
 #include "blockrelay/thinblock.h"
 #include "chain.h"
 #include "chainparams.h"
@@ -32,6 +33,7 @@
 #include "rpc/server.h"
 #include "script/standard.h"
 #include "stat.h"
+#include "sync.h"
 #include "timedata.h"
 #include "tinyformat.h"
 #include "tweak.h"
@@ -41,13 +43,14 @@
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include "utiltime.h"
 #include "validationinterface.h"
 #include "version.h"
 #include "versionbits.h"
 
 #include <atomic>
 #include <boost/lexical_cast.hpp>
-#include <boost/thread/tss.hpp> // for boost::thread_specific_ptr
+#include <chrono>
 #include <inttypes.h>
 #include <iomanip>
 #include <list>
@@ -57,10 +60,9 @@
 using namespace std;
 
 #ifdef DEBUG_LOCKORDER
-boost::mutex dd_mutex;
-std::map<std::pair<void *, void *>, LockStack> lockorders;
-boost::thread_specific_ptr<LockStack> lockstack;
+LockData lockdata;
 #endif
+
 
 // this flag is set to true when a wallet rescan has been invoked.
 std::atomic<bool> fRescan{false};
@@ -77,19 +79,21 @@ CCriticalSection cs_rpcWarmup;
 CSharedCriticalSection cs_mapBlockIndex;
 BlockMap mapBlockIndex GUARDED_BY(cs_mapBlockIndex);
 
+std::atomic<CBlockIndex *> pindexBestHeader{nullptr};
+std::atomic<CBlockIndex *> pindexBestInvalid{nullptr};
+
+// The max allowed size of the in memory UTXO cache.
+std::atomic<int64_t> nCoinCacheMaxSize{0};
+
 CCriticalSection cs_main;
 CChain chainActive GUARDED_BY(cs_main); // however, chainActive.Tip() is lock free
 // BU variables moved to globals.cpp
 // - moved CCriticalSection cs_main;
 // - moved BlockMap mapBlockIndex;
 // - movedCChain chainActive;
-std::atomic<CBlockIndex *> pindexBestHeader{nullptr};
 CFeeRate minRelayTxFee GUARDED_BY(cs_main) = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
-// The allowed size of the in memory UTXO cache
-int64_t nCoinCacheMaxSize GUARDED_BY(cs_main) = 0;
 /** A cache to store headers that have arrived but can not yet be connected **/
 std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders GUARDED_BY(cs_main);
-CBlockIndex *pindexBestInvalid GUARDED_BY(cs_main) = nullptr;
 /**
  * Every received block is assigned a unique and increasing identifier, so we
  * know which one to give priority in case of a fork.
@@ -179,7 +183,7 @@ uint64_t excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
 unsigned int excessiveAcceptDepth = DEFAULT_EXCESSIVE_ACCEPT_DEPTH;
 unsigned int maxMessageSizeMultiplier = DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER;
 int nMaxOutConnections = DEFAULT_MAX_OUTBOUND_CONNECTIONS;
-
+bool fCanonicalTxsOrder = true;
 uint32_t blockVersion = 0; // Overrides the mined block version if non-zero
 
 std::vector<std::string> BUComments = std::vector<std::string>();
@@ -240,7 +244,11 @@ std::queue<CTxInputData> txWaitNextBlockQ GUARDED_BY(csTxInQ);
 // Transactions that have been validated and are waiting to be committed into the mempool
 CWaitableCriticalSection csCommitQ;
 CConditionVariable cvCommitQ GUARDED_BY(csCommitQ);
-std::map<uint256, CTxCommitData> *txCommitQ = nullptr;
+std::map<uint256, CTxCommitData> *txCommitQ GUARDED_BY(csCommitQ) = nullptr;
+// Before the transactions are finally commited to the mempool the txCommitQ pointer is copied
+// to txCommitQFinal so that the lock on txCommitQ can be released and processing can continue.
+CCriticalSection csCommitQFinal;
+std::map<uint256, CTxCommitData> *txCommitQFinal GUARDED_BY(csCommitQFinal) = nullptr;
 
 // Control the execution of the parallel tx validation and serial mempool commit phases
 CThreadCorral txProcessingCorral;
@@ -260,6 +268,8 @@ CTweak<uint64_t> pruneIntervalTweak("prune.pruneInterval",
 
 CTweak<uint32_t> netMagic("net.magic", "network prefix override. If 0 use the default", 0);
 
+CTweak<uint32_t> randomlyDontInv("net.randomlyDontInv", "Skip sending an INV for some percent of transactions", 0);
+
 CTweakRef<uint64_t> ebTweak("net.excessiveBlock",
     "Excessive block size in bytes",
     &excessiveBlockSize,
@@ -268,7 +278,13 @@ CTweak<uint64_t> blockSigopsPerMb("net.excessiveSigopsPerMb",
     "Excessive effort per block, denoted in cost (# inputs * txsize) per MB",
     BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
 CTweak<bool> ignoreNetTimeouts("net.ignoreTimeouts", "ignore inactivity timeouts, used during debugging", false);
+CTweakRef<bool> displayArchInSubver("net.displayArchInSubver",
+    "Show box architecture, 32/64bit, in node user agent string (subver)",
+    &fDisplayArchInSubver);
 
+CTweak<bool> miningCPFP("mining.childPaysForParent",
+    "If enabled then we will mine ancestor packages and allow child pays for parent.",
+    true);
 CTweak<uint64_t> blockMiningSigopsPerMb("mining.excessiveSigopsPerMb",
     "Excessive effort per block, denoted in cost (# inputs * txsize) per MB",
     BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
@@ -286,12 +302,13 @@ CTweakRef<unsigned int> maxDataCarrierTweak("mining.dataCarrierSize",
     &nMaxDatacarrierBytes,
     &MaxDataCarrierValidator);
 
-CTweakRef<uint64_t> miningForkTime("consensus.forkMay2019Time",
-    "Time in seconds since the epoch to initiate the Bitcoin Cash hard fork scheduled on 15th May 2019.  A setting of "
+CTweakRef<uint64_t> miningForkTime("consensus.forkNov2019Time",
+    "Time in seconds since the epoch to initiate the Bitcoin Cash protocol upgraded scheduled on 15th Nov 2019.  A "
+    "setting of "
     "1 "
     "will turn on the fork at the appropriate time.",
     &nMiningForkTime,
-    &ForkTimeValidator); // Thu May 15 12:00:00 UTC 2019
+    &ForkTimeValidator); // Thu Nov 15 12:00:00 UTC 2019
 
 CTweak<uint64_t> maxScriptOps("consensus.maxScriptOps",
     "Maximum number of script operations allowed.  Stack pushes are excepted.",
@@ -329,13 +346,17 @@ CTweakRef<std::string> subverOverrideTweak("net.subversionOverride",
     &subverOverride,
     &SubverValidator);
 
-CTweak<bool> enableCanonicalTxOrder("consensus.enableCanonicalTxOrder",
+CTweakRef<bool> enableCanonicalTxOrder("consensus.enableCanonicalTxOrder",
     "True if canonical transaction ordering is enabled.  Reflects the actual state so may be switched on or off by"
     " fork time flags and blockchain reorganizations.",
-    false);
+    &fCanonicalTxsOrder);
 
 CTweak<unsigned int> numMsgHandlerThreads("net.msgHandlerThreads", "Max message handler threads", 0);
 CTweak<unsigned int> numTxAdmissionThreads("net.txAdmissionThreads", "Max transaction mempool admission threads", 0);
+CTweak<unsigned int> unconfPushAction("net.unconfChainResendAction",
+    "Action to take when this node thinks that a peer will now accept a previously unacceptable unconfirmed transaction"
+    "0: do not resend, 1: send an INV, 2: send the TX",
+    0);
 
 CTweak<CAmount> maxTxFee("wallet.maxTxFee",
     "Maximum total fees to use in a single wallet transaction or raw transaction; setting this too low may abort large "
@@ -380,6 +401,26 @@ CTweak<uint64_t> grapheneMaxVersionSupported("net.grapheneMaxVersionSupported",
 CTweak<uint64_t> grapheneFastFilterCompatibility("net.grapheneFastFilterCompatibility",
     "Support fast Bloom filter: 0 - either, 1 - fast only, 2 - regular only (default: either)",
     GRAPHENE_FAST_FILTER_SUPPORT);
+
+CTweak<bool> syncMempoolWithPeers("net.syncMempoolWithPeers", "Synchronize mempool with peers", false);
+
+/** This setting specifies the minimum supported mempool sync version (inclusive).
+ *  The actual version used will be negotiated between sender and receiver.
+ */
+std::string memSyncMinVerStr = "Minimum mempool sync version supported (default: " +
+                               std::to_string(DEFAULT_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED) + ")";
+CTweak<uint64_t> mempoolSyncMinVersionSupported("net.mempoolSyncMinVersionSupported",
+    memSyncMinVerStr,
+    DEFAULT_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED);
+
+/** This setting specifies the maximum supported mempool sync version (inclusive).
+ *  The actual version used will be negotiated between sender and receiver.
+ */
+std::string memSyncMaxVerStr = "Maximum mempool sync version supported (default: " +
+                               std::to_string(DEFAULT_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED) + ")";
+CTweak<uint64_t> mempoolSyncMaxVersionSupported("net.mempoolSyncMaxVersionSupported",
+    memSyncMaxVerStr,
+    DEFAULT_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED);
 
 /** This is the initial size of CFileBuffer's RAM buffer during reindex.  A
 larger size will result in a tiny bit better performance if blocks are that
@@ -434,6 +475,11 @@ CThinBlockData thindata;
 CGrapheneBlockData graphenedata;
 CCompactBlockData compactdata;
 ThinTypeRelay thinrelay;
+CCriticalSection cs_mempoolsync;
+std::map<NodeId, CMempoolSyncState> mempoolSyncRequested GUARDED_BY(cs_mempoolsync);
+std::map<NodeId, CMempoolSyncState> mempoolSyncResponded GUARDED_BY(cs_mempoolsync);
+uint64_t lastMempoolSync = GetStopwatchMicros();
+uint64_t lastMempoolSyncClear = GetStopwatchMicros();
 
 // Are we shutting down. Replaces boost interrupts.
 std::atomic<bool> shutdown_threads{false};

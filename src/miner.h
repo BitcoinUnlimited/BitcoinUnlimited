@@ -13,6 +13,9 @@
 #include <memory>
 #include <stdint.h>
 
+#include "boost/multi_index/ordered_index.hpp"
+#include "boost/multi_index_container.hpp"
+
 class CBlockIndex;
 class CChainParams;
 class CReserveKey;
@@ -22,6 +25,10 @@ class CWallet;
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_coinbaseFlags;
 
+extern std::atomic<int64_t> nTotalPackage;
+extern std::atomic<int64_t> nTotalScore;
+extern CTweak<bool> miningCPFP;
+
 namespace Consensus
 {
 struct Params;
@@ -29,12 +36,39 @@ struct Params;
 
 static const bool DEFAULT_PRINTPRIORITY = false;
 
+
 struct CBlockTemplate
 {
     CBlock block;
     std::vector<CAmount> vTxFees;
     std::vector<int64_t> vTxSigOps;
 };
+
+
+/** Comparator for CTxMemPool::txiter objects.
+ *  It simply compares the internal memory address of the CTxMemPoolEntry object
+ *  pointed to. This means it has no meaning, and is only useful for using them
+ *  as key in other indexes.
+ */
+struct CompareCTxMemPoolIter
+{
+    bool operator()(const CTxMemPool::txiter &a, const CTxMemPool::txiter &b) const { return &(*a) < &(*b); }
+};
+
+/** A comparator that sorts transactions based on number of ancestors.
+ * This is sufficient to sort an ancestor package in an order that is valid
+ * to appear in a block.
+ */
+struct CompareTxIterByAncestorCount
+{
+    bool operator()(const CTxMemPool::txiter &a, const CTxMemPool::txiter &b)
+    {
+        if (a->GetCountWithAncestors() != b->GetCountWithAncestors())
+            return a->GetCountWithAncestors() < b->GetCountWithAncestors();
+        return CTxMemPool::CompareIteratorByHash()(a, b);
+    }
+};
+
 
 /** Generate a new block, without valid proof-of-work */
 class BlockAssembler
@@ -78,12 +112,16 @@ private:
     /** Add transactions based on tx "priority" */
     void addPriorityTxs(std::vector<const CTxMemPoolEntry *> *vtxe);
 
+    /** Add transactions based on feerate including unconfirmed ancestors */
+    void addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, bool fCanonical);
+
     // helper function for addScoreTxs and addPriorityTxs
     bool IsIncrementallyGood(uint64_t nExtraSize, unsigned int nExtraSigOps);
     /** Test if tx will still "fit" in the block */
     bool TestForBlock(CTxMemPool::txiter iter);
     /** Test if tx still has unconfirmed parents not yet in block */
     bool isStillDependent(CTxMemPool::txiter iter);
+
     /** Bytes to reserve for coinbase and block header */
     uint64_t reserveBlockSize(const CScript &scriptPubKeyIn, int64_t coinbaseSize = -1);
     /** Internal method to construct a new block template */
@@ -92,6 +130,14 @@ private:
         int64_t coinbaseSize = -1);
     /** Constructs a coinbase transaction */
     CTransactionRef coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue);
+
+    // helper functions for addPackageTxs()
+    /** Test whether a package, if added to the block, would make the block exceed the sigops limits */
+    bool TestPackageSigOps(uint64_t packageSize, unsigned int packageSigOps);
+    /** Test if a set of transactions are all final */
+    bool TestPackageFinality(const CTxMemPool::setEntries &package);
+    /** Sort the package in an order that is valid to appear in a block */
+    void SortForBlock(const CTxMemPool::setEntries &package, std::vector<CTxMemPool::txiter> &sortedEntries);
 };
 
 /** Modify the extranonce in a block */
@@ -105,7 +151,10 @@ int64_t UpdateTime(CBlockHeader *pblock, const Consensus::Params &consensusParam
 UniValue SubmitBlock(CBlock &block);
 /** Make a block template to send to miners. */
 // implemented in mining.cpp
-UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize = -1, CBlock *pblockOut = nullptr);
+UniValue mkblocktemplate(const UniValue &params,
+    int64_t coinbaseSize = -1,
+    CBlock *pblockOut = nullptr,
+    const CScript &coinbaseScript = CScript());
 
 // Force block template recalculation the next time a template is requested
 void SignalBlockTemplateChange();

@@ -26,6 +26,7 @@ typedef enum ScriptError_t {
     SCRIPT_ERR_INVALID_NUMBER_RANGE,
     SCRIPT_ERR_IMPOSSIBLE_ENCODING,
     SCRIPT_ERR_INVALID_SPLIT_RANGE,
+    SCRIPT_ERR_INVALID_BIT_COUNT,
 
     /* Failed verify operations */
     SCRIPT_ERR_VERIFY,
@@ -46,6 +47,10 @@ typedef enum ScriptError_t {
     SCRIPT_ERR_DIV_BY_ZERO,
     SCRIPT_ERR_MOD_BY_ZERO,
 
+    /* Bitfield errors */
+    SCRIPT_ERR_INVALID_BITFIELD_SIZE,
+    SCRIPT_ERR_INVALID_BIT_RANGE,
+
     /* CHECKLOCKTIMEVERIFY and CHECKSEQUENCEVERIFY */
     SCRIPT_ERR_NEGATIVE_LOCKTIME,
     SCRIPT_ERR_UNSATISFIED_LOCKTIME,
@@ -63,6 +68,7 @@ typedef enum ScriptError_t {
 
     /* Schnorr */
     SCRIPT_ERR_SIG_BADLENGTH,
+    SCRIPT_ERR_SIG_NONSCHNORR,
     SCRIPT_ERR_MUST_USE_FORKID,
 
     /* softfork safeness */
@@ -79,5 +85,19 @@ typedef enum ScriptError_t {
 #define SCRIPT_ERR_LAST SCRIPT_ERR_ERROR_COUNT
 
 const char *ScriptErrorString(const ScriptError error);
+
+inline bool set_success(ScriptError *ret)
+{
+    if (ret)
+        *ret = SCRIPT_ERR_OK;
+    return true;
+}
+
+inline bool set_error(ScriptError *ret, const ScriptError serror)
+{
+    if (ret)
+        *ret = serror;
+    return false;
+}
 
 #endif // BITCOIN_SCRIPT_SCRIPT_ERROR_H

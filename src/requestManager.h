@@ -27,6 +27,7 @@ successful receipt, "requester.Rejected(...)" to indicate a bad object (request 
 #ifndef REQUEST_MANAGER_H
 #define REQUEST_MANAGER_H
 
+#include "blockrelay/mempool_sync.h"
 #include "net.h"
 #include "nodestate.h"
 #include "stat.h"
@@ -44,6 +45,10 @@ static const unsigned int DEFAULT_MIN_TX_REQUEST_RETRY_INTERVAL = 5 * 1000 * 100
 extern unsigned int blkReqRetryInterval;
 extern unsigned int MIN_BLK_REQUEST_RETRY_INTERVAL;
 static const unsigned int DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL = 5 * 1000 * 1000;
+// Which peers have mempool synchronization in-flight?
+extern std::map<NodeId, CMempoolSyncState> mempoolSyncRequested;
+extern uint64_t lastMempoolSync;
+extern CCriticalSection cs_mempoolsync;
 
 class CNode;
 
@@ -80,7 +85,7 @@ public:
     CInv obj;
     bool rateLimited;
     bool fProcessing; // object was received but is still being processed
-    int64_t lastRequestTime; // In microseconds, 0 means no request
+    int64_t lastRequestTime; // In stopwatch time microseconds, 0 means no request
     unsigned int outstandingReqs;
     ObjectSourceList availableFrom;
     unsigned int priority;
@@ -101,7 +106,7 @@ public:
 struct QueuedBlock
 {
     uint256 hash;
-    int64_t nTime; //! Time of "getdata" request in microseconds.
+    int64_t nTime; // Stopwatch time of "getdata" request in microseconds.
 };
 struct CRequestManagerNodeState
 {
@@ -232,6 +237,9 @@ public:
 
     // This gets called from RequestNextBlocksToDownload
     void FindNextBlocksToDownload(CNode *node, unsigned int count, std::vector<CBlockIndex *> &vBlocks);
+
+    // Request to synchronize mempool with peer pto
+    void RequestMempoolSync(CNode *pto);
 
     // Returns a bool indicating whether we requested this block.
     void MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash);

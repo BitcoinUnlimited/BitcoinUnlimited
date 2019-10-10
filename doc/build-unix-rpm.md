@@ -71,8 +71,8 @@ sudo yum install centos-release-scl
 sudo yum install http://repo.okay.com.mx/centos/7/x86_64/release/okay-release-1-1.noarch.rpm
 sudo yum install boost166-devel
 sudo yum install libtool libevent-devel autoconf automake openssl-devel python36u libdb4-devel libdb4-cxx-devel
-sudo yum install devtoolset-6-gcc*
-sudo scl enable devtoolset-6 bash
+sudo yum install devtoolset-7-gcc*
+sudo scl enable devtoolset-7 bash
 ```
 
 Create/update symlink for python3 if needed:

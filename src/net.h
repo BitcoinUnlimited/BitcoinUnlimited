@@ -204,9 +204,6 @@ extern CCriticalSection cs_mapRelay;
 extern std::vector<std::string> vAddedNodes;
 extern CCriticalSection cs_vAddedNodes;
 
-/** Subversion as sent to the P2P network in `version` messages */
-extern std::string strSubVersion;
-
 struct LocalServiceInfo
 {
     int nScore;
@@ -225,7 +222,8 @@ public:
     bool fRelayTxes;
     int64_t nLastSend;
     int64_t nLastRecv;
-    int64_t nTimeConnected;
+    int64_t nTimeConnected; /** Calendar time this node was connected */
+    uint64_t nStopwatchConnected; /** Stopwatch time this node was connected (in uSec) */
     int64_t nTimeOffset;
     std::string addrName;
     int nVersion;
@@ -257,7 +255,8 @@ public:
     CDataStream vRecv; // received message data
     unsigned int nDataPos;
 
-    int64_t nTime; // time (in microseconds) of message receipt.
+    int64_t nTime; // calendar time (in microseconds) of message receipt.
+    int64_t nStopwatch; // stopwatch time in microseconds of message receipt.  Used to calculate round trip latency.
 
     // default constructor builds an empty message object to accept assignment of real messages
     CNetMessage() : hdrbuf(0, 0), hdr({0, 0, 0, 0}), vRecv(0, 0)
@@ -359,6 +358,25 @@ class CNode
 #endif
 
 public:
+    /** This node's max acceptable number ancestor transactions.  Used to decide whether this node will accept a
+     * particular transaction. */
+    size_t nLimitAncestorCount = BCH_DEFAULT_ANCESTOR_LIMIT;
+    /** This node's max acceptable sum of all ancestor transaction sizes.  Used to decide whether this node will accept
+     * a particular transaction. */
+    size_t nLimitAncestorSize = BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000;
+    /** This node's max acceptable number of descendants.  Used to decide whether this node will accept a particular
+     * transaction. */
+    size_t nLimitDescendantCount = BCH_DEFAULT_DESCENDANT_LIMIT;
+    /** This node's max acceptable sum of all descendant transaction sizes.  Used to decide whether this node will
+     * accept a particular transaction. */
+    size_t nLimitDescendantSize = BCH_DEFAULT_DESCENDANT_SIZE_LIMIT * 1000;
+    // Does this node support mempool synchronization?
+    bool canSyncMempoolWithPeers = false;
+    // Minimum supported mempool synchronization version
+    uint64_t nMempoolSyncMinVersionSupported = 0;
+    // Maximum supported mempool synchronization version
+    uint64_t nMempoolSyncMaxVersionSupported = 0;
+
     // This is shared-locked whenever messages are processed.
     // Take it exclusive-locked to finish all ongoing processing
     CSharedCriticalSection csMsgSerializer;
@@ -381,63 +399,66 @@ public:
     int nRecvVersion;
 
     // BU connection de-prioritization
-    //! Total bytes sent and received
+    //* Total bytes sent and received
     uint64_t nActivityBytes;
 
     int64_t nLastSend;
     int64_t nLastRecv;
-    int64_t nTimeConnected;
+    int64_t nTimeConnected; /** Calendar time this node was connected */
+    uint64_t nStopwatchConnected; /** Stopwatch time this node was connected */
     int64_t nTimeOffset;
-    //! The address of the remote peer
+    /** The address of the remote peer */
     CAddress addr;
 
-    //! set to true if this node is ok with no message checksum
+    /** set to true if this node is ok with no message checksum */
     bool skipChecksum;
 
-    //! The address the remote peer advertised in its version message
+    /** The address the remote peer advertised in its version message */
     CAddress addrFrom_advertised;
 
     std::string addrName;
     const char *currentCommand; // if in the middle of the send, this is the command type
-    //! The the remote peer sees us as this address (may be different than our IP due to NAT)
+    /** The the remote peer sees us as this address (may be different than our IP due to NAT) */
     CService addrLocal;
     int nVersion;
 
-    //! The state of informing the remote peer of our version information
+    /** The state of informing the remote peer of our version information */
     ConnectionStateOutgoing state_outgoing;
 
-    //! The state of being informed by the remote peer of his version information
+    /** The state of being informed by the remote peer of his version information */
     ConnectionStateIncoming state_incoming;
 
-    //! used to make processing serial when version handshake is taking place
+    /** used to make processing serial when version handshake is taking place */
     CCriticalSection csSerialPhase;
 
-    //! the intial xversion message sent in the handshake
+    /** the intial xversion message sent in the handshake */
     CCriticalSection cs_xversion;
     CXVersionMessage xVersion;
 
-    //! strSubVer is whatever byte array we read from the wire. However, this field is intended
-    //! to be printed out, displayed to humans in various forms and so on. So we sanitize it and
-    //! store the sanitized version in cleanSubVer. The original should be used when dealing with
-    //! the network or wire types and the cleaned string used when displayed or logged.
+    /** strSubVer is whatever byte array we read from the wire. However, this field is intended
+        to be printed out, displayed to humans in various forms and so on. So we sanitize it and
+        store the sanitized version in cleanSubVer. The original should be used when dealing with
+        the network or wire types and the cleaned string used when displayed or logged.
+    */
     std::string strSubVer, cleanSubVer;
 
-    //! This peer can bypass DoS banning.
+    /** This peer can bypass DoS banning. */
     bool fWhitelisted;
-    //! If true this node is being used as a short lived feeler.
+    /** If true this node is being used as a short lived feeler. */
     bool fFeeler;
     bool fOneShot;
     bool fClient;
 
-    //! after BIP159
+    /** after BIP159 */
     bool m_limited_node;
 
-    //! If true a remote node initiated the connection.  If false, we initiated.
-    //! The protocol is slightly asymmetric:
-    //! initial version exchange
-    //! stop ADDR flooding in preparation for a network-wide eclipse attack
-    //! stop connection slot attack via eviction of stale (connected but no data) inbound connections
-    //! stop fingerprinting by seeding fake addresses and checking for them later by ignoring outbound getaddr
+    /** If true a remote node initiated the connection.  If false, we initiated.
+        The protocol is slightly asymmetric:
+        initial version exchange
+        stop ADDR flooding in preparation for a network-wide eclipse attack
+        stop connection slot attack via eviction of stale (connected but no data) inbound connections
+        stop fingerprinting by seeding fake addresses and checking for them later by ignoring outbound getaddr
+    */
     bool fInbound;
     bool fAutoOutbound; // any outbound node not connected with -addnode, connect-thinblock or -connect
     bool fNetworkNode; // any outbound node
@@ -588,6 +609,21 @@ public:
         return nRefCount;
     }
 
+    /** Returns true if a transaction with the passed properties will likely get accepted into this node's mempool */
+    bool IsTxAcceptable(const CTxProperties &props)
+    {
+        // Checking the descendants makes no sense -- the target node can't have descendants in its mempool if it
+        // doesn't have this transaction!
+        if (props.countWithAncestors > nLimitAncestorCount)
+            return false;
+        if (props.sizeWithAncestors > nLimitAncestorSize)
+            return false;
+        return true;
+    }
+
+    /** Updates node configuration variables based on XVERSION data in the xVersion member variable */
+    void ReadConfigFromXVersion();
+
     // requires LOCK(cs_vRecvMsg)
     unsigned int GetTotalRecvSize()
     {
@@ -684,10 +720,10 @@ public:
         filterInventoryKnown.insert(inv.hash);
     }
 
-    void PushInventory(const CInv &inv)
+    void PushInventory(const CInv &inv, bool force = false)
     {
         LOCK(cs_inventory);
-        if (inv.type == MSG_TX && filterInventoryKnown.contains(inv.hash))
+        if (!force && inv.type == MSG_TX && filterInventoryKnown.contains(inv.hash))
             return;
         vInventoryToSend.push_back(inv);
     }
@@ -1017,7 +1053,9 @@ private:
 typedef std::vector<CNodeRef> VNodeRefs;
 
 class CTransaction;
-void RelayTransaction(const CTransactionRef &ptx, const bool fRespend = false);
+void RelayTransaction(const CTransactionRef &ptx,
+    const bool fRespend = false,
+    const CTxProperties *txproperties = nullptr);
 
 /** Access to the (IP) address database (peers.dat) */
 class CAddrDB

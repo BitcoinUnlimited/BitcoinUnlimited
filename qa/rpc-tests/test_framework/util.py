@@ -29,6 +29,7 @@ import urllib.parse as urlparse
 import errno
 import logging
 import traceback
+from . import test_node
 
 from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
@@ -263,7 +264,7 @@ def is_connected(gdict, vertices_encountered = None, start_vertex=None):
         """ determines if the graph is connected """
         if vertices_encountered is None:
             vertices_encountered = set()
-        vertices = list(gdict.keys()) # "list" necessary in Python 3 
+        vertices = list(gdict.keys()) # "list" necessary in Python 3
         if not start_vertex:
             # chosse a vertex from graph as a starting point
             start_vertex = vertices[0]
@@ -284,10 +285,10 @@ def sync_blocks(rpc_connections, wait=1,verbose=1):
     iter=-1
     while True:
         counts = [ x.getblockcount() for x in rpc_connections ]
-        if verbose:
-            logging.info("sync blocks: " + str(counts))
         if counts == [ counts[0] ]*len(counts):
             break
+        if verbose and iter>2:
+            logging.info("sync blocks (" + str(iter) +"): " + str(counts))
         time.sleep(wait)
         iter+=1
         if connectionTracking and iter&7==0:  # do some other checks to ensure that block sync is possible
@@ -314,12 +315,14 @@ def sync_blocks_to(height, rpc_connections, wait=1,verbose=1):
     Wait until all passed nodes have the passed "height" block count
     """
     heights = [ height ]*len(rpc_connections)
+    iter = 0
     while True:
         counts = [ x.getblockcount() for x in rpc_connections ]
-        if verbose:
-            logging.info("sync blocks to %d: %s" % (height, str(counts)))
         if counts == heights:
             break
+        if verbose and iter>2:
+            logging.info("sync blocks (" + str(iter) + ") to %d: %s" % (height, str(counts)))
+        iter+=1
         time.sleep(wait)
 
 def hub_is_running(node_num):
@@ -604,7 +607,7 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
     if COVERAGE_DIR:
         coverage.write_all_rpc_commands(COVERAGE_DIR, proxy)
 
-    return proxy
+    return test_node.TestNode(proxy, datadir)
 
 def start_nodes(num_nodes, dirname, extra_args=None, rpchost=None, binary=None,timewait=None):
     """
@@ -653,6 +656,10 @@ def wait_bitcoinds():
     for bitcoind in bitcoind_processes.values():
         bitcoind.wait(timeout=BITCOIND_PROC_WAIT_TIMEOUT)
     bitcoind_processes.clear()
+
+def is_bitcoind_running(i):
+    assert i in bitcoind_processes
+    return bitcoind_processes[i].poll() is None
 
 def connect_nodes(from_connection, node_num_or_str):
     """Connect the passed node to another node specified either by node index or by ip address:port string
@@ -960,10 +967,11 @@ def try_rpc(code, message, fun, *args, **kwds):
         # JSONRPCException was thrown as expected. Check the code and message values are correct.
         if (code is not None) and (code != e.error["code"]):
             raise AssertionError(
-                "Unexpected JSONRPC error code %i" % e.error["code"])
+                "Unexpected JSONRPC error code %i (%s)" % (e.error["code"], str(e)))
         if (message is not None) and (message not in e.error['message']):
             raise AssertionError(
-                "Expected substring not found:" + e.error['message'])
+                "Expected substring '{}' not found in '{}'".format(
+                    message, e.error['message']))
         return True
     except Exception as e:
         raise AssertionError(
@@ -1148,7 +1156,7 @@ def findBitcoind():
 def standardFlags():
     flags = [] # ["--nocleanup", "--noshutdown"]
     if os.path.isdir("/ramdisk/test"):
-        flags.append("--tmppfx=/ramdisk/test")
+        flags.append("--tmpdir=/ramdisk/test/t")
     binpath = findBitcoind()
     flags.append("--srcdir=%s" % binpath)
     return flags

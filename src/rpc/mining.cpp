@@ -28,6 +28,7 @@
 #include "validation/validation.h"
 #include "validationinterface.h"
 
+#include <cstdlib>
 #include <stdint.h>
 
 #include <boost/assign/list_of.hpp>
@@ -542,7 +543,10 @@ void SignalBlockTemplateChange()
 
     forceTemplateRecalc = true;
 }
-UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *pblockOut)
+UniValue mkblocktemplate(const UniValue &params,
+    int64_t coinbaseSize,
+    CBlock *pblockOut,
+    const CScript &coinbaseScriptIn)
 {
     LOCK(cs_main);
 
@@ -550,6 +554,8 @@ UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *p
     UniValue lpval = NullUniValue;
     std::set<std::string> setClientRules;
     int64_t nMaxVersionPreVB = -1;
+    CScript coinbaseScript(coinbaseScriptIn); // non-const copy (we may modify this below)
+
     if (params.size() > 0)
     {
         const UniValue &oparam = params[0].get_obj();
@@ -678,36 +684,70 @@ UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *p
         // miners?
     }
 
+    const Consensus::Params &consensusParams = Params().GetConsensus();
+
     // Update block
     static CBlockIndex *pindexPrev = nullptr;
     static int64_t nStart = 0;
     static std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
-    if (pindexPrev != chainActive.Tip() || forceTemplateRecalc ||
-        (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5))
+    static CScript prevCoinbaseScript;
+    static int64_t prevCoinbaseSize = -1;
+    // We cache the previous block templates returned, but we invalidate the
+    // cache below (generate a new block) if any of:
+    // 1. Global forceTemplateRecalc is true.
+    // 2. Cached block points to a different chaintip.
+    // 3. Is testnet and 30 seconds have elapsed (so we pick up the testnet
+    //    minimum difficulty -> 1.0 after 20 mins).
+    // 4. Mempool has changed and 5 seconds has elapsed.
+    // 5. Passed-in coinbaseSize differs from cached.
+    // 6. Passed-in coinbaseScript differs from cached.
+    if (pindexPrev != chainActive.Tip() || forceTemplateRecalc || // 1 & 2 above
+        (consensusParams.fPowAllowMinDifficultyBlocks && std::abs(GetTime() - nStart) > 30) || // 3 above
+        // 4 above
+        (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && std::abs(GetTime() - nStart) > 5) ||
+        prevCoinbaseSize != coinbaseSize || prevCoinbaseScript != coinbaseScript) // 5 & 6 above
     {
         forceTemplateRecalc = false;
         // Clear pindexPrev so future calls make a new block, despite any failures from here on
         pindexPrev = nullptr;
+
+        // Saved passed-in values for coinbase (also used to determine if we need to create new block)
+        prevCoinbaseScript = coinbaseScript;
+        prevCoinbaseSize = coinbaseSize;
 
         // Store the pindexBest used before CreateNewBlock, to avoid races
         nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
         CBlockIndex *pindexPrevNew = chainActive.Tip();
         nStart = GetTime();
 
+        // If client code didn't specify a coinbase address for the mining reward, grab one from the wallet.
+        if (coinbaseScript.empty())
+        {
+            // Note that we don't cache the exact script from this to the prevCoinbaseScript -- it's sufficient
+            // to cache the fact that client code didn't specify a coinbase address (by caching the empty script).
+            boost::shared_ptr<CReserveScript> tmpScriptPtr;
+            GetMainSignals().ScriptForMining(tmpScriptPtr);
+
+            // throw an error if shared_ptr is not valid -- this means no wallet support was compiled-in
+            if (!tmpScriptPtr)
+                throw JSONRPCError(RPC_INTERNAL_ERROR,
+                    "Wallet support is not compiled-in, please specify an address for the coinbase tx");
+
+            // If the keypool is exhausted, the shared_ptr is valid but no actual script is generated; catch this.
+            if (tmpScriptPtr->reserveScript.empty())
+                throw JSONRPCError(
+                    RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
+
+            // Everything checks out, proceed with the wallet-generated address. Note that we don't tell the wallet to
+            // "KeepKey" this address -- which means future calls will return the same address from the wallet for
+            // future mining candidates, which is fine and good (since these are, after all, mining *candidates*).
+            // This also means that the bitcoin-miner program will continue to mine to the same key for all blocks,
+            // which is fine. If client code wants something more sophisticated, it can always specify coinbaseScript.
+            coinbaseScript = tmpScriptPtr->reserveScript;
+        }
+
         // Create new block
-        boost::shared_ptr<CReserveScript> coinbaseScript;
-        GetMainSignals().ScriptForMining(coinbaseScript);
-
-        // If the keypool is exhausted, no script is returned at all.  Catch this.
-        if (!coinbaseScript)
-            throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
-
-        // throw an error if no script was provided
-        if (coinbaseScript->reserveScript.empty())
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
-
-
-        pblocktemplate = BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript, coinbaseSize);
+        pblocktemplate = BlockAssembler(Params()).CreateNewBlock(coinbaseScript, coinbaseSize);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
@@ -720,7 +760,6 @@ UniValue mkblocktemplate(const UniValue &params, int64_t coinbaseSize, CBlock *p
             mempool.GetTransactionsUpdated(), nTransactionsUpdatedLast, GetTime(), nStart);
     }
     CBlock *pblock = &pblocktemplate->block; // pointer for convenience
-    const Consensus::Params &consensusParams = Params().GetConsensus();
 
     // Update nTime
     UpdateTime(pblock, consensusParams, pindexPrev);

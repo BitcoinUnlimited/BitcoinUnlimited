@@ -42,4 +42,37 @@ BOOST_AUTO_TEST_CASE(issue_1700)
     BOOST_CHECK(electrs_args_has("--electrum-rpc-addr=127.0.0.1:60001", "test"));
 }
 
+BOOST_AUTO_TEST_CASE(rawargs)
+{
+    BOOST_CHECK(electrs_args_has("--txid-limit=500"));
+    BOOST_CHECK(!electrs_args_has("--txid-limit=42"));
+
+    // Test that we override txid-limit and append server-banner
+    mapMultiArgs["-electrum.rawarg"].push_back("--txid-limit=42");
+    mapMultiArgs["-electrum.rawarg"].push_back("--server-banner=\"Hello World!\"");
+
+    BOOST_CHECK(!electrs_args_has("--txid-limit=500"));
+    BOOST_CHECK(electrs_args_has("--txid-limit=42"));
+    BOOST_CHECK(electrs_args_has("--server-banner=\"Hello World!\""));
+
+    mapMultiArgs.clear();
+}
+
+BOOST_AUTO_TEST_CASE(rawargs_verboseness)
+{
+    Logging::LogToggleCategory(ELECTRUM, true);
+    BOOST_CHECK(electrs_args_has("-vvvv"));
+    BOOST_CHECK(!electrs_args_has("-v"));
+
+    mapMultiArgs["-electrum.rawarg"].push_back("-v");
+    BOOST_CHECK(!electrs_args_has("-vvvv"));
+    BOOST_CHECK(electrs_args_has("-v"));
+
+    mapMultiArgs["-electrum.rawarg"].push_back("-vv");
+    BOOST_CHECK(!electrs_args_has("-vvvv"));
+    BOOST_CHECK(electrs_args_has("-vv"));
+    mapMultiArgs.clear();
+    Logging::LogToggleCategory(ELECTRUM, false);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

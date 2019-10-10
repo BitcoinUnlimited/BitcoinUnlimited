@@ -12,12 +12,7 @@
 #include "util.h"
 
 #ifdef DEBUG_LOCKORDER
-#include <boost/thread/tss.hpp>
-// BU add lockstack stuff here for bitcoin-cli, because I need to carefully
-// order it in globals.cpp for bitcoind and bitcoin-qt
-boost::mutex dd_mutex;
-std::map<std::pair<void *, void *>, LockStack> lockorders;
-boost::thread_specific_ptr<LockStack> lockstack;
+LockData lockdata;
 #endif
 
 int main(int argc, char **argv)

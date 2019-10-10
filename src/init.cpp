@@ -28,6 +28,7 @@
 #include "httprpc.h"
 #include "httpserver.h"
 #include "httpserver.h"
+#include "index/txindex.h"
 #include "key.h"
 #include "main.h"
 #include "miner.h"
@@ -188,6 +189,10 @@ void Interrupt(thread_group &threadGroup)
     // stop TxAdmission needs to be done before threadGroup tries to join_all
     // we only join_all after Interrupt so call StopTxAdmission here
     StopTxAdmission();
+    if (g_txindex)
+    {
+        g_txindex->Stop();
+    }
 }
 
 void Shutdown()
@@ -205,6 +210,16 @@ void Shutdown()
     RenameThread("shutoff");
     mempool.AddTransactionsUpdated(1);
 
+    // Call every async stop function before flushing to disk
+    StopHTTPRPC();
+    StopREST();
+    StopRPC();
+    StopHTTPServer();
+    StopTxAdmission();
+    StopNode();
+    PV.reset(nullptr); // clean up scriptcheck threads
+
+    // This is the longest running shutdown procedure
     {
         LOCK(cs_main);
         if (pcoinsTip != nullptr)
@@ -215,18 +230,18 @@ void Shutdown()
         }
     }
 
-    StopHTTPRPC();
-    StopREST();
-    StopRPC();
-    StopHTTPServer();
     electrum::ElectrumServer::Instance().Stop();
 #ifdef ENABLE_WALLET
     if (pwalletMain)
         pwalletMain->Flush(false);
 #endif
     GenerateBitcoins(false, 0, Params());
-    StopTxAdmission();
-    StopNode();
+
+    if (g_txindex)
+    {
+        g_txindex.reset();
+    }
+
     StopTorControl();
     UnregisterNodeSignals(GetNodeSignals());
     if (fDumpMempoolLater && GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
@@ -293,7 +308,6 @@ void Shutdown()
 #endif
     globalVerifyHandle.reset();
     ECC_Stop();
-    PV.reset(nullptr); // clean up scriptcheck threads
     requester.Cleanup();
     NetCleanup();
     connmgr.reset(nullptr); // clean up connection manager
@@ -616,6 +630,12 @@ void InitParameterInteraction()
 void InitLogging()
 {
     fPrintToConsole = GetBoolArg("-printtoconsole", DEFAULT_PRINTTOCONSOLE);
+
+    // Some QA tests depend on debug.log being written to, so default
+    // to always print to log file on regtest.
+    const bool regtest = Params().NetworkIDString() == CBaseChainParams::REGTEST;
+    fPrintToDebugLog = GetBoolArg("-printtologfile", !fPrintToConsole || regtest);
+
     fLogTimestamps = GetBoolArg("-logtimestamps", DEFAULT_LOGTIMESTAMPS);
     fLogTimeMicros = GetBoolArg("-logtimemicros", DEFAULT_LOGTIMEMICROS);
     fLogIPs = GetBoolArg("-logips", DEFAULT_LOGIPS);
@@ -715,6 +735,14 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         }
 #endif
     }
+    else
+    {
+        // raise preallocation size of block and undo files
+        blockfile_chunk_size = MAX_BLOCKFILE_SIZE;
+        // multiply by 8 as this is the same difference between default and max blockfile size
+        // we do not have a define max undofile size
+        undofile_chunk_size = undofile_chunk_size * 8;
+    }
 
     // Make sure enough file descriptors are available
     int nBind = std::max((int)mapArgs.count("-bind") + (int)mapArgs.count("-whitebind"), 1);
@@ -755,7 +783,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 
     // mempool limits
     int64_t nMempoolSizeMax = GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
-    int64_t nMempoolSizeMin = GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000 * 40;
+    int64_t nMempoolSizeMin = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000 * 40;
     if (nMempoolSizeMax < 0 || nMempoolSizeMax < nMempoolSizeMin)
         return InitError(strprintf(_("-maxmempool must be at least %d MB"), std::ceil(nMempoolSizeMin / 1000000.0)));
 
@@ -1024,6 +1052,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     // ********************************************************* Step 6: load block chain
 
     fReindex = GetBoolArg("-reindex", DEFAULT_REINDEX);
+    fTxIndex = GetBoolArg("-txindex", DEFAULT_TXINDEX);
     int64_t requested_block_mode = GetArg("-useblockdb", DEFAULT_BLOCK_DB_MODE);
     if (requested_block_mode >= 0 && requested_block_mode < END_STORAGE_OPTIONS)
     {
@@ -1070,20 +1099,24 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     }
 
     // Return the initial values for the various in memory caches.
-    int64_t nBlockDBCache = 0;
-    int64_t nBlockUndoDBCache = 0;
-    int64_t nBlockTreeDBCache = 0;
-    int64_t nCoinDBCache = 0;
-    GetCacheConfiguration(nBlockDBCache, nBlockUndoDBCache, nBlockTreeDBCache, nCoinDBCache, nCoinCacheMaxSize);
+    CacheConfig cacheConfig = DiscoverCacheConfiguration();
     LOGA("Cache configuration:\n");
-    LOGA("* Using %.1fMiB for block database\n", nBlockDBCache * (1.0 / 1024 / 1024));
-    LOGA("* Using %.1fMiB for block undo database\n", nBlockUndoDBCache * (1.0 / 1024 / 1024));
-    LOGA("* Using %.1fMiB for block index database\n", nBlockTreeDBCache * (1.0 / 1024 / 1024));
-    LOGA("* Using %.1fMiB for chain state database\n", nCoinDBCache * (1.0 / 1024 / 1024));
+    LOGA("* Using %.1fMiB for block database\n", cacheConfig.nBlockDBCache * (1.0 / 1024 / 1024));
+    LOGA("* Using %.1fMiB for block undo database\n", cacheConfig.nBlockUndoDBCache * (1.0 / 1024 / 1024));
+    LOGA("* Using %.1fMiB for block index database\n", cacheConfig.nBlockTreeDBCache * (1.0 / 1024 / 1024));
+    LOGA("* Using %.1fMiB for txindex database\n", cacheConfig.nTxIndexCache * (1.0 / 1024 / 1024));
+    LOGA("* Using %.1fMiB for chain state database\n", cacheConfig.nCoinDBCache * (1.0 / 1024 / 1024));
     LOGA("* Using %.1fMiB for in-memory UTXO set\n", nCoinCacheMaxSize * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
     StartTxAdmission(threadGroup);
+
+    if (fTxIndex)
+    {
+        auto txindex_db = new TxIndexDB(cacheConfig.nTxIndexCache, false, fReindex);
+        g_txindex = std::make_unique<TxIndex>(txindex_db);
+    }
+
     while (!fLoaded)
     {
         bool fReset = fReindex;
@@ -1103,10 +1136,11 @@ bool AppInit2(Config &config, thread_group &threadGroup)
                 delete pblockdb;
 
                 uiInterface.InitMessage(_("Opening Block database..."));
-                InitializeBlockStorage(nBlockTreeDBCache, nBlockDBCache, nBlockUndoDBCache);
+                InitializeBlockStorage(
+                    cacheConfig.nBlockTreeDBCache, cacheConfig.nBlockDBCache, cacheConfig.nBlockUndoDBCache);
 
                 uiInterface.InitMessage(_("Opening UTXO database..."));
-                pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false, fReindex);
+                pcoinsdbview = new CCoinsViewDB(cacheConfig.nCoinDBCache, false, fReindex);
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
                 uiInterface.InitMessage(_("Opening Coins Cache database..."));
                 pcoinsTip = new CCoinsViewCache(pcoinscatcher);
@@ -1147,13 +1181,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
                 if (!InitBlockIndex(chainparams))
                 {
                     strLoadError = _("Error initializing block database");
-                    break;
-                }
-
-                // Check for changed -txindex state
-                if (fTxIndex != GetBoolArg("-txindex", DEFAULT_TXINDEX))
-                {
-                    strLoadError = _("You need to rebuild the database using -reindex to change -txindex");
                     break;
                 }
 
@@ -1246,10 +1273,20 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
 
-    // Set enableCanonicalTxOrder for the BCH early in the bootstrap phase
-    if (IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()) && chainparams.NetworkIDString() != "regtest")
+    // Set fCanonicalTxsOrder for the BCH early in the bootstrap phase
+    if (IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()))
     {
-        enableCanonicalTxOrder = true;
+        if (chainparams.NetworkIDString() != "regtest")
+        {
+            fCanonicalTxsOrder = true;
+        }
+    }
+    else
+    {
+        if (chainparams.NetworkIDString() != "regtest")
+        {
+            fCanonicalTxsOrder = false;
+        }
     }
 
 
@@ -1258,8 +1295,9 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 #ifdef ENABLE_WALLET
 
     // Encoded addresses using cashaddr instead of base58
-    // Activates by default on Jan, 14
-    config.SetCashAddrEncoding(GetBoolArg("-usecashaddr", GetAdjustedTime() > 1515900000));
+    // The default behaviour is to use this encoding. This will help
+    // to avoid confusion with other currencies the base58 encoding
+    config.SetCashAddrEncoding(GetBoolArg("-usecashaddr", true));
 
     if (fDisableWallet)
     {
@@ -1277,6 +1315,10 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 #endif // !ENABLE_WALLET
 
     // ********************************************************* Step 8: data directory maintenance
+    if (g_txindex)
+    {
+        g_txindex->Start();
+    }
 
     // if pruning, unset the service bit and perform the initial blockstore prune
     // after any wallet rescanning has taken place.
@@ -1337,19 +1379,22 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     RegisterNodeSignals(GetNodeSignals());
 
     // sanitize comments per BIP-0014, format user agent and check total size
-    std::vector<string> uacomments;
+    std::vector<string> uacomments = {};
     for (string &cmt : mapMultiArgs["-uacomment"])
     {
         if (cmt != SanitizeString(cmt, SAFE_CHARS_UA_COMMENT))
             return InitError(strprintf(_("User Agent comment (%s) contains unsafe characters."), cmt));
         uacomments.push_back(SanitizeString(cmt, SAFE_CHARS_UA_COMMENT));
     }
-    strSubVersion = FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, uacomments);
-    if (strSubVersion.size() > MAX_SUBVERSION_LENGTH)
+
+    std::string strSubVersion = FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, BUComments);
+    if (strSubVersion.size() == MAX_SUBVERSION_LENGTH)
     {
-        return InitError(strprintf(_("Total length of network version string (%i) exceeds maximum length (%i). Reduce "
-                                     "the number or size of uacomments."),
-            strSubVersion.size(), MAX_SUBVERSION_LENGTH));
+        InitWarning(
+            strprintf(_("Total length of network version string with uacomments added exceeded "
+                        "the maximum length (%i) and have been truncated.  Reduce the number or size of uacomments "
+                        "to avoid truncation."),
+                MAX_SUBVERSION_LENGTH));
     }
 
     if (mapArgs.count("-onlynet"))
@@ -1548,8 +1593,11 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     uiInterface.InitMessage(_("Reaccepting Wallet Transactions"));
     if (pwalletMain)
     {
-        // Add wallet transactions that aren't already in a block to mapTransactions
-        pwalletMain->ReacceptWalletTransactions();
+        {
+            TxAdmissionPause pause; // Get an initial state to use during wallet tx acceptance
+            // Add wallet transactions that aren't already in a block to mapTransactions
+            pwalletMain->ReacceptWalletTransactions();
+        }
 
         // Run a thread to flush wallet periodically
         threadGroup.create_thread(&ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile));

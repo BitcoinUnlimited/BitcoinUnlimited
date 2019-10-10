@@ -32,6 +32,16 @@ KEY i BU_XTHIN_VERSION                          0x0002                   0x0003 
 KEY i BU_GRAPHENE_FAST_FILTER_PREF              0x0002                   0x0004         u64c
 # Graphene high / low (inclusive) version numbers
 KEY i BU_GRAPHENE_MIN_VERSION_SUPPORTED         0x0002                   0x0005         u64c
+# Mempool sync preferences
+KEY i BU_MEMPOOL_SYNC                           0x0002                   0x0006         u64c
+KEY i BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED     0x0002                   0x0007         u64c
+KEY i BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED     0x0002                   0x0008         u64c
+
+# Communicate mempool unconfirmed preferences to connected nodes.  This allows those nodes to send transactions when they will be accepted.
+KEY i BU_MEMPOOL_ANCESTOR_COUNT_LIMIT           0x0002                   0x0009         u64c
+KEY i BU_MEMPOOL_ANCESTOR_SIZE_LIMIT            0x0002                   0x000A         u64c
+KEY i BU_MEMPOOL_DESCENDANT_COUNT_LIMIT         0x0002                   0x000B         u64c
+KEY i BU_MEMPOOL_DESCENDANT_SIZE_LIMIT          0x0002                   0x000C         u64c
 
 # KEY i ABC_...                                0x0000                   ...
 # KEY i XT_DOUBLESPEND_FORWARDING_SCHEME       0x0003                   ...            vector

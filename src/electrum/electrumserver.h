@@ -36,7 +36,10 @@ private:
     std::unique_ptr<SubProcess> process;
     std::thread process_thread;
 
+    /// if the server has been successfully started
     std::atomic<bool> started;
+    /// if stopping electrum server has been initiated (by us)
+    std::atomic<bool> stop_requested;
 };
 
 } // ns electrum

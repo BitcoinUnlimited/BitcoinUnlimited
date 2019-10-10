@@ -10,6 +10,7 @@
 #include "arith_uint256.h"
 #include "blockrelay/blockrelay_common.h"
 #include "blockrelay/graphene.h"
+#include "blockrelay/mempool_sync.h"
 #include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
 #include "blockstorage/sequential_files.h"
@@ -24,6 +25,7 @@
 #include "dosman.h"
 #include "expedited.h"
 #include "hashwrapper.h"
+#include "index/txindex.h"
 #include "init.h"
 #include "merkleblock.h"
 #include "net.h"
@@ -98,7 +100,6 @@ extern CCriticalSection cs_mapInboundConnectionTracker;
 
 extern CCriticalSection cs_LastBlockFile;
 
-extern CBlockIndex *pindexBestInvalid;
 extern std::map<uint256, NodeId> mapBlockSource;
 extern std::set<int> setDirtyFileInfo;
 extern uint64_t nBlockSequenceId;
@@ -143,8 +144,11 @@ void InitializeNode(const CNode *pnode)
 
 void FinalizeNode(NodeId nodeid)
 {
+    // Clean up the sync maps
+    ClearDisconnectedFromMempoolSyncMaps(nodeid);
+
     // Clear thintype block data if we have any.
-    thinrelay.ClearBlockToReconstruct(nodeid);
+    thinrelay.ClearAllBlocksToReconstruct(nodeid);
     thinrelay.ClearAllBlocksInFlight(nodeid);
 
     // Update block sync counters
@@ -217,6 +221,7 @@ void UnregisterNodeSignals(CNodeSignals &nodeSignals)
 CBlockIndex *FindForkInGlobalIndex(const CChain &chain, const CBlockLocator &locator)
 {
     // Find the first block the caller has in the main chain
+    AssertLockHeld(cs_main); // for chain
     READLOCK(cs_mapBlockIndex);
     for (const uint256 &hash : locator.vHave)
     {
@@ -280,8 +285,6 @@ bool GetTransaction(const uint256 &hash,
 {
     const CBlockIndex *pindexSlow = blockIndex;
 
-    LOCK(cs_main);
-
     if (blockIndex == nullptr)
     {
         CTransactionRef ptx = mempool.get(hash);
@@ -293,28 +296,7 @@ bool GetTransaction(const uint256 &hash,
 
         if (fTxIndex)
         {
-            CDiskTxPos postx;
-            if (pblocktree->ReadTxIndex(hash, postx))
-            {
-                CAutoFile file(OpenBlockFile(postx, true), SER_DISK, CLIENT_VERSION);
-                if (file.IsNull())
-                    return error("%s: OpenBlockFile failed", __func__);
-                CBlockHeader header;
-                try
-                {
-                    file >> header;
-                    fseek(file.Get(), postx.nTxOffset, SEEK_CUR);
-                    file >> txOut;
-                }
-                catch (const std::exception &e)
-                {
-                    return error("%s: Deserialize or I/O error - %s", __func__, e.what());
-                }
-                hashBlock = header.GetHash();
-                if (txOut->GetHash() != hash)
-                    return error("%s: txid mismatch", __func__);
-                return true;
-            }
+            return g_txindex->FindTx(hash, hashBlock, txOut);
         }
 
         // use coin database to locate block that contains transaction, and scan it
@@ -399,7 +381,7 @@ bool AbortNode(CValidationState &state, const std::string &strMessage, const std
 // too slowly or too quickly).
 //
 void PartitionCheck(bool (*initialDownloadCheck)(),
-    CCriticalSection &cs,
+    CCriticalSection &cs_partitionCheck,
     const CBlockIndex *const &bestHeader,
     int64_t nPowTargetSpacing)
 {
@@ -420,7 +402,7 @@ void PartitionCheck(bool (*initialDownloadCheck)(),
     std::string strWarning;
     int64_t startTime = GetAdjustedTime() - SPAN_SECONDS;
 
-    LOCK(cs);
+    LOCK(cs_partitionCheck);
     const CBlockIndex *i = bestHeader;
     int nBlocks = 0;
     while (i->GetBlockTime() >= startTime)
@@ -722,7 +704,7 @@ void MainCleanup()
 
     {
         // orphan transactions
-        WRITELOCK(orphanpool.cs);
+        WRITELOCK(orphanpool.cs_orphanpool);
         orphanpool.mapOrphanTransactions.clear();
         orphanpool.mapOrphanTransactionsByPrev.clear();
     }

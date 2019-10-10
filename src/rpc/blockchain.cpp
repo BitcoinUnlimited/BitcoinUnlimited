@@ -4,6 +4,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "rpc/blockchain.h"
 #include "amount.h"
 #include "blockstorage/blockstorage.h"
 #include "chain.h"
@@ -24,6 +25,7 @@
 #include "txmempool.h"
 #include "txorphanpool.h"
 #include "ui_interface.h"
+#include "undo.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation/validation.h"
@@ -33,6 +35,7 @@
 
 #include <univalue.h>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/thread/thread.hpp> // boost::thread::interrupt
 
 // In case of operator error, limit the rollback of a chain to 100 blocks
@@ -222,7 +225,7 @@ std::string EntryDescriptionString()
 
 void entryToJSON(UniValue &info, const CTxMemPoolEntry &e)
 {
-    AssertLockHeld(mempool.cs);
+    AssertLockHeld(mempool.cs_txmempool);
 
     info.pushKV("size", (int)e.GetTxSize());
     info.pushKV("fee", ValueFromAmount(e.GetFee()));
@@ -266,7 +269,7 @@ UniValue mempoolToJSON(bool fVerbose = false)
 {
     if (fVerbose)
     {
-        READLOCK(mempool.cs);
+        READLOCK(mempool.cs_txmempool);
         UniValue o(UniValue::VOBJ);
         for (const CTxMemPoolEntry &e : mempool.mapTx)
         {
@@ -379,7 +382,7 @@ UniValue getmempoolancestors(const UniValue &params, bool fHelp)
 
     uint256 paramhash = ParseHashV(params[0], "parameter 1");
 
-    READLOCK(mempool.cs);
+    READLOCK(mempool.cs_txmempool);
 
     CTxMemPool::txiter it = mempool.mapTx.find(paramhash);
     if (it == mempool.mapTx.end())
@@ -390,7 +393,7 @@ UniValue getmempoolancestors(const UniValue &params, bool fHelp)
     CTxMemPool::setEntries setAncestors;
     uint64_t noLimit = std::numeric_limits<uint64_t>::max();
     std::string dummy;
-    mempool._CalculateMemPoolAncestors(*it, setAncestors, noLimit, noLimit, noLimit, noLimit, dummy, false);
+    mempool._CalculateMemPoolAncestors(*it, setAncestors, noLimit, noLimit, noLimit, noLimit, dummy, nullptr, false);
 
     if (!fVerbose)
     {
@@ -449,7 +452,7 @@ UniValue getmempooldescendants(const UniValue &params, bool fHelp)
 
     uint256 paramhash = ParseHashV(params[0], "parameter 1");
 
-    WRITELOCK(mempool.cs);
+    WRITELOCK(mempool.cs_txmempool);
 
     CTxMemPool::txiter it = mempool.mapTx.find(paramhash);
     if (it == mempool.mapTx.end())
@@ -505,7 +508,7 @@ UniValue getmempoolentry(const UniValue &params, bool fHelp)
 
     uint256 hash = ParseHashV(params[0], "parameter 1");
 
-    READLOCK(mempool.cs);
+    READLOCK(mempool.cs_txmempool);
 
     CTxMemPool::txiter it = mempool.mapTx.find(hash);
     if (it == mempool.mapTx.end())
@@ -609,7 +612,44 @@ static bool is_param_trueish(const UniValue &param)
     return param.get_bool();
 }
 
-UniValue getblock(const UniValue &params, bool fHelp)
+// Return the block data that corresponds to a given header.  If the block data does not exist, then throw an
+// exception that's compatible with our RPC interface.
+static CBlock GetBlockChecked(const CBlockIndex *pblockindex)
+{
+    if (IsBlockPruned(pblockindex))
+        throw JSONRPCError(RPC_MISC_ERROR, "Block not available (pruned data)");
+
+    CBlock block;
+    if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
+    {
+        // Block not found on disk. This could be because we have the block
+        // header in our index but don't have the block (for example if a
+        // non-whitelisted node sends us an unrequested long chain of valid
+        // blocks, we add the headers to our index, but don't accept the
+        // block).
+        throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
+    }
+    return block;
+}
+
+static CBlockUndo GetUndoChecked(const CBlockIndex *pblockindex)
+{
+    DbgAssert(pblockindex, throw std::runtime_error(__func__));
+    CBlockUndo blockUndo;
+    if (IsBlockPruned(pblockindex))
+    {
+        throw JSONRPCError(RPC_MISC_ERROR, "Undo data not available (pruned data)");
+    }
+
+    if (!ReadUndoFromDisk(blockUndo, pblockindex->GetUndoPos(), pblockindex->pprev))
+    {
+        throw JSONRPCError(RPC_MISC_ERROR, "Can't read undo data from disk");
+    }
+
+    return blockUndo;
+}
+
+static UniValue getblock(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 3)
         throw runtime_error(
@@ -684,16 +724,7 @@ UniValue getblock(const UniValue &params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
     }
 
-    CBlock block;
-
-    {
-        READLOCK(cs_mapBlockIndex);
-        if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Block not available (pruned data)");
-    }
-
-    if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+    const CBlock block = GetBlockChecked(pblockindex);
 
     if (!fVerbose)
     {
@@ -711,7 +742,7 @@ static void ApplyStats(CCoinsStats &stats,
     const uint256 &hash,
     const std::map<uint32_t, Coin> &outputs)
 {
-    assert(!outputs.empty());
+    DbgAssert(!outputs.empty(), throw std::runtime_error(__func__));
     ss << hash;
     ss << VARINT(
         outputs.begin()->second.nHeight * 2 + outputs.begin()->second.fCoinBase, VarIntMode::NONNEGATIVE_SIGNED);
@@ -731,7 +762,7 @@ static void ApplyStats(CCoinsStats &stats,
 static bool GetUTXOStats(CCoinsView *view, CCoinsStats &stats)
 {
     std::unique_ptr<CCoinsViewCursor> pcursor(view->Cursor());
-    assert(pcursor);
+    DbgAssert(pcursor, throw std::runtime_error(__func__));
 
     CHashWriter ss(SER_GETHASH, PROTOCOL_VERSION);
     stats.hashBlock = pcursor->GetBestBlock();
@@ -808,6 +839,24 @@ UniValue gettxoutsetinfo(const UniValue &params, bool fHelp)
     return ret;
 }
 
+UniValue evicttransaction(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1)
+        throw runtime_error(
+            "evicttransaction \"txid\"\n"
+            "\nRemove transaction from mempool.  Note that it could be readded quickly if relayed by another node\n"
+            "\nArguments:\n"
+            "1. \"txid\"       (string, required) The transaction id\n"
+            "\nResult:\n"
+            "\nExamples:\n" +
+            HelpExampleCli("evicttransaction", "\"txid\"") + HelpExampleRpc("evicttransaction", "\"txid\""));
+
+    std::string strHash = params[0].get_str();
+    uint256 hash(uint256S(strHash));
+    mempool.Remove(hash);
+    return UniValue();
+}
+
 UniValue gettxout(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 3)
@@ -858,7 +907,7 @@ UniValue gettxout(const UniValue &params, bool fHelp)
     Coin coin;
     if (fMempool)
     {
-        READLOCK(mempool.cs);
+        READLOCK(mempool.cs_txmempool);
         CCoinsViewMemPool view(pcoinsTip, mempool);
         // TODO: filtering spent coins should be done by the CCoinsViewMemPool
         if (!view.GetCoin(out, coin) || mempool.isSpent(out))
@@ -1287,13 +1336,24 @@ UniValue mempoolInfoToJSON()
     size_t maxmempool = GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
     ret.pushKV("maxmempool", (int64_t)maxmempool);
     ret.pushKV("mempoolminfee", ValueFromAmount(mempool.GetMinFee(maxmempool).GetFeePerK()));
+
+    double smoothedTps = 0.0, instantaneousTps = 0.0, peakTps = 0.0;
+    mempool.GetTransactionRateStatistics(smoothedTps, instantaneousTps, peakTps);
     try
     {
-        ret.pushKV("tps", std::stod(strprintf("%.2f", mempool.TransactionsPerSecond())));
+        ret.pushKV("tps", std::stod(strprintf("%.2f", smoothedTps)));
     }
     catch (...)
     {
         ret.pushKV("tps", "N/A");
+    }
+    try
+    {
+        ret.pushKV("peak_tps", std::stod(strprintf("%.2f", peakTps)));
+    }
+    catch (...)
+    {
+        ret.pushKV("peak_tps", "N/A");
     }
 
     return ret;
@@ -1312,6 +1372,7 @@ UniValue getmempoolinfo(const UniValue &params, bool fHelp)
                             "  \"maxmempool\": xxxxx,         (numeric) Maximum memory usage for the mempool\n"
                             "  \"mempoolminfee\": xxxxx       (numeric) Minimum fee for tx to be accepted\n"
                             "  \"tps\": xxxxx                 (numeric) Transactions per second accepted\n"
+                            "  \"peak_tps\": xxxxx            (numeric) Peak Transactions per second accepted\n"
                             "}\n"
                             "\nExamples:\n" +
                             HelpExampleCli("getmempoolinfo", "") + HelpExampleRpc("getmempoolinfo", ""));
@@ -1541,6 +1602,362 @@ UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
     return NullUniValue;
 }
 
+template <typename T>
+static T CalculateTruncatedMedian(std::vector<T> &scores)
+{
+    size_t size = scores.size();
+    if (size == 0)
+    {
+        return 0;
+    }
+
+    std::sort(scores.begin(), scores.end());
+    if (size % 2 == 0)
+    {
+        return (scores[size / 2 - 1] + scores[size / 2]) / 2;
+    }
+    else
+    {
+        return scores[size / 2];
+    }
+}
+
+void CalculatePercentilesBySize(CAmount result[NUM_GETBLOCKSTATS_PERCENTILES],
+    std::vector<std::pair<CAmount, int64_t> > &scores,
+    int64_t total_size)
+{
+    if (scores.empty())
+    {
+        return;
+    }
+
+    std::sort(scores.begin(), scores.end());
+
+    // 10th, 25th, 50th, 75th, and 90th percentile weight units.
+    const double weights[NUM_GETBLOCKSTATS_PERCENTILES] = {
+        total_size / 10.0, total_size / 4.0, total_size / 2.0, (total_size * 3.0) / 4.0, (total_size * 9.0) / 10.0};
+
+    int64_t next_percentile_index = 0;
+    int64_t cumulative_weight = 0;
+    for (const auto &element : scores)
+    {
+        cumulative_weight += element.second;
+        while (next_percentile_index < NUM_GETBLOCKSTATS_PERCENTILES &&
+               cumulative_weight >= weights[next_percentile_index])
+        {
+            result[next_percentile_index] = element.first;
+            ++next_percentile_index;
+        }
+    }
+
+    // Fill any remaining percentiles with the last value.
+    for (int64_t i = next_percentile_index; i < NUM_GETBLOCKSTATS_PERCENTILES; i++)
+    {
+        result[i] = scores.back().first;
+    }
+}
+
+template <typename T>
+static inline bool SetHasKeys(const std::set<T> &set)
+{
+    return false;
+}
+template <typename T, typename Tk, typename... Args>
+static inline bool SetHasKeys(const std::set<T> &set, const Tk &key, const Args &... args)
+{
+    return (set.count(key) != 0) || SetHasKeys(set, args...);
+}
+
+// outpoint (needed for the utxo index) + nHeight + fCoinBase
+static constexpr size_t PER_UTXO_OVERHEAD = sizeof(COutPoint) + sizeof(uint32_t) + sizeof(bool);
+
+static UniValue getblockstats(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 4)
+    {
+        throw std::runtime_error(
+            "getblockstats hash_or_height ( stats )\n"
+            "\nCompute per block statistics for a given window. All amounts are in satoshis.\n"
+            "It won't work for some heights with pruning.\n"
+            "\nArguments:\n"
+            "1. \"hash_or_height\"     (string or numeric, required) The block hash or height of the target block\n"
+            "2. \"stats\"              (array,  optional) Values to plot, by default all values (see result below)\n"
+            "    [\n"
+            "      \"height\",         (string, optional) Selected statistic\n"
+            "      \"time\",           (string, optional) Selected statistic\n"
+            "      ,...\n"
+            "    ]\n"
+            "\nResult:\n"
+            "{                           (json object)\n"
+            "  \"avgfee\": xxxxx,          (numeric) Average fee in the block\n"
+            "  \"avgfeerate\": xxxxx,      (numeric) Average feerate (in satoshis per virtual byte)\n"
+            "  \"avgtxsize\": xxxxx,       (numeric) Average transaction size\n"
+            "  \"blockhash\": xxxxx,       (string) The block hash (to check for potential reorgs)\n"
+            "  \"feerate_percentiles\": [  (array of numeric) Feerates at the 10th, 25th, 50th, 75th, and 90th "
+            "percentile weight unit (in satoshis per virtual byte)\n"
+            "      \"10th_percentile_feerate\",      (numeric) The 10th percentile feerate\n"
+            "      \"25th_percentile_feerate\",      (numeric) The 25th percentile feerate\n"
+            "      \"50th_percentile_feerate\",      (numeric) The 50th percentile feerate\n"
+            "      \"75th_percentile_feerate\",      (numeric) The 75th percentile feerate\n"
+            "      \"90th_percentile_feerate\",      (numeric) The 90th percentile feerate\n"
+            "  ],\n"
+            "  \"height\": xxxxx,          (numeric) The height of the block\n"
+            "  \"ins\": xxxxx,             (numeric) The number of inputs (excluding coinbase)\n"
+            "  \"maxfee\": xxxxx,          (numeric) Maximum fee in the block\n"
+            "  \"maxfeerate\": xxxxx,      (numeric) Maximum feerate (in satoshis per virtual byte)\n"
+            "  \"maxtxsize\": xxxxx,       (numeric) Maximum transaction size\n"
+            "  \"medianfee\": xxxxx,       (numeric) Truncated median fee in the block\n"
+            "  \"mediantime\": xxxxx,      (numeric) The block median time past\n"
+            "  \"mediantxsize\": xxxxx,    (numeric) Truncated median transaction size\n"
+            "  \"minfee\": xxxxx,          (numeric) Minimum fee in the block\n"
+            "  \"minfeerate\": xxxxx,      (numeric) Minimum feerate (in satoshis per virtual byte)\n"
+            "  \"mintxsize\": xxxxx,       (numeric) Minimum transaction size\n"
+            "  \"outs\": xxxxx,            (numeric) The number of outputs\n"
+            "  \"subsidy\": xxxxx,         (numeric) The block subsidy\n"
+            "  \"time\": xxxxx,            (numeric) The block time\n"
+            "  \"total_out\": xxxxx,       (numeric) Total amount in all outputs (excluding coinbase and thus reward "
+            "[ie subsidy + totalfee])\n"
+            "  \"total_size\": xxxxx,      (numeric) Total size of all non-coinbase transactions\n"
+            "  \"totalfee\": xxxxx,        (numeric) The fee total\n"
+            "  \"txs\": xxxxx,             (numeric) The number of transactions (excluding coinbase)\n"
+            "  \"utxo_increase\": xxxxx,   (numeric) The increase/decrease in the number of unspent outputs\n"
+            "  \"utxo_size_inc\": xxxxx,   (numeric) The increase/decrease in size for the utxo index (not discounting "
+            "op_return and similar)\n"
+            "}\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getblockstats", "1000 '[\"minfeerate\",\"avgfeerate\"]'") +
+            HelpExampleRpc("getblockstats", "1000 '[\"minfeerate\",\"avgfeerate\"]'"));
+    }
+
+    LOCK(cs_main);
+
+    CBlockIndex *pindex = nullptr;
+    bool isNumber = true;
+    int height = -1;
+    if (!params[0].isNum())
+    {
+        // determine if string is the height or block hash
+        const std::string param0 = params[0].get_str();
+        isNumber = (param0.size() <= 20);
+        if (isNumber)
+        {
+            // if it was a number as a string, try to convert it to an int
+            try
+            {
+                height = std::stoi(param0);
+            }
+            catch (const std::invalid_argument &ia)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    strprintf("Invalid argument: %s. Block height %s is not a valid value", ia.what(), param0.c_str()));
+            }
+        }
+        else
+        {
+            // if not grab the block by hash
+            const uint256 hash(uint256S(param0));
+            pindex = LookupBlockIndex(hash);
+            if (!pindex)
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found by block hash");
+            }
+            if (!chainActive.Contains(pindex))
+            {
+                throw JSONRPCError(
+                    RPC_INVALID_PARAMETER, strprintf("Block is not in chain %s", Params().NetworkIDString()));
+            }
+        }
+    }
+    else
+    {
+        height = params[0].get_int();
+    }
+    if (isNumber)
+    {
+        const int current_tip = chainActive.Height();
+        if (height < 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Target block height %d is negative", height));
+        }
+        if (height > current_tip)
+        {
+            throw JSONRPCError(
+                RPC_INVALID_PARAMETER, strprintf("Target block height %d after current tip %d", height, current_tip));
+        }
+        LOG(RPC, "%s for height %d (tip is at %d)", __func__, height, current_tip);
+        pindex = chainActive[height];
+        DbgAssert(pindex && pindex->nHeight == height, throw std::runtime_error(__func__));
+    }
+
+    DbgAssert(pindex != nullptr, throw std::runtime_error(__func__));
+
+    std::set<std::string> stats;
+    if (!params[1].isNull())
+    {
+        const UniValue stats_univalue = params[1].get_array();
+        for (unsigned int i = 0; i < stats_univalue.size(); i++)
+        {
+            const std::string stat = stats_univalue[i].get_str();
+            stats.insert(stat);
+        }
+    }
+
+    const CBlock block = GetBlockChecked(pindex);
+    const CBlockUndo blockUndo = GetUndoChecked(pindex);
+    // This property is required in the for loop below (and ofc every tx should have undo data)
+    DbgAssert(blockUndo.vtxundo.size() >= block.vtx.size() - 1,
+        throw JSONRPCError(RPC_DATABASE_ERROR, "Block undo data is corrupt"));
+
+    const bool do_all = stats.size() == 0; // Calculate everything if nothing selected (default)
+    const bool do_mediantxsize = do_all || stats.count("mediantxsize") != 0;
+    const bool do_medianfee = do_all || stats.count("medianfee") != 0;
+    const bool do_feerate_percentiles = do_all || stats.count("feerate_percentiles") != 0;
+    const bool loop_inputs = do_all || do_medianfee || do_feerate_percentiles ||
+                             SetHasKeys(stats, "utxo_size_inc", "totalfee", "avgfee", "avgfeerate", "minfee", "maxfee",
+                                 "minfeerate", "maxfeerate");
+    const bool loop_outputs = do_all || loop_inputs || stats.count("total_out");
+    const bool do_calculate_size =
+        do_mediantxsize || SetHasKeys(stats, "total_size", "avgtxsize", "mintxsize", "maxtxsize", "avgfeerate",
+                               "feerate_percentiles", "minfeerate", "maxfeerate");
+
+    CAmount maxfee = 0;
+    CAmount maxfeerate = 0;
+    CAmount minfee = MAX_MONEY;
+    CAmount minfeerate = MAX_MONEY;
+    CAmount total_out = 0;
+    CAmount totalfee = 0;
+    int64_t inputs = 0;
+    int64_t maxtxsize = 0;
+    int64_t mintxsize = std::numeric_limits<int64_t>::max();
+    int64_t outputs = 0;
+    int64_t total_size = 0;
+    int64_t utxo_size_inc = 0;
+    std::vector<CAmount> fee_array;
+    std::vector<std::pair<CAmount, int64_t> > feerate_array;
+    std::vector<int64_t> txsize_array;
+
+    for (size_t i = 0; i < block.vtx.size(); ++i)
+    {
+        const auto &tx = block.vtx.at(i);
+        outputs += tx->vout.size();
+
+        CAmount tx_total_out = 0;
+        if (loop_outputs)
+        {
+            for (const CTxOut &out : tx->vout)
+            {
+                tx_total_out += out.nValue;
+                utxo_size_inc += GetSerializeSize(out, SER_NETWORK, PROTOCOL_VERSION) + PER_UTXO_OVERHEAD;
+            }
+        }
+
+        if (tx->IsCoinBase())
+        {
+            continue;
+        }
+
+        inputs += tx->vin.size(); // Don't count coinbase's fake input
+        total_out += tx_total_out; // Don't count coinbase reward
+
+        int64_t tx_size = 0;
+        if (do_calculate_size)
+        {
+            tx_size = tx->GetTxSize();
+            if (do_mediantxsize)
+            {
+                txsize_array.push_back(tx_size);
+            }
+            maxtxsize = std::max(maxtxsize, tx_size);
+            mintxsize = std::min(mintxsize, tx_size);
+            total_size += tx_size;
+        }
+
+        if (loop_inputs)
+        {
+            CAmount tx_total_in = 0;
+            const auto &txundo = blockUndo.vtxundo.at(i - 1);
+            for (const Coin &coin : txundo.vprevout)
+            {
+                const CTxOut &prevoutput = coin.out;
+
+                tx_total_in += prevoutput.nValue;
+                utxo_size_inc -= GetSerializeSize(prevoutput, SER_NETWORK, PROTOCOL_VERSION) + PER_UTXO_OVERHEAD;
+            }
+
+            CAmount txfee = tx_total_in - tx_total_out;
+            DbgAssert(MoneyRange(txfee), throw std::runtime_error(__func__));
+            if (do_medianfee)
+            {
+                fee_array.push_back(txfee);
+            }
+            maxfee = std::max(maxfee, txfee);
+            minfee = std::min(minfee, txfee);
+            totalfee += txfee;
+
+            CAmount feerate = tx_size ? txfee / tx_size : 0;
+            if (do_feerate_percentiles)
+            {
+                feerate_array.emplace_back(feerate, tx_size);
+            }
+            maxfeerate = std::max(maxfeerate, feerate);
+            minfeerate = std::min(minfeerate, feerate);
+        }
+    }
+
+    CAmount feerate_percentiles[NUM_GETBLOCKSTATS_PERCENTILES] = {0};
+    CalculatePercentilesBySize(feerate_percentiles, feerate_array, total_size);
+
+    UniValue feerates_res(UniValue::VARR);
+    for (int64_t i = 0; i < NUM_GETBLOCKSTATS_PERCENTILES; i++)
+    {
+        feerates_res.push_back(ValueFromAmount(feerate_percentiles[i]));
+    }
+
+    UniValue ret_all(UniValue::VOBJ);
+    ret_all.pushKV("avgfee", ValueFromAmount((block.vtx.size() > 1) ? totalfee / (block.vtx.size() - 1) : 0));
+    ret_all.pushKV("avgfeerate", ValueFromAmount(total_size ? totalfee / total_size : 0)); // Unit: sat/byte
+    ret_all.pushKV("avgtxsize", (block.vtx.size() > 1) ? total_size / (block.vtx.size() - 1) : 0);
+    ret_all.pushKV("blockhash", pindex->GetBlockHash().GetHex());
+    ret_all.pushKV("feerate_percentiles", feerates_res);
+    ret_all.pushKV("height", (int64_t)pindex->nHeight);
+    ret_all.pushKV("ins", inputs);
+    ret_all.pushKV("maxfee", ValueFromAmount(maxfee));
+    ret_all.pushKV("maxfeerate", ValueFromAmount(maxfeerate));
+    ret_all.pushKV("maxtxsize", maxtxsize);
+    ret_all.pushKV("medianfee", ValueFromAmount(CalculateTruncatedMedian(fee_array)));
+    ret_all.pushKV("mediantime", pindex->GetMedianTimePast());
+    ret_all.pushKV("mediantxsize", CalculateTruncatedMedian(txsize_array));
+    ret_all.pushKV("minfee", ValueFromAmount((minfee == MAX_MONEY) ? 0 : minfee));
+    ret_all.pushKV("minfeerate", ValueFromAmount((minfeerate == MAX_MONEY) ? 0 : minfeerate));
+    ret_all.pushKV("mintxsize", mintxsize == std::numeric_limits<int64_t>::max() ? 0 : mintxsize);
+    ret_all.pushKV("outs", outputs);
+    ret_all.pushKV("subsidy", ValueFromAmount(GetBlockSubsidy(pindex->nHeight, Params().GetConsensus())));
+    ret_all.pushKV("time", pindex->GetBlockTime());
+    ret_all.pushKV("total_out", ValueFromAmount(total_out));
+    ret_all.pushKV("total_size", total_size);
+    ret_all.pushKV("totalfee", ValueFromAmount(totalfee));
+    ret_all.pushKV("txs", (int64_t)block.vtx.size());
+    ret_all.pushKV("utxo_increase", outputs - inputs);
+    ret_all.pushKV("utxo_size_inc", utxo_size_inc);
+
+    if (do_all)
+    {
+        return ret_all;
+    }
+
+    UniValue ret(UniValue::VOBJ);
+    for (const std::string &stat : stats)
+    {
+        const UniValue &value = ret_all[stat];
+        if (value.isNull())
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Invalid selected statistic %s", stat));
+        }
+        ret.pushKV(stat, value);
+    }
+    return ret;
+}
+
 UniValue savemempool(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -1571,9 +1988,10 @@ static const CRPCCommand commands[] = {
     {"blockchain", "getmempooldescendants", &getmempooldescendants, true},
     {"blockchain", "getmempoolentry", &getmempoolentry, true}, {"blockchain", "getmempoolinfo", &getmempoolinfo, true},
     {"blockchain", "getorphanpoolinfo", &getorphanpoolinfo, true},
-    {"blockchain", "getrawmempool", &getrawmempool, true}, {"blockchain", "getraworphanpool", &getraworphanpool, true},
-    {"blockchain", "gettxout", &gettxout, true}, {"blockchain", "gettxoutsetinfo", &gettxoutsetinfo, true},
-    {"blockchain", "savemempool", &savemempool, true}, {"blockchain", "verifychain", &verifychain, true},
+    {"blockchain", "evicttransaction", &evicttransaction, true}, {"blockchain", "getrawmempool", &getrawmempool, true},
+    {"blockchain", "getraworphanpool", &getraworphanpool, true}, {"blockchain", "gettxout", &gettxout, true},
+    {"blockchain", "gettxoutsetinfo", &gettxoutsetinfo, true}, {"blockchain", "savemempool", &savemempool, true},
+    {"blockchain", "verifychain", &verifychain, true}, {"blockchain", "getblockstats", &getblockstats, true},
 
     /* Not shown in help */
     {"hidden", "invalidateblock", &invalidateblock, true}, {"hidden", "reconsiderblock", &reconsiderblock, true},

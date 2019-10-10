@@ -292,6 +292,22 @@ struct CMutableTransaction
     uint256 GetHash() const;
 };
 
+/** Properties of a transaction that are discovered during tx evaluation */
+class CTxProperties
+{
+public:
+    uint64_t countWithAncestors = 0;
+    uint64_t sizeWithAncestors = 0;
+    uint64_t countWithDescendants = 0;
+    uint64_t sizeWithDescendants = 0;
+    CTxProperties() {}
+    CTxProperties(uint64_t ancestorCount, uint64_t ancestorSize, uint64_t descendantCount, uint64_t descendantSize)
+        : countWithAncestors(ancestorCount), sizeWithAncestors(ancestorSize), countWithDescendants(descendantCount),
+          sizeWithDescendants(descendantSize)
+    {
+    }
+};
+
 typedef std::shared_ptr<const CTransaction> CTransactionRef;
 static inline CTransactionRef MakeTransactionRef() { return std::make_shared<const CTransaction>(); }
 template <typename Tx>

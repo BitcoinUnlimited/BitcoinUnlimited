@@ -169,7 +169,7 @@ class CAddrMan
 {
 private:
     //! critical section to protect the inner data structures
-    mutable CCriticalSection cs;
+    mutable CCriticalSection cs_addrman;
 
     //! last used nId
     int nIdCount;
@@ -293,7 +293,7 @@ public:
     template <typename Stream>
     void Serialize(Stream &s) const
     {
-        LOCK(cs);
+        LOCK(cs_addrman);
 
         unsigned char nVersion = 1;
         s << nVersion;
@@ -351,7 +351,7 @@ public:
     template <typename Stream>
     void Unserialize(Stream &s)
     {
-        LOCK(cs);
+        LOCK(cs_addrman);
 
         Clear();
 
@@ -509,7 +509,7 @@ public:
     {
 #ifdef DEBUG_ADDRMAN
         {
-            LOCK(cs);
+            LOCK(cs_addrman);
             int err;
             if ((err = Check_()))
                 LOGA("ADDRMAN CONSISTENCY CHECK FAILED!!! err=%i\n", err);
@@ -522,7 +522,7 @@ public:
     {
         bool fRet = false;
         {
-            LOCK(cs);
+            LOCK(cs_addrman);
             Check();
             fRet |= Add_(addr, source, nTimePenalty);
             Check();
@@ -538,7 +538,7 @@ public:
     {
         int nAdd = 0;
         {
-            LOCK(cs);
+            LOCK(cs_addrman);
             Check();
             for (std::vector<CAddress>::const_iterator it = vAddr.begin(); it != vAddr.end(); it++)
                 nAdd += Add_(*it, source, nTimePenalty) ? 1 : 0;
@@ -553,7 +553,7 @@ public:
     void Good(const CService &addr, bool test_before_evict = true, int64_t nTime = GetAdjustedTime())
     {
         {
-            LOCK(cs);
+            LOCK(cs_addrman);
             Check();
             Good_(addr, test_before_evict, nTime);
             Check();
@@ -564,7 +564,7 @@ public:
     void Attempt(const CService &addr, bool fCountFailure, int64_t nTime = GetAdjustedTime())
     {
         {
-            LOCK(cs);
+            LOCK(cs_addrman);
             Check();
             Attempt_(addr, fCountFailure, nTime);
             Check();
@@ -574,7 +574,7 @@ public:
     //! See if any to-be-evicted tried table entries have been tested and if so resolve the collisions.
     void ResolveCollisions()
     {
-        LOCK(cs);
+        LOCK(cs_addrman);
         Check();
         ResolveCollisions_();
         Check();
@@ -585,7 +585,7 @@ public:
     {
         CAddrInfo ret;
         {
-            LOCK(cs);
+            LOCK(cs_addrman);
             Check();
             ret = SelectTriedCollision_();
             Check();
@@ -600,7 +600,7 @@ public:
     {
         CAddrInfo addrRet;
         {
-            LOCK(cs);
+            LOCK(cs_addrman);
             Check();
             addrRet = Select_(newOnly);
             Check();
@@ -614,7 +614,7 @@ public:
         Check();
         std::vector<CAddress> vAddr;
         {
-            LOCK(cs);
+            LOCK(cs_addrman);
             GetAddr_(vAddr);
         }
         Check();
@@ -625,7 +625,7 @@ public:
     void Connected(const CService &addr, int64_t nTime = GetAdjustedTime())
     {
         {
-            LOCK(cs);
+            LOCK(cs_addrman);
             Check();
             Connected_(addr, nTime);
             Check();

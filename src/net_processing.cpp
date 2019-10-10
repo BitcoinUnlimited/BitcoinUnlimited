@@ -10,6 +10,7 @@
 #include "blockrelay/blockrelay_common.h"
 #include "blockrelay/compactblock.h"
 #include "blockrelay/graphene.h"
+#include "blockrelay/mempool_sync.h"
 #include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
 #include "chain.h"
@@ -34,6 +35,11 @@ extern CTweak<unsigned int> maxBlocksInTransitPerPeer;
 extern CTweak<uint64_t> grapheneMinVersionSupported;
 extern CTweak<uint64_t> grapheneMaxVersionSupported;
 extern CTweak<uint64_t> grapheneFastFilterCompatibility;
+extern CTweak<uint64_t> mempoolSyncMinVersionSupported;
+extern CTweak<uint64_t> mempoolSyncMaxVersionSupported;
+extern CTweak<uint64_t> syncMempoolWithPeers;
+
+extern CTweak<uint32_t> randomlyDontInv;
 
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
@@ -384,13 +390,13 @@ static void enableCompactBlocks(CNode *pfrom)
     }
 }
 
-bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nTimeReceived)
+bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, int64_t nStopwatchTimeReceived)
 {
     int64_t receiptTime = GetTime();
     const CChainParams &chainparams = Params();
     RandAddSeedPerfmon();
     unsigned int msgSize = vRecv.size(); // BU for statistics
-    UpdateRecvStats(pfrom, strCommand, msgSize, nTimeReceived);
+    UpdateRecvStats(pfrom, strCommand, msgSize, nStopwatchTimeReceived);
     LOG(NET, "received: %s (%u bytes) peer=%s\n", SanitizeString(strCommand), msgSize, pfrom->GetLogName());
     if (mapArgs.count("-dropmessagestest") && GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
     {
@@ -577,7 +583,21 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         xver.set_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED, grapheneMaxVersionSupported.Value());
         xver.set_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED, grapheneMinVersionSupported.Value());
         xver.set_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF, grapheneFastFilterCompatibility.Value());
+        xver.set_u64c(XVer::BU_MEMPOOL_SYNC, syncMempoolWithPeers.Value());
+        xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED, mempoolSyncMaxVersionSupported.Value());
+        xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED, mempoolSyncMinVersionSupported.Value());
         xver.set_u64c(XVer::BU_XTHIN_VERSION, 2); // xthin version
+
+        size_t nLimitAncestors = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
+        size_t nLimitAncestorSize = GetArg("-limitancestorsize", BU_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
+        size_t nLimitDescendants = GetArg("-limitdescendantcount", BU_DEFAULT_DESCENDANT_LIMIT);
+        size_t nLimitDescendantSize = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
+
+        xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT, nLimitAncestors);
+        xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT, nLimitAncestorSize);
+        xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT, nLimitDescendants);
+        xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT, nLimitDescendantSize);
+
         pfrom->PushMessage(NetMsgType::XVERSION, xver);
 
 
@@ -655,17 +675,15 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 ConnectionStateOutgoing::ANY, pfrom))
             return false;
         vRecv >> pfrom->xVersion;
-        pfrom->skipChecksum = (pfrom->xVersion.as_u64c(XVer::BU_MSG_IGNORE_CHECKSUM) == 1);
-        if (pfrom->addrFromPort == 0)
-        {
-            pfrom->addrFromPort = pfrom->xVersion.as_u64c(XVer::BU_LISTEN_PORT) & 0xffff;
-        }
-        else
+
+        if (pfrom->addrFromPort != 0)
         {
             LOG(NET, "Encountered odd node that sent BUVERSION before XVERSION. Ignoring duplicate addrFromPort "
                      "setting. peer=%s version=%s\n",
                 pfrom->GetLogName(), pfrom->cleanSubVer);
         }
+
+        pfrom->ReadConfigFromXVersion();
 
         pfrom->PushMessage(NetMsgType::XVERACK);
         pfrom->state_incoming = ConnectionStateIncoming::READY;
@@ -747,27 +765,28 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     // messages during the initial (x)version handshake).
     else if (strCommand == NetMsgType::PING)
     {
-        // take the lock exclusively to force a serialization point
-        CSharedUnlocker unl(pfrom->csMsgSerializer);
-        {
-            WRITELOCK(pfrom->csMsgSerializer);
-            uint64_t nonce = 0;
-            vRecv >> nonce;
-            // although PONG was enabled in BIP31, all clients should handle it at this point
-            // and unknown messages are silently dropped.  So for simplicity, always respond with PONG
-            // Echo the message back with the nonce. This allows for two useful features:
-            //
-            // 1) A remote node can quickly check if the connection is operational
-            // 2) Remote nodes can measure the latency of the network thread. If this node
-            //    is overloaded it won't respond to pings quickly and the remote node can
-            //    avoid sending us more work, like chain download requests.
-            //
-            // The nonce stops the remote getting confused between different pings: without
-            // it, if the remote node sends a ping once per second and this node takes 5
-            // seconds to respond to each, the 5th ping the remote sends would appear to
-            // return very quickly.
-            pfrom->PushMessage(NetMsgType::PONG, nonce);
-        }
+        LeaveCritical(&pfrom->csMsgSerializer);
+        EnterCritical("pfrom.csMsgSerializer", __FILE__, __LINE__, (void *)(&pfrom->csMsgSerializer),
+            LockType::SHARED_MUTEX, OwnershipType::EXCLUSIVE);
+        uint64_t nonce = 0;
+        vRecv >> nonce;
+        // although PONG was enabled in BIP31, all clients should handle it at this point
+        // and unknown messages are silently dropped.  So for simplicity, always respond with PONG
+        // Echo the message back with the nonce. This allows for two useful features:
+        //
+        // 1) A remote node can quickly check if the connection is operational
+        // 2) Remote nodes can measure the latency of the network thread. If this node
+        //    is overloaded it won't respond to pings quickly and the remote node can
+        //    avoid sending us more work, like chain download requests.
+        //
+        // The nonce stops the remote getting confused between different pings: without
+        // it, if the remote node sends a ping once per second and this node takes 5
+        // seconds to respond to each, the 5th ping the remote sends would appear to
+        // return very quickly.
+        pfrom->PushMessage(NetMsgType::PONG, nonce);
+        LeaveCritical(&pfrom->csMsgSerializer);
+        EnterCritical("pfrom.csMsgSerializer", __FILE__, __LINE__, (void *)(&pfrom->csMsgSerializer),
+            LockType::SHARED_MUTEX, OwnershipType::SHARED);
     }
 
     // ------------------------- END INITIAL COMMAND SET PROCESSING
@@ -1044,7 +1063,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if ((fDebug && invDeque.size() > 0) || (invDeque.size() == 1))
             LOG(NET, "received getdata for: %s peer=%s\n", invDeque[0].ToString(), pfrom->GetLogName());
 
+        // Run process getdata and process as much of the getdata's as we can before taking the lock
+        // and appending the remainder to the vRecvGetData queue.
         ProcessGetData(pfrom, chainparams.GetConsensus(), invDeque);
+        if (!invDeque.empty())
         {
             LOCK(pfrom->csRecvGetData);
             pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), invDeque.begin(), invDeque.end());
@@ -1675,6 +1697,29 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         return CompactReReqResponse::HandleMessage(vRecv, pfrom);
     }
 
+    // Mempool synchronization request
+    else if (strCommand == NetMsgType::GET_MEMPOOLSYNC)
+    {
+        return HandleMempoolSyncRequest(vRecv, pfrom);
+    }
+
+    else if (strCommand == NetMsgType::MEMPOOLSYNC)
+    {
+        return CMempoolSync::ReceiveMempoolSync(vRecv, pfrom, strCommand);
+    }
+
+    // Mempool synchronization transaction request
+    else if (strCommand == NetMsgType::GET_MEMPOOLSYNCTX)
+    {
+        return CRequestMempoolSyncTx::HandleMessage(vRecv, pfrom);
+    }
+
+    else if (strCommand == NetMsgType::MEMPOOLSYNCTX)
+    {
+        return CMempoolSyncTx::HandleMessage(vRecv, pfrom);
+    }
+
+
     // Handle full blocks
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) // Ignore blocks received while importing
     {
@@ -1706,7 +1751,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (state != nullptr)
                 state->nSyncStartTime = now; // reset the time because more headers needed
         }
-        pfrom->nPingUsecStart = GetTimeMicros(); // Reset ping time because block can consume all bandwidth
+        pfrom->nPingUsecStart = GetStopwatchMicros(); // Reset ping time because block can consume all bandwidth
 
         // Message consistency checking
         // NOTE: consistency checking is handled by checkblock() which is called during
@@ -1792,7 +1837,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
     else if (strCommand == NetMsgType::PONG)
     {
-        int64_t pingUsecEnd = nTimeReceived;
+        int64_t pingUsecEnd = nStopwatchTimeReceived;
         uint64_t nonce = 0;
         size_t nAvail = vRecv.in_avail();
         bool bPingFinished = false;
@@ -2078,7 +2123,7 @@ bool ProcessMessages(CNode *pfrom)
         bool fRet = false;
         try
         {
-            fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime);
+            fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nStopwatch);
             if (shutdown_threads.load() == true)
             {
                 return false;
@@ -2165,7 +2210,7 @@ bool SendMessages(CNode *pto)
             // RPC ping request by user
             pingSend = true;
         }
-        if (pto->nPingNonceSent == 0 && pto->nPingUsecStart + PING_INTERVAL * 1000000 < GetTimeMicros())
+        if (pto->nPingNonceSent == 0 && pto->nPingUsecStart + PING_INTERVAL * 1000000 < (int64_t)GetStopwatchMicros())
         {
             // Ping automatically sent as a latency probe & keepalive.
             pingSend = true;
@@ -2178,7 +2223,7 @@ bool SendMessages(CNode *pto)
                 GetRandBytes((unsigned char *)&nonce, sizeof(nonce));
             }
             pto->fPingQueued = false;
-            pto->nPingUsecStart = GetTimeMicros();
+            pto->nPingUsecStart = GetStopwatchMicros();
             pto->nPingNonceSent = nonce;
             pto->PushMessage(NetMsgType::PING, nonce);
         }
@@ -2190,7 +2235,7 @@ bool SendMessages(CNode *pto)
         thinrelay.CheckForDownloadTimeout(pto);
 
         // Check for block download timeout and disconnect node if necessary. Does not require cs_main.
-        int64_t nNow = GetTimeMicros();
+        int64_t nNow = GetStopwatchMicros();
         requester.DisconnectOnDownloadTimeout(pto, consensusParams, nNow);
 
         // Address refresh broadcast
@@ -2470,13 +2515,15 @@ bool SendMessages(CNode *pto)
                 // while providing no value to the network.
                 // However we will still send them block inventory in the case they are a pruned node or wallet
                 // waiting for block announcements, therefore we have to check each inv in pto->vInventoryToSend.
-                bool fChokeTxInv = (pto->nActivityBytes == 0 && (nNow / 1000000 - pto->nTimeConnected) > 120);
+                bool fChokeTxInv =
+                    (pto->nActivityBytes == 0 && (GetStopwatchMicros() - pto->nStopwatchConnected) > 120 * 1000000);
 
                 // Find INV's which should be sent, save them to vInvSend, and then erase from vInventoryToSend.
                 int invsz = std::min((int)pto->vInventoryToSend.size(), MAX_INV_TO_SEND);
                 vInvSend.reserve(invsz);
 
                 LOCK(pto->cs_inventory);
+                FastRandomContext rnd;
                 for (const CInv &inv : pto->vInventoryToSend)
                 {
                     nToErase++;
@@ -2489,8 +2536,11 @@ bool SendMessages(CNode *pto)
                         if (pto->filterInventoryKnown.contains(inv.hash))
                             continue;
                     }
-                    vInvSend.push_back(inv);
-                    pto->filterInventoryKnown.insert(inv.hash);
+                    if ((rnd.rand32() % 100) < (100 - randomlyDontInv.Value()))
+                    {
+                        vInvSend.push_back(inv);
+                        pto->filterInventoryKnown.insert(inv.hash);
+                    }
 
                     if (vInvSend.size() >= MAX_INV_TO_SEND)
                         break;
@@ -2517,7 +2567,19 @@ bool SendMessages(CNode *pto)
         }
 
         // If the chain is not entirely sync'd then look for new blocks to download.
-        if (!IsChainSyncd())
+        //
+        // Also check an edge condition, where we've invalidated a chain and set the pindexBestHeader to the
+        // new most work chain, as a result we may end up just connecting whatever blocks are in setblockindexcandidates
+        // resulting in pindexBestHeader equalling the chainActive.Tip() causing us to stop checking for more blocks to
+        // download (our chain will now not sync until the next block announcement is received). Therefore, if the
+        // best invalid chain work is still greater than our chaintip then we have to keep looking for more blocks
+        // to download.
+        //
+        // Use temporaries for the chain tip and best invalid because they are both atomics and either could
+        // be nullified between the two calls.
+        CBlockIndex *pTip = chainActive.Tip();
+        CBlockIndex *pBestInvalid = pindexBestInvalid.load();
+        if (!IsChainSyncd() || (pBestInvalid && pTip && pBestInvalid->nChainWork > pTip->nChainWork))
         {
             TRY_LOCK(cs_main, locked);
             if (locked)

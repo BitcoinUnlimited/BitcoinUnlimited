@@ -230,11 +230,8 @@ static bool rest_block(HTTPRequest *req, const std::string &strURIPart, bool sho
     if (!pblockindex)
         return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
 
-    {
-        READLOCK(cs_mapBlockIndex); // for nStatus
-        if (fHavePruned && !(pblockindex->nStatus & BLOCK_HAVE_DATA) && pblockindex->nTx > 0)
-            return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not available (pruned data)");
-    }
+    if (IsBlockPruned(pblockindex))
+        return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not available (pruned data)");
 
     if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
         return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
@@ -449,7 +446,7 @@ static bool rest_getutxos(HTTPRequest *req, const std::string &strURIPart)
         boost::split(uriParts, strUriParams, boost::is_any_of("/"));
     }
 
-    // throw exception in case of a empty request
+    // throw exception in case of an empty request
     std::string strRequestMutable = req->ReadBody();
     if (strRequestMutable.length() == 0 && uriParts.size() == 0)
         return RESTERR(req, HTTP_INTERNAL_SERVER_ERROR, "Error: empty request");
@@ -546,7 +543,7 @@ static bool rest_getutxos(HTTPRequest *req, const std::string &strURIPart)
     std::vector<bool> hits;
     bitmap.resize((vOutPoints.size() + 7) / 8);
     {
-        READLOCK(mempool.cs);
+        READLOCK(mempool.cs_txmempool);
 
         CCoinsView viewDummy;
         CCoinsViewCache view(&viewDummy);

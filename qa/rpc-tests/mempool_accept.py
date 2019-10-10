@@ -21,7 +21,7 @@ from test_framework.script import *
 
 
 class PayDest:
-    """A payment destination.  All the info you need to send a payment here and make a subsequent payment 
+    """A payment destination.  All the info you need to send a payment here and make a subsequent payment
        from this address"""
 
     def __init__(self, node=None):
@@ -80,14 +80,14 @@ def createConflictingTx(dests, source, count, fee=1):
 
 
 def createTx(dests, sources, node, maxx=None, fee=1, nextWallet=None, generatedTx=None):
-    """ Create "maxx" transactions that spend from individual "sources" to every "dests" evenly (many fan-out 
+    """ Create "maxx" transactions that spend from individual "sources" to every "dests" evenly (many fan-out
     transactions).  If "generatedTx" is a list the created transactions are put into it.  Otherwise they are
     sent to "node".  If "nextWallet" is a list the outputs of all these created tx are put into it in a format
     compatible with "sources" (you can use nextWallet as the sources input in a subsequent call to this function).
 
     Change the base "fee" if you want which is actually the fee PER dest.
 
-    sources: list of dictionaries in RPC listunspent format, with optional additional "privkey" field which 
+    sources: list of dictionaries in RPC listunspent format, with optional additional "privkey" field which
        is the private key in bytes.  If "privkey" does not exist, "node" is asked for it.
     dests: a list of PayDest objects.
     fee: what to deduct as the fee (in Satoshi)
@@ -392,6 +392,23 @@ class MyTest (BitcoinTestFramework):
                      if NTX - self.nodes[2].getmempoolinfo()["size"] < 30 else None)
         end = time.monotonic()
         logging.info("synced %d tx in %s seconds.  Speed %f tx/sec" % (NTX, end - start, float(NTX) / (end - start)))
+
+        # Regression test the stats now.  Ideally this would be in an isolated test, but this can be done here quickly
+        # and Travis runs out of time often.
+        for n in self.nodes:
+            result = n.getstatlist()
+            # logging.info(result)
+            result = n.getstat("memPool/txAdded", "sec10", 100)
+            logging.info(result)
+            result = n.getstat("memPool/size", "min5")
+            logging.info(result)
+            result = n.getstat("net/recv/msg/inv", "sec10", 20)
+            logging.info(result)
+            result = n.getstat("net/recv/total", "sec10", 20)
+            logging.info(result)
+            result = n.getstat("net/send/total", "sec10")
+            logging.info(result)
+
 
         if self.bigTest:
             # Start up node 4

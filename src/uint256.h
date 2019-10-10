@@ -34,7 +34,7 @@ public:
     }
     //! Construct from a std::vector by copying bytes directly
     explicit base_blob(const std::vector<unsigned char> &vch);
-    //! Construct from a byte buffer by copying bytes directly.  Note that the caller must ensure that bch is
+    //! Construct from a byte buffer by copying bytes directly.  Note that the caller must ensure that vch is
     //  the proper size.
     explicit base_blob(const uint8_t *vch);
 
@@ -126,6 +126,9 @@ public:
     uint160() {}
     uint160(const base_blob<160> &b) : base_blob<160>(b) {}
     explicit uint160(const std::vector<unsigned char> &vch) : base_blob<160>(vch) {}
+    //! Construct from a byte buffer by copying bytes directly.  Note that the caller must ensure that bch is
+    //  the proper size.
+    explicit uint160(const uint8_t *vch) : base_blob<160>(vch) {}
 };
 
 /** 256-bit opaque blob.

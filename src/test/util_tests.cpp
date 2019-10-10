@@ -6,13 +6,16 @@
 #include "util.h"
 
 #include "clientversion.h"
+#include "consensus/consensus.h"
 #include "primitives/transaction.h"
 #include "reverse_iterator.h"
 #include "sync.h"
 #include "test/test_bitcoin.h"
 #include "test/test_random.h"
+#include "unlimited.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
+#include "xversionmessage.h"
 
 #include <stdint.h>
 #include <vector>
@@ -25,11 +28,11 @@ BOOST_FIXTURE_TEST_SUITE(util_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(util_criticalsection)
 {
-    CCriticalSection cs;
+    CCriticalSection test_cs;
 
     do
     {
-        LOCK(cs);
+        LOCK(test_cs);
         break;
 
         BOOST_ERROR("break was swallowed!");
@@ -37,7 +40,7 @@ BOOST_AUTO_TEST_CASE(util_criticalsection)
 
     do
     {
-        TRY_LOCK(cs, lockTest);
+        TRY_LOCK(test_cs, lockTest);
         if (lockTest)
             break;
 
@@ -61,11 +64,11 @@ void ThreadSharedCritTest(CSharedCriticalSection *cs)
 
 BOOST_AUTO_TEST_CASE(util_sharedcriticalsection)
 {
-    CSharedCriticalSection cs;
+    CSharedCriticalSection test_cs;
 
     do
     {
-        READLOCK(cs);
+        READLOCK(test_cs);
         break;
 
         BOOST_ERROR("break was swallowed!");
@@ -73,7 +76,7 @@ BOOST_AUTO_TEST_CASE(util_sharedcriticalsection)
 
     do
     {
-        WRITELOCK(cs);
+        WRITELOCK(test_cs);
         break;
 
         BOOST_ERROR("break was swallowed!");
@@ -81,8 +84,8 @@ BOOST_AUTO_TEST_CASE(util_sharedcriticalsection)
 
     { // If the read lock does not allow simultaneous locking, this code will hang in the join_all
         boost::thread_group thrds;
-        READLOCK(cs);
-        thrds.create_thread(boost::bind(ThreadSharedCritTest, &cs));
+        READLOCK(test_cs);
+        thrds.create_thread(boost::bind(ThreadSharedCritTest, &test_cs));
         thrds.join_all();
     }
 
@@ -93,8 +96,8 @@ BOOST_AUTO_TEST_CASE(util_sharedcriticalsection)
         critVal = 1;
         boost::thread_group thrds;
         {
-            WRITELOCK(cs);
-            thrds.create_thread(boost::bind(ThreadSharedCritTest, &cs));
+            WRITELOCK(test_cs);
+            thrds.create_thread(boost::bind(ThreadSharedCritTest, &test_cs));
             MilliSleep(250); // give thread a chance to run.
             BOOST_CHECK(threadStarted == true);
             BOOST_CHECK(threadExited == false);
@@ -573,6 +576,10 @@ BOOST_AUTO_TEST_CASE(test_FormatParagraph)
 
 BOOST_AUTO_TEST_CASE(test_FormatSubVersion)
 {
+    int temp = 0;
+    int *ptemp = &temp;
+    std::string arch = (sizeof(ptemp) == 4) ? "32bit" : "64bit";
+
     std::vector<std::string> comments;
     comments.push_back(std::string("comment1"));
     std::vector<std::string> comments2;
@@ -580,10 +587,45 @@ BOOST_AUTO_TEST_CASE(test_FormatSubVersion)
     // Semicolon is discouraged but not forbidden by BIP-0014
     comments2.push_back(
         SanitizeString(std::string("Comment2; .,_?@-; !\"#$%&'()*+/<=>[]\\^`{|}~"), SAFE_CHARS_UA_COMMENT));
-    BOOST_CHECK_EQUAL(FormatSubVersion("Test", 99900, std::vector<std::string>()), std::string("/Test:0.9.99/"));
-    BOOST_CHECK_EQUAL(FormatSubVersion("Test", 99900, comments), std::string("/Test:0.9.99(comment1)/"));
-    BOOST_CHECK_EQUAL(
-        FormatSubVersion("Test", 99900, comments2), std::string("/Test:0.9.99(comment1; Comment2; .,_?@-; )/"));
+    BOOST_CHECK_EQUAL(FormatSubVersion("Test", 99800, {}), std::string("/Test:0.9.98(" + arch + ")/"));
+    BOOST_CHECK_EQUAL(FormatSubVersion("Test", 99900, comments), std::string("/Test:0.9.99(comment1; " + arch + ")/"));
+    BOOST_CHECK_EQUAL(FormatSubVersion("Test", 99900, comments2),
+        std::string("/Test:0.9.99(comment1; Comment2; .,_?@-; ; " + arch + ")/"));
+
+    excessiveBlockSize = 1000000;
+    excessiveAcceptDepth = 40;
+    settingsToUserAgentString();
+    const char *argv_test[] = {"bitcoind", "-uacomment=comment1", "-uacomment=Comment2", "-uacomment=Comment3"};
+    ParseParameters(4, (char **)argv_test, AllowedArgs::Bitcoind());
+    BOOST_CHECK_EQUAL(FormatSubVersion("Test", 99900, BUComments),
+        std::string("/Test:0.9.99(EB1; AD40; " + arch + "; comment1; Comment2; Comment3)/"));
+
+    const char *argv_test2[] = {"bitcoind", "-uacomment=Commenttttttttttttttttttttttttttttttttttttttttt1",
+        "-uacomment=Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt2",
+        "-uacomment=Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt3",
+        "-uacomment=Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt4"};
+    ParseParameters(5, (char **)argv_test2, AllowedArgs::Bitcoind());
+    BOOST_CHECK_EQUAL(FormatSubVersion("Test", 99900, BUComments),
+        std::string("/Test:0.9.99(EB1; AD40; " + arch + "; Commenttttttttttttttttttttttttttttttttttttttttt1; "
+                                                        "Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt2; "
+                                                        "Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt3; "
+                                                        "Commenttttttttttttttttttttttttttttttttttttttttttt)/"));
+
+    std::string subver = FormatSubVersion("Test", 99900, BUComments);
+    BOOST_CHECK_EQUAL(subver.size(), MAX_SUBVERSION_LENGTH);
+
+    // Check if displayArchInSubver Tweak is working
+    fDisplayArchInSubver = false;
+    settingsToUserAgentString();
+    const char *argv_test3[] = {"bitcoind", "-uacomment=comment1", "-uacomment=Comment2", "-uacomment=Comment3"};
+    ParseParameters(4, (char **)argv_test3, AllowedArgs::Bitcoind());
+    BOOST_CHECK_EQUAL(FormatSubVersion("Test", 99900, BUComments),
+        std::string("/Test:0.9.99(EB1; AD40; comment1; Comment2; Comment3)/"));
+
+    // set EB/AD back to default value
+    excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
+    excessiveAcceptDepth = DEFAULT_EXCESSIVE_ACCEPT_DEPTH;
+    fDisplayArchInSubver = true;
 }
 
 BOOST_AUTO_TEST_CASE(test_ParseFixedPoint)

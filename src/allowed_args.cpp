@@ -548,19 +548,19 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
             strprintf("Stop running after importing blocks from disk (default: %u)", DEFAULT_STOPAFTERBLOCKIMPORT))
         .addDebugArg("limitancestorcount=<n>", requiredInt,
             strprintf("Do not accept transactions if number of in-mempool ancestors is <n> or more (default: %u)",
-                         DEFAULT_ANCESTOR_LIMIT))
+                         BU_DEFAULT_ANCESTOR_LIMIT))
         .addDebugArg(
             "limitancestorsize=<n>", requiredInt, strprintf("Do not accept transactions whose size with all in-mempool "
                                                             "ancestors exceeds <n> kilobytes (default: %u)",
-                                                      DEFAULT_ANCESTOR_SIZE_LIMIT))
+                                                      BU_DEFAULT_ANCESTOR_SIZE_LIMIT))
         .addDebugArg(
             "limitdescendantcount=<n>", requiredInt, strprintf("Do not accept transactions if any ancestor would have "
                                                                "<n> or more in-mempool descendants (default: %u)",
-                                                         DEFAULT_DESCENDANT_LIMIT))
+                                                         BU_DEFAULT_DESCENDANT_LIMIT))
         .addDebugArg("limitdescendantsize=<n>", requiredInt,
             strprintf("Do not accept transactions if any ancestor would have more than <n> kilobytes of in-mempool "
                       "descendants (default: %u).",
-                         DEFAULT_DESCENDANT_SIZE_LIMIT))
+                         BU_DEFAULT_DESCENDANT_SIZE_LIMIT))
         .addArg("debug=<category>", optionalStr,
             strprintf(_("Output debugging information (default: %u, supplying <category> is optional)"), 0) + ". " +
                 _("If <category> is not supplied or if <category> = 1, output all debugging information. ") +
@@ -593,6 +593,7 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addDebugArg("printpriority", optionalBool,
             strprintf("Log transaction priority and fee per kB when mining blocks (default: %u)",
                          DEFAULT_PRINTPRIORITY))
+        .addDebugArg("printtologfile", optionalBool, "Write log to debug.log")
 #ifdef ENABLE_WALLET
         .addDebugArg("privdb", optionalBool,
             strprintf("Sets the DB_PRIVATE flag in the wallet db environment (default: %u)", DEFAULT_WALLET_PRIVDB),
@@ -720,7 +721,11 @@ static void addElectrumOptions(AllowedArgs &allowedArgs)
         .addArg("electrum.dir", requiredStr, "Data directory for electrum database")
         .addArg("electrum.port", requiredStr, "Port electrum RPC listens on (default: mainnet 50001, testnet: 60001")
         .addArg("electrum.host", requiredStr, "Host electrum RPC listens on (default: 127.0.0.1)")
-        .addArg("electrum.addr.limit", requiredStr, "Max txs to look up per address (default: 500)")
+        .addArg("electrum.rawarg", optionalStr,
+            "Raw argument to pass directly to underlying electrum daemon "
+            "(example: -electrum.rawarg=\"--server-banner=\\\"Welcome to my server!\\\"\"). "
+            "This option can be specified multiple times.")
+        .addArg("electrum.shutdownonerror", optionalBool, "Shutdown if the electrum server exits unexpectedly")
         .addDebugArg("electrum.exec", requiredStr, "Path to electrum daemon executable")
         .addDebugArg("electrum.monitoring.port", requiredStr, "Port to bind monitoring service")
         .addDebugArg("electrum.monitoring.host", requiredStr, "Host to bind monitoring service")

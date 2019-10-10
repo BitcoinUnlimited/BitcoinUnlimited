@@ -30,6 +30,12 @@ def create_block(hashprev, coinbase, nTime=None, txns=None, ctor=True):
     block.calc_sha256()
     return block
 
+def make_conform_to_ctor(block):
+    for tx in block.vtx:
+        tx.rehash()
+    block.vtx = [block.vtx[0]] + \
+        sorted(block.vtx[1:], key=lambda tx: tx.getHash())
+
 def serialize_script_num(value):
     r = bytearray(0)
     if value == 0:
@@ -48,9 +54,10 @@ def serialize_script_num(value):
 # Create a coinbase transaction, assuming no miner fees.
 # If pubkey is passed in, the coinbase output will be a P2PK output;
 # otherwise an anyone-can-spend output.
-def create_coinbase(height, pubkey = None):
+def create_coinbase(height, pubkey = None, scriptPubKey = None):
+    assert not (pubkey and scriptPubKey), "cannot both have pubkey and custom scriptPubKey"
     coinbase = CTransaction()
-    coinbase.vin.append(CTxIn(COutPoint(0, 0xffffffff), 
+    coinbase.vin.append(CTxIn(COutPoint(0, 0xffffffff),
                 ser_string(serialize_script_num(height)), 0xffffffff))
     coinbaseoutput = CTxOut()
     coinbaseoutput.nValue = 50 * COIN
@@ -59,7 +66,9 @@ def create_coinbase(height, pubkey = None):
     if (pubkey != None):
         coinbaseoutput.scriptPubKey = CScript([pubkey, OP_CHECKSIG])
     else:
-        coinbaseoutput.scriptPubKey = CScript([OP_NOP])
+        if scriptPubKey is None:
+            scriptPubKey = CScript([OP_NOP])
+        coinbaseoutput.scriptPubKey = CScript(scriptPubKey)
     coinbase.vout = [ coinbaseoutput ]
 
     # Make sure the coinbase is at least 100 bytes
@@ -75,6 +84,7 @@ def create_coinbase(height, pubkey = None):
 # or a list to create multiple outputs
 PADDED_ANY_SPEND =  b'\x61'*50 # add a bunch of OP_NOPs to make sure this tx is long enough
 def create_transaction(prevtx, n, sig, value, out=PADDED_ANY_SPEND):
+    prevtx.calc_sha256()
     if not type(value) is list:
         value = [value]
     tx = CTransaction()

@@ -23,7 +23,7 @@ COIN = 100000000  # 1 btc in satoshis
 
 # One lock for synchronizing all data access between the networking thread (see
 # NetworkThread below) and the thread running the test logic.  For simplicity,
-# NodeConn acquires this lock whenever delivering a message to to a NodeConnCB,
+# NodeConn acquires this lock whenever delivering a message to a NodeConnCB,
 # and whenever adding anything to the send buffer (in send_message()).  This
 # lock should be acquired in the thread running the test logic to synchronize
 # access to any data shared with the NodeConnCB or NodeConn.
@@ -626,6 +626,7 @@ class CTransaction(object):
     def rehash(self):
         self.sha256 = None
         self.calc_sha256()
+        return self.hash
 
     def calc_sha256(self):
         if self.sha256 is None:
@@ -853,9 +854,19 @@ class CBlockHeader(object):
             self.hash = encode(hash256(r)[::-1], 'hex_codec').decode('ascii')
         return self.hash
 
-    def gethash(self):
+    def gethashprevblock(self, encoding = 'int'):
+        assert encoding == 'hex' or encoding == 'int'
+        if encoding == 'int':
+            return self.hashPrevBlock
+        return hex(self.hashPrevBlock)
+
+
+    def gethash(self, encoding = 'int'):
+        assert encoding == 'hex' or encoding == 'int'
         self.calc_sha256()
-        return self.sha256
+        if encoding == 'int':
+            return self.sha256
+        return hex(self.sha256)
 
     def rehash(self):
         self.sha256 = None
@@ -1590,8 +1601,8 @@ class msg_headers(object):
     """
     command = b"headers"
 
-    def __init__(self):
-        self.headers = []
+    def __init__(self, headers = None):
+        self.headers = [] if headers is None else headers
 
     def deserialize(self, f):
         # comment in bitcoind indicates these should be deserialized as blocks

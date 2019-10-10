@@ -360,7 +360,7 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
 
     // Check max LabelPublic: MAX_OP_RETURN_RELAY-2 byte TX_NULL_DATA
     nMaxDatacarrierBytes = MAX_OP_RETURN_RELAY;
-    uint64_t someNumber = 1;
+    uint64_t someNumber = 17; // serializes to 2 bytes which is important to make the total script the desired len
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << CScriptNum(someNumber)
                                        << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
                                                    "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"

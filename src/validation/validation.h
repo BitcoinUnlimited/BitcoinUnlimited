@@ -12,6 +12,7 @@
 #include "consensus/validation.h"
 #include "forks.h"
 #include "parallel.h"
+#include "txdebugger.h"
 #include "txmempool.h"
 #include "versionbits.h"
 
@@ -69,7 +70,8 @@ bool CheckInputs(const CTransactionRef &tx,
     bool cacheStore,
     ValidationResourceTracker *resourceTracker,
     std::vector<CScriptCheck> *pvChecks = nullptr,
-    unsigned char *sighashType = nullptr);
+    unsigned char *sighashType = nullptr,
+    CValidationDebugger *debugger = nullptr);
 
 /** Remove invalidity status from a block and its descendants. */
 bool ReconsiderBlock(CValidationState &state, CBlockIndex *pindex);
@@ -111,6 +113,8 @@ bool ReceivedBlockTransactions(const CBlock &block,
     CValidationState &state,
     CBlockIndex *pindexNew,
     const CDiskBlockPos &pos);
+
+uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params &consensusparams);
 
 /** Undo the effects of this block (with given index) on the UTXO set represented by coins.
  *  In case pfClean is provided, operation will try to be tolerant about errors, and *pfClean
@@ -162,5 +166,8 @@ bool ProcessNewBlock(CValidationState &state,
     bool fForceProcessing,
     CDiskBlockPos *dbp,
     bool fParallel);
+
+//! Check whether the block associated with this index entry is pruned or not.
+bool IsBlockPruned(const CBlockIndex *pblockindex);
 
 #endif

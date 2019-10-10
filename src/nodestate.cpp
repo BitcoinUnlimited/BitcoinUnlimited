@@ -49,7 +49,7 @@ CNodeState *CState::_GetNodeState(const NodeId id)
 */
 void CState::InitializeNodeState(const CNode *pnode)
 {
-    LOCK(cs);
+    LOCK(cs_cstate);
     mapNodeState.emplace_hint(mapNodeState.end(), std::piecewise_construct, std::forward_as_tuple(pnode->GetId()),
         std::forward_as_tuple(pnode->addr, pnode->addrName));
 }
@@ -62,7 +62,7 @@ void CState::InitializeNodeState(const CNode *pnode)
 */
 void CState::RemoveNodeState(const NodeId id)
 {
-    LOCK2(cs, requester.cs_objDownloader);
+    LOCK2(cs_cstate, requester.cs_objDownloader);
     mapNodeState.erase(id);
 
     // Remove any other types of nodestate
@@ -79,6 +79,6 @@ void CState::RemoveNodeState(const NodeId id)
 
 void CState::Clear()
 {
-    LOCK(cs);
+    LOCK(cs_cstate);
     mapNodeState.clear();
 }

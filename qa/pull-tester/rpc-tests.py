@@ -46,7 +46,7 @@ if sourcePath != outOfSourceBuildPath:
     sys.path.append(outOfSourceBuildPath)
 
 from tests_config import *
-from test_classes import RpcTest, Disabled, Skip
+from test_classes import RpcTest, Disabled, Skip, WhenElectrumFound
 
 BOLD = ("","")
 if os.name == 'posix':
@@ -180,9 +180,11 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
+    'txindex',
+    'mempool_push',
     Disabled('schnorr-activation', 'Need to be updated to work with BU'),
     'schnorrsig',
-    Disabled('segwit-recovery-activation','Need to be updated to work with BU'),
+    'segwit_recovery',
     'bip135basic',
     'ctor',
     'mining_ctor',
@@ -199,7 +201,7 @@ testScripts = [ RpcTest(t) for t in [
     'wallet',
     'wallet-hd',
     'wallet-dump',
-    'excessive',
+    Disabled('excessive', "Reduce Travis execution time"),
     Disabled('uahf', 'temporary disable while waiting, to use as a template for future tests'),
     'listtransactions',
     'receivedby',
@@ -214,6 +216,8 @@ testScripts = [ RpcTest(t) for t in [
     'mempool_reorg',
     'mempool_limit',
     'mempool_persist',
+    'mempool_validate',
+    'mempoolsync',
     'httpbasics',
     'multi_rpc',
     'zapwallettxes',
@@ -245,8 +249,13 @@ testScripts = [ RpcTest(t) for t in [
     'sighashmatch',
     'getlogcategories',
     'getrawtransaction',
-    Disabled('electrum_basics', "Needs to be skipped if electrs is not built"),
-    Disabled('electrum_reorg', "Needs to be skipped if electrs is not built")
+    WhenElectrumFound('electrum_basics'),
+    WhenElectrumFound('electrum_reorg'),
+    WhenElectrumFound('electrum_shutdownonerror'),
+    'rpc_getblockstats',
+    WhenElectrumFound('electrum_cashaccount'),
+    'minimaldata-activation',
+    'schnorrmultisig-activation'
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
@@ -258,7 +267,7 @@ testScriptsExt = [ RpcTest(t) for t in [
     'excessive --extensive',
     'parallel --extensive',
     'bip65-cltv',
-    'bip68-sequence',
+    'bip68_sequence',
     Disabled('bipdersig-p2p', "keep as an example of testing fork activation"),
     'bipdersig',
     'bip135-grace',
@@ -389,6 +398,10 @@ def runtests():
                 else:
                     trimmed_tests_to_run.append(t)
             tests_to_run = trimmed_tests_to_run
+
+        # if all specified tests are disabled just quit
+        if len(tests_to_run) == 0:
+            quit()
 
         if len(tests_to_run) > 1 and run_parallel:
             # Populate cache

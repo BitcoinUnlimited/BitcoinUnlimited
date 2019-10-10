@@ -95,6 +95,7 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     }
 
     CInv inv(MSG_BLOCK, thinBlock->header.GetHash());
+    requester.UpdateBlockAvailability(pfrom->GetId(), inv.hash);
     LOG(THIN, "received thinblock %s from peer %s of %d bytes\n", inv.hash.ToString(), pfrom->GetLogName(),
         thinBlock->GetSize());
 
@@ -239,7 +240,7 @@ CXThinBlock::CXThinBlock(const CBlock &block) : nSize(0), collision(false)
     vTxHashes.reserve(nTx);
     std::set<uint64_t> setPartialTxHash;
 
-    READLOCK(orphanpool.cs);
+    READLOCK(orphanpool.cs_orphanpool);
     for (unsigned int i = 0; i < nTx; i++)
     {
         const uint256 hash256 = block.vtx[i]->GetHash();
@@ -277,25 +278,14 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     CXThinBlockTx thinBlockTx;
     vRecv >> thinBlockTx;
 
-    // Get already partially reconstructed block from memory. This block was created when the xthinblock
-    // was first received.
-    std::shared_ptr<CBlockThinRelay> pblock = thinrelay.GetBlockToReconstruct(pfrom);
-    if (pblock == nullptr)
-        return error("No block available to reconstruct for xblocktx");
-    DbgAssert(pblock->xthinblock != nullptr, return false);
-    std::shared_ptr<CXThinBlock> thinBlock = pblock->xthinblock;
-
     // Message consistency checking
     CInv inv(MSG_XTHINBLOCK, thinBlockTx.blockhash);
     if (thinBlockTx.vMissingTx.empty() || thinBlockTx.blockhash.IsNull())
     {
-        thinrelay.ClearAllBlockData(pfrom, pblock);
-
         dosMan.Misbehaving(pfrom, 100);
         return error("incorrectly constructed xblocktx or inconsistent thinblock data received.  Banning peer=%s",
             pfrom->GetLogName());
     }
-
     LOG(THIN, "received xblocktx for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
     {
         // Do not process unrequested xblocktx unless from an expedited node.
@@ -306,6 +296,14 @@ bool CXThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
                 "Received xblocktx %s from peer %s but was unrequested", inv.hash.ToString(), pfrom->GetLogName());
         }
     }
+
+    // Get already partially reconstructed block from memory. This block was created when the xthinblock
+    // was first received.
+    std::shared_ptr<CBlockThinRelay> pblock = thinrelay.GetBlockToReconstruct(pfrom, thinBlockTx.blockhash);
+    if (pblock == nullptr)
+        return error("No block available to reconstruct for xblocktx");
+    DbgAssert(pblock->xthinblock != nullptr, return false);
+    std::shared_ptr<CXThinBlock> thinBlock = pblock->xthinblock;
 
     // Check if we've already received this block and have it on disk
     if (AlreadyHaveBlock(inv))
@@ -630,7 +628,7 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<
         // released the orphan lock and before we took the mempool lock, which would show up as a false hash
         // collision.
         {
-            READLOCK(orphanpool.cs);
+            READLOCK(orphanpool.cs_orphanpool);
             for (auto &mi : orphanpool.mapOrphanTransactions)
             {
                 uint64_t cheapHash = mi.first.GetCheapHash();
@@ -834,7 +832,7 @@ static bool ReconstructBlock(CNode *pfrom,
                 }
                 else
                 {
-                    READLOCK(orphanpool.cs);
+                    READLOCK(orphanpool.cs_orphanpool);
                     std::map<uint256, CTxOrphanPool::COrphanTx>::iterator iter2 =
                         orphanpool.mapOrphanTransactions.find(hash);
                     if (iter2 != orphanpool.mapOrphanTransactions.end())
@@ -1483,7 +1481,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
 
         uint64_t nMapTxSize = 0;
         {
-            READLOCK(mempool.cs);
+            READLOCK(mempool.cs_txmempool);
             nMapTxSize = mempool.mapTx.size();
         }
 
@@ -1502,7 +1500,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
                     (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : GetAdjustedTime();
             }
 
-            READLOCK(mempool.cs);
+            READLOCK(mempool.cs_txmempool);
 
             // Create a sorted list of transactions and their updated priorities.  This will be used to fill
             // the mempoolhashes with the expected priority area of the next block.  We will multiply this by

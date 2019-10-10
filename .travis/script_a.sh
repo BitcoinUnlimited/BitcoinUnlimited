@@ -11,7 +11,7 @@ fi
 
 if [ $DIST = "RPM" ]; then
   # this is temporary until the default compiler on centos/rhel supports c++14
-  DOCKER_EXEC ln -fs  /opt/rh/devtoolset-6/root/bin/g++ /usr/bin/g++
+  DOCKER_EXEC ln -fs  /opt/rh/devtoolset-7/root/bin/g++ /usr/bin/g++
   DOCKER_EXEC ln -fs /usr/bin/python3.6 /usr/bin/python3
   DOCKER_EXEC ln -fs /usr/bin/python3 /usr/bin/python
 fi

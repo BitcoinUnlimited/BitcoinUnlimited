@@ -9,6 +9,7 @@
 #include "main.h"
 #include "net.h"
 #include "threadgroup.h"
+#include "txdebugger.h"
 #include "txmempool.h"
 #include <queue>
 
@@ -54,7 +55,7 @@ static const bool DEFAULT_RELAYPRIORITY = false;
 class Snapshot
 {
 public:
-    CCriticalSection cs;
+    CCriticalSection cs_snapshot;
     uint64_t tipHeight;
     uint64_t tipMedianTimePast;
     int64_t adjustedTime;
@@ -147,6 +148,8 @@ extern std::queue<CTxInputData> txWaitNextBlockQ;
 extern CWaitableCriticalSection csCommitQ;
 extern CConditionVariable cvCommitQ;
 extern std::map<uint256, CTxCommitData> *txCommitQ;
+extern CCriticalSection csCommitQFinal;
+extern std::map<uint256, CTxCommitData> *txCommitQFinal;
 
 // returns a transaction ref, if it exists in the commitQ
 CTransactionRef CommitQGet(uint256 hash);
@@ -182,7 +185,9 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     bool fRejectAbsurdFee,
     TransactionClass allowedTx,
     std::vector<COutPoint> &vCoinsToUncache,
-    bool *isRespend);
+    bool *isRespend,
+    CValidationDebugger *debugger = nullptr,
+    CTxProperties *txProps = nullptr);
 
 /** Checks the size of the mempool and trims it if needed */
 void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age);

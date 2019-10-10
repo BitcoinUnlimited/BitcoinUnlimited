@@ -178,9 +178,7 @@ bool ThinTypeRelay::IsBlockInFlight(CNode *pfrom, const std::string thinType)
         return true;
 
     // check if this node already has this thinType of block in flight.
-    std::pair<std::multimap<const NodeId, CThinTypeBlockInFlight>::iterator,
-        std::multimap<const NodeId, CThinTypeBlockInFlight>::iterator>
-        range = mapThinTypeBlocksInFlight.equal_range(pfrom->GetId());
+    auto range = mapThinTypeBlocksInFlight.equal_range(pfrom->GetId());
     while (range.first != range.second)
     {
         if (range.first->second.thinType == thinType)
@@ -200,9 +198,7 @@ unsigned int ThinTypeRelay::TotalBlocksInFlight()
 void ThinTypeRelay::BlockWasReceived(CNode *pfrom, const uint256 &hash)
 {
     LOCK(cs_inflight);
-    std::pair<std::multimap<const NodeId, CThinTypeBlockInFlight>::iterator,
-        std::multimap<const NodeId, CThinTypeBlockInFlight>::iterator>
-        range = mapThinTypeBlocksInFlight.equal_range(pfrom->GetId());
+    auto range = mapThinTypeBlocksInFlight.equal_range(pfrom->GetId());
     while (range.first != range.second)
     {
         if (range.first->second.hash == hash)
@@ -227,9 +223,7 @@ bool ThinTypeRelay::AddBlockInFlight(CNode *pfrom, const uint256 &hash, const st
 void ThinTypeRelay::ClearBlockInFlight(CNode *pfrom, const uint256 &hash)
 {
     LOCK(cs_inflight);
-    std::pair<std::multimap<const NodeId, CThinTypeBlockInFlight>::iterator,
-        std::multimap<const NodeId, CThinTypeBlockInFlight>::iterator>
-        range = mapThinTypeBlocksInFlight.equal_range(pfrom->GetId());
+    auto range = mapThinTypeBlocksInFlight.equal_range(pfrom->GetId());
     while (range.first != range.second)
     {
         if (range.first->second.hash == hash)
@@ -246,13 +240,8 @@ void ThinTypeRelay::ClearBlockInFlight(CNode *pfrom, const uint256 &hash)
 void ThinTypeRelay::ClearAllBlocksInFlight(NodeId id)
 {
     LOCK(cs_inflight);
-    std::pair<std::multimap<const NodeId, CThinTypeBlockInFlight>::iterator,
-        std::multimap<const NodeId, CThinTypeBlockInFlight>::iterator>
-        range = mapThinTypeBlocksInFlight.equal_range(id);
-    while (range.first != range.second)
-    {
-        range.first = mapThinTypeBlocksInFlight.erase(range.first);
-    }
+    auto range = mapThinTypeBlocksInFlight.equal_range(id);
+    mapThinTypeBlocksInFlight.erase(range.first, range.second);
 }
 
 void ThinTypeRelay::CheckForDownloadTimeout(CNode *pfrom)
@@ -261,9 +250,7 @@ void ThinTypeRelay::CheckForDownloadTimeout(CNode *pfrom)
     if (mapThinTypeBlocksInFlight.size() == 0)
         return;
 
-    std::pair<std::multimap<const NodeId, CThinTypeBlockInFlight>::iterator,
-        std::multimap<const NodeId, CThinTypeBlockInFlight>::iterator>
-        range = mapThinTypeBlocksInFlight.equal_range(pfrom->GetId());
+    auto range = mapThinTypeBlocksInFlight.equal_range(pfrom->GetId());
     while (range.first != range.second)
     {
         // Use a timeout of 6 times the retry inverval before disconnecting.  This way only a max of 6
@@ -306,8 +293,6 @@ std::shared_ptr<CBlockThinRelay> ThinTypeRelay::SetBlockToReconstruct(CNode *pfr
     // Otherwise, start with a fresh instance.
     else
     {
-        ClearBlockToReconstruct(pfrom->GetId());
-
         // Store and empty block which can be used later
         std::shared_ptr<CBlockThinRelay> pblock;
         pblock = std::make_shared<CBlockThinRelay>(CBlockThinRelay());
@@ -318,30 +303,48 @@ std::shared_ptr<CBlockThinRelay> ThinTypeRelay::SetBlockToReconstruct(CNode *pfr
         pblock->cmpctblock = std::make_shared<CompactBlock>(CompactBlock());
         pblock->grapheneblock = std::make_shared<CGrapheneBlock>(CGrapheneBlock());
 
-        mapBlocksReconstruct.insert(
-            std::make_pair(pfrom->GetId(), std::make_pair(pblock->GetBlockHeader().GetHash(), pblock)));
+        mapBlocksReconstruct.insert(std::make_pair(pfrom->GetId(), std::make_pair(hash, pblock)));
         return pblock;
     }
 }
 
-std::shared_ptr<CBlockThinRelay> ThinTypeRelay::GetBlockToReconstruct(CNode *pfrom)
+std::shared_ptr<CBlockThinRelay> ThinTypeRelay::GetBlockToReconstruct(CNode *pfrom, const uint256 &hash)
 {
     // Retrieve a current instance of a block being reconstructed. This is typically used
     // when we have received the response of a re-request for more transactions.
     LOCK(cs_reconstruct);
-    auto iter = mapBlocksReconstruct.find(pfrom->GetId());
-    if (iter != mapBlocksReconstruct.end())
+    auto range = mapBlocksReconstruct.equal_range(pfrom->GetId());
+    while (range.first != range.second)
     {
-        return iter->second.second;
+        if (range.first->second.first == hash)
+        {
+            return range.first->second.second;
+        }
+        range.first++;
     }
-    else
-        return nullptr;
+    return nullptr;
 }
 
-void ThinTypeRelay::ClearBlockToReconstruct(NodeId id)
+void ThinTypeRelay::ClearBlockToReconstruct(NodeId id, const uint256 &hash)
 {
     LOCK(cs_reconstruct);
-    mapBlocksReconstruct.erase(id);
+    auto range = mapBlocksReconstruct.equal_range(id);
+    while (range.first != range.second)
+    {
+        if (range.first->second.first == hash)
+        {
+            mapBlocksReconstruct.erase(range.first);
+            break;
+        }
+        range.first++;
+    }
+}
+
+void ThinTypeRelay::ClearAllBlocksToReconstruct(NodeId id)
+{
+    LOCK(cs_reconstruct);
+    auto range = mapBlocksReconstruct.equal_range(id);
+    mapBlocksReconstruct.erase(range.first, range.second);
 }
 
 void ThinTypeRelay::AddBlockBytes(uint64_t bytes, std::shared_ptr<CBlockThinRelay> pblock)
@@ -354,7 +357,7 @@ void ThinTypeRelay::ClearAllBlockData(CNode *pnode, std::shared_ptr<CBlockThinRe
 {
     // We must make sure to clear the block data first before clearing the thinblock in flight.
     uint256 hash = pblock->GetBlockHeader().GetHash();
-    ClearBlockToReconstruct(pnode->GetId());
+    ClearBlockToReconstruct(pnode->GetId(), hash);
 
     // Clear block data
     if (pblock)

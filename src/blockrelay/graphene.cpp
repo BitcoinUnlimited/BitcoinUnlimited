@@ -46,19 +46,10 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
 {
     header = pblock->GetBlockHeader();
     nBlockTxs = pblock->vtx.size();
-    uint64_t grapheneSetVersion = 0;
+    uint64_t grapheneSetVersion = CGrapheneBlock::GetGrapheneSetVersion(version);
 
     if (version >= 2)
         FillShortTxIDSelector();
-
-    if (version < 2)
-        grapheneSetVersion = 0;
-    if (version == 2)
-        grapheneSetVersion = 1;
-    else if (version == 3)
-        grapheneSetVersion = 2;
-    else if (version == 4)
-        grapheneSetVersion = 3;
 
     std::vector<uint256> blockHashes;
     for (auto &tx : pblock->vtx)
@@ -69,7 +60,7 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
             vAdditionalTxs.push_back(tx);
     }
 
-    if (enableCanonicalTxOrder.Value())
+    if (fCanonicalTxsOrder)
         pGrapheneSet =
             std::make_shared<CGrapheneSet>(CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock, blockHashes,
                 shorttxidk0, shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, computeOptimized, false));
@@ -104,24 +95,13 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     CGrapheneBlockTx grapheneBlockTx;
     vRecv >> grapheneBlockTx;
 
-    auto pblock = thinrelay.GetBlockToReconstruct(pfrom);
-    if (pblock == nullptr)
-        return error("No block available to reconstruct for graphenetx");
-    DbgAssert(pblock->grapheneblock != nullptr, return false);
-    std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
-
     // Message consistency checking
     CInv inv(MSG_GRAPHENEBLOCK, grapheneBlockTx.blockhash);
-    if (grapheneBlockTx.vMissingTx.empty() || grapheneBlockTx.blockhash.IsNull() ||
-        grapheneBlock->vTxHashes256.size() < grapheneBlockTx.vMissingTx.size())
+    if (grapheneBlockTx.vMissingTx.empty() || grapheneBlockTx.blockhash.IsNull())
     {
-        thinrelay.ClearAllBlockData(pfrom, pblock);
-
         dosMan.Misbehaving(pfrom, 100);
-        return error("Incorrectly constructed grblocktx or inconsistent graphene block data received.  Banning peer=%s",
-            pfrom->GetLogName());
+        return error("Incorrectly constructed grblocktx  data received.  Banning peer=%s", pfrom->GetLogName());
     }
-
     LOG(GRAPHENE, "Received grblocktx for %s peer=%s\n", inv.hash.ToString(), pfrom->GetLogName());
     {
         // Do not process unrequested grblocktx unless from an expedited node.
@@ -131,6 +111,17 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
             return error(
                 "Received grblocktx %s from peer %s but was unrequested", inv.hash.ToString(), pfrom->GetLogName());
         }
+    }
+
+    auto pblock = thinrelay.GetBlockToReconstruct(pfrom, grapheneBlockTx.blockhash);
+    if (pblock == nullptr)
+        return error("No block available to reconstruct for graphenetx");
+    DbgAssert(pblock->grapheneblock != nullptr, return false);
+    std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
+    if (grapheneBlock->vTxHashes256.size() < grapheneBlockTx.vMissingTx.size())
+    {
+        dosMan.Misbehaving(pfrom, 100);
+        return error("Inconsistent graphene block data received.  Banning peer=%s", pfrom->GetLogName());
     }
 
     // Check if we've already received this block and have it on disk
@@ -158,7 +149,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // If canonical ordering is activated, locate empty indexes in vTxHashes256 to be used in sorting
     std::vector<size_t> missingTxIdxs;
-    if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
+    if (fCanonicalTxsOrder && NegotiateGrapheneVersion(pfrom) >= 1)
     {
         uint256 nullhash;
         for (size_t idx = 0; idx < grapheneBlock->vTxHashes256.size(); idx++)
@@ -179,14 +170,14 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
             GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash, NegotiateGrapheneVersion(pfrom));
 
         // Insert in arbitrary order if canonical ordering is enabled and xversion is recent enough
-        if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
+        if (fCanonicalTxsOrder && NegotiateGrapheneVersion(pfrom) >= 1)
             grapheneBlock->vTxHashes256[missingTxIdxs[idx++]] = hash;
         // Otherwise, use ordering information
         else
             grapheneBlock->vTxHashes256[grapheneBlock->mapHashOrderIndex[cheapHash]] = hash;
     }
     // Sort order transactions if canonical ordering is enabled and xversion is recent enough
-    if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
+    if (fCanonicalTxsOrder && NegotiateGrapheneVersion(pfrom) >= 1)
     {
         // coinbase is always first
         std::sort(grapheneBlock->vTxHashes256.begin() + 1, grapheneBlock->vTxHashes256.end());
@@ -468,7 +459,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     bool fMerkleRootCorrect = true;
     {
         {
-            READLOCK(orphanpool.cs);
+            READLOCK(orphanpool.cs_orphanpool);
             for (auto &kv : orphanpool.mapOrphanTransactions)
             {
                 uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, kv.first, version);
@@ -535,7 +526,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
 
                 // If canonical order is not enabled or xversion is less than 1, update mapHashOrderIndex so
                 // it is available if we later receive missing txs
-                if (!enableCanonicalTxOrder.Value() || NegotiateGrapheneVersion(pfrom) < 1)
+                if (!fCanonicalTxsOrder || NegotiateGrapheneVersion(pfrom) < 1)
                     grapheneBlock->mapHashOrderIndex[cheapHash] = i;
 
                 const auto &elem = mapPartialTxHash.find(cheapHash);
@@ -552,7 +543,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
             }
 
             // Sort order transactions if canonical order is enabled and graphene version is late enough
-            if (enableCanonicalTxOrder.Value() && NegotiateGrapheneVersion(pfrom) >= 1)
+            if (fCanonicalTxsOrder && NegotiateGrapheneVersion(pfrom) >= 1)
             {
                 // coinbase is always first
                 std::sort(grapheneBlock->vTxHashes256.begin() + 1, grapheneBlock->vTxHashes256.end());
@@ -727,7 +718,7 @@ static bool ReconstructBlock(CNode *pfrom,
                     }
                     else
                     {
-                        READLOCK(orphanpool.cs);
+                        READLOCK(orphanpool.cs_orphanpool);
                         std::map<uint256, CTxOrphanPool::COrphanTx>::iterator iter3 =
                             orphanpool.mapOrphanTransactions.find(hash);
                         if (iter3 != orphanpool.mapOrphanTransactions.end())
@@ -1377,7 +1368,7 @@ void RequestFailoverBlock(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
 
         std::vector<uint256> vOrphanHashes;
         {
-            READLOCK(orphanpool.cs);
+            READLOCK(orphanpool.cs_orphanpool);
             for (auto &mi : orphanpool.mapOrphanTransactions)
                 vOrphanHashes.emplace_back(mi.first);
         }

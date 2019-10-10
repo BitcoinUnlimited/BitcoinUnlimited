@@ -70,6 +70,12 @@ core_write.cpp
 cuckoocache.h
 dbwrapper.cpp
 dbwrapper.h
+deadlock-detection/locklocation.cpp
+deadlock-detection/locklocation.h
+deadlock-detection/lockorder.cpp
+deadlock-detection/lockorder.h
+deadlock-detection/threaddeadlock.cpp
+deadlock-detection/threaddeadlock.h
 dosman.cpp
 dosman.h
 dstencode.cpp
@@ -93,6 +99,8 @@ httpserver.h
 iblt.cpp
 iblt.h
 iblt_params.h
+index/txindex.cpp
+index/txindex.h
 init.cpp
 init.h
 key.cpp
@@ -152,6 +160,7 @@ txadmission.cpp
 txadmission.h
 txdb.cpp
 txdb.h
+txdebugger.h
 txmempool.cpp
 txmempool.h
 ui_interface.h
@@ -270,6 +279,8 @@ qt/transactiondescdialog.h
 qt/transactiondesc.h
 qt/transactionfilterproxy.cpp
 qt/transactionfilterproxy.h
+qt/transactiongraphwidget.cpp
+qt/transactiongraphwidget.h
 qt/transactionrecord.cpp
 qt/transactionrecord.h
 qt/transactiontablemodel.cpp
@@ -342,6 +353,7 @@ test/sanity_tests.cpp
 test/scriptnum10.h
 test/scriptnum_tests.cpp
 test/script_P2SH_tests.cpp
+test/script_bitfield_tests.cpp
 test/script_tests.cpp
 test/serialize_tests.cpp
 test/sighash_tests.cpp
@@ -389,6 +401,8 @@ zmq/zmqpublishnotifier.cpp
 zmq/zmqpublishnotifier.h
 script/bitcoinconsensus.cpp
 script/bitcoinconsensus.h
+script/bitfield.cpp
+script/bitfield.h
 script/interpreter.cpp
 script/interpreter.h
 script/ismine.cpp
@@ -414,6 +428,7 @@ respend/respendrelayer.h
 respend/test/respenddetector_tests.cpp
 respend/test/respendrelayer_tests.cpp
 rpc/blockchain.cpp
+rpc/blockchain.h
 rpc/client.cpp
 rpc/client.h
 rpc/electrum.cpp

@@ -6,6 +6,7 @@
 #include "blockrelay/blockrelay_common.h"
 #include "blockrelay/compactblock.h"
 #include "blockrelay/graphene.h"
+#include "blockrelay/mempool_sync.h"
 #include "blockrelay/thinblock.h"
 #include "chain.h"
 #include "chainparams.h"
@@ -27,9 +28,11 @@
 #include "unlimited.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include "utiltime.h"
 #include "validation/validation.h"
 #include "validationinterface.h"
 #include "version.h"
+#include "xversionkeys.h"
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
@@ -82,6 +85,12 @@ static CBlockIndex *LastCommonAncestor(CBlockIndex *pa, CBlockIndex *pb)
     // Eventually all chain branches meet at the genesis block.
     assert(pa == pb);
     return pa;
+}
+
+static bool IsBlockType(const CInv &obj)
+{
+    return ((obj.type == MSG_BLOCK) || (obj.type == MSG_CMPCT_BLOCK) || (obj.type == MSG_XTHINBLOCK) ||
+            (obj.type == MSG_GRAPHENEBLOCK));
 }
 
 // Constructor for CRequestManagerNodeState struct
@@ -200,7 +209,7 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
         // Got the data, now add the node as a source
         data.AddSource(from);
     }
-    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_CMPCT_BLOCK) || (obj.type == MSG_XTHINBLOCK))
+    else if (IsBlockType(obj))
     {
         uint256 temp = obj.hash;
         OdMap::value_type v(temp, CUnknownObj());
@@ -298,7 +307,7 @@ bool CRequestManager::AlreadyAskedForBlock(const uint256 &hash)
 
 void CRequestManager::UpdateTxnResponseTime(const CInv &obj, CNode *pfrom)
 {
-    int64_t now = GetTimeMicros();
+    int64_t now = GetStopwatchMicros();
     LOCK(cs_objDownloader);
     if (pfrom && obj.type == MSG_TX)
     {
@@ -362,7 +371,7 @@ void CRequestManager::Received(const CInv &obj, CNode *pfrom)
         LOG(REQ, "ReqMgr: TX received for %s.\n", item->second.obj.ToString().c_str());
         cleanup(item);
     }
-    else if (obj.type == MSG_BLOCK || obj.type == MSG_CMPCT_BLOCK || obj.type == MSG_XTHINBLOCK)
+    else if (IsBlockType(obj))
     {
         OdMap::iterator item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
@@ -415,7 +424,7 @@ void CRequestManager::Rejected(const CInv &obj, CNode *from, unsigned char reaso
 
         rejectedTxns += 1;
     }
-    else if ((obj.type == MSG_BLOCK) || (obj.type == MSG_CMPCT_BLOCK) || (obj.type == MSG_XTHINBLOCK))
+    else if (IsBlockType(obj))
     {
         item = mapBlkInfo.find(obj.hash);
         if (item == mapBlkInfo.end())
@@ -575,7 +584,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
                 inv2.type = MSG_XTHINBLOCK;
                 std::vector<uint256> vOrphanHashes;
                 {
-                    READLOCK(orphanpool.cs);
+                    READLOCK(orphanpool.cs_orphanpool);
                     for (auto &mi : orphanpool.mapOrphanTransactions)
                         vOrphanHashes.emplace_back(mi.first);
                 }
@@ -672,7 +681,7 @@ void CRequestManager::SendRequests()
     // Get Blocks
     while (sendBlkIter != mapBlkInfo.end())
     {
-        now = GetTimeMicros();
+        now = GetStopwatchMicros();
         OdMap::iterator itemIter = sendBlkIter;
         if (itemIter == mapBlkInfo.end())
             break;
@@ -830,7 +839,7 @@ void CRequestManager::SendRequests()
         sendIter = mapTxnInfo.begin();
     while ((sendIter != mapTxnInfo.end()) && requestPacer.try_leak(1))
     {
-        now = GetTimeMicros();
+        now = GetStopwatchMicros();
         OdMap::iterator itemIter = sendIter;
         if (itemIter == mapTxnInfo.end())
             break;
@@ -1185,6 +1194,33 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
     }
 }
 
+void CRequestManager::RequestMempoolSync(CNode *pto)
+{
+    LOCK(cs_mempoolsync);
+    NodeId nodeId = pto->GetId();
+
+    if ((mempoolSyncRequested.count(nodeId) == 0 ||
+            ((GetStopwatchMicros() - mempoolSyncRequested[nodeId].lastUpdated) > MEMPOOLSYNC_FREQ_US)) &&
+        pto->canSyncMempoolWithPeers)
+    {
+        // Similar to Graphene, receiver must send CMempoolInfo
+        CInv inv;
+        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+
+        inv.type = MSG_MEMPOOLSYNC;
+        CMempoolSyncInfo receiverMemPoolInfo = GetMempoolSyncInfo();
+        ss << inv;
+        ss << receiverMemPoolInfo;
+
+        mempoolSyncRequested[nodeId] = CMempoolSyncState(
+            GetStopwatchMicros(), receiverMemPoolInfo.shorttxidk0, receiverMemPoolInfo.shorttxidk1, false);
+        pto->PushMessage(NetMsgType::GET_MEMPOOLSYNC, ss);
+        LOG(MPOOLSYNC, "Requesting mempool synchronization from peer %s\n", pto->GetLogName());
+
+        lastMempoolSync = GetStopwatchMicros();
+    }
+}
+
 // indicate whether we requested this block.
 void CRequestManager::MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash)
 {
@@ -1203,7 +1239,7 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash)
         CRequestManagerNodeState *state = &it->second;
 
         // Add queued block to nodestate and add iterator for queued block to mapBlocksInFlight
-        int64_t nNow = GetTimeMicros();
+        int64_t nNow = GetStopwatchMicros();
         QueuedBlock newentry = {hash, nNow};
         std::list<QueuedBlock>::iterator it2 = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
         mapBlocksInFlight[hash][nodeid] = it2;
@@ -1213,7 +1249,7 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash)
         if (state->nBlocksInFlight == 1)
         {
             // We're starting a block download (batch) from this peer.
-            state->nDownloadingSince = GetTimeMicros();
+            state->nDownloadingSince = GetStopwatchMicros();
         }
     }
 }
@@ -1243,7 +1279,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         CRequestManagerNodeState *state = &it->second;
 
         int64_t getdataTime = itInFlight->second->nTime;
-        int64_t now = GetTimeMicros();
+        int64_t now = GetStopwatchMicros();
         double nResponseTime = (double)(now - getdataTime) / 1000000.0;
 
         // calculate avg block response time over a range of blocks to be used for IBD tuning.
@@ -1371,7 +1407,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         if (state->vBlocksInFlight.begin() == itInFlight->second)
         {
             // First block on the queue was received, update the start download time for the next one
-            state->nDownloadingSince = std::max(state->nDownloadingSince, GetTimeMicros());
+            state->nDownloadingSince = std::max(state->nDownloadingSince, (int64_t)GetStopwatchMicros());
         }
         // In order to prevent a dangling iterator we must erase from vBlocksInFlight after mapBlockInFlight
         // however that will invalidate the iterator held by mapBlocksInFlight. Use a temporary to work around this.

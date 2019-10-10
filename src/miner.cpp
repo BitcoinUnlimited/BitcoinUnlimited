@@ -30,9 +30,18 @@
 #include "validation/validation.h"
 #include "validationinterface.h"
 
+#include <algorithm>
+#include <boost/thread.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <queue>
 #include <thread>
+
+// Track timing information for Score and Package mining.
+std::atomic<int64_t> nTotalPackage{0};
+std::atomic<int64_t> nTotalScore{0};
+
+/** Maximum number of failed attempts to insert a package into a block */
+static const unsigned int MAX_PACKAGE_FAILURES = 5;
 
 using namespace std;
 
@@ -223,7 +232,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     assert(pindexPrev); // can't make a new block if we don't even have the genesis block
 
     {
-        READLOCK(mempool.cs);
+        READLOCK(mempool.cs_txmempool);
         nHeight = pindexPrev->nHeight + 1;
 
         pblock->nTime = GetAdjustedTime();
@@ -237,17 +246,8 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         nLockTimeCutoff =
             (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ? nMedianTimePast : pblock->GetBlockTime();
 
-        std::vector<const CTxMemPoolEntry *> vtxe;
-        addPriorityTxs(&vtxe);
-        addScoreTxs(&vtxe);
-
-        nLastBlockTx = nBlockTx;
-        nLastBlockSize = nBlockSize;
-        LOGA("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
-            nBlockSigOps);
-
-        bool canonical = enableCanonicalTxOrder.Value();
-        // On BCH always allow overwite of enableCanonicalTxOrder but not for regtest
+        bool canonical = fCanonicalTxsOrder;
+        // On BCH always allow overwite of fCanonicalTxsOrder but not for regtest
         if (IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()))
         {
             if (chainparams.NetworkIDString() != "regtest")
@@ -255,6 +255,36 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
                 canonical = true;
             }
         }
+        else
+        {
+            if (chainparams.NetworkIDString() != "regtest")
+            {
+                canonical = false;
+            }
+        }
+
+        std::vector<const CTxMemPoolEntry *> vtxe;
+        addPriorityTxs(&vtxe);
+
+        // Mine by package (CPFP) or by score.
+        if (miningCPFP.Value() == true)
+        {
+            int64_t nStartPackage = GetStopwatchMicros();
+            addPackageTxs(&vtxe, canonical);
+            nTotalPackage += GetStopwatchMicros() - nStartPackage;
+        }
+        else
+        {
+            int64_t nStartScore = GetStopwatchMicros();
+            addScoreTxs(&vtxe);
+            nTotalScore += GetStopwatchMicros() - nStartScore;
+        }
+
+        nLastBlockTx = nBlockTx;
+        nLastBlockSize = nBlockSize;
+        LOGA("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
+            nBlockSigOps);
+
 
         // sort tx if there are any and the feature is enabled
         if (canonical)
@@ -317,6 +347,27 @@ bool BlockAssembler::isStillDependent(CTxMemPool::txiter iter)
         }
     }
     return false;
+}
+
+bool BlockAssembler::TestPackageSigOps(uint64_t packageSize, unsigned int packageSigOps)
+{
+    uint64_t blockMbSize = 1 + (nBlockSize + packageSize - 1) / 1000000;
+    uint64_t nMaxSigOpsAllowed = blockMiningSigopsPerMb.Value() * blockMbSize;
+    if (nBlockSigOps + packageSigOps >= nMaxSigOpsAllowed)
+        return false;
+    return true;
+}
+
+// Block size and sigops have already been tested.  Check that all transactions
+// are final.
+bool BlockAssembler::TestPackageFinality(const CTxMemPool::setEntries &package)
+{
+    for (const CTxMemPool::txiter it : package)
+    {
+        if (!IsFinalTx(it->GetSharedTx(), nHeight, nLockTimeCutoff))
+            return false;
+    }
+    return true;
 }
 
 // Return true if incremental tx or txs in the block with the given size and sigop count would be
@@ -439,7 +490,7 @@ void BlockAssembler::addScoreTxs(std::vector<const CTxMemPoolEntry *> *vtxe)
             clearedTxs.pop();
         }
 
-        // If tx already in block, skip  (added by addPriorityTxs)
+        // If tx already in block then skip
         if (inBlock.count(iter))
         {
             continue;
@@ -468,6 +519,128 @@ void BlockAssembler::addScoreTxs(std::vector<const CTxMemPoolEntry *> *vtxe)
                     clearedTxs.push(child);
                     waitSet.erase(child);
                 }
+            }
+        }
+    }
+}
+
+void BlockAssembler::SortForBlock(const CTxMemPool::setEntries &package, std::vector<CTxMemPool::txiter> &sortedEntries)
+{
+    // Sort package by ancestor count
+    // If a transaction A depends on transaction B, then A's ancestor count
+    // must be greater than B's.  So this is sufficient to validly order the
+    // transactions for block inclusion.
+    sortedEntries.clear();
+    sortedEntries.insert(sortedEntries.begin(), package.begin(), package.end());
+    std::sort(sortedEntries.begin(), sortedEntries.end(), CompareTxIterByAncestorCount());
+}
+
+// This transaction selection algorithm orders the mempool based
+// on feerate of a transaction including all unconfirmed ancestors.
+//
+// This is accomplished by considering a group of ancestors as a single transaction. We can call these
+// transactions, Ancestor Grouped Transactions (AGT). This approach to grouping allows us to process
+// packages orders of magnitude faster than other methods of package mining since we no longer have
+// to continuously update the descendant state as we mine part of an unconfirmed chain.
+//
+// There is a theoretical flaw in this approach which could happen when a block is almost full. We
+// could for instance end up including a lower fee transaction as part of an ancestor group when
+// in fact it would be better, in terms of fees, to include some other single transaction. This
+// would result in slightly less fees (perhaps a few hundred satoshis) rewarded to the miner. However,
+// this situation is not likely to be seen for two reasons. One, long unconfirmed chains are typically
+// having transactions with all the same fees and Two, the typical child pays for parent scenario has only
+// two transactions with the child having the higher fee. And neither of these two types of packages could
+// cause any loss of fees with this mining algorithm, when the block is nearly full.
+void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, bool fCanonical)
+{
+    AssertLockHeld(mempool.cs_txmempool);
+
+    CTxMemPool::txiter iter;
+    uint64_t nPackageFailures = 0;
+    for (auto mi = mempool.mapTx.get<ancestor_score>().begin(); mi != mempool.mapTx.get<ancestor_score>().end(); mi++)
+    {
+        iter = mempool.mapTx.project<0>(mi);
+
+        uint64_t packageSize = iter->GetSizeWithAncestors();
+        CAmount packageFees = iter->GetModFeesWithAncestors();
+        unsigned int packageSigOps = iter->GetSigOpCountWithAncestors();
+
+        // Skip txns we know are in the block
+        if (inBlock.count(iter))
+        {
+            continue;
+        }
+
+        // Get any unconfirmed ancestors of this txn
+        CTxMemPool::setEntries ancestors;
+        uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
+        std::string dummy;
+        mempool._CalculateMemPoolAncestors(
+            *iter, ancestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy, &inBlock, false);
+
+        // Include in the package the current txn we're working with
+        ancestors.insert(iter);
+
+        // Recalculate sigops and package size, only if there were txns already in the block for
+        // this set of ancestors
+        if (iter->GetCountWithAncestors() > ancestors.size())
+        {
+            packageSize = 0;
+            packageSigOps = 0;
+            for (auto &it : ancestors)
+            {
+                packageSize += it->GetTxSize();
+                packageSigOps += it->GetSigOpCount();
+            }
+        }
+        if (packageFees < ::minRelayTxFee.GetFee(packageSize) && nBlockSize >= nBlockMinSize)
+        {
+            // Everything else we might consider has a lower fee rate so no need to continue
+            return;
+        }
+
+        // Test if package fits in the block
+        if (nBlockSize + packageSize > nBlockMaxSize)
+        {
+            if (nBlockSize > nBlockMaxSize * .50)
+            {
+                nPackageFailures++;
+            }
+
+            // If we keep failing then the block must be almost full so bail out here.
+            if (nPackageFailures >= MAX_PACKAGE_FAILURES)
+                return;
+            else
+                continue;
+        }
+
+        // Test that the package does not exceed sigops limits
+        if (!TestPackageSigOps(packageSize, packageSigOps))
+        {
+            continue;
+        }
+        // Test if all tx's are Final
+        if (!TestPackageFinality(ancestors))
+        {
+            continue;
+        }
+
+        // The Package can now be added to the block.
+        if (fCanonical)
+        {
+            for (auto &it : ancestors)
+            {
+                AddToBlock(vtxe, it);
+            }
+        }
+        else
+        {
+            // Sort the entries in a valid order if we are not doing CTOR
+            vector<CTxMemPool::txiter> sortedEntries;
+            SortForBlock(ancestors, sortedEntries);
+            for (size_t i = 0; i < sortedEntries.size(); ++i)
+            {
+                AddToBlock(vtxe, sortedEntries[i]);
             }
         }
     }

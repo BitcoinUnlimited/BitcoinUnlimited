@@ -4,7 +4,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "blockstorage/blockstorage.h"
+#include "blockstorage.h"
 
 #include "blockleveldb.h"
 #include "chainparams.h"
@@ -24,6 +24,8 @@ extern std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
 extern CTweak<uint64_t> pruneIntervalTweak;
 
 CDatabaseAbstract *pblockdb = nullptr;
+unsigned int blockfile_chunk_size = DEFAULT_BLOCKFILE_CHUNK_SIZE;
+unsigned int undofile_chunk_size = DEFAULT_UNDOFILE_CHUNK_SIZE;
 
 /**
   * Config param to determine what DB type we are using
@@ -570,7 +572,7 @@ bool FlushStateToDiskInternal(CValidationState &state,
     static int64_t nLastWrite = 0;
     static int64_t nLastFlush = 0;
     static int64_t nLastSetChain = 0;
-    int64_t nNow = GetTimeMicros();
+    int64_t nNow = GetStopwatchMicros();
     // Avoid writing/flushing immediately after startup.
     if (nLastWrite == 0)
     {
@@ -592,8 +594,9 @@ bool FlushStateToDiskInternal(CValidationState &state,
     size_t cacheSize = pcoinsTip->DynamicMemoryUsage();
     static int64_t nSizeAfterLastFlush = 0;
     // The cache is close to the limit. Try to flush and trim.
-    bool fCacheCritical = ((mode == FLUSH_STATE_IF_NEEDED) && (cacheSize > nCoinCacheMaxSize * 0.995)) ||
-                          (cacheSize - nSizeAfterLastFlush > (int64_t)nMaxCacheIncreaseSinceLastFlush);
+    bool fCacheCritical =
+        ((mode == FLUSH_STATE_IF_NEEDED) && (cacheSize > (size_t)nCoinCacheMaxSize)) ||
+        (!GetArg("-dbcache", 0) && cacheSize - nSizeAfterLastFlush > (int64_t)nMaxCacheIncreaseSinceLastFlush);
     // It's been a while since we wrote the block index to disk. Do this frequently, so we don't need to redownload
     // after a crash.
     bool fPeriodicWrite =
@@ -681,18 +684,31 @@ bool FlushStateToDiskInternal(CValidationState &state,
         // trim extra so that we don't flush as often during IBD.
         if (IsChainNearlySyncd() && !fReindex && !fImporting)
         {
-            pcoinsTip->Trim(nCoinCacheMaxSize);
+            pcoinsTip->Trim(nCoinCacheMaxSize * .95);
         }
-        else
+        else if (!GetArg("-dbcache", 0))
         {
+            // When no dbcache setting is in place then we default to flushing the cache
+            // more frequently to support the automatic cache sizing function. If we don't
+            // do this, then when flush time comes we can easily exceed the maxiumum memory,
+            // particularly on Windows systems.
             // Trim, but never trim more than nMaxCacheIncreaseSinceLastFlush
             size_t nTrimSize = nCoinCacheMaxSize * .90;
             if (nCoinCacheMaxSize - nMaxCacheIncreaseSinceLastFlush > nTrimSize)
             {
-                nTrimSize = nCoinCacheMaxSize - nMaxCacheIncreaseSinceLastFlush;
+                if (nCoinCacheMaxSize > (int64_t)nMaxCacheIncreaseSinceLastFlush)
+                    nTrimSize = nCoinCacheMaxSize - nMaxCacheIncreaseSinceLastFlush;
             }
             pcoinsTip->Trim(nTrimSize);
         }
+        else
+        {
+            // During IBD this is gives optimal performance, particularly on systems with
+            // spinning disk. This is because we keep the number of databaase compactions
+            // to a minimum.
+            pcoinsTip->Trim(nCoinCacheMaxSize * .90);
+        }
+
         nSizeAfterLastFlush = pcoinsTip->DynamicMemoryUsage();
     }
     if (fDoFullFlush || ((mode == FLUSH_STATE_ALWAYS || mode == FLUSH_STATE_PERIODIC) &&
@@ -829,22 +845,22 @@ bool FindBlockPos(CValidationState &state,
 
     if (!fKnown)
     {
-        unsigned int nOldChunks = (pos.nPos + BLOCKFILE_CHUNK_SIZE - 1) / BLOCKFILE_CHUNK_SIZE;
-        unsigned int nNewChunks = (vinfoBlockFile[nFile].nSize + BLOCKFILE_CHUNK_SIZE - 1) / BLOCKFILE_CHUNK_SIZE;
+        unsigned int nOldChunks = (pos.nPos + blockfile_chunk_size - 1) / blockfile_chunk_size;
+        unsigned int nNewChunks = (vinfoBlockFile[nFile].nSize + blockfile_chunk_size - 1) / blockfile_chunk_size;
         if (nNewChunks > nOldChunks)
         {
             if (fPruneMode)
             {
                 fCheckForPruning = true;
             }
-            if (CheckDiskSpace(nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos))
+            if (CheckDiskSpace(nNewChunks * blockfile_chunk_size - pos.nPos))
             {
                 FILE *file = OpenBlockFile(pos);
                 if (file)
                 {
-                    LOGA("Pre-allocating up to position 0x%x in blk%05u.dat\n", nNewChunks * BLOCKFILE_CHUNK_SIZE,
+                    LOGA("Pre-allocating up to position 0x%x in blk%05u.dat\n", nNewChunks * blockfile_chunk_size,
                         pos.nFile);
-                    AllocateFileRange(file, pos.nPos, nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos);
+                    AllocateFileRange(file, pos.nPos, nNewChunks * blockfile_chunk_size - pos.nPos);
                     fclose(file);
                 }
             }
@@ -879,22 +895,22 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
     nNewSize = vinfoBlockFile[nFile].nUndoSize += nAddSize;
     setDirtyFileInfo.insert(nFile);
 
-    unsigned int nOldChunks = (pos.nPos + UNDOFILE_CHUNK_SIZE - 1) / UNDOFILE_CHUNK_SIZE;
-    unsigned int nNewChunks = (nNewSize + UNDOFILE_CHUNK_SIZE - 1) / UNDOFILE_CHUNK_SIZE;
+    unsigned int nOldChunks = (pos.nPos + undofile_chunk_size - 1) / undofile_chunk_size;
+    unsigned int nNewChunks = (nNewSize + undofile_chunk_size - 1) / undofile_chunk_size;
     if (nNewChunks > nOldChunks)
     {
         if (fPruneMode)
         {
             fCheckForPruning = true;
         }
-        if (CheckDiskSpace(nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos))
+        if (CheckDiskSpace(nNewChunks * undofile_chunk_size - pos.nPos))
         {
             FILE *file = OpenUndoFile(pos);
             if (file)
             {
                 LOGA(
-                    "Pre-allocating up to position 0x%x in rev%05u.dat\n", nNewChunks * UNDOFILE_CHUNK_SIZE, pos.nFile);
-                AllocateFileRange(file, pos.nPos, nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos);
+                    "Pre-allocating up to position 0x%x in rev%05u.dat\n", nNewChunks * undofile_chunk_size, pos.nFile);
+                AllocateFileRange(file, pos.nPos, nNewChunks * undofile_chunk_size - pos.nPos);
                 fclose(file);
             }
         }

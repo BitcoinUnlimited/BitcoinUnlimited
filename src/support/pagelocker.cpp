@@ -30,7 +30,11 @@
 #endif
 
 LockedPageManager* LockedPageManager::_instance = nullptr;
+#ifdef WIN32
 boost::once_flag LockedPageManager::init_flag = BOOST_ONCE_INIT;
+#else
+std::once_flag LockedPageManager::init_flag;
+#endif
 
 /** Determine system page size in bytes */
 static inline size_t GetSystemPageSize()

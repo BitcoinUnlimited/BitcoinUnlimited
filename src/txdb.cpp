@@ -23,6 +23,7 @@ static const char DB_COIN = 'C';
 static const char DB_COINS = 'c';
 static const char DB_BLOCK_FILES = 'f';
 static const char DB_TXINDEX = 't';
+static const char DB_TXINDEX_BLOCK = 'T';
 static const char DB_BLOCK_INDEX = 'b';
 
 static const char DB_BEST_BLOCK = 'B';
@@ -350,15 +351,6 @@ bool CBlockTreeDB::WriteBatchSync(const std::vector<std::pair<int, const CBlockF
         batch.Write(make_pair(DB_BLOCK_INDEX, (*it)->GetBlockHash()), CDiskBlockIndex(*it));
     }
     return WriteBatch(batch, true);
-}
-
-bool CBlockTreeDB::ReadTxIndex(const uint256 &txid, CDiskTxPos &pos) { return Read(make_pair(DB_TXINDEX, txid), pos); }
-bool CBlockTreeDB::WriteTxIndex(const std::vector<std::pair<uint256, CDiskTxPos> > &vect)
-{
-    CDBBatch batch(*this);
-    for (std::vector<std::pair<uint256, CDiskTxPos> >::const_iterator it = vect.begin(); it != vect.end(); it++)
-        batch.Write(make_pair(DB_TXINDEX, it->first), it->second);
-    return WriteBatch(batch);
 }
 
 bool CBlockTreeDB::WriteFlag(const std::string &name, bool fValue)
@@ -705,12 +697,7 @@ uint64_t GetTotalSystemMemory()
 }
 #endif
 
-void GetCacheConfiguration(int64_t &_nBlockDBCache,
-    int64_t &_nBlockUndoDBcache,
-    int64_t &_nBlockTreeDBCache,
-    int64_t &_nCoinDBCache,
-    int64_t &_nCoinCacheMaxSize,
-    bool fDefault)
+CacheConfig DiscoverCacheConfiguration(bool fDefault)
 {
 #ifdef WIN32
     // If using WINDOWS then determine the actual physical memory that is currently available for dbcaching.
@@ -749,55 +736,65 @@ void GetCacheConfiguration(int64_t &_nBlockDBCache,
     }
 
     // Now that we have the nTotalCache we can calculate all the various cache sizes.
-    CacheSizeCalculations(
-        nTotalCache, _nBlockDBCache, _nBlockUndoDBcache, _nBlockTreeDBCache, _nCoinDBCache, _nCoinCacheMaxSize);
+    return CacheSizeCalculations(nTotalCache);
 }
 
-void CacheSizeCalculations(int64_t _nTotalCache,
-    int64_t &_nBlockDBCache,
-    int64_t &_nBlockUndoDBcache,
-    int64_t &_nBlockTreeDBCache,
-    int64_t &_nCoinDBCache,
-    int64_t &_nCoinCacheMaxSize)
+CacheConfig CacheSizeCalculations(int64_t _nTotalCache)
 {
+    CacheConfig cache;
+
     // make sure total cache is within limits
     _nTotalCache = std::max(_nTotalCache, nMinDbCache << 20); // total cache cannot be less than nMinDbCache
     _nTotalCache = std::min(_nTotalCache, nMaxDbCache << 20); // total cache cannot be greater than nMaxDbcache
 
     // calculate the block index leveldb cache size. It shouldn't be larger than 2 MiB.
     // NOTE: this is not the same as the in memory block index which is fully stored in memory.
-    _nBlockTreeDBCache = _nTotalCache / 8;
-    if (_nBlockTreeDBCache > (1 << 21) && !GetBoolArg("-txindex", DEFAULT_TXINDEX))
-        _nBlockTreeDBCache = (1 << 21);
+    cache.nBlockTreeDBCache = _nTotalCache / 8;
+    if (cache.nBlockTreeDBCache > (1 << 21))
+        cache.nBlockTreeDBCache = (1 << 21);
 
     // If we are in block db storage mode then calculated the level db cache size for the block and undo caches.
     // As a safeguard make them at least as large as the _nBlockTreeDBCache;
-    _nTotalCache -= _nBlockTreeDBCache;
+    _nTotalCache -= cache.nBlockTreeDBCache;
     if (BLOCK_DB_MODE == LEVELDB_BLOCK_STORAGE)
     {
         // use up to 5% for the level db block cache but no bigger than 256MB
-        _nBlockDBCache = _nTotalCache * 0.05;
-        if (_nBlockDBCache < _nBlockTreeDBCache)
-            _nBlockDBCache = _nBlockTreeDBCache;
-        else if (_nBlockDBCache > 256 << 20)
-            _nBlockDBCache = 256 << 20;
+        cache.nBlockDBCache = _nTotalCache * 0.05;
+        if (cache.nBlockDBCache < cache.nBlockTreeDBCache)
+            cache.nBlockDBCache = cache.nBlockTreeDBCache;
+        else if (cache.nBlockDBCache > 256 << 20)
+            cache.nBlockDBCache = 256 << 20;
 
         // use up to 1% for the level db undo cache but no bigger than 64MB
-        _nBlockUndoDBcache = _nTotalCache * 0.01;
-        if (_nBlockUndoDBcache < _nBlockTreeDBCache)
-            _nBlockUndoDBcache = _nBlockTreeDBCache;
-        else if (_nBlockUndoDBcache > 64 << 20)
-            _nBlockUndoDBcache = 64 << 20;
+        cache.nBlockUndoDBCache = _nTotalCache * 0.01;
+        if (cache.nBlockUndoDBCache < cache.nBlockTreeDBCache)
+            cache.nBlockUndoDBCache = cache.nBlockTreeDBCache;
+        else if (cache.nBlockUndoDBCache > 64 << 20)
+            cache.nBlockUndoDBCache = 64 << 20;
     }
 
     // use 25%-50% of the remainder for the utxo leveldb disk cache
-    _nTotalCache -= _nBlockDBCache;
-    _nTotalCache -= _nBlockUndoDBcache;
-    _nCoinDBCache = std::min(_nTotalCache / 2, (_nTotalCache / 4) + (1 << 23));
+    _nTotalCache -= cache.nBlockDBCache;
+    _nTotalCache -= cache.nBlockUndoDBCache;
+    cache.nCoinDBCache = std::min(_nTotalCache / 2, (_nTotalCache / 4) + (1 << 23));
+    if (!GetBoolArg("-txindex", DEFAULT_TXINDEX))
+    {
+        cache.nTxIndexCache = 0;
+    }
+    else
+    {
+        // TODO: For now we divide the memory equally between the two but we probably need to refine
+        // this in the future.
+        cache.nCoinDBCache /= 2;
+        cache.nTxIndexCache = cache.nCoinDBCache;
+    }
 
-    // the remainder goes to the in-memory utxo coins cache
-    _nTotalCache -= _nCoinDBCache;
-    _nCoinCacheMaxSize = _nTotalCache;
+    // the remainder goes to the global in-memory utxo coins cache max size
+    _nTotalCache -= cache.nCoinDBCache;
+    _nTotalCache -= cache.nTxIndexCache;
+    nCoinCacheMaxSize = _nTotalCache;
+
+    return cache;
 }
 
 void AdjustCoinCacheSize()
@@ -806,20 +803,15 @@ void AdjustCoinCacheSize()
 
     // If the operator has not set a dbcache and initial sync is complete then revert back to the default
     // value for dbcache. This will cause the current coins cache to be immediately trimmed to size.
-    if (!IsInitialBlockDownload() && !GetArg("-dbcache", 0) && chainActive.Tip())
+    if (!IsInitialBlockDownload() && IsChainSyncd() && !GetArg("-dbcache", 0) && chainActive.Tip())
     {
-        // Get the default value for nCoinCacheMaxSize.
-        int64_t dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache = 0;
-        CacheSizeCalculations(
-            nDefaultDbCache, dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
-        nCoinCacheMaxSize = nMaxCoinCache;
-
+        DiscoverCacheConfiguration(true);
         return;
     }
 
 #ifdef WIN32
     static int64_t nLastDbAdjustment = 0;
-    int64_t nNow = GetTimeMicros();
+    int64_t nNow = GetStopwatchMicros();
 
     if (nLastDbAdjustment == 0)
     {
@@ -851,11 +843,10 @@ void AdjustCoinCacheSize()
         {
             // Get the lowest possible default coins cache configuration possible and use this value as a limiter
             // to prevent the nCoinCacheMaxSize from falling below this value.
-            int64_t dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache = 0;
-            GetCacheConfiguration(
-                dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, nDefaultCoinCache, true);
+            DiscoverCacheConfiguration(true);
 
-            nCoinCacheMaxSize = std::max(nDefaultCoinCache, nCoinCacheMaxSize - (nUnusedMem - nMemAvailable));
+            nCoinCacheMaxSize =
+                std::max((int64_t)nCoinCacheMaxSize, (int64_t)(nCoinCacheMaxSize - (nUnusedMem - nMemAvailable)));
             LOG(COINDB, "Current cache size: %ld MB, nCoinCacheMaxSize was reduced by %u MB\n",
                 nCoinCacheMaxSize / 1000000, (nUnusedMem - nMemAvailable) / 1000000);
             nLastDbAdjustment = nNow;
@@ -869,11 +860,10 @@ void AdjustCoinCacheSize()
         {
             // find the max coins cache possible for this configuration.  Use the max int possible for total cache
             // size to ensure you receive the max cache size possible.
-            int64_t dummyBlockCache, dummyUndoCache, dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache = 0;
-            CacheSizeCalculations(std::numeric_limits<long long>::max(), dummyBlockCache, dummyUndoCache,
-                dummyBIDiskCache, dummyUtxoDiskCache, nMaxCoinCache);
+            CacheSizeCalculations(std::numeric_limits<long long>::max());
 
-            nCoinCacheMaxSize = std::min(nMaxCoinCache, nCoinCacheMaxSize + (nMemAvailable - nLastMemAvailable));
+            nCoinCacheMaxSize = std::min(
+                (int64_t)nCoinCacheMaxSize, (int64_t)(nCoinCacheMaxSize + (nMemAvailable - nLastMemAvailable)));
             LOG(COINDB, "Current cache size: %ld MB, nCoinCacheMaxSize was increased by %u MB\n",
                 nCoinCacheMaxSize / 1000000, (nMemAvailable - nLastMemAvailable) / 1000000);
             nLastDbAdjustment = nNow;
@@ -881,4 +871,184 @@ void AdjustCoinCacheSize()
         }
     }
 #endif
+}
+
+TxIndexDB::TxIndexDB(size_t n_cache_size, bool f_memory, bool f_wipe)
+    : CDBWrapper(GetDataDir() / "indexes" / "txindex", n_cache_size, f_memory, f_wipe)
+{
+}
+
+bool TxIndexDB::ReadTxPos(const uint256 &txid, CDiskTxPos &pos) const
+{
+    return Read(std::make_pair(DB_TXINDEX, txid), pos);
+}
+
+bool TxIndexDB::WriteTxs(const std::vector<std::pair<uint256, CDiskTxPos> > &v_pos)
+{
+    CDBBatch batch(*this);
+    for (const auto &tuple : v_pos)
+    {
+        batch.Write(std::make_pair(DB_TXINDEX, tuple.first), tuple.second);
+    }
+    return WriteBatch(batch);
+}
+
+bool TxIndexDB::ReadBestBlock(CBlockLocator &locator) const
+{
+    bool success = Read(DB_BEST_BLOCK, locator);
+    if (!success)
+    {
+        locator.SetNull();
+    }
+    return success;
+}
+
+bool TxIndexDB::WriteBestBlock(const CBlockLocator &locator) { return Write(DB_BEST_BLOCK, locator); }
+/*
+ * Safely persist a transfer of data from the old txindex database to the new one, and compact the
+ * range of keys updated. This is used internally by MigrateData.
+ */
+static void WriteTxIndexMigrationBatches(TxIndexDB &newdb,
+    CBlockTreeDB &olddb,
+    CDBBatch &batch_newdb,
+    CDBBatch &batch_olddb,
+    const std::pair<unsigned char, uint256> &begin_key,
+    const std::pair<unsigned char, uint256> &end_key)
+{
+    // Sync new DB changes to disk before deleting from old DB.
+    newdb.WriteBatch(batch_newdb, /*fSync=*/true);
+    olddb.WriteBatch(batch_olddb);
+    olddb.CompactRange(begin_key, end_key);
+
+    batch_newdb.Clear();
+    batch_olddb.Clear();
+}
+
+bool TxIndexDB::MigrateData(CBlockTreeDB &block_tree_db, const CBlockLocator &best_locator)
+{
+    // The prior implementation of txindex was always in sync with block index
+    // and presence was indicated with a boolean DB flag. If the flag is set,
+    // this means the txindex from a previous version is valid and in sync with
+    // the chain tip. The first step of the migration is to unset the flag and
+    // write the chain hash to a separate key, DB_TXINDEX_BLOCK. After that, the
+    // index entries are copied over in batches to the new database. Finally,
+    // DB_TXINDEX_BLOCK is erased from the old database and the block hash is
+    // written to the new database.
+    //
+    // Unsetting the boolean flag ensures that if the node is downgraded to a
+    // previous version, it will not see a corrupted, partially migrated index
+    // -- it will see that the txindex is disabled. When the node is upgraded
+    // again, the migration will pick up where it left off and sync to the block
+    // with hash DB_TXINDEX_BLOCK.
+    bool f_legacy_flag = false;
+    block_tree_db.ReadFlag("txindex", f_legacy_flag);
+    if (f_legacy_flag)
+    {
+        if (!block_tree_db.Write(DB_TXINDEX_BLOCK, best_locator))
+        {
+            return error("%s: cannot write block indicator", __func__);
+        }
+        if (!block_tree_db.WriteFlag("txindex", false))
+        {
+            return error("%s: cannot write block index db flag", __func__);
+        }
+    }
+
+    CBlockLocator locator;
+    if (!block_tree_db.Read(DB_TXINDEX_BLOCK, locator))
+    {
+        return true;
+    }
+
+    int64_t count = 0;
+    LOGA("Upgrading txindex database... [0%%]\n");
+    uiInterface.InitMessage(_("Upgrading txindex database..."));
+    uiInterface.ShowProgress(_("Upgrading txindex database "), 0);
+    int report_done = 0;
+    const size_t batch_size = 1 << 24; // 16 MiB
+
+    CDBBatch batch_newdb(*this);
+    CDBBatch batch_olddb(block_tree_db);
+
+    std::pair<unsigned char, uint256> key;
+    std::pair<unsigned char, uint256> begin_key{DB_TXINDEX, uint256()};
+    std::pair<unsigned char, uint256> prev_key = begin_key;
+
+    bool interrupted = false;
+    std::unique_ptr<CDBIterator> cursor(block_tree_db.NewIterator());
+    for (cursor->Seek(begin_key); cursor->Valid(); cursor->Next())
+    {
+        if (shutdown_threads.load() == true)
+        {
+            interrupted = true;
+            break;
+        }
+
+        if (!cursor->GetKey(key))
+        {
+            return error("%s: cannot get key from valid cursor", __func__);
+        }
+        if (key.first != DB_TXINDEX)
+        {
+            break;
+        }
+
+        // Log progress every 10%.
+        if (++count % 256 == 0)
+        {
+            // Since txids are uniformly random and traversed in increasing order, the high 16 bits
+            // of the hash can be used to estimate the current progress.
+            const uint256 &txid = key.second;
+            uint32_t high_nibble =
+                (static_cast<uint32_t>(*(txid.begin() + 0)) << 8) + (static_cast<uint32_t>(*(txid.begin() + 1)) << 0);
+            int percentage_done = (int)(high_nibble * 100.0 / 65536.0 + 0.5);
+
+            uiInterface.ShowProgress(_("Upgrading txindex database "), percentage_done);
+            if (report_done < percentage_done / 10)
+            {
+                LOGA("Upgrading txindex database... [%d%%]\n", percentage_done);
+                report_done = percentage_done / 10;
+            }
+        }
+
+        CDiskTxPos value;
+        if (!cursor->GetValue(value))
+        {
+            return error("%s: cannot parse txindex record", __func__);
+        }
+        batch_newdb.Write(key, value);
+        batch_olddb.Erase(key);
+
+        if (batch_newdb.SizeEstimate() > batch_size || batch_olddb.SizeEstimate() > batch_size)
+        {
+            // NOTE: it's OK to delete the key pointed at by the current DB cursor while iterating
+            // because LevelDB iterators are guaranteed to provide a consistent view of the
+            // underlying data, like a lightweight snapshot.
+            WriteTxIndexMigrationBatches(*this, block_tree_db, batch_newdb, batch_olddb, prev_key, key);
+            prev_key = key;
+        }
+    }
+
+    // If these final DB batches complete the migration, write the best block
+    // hash marker to the new database and delete from the old one. This signals
+    // that the former is fully caught up to that point in the blockchain and
+    // that all txindex entries have been removed from the latter.
+    if (!interrupted)
+    {
+        batch_olddb.Erase(DB_TXINDEX_BLOCK);
+        batch_newdb.Write(DB_BEST_BLOCK, locator);
+    }
+
+    WriteTxIndexMigrationBatches(*this, block_tree_db, batch_newdb, batch_olddb, begin_key, key);
+
+    if (interrupted)
+    {
+        LOGA("[CANCELLED txindex upgrade].\n");
+        return false;
+    }
+
+    uiInterface.ShowProgress("", 100);
+
+    LOGA("[COMPLETED txindex upgrade].\n");
+    return true;
 }

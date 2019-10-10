@@ -232,7 +232,7 @@ std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool valida
     {
         if (*item == 1)
         {
-            *item = Params().GetConsensus().may2019ActivationTime;
+            *item = Params().GetConsensus().nov2019ActivationTime;
         }
         settingsToUserAgentString();
     }
@@ -262,7 +262,7 @@ void UpdateSendStats(CNode *pfrom, const char *strCommand, int msgSize, int64_t 
     }
 }
 
-void UpdateRecvStats(CNode *pfrom, const std::string &strCommand, int msgSize, int64_t nTimeReceived)
+void UpdateRecvStats(CNode *pfrom, const std::string &strCommand, int msgSize, int64_t nStopwatchTimeReceived)
 {
     recvAmt += msgSize;
     std::string name = "net/recv/msg/" + strCommand;
@@ -446,7 +446,7 @@ void UnlimitedSetup(void)
 
     // If the user configures it to 1, assume this means default
     if (miningForkTime.Value() == 1)
-        miningForkTime = Params().GetConsensus().may2019ActivationTime;
+        miningForkTime = Params().GetConsensus().nov2019ActivationTime;
 
     if (maxGeneratedBlock > excessiveBlockSize)
     {
@@ -782,6 +782,59 @@ void GenerateBitcoins(bool fGenerate, int nThreads, const CChainParams &chainpar
     minerThreads = new boost::thread_group();
     for (int i = 0; i < nThreads; i++)
         minerThreads->create_thread(boost::bind(&BitcoinMiner, boost::cref(chainparams)));
+}
+
+/** This function searches the mempool for transactions that are recently acceptable into the mempools of other
+nodes and forwards any found to those nodes.
+*/
+void ForwardAcceptableTransactions(const std::vector<CTxChange> &changeSet)
+{
+    // Start by grabbing node refs to minimize the time that the list is locked.
+    std::vector<CNodeRef> nodes;
+    nodes.reserve(vNodes.size());
+
+    {
+        LOCK(cs_vNodes);
+
+        for (CNode *pNode : vNodes)
+        {
+            if (pNode)
+                nodes.push_back(CNodeRef(pNode));
+        }
+    }
+
+    LOG(MEMPOOL | NET, "Check %d TX applicability to %d nodes\n", changeSet.size(), nodes.size());
+    for (auto &txc : changeSet)
+    {
+        LOG(MEMPOOL | NET, "%s: A:%d->%d, D:%d->%d, AS:%d->%d, DS:%d->%d\n", txc.tx->GetHash().ToString(),
+            txc.prior.countWithAncestors, txc.now.countWithAncestors, txc.prior.countWithDescendants,
+            txc.now.countWithDescendants, txc.prior.sizeWithAncestors, txc.now.sizeWithAncestors,
+            txc.prior.sizeWithDescendants, txc.now.sizeWithDescendants);
+    }
+    // Iterate through all changed transactions and all nodes to see if the tx crosses the nodes reject/accept boundary
+    for (auto &txc : changeSet)
+    {
+        for (auto &node : nodes)
+        {
+            if (!node->IsTxAcceptable(txc.prior))
+            {
+                if (node->IsTxAcceptable(txc.now))
+                {
+                    // forward this tx to this node
+                    LOG(MEMPOOL | NET, "TX %s is now acceptable to node %s\n", txc.tx->GetHash().ToString(),
+                        node->GetLogName());
+                    if (unconfPushAction.Value() == 2)
+                        node->PushMessage(NetMsgType::TX, *(txc.tx));
+                    else if (unconfPushAction.Value() == 1)
+                    {
+                        // I may have relayed this INV to this node before it was willing to accept it so "force" push
+                        // this INV -- that is, ignore the bloom filter that stops repeat INVs
+                        node->PushInventory(CInv(MSG_TX, txc.tx->GetHash()), true);
+                    }
+                }
+            }
+        }
+    }
 }
 
 // RPC read mining status
@@ -1759,18 +1812,28 @@ UniValue getminingcandidate(const UniValue &params, bool fHelp)
     CMiningCandidate candid;
     int64_t coinbaseSize = -1; // If -1 then not used to set coinbase size
 
-    if (fHelp || params.size() > 1)
+    if (fHelp || params.size() > 2)
     {
-        throw runtime_error("getminingcandidate"
-                            "\nReturns Mining-Candidate protocol data.\n"
-                            "\nArguments:\n"
-                            "1. \"coinbasesize\" (int, optional) Get a fixed size coinbase transaction.\n" +
-                            HelpExampleCli("", "") + HelpExampleCli("coinbasesize", "100"));
+        throw runtime_error(
+            "getminingcandidate"
+            "\nReturns Mining-Candidate protocol data.\n"
+            "\nArguments:\n"
+            "1. \"coinbasesize\" (int, optional) Get a fixed size coinbase transaction.\n"
+            "                                  Default: null (null indicates unspecified / use daemon defaults)\n"
+            "2. \"address\"      (string, optional) The address to send the newly generated bitcoin to.\n"
+            "                                     Default: an address in daemon's wallet.\n" +
+            HelpExampleCli("getminingcandidate", "") + HelpExampleCli("getminingcandidate", "1000") +
+            HelpExampleCli("getminingcandidate", "1000 bchtest:qq9rw090p2eu9drv6ptztwx4ghpftwfa0gyqvlvx2q") +
+            HelpExampleCli("getminingcandidate", "null bchtest:qq9rw090p2eu9drv6ptztwx4ghpftwfa0gyqvlvx2q"));
     }
 
-    if (params.size() == 1)
+    CScript coinbaseScript;
+    std::string destStr;
+
+    // we accept: param1, param2 or just param1 by itself or null,param2 to only specify param2
+    if (params.size() >= 1 && !params[0].isNull() && !params[0].getValStr().empty())
     {
-        coinbaseSize = params[0].get_int64();
+        coinbaseSize = params[0].get_int64(); // may throw, which is what we want
         if (coinbaseSize < 0)
         {
             throw std::runtime_error("Requested coinbase size is less than 0");
@@ -1782,8 +1845,23 @@ UniValue getminingcandidate(const UniValue &params, bool fHelp)
                 strprintf("Requested coinbase size too big. Max allowed: %u", BLOCKSTREAM_CORE_MAX_BLOCK_SIZE));
         }
     }
+    if (params.size() == 2)
+    {
+        destStr = params[1].get_str();
+    }
 
-    mkblocktemplate(UniValue(UniValue::VARR), coinbaseSize, &candid.block);
+    // validate destination address (if supplied)
+    if (!destStr.empty())
+    {
+        CTxDestination destination = DecodeDestination(destStr);
+        if (!IsValidDestination(destination))
+        {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("Error: Invalid address \"%s\"", destStr));
+        }
+        coinbaseScript = GetScriptForDestination(destination);
+    }
+
+    mkblocktemplate(UniValue(UniValue::VARR), coinbaseSize, &candid.block, coinbaseScript);
 
     ret = MkMiningCandidateJson(candid);
     return ret;
@@ -1794,7 +1872,6 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
 {
     UniValue rcvd;
     CBlock block;
-    LOCK(cs_main);
 
     if (fHelp || params.size() != 1)
     {
@@ -1814,15 +1891,17 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
 
     int64_t id = rcvd["id"].get_int64();
 
-    // Needs LOCK(cs_main); above:
-    if (miningCandidatesMap.count(id) == 1)
     {
-        block = miningCandidatesMap[id].block;
-        miningCandidatesMap.erase(id);
-    }
-    else
-    {
-        return UniValue("id not found");
+        LOCK(cs_main);
+        if (miningCandidatesMap.count(id) == 1)
+        {
+            block = miningCandidatesMap[id].block;
+            miningCandidatesMap.erase(id);
+        }
+        else
+        {
+            return UniValue("id not found");
+        }
     }
 
     UniValue nonce = rcvd["nonce"];
@@ -2067,9 +2146,6 @@ UniValue validateblocktemplate(const UniValue &params, bool fHelp)
 }
 
 #ifdef DEBUG
-#ifdef DEBUG_LOCKORDER
-extern std::map<std::pair<void *, void *>, LockStack> lockorders;
-#endif
 
 extern std::vector<std::string> vUseDNSSeeds;
 extern std::list<CNode *> vNodesDisconnected;
@@ -2122,7 +2198,7 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     ret.pushKV("vNodes", (int64_t)vNodes.size());
     ret.pushKV("vNodesDisconnected", (int64_t)vNodesDisconnected.size());
     {
-        READLOCK(orphanpool.cs);
+        READLOCK(orphanpool.cs_orphanpool);
         ret.pushKV("mapOrphanTransactions", (int64_t)orphanpool.mapOrphanTransactions.size());
         ret.pushKV("mapOrphanTransactionsByPrev", (int64_t)orphanpool.mapOrphanTransactionsByPrev.size());
     }
@@ -2138,11 +2214,18 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         ret.pushKV("txCommitQ", (uint64_t)txCommitQ->size());
     ret.pushKV("txInQ", (uint64_t)txInQ.size());
     ret.pushKV("txDeferQ", (uint64_t)txDeferQ.size());
-
 #ifdef DEBUG_LOCKORDER
-    ret.pushKV("lockorders", (uint64_t)lockorders.size());
+    {
+        std::lock_guard<std::mutex> lock(lockdata.dd_mutex);
+        uint64_t lockorderssize = 0;
+        lockorderssize += lockdata.readlockswaiting.size();
+        lockorderssize += lockdata.writelockswaiting.size();
+        lockorderssize += lockdata.readlocksheld.size();
+        lockorderssize += lockdata.writelocksheld.size();
+        lockorderssize *= 2;
+        ret.pushKV("lockorders", lockorderssize);
+    }
 #endif
-
     LOCK(cs_vNodes);
     int disconnected = 0; // watch # of disconnected nodes to ensure they are being cleaned up
     for (std::vector<CNode *>::iterator it = vNodes.begin(); it != vNodes.end(); ++it)
@@ -2293,7 +2376,7 @@ UniValue getaddressforms(const UniValue &params, bool fHelp)
 
 std::string CStatusString::GetPrintable() const
 {
-    LOCK(cs);
+    LOCK(cs_status_string);
     if (strSet.empty())
         return "ready";
     std::string ret;
@@ -2309,12 +2392,12 @@ std::string CStatusString::GetPrintable() const
 
 void CStatusString::Set(const std::string &yourStatus)
 {
-    LOCK(cs);
+    LOCK(cs_status_string);
     strSet.insert(yourStatus);
 }
 
 void CStatusString::Clear(const std::string &yourStatus)
 {
-    LOCK(cs);
+    LOCK(cs_status_string);
     strSet.erase(yourStatus);
 }

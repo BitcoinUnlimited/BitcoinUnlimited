@@ -202,6 +202,12 @@ enum opcodetype
 
 const char *GetOpName(opcodetype opcode);
 
+/**
+ * Check whether the given stack element data would be minimally pushed using
+ * the given opcode.
+ */
+bool CheckMinimalPush(const std::vector<uint8_t> &data, opcodetype opcode);
+
 class scriptnum_error : public std::runtime_error
 {
 public:
@@ -368,6 +374,15 @@ private:
     int64_t m_value;
 };
 
+/** wrapper class that serializes in an older way that is incompatible with current rules, but is used by the genesis
+block */
+class LegacyCScriptNum : public CScriptNum
+{
+public:
+    explicit LegacyCScriptNum(const int64_t &n) : CScriptNum(n) {}
+};
+
+
 /**
  * We use a prevector for the script to reduce the considerable memory overhead
  *  of vectors in cases where they normally contain a small number of small elements.
@@ -439,9 +454,55 @@ public:
         return *this;
     }
 
+    CScript &operator<<(const LegacyCScriptNum &a)
+    {
+        auto b = a.getvch();
+
+        if (b.size() < OP_PUSHDATA1)
+        {
+            insert(end(), (unsigned char)b.size());
+        }
+        else if (b.size() <= 0xff)
+        {
+            insert(end(), OP_PUSHDATA1);
+            insert(end(), (unsigned char)b.size());
+        }
+        else if (b.size() <= 0xffff)
+        {
+            insert(end(), OP_PUSHDATA2);
+            uint8_t data[2];
+            WriteLE16(data, b.size());
+            insert(end(), data, data + sizeof(data));
+        }
+        else
+        {
+            insert(end(), OP_PUSHDATA4);
+            uint8_t data[4];
+            WriteLE32(data, b.size());
+            insert(end(), data, data + sizeof(data));
+        }
+        insert(end(), b.begin(), b.end());
+        return *this;
+    }
+
     CScript &operator<<(const std::vector<unsigned char> &b)
     {
-        if (b.size() < OP_PUSHDATA1)
+        if (b.size() == 0)
+        {
+            insert(end(), OP_0);
+            return *this;
+        }
+        if ((b.size() == 1) && (b[0] >= 1 && b[0] <= 16))
+        {
+            insert(end(), OP_1 - 1 + b[0]);
+            return *this;
+        }
+        else if ((b.size() == 1) && (b[0] == 0x81))
+        {
+            insert(end(), OP_1NEGATE);
+            return *this;
+        }
+        else if (b.size() < OP_PUSHDATA1)
         {
             insert(end(), (unsigned char)b.size());
         }

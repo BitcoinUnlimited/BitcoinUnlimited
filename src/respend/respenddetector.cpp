@@ -65,7 +65,7 @@ RespendDetector::~RespendDetector()
 
 void RespendDetector::CheckForRespend(const CTxMemPool &pool, const CTransactionRef &ptx)
 {
-    READLOCK(pool.cs); // protect pool.mapNextTx
+    READLOCK(pool.cs_txmempool); // protect pool.mapNextTx
 
     for (const CTxIn &in : ptx->vin)
     {

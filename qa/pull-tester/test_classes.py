@@ -125,6 +125,19 @@ def Skip(test_name, platforms, reason):
     rpctest.skip(platforms, reason)
     return rpctest
 
+def WhenElectrumFound(test_name):
+    '''
+    Keeps test enabled when electrum binary is found. Disables it if not.
+    '''
+    import os
+    electrs_path = os.path.join(
+        os.path.dirname(os.environ["BITCOIND"]),
+        "electrscash")
+
+    if os.path.exists(electrs_path):
+        return test_name
+
+    return Disabled(test_name, "Electrum server not built")
 
 if __name__ == "__main__":
     import doctest

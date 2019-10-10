@@ -24,6 +24,8 @@
 
 class CAutoFile;
 class CBlockIndex;
+class TxMempoolOriginalState;
+class CTxChange;
 
 inline double AllowFreeThreshold() { return COIN * 144 / 250; }
 inline bool AllowFree(double dPriority)
@@ -35,6 +37,10 @@ inline bool AllowFree(double dPriority)
 
 /** Fake height value used in Coin to signify they are only in the memory pool (since 0.8) */
 static const uint32_t MEMPOOL_HEIGHT = 0x7FFFFFFF;
+/** Length of time in seconds over which to smooth the tx rate */
+static const double TX_RATE_SMOOTHING_SEC = 60;
+/** Sample resolution in milliseconds over which to compute the instantaneous transaction rate */
+static const int TX_RATE_RESOLUTION_MILLIS = 1000;
 
 /** Dump the mempool to disk. */
 bool DumpMempool();
@@ -298,7 +304,7 @@ public:
 
         if (f1 == f2)
         {
-            return a.GetTx().GetHash() < b.GetTx().GetHash();
+            return a.GetTime() < b.GetTime();
         }
 
         return f1 > f2;
@@ -469,7 +475,9 @@ private:
     void trackPackageRemoved(const CFeeRate &rate);
 
     std::mutex cs_txPerSec;
-    double nTxPerSec; // BU: tx's per second accepted into the mempool
+    double nTxPerSec GUARDED_BY(cs_txPerSec); //! txns per second accepted into the mempool
+    double nInstantaneousTxPerSec GUARDED_BY(cs_txPerSec); //! instantaneous (1-second resolution) txns per second
+    double nPeakRate GUARDED_BY(cs_txPerSec); //! peak rate since startup for txns per second
 
 public:
     static const int ROLLING_FEE_HALFLIFE = 60 * 60 * 12; // public only for testing
@@ -497,7 +505,7 @@ public:
                 CompareTxMemPoolEntryByAncestorFee> > >
         indexed_transaction_set;
 
-    mutable CSharedCriticalSection cs;
+    mutable CSharedCriticalSection cs_txmempool;
     indexed_transaction_set mapTx;
     typedef indexed_transaction_set::nth_index<0>::type::iterator txiter;
     struct CompareIteratorByHash
@@ -505,6 +513,9 @@ public:
         bool operator()(const txiter &a, const txiter &b) const { return a->GetTx().GetHash() < b->GetTx().GetHash(); }
     };
     typedef std::set<txiter, CompareIteratorByHash> setEntries;
+    typedef std::map<CTxMemPool::txiter, TxMempoolOriginalState, CTxMemPool::CompareIteratorByHash>
+        TxMempoolOriginalStateMap;
+
 
     const setEntries &GetMemPoolParents(txiter entry) const;
     const setEntries &GetMemPoolChildren(txiter entry) const;
@@ -537,6 +548,39 @@ public:
     CTxMemPool(const CFeeRate &_minReasonableRelayFee);
     ~CTxMemPool();
 
+    /** Atomically (with respect to the mempool) call f on each mempool entry, and then clear the mempool */
+    template <typename Lambda>
+    void forEachThenClear(const Lambda &f)
+    {
+        WRITELOCK(cs_txmempool);
+        for (CTxMemPool::indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++)
+        {
+            f(*it);
+        }
+        _clear();
+    }
+    template <typename Lambda>
+    void _forEachThenClear(const Lambda &f)
+    {
+        AssertWriteLockHeld(cs_txmempool);
+        for (CTxMemPool::indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++)
+        {
+            f(*it);
+        }
+        _clear();
+    }
+
+    /** Atomically (with respect to the mempool) call f on each mempool entry */
+    template <typename Lambda>
+    void forEach(const Lambda &f)
+    {
+        WRITELOCK(cs_txmempool);
+        for (CTxMemPool::indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++)
+        {
+            f(*it);
+        }
+    }
+
     /**
      * If sanity-checking is turned on, check makes sure the pool is
      * consistent (does not contain two transactions that spend the same inputs,
@@ -550,6 +594,7 @@ public:
     // addUnchecked can be used to have it call CalculateMemPoolAncestors(), and
     // then invoke the second version.
     bool addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry, bool fCurrentEstimate = true);
+    bool _addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry, bool fCurrentEstimate = true);
     bool addUnchecked(const uint256 &hash,
         const CTxMemPoolEntry &entry,
         setEntries &setAncestors,
@@ -563,7 +608,8 @@ public:
     void removeForBlock(const std::vector<CTransactionRef> &vtx,
         unsigned int nBlockHeight,
         std::list<CTransactionRef> &conflicted,
-        bool fCurrentEstimate = true);
+        bool fCurrentEstimate = true,
+        std::vector<CTxChange> *txChange = nullptr);
     void clear();
     void _clear(); // lock free
     void queryHashes(std::vector<uint256> &vtxid) const;
@@ -595,7 +641,7 @@ public:
      *  Set updateDescendants to true when removing a tx that was in a block, so
      *  that any in-mempool descendants have their ancestor state updated.
      */
-    void _RemoveStaged(setEntries &stage, bool updateDescendants);
+    void _RemoveStaged(setEntries &stage, bool updateDescendants, TxMempoolOriginalStateMap *changeSet = nullptr);
 
     /** When adding transactions from a disconnected block back to the mempool,
      *  new mempool entries may have children in the mempool (which is generally
@@ -635,11 +681,11 @@ public:
         uint64_t limitDescendantCount,
         uint64_t limitDescendantSize,
         std::string &errString,
+        setEntries *inBlock = nullptr,
         bool fSearchForParents = true) const;
 
-    /** Populate setDescendants with all in-mempool descendants of hash.
- *  Assumes that setDescendants includes all in-mempool descendants of anything
- *  already in it.  */
+    /** Populate setDescendants with all in-mempool descendants of hash.  Assumes that setDescendants includes
+     *  all in-mempool descendants of anything already in it.  */
     void _CalculateDescendants(txiter it, setEntries &setDescendants);
 
     /** Similar to CalculateMemPoolAncestors, except only requires the inputs and just returns true/false depending on
@@ -651,6 +697,20 @@ public:
         uint64_t limitDescendantSize,
         std::string &errString);
 
+    /** Get tx properties, returns true if tx in mempool and fills fields */
+    bool GetTxProperties(const uint256 &hash, CTxProperties *txProps) const
+    {
+        DbgAssert(txProps, return false);
+        READLOCK(cs_txmempool);
+        auto entryPtr = mapTx.find(hash);
+        if (entryPtr == mapTx.end())
+            return false;
+        txProps->countWithAncestors = entryPtr->GetCountWithAncestors();
+        txProps->sizeWithAncestors = entryPtr->GetSizeWithAncestors();
+        txProps->countWithDescendants = entryPtr->GetCountWithDescendants();
+        txProps->sizeWithDescendants = entryPtr->GetSizeWithDescendants();
+        return true;
+    }
 
     /** The minimum fee to get into the mempool, which may itself not be enough
       *  for larger-sized transactions.
@@ -671,36 +731,39 @@ public:
      * transactions. */
     int Expire(int64_t time, std::vector<COutPoint> &vCoinsToUncache);
 
+    /** Remove a transaction from the mempool.  Returns the number of tx removed, 0 if the passed tx is not in the
+        mempool, 1, or > 1 if this tx had dependent tx that also had to be removed */
+    int Remove(const uint256 &txhash, std::vector<COutPoint> *vCoinsToUncache = nullptr);
+
     /** BU: Every transaction that is accepted into the mempool will call this method to update the current value*/
     void UpdateTransactionsPerSecond();
 
+    /** Obtain current transaction rate statistics
+     *  Will cause statistics to be updated before they are returned
+     */
+    void GetTransactionRateStatistics(double &smoothedTps, double &instantaneousTps, double &peakTps);
+
     unsigned long size() const
     {
-        READLOCK(cs);
+        READLOCK(cs_txmempool);
         return mapTx.size();
     }
     unsigned long _size() const { return mapTx.size(); }
     uint64_t GetTotalTxSize()
     {
-        READLOCK(cs);
+        READLOCK(cs_txmempool);
         return totalTxSize;
     }
 
     bool exists(const uint256 &hash) const
     {
-        READLOCK(cs);
+        READLOCK(cs_txmempool);
         return (mapTx.count(hash) != 0);
     }
     bool _exists(const uint256 &hash) const { return (mapTx.count(hash) != 0); }
-    double TransactionsPerSecond()
-    {
-        std::lock_guard<std::mutex> lock(cs_txPerSec);
-        return nTxPerSec;
-    }
-
     bool exists(const COutPoint &outpoint) const
     {
-        READLOCK(cs);
+        READLOCK(cs_txmempool);
         auto it = mapTx.find(outpoint.hash);
         return (it != mapTx.end() && outpoint.n < it->GetTx().vout.size());
     }
@@ -757,9 +820,17 @@ private:
     /** For each transaction being removed, update ancestors and any direct children.
       * If updateDescendants is true, then also update in-mempool descendants'
       * ancestor state. */
-    void _UpdateForRemoveFromMempool(const setEntries &entriesToRemove, bool updateDescendants);
+    void _UpdateForRemoveFromMempool(const setEntries &entriesToRemove,
+        bool updateDescendants,
+        TxMempoolOriginalStateMap *changeSet);
     /** Sever link between specified transaction and direct children. */
     void UpdateChildrenForRemoval(txiter entry);
+    /** Internal implementation of transaction per sec rate update logic
+     *  Requires that the cs_txPerSec lock be held by the calling method
+     */
+    void UpdateTransactionsPerSecondImpl(bool fAddTxn, const std::lock_guard<std::mutex> &lock)
+        EXCLUSIVE_LOCKS_REQUIRED(cs_txPerSec);
+
 
     /** Before calling removeUnchecked for a given transaction,
      *  UpdateForRemoveFromMempool must be called on the entire (dependent) set
@@ -770,6 +841,52 @@ private:
      *  removal.
      */
     void removeUnchecked(txiter entry);
+};
+
+/** This internal class holds the original state of mempool state values.
+*/
+class TxMempoolOriginalState
+{
+public:
+    /** remember the prior values so we can determine if the change is material for a particular node */
+    CTxProperties prior;
+    CTxMemPool::txiter txEntry;
+
+    TxMempoolOriginalState(CTxMemPool::txiter &entry)
+    {
+        txEntry = entry;
+        prior.countWithDescendants = txEntry->GetCountWithDescendants();
+        prior.sizeWithDescendants = txEntry->GetSizeWithDescendants();
+        prior.countWithAncestors = txEntry->GetCountWithAncestors();
+        prior.sizeWithAncestors = txEntry->GetSizeWithAncestors();
+    }
+};
+
+
+/** This class tracks changes to the mempool that may allow this transaction to be accepted into other node's
+    mempools.
+*/
+class CTxChange
+{
+public:
+    /** remember the prior values so we can determine if the change is material for a particular node */
+
+    CTxProperties prior;
+    CTxProperties now;
+    CTransactionRef tx;
+
+    CTxChange(TxMempoolOriginalState &mc)
+    {
+        // Extract the relevant fields and the transaction reference from the mempool entry so that use of this
+        // structure does not require the mempool to remain unchanged.
+        prior = mc.prior;
+
+        now.countWithDescendants = mc.txEntry->GetCountWithDescendants();
+        now.sizeWithDescendants = mc.txEntry->GetSizeWithDescendants();
+        now.countWithAncestors = mc.txEntry->GetCountWithAncestors();
+        now.sizeWithAncestors = mc.txEntry->GetSizeWithAncestors();
+        tx = mc.txEntry->GetSharedTx();
+    }
 };
 
 /**
