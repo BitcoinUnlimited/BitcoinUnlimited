@@ -14,7 +14,7 @@
 
 using namespace std;
 
-typedef vector<unsigned char> valtype;
+typedef vector<uint8_t> valtype;
 
 bool fAcceptDatacarrier = DEFAULT_ACCEPT_DATACARRIER;
 unsigned nMaxDatacarrierBytes = MAX_OP_RETURN_RELAY;
@@ -44,33 +44,177 @@ const char *GetTxnOutputType(txnouttype t)
     return nullptr;
 }
 
+static bool MatchPayToPubkey(const CScript &script, valtype &pubkey)
+{
+    // Standard tx, sender provides pubkey, receiver adds signature
+    // Template: "CScript() << OP_PUBKEY << OP_CHECKSIG"
+
+    if (script.size() == CPubKey::PUBLIC_KEY_SIZE + 2 && script[0] == CPubKey::PUBLIC_KEY_SIZE &&
+        script.back() == OP_CHECKSIG)
+    {
+        pubkey = valtype(script.begin() + 1, script.begin() + CPubKey::PUBLIC_KEY_SIZE + 1);
+        return CPubKey::ValidSize(pubkey);
+    }
+
+    if (script.size() == CPubKey::COMPRESSED_PUBLIC_KEY_SIZE + 2 && script[0] == CPubKey::COMPRESSED_PUBLIC_KEY_SIZE &&
+        script.back() == OP_CHECKSIG)
+    {
+        pubkey = valtype(script.begin() + 1, script.begin() + CPubKey::COMPRESSED_PUBLIC_KEY_SIZE + 1);
+        return CPubKey::ValidSize(pubkey);
+    }
+    return false;
+}
+
+static bool MatchPayToPubkeyHash(const CScript &script, valtype &pubkeyhash)
+{
+    // Bitcoin address tx, sender provides hash of pubkey, receiver provides signature and pubkey
+    // Template: "OP_DUP << OP_HASH160 << OP_PUBKEYHASH << OP_EQUALVERIFY << OP_CHECKSIG"
+
+    if (script.size() == 25 && script[0] == OP_DUP && script[1] == OP_HASH160 && script[2] == 20 &&
+        script[23] == OP_EQUALVERIFY && script[24] == OP_CHECKSIG)
+    {
+        pubkeyhash = valtype(script.begin() + 3, script.begin() + 23);
+        return true;
+    }
+    return false;
+}
+
+/** Check if a script is of the TX_LABELPUBLIC type
+ *
+ * param script const CScript& a reference to the script to evaluate
+ * param dataCarriage std::vector<valtype> a reference to vector containing
+ *                  2 elements: the big int valu used to mark the txns and the
+ *                  actual string to display along with the txs.
+ *
+ * return boolean
+ */
+static bool MatchLabelPublic(const CScript &script, std::vector<valtype> &dataCarriage)
+{
+    // LabelPublc OP_RETURN data size format small
+    // Template: "CScript() << OP_RETURN << OP_BIGINTEGER << OP_DATA"
+    // data deve contenere il OP_DATA
+    if (script.size() < 1 || script[0] != OP_RETURN || !script.IsPushOnly(script.begin() + 1))
+    {
+        return false;
+    }
+
+    valtype data;
+    opcodetype opcode;
+    CScript::const_iterator s = script.begin() + 1;
+    script.GetOp(s, opcode, data);
+
+    try
+    {
+        CScriptNum dataId(data, true, 5);
+        dataCarriage.emplace_back(data);
+    }
+    catch (scriptnum_error)
+    {
+        return false;
+    }
+
+    if (script.GetOp(s, opcode, data))
+    {
+        dataCarriage.emplace_back(std::move(data));
+        return true;
+    }
+
+    return false;
+}
+
+static bool MatchFreezeCLTV(const CScript &script, std::vector<valtype> &pubkeys)
+{
+    // Freeze tx using CLTV ; nFreezeLockTime CLTV DROP (0x21 pubkeys) checksig
+    // {TX_CLTV, CScript() << OP_BIGINTEGER << OP_CHECKLOCKTIMEVERIFY << OP_DROP << OP_PUBKEYS << OP_CHECKSIG},
+
+    if ((script.size() < 1) || script.back() != OP_CHECKSIG)
+    {
+        return false;
+    }
+
+    valtype data;
+    opcodetype opcode;
+    CScript::const_iterator s = script.begin();
+    script.GetOp(s, opcode, data);
+
+    try
+    {
+        CScriptNum nLockFreezeTime(data, true, 5);
+        pubkeys.emplace_back(data);
+    }
+    catch (scriptnum_error)
+    {
+        return false;
+    }
+
+    CScriptNum nLockFreezeTime(data, true, 5);
+    uint8_t pos = 5;
+    if (nLockFreezeTime < LOCKTIME_THRESHOLD)
+    {
+        pos = 4;
+    }
+    if ((script[pos] != OP_CHECKLOCKTIMEVERIFY) || (script[pos + 1] != OP_DROP))
+    {
+        return false;
+    }
+
+    // starting from pubkeys (4/5 byte nlock time + 1 OP_CLTV + 1 OP_DROP)
+    CScript::const_iterator it = script.begin() + pos + 2;
+    if (!script.GetOp(it, opcode, data))
+    {
+        return false;
+    }
+    if (!CPubKey::ValidSize(data))
+    {
+        return false;
+    }
+    pubkeys.emplace_back(std::move(data));
+    // after key extraction we should still have on byte which represent OP_CHECKSIG
+    return (it + 1 == script.end());
+}
+
+/** Test for "small positive integer" script opcodes - OP_1 through OP_16. */
+static constexpr bool IsSmallInteger(opcodetype opcode) { return opcode >= OP_1 && opcode <= OP_16; }
+static bool MatchMultisig(const CScript &script, unsigned int &required, std::vector<valtype> &pubkeys)
+{
+    // Sender provides N pubkeys, receivers provides M signatures
+    // Template: "CScript() << OP_SMALLINTEGER << OP_PUBKEYS << OP_SMALLINTEGER << OP_CHECKMULTISIG"
+    opcodetype opcode;
+    valtype data;
+    CScript::const_iterator it = script.begin();
+    if (script.size() < 1 || script.back() != OP_CHECKMULTISIG)
+    {
+        return false;
+    }
+
+    if (!script.GetOp(it, opcode, data) || !IsSmallInteger(opcode))
+    {
+        return false;
+    }
+    required = CScript::DecodeOP_N(opcode);
+    while (script.GetOp(it, opcode, data) && CPubKey::ValidSize(data))
+    {
+        pubkeys.emplace_back(std::move(data));
+    }
+    if (!IsSmallInteger(opcode))
+    {
+        return false;
+    }
+    unsigned int keys = CScript::DecodeOP_N(opcode);
+    if (pubkeys.size() != keys || keys < required)
+    {
+        return false;
+    }
+    return (it + 1 == script.end());
+}
+
+
 /**
  * Return public keys or hashes from scriptPubKey, for 'standard' transaction types.
  */
-bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, vector<vector<unsigned char> > &vSolutionsRet)
+bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, std::vector<valtype> &vSolutionsRet)
 {
-    // Templates
-    static multimap<txnouttype, CScript> mTemplates = {
-
-        // Standard tx, sender provides pubkey, receiver adds signature
-        {TX_PUBKEY, CScript() << OP_PUBKEY << OP_CHECKSIG},
-
-        // Bitcoin address tx, sender provides hash of pubkey, receiver provides signature and pubkey
-        {TX_PUBKEYHASH, CScript() << OP_DUP << OP_HASH160 << OP_PUBKEYHASH << OP_EQUALVERIFY << OP_CHECKSIG},
-
-        // Sender provides N pubkeys, receivers provides M signatures
-        {TX_MULTISIG, CScript() << OP_SMALLINTEGER << OP_PUBKEYS << OP_SMALLINTEGER << OP_CHECKMULTISIG},
-
-        // Freeze tx using CLTV ; nFreezeLockTime CLTV DROP (0x21 pubkeys) checksig
-        {TX_CLTV, CScript() << OP_BIGINTEGER << OP_CHECKLOCKTIMEVERIFY << OP_DROP << OP_PUBKEYS << OP_CHECKSIG},
-
-        // LabelPublc OP_RETURN data size format small
-        {TX_LABELPUBLIC, CScript() << OP_RETURN << OP_BIGINTEGER << OP_DATA}
-
-    };
-
     vSolutionsRet.clear();
-    // LOGA("Freeze Solve: %s \n ", ::ScriptToAsmStr(scriptPubKey));
 
     // Shortcut for pay-to-script-hash, which are more constrained than the other types:
     // it is always OP_HASH160 20 [20 byte hash] OP_EQUAL
@@ -82,101 +226,14 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, vector<vector<unsi
         return true;
     }
 
-    // Scan templates
-    const CScript &script1 = scriptPubKey;
-    for (const PAIRTYPE(txnouttype, CScript) & tplate : mTemplates)
+    std::vector<valtype> vData;
+    // This need to go after general check about unspendable output (OP_RETURN)
+    // otherwise all transactions of the TX_LABELPUBLIC type will be masked
+    if (MatchLabelPublic(scriptPubKey, vData))
     {
-        const CScript &script2 = tplate.second;
-        vSolutionsRet.clear();
-
-        opcodetype opcode1, opcode2;
-        vector<unsigned char> vch1, vch2;
-
-        // Compare
-        CScript::const_iterator pc1 = script1.begin();
-        CScript::const_iterator pc2 = script2.begin();
-
-        // generate key list
-        while (true)
-        {
-            if (pc1 == script1.end() && pc2 == script2.end())
-            {
-                // Found a match
-                typeRet = tplate.first;
-                if (typeRet == TX_MULTISIG)
-                {
-                    // Additional checks for TX_MULTISIG:
-                    unsigned char m = vSolutionsRet.front()[0];
-                    unsigned char n = vSolutionsRet.back()[0];
-                    if (m < 1 || n < 1 || m > n || vSolutionsRet.size() - 2 != n)
-                        return false;
-                }
-                return true;
-            }
-            if (!script1.GetOp(pc1, opcode1, vch1))
-                break;
-            if (!script2.GetOp(pc2, opcode2, vch2))
-                break;
-            // Template matching opcodes:
-            if (opcode2 == OP_PUBKEYS)
-            {
-                while (CPubKey::ValidSize(vch1))
-                {
-                    vSolutionsRet.push_back(vch1);
-                    if (!script1.GetOp(pc1, opcode1, vch1))
-                        break;
-                }
-                if (!script2.GetOp(pc2, opcode2, vch2))
-                    break;
-                // Normal situation is to fall through
-                // to other if/else statements
-            }
-
-            if (opcode2 == OP_PUBKEY)
-            {
-                if (!CPubKey::ValidSize(vch1))
-                    break;
-                vSolutionsRet.push_back(vch1);
-            }
-            else if (opcode2 == OP_PUBKEYHASH)
-            {
-                if (vch1.size() != sizeof(uint160))
-                    break;
-                vSolutionsRet.push_back(vch1);
-            }
-            else if (opcode2 == OP_SMALLINTEGER)
-            { // Single-byte small integer pushed onto vSolutions
-                if (opcode1 == OP_0 || (opcode1 >= OP_1 && opcode1 <= OP_16))
-                {
-                    char n = (char)CScript::DecodeOP_N(opcode1);
-                    vSolutionsRet.push_back(valtype(1, n));
-                }
-                else
-                    break;
-            }
-            else if (opcode2 == OP_BIGINTEGER)
-            {
-                try
-                {
-                    CScriptNum n(vch1, true, 5);
-                    // if try reaches here without scriptnum_error
-                    // then vch1 is a valid bigint
-                    vSolutionsRet.push_back(vch1);
-                }
-                catch (scriptnum_error &)
-                {
-                    // the data is not a proper big int so this is not a match
-                    break;
-                } // end try/catch
-            }
-            else if (opcode2 == OP_DATA)
-                vSolutionsRet.push_back(vch1);
-            else if (opcode1 != opcode2 || vch1 != vch2)
-            {
-                // Others must match exactly
-                break;
-            }
-        }
+        typeRet = TX_LABELPUBLIC;
+        vSolutionsRet.insert(vSolutionsRet.end(), vData.begin(), vData.end());
+        return true;
     }
 
     // Provably prunable, data-carrying output
@@ -187,6 +244,41 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, vector<vector<unsi
     if (scriptPubKey.size() >= 1 && scriptPubKey[0] == OP_RETURN && scriptPubKey.IsPushOnly(scriptPubKey.begin() + 1))
     {
         typeRet = TX_NULL_DATA;
+        return true;
+    }
+
+    std::vector<uint8_t> data;
+    if (MatchPayToPubkey(scriptPubKey, data))
+    {
+        typeRet = TX_PUBKEY;
+        vSolutionsRet.push_back(std::move(data));
+        return true;
+    }
+
+    if (MatchPayToPubkeyHash(scriptPubKey, data))
+    {
+        typeRet = TX_PUBKEYHASH;
+        vSolutionsRet.push_back(std::move(data));
+        return true;
+    }
+
+    if (MatchFreezeCLTV(scriptPubKey, vData))
+    {
+        typeRet = TX_CLTV;
+        vSolutionsRet.insert(vSolutionsRet.end(), vData.begin(), vData.end());
+        return true;
+    }
+
+    unsigned int required;
+    std::vector<std::vector<uint8_t> > keys;
+    if (MatchMultisig(scriptPubKey, required, keys))
+    {
+        typeRet = TX_MULTISIG;
+        // safe as required is in range 1..16
+        vSolutionsRet.push_back({static_cast<uint8_t>(required)});
+        vSolutionsRet.insert(vSolutionsRet.end(), keys.begin(), keys.end());
+        // safe as size is in range 1..16
+        vSolutionsRet.push_back({static_cast<uint8_t>(keys.size())});
         return true;
     }
 
