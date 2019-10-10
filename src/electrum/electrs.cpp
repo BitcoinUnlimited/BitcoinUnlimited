@@ -33,6 +33,25 @@ static std::string rpc_port(const std::string &network)
 }
 static void remove_conflicting_arg(std::vector<std::string> &args, const std::string &override_arg)
 {
+    // special case: verboseness argument
+    const std::regex verbose("^-v+$");
+    if (std::regex_search(override_arg, verbose))
+    {
+        auto it = begin(args);
+        while (it != end(args))
+        {
+            if (!std::regex_search(*it, verbose))
+            {
+                ++it;
+                continue;
+            }
+            LOGA("Electrum: Argument '%s' overrides '%s'", override_arg, *it);
+            it = args.erase(it);
+        }
+        return;
+    }
+
+    // normal case
     auto separator = override_arg.find_first_of("=");
     if (separator == std::string::npos)
     {
