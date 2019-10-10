@@ -22,7 +22,11 @@ The RPC call `getelectruminfo` gives you runtime details, such as indexing statu
 
 ## Compiling from source
 
-First install dependencies as described [here](https://github.com/BitcoinUnlimited/ElectrsCash/blob/master/doc/usage.md#building-binaries).
+First install dependencies (rust version has to be 1.34+):
+
+```sh
+sudo apt install python3-git cargo clang
+```
 
 The latest stable release used by the node software can be compiled from the Bitcoin Unlimited source tree by running
 
