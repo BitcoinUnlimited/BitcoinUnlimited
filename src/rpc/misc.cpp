@@ -141,6 +141,7 @@ UniValue logline(const UniValue &params, bool fHelp)
                             "Writes a string into the log (prefixed with 'rpc-logline: ').\n"
                             "\nResult: None\n");
     LOGA("rpc-logline: %s\n", params[0].get_str());
+    LogFlush();
     return NullUniValue;
 }
 

@@ -18,6 +18,7 @@ class TestNode():
 
     @contextlib.contextmanager
     def assert_debug_log(self, *, expected_msgs, unexpected_msgs):
+        self.logline('flush log')
         debug_log = os.path.join(self.datadir, 'regtest', 'debug.log')
         with open(debug_log, encoding='utf-8') as dl:
             dl.seek(0, 2)
@@ -25,6 +26,7 @@ class TestNode():
         try:
             yield
         finally:
+            self.logline('flush log')
             with open(debug_log, encoding='utf-8') as dl:
                 dl.seek(prev_size)
                 log = dl.read()
