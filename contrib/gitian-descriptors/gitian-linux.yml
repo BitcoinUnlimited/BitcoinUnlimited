@@ -20,9 +20,9 @@ packages:
 - "bsdmainutils"
 - "ca-certificates"
 - "python"
-- "python3-git" # building electrs
-- "clang" # for rocksdb in electrs
-- "cmake" # for rocksdb in electrs
+- "python3-git" # building electrscash
+- "clang" # for rocksdb in electrscash
+- "cmake" # for rocksdb in electrscash
 reference_datetime: "2019-09-20 00:00:00"
 remotes:
 - "url": "https://github.com/BitcoinUnlimited/BitcoinUnlimited.git"
@@ -157,16 +157,16 @@ script: |
     tar --strip-components=1 -xf ../$SOURCEDIST
     CONFIG_SITE=${BASEPREFIX}/${i}/share/config.site ./configure --prefix=/ --disable-ccache --disable-maintainer-mode --disable-dependency-tracking ${CONFIGFLAGS} CFLAGS="${HOST_CFLAGS}" CXXFLAGS="${HOST_CXXFLAGS}" LDFLAGS="${HOST_LDFLAGS}"
     if [ "$i" = "x86_64-linux-gnu" ]; then
-        # Scope of electrs support is for servers running linux.
+        # Scope of electrscash support is for servers running linux.
         # We'll support x86_64 only for now.
-        make ${MAKEOPTS} electrs
+        make ${MAKEOPTS} electrscash
     fi
     make -j7 ${MAKEOPTS}
     make ${MAKEOPTS} -C src check-security
     make ${MAKEOPTS} -C src check-symbols
     make install DESTDIR=${INSTALLPATH}
-    if [ -f src/electrs ]; then
-        cp src/electrs ${INSTALLPATH}/bin/electrs
+    if [ -f src/electrscash ]; then
+        cp src/electrscash ${INSTALLPATH}/bin/electrscash
     fi
     # BU save the executables with debug symbols
     cp -f src/bitcoind ${OUTDIR}/bitcoind-${i}.debug
