@@ -1677,8 +1677,7 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
     {
         throw std::runtime_error(
             "getblockstats hash_or_height ( stats )\n"
-            "\nCompute per block statistics for a given window. All amounts are in satoshis.\n"
-            "It won't work for some heights with pruning.\n"
+            "\nCompute per block statistics for a given window. It won't work for some heights with pruning.\n"
             "\nArguments:\n"
             "1. \"hash_or_height\"     (string or numeric, required) The block hash or height of the target block\n"
             "2. \"stats\"              (array,  optional) Values to plot, by default all values (see result below)\n"
