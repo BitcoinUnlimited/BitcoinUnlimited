@@ -362,4 +362,188 @@ BOOST_AUTO_TEST_CASE(script_standard_GetScriptFor_) {
     BOOST_CHECK(result == expected);
 }
 
+BOOST_AUTO_TEST_CASE(script_standard_IsMine) {
+    CKey keys[2];
+    CPubKey pubkeys[2];
+    for (int i = 0; i < 2; i++) {
+        keys[i].MakeNewKey(true);
+        pubkeys[i] = keys[i].GetPubKey();
+    }
+
+    CKey uncompressedKey;
+    uncompressedKey.MakeNewKey(false);
+    CPubKey uncompressedPubkey = uncompressedKey.GetPubKey();
+
+    CScript scriptPubKey;
+    isminetype result;
+    CBlockIndex *nullBestBlock = nullptr;
+
+    // P2PK compressed
+    {
+        CBasicKeyStore keystore;
+        scriptPubKey.clear();
+        scriptPubKey << ToByteVector(pubkeys[0]) << OP_CHECKSIG;
+
+        // Keystore does not have key
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_NO);
+
+        // Keystore has key
+        keystore.AddKey(keys[0]);
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_SPENDABLE);
+    }
+
+    // P2PK uncompressed
+    {
+        CBasicKeyStore keystore;
+        scriptPubKey.clear();
+        scriptPubKey << ToByteVector(uncompressedPubkey) << OP_CHECKSIG;
+
+        // Keystore does not have key
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_NO);
+
+        // Keystore has key
+        keystore.AddKey(uncompressedKey);
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_SPENDABLE);
+    }
+
+    // P2PKH compressed
+    {
+        CBasicKeyStore keystore;
+        scriptPubKey.clear();
+        scriptPubKey << OP_DUP << OP_HASH160 << ToByteVector(pubkeys[0].GetID())
+                     << OP_EQUALVERIFY << OP_CHECKSIG;
+
+        // Keystore does not have key
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_NO);
+
+        // Keystore has key
+        keystore.AddKey(keys[0]);
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_SPENDABLE);
+    }
+
+    // P2PKH uncompressed
+    {
+        CBasicKeyStore keystore;
+        scriptPubKey.clear();
+        scriptPubKey << OP_DUP << OP_HASH160
+                     << ToByteVector(uncompressedPubkey.GetID())
+                     << OP_EQUALVERIFY << OP_CHECKSIG;
+
+        // Keystore does not have key
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_NO);
+
+        // Keystore has key
+        keystore.AddKey(uncompressedKey);
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_SPENDABLE);
+    }
+
+    // P2SH
+    {
+        CBasicKeyStore keystore;
+
+        CScript redeemScript;
+        redeemScript << OP_DUP << OP_HASH160 << ToByteVector(pubkeys[0].GetID())
+                     << OP_EQUALVERIFY << OP_CHECKSIG;
+
+        scriptPubKey.clear();
+        scriptPubKey << OP_HASH160 << ToByteVector(CScriptID(redeemScript))
+                     << OP_EQUAL;
+
+        // Keystore does not have redeemScript or key
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_NO);
+
+        // Keystore has redeemScript but no key
+        keystore.AddCScript(redeemScript);
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_NO);
+
+        // Keystore has redeemScript and key
+        keystore.AddKey(keys[0]);
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_SPENDABLE);
+    }
+
+    // scriptPubKey multisig
+    {
+        CBasicKeyStore keystore;
+
+        scriptPubKey.clear();
+        scriptPubKey << OP_2 << ToByteVector(uncompressedPubkey)
+                     << ToByteVector(pubkeys[1]) << OP_2 << OP_CHECKMULTISIG;
+
+        // Keystore does not have any keys
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_NO);
+
+        // Keystore has 1/2 keys
+        keystore.AddKey(uncompressedKey);
+
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_NO);
+
+        // Keystore has 2/2 keys
+        keystore.AddKey(keys[1]);
+
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_SPENDABLE);
+    }
+
+    // P2SH multisig
+    {
+        CBasicKeyStore keystore;
+        keystore.AddKey(uncompressedKey);
+        keystore.AddKey(keys[1]);
+
+        CScript redeemScript;
+        redeemScript << OP_2 << ToByteVector(uncompressedPubkey)
+                     << ToByteVector(pubkeys[1]) << OP_2 << OP_CHECKMULTISIG;
+
+        scriptPubKey.clear();
+        scriptPubKey << OP_HASH160 << ToByteVector(CScriptID(redeemScript))
+                     << OP_EQUAL;
+
+        // Keystore has no redeemScript
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_NO);
+
+        // Keystore has redeemScript
+        keystore.AddCScript(redeemScript);
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_SPENDABLE);
+    }
+
+    // OP_RETURN
+    {
+        CBasicKeyStore keystore;
+        keystore.AddKey(keys[0]);
+
+        scriptPubKey.clear();
+        scriptPubKey << OP_RETURN << ToByteVector(pubkeys[0]);
+
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_NO);
+    }
+
+    // Nonstandard
+    {
+        CBasicKeyStore keystore;
+        keystore.AddKey(keys[0]);
+
+        scriptPubKey.clear();
+        scriptPubKey << OP_9 << OP_ADD << OP_11 << OP_EQUAL;
+
+        result = IsMine(keystore, scriptPubKey, nullBestBlock);
+        BOOST_CHECK_EQUAL(result, ISMINE_NO);
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
