@@ -37,11 +37,8 @@ BOOST_AUTO_TEST_CASE(script_standard_Solver_success) {
     BOOST_CHECK_EQUAL(whichType, TX_PUBKEY);
     BOOST_CHECK_EQUAL(solutions.size(), 1);
     BOOST_CHECK(solutions[0] == ToByteVector(pubkeys[0]));
-#ifdef ENABLE_WALLET
     BOOST_CHECK(IsMine(keystore, s, nullBestBlock));
     BOOST_CHECK(!IsMine(emptykeystore, s, nullBestBlock));
-#endif
-
 
     // TX_PUBKEYHASH
     s.clear();
@@ -50,11 +47,8 @@ BOOST_AUTO_TEST_CASE(script_standard_Solver_success) {
     BOOST_CHECK_EQUAL(whichType, TX_PUBKEYHASH);
     BOOST_CHECK_EQUAL(solutions.size(), 1);
     BOOST_CHECK(solutions[0] == ToByteVector(pubkeys[0].GetID()));
-#ifdef ENABLE_WALLET
     BOOST_CHECK(IsMine(keystore, s, nullBestBlock));
     BOOST_CHECK(!IsMine(emptykeystore, s, nullBestBlock));
-#endif
-
 
     // TX_SCRIPTHASH
     CScript redeemScript(s); // initialize with leftover P2PKH script
@@ -86,12 +80,9 @@ BOOST_AUTO_TEST_CASE(script_standard_Solver_success) {
     BOOST_CHECK(solutions[2] == ToByteVector(pubkeys[1]));
     BOOST_CHECK(solutions[3] == ToByteVector(pubkeys[2]));
     BOOST_CHECK(solutions[4] == std::vector<uint8_t>({3}));
-#ifdef ENABLE_WALLET
     BOOST_CHECK(IsMine(keystore, s, nullBestBlock));
     BOOST_CHECK(!IsMine(emptykeystore, s, nullBestBlock));
     BOOST_CHECK(!IsMine(partialkeystore, s, nullBestBlock));
-#endif
-
 
     // TX_NULL_DATA
     s.clear();
