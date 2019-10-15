@@ -34,12 +34,12 @@ const char *GetTxnOutputType(txnouttype t)
         return "scripthash";
     case TX_MULTISIG:
         return "multisig";
-    case TX_NULL_DATA:
-        return "nulldata";
     case TX_CLTV:
         return "cltv"; // CLTV HODL Freeze
     case TX_LABELPUBLIC:
         return "publiclabel";
+    case TX_NULL_DATA:
+        return "nulldata";
     }
     return nullptr;
 }
