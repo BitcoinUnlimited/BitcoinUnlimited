@@ -9,9 +9,10 @@
 
 /* clang-format off */
 
+// https://github.com/bitcoincashorg/bitcoincash.org/blob/master/etc/protocols.csv
 enum CASH_PROTOCOLS : uint32_t
 {
-    TOKENDA             = 0x00000010,
+    TOKEDA              = 0x00000010,
     TOKENIZED           = 0x00000020,
     BCHTORRENTS         = 0X0000005C,
     GAMECHAIN_LOBBY     = 0X00001337,
