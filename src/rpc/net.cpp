@@ -17,6 +17,7 @@
 #include "sync.h"
 #include "timedata.h"
 #include "tweak.h"
+#include "txadmission.h"
 #include "ui_interface.h"
 #include "unlimited.h"
 #include "util.h"
@@ -554,6 +555,8 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
             "considered free and subject to limitfreerelay\n"
             "  \"maxlimitertxfee\": x.xxxx,           (numeric) fee (in satoshi/byte) above which transactions are "
             "always relayed\n"
+            "  \"limitfreerelay\": x.xxxx,            (numeric) The maximum number of free transactions (in KB) that "
+            "can enter the mempool per minute\n"
             "  \"localaddresses\": [                  (array) list of local addresses\n"
             "    {\n"
             "      \"address\": \"xxxx\",               (string) network address\n"
@@ -584,6 +587,7 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
     obj.pushKV("relayfee", ValueFromAmount(::minRelayTxFee.GetFeePerK()));
     obj.pushKV("minlimitertxfee", strprintf("%.4f", dMinLimiterTxFee.Value()));
     obj.pushKV("maxlimitertxfee", strprintf("%.4f", dMaxLimiterTxFee.Value()));
+    obj.pushKV("limitfreerelay", strprintf("%.4f", GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY)));
     UniValue localAddresses(UniValue::VARR);
     {
         LOCK(cs_mapLocalHost);
