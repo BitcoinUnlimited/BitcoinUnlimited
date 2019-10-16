@@ -944,15 +944,19 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         for (unsigned int nInv = 0; nInv < vInv.size(); nInv++)
         {
             if (shutdown_threads.load() == true)
-            {
                 return false;
-            }
 
             const CInv &inv = vInv[nInv];
-            if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK)) || inv.hash.IsNull())
+            if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK)))
+            {
+                LOG(NET, "message inv invalid type = %u hash %s", inv.type, inv.hash.ToString());
+                return false;
+            }
+            else if (inv.hash.IsNull())
             {
                 dosMan.Misbehaving(pfrom, 20);
-                return error("message inv invalid type = %u or is null hash %s", inv.type, inv.hash.ToString());
+                LOG(NET, "message inv has null hash %s", inv.type, inv.hash.ToString());
+                return false;
             }
 
             if (inv.type == MSG_BLOCK)
