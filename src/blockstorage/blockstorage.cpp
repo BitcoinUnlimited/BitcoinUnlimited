@@ -605,9 +605,9 @@ bool FlushStateToDiskInternal(CValidationState &state,
     bool fPeriodicFlush =
         mode == FLUSH_STATE_PERIODIC && nNow > nLastFlush + (int64_t)DATABASE_FLUSH_INTERVAL * 1000000;
     // Combine all conditions that result in a full cache flush.
-    bool fDoFullFlush = (mode == FLUSH_STATE_ALWAYS) || fCacheCritical || fPeriodicFlush || fFlushForPrune;
+    bool fDoFullFlush = (mode == FLUSH_STATE_ALWAYS) || fCacheCritical || fPeriodicFlush;
     // Write blocks and block index to disk.
-    if (fDoFullFlush || fPeriodicWrite)
+    if (fDoFullFlush || fPeriodicWrite || fFlushForPrune)
     {
         // Depend on nMinDiskSpace to ensure we can write block index
         if (!CheckDiskSpace(0))
@@ -711,8 +711,8 @@ bool FlushStateToDiskInternal(CValidationState &state,
 
         nSizeAfterLastFlush = pcoinsTip->DynamicMemoryUsage();
     }
-    if (fDoFullFlush || ((mode == FLUSH_STATE_ALWAYS || mode == FLUSH_STATE_PERIODIC) &&
-                            nNow > nLastSetChain + (int64_t)DATABASE_WRITE_INTERVAL * 1000000))
+    if (fDoFullFlush || fFlushForPrune || ((mode == FLUSH_STATE_ALWAYS || mode == FLUSH_STATE_PERIODIC) &&
+                                              nNow > nLastSetChain + (int64_t)DATABASE_WRITE_INTERVAL * 1000000))
     {
         // Update best block in wallet (so we can detect restored wallets).
         GetMainSignals().SetBestChain(chainActive.GetLocator());
