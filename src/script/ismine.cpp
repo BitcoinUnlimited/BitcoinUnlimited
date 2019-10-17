@@ -45,7 +45,13 @@ std::string getLabelPublic(const CScript &scriptPubKey)
         if (whichType == TX_LABELPUBLIC)
         {
             CScript labelPublic(vSolutions[1]);
-            return std::string(labelPublic.begin() + 1, labelPublic.end());
+
+            valtype data;
+            opcodetype opcode;
+            CScript::const_iterator s = labelPublic.begin();
+            labelPublic.GetOp(s, opcode, data);
+
+            return std::string(data.begin(), data.end());
         }
     }
 
