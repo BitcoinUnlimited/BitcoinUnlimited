@@ -79,6 +79,8 @@ static bool MatchPayToPubkeyHash(const CScript &script, valtype &pubkeyhash)
     return false;
 }
 
+/** Test for "small positive integer" script opcodes - OP_1 through OP_16. */
+static constexpr bool IsSmallInteger(opcodetype opcode) { return opcode >= OP_1 && opcode <= OP_16; }
 /** Check if a script is of the TX_LABELPUBLIC type
  *
  * param script const CScript& a reference to the script to evaluate
@@ -103,9 +105,24 @@ static bool MatchLabelPublic(const CScript &script, std::vector<valtype> &dataCa
     CScript::const_iterator s = script.begin() + 1;
     script.GetOp(s, opcode, data);
 
+    uint8_t declaredLen = 0;
+
     try
     {
         CScriptNum dataId(data, true, 5);
+        if (IsSmallInteger(opcode))
+        {
+            declaredLen = CScript::DecodeOP_N(opcode);
+        }
+        if (dataId.getint() > 0)
+        {
+            declaredLen = dataId.getint();
+        }
+        if (declaredLen == 0)
+        {
+            // this is not the expected format for LABELPUBLIC
+            return false;
+        }
         dataCarriage.emplace_back(data);
     }
     catch (scriptnum_error)
@@ -115,8 +132,12 @@ static bool MatchLabelPublic(const CScript &script, std::vector<valtype> &dataCa
 
     if (script.GetOp(s, opcode, data))
     {
-        dataCarriage.emplace_back(std::move(data));
-        return true;
+        std::string labelPublic = std::string(data.begin(), data.end());
+        if (labelPublic.size() == declaredLen)
+        {
+            dataCarriage.emplace_back(std::move(data));
+            return true;
+        }
     }
 
     return false;
@@ -169,8 +190,6 @@ static bool MatchFreezeCLTV(const CScript &script, std::vector<valtype> &pubkeys
     }
 }
 
-/** Test for "small positive integer" script opcodes - OP_1 through OP_16. */
-static constexpr bool IsSmallInteger(opcodetype opcode) { return opcode >= OP_1 && opcode <= OP_16; }
 static bool MatchMultisig(const CScript &script, unsigned int &required, std::vector<valtype> &pubkeys)
 {
     // Sender provides N pubkeys, receivers provides M signatures
