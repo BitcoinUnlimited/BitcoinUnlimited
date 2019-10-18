@@ -45,7 +45,7 @@ This is list of the main changes that have been merged in this release:
 - Graphene ver 2.1 and IBLT specifications
 - New dead-lock detection mechanism
 - New getblockstats rpc call
-- ElectrsCash v1.0
+- ElectrsCash v1.0 ([release notes](https://github.com/BitcoinUnlimited/ElectrsCash/blob/master/RELEASE-NOTES.md#100-18-september-2019))
 - QA improvements
 - Schnorr multisignature (Nov 15th' 2019 upgrade)
 - Enforce minimal data push at the consensus layer (Nov 15th' 2019 upgrade).
