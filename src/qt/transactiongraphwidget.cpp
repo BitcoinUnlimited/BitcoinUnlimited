@@ -281,7 +281,7 @@ void TransactionGraphWidget::setTransactionsPerSecond(double nTxPerSec,
     // Purge smoothed sample(s) that have moved beyond the sample set size limit
     while (vSmoothedSamples.size() > MAXIMUM_SAMPLES_TO_KEEP)
     {
-        float fRemoving = vInstantaneousSamples.last();
+        float fRemoving = vSmoothedSamples.last();
         // Adjust smoothed mean for total sample set to exclude the sample being purged
         fSmoothedTpsAverage_Sampled =
             SubtractFromArithmeticMean(fSmoothedTpsAverage_Sampled, vSmoothedSamples.size(), fRemoving);
