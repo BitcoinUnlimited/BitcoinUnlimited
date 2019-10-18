@@ -25,6 +25,12 @@ The following is a list of the previuos network upgrades specifications:
 Upgrading
 ---------
 
+If you are running your client with `-txindex` (`txindex=1), the first session
+after upgrading to 1.7.0 the transactions index database will be migrated to a new
+format. This process could take quite a while especially if you are storing your blockchain
+data on a rotative hard disk (up to one hour). During the migration bitcoind won't respond
+to RPC calls.
+
 If you are running an older version, shut it down. Wait until it has completely
 shut down (which might take a few minutes for older versions), then run the
 installer (on Windows) or just copy over /Applications/Bitcoin-Qt (on Mac) or
