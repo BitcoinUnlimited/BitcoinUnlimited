@@ -58,6 +58,28 @@ struct ForkDeploymentInfo
 };
 struct ForkDeploymentInfo VersionBitsDeploymentInfo[Consensus::MAX_VERSION_BITS_DEPLOYMENTS];
 
+// Must match the equivalent object in calling language code
+typedef enum {
+    AddrBlockchainBCH = 1,
+    AddrBlockchainBCHtestnet = 2,
+    AddrBlockchainBCHregtest = 3,
+    AddrBlockchainNol = 4,
+} ChainSelector;
+
+static CChainParams *GetChainParams(ChainSelector chainSelector)
+{
+    if (chainSelector == AddrBlockchainBCH)
+        return &Params(CBaseChainParams::MAIN);
+    else if (chainSelector == AddrBlockchainBCHtestnet)
+        return &Params(CBaseChainParams::TESTNET);
+    else if (chainSelector == AddrBlockchainBCHregtest)
+        return &Params(CBaseChainParams::REGTEST);
+    else if (chainSelector == AddrBlockchainNol)
+        return &Params(CBaseChainParams::UNL);
+    else
+        return nullptr;
+}
+
 
 // helper functions
 namespace
@@ -597,7 +619,7 @@ std::string toString(JNIEnv *env, jstring jStr)
     return ret;
 }
 
-jint throwIllegalState(JNIEnv *env, const char *message)
+jint triggerJavaIllegalStateException(JNIEnv *env, const char *message)
 {
     jclass exc = env->FindClass("java/lang/IllegalStateException");
     if (nullptr == exc)
@@ -698,7 +720,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Cod
     auto dataBytes = DecodeBase64(data.c_str(), &valid);
     if (!valid)
     {
-        throwIllegalState(env, "bad encoding");
+        triggerJavaIllegalStateException(env, "bad encoding");
         return jbyteArray();
     }
     return makeJByteArray(env, dataBytes);
@@ -766,7 +788,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Wal
 
     if (!((falsePosRate >= 0) && (falsePosRate <= 1.0)))
     {
-        throwIllegalState(env, "unknown chain selection");
+        triggerJavaIllegalStateException(env, "unknown chain selection");
         return nullptr;
     }
 
@@ -829,13 +851,14 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Pay
 
 extern "C" JNIEXPORT jstring JNICALL Java_bitcoinunlimited_libbitcoincash_PayAddress_EncodeCashAddr(JNIEnv *env,
     jobject ths,
+    jbyte chainSelector,
     jbyte typ,
     jbyteArray arg)
 {
     size_t len = env->GetArrayLength(arg);
     if (len != 20)
     {
-        throwIllegalState(env, "bad address argument length");
+        triggerJavaIllegalStateException(env, "bad address argument length");
         return env->NewStringUTF("bad address argument length");
     }
     jbyte *data = env->GetByteArrayElements(arg, 0);
@@ -845,7 +868,13 @@ extern "C" JNIEXPORT jstring JNICALL Java_bitcoinunlimited_libbitcoincash_PayAdd
 
     env->ReleaseByteArrayElements(arg, data, 0);
 
-    std::string addrAsStr(EncodeCashAddr(dst, *cashlibParams));
+    const CChainParams *cp = GetChainParams((ChainSelector)chainSelector);
+    if (cp == nullptr)
+    {
+        triggerJavaIllegalStateException(env, "Unknown blockchain selection");
+        return nullptr;
+    }
+    std::string addrAsStr(EncodeCashAddr(dst, *cp));
     return env->NewStringUTF(addrAsStr.c_str());
 }
 
@@ -876,13 +905,21 @@ public:
 
 extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_PayAddress_DecodeCashAddr(JNIEnv *env,
     jobject ths,
+    jbyte chainSelector,
     jstring addrstr)
 {
-    CTxDestination dst = DecodeCashAddr(toString(env, addrstr), *cashlibParams);
+    const CChainParams *cp = GetChainParams((ChainSelector)chainSelector);
+    if (cp == nullptr)
+    {
+        triggerJavaIllegalStateException(env, "Unknown blockchain selection");
+        return nullptr;
+    }
+
+    CTxDestination dst = DecodeCashAddr(toString(env, addrstr), *cp);
 
     jbyteArray bArray = env->NewByteArray(21);
     jbyte *data = env->GetByteArrayElements(bArray, 0);
-    boost::apply_visitor(PubkeyExtractor(data, *cashlibParams), dst);
+    boost::apply_visitor(PubkeyExtractor(data, *cp), dst);
     env->ReleaseByteArrayElements(bArray, data, 0);
     return bArray;
 }
@@ -899,7 +936,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Key
     size_t mslen = env->GetArrayLength(masterSecretBytes);
     if (mslen != 32)
     {
-        throwIllegalState(env, "key derivation failure -- master secret is incorrect length");
+        triggerJavaIllegalStateException(env, "key derivation failure -- master secret is incorrect length");
         return nullptr;
     }
 
@@ -913,7 +950,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Key
     jbyte *data = env->GetByteArrayElements(bArray, 0);
     if (secret.size() != 32)
     {
-        throwIllegalState(env, "key derivation failure -- derived secret is incorrect length");
+        triggerJavaIllegalStateException(env, "key derivation failure -- derived secret is incorrect length");
         return nullptr;
     }
     memcpy(data, secret.begin(), 32);
@@ -975,17 +1012,10 @@ extern "C" JNIEXPORT jstring JNICALL Java_bitcoinunlimited_libbitcoincash_Initia
 {
     javaEnv = env;
 
-    if (chainSelector == 1)
-        cashlibParams = &Params(CBaseChainParams::MAIN);
-    else if (chainSelector == 2)
-        cashlibParams = &Params(CBaseChainParams::TESTNET);
-    else if (chainSelector == 3)
-        cashlibParams = &Params(CBaseChainParams::REGTEST);
-    else if (chainSelector == 4)
-        cashlibParams = &Params(CBaseChainParams::UNL);
-    else
+    cashlibParams = GetChainParams((ChainSelector)chainSelector);
+    if (cashlibParams == nullptr)
     {
-        throwIllegalState(env, "unknown chain selection");
+        triggerJavaIllegalStateException(env, "unknown blockchain selection");
     }
 
 #ifdef ANDROID
