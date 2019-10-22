@@ -58,6 +58,7 @@ public:
         return (Rw << 16) + Rz;
     }
 
+    bool randbool() { return rand32() & 1; }
     uint64_t rand64()
     {
         uint64_t a = rand32();
