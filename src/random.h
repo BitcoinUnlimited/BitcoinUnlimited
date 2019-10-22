@@ -7,6 +7,7 @@
 #ifndef BITCOIN_RANDOM_H
 #define BITCOIN_RANDOM_H
 
+#include "crypto/chacha20.h"
 #include "uint256.h"
 
 #include <stdint.h>
@@ -36,8 +37,26 @@ void GetStrongRandBytes(unsigned char *buf, int num);
 class FastRandomContext
 {
 private:
+    bool requires_seed;
+    ChaCha20 rng;
+
+    unsigned char bytebuf[64];
+    int bytebuf_size;
+
     uint64_t bitbuf;
     int bitbuf_size;
+
+    void RandomSeed();
+
+    void FillByteBuffer()
+    {
+        if (requires_seed)
+        {
+            RandomSeed();
+        }
+        rng.Output(bytebuf, sizeof(bytebuf));
+        bytebuf_size = sizeof(bytebuf);
+    }
 
     void FillBitBuffer()
     {
@@ -48,25 +67,20 @@ private:
 public:
     explicit FastRandomContext(bool fDeterministic = false);
 
-    uint32_t Rz;
-    uint32_t Rw;
+    /** Initialize with explicit seed (only for testing) */
+    explicit FastRandomContext(const uint256 &seed);
 
-    uint32_t rand32()
-    {
-        Rz = 36969 * (Rz & 65535) + (Rz >> 16);
-        Rw = 18000 * (Rw & 65535) + (Rw >> 16);
-        return (Rw << 16) + Rz;
-    }
-
-    bool randbool() { return rand32() & 1; }
+    /** Generate a random 64-bit integer. */
     uint64_t rand64()
     {
-        uint64_t a = rand32();
-        uint64_t b = rand32();
-        return (b << 32) + a;
+        if (bytebuf_size < 8)
+            FillByteBuffer();
+        uint64_t ret = ReadLE64(bytebuf + 64 - bytebuf_size);
+        bytebuf_size -= 8;
+        return ret;
     }
 
-    bool randbool() { return rand32() & 1; }
+    /** Generate a random (bits)-bit integer. */
     uint64_t randbits(int bits)
     {
         if (bits == 0)
@@ -81,13 +95,17 @@ public:
         {
             if (bitbuf_size < bits)
                 FillBitBuffer();
-
             uint64_t ret = bitbuf & (~uint64_t(0) >> (64 - bits));
             bitbuf >>= bits;
             bitbuf_size -= bits;
             return ret;
         }
     }
+
+    /** Generate a random 32-bit integer. */
+    uint32_t rand32() { return randbits(32); }
+    /** Generate a random boolean. */
+    bool randbool() { return randbits(1); }
 };
 
 /* Number of random bytes returned by GetOSRand.
