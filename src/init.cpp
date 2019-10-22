@@ -1547,8 +1547,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     if (!strErrors.str().empty())
         return InitError(strErrors.str());
 
-    RandAddSeedPerfmon();
-
     //// debug print
     {
         READLOCK(cs_mapBlockIndex);

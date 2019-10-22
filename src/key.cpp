@@ -247,10 +247,9 @@ static int ec_privkey_export_der(const secp256k1_context *ctx,
 bool CKey::Check(const unsigned char *vch) { return secp256k1_ec_seckey_verify(secp256k1_context_sign, vch); }
 void CKey::MakeNewKey(bool fCompressedIn)
 {
-    RandAddSeedPerfmon();
     do
     {
-        GetRandBytes(vch, sizeof(vch));
+        GetStrongRandBytes(vch, sizeof(vch));
     } while (!Check(vch));
     fValid = true;
     fCompressed = fCompressedIn;

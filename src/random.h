@@ -11,11 +11,8 @@
 
 #include <stdint.h>
 
-/**
- * Seed OpenSSL PRNG with additional entropy data
- */
+/* Seed OpenSSL PRNG with additional entropy data */
 void RandAddSeed();
-void RandAddSeedPerfmon();
 
 /**
  * Functions to gather random data via the OpenSSL PRNG
@@ -24,6 +21,12 @@ void GetRandBytes(unsigned char *buf, int num);
 uint64_t GetRand(uint64_t nMax);
 int GetRandInt(int nMax);
 uint256 GetRandHash();
+
+/**
+ * Function to gather random data from multiple sources, failing whenever any
+ * of those source fail to provide a result.
+ */
+void GetStrongRandBytes(unsigned char *buf, int num);
 
 /**
  * Fast randomness source. This is seeded once with secure random data, but
@@ -91,11 +94,11 @@ public:
  * sure that the underlying OS APIs for all platforms support the number.
  * (many cap out at 256 bytes).
  */
-static const ssize_t NUM_OS_RANDOM_BYTES = 32;
+// static const ssize_t NUM_OS_RANDOM_BYTES = 32;
 
 /** Get 32 bytes of system entropy. Do not use this in application code: use
  * GetStrongRandBytes instead.
  */
-void GetOSRand(unsigned char *ent32);
+// void GetOSRand(unsigned char *ent32);
 
 #endif // BITCOIN_RANDOM_H
