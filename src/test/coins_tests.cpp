@@ -43,7 +43,7 @@ public:
             return false;
         }
         coin = it->second;
-        if (coin.IsSpent() && insecure_randrange(2) == 0)
+        if (coin.IsSpent() && insecure_randbool() == 0)
         {
             // Randomly return false in case of an empty entry.
             return false;
@@ -251,7 +251,7 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
         // Every 100 iterations, flush an intermediate cache
         if (insecure_randrange(100) == 0)
         {
-            if (stack.size() > 1 && insecure_randrange(2) == 0)
+            if (stack.size() > 1 && insecure_randbool() == 0)
             {
                 unsigned int flushIndex = insecure_randrange(stack.size() - 1);
                 stack[flushIndex]->Flush();
@@ -261,14 +261,14 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
         // Every 50 iterations, change the cache stack.
         if (insecure_randrange(50) == 0)
         {
-            if (stack.size() > 0 && insecure_randrange(2) == 0)
+            if (stack.size() > 0 && insecure_randbool() == 0)
             {
                 // Remove the top cache
                 stack.back()->Flush();
                 delete stack.back();
                 stack.pop_back();
             }
-            if (stack.size() == 0 || (stack.size() < 4 && insecure_randrange(2)))
+            if (stack.size() == 0 || (stack.size() < 4 && insecure_randbool()))
             {
                 // Add a new cache
                 CCoinsView *tip = &base;

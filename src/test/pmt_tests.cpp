@@ -28,7 +28,7 @@ public:
     void Damage()
     {
         unsigned int n = insecure_randrange(vHash.size());
-        int bit = insecure_randrange(256);
+        int bit = insecure_randbits(8);
         *(vHash[n].begin() + (bit >> 3)) ^= 1 << (bit & 7);
     }
 };
