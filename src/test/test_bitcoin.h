@@ -38,7 +38,6 @@ static inline uint64_t insecure_randbits(int bits) { return insecure_rand_ctx.ra
 static inline uint64_t insecure_randrange(uint64_t range) { return insecure_rand_ctx.randrange(range); }
 static inline bool insecure_randbool() { return insecure_rand_ctx.randbool(); }
 static inline std::vector<unsigned char> insecure_randbytes(size_t len) { return insecure_rand_ctx.randbytes(len); }
-static inline uint256 InsecureRand256(void) { return GetRandHash(); }
 /** Basic testing setup.
  * This just configures logging and chain parameters.
  */

@@ -49,7 +49,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     CMutableTransaction respend;
     respend.vin.resize(1);
     respend.vin[0].prevout.n = 0;
-    respend.vin[0].prevout.hash = GetRandHash();
+    respend.vin[0].prevout.hash = insecure_rand256();
     respend.vin[0].scriptSig << OP_1;
 
     CNode node(INVALID_SOCKET, CAddress());
