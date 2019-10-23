@@ -904,6 +904,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 
     // Initialize elliptic curve code
     std::string sha256_algo = SHA256AutoDetect();
+    RandomInit();
     LOGA("Using the '%s' SHA256 implementation\n", sha256_algo);
     ECC_Start();
     globalVerifyHandle.reset(new ECCVerifyHandle());

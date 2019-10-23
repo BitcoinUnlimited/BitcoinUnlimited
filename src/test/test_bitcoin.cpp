@@ -48,6 +48,7 @@ BasicTestingSetup::BasicTestingSetup(const std::string &chainName)
     if (mapArgs.count("-datadir") == 0)
         mapArgs["-datadir"] = GetTempPath().string();
     SHA256AutoDetect();
+    RandomInit();
     ECC_Start();
     SetupEnvironment();
     SetupNetworking();
