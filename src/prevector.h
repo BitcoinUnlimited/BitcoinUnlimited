@@ -382,6 +382,7 @@ public:
         fill(item_ptr(0), other.begin(),  other.end());
     }
 
+    prevector(prevector<N, T, Size, Diff> &&other) : _size(0) { swap(other); }
     prevector &operator=(const prevector<N, T, Size, Diff> &other)
     {
         if (&other == this)
@@ -389,6 +390,12 @@ public:
             return *this;
         }
         assign(other.begin(), other.end());
+        return *this;
+    }
+
+    prevector &operator=(prevector<N, T, Size, Diff> &&other)
+    {
+        swap(other);
         return *this;
     }
 
