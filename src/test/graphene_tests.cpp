@@ -1,6 +1,7 @@
 // Copyright (c) 2018-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "blockrelay/graphene.h"
 #include "blockrelay/graphene_set.h"
 #include "bloom.h"
@@ -24,7 +25,6 @@
 size_t ProjectedGrapheneSizeBytes(uint64_t version, uint64_t nBlockTxs, uint64_t nExcessTxs, uint64_t nSymDiff, bool computeOptimized=false)
 {
     const int SERIALIZATION_OVERHEAD = 11;
-    FastRandomContext insecure_rand(true);
     auto fpr = [nExcessTxs](int a) { return a / float(nExcessTxs); };
 
     CIblt iblt(nSymDiff, CGrapheneSet::GetCIbltVersion(version));
@@ -39,7 +39,7 @@ size_t ProjectedGrapheneSizeBytes(uint64_t version, uint64_t nBlockTxs, uint64_t
     else
     {
         CBloomFilter filter(
-            nBlockTxs, fpr(nSymDiff), insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
+            nBlockTxs, fpr(nSymDiff), insecure_rand_ctx.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max());
         filterBytes = ::GetSerializeSize(filter, SER_NETWORK, PROTOCOL_VERSION) - SERIALIZATION_OVERHEAD;
     }
 

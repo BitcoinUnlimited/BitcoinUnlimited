@@ -123,7 +123,7 @@ public:
 
     GenVersionBitsTesterMinBlocks& TestDefined() {
         for (int i = 0; i < CHECKERS; i++) {
-            if ((insecure_rand() & ((1 << i) - 1)) == 0) {
+            if ((InsecureRand32() & ((1 << i) - 1)) == 0) {
                 BOOST_CHECK_MESSAGE(checker[i].GetState(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_DEFINED, strprintf("Test %i for DEFINED", num));
             }
         }
@@ -133,7 +133,7 @@ public:
 
     GenVersionBitsTesterMinBlocks& TestStarted() {
         for (int i = 0; i < CHECKERS; i++) {
-            if ((insecure_rand() & ((1 << i) - 1)) == 0) {
+            if ((InsecureRand32() & ((1 << i) - 1)) == 0) {
                 BOOST_CHECK_MESSAGE(checker[i].GetState(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_STARTED, strprintf("Test %i for STARTED", num));
             }
         }
@@ -143,7 +143,7 @@ public:
 
     GenVersionBitsTesterMinBlocks& TestLockedIn() {
         for (int i = 0; i < CHECKERS; i++) {
-            if ((insecure_rand() & ((1 << i) - 1)) == 0) {
+            if ((InsecureRand32() & ((1 << i) - 1)) == 0) {
                 BOOST_CHECK_MESSAGE(checker[i].GetState(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_LOCKED_IN, strprintf("Test %i for LOCKED_IN", num));
             }
         }
@@ -153,7 +153,7 @@ public:
 
     GenVersionBitsTesterMinBlocks& TestActive() {
         for (int i = 0; i < CHECKERS; i++) {
-            if ((insecure_rand() & ((1 << i) - 1)) == 0) {
+            if ((InsecureRand32() & ((1 << i) - 1)) == 0) {
                 BOOST_CHECK_MESSAGE(checker[i].GetState(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_ACTIVE, strprintf("Test %i for ACTIVE", num));
             }
         }
@@ -162,7 +162,7 @@ public:
     }
     GenVersionBitsTesterMinBlocks& TestFailed() {
         for (int i = 0; i < CHECKERS; i++) {
-            if ((insecure_rand() & ((1 << i) - 1)) == 0) {
+            if ((InsecureRand32() & ((1 << i) - 1)) == 0) {
                 BOOST_CHECK_MESSAGE(checker[i].GetState(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_FAILED, strprintf("Test %i for FAILED", num));
             }
         }
@@ -226,7 +226,7 @@ public:
 
     GenVersionBitsTesterMinTime& TestDefined() {
         for (int i = 0; i < CHECKERS; i++) {
-            if ((insecure_rand() & ((1 << i) - 1)) == 0) {
+            if ((InsecureRand32() & ((1 << i) - 1)) == 0) {
                 BOOST_CHECK_MESSAGE(checker[i].GetState(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_DEFINED, strprintf("Test %i for DEFINED", num));
             }
         }
@@ -236,7 +236,7 @@ public:
 
     GenVersionBitsTesterMinTime& TestStarted() {
         for (int i = 0; i < CHECKERS; i++) {
-            if ((insecure_rand() & ((1 << i) - 1)) == 0) {
+            if ((InsecureRand32() & ((1 << i) - 1)) == 0) {
                 BOOST_CHECK_MESSAGE(checker[i].GetState(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_STARTED, strprintf("Test %i for STARTED", num));
             }
         }
@@ -246,7 +246,7 @@ public:
 
     GenVersionBitsTesterMinTime& TestLockedIn() {
         for (int i = 0; i < CHECKERS; i++) {
-            if ((insecure_rand() & ((1 << i) - 1)) == 0) {
+            if ((InsecureRand32() & ((1 << i) - 1)) == 0) {
                 BOOST_CHECK_MESSAGE(checker[i].GetState(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_LOCKED_IN, strprintf("Test %i for LOCKED_IN", num));
             }
         }
@@ -256,7 +256,7 @@ public:
 
     GenVersionBitsTesterMinTime& TestActive() {
         for (int i = 0; i < CHECKERS; i++) {
-            if ((insecure_rand() & ((1 << i) - 1)) == 0) {
+            if ((InsecureRand32() & ((1 << i) - 1)) == 0) {
                 BOOST_CHECK_MESSAGE(checker[i].GetState(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_ACTIVE, strprintf("Test %i for ACTIVE", num));
             }
         }
@@ -265,7 +265,7 @@ public:
     }
     GenVersionBitsTesterMinTime& TestFailed() {
         for (int i = 0; i < CHECKERS; i++) {
-            if ((insecure_rand() & ((1 << i) - 1)) == 0) {
+            if ((InsecureRand32() & ((1 << i) - 1)) == 0) {
                 BOOST_CHECK_MESSAGE(checker[i].GetState(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_FAILED, strprintf("Test %i for FAILED", num));
             }
         }

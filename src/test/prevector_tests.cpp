@@ -207,82 +207,82 @@ BOOST_AUTO_TEST_CASE(PrevectorTestInt)
         prevector_tester<8, int> test;
         for (int i = 0; i < 2048; i++)
         {
-            if (insecure_randbits(2) == 0)
+            if (InsecureRandBits(2) == 0)
             {
-                test.insert(insecure_randrange(test.size() + 1), insecure_rand());
+                test.insert(InsecureRandRange(test.size() + 1), InsecureRand32());
             }
-            if (test.size() > 0 && insecure_randbits(2) == 1)
+            if (test.size() > 0 && InsecureRandBits(2) == 1)
             {
-                test.erase(insecure_randrange(test.size()));
+                test.erase(InsecureRandRange(test.size()));
             }
-            if (insecure_randbits(3) == 2)
+            if (InsecureRandBits(3) == 2)
             {
-                int new_size = std::max<int>(0, std::min<int>(30, test.size() + (insecure_randrange(5)) - 2));
+                int new_size = std::max<int>(0, std::min<int>(30, test.size() + (InsecureRandRange(5)) - 2));
                 test.resize(new_size);
             }
-            if (insecure_randbits(3) == 3)
+            if (InsecureRandBits(3) == 3)
             {
-                test.insert(insecure_randrange(test.size() + 1), 1 + insecure_randbool(), insecure_rand());
+                test.insert(InsecureRandRange(test.size() + 1), 1 + InsecureRandBool(), InsecureRand32());
             }
-            if (insecure_randbits(3) == 4)
+            if (InsecureRandBits(3) == 4)
             {
-                int del = std::min<int>(test.size(), 1 + (insecure_randbool()));
-                int beg = insecure_randrange(test.size() + 1 - del);
+                int del = std::min<int>(test.size(), 1 + (InsecureRandBool()));
+                int beg = InsecureRandRange(test.size() + 1 - del);
                 test.erase(beg, beg + del);
             }
-            if (insecure_randbits(4) == 5)
+            if (InsecureRandBits(4) == 5)
             {
-                test.push_back(insecure_rand());
+                test.push_back(InsecureRand32());
             }
-            if (test.size() > 0 && insecure_randbits(4) == 6)
+            if (test.size() > 0 && InsecureRandBits(4) == 6)
             {
                 test.pop_back();
             }
-            if (insecure_randbits(5) == 7)
+            if (InsecureRandBits(5) == 7)
             {
                 int values[4];
-                int num = 1 + (insecure_randbits(2));
+                int num = 1 + (InsecureRandBits(2));
                 for (int k = 0; k < num; k++)
                 {
-                    values[k] = insecure_rand();
+                    values[k] = InsecureRand32();
                 }
-                test.insert_range(insecure_randrange(test.size() + 1), values, values + num);
+                test.insert_range(InsecureRandRange(test.size() + 1), values, values + num);
             }
-            if (insecure_randbits(5) == 8)
+            if (InsecureRandBits(5) == 8)
             {
-                int del = std::min<int>(test.size(), 1 + (insecure_randbits(2)));
-                int beg = insecure_randrange(test.size() + 1 - del);
+                int del = std::min<int>(test.size(), 1 + (InsecureRandBits(2)));
+                int beg = InsecureRandRange(test.size() + 1 - del);
                 test.erase(beg, beg + del);
             }
-            if (insecure_randbits(5) == 9)
+            if (InsecureRandBits(5) == 9)
             {
-                test.reserve(insecure_randbits(5));
+                test.reserve(InsecureRandBits(5));
             }
-            if (insecure_randbits(6) == 10)
+            if (InsecureRandBits(6) == 10)
             {
                 test.shrink_to_fit();
             }
             if (test.size() > 0)
             {
-                test.update(insecure_randrange(test.size()), insecure_rand());
+                test.update(InsecureRandRange(test.size()), InsecureRand32());
             }
-            if (insecure_randbits(10) == 11)
+            if (InsecureRandBits(10) == 11)
             {
                 test.clear();
             }
-            if (insecure_randbits(9) == 12)
+            if (InsecureRandBits(9) == 12)
             {
-                test.assign(insecure_randbits(5), insecure_rand());
+                test.assign(InsecureRandBits(5), InsecureRand32());
             }
-            if (insecure_randbits(3) == 3)
+            if (InsecureRandBits(3) == 3)
             {
                 test.swap();
             }
-            if (insecure_randbits(4) == 8)
+            if (InsecureRandBits(4) == 8)
             {
                 test.copy();
             }
-            if (insecure_randbits(5) == 18)
+            if (InsecureRandBits(5) == 18)
             {
                 test.move();
             }

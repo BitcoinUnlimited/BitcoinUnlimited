@@ -95,7 +95,7 @@ public:
     {
         for (int i = 0; i < CHECKERS; i++)
         {
-            if (insecure_randbits(i) == 0)
+            if (InsecureRandBits(i) == 0)
             {
                 BOOST_CHECK_MESSAGE(
                     checker[i].GetStateFor(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_DEFINED,
@@ -110,7 +110,7 @@ public:
     {
         for (int i = 0; i < CHECKERS; i++)
         {
-            if (insecure_randbits(i) == 0)
+            if (InsecureRandBits(i) == 0)
             {
                 BOOST_CHECK_MESSAGE(
                     checker[i].GetStateFor(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_STARTED,
@@ -125,7 +125,7 @@ public:
     {
         for (int i = 0; i < CHECKERS; i++)
         {
-            if (insecure_randbits(i) == 0)
+            if (InsecureRandBits(i) == 0)
             {
                 BOOST_CHECK_MESSAGE(
                     checker[i].GetStateFor(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_LOCKED_IN,
@@ -140,7 +140,7 @@ public:
     {
         for (int i = 0; i < CHECKERS; i++)
         {
-            if (insecure_randbits(i) == 0)
+            if (InsecureRandBits(i) == 0)
             {
                 BOOST_CHECK_MESSAGE(
                     checker[i].GetStateFor(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_ACTIVE,
@@ -155,7 +155,7 @@ public:
     {
         for (int i = 0; i < CHECKERS; i++)
         {
-            if (insecure_randbits(i) == 0)
+            if (InsecureRandBits(i) == 0)
             {
                 BOOST_CHECK_MESSAGE(
                     checker[i].GetStateFor(vpblock.empty() ? nullptr : vpblock.back()) == THRESHOLD_FAILED,

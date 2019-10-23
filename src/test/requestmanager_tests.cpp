@@ -144,8 +144,8 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
 
     // Create basic Inv for requesting blocks. This simulates an entry in the request manager for a block
     // download.
-    uint256 hash = insecure_rand256();
-    uint256 randhash = insecure_rand256();
+    uint256 hash = InsecureRand256();
+    uint256 randhash = InsecureRand256();
     CInv inv(MSG_BLOCK, hash);
     CInv inv_cmpct(MSG_CMPCT_BLOCK, hash);
 
@@ -714,7 +714,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     // Now move the clock ahead so that the timer is exceeded and we should now
     // download a full block
     SetMockTime(nTime + 20);
-    randhash = insecure_rand256();
+    randhash = InsecureRand256();
     thinrelay.AddBlockInFlight(&dummyNodeGraphene, randhash, NetMsgType::GRAPHENEBLOCK);
     BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
     BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg) == "getdata");
@@ -744,24 +744,23 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetMockTime(nTime);
 
     // The first request should suceed as should successive requests up until the limit of thintype requests in flight
-    inv.hash = insecure_rand256();
-
+    inv.hash = InsecureRand256();
     BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
     BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 1);
 
-    inv.hash = insecure_rand256();
+    inv.hash = InsecureRand256();
     BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
     BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 2);
 
-    inv.hash = insecure_rand256();
+    inv.hash = InsecureRand256();
     BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
     BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 3);
 
-    inv.hash = insecure_rand256();
+    inv.hash = InsecureRand256();
     BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
     BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 4);
 
-    inv.hash = insecure_rand256();
+    inv.hash = InsecureRand256();
     BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
     BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 5);
 
@@ -769,12 +768,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     // download an xthin
     SetMockTime(nTime + 20);
     dummyNodeXthin.vSendMsg.clear();
-    inv.hash = insecure_rand256();
+    inv.hash = InsecureRand256();
     BOOST_CHECK(requester.RequestBlock(&dummyNodeXthin, inv) == true);
     BOOST_CHECK(dummyNodeXthin.vSendMsg.size() == 1);
 
     // Try to send a 7th block. It should fail to send as it's above the limit of thintype blocks in flight.
-    inv.hash = insecure_rand256();
+    inv.hash = InsecureRand256();
     BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == false);
     BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 5);
 
@@ -834,7 +833,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     // Now move the clock ahead so that the timer is exceeded and we should now
     // download a full block
     SetMockTime(nTime + 20);
-    randhash = insecure_rand256();
+    randhash = InsecureRand256();
     thinrelay.AddBlockInFlight(&dummyNodeXthin, randhash, NetMsgType::XTHINBLOCK);
     BOOST_CHECK(requester.RequestBlock(&dummyNodeXthin, inv) == true);
     BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg) == "getdata");
@@ -870,7 +869,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     // Now move the clock ahead so that the timer is exceeded and we should now
     // download a full block
     SetMockTime(nTime + 20);
-    randhash = insecure_rand256();
+    randhash = InsecureRand256();
     thinrelay.AddBlockInFlight(&dummyNodeCmpct, randhash, NetMsgType::CMPCTBLOCK);
     BOOST_CHECK(requester.RequestBlock(&dummyNodeCmpct, inv) == true);
     BOOST_CHECK(NetMessage(dummyNodeCmpct.vSendMsg) == "getdata");

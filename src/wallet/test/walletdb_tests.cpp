@@ -31,7 +31,7 @@ static std::unique_ptr<CWalletDB> TmpDB(const fs::path &pathTemp, const std::str
     fs::path dir = pathTemp / testname;
     BOOST_CHECK_MESSAGE(fs::create_directory(dir),
                         "Unable to create a directory for test " + testname);
-    fs::path path = dir / strprintf("testwallet%i", static_cast<int>(insecure_randrange(1000000)));
+    fs::path path = dir / strprintf("testwallet%i", static_cast<int>(InsecureRandRange(1000000)));
     return std::unique_ptr<CWalletDB>(new CWalletDB(path.string(), "cr+"));
 }
 

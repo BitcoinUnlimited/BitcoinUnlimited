@@ -24,7 +24,7 @@ static valtype randomHashTypes()
 {
     valtype res;
     for (size_t i = 0; i < 16; i++)
-        res.emplace_back(insecure_rand() & 0xff);
+        res.emplace_back(InsecureRand32() & 0xff);
     return res;
 }
 
@@ -49,7 +49,7 @@ static std::vector<uint32_t> randomFlags()
     std::vector<uint32_t> res;
     for (size_t i = 0; i < 100; i++)
     {
-        uint32_t val = insecure_rand();
+        uint32_t val = InsecureRand32();
         res.emplace_back(val & ((1U << 17) - 1));
     }
     return res;

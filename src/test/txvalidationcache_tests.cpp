@@ -232,9 +232,9 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     // Add an orphan to the orphan cache.  The valid inputs should be present in the coins cache.
     spends.resize(3);
     spends[2].vin.resize(3);
-    spends[2].vin[2].prevout.hash = insecure_rand256();
+    spends[2].vin[2].prevout.hash = InsecureRand256();
     spends[2].vin[2].prevout.n = 0;
-    spends[2].vin[1].prevout.hash = insecure_rand256();
+    spends[2].vin[1].prevout.hash = InsecureRand256();
     spends[2].vin[1].prevout.n = 0;
     spends[2].vin[0].prevout.hash = coinbaseTxns[2].GetHash();
     spends[2].vin[0].prevout.n = 0;
@@ -355,9 +355,9 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     // Add an orphan to the orphan cache.  The valid inputs should be present in the coins cache.
     spends.resize(5);
     spends[4].vin.resize(3);
-    spends[4].vin[2].prevout.hash = insecure_rand256();
+    spends[4].vin[2].prevout.hash = InsecureRand256();
     spends[4].vin[2].prevout.n = 0;
-    spends[4].vin[1].prevout.hash = insecure_rand256();
+    spends[4].vin[1].prevout.hash = InsecureRand256();
     spends[4].vin[1].prevout.n = 0;
     spends[4].vin[0].prevout.hash = coinbaseTxns[5].GetHash();
     spends[4].vin[0].prevout.n = 0;

@@ -67,7 +67,7 @@ TestingSetup::TestingSetup(const std::string &chainName) : BasicTestingSetup(cha
     RegisterAllCoreRPCCommands(tableRPC);
     ClearDatadirCache();
     pathTemp =
-        GetTempPath() / strprintf("test_bitcoin_%lu_%i", (unsigned long)GetTime(), (int)(insecure_randrange(1 << 30)));
+        GetTempPath() / strprintf("test_bitcoin_%lu_%i", (unsigned long)GetTime(), (int)(InsecureRandRange(1 << 30)));
     fs::create_directories(pathTemp);
     pblocktree = new CBlockTreeDB(1 << 20, "", true);
     pcoinsdbview = new CCoinsViewDB(1 << 23, true);
