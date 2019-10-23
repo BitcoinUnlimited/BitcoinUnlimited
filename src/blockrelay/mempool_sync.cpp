@@ -132,8 +132,7 @@ bool HandleMempoolSyncRequest(CDataStream &vRecv, CNode *pfrom)
         }
 
         // Assemble mempool sync object
-        uint64_t nBothMempools = mempoolTxHashes.size() + mempoolinfo.nTxInMempool;
-        CMempoolSync mempoolSync(mempoolTxHashes, mempoolinfo.nTxInMempool, nBothMempools, mempoolinfo.shorttxidk0,
+        CMempoolSync mempoolSync(mempoolTxHashes, mempoolinfo.nTxInMempool, mempoolTxHashes.size(), mempoolinfo.shorttxidk0,
             mempoolinfo.shorttxidk1, NegotiateMempoolSyncVersion(pfrom));
 
         pfrom->PushMessage(NetMsgType::MEMPOOLSYNC, mempoolSync);
