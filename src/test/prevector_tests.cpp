@@ -4,7 +4,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "prevector.h"
-#include "test/test_random.h"
 #include <vector>
 
 #include "serialize.h"

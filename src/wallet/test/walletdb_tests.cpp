@@ -4,7 +4,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "test/test_bitcoin.h"
-#include "test/test_random.h"
 #include "fs.h"
 
 #include "wallet/wallet.h"

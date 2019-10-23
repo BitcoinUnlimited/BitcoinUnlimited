@@ -7,7 +7,6 @@
 #include "consensus/validation.h"
 #include "main.h"
 #include "test/test_bitcoin.h"
-#include "test/test_random.h"
 #include "uint256.h"
 #include "undo.h"
 
