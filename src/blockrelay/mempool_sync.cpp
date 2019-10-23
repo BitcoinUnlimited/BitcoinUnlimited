@@ -219,6 +219,8 @@ bool CMempoolSync::process(CNode *pfrom)
     {
         LOG(MPOOLSYNC, "Mempool sync failed for peer %s. Graphene set could not be reconciled: %s\n",
             pfrom->GetLogName(), e.what());
+
+        return false;
     }
 
     LOG(MPOOLSYNC, "Mempool sync received: %d total responder txns, requester waiting for %d txs from peer %s\n",
