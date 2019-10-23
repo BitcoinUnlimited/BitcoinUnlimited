@@ -106,7 +106,7 @@ BOOST_AUTO_TEST_CASE(merkle_test)
 
     for (unsigned int i = 0; i < MAX_TRIES; i++)
     {
-        uint32_t size = insecure_rand() % MAX_LEAVES;
+        uint32_t size = insecure_randrange(MAX_LEAVES);
         std::vector<uint256> leaves = leafData;
         leaves.resize(size);
 
@@ -189,7 +189,7 @@ BOOST_AUTO_TEST_CASE(merkle_test)
                     int mtx = loop;
                     if (ntx > 16)
                     {
-                        mtx = insecure_rand() % ntx;
+                        mtx = insecure_randrange(ntx);
                     }
                     std::vector<uint256> newBranch = BlockMerkleBranch(block, mtx);
                     std::vector<uint256> oldBranch = BlockGetMerkleBranch(block, merkleTree, mtx);

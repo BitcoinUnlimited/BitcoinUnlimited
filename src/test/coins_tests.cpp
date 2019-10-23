@@ -157,7 +157,7 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
     {
         // Do a random modification.
         {
-            uint256 txid = txids[insecure_rand() % txids.size()]; // txid we're going to modify in this iteration.
+            uint256 txid = txids[insecure_randrange(txids.size())]; // txid we're going to modify in this iteration.
             Coin &coin = result[COutPoint(txid, 0)];
             if ((insecure_randrange(500)) == 0)
             {
@@ -202,8 +202,8 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
         // One every 10 iterations, remove a random entry from the cache
         if (insecure_randrange(10))
         {
-            COutPoint out(txids[insecure_rand() % txids.size()], 0);
-            int cacheid = insecure_rand() % stack.size();
+            COutPoint out(txids[insecure_randrange(txids.size())], 0);
+            int cacheid = insecure_randrange(stack.size());
             stack[cacheid]->Uncache(out);
 
             bool fSpent = false;
@@ -213,7 +213,7 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
         // One every 500 iterations, trim a random cache to zero
         if (insecure_randrange(500))
         {
-            int cacheid = insecure_rand() % stack.size();
+            int cacheid = insecure_randrange(stack.size());
             stack[cacheid]->Trim(0);
         }
 
@@ -253,7 +253,7 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
         {
             if (stack.size() > 1 && insecure_randrange(2) == 0)
             {
-                unsigned int flushIndex = insecure_rand() % (stack.size() - 1);
+                unsigned int flushIndex = insecure_randrange(stack.size() - 1);
                 stack[flushIndex]->Flush();
             }
         }
