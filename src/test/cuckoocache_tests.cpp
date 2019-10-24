@@ -38,7 +38,6 @@ BOOST_AUTO_TEST_CASE(test_cuckoocache_no_fakes)
     size_t megabytes = 4;
     cc.setup_bytes(megabytes << 20);
     for (int x = 0; x < 100000; ++x) {
-        insecure_GetRandHash(v);
         cc.insert(InsecureRand256());
     }
     for (int x = 0; x < 100000; ++x) {
