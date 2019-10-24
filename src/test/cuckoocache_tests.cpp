@@ -24,19 +24,8 @@
  *  using BOOST_CHECK_CLOSE to fail.
  *
  */
-FastRandomContext local_rand_ctx(true);
 
 BOOST_AUTO_TEST_SUITE(cuckoocache_tests);
-
-
-/** insecure_GetRandHash fills in a uint256 from local_rand_ctx
- */
-void insecure_GetRandHash(uint256& t)
-{
-    uint32_t* ptr = (uint32_t*)t.begin();
-    for (uint8_t j = 0; j < 8; ++j)
-        *(ptr++) = local_rand_ctx.rand32();
-}
 
 /* Test that no values not inserted into the cache are read out of it.
  *
@@ -44,18 +33,16 @@ void insecure_GetRandHash(uint256& t)
  */
 BOOST_AUTO_TEST_CASE(test_cuckoocache_no_fakes)
 {
-    local_rand_ctx = FastRandomContext(true);
+    SeedInsecureRand(true);
     CuckooCache::cache<uint256, SignatureCacheHasher> cc{};
     size_t megabytes = 4;
     cc.setup_bytes(megabytes << 20);
-    uint256 v;
     for (int x = 0; x < 100000; ++x) {
         insecure_GetRandHash(v);
-        cc.insert(v);
+        cc.insert(InsecureRand256());
     }
     for (int x = 0; x < 100000; ++x) {
-        insecure_GetRandHash(v);
-        BOOST_CHECK(!cc.contains(v, false));
+        BOOST_CHECK(!cc.contains(InsecureRand256(), false));
     }
 };
 
@@ -65,7 +52,7 @@ BOOST_AUTO_TEST_CASE(test_cuckoocache_no_fakes)
 template <typename Cache>
 double test_cache(size_t megabytes, double load)
 {
-    local_rand_ctx = FastRandomContext(true);
+    SeedInsecureRand(true);
     std::vector<uint256> hashes;
     Cache set{};
     size_t bytes = megabytes * (1 << 20);
@@ -75,7 +62,7 @@ double test_cache(size_t megabytes, double load)
     for (uint32_t i = 0; i < n_insert; ++i) {
         uint32_t* ptr = (uint32_t*)hashes[i].begin();
         for (uint8_t j = 0; j < 8; ++j)
-            *(ptr++) = local_rand_ctx.rand32();
+            *(ptr++) = InsecureRand32();
     }
     /** We make a copy of the hashes because future optimizations of the
      * cuckoocache may overwrite the inserted element, so the test is
@@ -136,7 +123,7 @@ template <typename Cache>
 void test_cache_erase(size_t megabytes)
 {
     double load = 1;
-    local_rand_ctx = FastRandomContext(true);
+    SeedInsecureRand(true);
     std::vector<uint256> hashes;
     Cache set{};
     size_t bytes = megabytes * (1 << 20);
@@ -146,7 +133,7 @@ void test_cache_erase(size_t megabytes)
     for (uint32_t i = 0; i < n_insert; ++i) {
         uint32_t* ptr = (uint32_t*)hashes[i].begin();
         for (uint8_t j = 0; j < 8; ++j)
-            *(ptr++) = local_rand_ctx.rand32();
+            *(ptr++) = InsecureRand32();
     }
     /** We make a copy of the hashes because future optimizations of the
      * cuckoocache may overwrite the inserted element, so the test is
@@ -199,7 +186,7 @@ template <typename Cache>
 void test_cache_erase_parallel(size_t megabytes)
 {
     double load = 1;
-    local_rand_ctx = FastRandomContext(true);
+    SeedInsecureRand(true);
     std::vector<uint256> hashes;
     Cache set{};
     size_t bytes = megabytes * (1 << 20);
@@ -209,7 +196,7 @@ void test_cache_erase_parallel(size_t megabytes)
     for (uint32_t i = 0; i < n_insert; ++i) {
         uint32_t* ptr = (uint32_t*)hashes[i].begin();
         for (uint8_t j = 0; j < 8; ++j)
-            *(ptr++) = local_rand_ctx.rand32();
+            *(ptr++) = InsecureRand32();
     }
     /** We make a copy of the hashes because future optimizations of the
      * cuckoocache may overwrite the inserted element, so the test is
@@ -297,12 +284,6 @@ void test_cache_generations()
     // min_hit_rate*max_rate_less_than_tight_hit_rate = 0.999*99%+0.99*1% == 99.89%
     // hit rate with low variance.
 
-    // We use deterministic values, but this test has also passed on many
-    // iterations with non-deterministic values, so it isn't "overfit" to the
-    // specific entropy in FastRandomContext(true) and implementation of the
-    // cache.
-    local_rand_ctx = FastRandomContext(true);
-
     // block_activity models a chunk of network activity. n_insert elements are
     // adde to the cache. The first and last n/4 are stored for removal later
     // and the middle n/2 are not stored. This models a network which uses half
@@ -312,13 +293,14 @@ void test_cache_generations()
         std::vector<uint256> reads;
         block_activity(uint32_t n_insert, Cache& c) : reads()
         {
+            SeedInsecureRand(true);
             std::vector<uint256> inserts;
             inserts.resize(n_insert);
             reads.reserve(n_insert / 2);
             for (uint32_t i = 0; i < n_insert; ++i) {
                 uint32_t* ptr = (uint32_t*)inserts[i].begin();
                 for (uint8_t j = 0; j < 8; ++j)
-                    *(ptr++) = local_rand_ctx.rand32();
+                    *(ptr++) = InsecureRand32();
             }
             for (uint32_t i = 0; i < n_insert / 4; ++i)
                 reads.push_back(inserts[i]);
