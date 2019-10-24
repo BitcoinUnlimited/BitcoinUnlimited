@@ -201,7 +201,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     BOOST_CHECK(fSpent == false);
 
     // Try to add the same tx to the memory pool. The coins should still be present.
-    BOOST_CHECK(!ToMemPool(spends[0]));
+    BOOST_CHECK(!ToMemPool(spends[0], "txn-already-in-mempool"));
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[0].vin[0].prevout, fSpent));
     BOOST_CHECK(fSpent == false);
 
@@ -223,7 +223,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     vchSig2.push_back((unsigned char)sighashType);
     spends[1].vin[0].scriptSig << vchSig2;
 
-    BOOST_CHECK(!ToMemPool(spends[1]));
+    BOOST_CHECK(!ToMemPool(spends[1], "bad-txns-premature-spend-of-coinbase"));
     // not uncached because from a previous txn
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[0].vin[0].prevout, fSpent));
     BOOST_CHECK(fSpent == false);
