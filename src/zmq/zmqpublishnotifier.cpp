@@ -119,7 +119,7 @@ void CZMQAbstractPublishNotifier::Shutdown()
         zmq_close(psocket);
     }
 
-    psocket = 0;
+    psocket = nullptr;
 }
 
 bool CZMQPublishHashBlockNotifier::NotifyBlock(const CBlockIndex *pindex)

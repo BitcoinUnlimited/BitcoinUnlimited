@@ -733,7 +733,7 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
         mapWallet[hash] = wtxIn;
         CWalletTx &wtx = mapWallet[hash];
         wtx.BindWallet(this);
-        wtxOrdered.insert(make_pair(wtx.nOrderPos, TxPair(&wtx, (CAccountingEntry *)0)));
+        wtxOrdered.insert(make_pair(wtx.nOrderPos, TxPair(&wtx, nullptr)));
         AddToSpends(hash);
         for (const CTxIn &txin : wtx.vin)
         {
@@ -758,7 +758,7 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
         {
             wtx.nTimeReceived = GetAdjustedTime();
             wtx.nOrderPos = IncOrderPosNext(pwalletdb);
-            wtxOrdered.insert(make_pair(wtx.nOrderPos, TxPair(&wtx, (CAccountingEntry *)0)));
+            wtxOrdered.insert(make_pair(wtx.nOrderPos, TxPair(&wtx, nullptr)));
 
             wtx.nTimeSmart = wtx.nTimeReceived;
             if (!wtxIn.hashUnset())
@@ -1602,7 +1602,7 @@ CAmount CWalletTx::GetImmatureCredit(bool fUseCache) const
 
 CAmount CWalletTx::GetAvailableCredit(bool fUseCache) const
 {
-    if (pwallet == 0)
+    if (pwallet == nullptr)
         return 0;
 
     // Must wait until coinbase is safely deep enough in the chain before valuing it
@@ -1646,7 +1646,7 @@ CAmount CWalletTx::GetImmatureWatchOnlyCredit(const bool &fUseCache) const
 
 CAmount CWalletTx::GetAvailableWatchOnlyCredit(const bool &fUseCache) const
 {
-    if (pwallet == 0)
+    if (pwallet == nullptr)
         return 0;
 
     // Must wait until coinbase is safely deep enough in the chain before valuing it
@@ -2616,7 +2616,7 @@ bool CWallet::AddAccountingEntry(const CAccountingEntry &acentry, CWalletDB &pwa
 
     laccentries.push_back(acentry);
     CAccountingEntry &entry = laccentries.back();
-    wtxOrdered.insert(make_pair(entry.nOrderPos, TxPair((CWalletTx *)0, &entry)));
+    wtxOrdered.insert(make_pair(entry.nOrderPos, TxPair(nullptr, &entry)));
 
     return true;
 }
