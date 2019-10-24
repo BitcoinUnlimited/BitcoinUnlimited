@@ -122,6 +122,9 @@ enum
 // maximum transaction mempool admission threads
 extern CTweak<unsigned int> numTxAdmissionThreads;
 
+// restrict transaction inputs to 1 for long unconfirmed chains
+extern CTweak<bool> restrictInputs;
+
 extern CRollingFastFilter<4 * 1024 * 1024> recentRejects;
 extern CRollingFastFilter<4 * 1024 * 1024> txRecentlyInBlock;
 
