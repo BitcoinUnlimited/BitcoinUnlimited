@@ -410,6 +410,10 @@ bool Random_SanityCheck()
     if (stop == start)
         return false;
 
+    // We called GetPerformanceCounter. Use it as entropy.
+    RAND_add((const unsigned char *)&start, sizeof(start), 1);
+    RAND_add((const unsigned char *)&stop, sizeof(stop), 1);
+
     return true;
 }
 
