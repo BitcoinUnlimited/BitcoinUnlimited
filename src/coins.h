@@ -318,6 +318,12 @@ public:
      * of the cache while holding the reference, this behavior should not be relied
      * on! To be safe, best to not hold the returned reference through any other
      * calls to this cache.
+     *
+     * Due to the multi-threaded nature of the BU code, its dangerous to use this access method,
+     * which is why it lacks of locking is indicated by prepending the function with an _.
+     * In BU, the "CoinAccessor" wrapper should be used since it properly handles locking over
+     * the duration of your use of the coin. See tx_verify.cpp as an example on how to use use
+     * CoinAccessor rather than _AccessCoin.
      */
     const Coin &_AccessCoin(const COutPoint &output) const;
 
