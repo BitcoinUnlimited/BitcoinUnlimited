@@ -37,12 +37,11 @@
 #include <openssl/err.h>
 #include <openssl/rand.h>
 
-static void RandFailure()
+[[noreturn]] static void RandFailure()
 {
     LOGA("Failed to read randomness, aborting\n");
-    abort();
+    std::abort();
 }
-
 
 static inline int64_t GetPerformanceCounter()
 {
