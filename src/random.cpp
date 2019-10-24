@@ -218,7 +218,7 @@ void GetOSRand(unsigned char *ent32)
 {
 #ifdef WIN32
     HCRYPTPROV hProvider;
-    int ret = CryptAcquireContextW(&hProvider, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT);
+    int ret = CryptAcquireContextW(&hProvider, nullptr, nullptr, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT);
     if (!ret)
     {
         RandFailure();
@@ -264,7 +264,7 @@ void GetOSRand(unsigned char *ent32)
     }
 #elif defined(HAVE_GETENTROPY_RAND) && defined(MAC_OSX)
     // We need a fallback for OSX < 10.12
-    if (&getentropy != NULL)
+    if (&getentropy != nullptr)
     {
         if (getentropy(ent32, NUM_OS_RANDOM_BYTES) != 0)
         {
@@ -284,7 +284,7 @@ void GetOSRand(unsigned char *ent32)
     do
     {
         size_t len = NUM_OS_RANDOM_BYTES - have;
-        if (sysctl(name, ARRAYLEN(name), ent32 + have, &len, NULL, 0) != 0)
+        if (sysctl(name, ARRAYLEN(name), ent32 + have, &len, nullptr, 0) != 0)
         {
             RandFailure();
         }
