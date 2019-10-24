@@ -182,6 +182,7 @@ void GetDevURandom(unsigned char *ent32)
     int f = open("/dev/urandom", O_RDONLY);
     if (f == -1)
     {
+        close(f);
         RandFailure();
     }
     int have = 0;
