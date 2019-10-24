@@ -19,6 +19,7 @@
 #include <chrono>
 #include <limits>
 #include <stdlib.h>
+#include <thread>
 
 #ifndef WIN32
 #include <sys/time.h>
@@ -368,6 +369,8 @@ FastRandomContext::FastRandomContext(const uint256 &seed) : requires_seed(false)
 
 bool Random_SanityCheck()
 {
+    uint64_t start = GetPerformanceCounter();
+
     /* This does not measure the quality of randomness, but it does test that
      * OSRandom() overwrites all 32 bytes of the output given a maximum
      * number of tries.
@@ -398,7 +401,16 @@ bool Random_SanityCheck()
 
         tries += 1;
     } while (num_overwritten < NUM_OS_RANDOM_BYTES && tries < MAX_TRIES);
-    return (num_overwritten == NUM_OS_RANDOM_BYTES); /* If this failed, bailed out after too many tries */
+    if (num_overwritten != NUM_OS_RANDOM_BYTES)
+        return false; /* If this failed, bailed out after too many tries */
+
+    // Check that GetPerformanceCounter increases at least during a GetOSRand() call + 1ms sleep.
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    uint64_t stop = GetPerformanceCounter();
+    if (stop == start)
+        return false;
+
+    return true;
 }
 
 FastRandomContext::FastRandomContext(bool fDeterministic)
