@@ -1158,7 +1158,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         if (setAncestors.size() >= BCH_DEFAULT_ANCESTOR_LIMIT && restrictInputs.Value() == true)
         {
             if (tx->vin.size() > 1)
-                return state.DoS(0, false, REJECT_NONSTANDARD, "too-many-inputs");
+                return state.DoS(0, false, REJECT_NONSTANDARD, "bad-txn-too-many-inputs");
         }
 
         if (txProps) // This is inefficient since _CalculateMemPoolAncestors also calculates this

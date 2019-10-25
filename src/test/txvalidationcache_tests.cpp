@@ -507,7 +507,7 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
         BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
         vchSig.push_back((unsigned char)sighashType);
         tx.vin[0].scriptSig << vchSig;
-        BOOST_CHECK(!ToMemPool(tx, "too-many-inputs"));
+        BOOST_CHECK(!ToMemPool(tx, "bad-txn-too-many-inputs"));
     }
 
     // Now try to add a tx with only one input. It should succeed.
