@@ -439,6 +439,22 @@ CTweak<uint64_t> grapheneFastFilterCompatibility("net.grapheneFastFilterCompatib
     "Support fast Bloom filter: 0 - either, 1 - fast only, 2 - regular only (default: either)",
     GRAPHENE_FAST_FILTER_SUPPORT);
 
+/** This setting overrides the number of cells (excluding overhead) in the initial IBLT
+ * sent using Graphene. The intent is to enable the first stage of the Graphene protocol
+ * to fail in order to test the second stage.
+ */
+CTweak<uint64_t> grapheneIbltSizeOverride("net.grapheneIbltSizeOverride",
+    "Override size of Iblt to the indicated value (greater than 0): 0 for optimal (default: 0)",
+    0);
+
+/** This setting overrides the false positive rate in the initial Bloom filter sent using
+ * Graphene. The intent is to enable the first stage of the Graphene protocol to fail in
+ * order to test the second stage.
+ */
+CTweak<double> grapheneBloomFprOverride("net.grapheneBloomFprOverride",
+    "Override size of Bloom filter to the indicated value (greater than 0.0): 0.0 for optimal (default: 0.0)",
+    0.0);
+
 CTweak<bool> syncMempoolWithPeers("net.syncMempoolWithPeers", "Synchronize mempool with peers", false);
 
 /** This setting specifies the minimum supported mempool sync version (inclusive).
@@ -510,6 +526,8 @@ CStatHistory<uint64_t> nBlockValidationTime("blockValidationTime", STAT_OP_MAX |
 // Single classes for gather thin type block relay statistics
 CThinBlockData thindata;
 CGrapheneBlockData graphenedata;
+CCriticalSection cs_graphenerecovery;
+std::map<NodeId, CGrapheneBlock> grapheneRecoveryBlock GUARDED_BY(cs_graphenerecovery);
 CCompactBlockData compactdata;
 ThinTypeRelay thinrelay;
 CCriticalSection cs_mempoolsync;

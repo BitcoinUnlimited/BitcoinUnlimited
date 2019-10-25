@@ -14,6 +14,9 @@
 #include <cmath>
 #include <numeric>
 
+extern CTweak<uint64_t> grapheneIbltSizeOverride;
+extern CTweak<double> grapheneBloomFprOverride;
+
 CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     uint64_t nSenderUniverseItems,
     const std::vector<uint256> &_itemHashes,
@@ -26,78 +29,40 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     bool fDeterministic)
     : ordered(_ordered), nReceiverUniverseItems(_nReceiverUniverseItems), shorttxidk0(_shorttxidk0),
       shorttxidk1(_shorttxidk1), version(_version), ibltSalt(ibltEntropy), computeOptimized(_computeOptimized),
-      pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr)
+      pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr), fBloomFPR(1.0)
 {
     // Below is the parameter "n" from the graphene paper
     uint64_t nItems = _itemHashes.size();
 
-    uint64_t ibltVersion = CGrapheneSet::GetCIbltVersion(version);
-
     FastRandomContext insecure_rand(fDeterministic);
 
-    // Infer various receiver quantities
-    uint64_t nReceiverExcessItems =
-        std::max((int)(nReceiverUniverseItems - nItems), (int)(nSenderUniverseItems - nItems));
-    nReceiverExcessItems = std::max(0, (int)nReceiverExcessItems); // must be non-negative
-    nReceiverExcessItems =
-        std::min((int)nReceiverUniverseItems, (int)nReceiverExcessItems); // must not exceed total mempool size
-    uint64_t nReceiverMissingItems = std::max(1, (int)(nItems - (nReceiverUniverseItems - nReceiverExcessItems)));
+    GrapheneSetOptimizationParams params =
+        DetermineGrapheneSetOptimizationParams(nReceiverUniverseItems, nSenderUniverseItems, nItems, version);
+    double optSymDiff = params.optSymDiff;
+    fBloomFPR = params.fBloomFPR;
 
-    LOG(GRAPHENE, "receiver expected to have at most %d excess txs in mempool\n", nReceiverExcessItems);
-    LOG(GRAPHENE, "receiver expected to be missing at most %d txs from block\n", nReceiverMissingItems);
-
-    // Optimal symmetric differences between receiver and sender IBLTs
-    // This is the parameter "a" from the graphene paper
-    double optSymDiff = nReceiverMissingItems;
-    try
-    {
-        if (nItems <= nReceiverUniverseItems + nReceiverMissingItems)
-            optSymDiff = OptimalSymDiff(nItems, nReceiverUniverseItems, nReceiverExcessItems, nReceiverMissingItems);
-    }
-    catch (const std::runtime_error &e)
-    {
-        LOG(GRAPHENE, "failed to optimize symmetric difference for graphene: %s\n", e.what());
-    }
-
-    // Set false positive rate for Bloom filter based on optSymDiff
-    double fpr = BloomFalsePositiveRate(optSymDiff, nReceiverExcessItems);
-
-    // So far we have only made room for false positives in the IBLT
-    // Make more room for missing items
-    optSymDiff += nReceiverMissingItems;
+    // For testing stage 2, allow FPR to be set to specific value
+    if (grapheneBloomFprOverride.Value() > 0.0)
+        fBloomFPR = grapheneBloomFprOverride.Value();
 
     // Construct Bloom filter
     if (computeOptimized)
     {
         LOG(GRAPHENE, "using compute-optimized Bloom filter\n");
-        pFastFilter = std::make_shared<CVariableFastFilter>(CVariableFastFilter(nItems, fpr));
+        pFastFilter = std::make_shared<CVariableFastFilter>(CVariableFastFilter(nItems, fBloomFPR));
     }
     else
     {
         LOG(GRAPHENE, "using regular Bloom filter\n");
         pSetFilter = std::make_shared<CBloomFilter>(CBloomFilter(
-            nItems, fpr, insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max()));
+            nItems, fBloomFPR, insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max()));
     }
-    LOG(GRAPHENE, "fp rate: %f Num elements in bloom filter: %d\n", fpr, nItems);
+    LOG(GRAPHENE, "fp rate: %f Num elements in bloom filter: %d\n", fBloomFPR, nItems);
 
-    // Construct IBLT
-    uint64_t nIbltCells = std::max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
-    uint8_t nCheckSumBits;
-    if (ibltVersion >= 2)
-    {
-        nCheckSumBits = CGrapheneSet::NChecksumBits(nIbltCells * CIblt::OptimalOverhead(nIbltCells),
-            CIblt::OptimalNHash(nIbltCells), nReceiverUniverseItems, fpr, UNCHECKED_ERROR_TOL);
-    }
-    else
-        nCheckSumBits = MAX_CHECKSUM_BITS;
-
-    LOG(GRAPHENE, "using %d checksum bits in IBLT\n", nCheckSumBits);
-    uint32_t keycheckMask = MAX_CHECKSUM_MASK >> (MAX_CHECKSUM_BITS - nCheckSumBits);
-    pSetIblt = std::make_shared<CIblt>(CIblt(nIbltCells, ibltSalt, ibltVersion, keycheckMask));
+    pSetIblt = std::make_shared<CIblt>(CGrapheneSet::ConstructIblt(
+        nReceiverUniverseItems, optSymDiff, fBloomFPR, ibltSalt, version, grapheneIbltSizeOverride.Value()));
 
     std::map<uint64_t, uint256> mapCheapHashes;
-
-    LOG(GRAPHENE, "constructed IBLT with %d cells\n", nIbltCells);
 
     for (const uint256 &itemHash : _itemHashes)
     {
@@ -150,7 +115,8 @@ uint64_t CGrapheneSet::GetShortID(const uint256 &txhash) const
 }
 
 
-double CGrapheneSet::OptimalSymDiff(uint64_t nBlockTxs,
+double CGrapheneSet::OptimalSymDiff(uint64_t version,
+    uint64_t nBlockTxs,
     uint64_t nReceiverPoolTx,
     uint64_t nReceiverExcessTxs,
     uint64_t nReceiverMissingTxs)
@@ -163,10 +129,10 @@ double CGrapheneSet::OptimalSymDiff(uint64_t nBlockTxs,
     // First calculate optimal symmetric difference assuming the maximum number of checksum bits
     double optSymDiff;
     if (nBlockTxs >= approx_items_thresh && nReceiverExcessTxs >= nBlockTxs / APPROX_EXCESS_RATE)
-        optSymDiff = ApproxOptimalSymDiff(nBlockTxs, MAX_CHECKSUM_BITS);
+        optSymDiff = CGrapheneSet::ApproxOptimalSymDiff(version, nBlockTxs, MAX_CHECKSUM_BITS);
     else
-        optSymDiff =
-            BruteForceSymDiff(nBlockTxs, nReceiverPoolTx, nReceiverExcessTxs, nReceiverMissingTxs, MAX_CHECKSUM_BITS);
+        optSymDiff = CGrapheneSet::BruteForceSymDiff(
+            nBlockTxs, nReceiverPoolTx, nReceiverExcessTxs, nReceiverMissingTxs, MAX_CHECKSUM_BITS);
 
     if (version < 4)
         return optSymDiff;
@@ -175,17 +141,18 @@ double CGrapheneSet::OptimalSymDiff(uint64_t nBlockTxs,
     uint64_t nIbltCells = std::max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
     uint8_t nChecksumBits =
         CGrapheneSet::NChecksumBits(nIbltCells * CIblt::OptimalOverhead(nIbltCells), CIblt::OptimalNHash(nIbltCells),
-            nReceiverPoolTx, BloomFalsePositiveRate(optSymDiff, nReceiverExcessTxs), UNCHECKED_ERROR_TOL);
+            nReceiverPoolTx, CGrapheneSet::BloomFalsePositiveRate(optSymDiff, nReceiverExcessTxs), UNCHECKED_ERROR_TOL);
 
     // Recalculate optimal symmetric difference assuming optimal checksum bits
     if (nBlockTxs >= approx_items_thresh && nReceiverExcessTxs >= nBlockTxs / APPROX_EXCESS_RATE)
-        return ApproxOptimalSymDiff(nBlockTxs, nChecksumBits);
+        return CGrapheneSet::ApproxOptimalSymDiff(version, nBlockTxs, nChecksumBits);
     else
-        return BruteForceSymDiff(nBlockTxs, nReceiverPoolTx, nReceiverExcessTxs, nReceiverMissingTxs, nChecksumBits);
+        return CGrapheneSet::BruteForceSymDiff(
+            nBlockTxs, nReceiverPoolTx, nReceiverExcessTxs, nReceiverMissingTxs, nChecksumBits);
 }
 
 
-double CGrapheneSet::ApproxOptimalSymDiff(uint64_t nBlockTxs, uint8_t nChecksumBits)
+double CGrapheneSet::ApproxOptimalSymDiff(uint64_t version, uint64_t nBlockTxs, uint8_t nChecksumBits)
 {
     /* Approximation to the optimal symmetric difference between block txs and receiver
      * mempool txs passing through filter to use for IBLT.
@@ -297,37 +264,68 @@ std::vector<uint64_t> CGrapheneSet::Reconcile(const std::vector<uint256> &receiv
     LOG(GRAPHENE, "%d txs passed receiver Bloom filter\n", passedFilter);
 
     mapCheapHashes.clear();
-    return Reconcile(receiverSet, localIblt);
+    return CGrapheneSet::Reconcile(receiverSet, localIblt, this->GetIblt(), GetEncodedRank(), GetOrdered());
+}
+
+// This version assumes that we know the set that have passed through the sender Bloom filter
+std::vector<uint64_t> CGrapheneSet::Reconcile(const std::set<uint64_t> &setSenderFilterPositiveCheapHashes)
+{
+    CIblt localIblt((*pSetIblt));
+    localIblt.reset();
+
+    for (const auto &cheapHash : setSenderFilterPositiveCheapHashes)
+    {
+        localIblt.insert(cheapHash, IBLT_NULL_VALUE);
+    }
+
+    return Reconcile(setSenderFilterPositiveCheapHashes, localIblt, pSetIblt, encodedRank, ordered);
 }
 
 // Pass a map of cheap hash to transaction hashes that the local machine has to reconcile with the remote and
 // return a list of cheap hashes in the block in the correct order
 std::vector<uint64_t> CGrapheneSet::Reconcile(const std::map<uint64_t, uint256> &mapCheapHashes)
 {
+    return CGrapheneSet::Reconcile(mapCheapHashes, this->GetIblt(), this->GetRegularFilter(), this->GetFastFilter(),
+        this->GetEncodedRank(), this->GetComputeOptimized(), this->GetOrdered());
+}
+
+std::vector<uint64_t> CGrapheneSet::Reconcile(const std::map<uint64_t, uint256> &mapCheapHashes,
+    std::shared_ptr<CIblt> _pSetIblt,
+    std::shared_ptr<CBloomFilter> _pSetFilter,
+    std::shared_ptr<CVariableFastFilter> _pFastFilter,
+    std::vector<unsigned char> _encodedRank,
+    bool _computeOptimized,
+    bool _ordered)
+{
     std::set<uint64_t> receiverSet;
-    CIblt localIblt((*pSetIblt));
+    CIblt localIblt((*_pSetIblt));
     localIblt.reset();
 
     for (const auto &entry : mapCheapHashes)
     {
-        if ((computeOptimized && pFastFilter->contains(entry.second)) ||
-            (!computeOptimized && pSetFilter->contains(entry.second)))
+        if ((_computeOptimized && _pFastFilter->contains(entry.second)) ||
+            (!_computeOptimized && _pSetFilter->contains(entry.second)))
         {
             receiverSet.insert(entry.first);
             localIblt.insert(entry.first, IBLT_NULL_VALUE);
         }
     }
 
-    return Reconcile(receiverSet, localIblt);
+    return Reconcile(receiverSet, localIblt, _pSetIblt, _encodedRank, _ordered);
 }
 
-std::vector<uint64_t> CGrapheneSet::Reconcile(std::set<uint64_t> &receiverSet, const CIblt &localIblt)
+std::vector<uint64_t> CGrapheneSet::Reconcile(const std::set<uint64_t> &setSenderFilterPositiveCheapHashes,
+    const CIblt &localIblt,
+    std::shared_ptr<CIblt> _pSetIblt,
+    std::vector<unsigned char> _encodedRank,
+    bool _ordered)
 {
+    std::set<uint64_t> receiverSet = std::set<uint64_t>(setSenderFilterPositiveCheapHashes);
     // Determine difference between sender and receiver IBLTs
     std::set<std::pair<uint64_t, std::vector<uint8_t> > > senderHas;
     std::set<std::pair<uint64_t, std::vector<uint8_t> > > receiverHas;
 
-    if (!((*pSetIblt) - localIblt).listEntries(senderHas, receiverHas))
+    if (!((*_pSetIblt) - localIblt).listEntries(senderHas, receiverHas))
         throw std::runtime_error("Graphene set IBLT did not decode");
 
     LOG(GRAPHENE, "senderHas: %d, receiverHas: %d\n", senderHas.size(), receiverHas.size());
@@ -342,18 +340,146 @@ std::vector<uint64_t> CGrapheneSet::Reconcile(std::set<uint64_t> &receiverSet, c
 
     std::vector<uint64_t> receiverSetItems(receiverSet.begin(), receiverSet.end());
 
-    if (!ordered)
+    if (!_ordered)
         return receiverSetItems;
 
     // Place items in order
     uint8_t nBits = ceil(log2(receiverSetItems.size()));
-    std::vector<uint64_t> itemRank = CGrapheneSet::DecodeRank(encodedRank, receiverSetItems.size(), nBits);
+    std::vector<uint64_t> itemRank = CGrapheneSet::DecodeRank(_encodedRank, receiverSetItems.size(), nBits);
     std::sort(receiverSetItems.begin(), receiverSetItems.end(), [](uint64_t i1, uint64_t i2) { return i1 < i2; });
     std::vector<uint64_t> orderedSetItems(itemRank.size(), 0);
     for (size_t i = 0; i < itemRank.size(); i++)
         orderedSetItems[itemRank[i]] = receiverSetItems[i];
 
     return orderedSetItems;
+}
+
+double CGrapheneSet::TruePositiveMargin(uint64_t nSenderFilterPositiveItems,
+    uint64_t nReceiverUniverseItems,
+    double fSenderBloomFpr,
+    uint64_t nLowerBoundTruePositives)
+{
+    return (nSenderFilterPositiveItems - nLowerBoundTruePositives) /
+               ((nReceiverUniverseItems - nLowerBoundTruePositives) * fSenderBloomFpr) -
+           1;
+}
+
+double CGrapheneSet::TruePositiveProbability(uint64_t nSenderFilterPositiveItems,
+    uint64_t nReceiverUniverseItems,
+    double fSenderBloomFpr,
+    uint64_t nLowerBoundTruePositives)
+{
+    double margin = TruePositiveMargin(
+        nSenderFilterPositiveItems, nReceiverUniverseItems, fSenderBloomFpr, nLowerBoundTruePositives);
+    double margin_plus_1 = margin + 1;
+
+    return pow(exp(margin) / pow(margin_plus_1, margin_plus_1),
+        (nReceiverUniverseItems - nLowerBoundTruePositives) * fSenderBloomFpr);
+}
+
+uint64_t CGrapheneSet::LowerBoundTruePositives(uint64_t nTargetItems,
+    uint64_t nSenderFilterPositiveItems,
+    uint64_t nReceiverUniverseItems,
+    double fSenderBloomFpr,
+    double successRate)
+{
+    // x* in the graphene paper
+
+    if (nSenderFilterPositiveItems == 0)
+        return 0;
+
+    uint64_t nLowerBoundTruePositives = 0;
+    double prob = TruePositiveProbability(
+        nSenderFilterPositiveItems, nReceiverUniverseItems, fSenderBloomFpr, nLowerBoundTruePositives);
+
+    while (prob <= (1 - successRate) &&
+           ((int)nLowerBoundTruePositives <= (int)std::min(nSenderFilterPositiveItems, nTargetItems)))
+    {
+        nLowerBoundTruePositives += 1;
+        prob += TruePositiveProbability(
+            nSenderFilterPositiveItems, nReceiverUniverseItems, fSenderBloomFpr, nLowerBoundTruePositives);
+    }
+
+    return (uint64_t)std::max(0, (int)(nLowerBoundTruePositives - 1));
+}
+
+double CGrapheneSet::FalsePositiveMargin(uint64_t nLowerBoundTruePositives,
+    uint64_t nReceiverUniverseItems,
+    double fSenderBloomFpr,
+    double successRate)
+{
+    // delta in the graphene paper
+    double log_b = log(1 - successRate);
+    double s = -log_b / ((nReceiverUniverseItems - nLowerBoundTruePositives) * fSenderBloomFpr);
+
+    return 0.5 * (s + sqrt(pow(s, 2) + 8 * s));
+}
+
+uint64_t CGrapheneSet::UpperBoundFalsePositives(uint64_t nTargetItems,
+    uint64_t nSenderFilterPositiveItems,
+    uint64_t nReceiverUniverseItems,
+    double fSenderBloomFpr,
+    double successRate)
+{
+    // y* in the graphene paper
+    uint64_t nLowerBoundTruePositives = LowerBoundTruePositives(
+        nTargetItems, nSenderFilterPositiveItems, nReceiverUniverseItems, fSenderBloomFpr, successRate);
+    double margin = FalsePositiveMargin(nLowerBoundTruePositives, nReceiverUniverseItems, fSenderBloomFpr, successRate);
+
+    return (uint64_t)std::min((double)nSenderFilterPositiveItems,
+        (1 + margin) * (nReceiverUniverseItems - nLowerBoundTruePositives) * fSenderBloomFpr);
+}
+
+double CGrapheneSet::FailureRecoveryFpr(uint64_t nItems,
+    uint64_t nReceiverUniverseItems,
+    double fSenderBloomFpr,
+    double successRate)
+{
+    return 1;
+}
+
+CVariableFastFilter CGrapheneSet::FailureRecoveryFilter(std::vector<uint256> &relevantHashes,
+    uint64_t nItems,
+    uint64_t nSenderFilterPositiveItems,
+    uint64_t nReceiverRevisedUniverseItems,
+    double successRate,
+    double fSenderBloomFPR,
+    uint64_t grapheneSetVersion)
+{
+    uint64_t nLowerBoundTruePositives = LowerBoundTruePositives(
+        nItems, nSenderFilterPositiveItems, nReceiverRevisedUniverseItems, fSenderBloomFPR, successRate);
+    GrapheneSetOptimizationParams params = DetermineGrapheneSetOptimizationParams(
+        nSenderFilterPositiveItems, nItems, nLowerBoundTruePositives, grapheneSetVersion);
+    CVariableFastFilter filter(relevantHashes.size(), params.fBloomFPR);
+
+    for (auto &hash : relevantHashes)
+        filter.insert(hash);
+
+    return filter;
+}
+
+CIblt CGrapheneSet::FailureRecoveryIblt(std::set<uint64_t> &relevantCheapHashes,
+    uint64_t nItems,
+    uint64_t nSenderFilterPositiveItems,
+    uint64_t nReceiverRevisedUniverseItems,
+    double successRate,
+    double fSenderBloomFPR,
+    uint64_t grapheneSetVersion,
+    uint32_t ibltSaltRevised)
+{
+    GrapheneSetOptimizationParams params = DetermineGrapheneSetOptimizationParams(
+        nSenderFilterPositiveItems, nItems, relevantCheapHashes.size(), grapheneSetVersion);
+    uint64_t nUpperBoundFalsePositives = UpperBoundFalsePositives(
+        nItems, nSenderFilterPositiveItems, nReceiverRevisedUniverseItems, fSenderBloomFPR, successRate);
+    CIblt iblt = CGrapheneSet::ConstructIblt(nReceiverRevisedUniverseItems,
+        params.optSymDiff + nUpperBoundFalsePositives, params.fBloomFPR, ibltSaltRevised, version, 0);
+
+    for (auto &cheapHash : relevantCheapHashes)
+    {
+        iblt.insert(cheapHash, IBLT_NULL_VALUE);
+    }
+
+    return iblt;
 }
 
 std::vector<unsigned char> CGrapheneSet::EncodeRank(std::vector<uint64_t> items, uint16_t nBitsPerItem)
@@ -419,6 +545,89 @@ double CGrapheneSet::BloomFalsePositiveRate(double optSymDiff, uint64_t nReceive
         fpr = optSymDiff / float(nReceiverExcessItems);
 
     return fpr;
+}
+
+GrapheneSetOptimizationParams CGrapheneSet::DetermineGrapheneSetOptimizationParams(uint64_t nReceiverUniverseItems,
+    uint64_t nSenderUniverseItems,
+    uint64_t nItems,
+    uint64_t version)
+{
+    // Infer various receiver quantities
+    uint64_t nReceiverExcessItems =
+        std::max((int)(nReceiverUniverseItems - nItems), (int)(nSenderUniverseItems - nItems));
+    nReceiverExcessItems = std::max(0, (int)nReceiverExcessItems); // must be non-negative
+    nReceiverExcessItems =
+        std::min((int)nReceiverUniverseItems, (int)nReceiverExcessItems); // must not exceed total mempool size
+    uint64_t nReceiverMissingItems = std::max(1, (int)(nItems - (nReceiverUniverseItems - nReceiverExcessItems)));
+
+    LOG(GRAPHENE, "receiver expected to have at most %d excess txs in mempool\n", nReceiverExcessItems);
+    LOG(GRAPHENE, "receiver expected to be missing at most %d txs from block\n", nReceiverMissingItems);
+
+    if (nItems == 0)
+    {
+        GrapheneSetOptimizationParams params = {
+            nReceiverExcessItems, nReceiverMissingItems, (double)nReceiverMissingItems, FILTER_FPR_MAX};
+
+        return params;
+    }
+
+    // Optimal symmetric differences between receiver and sender IBLTs
+    // This is the parameter "a" from the graphene paper
+    double optSymDiff = nReceiverMissingItems;
+    try
+    {
+        if (nItems <= nReceiverUniverseItems + nReceiverMissingItems)
+            optSymDiff = CGrapheneSet::OptimalSymDiff(
+                version, nItems, nReceiverUniverseItems, nReceiverExcessItems, nReceiverMissingItems);
+    }
+    catch (const std::runtime_error &e)
+    {
+        LOG(GRAPHENE, "failed to optimize symmetric difference for graphene: %s\n", e.what());
+    }
+
+    // Set false positive rate for Bloom filter based on optSymDiff
+    double fBloomFPR = CGrapheneSet::BloomFalsePositiveRate(optSymDiff, nReceiverExcessItems);
+
+    // So far we have only made room for false positives in the IBLT
+    // Make more room for missing items
+    optSymDiff += nReceiverMissingItems;
+
+    GrapheneSetOptimizationParams params = {nReceiverExcessItems, nReceiverMissingItems, optSymDiff, fBloomFPR};
+
+    return params;
+}
+
+CIblt CGrapheneSet::ConstructIblt(uint64_t nReceiverUniverseItems,
+    double optSymDiff,
+    double fBloomFPR,
+    uint32_t ibltSalt,
+    uint64_t graphenSetVersion,
+    uint64_t nOverrideValue)
+{
+    uint64_t ibltVersion = CGrapheneSet::GetCIbltVersion(graphenSetVersion);
+    uint64_t nIbltCells = std::max((int)IBLT_CELL_MINIMUM, (int)ceil(optSymDiff));
+
+    // For testing stage 2, allow IBLT size to be set to specific value
+    if (nOverrideValue > 0)
+        nIbltCells = nOverrideValue;
+
+    uint8_t nCheckSumBits;
+    if (ibltVersion >= 2)
+    {
+        nCheckSumBits = CGrapheneSet::NChecksumBits(nIbltCells * CIblt::OptimalOverhead(nIbltCells),
+            CIblt::OptimalNHash(nIbltCells), nReceiverUniverseItems, fBloomFPR, UNCHECKED_ERROR_TOL);
+    }
+    else
+        nCheckSumBits = MAX_CHECKSUM_BITS;
+
+    LOG(GRAPHENE, "using %d checksum bits in IBLT\n", nCheckSumBits);
+    uint32_t keycheckMask = MAX_CHECKSUM_MASK >> (MAX_CHECKSUM_BITS - nCheckSumBits);
+
+    CIblt iblt = CIblt(nIbltCells, ibltSalt, ibltVersion, keycheckMask);
+
+    LOG(GRAPHENE, "constructed IBLT with %d cells\n", nIbltCells);
+
+    return iblt;
 }
 
 

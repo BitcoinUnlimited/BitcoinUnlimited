@@ -50,6 +50,8 @@ const char *GRAPHENEBLOCK = "grblk";
 const char *GRAPHENETX = "grblktx";
 const char *GET_GRAPHENETX = "get_grblktx";
 const char *GET_GRAPHENE = "get_grblk";
+const char *GET_GRAPHENE_RECOVERY = "get_grrec";
+const char *GRAPHENE_RECOVERY = "grrec";
 // BUIPXXX Graphene - end section
 // Mempool sync - begin section
 const char *MEMPOOLSYNC = "memsync";
@@ -94,6 +96,7 @@ const static std::string allNetMessageTypes[] = {
     NetMsgType::XPEDITEDREQUEST, NetMsgType::XPEDITEDBLK, NetMsgType::XPEDITEDTXN, NetMsgType::BUVERSION,
     NetMsgType::BUVERACK, NetMsgType::XVERSION, NetMsgType::XVERACK, NetMsgType::XUPDATE, NetMsgType::SENDCMPCT,
     NetMsgType::SENDCMPCT, NetMsgType::CMPCTBLOCK, NetMsgType::GETBLOCKTXN, NetMsgType::BLOCKTXN,
+    NetMsgType::GET_GRAPHENE_RECOVERY, NetMsgType::GRAPHENE_RECOVERY,
 
 };
 const static std::vector<std::string> allNetMessageTypesVec(allNetMessageTypes,

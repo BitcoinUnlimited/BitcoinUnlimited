@@ -78,6 +78,11 @@ void ThinTypeRelay::RemovePeers(CNode *pfrom)
     nThinBlockPeers = setThinBlockPeers.size();
     nGraphenePeers = setGraphenePeers.size();
     nCompactBlockPeers = setCompactBlockPeers.size();
+
+    {
+        LOCK(cs_graphene_sender);
+        mapGrapheneSentBlocks.erase(pfrom->GetId());
+    }
 }
 
 // Preferential Block Relay Timer:

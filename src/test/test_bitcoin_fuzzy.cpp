@@ -529,6 +529,7 @@ protected:
 
         try
         {
+            uint64_t gs_version = CGrapheneBlock::GetGrapheneSetVersion(GRAPHENE_MAX_VERSION_SUPPORTED);
             gs = std::make_shared<CGrapheneSet>(
                 nReceiverUniverseItems, nReceiverUniverseItems, itemHashes, 0, 0, true, ordered, fDeterministic);
 
@@ -544,7 +545,7 @@ protected:
                     *ds >> nBlockTx;
                     *ds >> nReceiverPoolTx;
                     if ((nReceiverPoolTx >= nBlockTx - 1))
-                        out << gs->OptimalSymDiff(nBlockTx, nReceiverPoolTx);
+                        out << CGrapheneSet::OptimalSymDiff(gs_version, nBlockTx, nReceiverPoolTx);
                 }
                 break;
                 case 1:

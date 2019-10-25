@@ -35,6 +35,14 @@ const uint8_t MIN_CHECKSUM_BITS = 10;
 const uint8_t MAX_CHECKSUM_BITS = 32;
 
 
+struct GrapheneSetOptimizationParams
+{
+    uint64_t nReceiverExcessItems;
+    uint64_t nReceiverMissingItems;
+    double optSymDiff;
+    double fBloomFPR;
+};
+
 class CGrapheneSet
 {
 private:
@@ -48,6 +56,7 @@ private:
     std::shared_ptr<CBloomFilter> pSetFilter;
     std::shared_ptr<CVariableFastFilter> pFastFilter;
     std::shared_ptr<CIblt> pSetIblt;
+    double fBloomFPR;
 
     static const uint8_t SHORTTXIDS_LENGTH = 8;
 
@@ -65,17 +74,18 @@ public:
     // The default constructor is for 2-phase construction via deserialization
     CGrapheneSet()
         : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), version(1), ibltSalt(0),
-          computeOptimized(false), pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr)
+          computeOptimized(false), pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr), fBloomFPR(1.0)
     {
     }
     CGrapheneSet(uint64_t _version)
         : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), version(_version), ibltSalt(0),
-          computeOptimized(false), pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr)
+          computeOptimized(false), pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr), fBloomFPR(1.0)
     {
     }
     CGrapheneSet(uint64_t _version, bool _computeOptimized)
         : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), version(_version), ibltSalt(0),
-          computeOptimized(_computeOptimized), pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr)
+          computeOptimized(_computeOptimized), pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr),
+          fBloomFPR(1.0)
     {
     }
     CGrapheneSet(size_t _nReceiverUniverseItems,
@@ -91,11 +101,18 @@ public:
 
     // Generate cheap hash from seeds using SipHash
     uint64_t GetShortID(const uint256 &txhash) const;
-
+    uint64_t GetNReceiverUniverseItems() const { return nReceiverUniverseItems; }
+    bool GetOrdered() const { return ordered; }
+    bool GetComputeOptimized() const { return computeOptimized; }
+    std::vector<unsigned char> GetEncodedRank() const { return encodedRank; }
+    std::shared_ptr<CIblt> GetIblt() const { return pSetIblt; }
+    std::shared_ptr<CBloomFilter> GetRegularFilter() const { return pSetFilter; }
+    std::shared_ptr<CVariableFastFilter> GetFastFilter() const { return pFastFilter; }
     /* Optimal symmetric difference between block txs and receiver mempool txs passing
      * though filter to use for IBLT.
      */
-    double OptimalSymDiff(uint64_t nBlockTxs,
+    static double OptimalSymDiff(uint64_t version,
+        uint64_t nBlockTxs,
         uint64_t nReceiverPoolTx,
         uint64_t nReceiverExcessTxs = 0,
         uint64_t nReceiverMissingTxs = 1);
@@ -110,7 +127,7 @@ public:
      * For details see
      * https://github.com/bissias/graphene-experiments/blob/master/jupyter/graphene_size_optimization.ipynb
      */
-    double ApproxOptimalSymDiff(uint64_t nBlockTxs, uint8_t nChecksumBits = MAX_CHECKSUM_BITS);
+    static double ApproxOptimalSymDiff(uint64_t version, uint64_t nBlockTxs, uint8_t nChecksumBits = MAX_CHECKSUM_BITS);
 
     /* Brute force search for optimal symmetric difference between block txs and receiver
      * mempool txs passing though filter to use for IBLT.
@@ -121,7 +138,7 @@ public:
      * The total size in bytes of a graphene block is given by T(a) = F(a) + L(a) as defined
      * in the code below. (Note that meta parameters for the Bloom Filter and IBLT are ignored).
      */
-    double BruteForceSymDiff(uint64_t nBlockTxs,
+    static double BruteForceSymDiff(uint64_t nBlockTxs,
         uint64_t nReceiverPoolTx,
         uint64_t nReceiverExcessTxs,
         uint64_t nReceiverMissingTxs,
@@ -131,17 +148,93 @@ public:
     // of cheap hashes in the block in the correct order
     std::vector<uint64_t> Reconcile(const std::vector<uint256> &receiverItemHashes);
 
+    // This version assumes that we know the set that have passed through the sender Bloom filter
+    std::vector<uint64_t> Reconcile(const std::set<uint64_t> &setSenderFilterPositiveCheapHashes);
+
     // Pass a map of cheap hash to transaction hashes that the local machine has to reconcile with the remote and
     // return a list of cheap hashes in the block in the correct order
     std::vector<uint64_t> Reconcile(const std::map<uint64_t, uint256> &mapCheapHashes);
 
-    std::vector<uint64_t> Reconcile(std::set<uint64_t> &receiverSet, const CIblt &localIblt);
+    static std::vector<uint64_t> Reconcile(const std::map<uint64_t, uint256> &mapCheapHashes,
+        std::shared_ptr<CIblt> _pSetIblt,
+        std::shared_ptr<CBloomFilter> _pSetFilter,
+        std::shared_ptr<CVariableFastFilter> _pFastFilter,
+        std::vector<unsigned char> _encodedRank,
+        bool _computeOptimized,
+        bool _ordered);
+
+    static std::vector<uint64_t> Reconcile(const std::set<uint64_t> &setSenderFilterPositiveCheapHashes,
+        const CIblt &localIblt,
+        std::shared_ptr<CIblt> _pSetIblt,
+        std::vector<unsigned char> _encodedRank,
+        bool _ordered);
+
+    static GrapheneSetOptimizationParams DetermineGrapheneSetOptimizationParams(uint64_t nReceiverUniverseItems,
+        uint64_t nSenderUniverseItems,
+        uint64_t nItems,
+        uint64_t version);
+
+    static CIblt ConstructIblt(uint64_t nReceiverUniverseItems,
+        double optSymDiff,
+        double fBloomFPR,
+        uint32_t ibltSalt,
+        uint64_t graphenSetVersion,
+        uint64_t nOverrideValue);
 
     static std::vector<unsigned char> EncodeRank(std::vector<uint64_t> items, uint16_t nBitsPerItem);
 
     static std::vector<uint64_t> DecodeRank(std::vector<unsigned char> encoded, size_t nItems, uint16_t nBitsPerItem);
 
     static double BloomFalsePositiveRate(double optSymDiff, uint64_t nReceiverExcessItems);
+
+    static double TruePositiveMargin(uint64_t nSenderFilterPositiveItems,
+        uint64_t nReceiverUniverseItems,
+        double fSenderBloomFpr,
+        uint64_t nLowerBoundTruePositives);
+
+    static double TruePositiveProbability(uint64_t nSenderFilterPositiveItems,
+        uint64_t nReceiverUniverseItems,
+        double fSenderBloomFpr,
+        uint64_t nLowerBoundTruePositives);
+
+    static uint64_t LowerBoundTruePositives(uint64_t nTargetItems,
+        uint64_t nSenderFilterPositiveItems,
+        uint64_t nReceiverUniverseItems,
+        double fSenderBloomFpr,
+        double successRate);
+
+    static double FalsePositiveMargin(uint64_t nLowerBoundTruePositives,
+        uint64_t nReceiverUniverseItems,
+        double fSenderBloomFpr,
+        double successRate);
+
+    static uint64_t UpperBoundFalsePositives(uint64_t nTargetItems,
+        uint64_t nSenderFilterPositiveItems,
+        uint64_t nReceiverUniverseItems,
+        double fSenderBloomFpr,
+        double successRate);
+
+    static double FailureRecoveryFpr(uint64_t nItems,
+        uint64_t nReceiverUniverseItems,
+        double fSenderBloomFpr,
+        double successRate);
+
+    CVariableFastFilter FailureRecoveryFilter(std::vector<uint256> &relevantHashes,
+        uint64_t nItems,
+        uint64_t nSenderFilterPositiveItems,
+        uint64_t nReceiverRevisedUniverseItems,
+        double successRate,
+        double fSenderBloomFPR,
+        uint64_t grapheneSetVersion);
+
+    CIblt FailureRecoveryIblt(std::set<uint64_t> &relevantCheapHashes,
+        uint64_t nItems,
+        uint64_t nSenderFilterPositiveItems,
+        uint64_t nReceiverRevisedUniverseItems,
+        double successRate,
+        double fSenderBloomFPR,
+        uint64_t grapheneSetVersion,
+        uint32_t ibltSaltRevised);
 
     /* This method calculates the number of bits required for the IBLT cell checksum in order to
      * achieve unchecked error tolerance fUncheckedErrorTol. Details can be found at the link below.
@@ -213,6 +306,8 @@ public:
         if (!pSetIblt)
             pSetIblt = std::make_shared<CIblt>(CIblt(CGrapheneSet::GetCIbltVersion(version)));
         READWRITE(*pSetIblt);
+        if (version >= 5)
+            READWRITE(fBloomFPR);
     }
 };
 
