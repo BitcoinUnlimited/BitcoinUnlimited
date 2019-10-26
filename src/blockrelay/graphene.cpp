@@ -331,7 +331,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
     CGrapheneBlock tmp(NegotiateGrapheneVersion(pfrom), NegotiateFastFilterSupport(pfrom));
     vRecv >> tmp;
     auto pblock = thinrelay.SetBlockToReconstruct(pfrom, tmp.header.GetHash());
-    pblock->grapheneblock = std::make_shared<CGrapheneBlock>(std::forward<CGrapheneBlock>(tmp));
+    pblock->grapheneblock = std::make_shared<CGrapheneBlock>(tmp);
 
     std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
 

@@ -67,7 +67,7 @@ bool CThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     CThinBlock tmp;
     vRecv >> tmp;
     auto pblock = thinrelay.SetBlockToReconstruct(pfrom, tmp.header.GetHash());
-    pblock->thinblock = std::make_shared<CThinBlock>(std::forward<CThinBlock>(tmp));
+    pblock->thinblock = std::make_shared<CThinBlock>(tmp);
 
     std::shared_ptr<CThinBlock> thinBlock = pblock->thinblock;
 
@@ -486,7 +486,7 @@ bool CXThinBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string st
     CXThinBlock tmp;
     vRecv >> tmp;
     auto pblock = thinrelay.SetBlockToReconstruct(pfrom, tmp.header.GetHash());
-    pblock->xthinblock = std::make_shared<CXThinBlock>(std::forward<CXThinBlock>(tmp));
+    pblock->xthinblock = std::make_shared<CXThinBlock>(tmp);
 
     std::shared_ptr<CXThinBlock> thinBlock = pblock->xthinblock;
     CInv inv(MSG_BLOCK, thinBlock->header.GetHash());

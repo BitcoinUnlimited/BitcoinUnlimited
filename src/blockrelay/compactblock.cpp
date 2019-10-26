@@ -131,7 +131,7 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     CompactBlock tmp;
     vRecv >> tmp;
     auto pblock = thinrelay.SetBlockToReconstruct(pfrom, tmp.header.GetHash());
-    pblock->cmpctblock = std::make_shared<CompactBlock>(std::forward<CompactBlock>(tmp));
+    pblock->cmpctblock = std::make_shared<CompactBlock>(tmp);
 
     std::shared_ptr<CompactBlock> compactBlock = pblock->cmpctblock;
 
