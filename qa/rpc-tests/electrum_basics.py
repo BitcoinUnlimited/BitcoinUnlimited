@@ -56,7 +56,6 @@ class ElectrumBasicTests(BitcoinTestFramework):
         def check_address(address, unconfirmed = 0, confirmed = 0):
             res = electrum_client.call("blockchain.scripthash.get_balance",
                 address_to_scripthash(addr))
-            res = res["result"]
 
             return res["unconfirmed"] == unconfirmed * COIN \
                 and res["confirmed"] == confirmed * COIN
