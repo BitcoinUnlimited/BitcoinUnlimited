@@ -23,9 +23,11 @@ static const unsigned int MAX_BLOCK_SIZE_MULTIPLIER = 3;
 /** The maximum number of free transactions (in KB) that can enter the mempool per minute.
  *  For a 1MB block we allow 15KB of free transactions per 1 minute.
  */
-static const uint32_t DEFAULT_LIMITFREERELAY = DEFAULT_BLOCK_MAX_SIZE * 0.000015;
+// static const uint32_t DEFAULT_LIMITFREERELAY = DEFAULT_BLOCK_MAX_SIZE * 0.000015;
+static const uint32_t DEFAULT_LIMITFREERELAY = 0;
 /** The minimum value possible for -limitfreerelay when rate limiting */
-static const unsigned int DEFAULT_MIN_LIMITFREERELAY = 1;
+// static const unsigned int DEFAULT_MIN_LIMITFREERELAY = 1;
+static const unsigned int DEFAULT_MIN_LIMITFREERELAY = 0;
 
 /** Subject free transactions to priority checking when entering the mempool */
 static const bool DEFAULT_RELAYPRIORITY = false;
