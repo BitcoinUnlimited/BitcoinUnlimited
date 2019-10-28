@@ -587,7 +587,7 @@ public:
     ByteArrayAccessor(JNIEnv *e, jbyteArray &arg) : env(e), obj(arg)
     {
         size = env->GetArrayLength(obj);
-        data = (uint8_t *)env->GetByteArrayElements(obj, NULL);
+        data = (uint8_t *)env->GetByteArrayElements(obj, nullptr);
     }
 
     ~ByteArrayAccessor()
@@ -609,7 +609,7 @@ std::string toString(JNIEnv *env, jstring jStr)
     const jbyteArray stringJbytes = (jbyteArray)env->CallObjectMethod(jStr, getBytes, env->NewStringUTF("UTF-8"));
 
     size_t length = (size_t)env->GetArrayLength(stringJbytes);
-    jbyte *pBytes = env->GetByteArrayElements(stringJbytes, NULL);
+    jbyte *pBytes = env->GetByteArrayElements(stringJbytes, nullptr);
 
     std::string ret = std::string((char *)pBytes, length);
     env->ReleaseByteArrayElements(stringJbytes, pBytes, JNI_ABORT);
@@ -632,10 +632,10 @@ jbyteArray encodeUint256(JNIEnv *env, arith_uint256 value)
 {
     const size_t size = 256 / 8;
     jbyteArray result = env->NewByteArray(size);
-    if (result != NULL)
+    if (result != nullptr)
     {
-        jbyte *data = env->GetByteArrayElements(result, NULL);
-        if (data != NULL)
+        jbyte *data = env->GetByteArrayElements(result, nullptr);
+        if (data != nullptr)
         {
             int i;
             for (i = (int)(size - 1); i >= 0; i--)
@@ -830,7 +830,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Pay
     jbyteArray arg)
 {
     size_t len = env->GetArrayLength(arg);
-    jbyte *data = env->GetByteArrayElements(arg, NULL);
+    jbyte *data = env->GetByteArrayElements(arg, nullptr);
 
     if (len != 32)
     {

@@ -1700,10 +1700,10 @@ UniValue listtransactions(const UniValue &params, bool fHelp)
     for (CWallet::TxItems::const_reverse_iterator it = txOrdered.rbegin(); it != txOrdered.rend(); ++it)
     {
         CWalletTx *const pwtx = (*it).second.first;
-        if (pwtx != 0)
+        if (pwtx != nullptr)
             ListTransactions(*pwtx, strAccount, 0, true, ret, filter);
         CAccountingEntry *const pacentry = (*it).second.second;
-        if (pacentry != 0)
+        if (pacentry != nullptr)
             AcentryToJSON(*pacentry, strAccount, ret);
 
         if ((int)ret.size() >= (nCount + nFrom))

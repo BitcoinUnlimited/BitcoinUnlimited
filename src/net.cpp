@@ -1460,9 +1460,9 @@ static bool fShutdownUPnP = false;
 void ThreadMapPort()
 {
     std::string port = strprintf("%u", GetListenPort());
-    const char *multicastif = 0;
-    const char *minissdpdpath = 0;
-    struct UPNPDev *devlist = 0;
+    const char *multicastif = nullptr;
+    const char *minissdpdpath = nullptr;
+    struct UPNPDev *devlist = nullptr;
     char lanaddr[64];
 
 #ifndef UPNPDISCOVER_SUCCESS

@@ -117,7 +117,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                             // best equivalent proof of work) than the best header chain we know about.
                             {
                                 READLOCK(cs_mapBlockIndex);
-                                fSend = mi->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != NULL) &&
+                                fSend = mi->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != nullptr) &&
                                         (pindexBestHeader.load()->GetBlockTime() - mi->GetBlockTime() < nOneMonth) &&
                                         (GetBlockProofEquivalentTime(
                                              *pindexBestHeader, *mi, *pindexBestHeader, consensusParams) < nOneMonth);
