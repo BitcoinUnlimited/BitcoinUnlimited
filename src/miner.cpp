@@ -551,6 +551,18 @@ void BlockAssembler::SortForBlock(const CTxMemPool::setEntries &package, std::ve
 // having transactions with all the same fees and Two, the typical child pays for parent scenario has only
 // two transactions with the child having the higher fee. And neither of these two types of packages could
 // cause any loss of fees with this mining algorithm, when the block is nearly full.
+//
+// The mining algorithm is surprisingly simple and centers around parsing though the mempools ancestor_score
+// index and adding the AGT's into the new block. There is however a pathological case which has to be
+// accounted for where a child transaction has less fees per KB than its parent which causes child transactions
+// to show up later as we parse though the ancestor index. In this case we then have to recalculate the
+// ancestor sigops and package size which can be time consuming given we have to parse through the ancestor
+// tree each time. However we get around that by shortcutting the process by parsing through only the portion
+// of the tree that is currently not in the block. This shortcutting happens in _CalculateMempoolAncestors()
+// where we pass in the inBlock vector of already added transactions. Even so, if we didn't do this shortcutting
+// the current algo is still much better than the older method which needed to update calculations for the
+// entire descendant tree after each package was added to the block.
+
 void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, bool fCanonical)
 {
     AssertLockHeld(mempool.cs_txmempool);
