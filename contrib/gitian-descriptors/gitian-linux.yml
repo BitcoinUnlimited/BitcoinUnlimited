@@ -166,6 +166,8 @@ script: |
     make ${MAKEOPTS} -C src check-symbols
     make install DESTDIR=${INSTALLPATH}
     if [ -f src/electrscash ]; then
+        cp src/electrscash ${OUTDIR}/electrscash-${i}.debug
+        strip src/electrscash
         cp src/electrscash ${INSTALLPATH}/bin/electrscash
     fi
     # BU save the executables with debug symbols
