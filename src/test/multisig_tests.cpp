@@ -409,18 +409,39 @@ BOOST_AUTO_TEST_CASE(opreturn_send)
 
     CBasicKeyStore keystore;
 
-    // Create and unpack a CLTV script
+    // Create and unpack a LABELPUBLIC script
     vector<valtype> solutions;
     txnouttype whichType;
     vector<CTxDestination> addresses;
 
     string inMsg = "hello world", outMsg = "";
     CScript s = GetScriptLabelPublic(inMsg);
-
     outMsg = getLabelPublic(s);
     BOOST_CHECK(inMsg == outMsg);
     BOOST_CHECK(Solver(s, whichType, solutions));
     BOOST_CHECK(whichType == TX_LABELPUBLIC);
+    BOOST_CHECK(solutions.size() == 2);
+
+    inMsg = "hello world hello world hello world hello world hello world"
+            "hello world hello world";
+    s.clear();
+    s = GetScriptLabelPublic(inMsg);
+    outMsg = getLabelPublic(s);
+    BOOST_CHECK(inMsg == outMsg);
+    BOOST_CHECK(Solver(s, whichType, solutions));
+    BOOST_CHECK(whichType == TX_LABELPUBLIC);
+
+    inMsg = "hello world hello world hello world hello world hello world"
+            "hello world hello world hello world hello world hello world"
+            "hello world hello world hello world hello world hello world"
+            "hello world hello world";
+    s.clear();
+    s = GetScriptLabelPublic(inMsg);
+    outMsg = getLabelPublic(s);
+    BOOST_CHECK(inMsg == outMsg);
+    BOOST_CHECK(Solver(s, whichType, solutions));
+    BOOST_CHECK(whichType == TX_LABELPUBLIC);
+    BOOST_CHECK(solutions.size() == 2);
 }
 #endif
 BOOST_AUTO_TEST_SUITE_END()
