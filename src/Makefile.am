@@ -362,6 +362,8 @@ libbitcoincash_a_SOURCES = \
   cashlib/cashlib.cpp \
   base58.cpp \
   base58.h \
+  merkleblock.cpp \
+  merkleblock.h \
   chainparams.cpp \
   chainparams.h \
   chainparamsbase.cpp \
