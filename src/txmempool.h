@@ -304,6 +304,11 @@ public:
 
         if (f1 == f2)
         {
+            // Sorting by time here does two things when mining CPFP packages. In the case of long
+            // packages, it finds the part of the package that fits perfectly into the block, because
+            // we won't bail out early due to package insertion failures. Secondly it also preserves some
+            // sense of fairness that, all other things begin equal, the first transation to arrive in the
+            // mempool has priority over ones that follow.
             return a.GetTime() < b.GetTime();
         }
 
