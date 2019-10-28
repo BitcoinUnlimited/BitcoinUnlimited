@@ -132,9 +132,8 @@ bool HandleMempoolSyncRequest(CDataStream &vRecv, CNode *pfrom)
         }
 
         // Assemble mempool sync object
-        uint64_t nBothMempools = mempoolTxHashes.size() + mempoolinfo.nTxInMempool;
-        CMempoolSync mempoolSync(mempoolTxHashes, mempoolinfo.nTxInMempool, nBothMempools, mempoolinfo.shorttxidk0,
-            mempoolinfo.shorttxidk1, NegotiateMempoolSyncVersion(pfrom));
+        CMempoolSync mempoolSync(mempoolTxHashes, mempoolinfo.nTxInMempool, mempoolTxHashes.size(),
+            mempoolinfo.shorttxidk0, mempoolinfo.shorttxidk1, NegotiateMempoolSyncVersion(pfrom));
 
         pfrom->PushMessage(NetMsgType::MEMPOOLSYNC, mempoolSync);
         LOG(MPOOLSYNC, "Sent mempool sync to peer %s using version %d\n", pfrom->GetLogName(), mempoolSync.version);
@@ -220,10 +219,12 @@ bool CMempoolSync::process(CNode *pfrom)
     {
         LOG(MPOOLSYNC, "Mempool sync failed for peer %s. Graphene set could not be reconciled: %s\n",
             pfrom->GetLogName(), e.what());
+
+        return false;
     }
 
-    LOG(MPOOLSYNC, "Mempool sync received: %d total txns, waiting for: %d from peer %s\n", nSenderMempoolTxs,
-        setHashesToRequest.size(), pfrom->GetLogName());
+    LOG(MPOOLSYNC, "Mempool sync received: %d total responder txns, requester waiting for %d txs from peer %s\n",
+        nSenderMempoolTxs, setHashesToRequest.size(), pfrom->GetLogName());
 
     // If there are any missing transactions then we request them here.
     if (!setHashesToRequest.empty())
@@ -502,7 +503,7 @@ CNode *SelectMempoolSyncPeer(std::vector<CNode *> vNodesCopy)
         return nullptr;
 }
 
-void ClearDisconnectedFromMempoolSyncMaps(NodeId nodeid)    
+void ClearDisconnectedFromMempoolSyncMaps(NodeId nodeid)
 {
     LOCK(cs_mempoolsync);
     mempoolSyncRequested.erase(nodeid);
