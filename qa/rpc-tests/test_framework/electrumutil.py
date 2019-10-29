@@ -8,6 +8,7 @@ from . import cashaddr
 from .script import *
 from test_framework.connectrum.client import StratumClient
 from test_framework.connectrum.svr_info import ServerInfo
+from test_framework.util import waitFor
 
 ELECTRUM_PORT = None
 
@@ -33,7 +34,6 @@ class ElectrumConnection:
     def __init__(self):
         self.cli = StratumClient()
         self.loop = asyncio.get_event_loop()
-
         self.loop.run_until_complete(self.connect())
 
     async def connect(self):
@@ -56,6 +56,11 @@ class ElectrumConnection:
     def call(self, method, *args):
         return self.loop.run_until_complete(self.cli.RPC(method, *args))
 
+    def subscribe(self, method, *args):
+        future, queue = self.cli.subscribe(method, *args)
+        result = self.loop.run_until_complete(future)
+        return result, queue
+
 def create_electrum_connection():
     return ElectrumConnection()
 
@@ -74,3 +79,5 @@ def address_to_scripthash(addr):
 
     return scripthash.hex()
 
+def sync_electrum_height(node, timeout = 10):
+    waitFor(timeout, lambda: compare(node, "index_height", node.getblockcount()))
