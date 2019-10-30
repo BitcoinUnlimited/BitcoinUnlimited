@@ -73,6 +73,7 @@ SetupPythonLogConfig()
 class UtilOptions:
     # this module-wide var is set from test_framework.py
     no_ipv6_rpc_listen = False
+    electrumexec = None
 
 BITCOIND_PROC_WAIT_TIMEOUT = 60
 
@@ -385,6 +386,15 @@ def initialize_datadir(dirname, n, bitcoinConfDict=None, wallet=None, bins=None)
             "rpcbind": "127.0.0.1",
             "rpcallowip" : "127.0.0.1"
             })
+
+    if UtilOptions.electrumexec is not None:
+        if not os.path.isfile(UtilOptions.electrumexec):
+            raise Exception("Electrum server path {} does not exist"
+                .format(UtilOptions.electrumexec))
+
+        defaults.update({
+            "electrum.exec": UtilOptions.electrumexec
+        })
 
     if bitcoinConfDict: defaults.update(bitcoinConfDict)
 
