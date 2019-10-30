@@ -573,15 +573,15 @@ void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, b
     {
         iter = mempool.mapTx.project<0>(mi);
 
-        uint64_t packageSize = iter->GetSizeWithAncestors();
-        CAmount packageFees = iter->GetModFeesWithAncestors();
-        unsigned int packageSigOps = iter->GetSigOpCountWithAncestors();
-
         // Skip txns we know are in the block
         if (inBlock.count(iter))
         {
             continue;
         }
+
+        uint64_t packageSize = iter->GetSizeWithAncestors();
+        CAmount packageFees = iter->GetModFeesWithAncestors();
+        unsigned int packageSigOps = iter->GetSigOpCountWithAncestors();
 
         // Get any unconfirmed ancestors of this txn
         CTxMemPool::setEntries ancestors;
