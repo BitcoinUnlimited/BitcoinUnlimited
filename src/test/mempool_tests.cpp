@@ -543,7 +543,7 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest)
     tx7.vin.resize(2);
     tx7.vin[0].prevout = COutPoint(tx5.GetHash(), 0);
     tx7.vin[0].scriptSig = CScript() << OP_5;
-    tx7.vin[1].prevout = COutPoint(tx6.GetHash(), 0);
+    tx7.vin[1].prevout = COutPoint(tx6.GetHash(), 1);
     tx7.vin[1].scriptSig = CScript() << OP_6;
     tx7.vout.resize(2);
     tx7.vout[0].scriptPubKey = CScript() << OP_7 << OP_EQUAL;
@@ -551,30 +551,57 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest)
     tx7.vout[1].scriptPubKey = CScript() << OP_7 << OP_EQUAL;
     tx7.vout[1].nValue = 10 * COIN;
 
+    CMutableTransaction tx8 = CMutableTransaction();
+    tx4.vin.resize(2);
+    tx4.vin[0].prevout.SetNull();
+    tx4.vin[0].scriptSig = CScript() << OP_4;
+    tx4.vin[1].prevout.SetNull();
+    tx4.vin[1].scriptSig = CScript() << OP_4;
+    tx4.vout.resize(2);
+    tx4.vout[0].scriptPubKey = CScript() << OP_4 << OP_EQUAL;
+    tx4.vout[0].nValue = 10 * COIN;
+    tx4.vout[1].scriptPubKey = CScript() << OP_4 << OP_EQUAL;
+    tx4.vout[1].nValue = 10 * COIN;
+
     pool.addUnchecked(tx4.GetHash(), entry.Fee(7000LL).FromTx(tx4, &pool));
     pool.addUnchecked(tx5.GetHash(), entry.Fee(1000LL).FromTx(tx5, &pool));
     pool.addUnchecked(tx6.GetHash(), entry.Fee(1100LL).FromTx(tx6, &pool));
     pool.addUnchecked(tx7.GetHash(), entry.Fee(9000LL).FromTx(tx7, &pool));
+    pool.addUnchecked(tx8.GetHash(), entry.Fee(7000LL).FromTx(tx8, &pool));
 
-    // we only require this remove, at max, 2 txn, because its not clear what we're really optimizing for aside from
-    // that
+    // All txns other than tx8 will get removed because they belong to the same chain
     pool.TrimToSize(pool.DynamicMemoryUsage() - 1);
-    BOOST_CHECK(pool.exists(tx4.GetHash()));
-    BOOST_CHECK(pool.exists(tx6.GetHash()));
+    BOOST_CHECK(!pool.exists(tx4.GetHash()));
+    BOOST_CHECK(!pool.exists(tx5.GetHash()));
+    BOOST_CHECK(!pool.exists(tx6.GetHash()));
     BOOST_CHECK(!pool.exists(tx7.GetHash()));
+    BOOST_CHECK(pool.exists(tx8.GetHash()));
 
+    if (!pool.exists(tx4.GetHash()))
+        pool.addUnchecked(tx4.GetHash(), entry.Fee(7000LL).FromTx(tx4, &pool));
     if (!pool.exists(tx5.GetHash()))
         pool.addUnchecked(tx5.GetHash(), entry.Fee(1000LL).FromTx(tx5, &pool));
-    pool.addUnchecked(tx7.GetHash(), entry.Fee(9000LL).FromTx(tx7, &pool));
+    if (!pool.exists(tx6.GetHash()))
+        pool.addUnchecked(tx6.GetHash(), entry.Fee(1100LL).FromTx(tx6, &pool));
+    if (!pool.exists(tx7.GetHash()))
+        pool.addUnchecked(tx7.GetHash(), entry.Fee(9000LL).FromTx(tx7, &pool));
+    if (!pool.exists(tx8.GetHash()))
+        pool.addUnchecked(tx8.GetHash(), entry.Fee(7000LL).FromTx(tx8, &pool));
 
-    pool.TrimToSize(pool.DynamicMemoryUsage() / 2); // should maximize mempool size by only removing 5/7
-    BOOST_CHECK(pool.exists(tx4.GetHash()));
+    pool.TrimToSize(pool.DynamicMemoryUsage() / 2); // only tx8 remains
+    BOOST_CHECK(!pool.exists(tx4.GetHash()));
     BOOST_CHECK(!pool.exists(tx5.GetHash()));
-    BOOST_CHECK(pool.exists(tx6.GetHash()));
+    BOOST_CHECK(!pool.exists(tx6.GetHash()));
     BOOST_CHECK(!pool.exists(tx7.GetHash()));
-
-    pool.addUnchecked(tx5.GetHash(), entry.Fee(1000LL).FromTx(tx5, &pool));
-    pool.addUnchecked(tx7.GetHash(), entry.Fee(9000LL).FromTx(tx7, &pool));
+    BOOST_CHECK(pool.exists(tx8.GetHash()));
+    if (!pool.exists(tx4.GetHash()))
+        pool.addUnchecked(tx4.GetHash(), entry.Fee(7000LL).FromTx(tx4, &pool));
+    if (!pool.exists(tx5.GetHash()))
+        pool.addUnchecked(tx5.GetHash(), entry.Fee(1000LL).FromTx(tx5, &pool));
+    if (!pool.exists(tx6.GetHash()))
+        pool.addUnchecked(tx6.GetHash(), entry.Fee(1100LL).FromTx(tx6, &pool));
+    if (!pool.exists(tx7.GetHash()))
+        pool.addUnchecked(tx7.GetHash(), entry.Fee(9000LL).FromTx(tx7, &pool));
 
     std::vector<CTransactionRef> vtx;
     std::list<CTransactionRef> conflicts;

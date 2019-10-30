@@ -256,16 +256,16 @@ void ThreadCommitToMempool()
 void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age)
 {
     std::vector<COutPoint> vCoinsToUncache;
-    int expired = pool.Expire(GetTime() - age, vCoinsToUncache);
+    int expired = pool.Expire(GetTime() - age, &vCoinsToUncache);
     for (const COutPoint &txin : vCoinsToUncache)
         pcoinsTip->Uncache(txin);
     if (expired != 0)
         LOG(MEMPOOL, "Expired %i transactions from the memory pool\n", expired);
 
-    std::vector<COutPoint> vNoSpendsRemaining;
-    pool.TrimToSize(limit, &vNoSpendsRemaining);
-    for (const COutPoint &removed : vNoSpendsRemaining)
-        pcoinsTip->Uncache(removed);
+    vCoinsToUncache.clear();
+    pool.TrimToSize(limit, &vCoinsToUncache);
+    for (const COutPoint &txin : vCoinsToUncache)
+        pcoinsTip->Uncache(txin);
 }
 
 void CommitTxToMempool()

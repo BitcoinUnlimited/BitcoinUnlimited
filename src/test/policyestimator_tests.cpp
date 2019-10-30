@@ -50,6 +50,8 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
     std::list<CTransactionRef> dummyConflicted;
     tx.vin.resize(1);
     tx.vin[0].scriptSig = garbage;
+    tx.vin[0].prevout.hash = GetRandHash();
+    tx.vin[0].prevout.n = 0;
     tx.vout.resize(1);
     tx.vout[0].nValue = 0LL;
     CFeeRate baseRate(basefee, ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION));
@@ -110,7 +112,6 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
             BOOST_CHECK(mpool.estimateSmartFee(8, &answerFound) == mpool.estimateFee(8) && answerFound == 8);
         }
     }
-
     std::vector<CAmount> origFeeEst;
     std::vector<double> origPriEst;
     // Highest feerate is 10*baseRate and gets in all blocks,
@@ -192,6 +193,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
             txHashes[j].pop_back();
         }
     }
+
     mpool.removeForBlock(block, 265, dummyConflicted);
     block.clear();
     for (int i = 1; i < 10; i++)
@@ -223,6 +225,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
         mpool.removeForBlock(block, ++blocknum, dummyConflicted);
         block.clear();
     }
+
     for (int i = 1; i < 10; i++)
     {
         BOOST_CHECK(mpool.estimateFee(i).GetFeePerK() < origFeeEst[i - 1] - deltaFee);
@@ -236,6 +239,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
     // evict that transaction which should set a mempool min fee of minRelayTxFee + feeV[0][5]
     mpool.TrimToSize(1);
     BOOST_CHECK(mpool.GetMinFee(1).GetFeePerK() > feeV[0][5]);
+
     for (int i = 1; i < 10; i++)
     {
         BOOST_CHECK(mpool.estimateSmartFee(i).GetFeePerK() >= mpool.estimateFee(i).GetFeePerK());

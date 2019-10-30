@@ -693,11 +693,12 @@ public:
         uint64_t limitDescendantSize,
         std::string &errString,
         setEntries *inBlock = nullptr,
-        bool fSearchForParents = true) const;
+        bool fSearchForParents = true,
+        setEntries *setEndPoints = nullptr) const;
 
     /** Populate setDescendants with all in-mempool descendants of hash.  Assumes that setDescendants includes
      *  all in-mempool descendants of anything already in it.  */
-    void _CalculateDescendants(txiter it, setEntries &setDescendants);
+    void _CalculateDescendants(txiter it, setEntries &setDescendants, setEntries *setEndPoints = nullptr);
 
     /** Similar to CalculateMemPoolAncestors, except only requires the inputs and just returns true/false depending on
      * whether the input set conforms to the passed limits */
@@ -732,15 +733,12 @@ public:
     CFeeRate GetMinFee(size_t sizelimit) const;
     CFeeRate _GetMinFee(size_t sizelimit) const;
 
-    /** Remove transactions from the mempool until its dynamic size is <= sizelimit.
-      *  pvNoSpendsRemaining, if set, will be populated with the list of outpoints
-      *  which are not in mempool which no longer have any spends in this mempool.
-      */
-    void TrimToSize(size_t sizelimit, std::vector<COutPoint> *pvNoSpendsRemaining = nullptr);
+    /** Remove transactions from the mempool until its dynamic size is <= sizelimit. */
+    void TrimToSize(size_t sizelimit, std::vector<COutPoint> *vCoinsToUncache = nullptr);
 
     /** Expire all transaction (and their dependencies) in the mempool older than time. Return the number of removed
      * transactions. */
-    int Expire(int64_t time, std::vector<COutPoint> &vCoinsToUncache);
+    int Expire(int64_t time, std::vector<COutPoint> *vCoinsToUncache);
 
     /** Remove a transaction from the mempool.  Returns the number of tx removed, 0 if the passed tx is not in the
         mempool, 1, or > 1 if this tx had dependent tx that also had to be removed */
@@ -836,6 +834,9 @@ private:
         TxMempoolOriginalStateMap *changeSet);
     /** Sever link between specified transaction and direct children. */
     void UpdateChildrenForRemoval(txiter entry);
+    /** Remove from the mempool, the entire set of chained transactions that has this transaction in it */
+    uint64_t RemoveTransactionChain(txiter it, std::vector<COutPoint> *vCoinsToUncache, std::set<uint256> &setRemoved);
+
     /** Internal implementation of transaction per sec rate update logic
      *  Requires that the cs_txPerSec lock be held by the calling method
      */

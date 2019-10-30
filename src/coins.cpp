@@ -440,11 +440,10 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
     }
 }
 
-void CCoinsViewCache::Uncache(const COutPoint &hash)
+void CCoinsViewCache::Uncache(const COutPoint &outpoint)
 {
     WRITELOCK(cs_utxo);
-    CCoinsMap::iterator it = cacheCoins.find(hash);
-
+    CCoinsMap::iterator it = cacheCoins.find(outpoint);
     // only uncache coins that are not dirty.
     if (it != cacheCoins.end() && it->second.flags == 0)
     {
