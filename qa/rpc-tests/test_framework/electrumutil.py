@@ -3,8 +3,11 @@
 from test_framework.loginit import logging
 import socket
 import json
+import asyncio
 from . import cashaddr
 from .script import *
+from test_framework.connectrum.client import StratumClient
+from test_framework.connectrum.svr_info import ServerInfo
 
 ELECTRUM_PORT = None
 
@@ -27,37 +30,34 @@ def bitcoind_electrum_args():
             "-electrum.monitoring.port=" + str(random.randint(40000, 60000))]
 
 class ElectrumConnection:
-    def __init__(self, timeout_seconds = 60.0):
-        self.s = socket.create_connection(("127.0.0.1", ELECTRUM_PORT))
-        self.s.settimeout(timeout_seconds)
-        self.f = self.s.makefile('r')
-        self.id = 0
+    def __init__(self):
+        self.cli = StratumClient()
+        self.loop = asyncio.get_event_loop()
 
-    def call(self, method, *args):
-        req = {
-            'id': self.id,
-            'method': method,
-            'params': list(args),
-        }
-        msg = json.dumps(req) + '\n'
-        self.s.sendall(msg.encode('ascii'))
-        res = self.f.readline()
-        return json.loads(res)
+        self.loop.run_until_complete(self.connect())
 
-# Helper function to attempt several times to connect to electrum server.
-# At startup, it may take a while before the server accepts connections.
-def create_electrum_connection(timeout = 30):
-    import time
-    start = time.time()
-    err = None
-    while time.time() < (start + timeout):
-        try:
-            return ElectrumConnection()
-        except Exception as e:
-            err = e
+    async def connect(self):
+        connect_timeout = 30
+        import time
+        start = time.time()
+        while True:
+            try:
+                await self.cli.connect(ServerInfo(None,
+                    ip_addr = "127.0.0.1", ports = ELECTRUM_PORT))
+                break
+
+            except Exception as e:
+                if time.time() >= (start + connect_timeout):
+                    raise Exception("Failed to connect to electrum server. Error '{}'".format(e))
+
             time.sleep(1)
 
-    raise Exception("Failed to connect to electrum server. Error '%s'" % err)
+
+    def call(self, method, *args):
+        return self.loop.run_until_complete(self.cli.RPC(method, *args))
+
+def create_electrum_connection():
+    return ElectrumConnection()
 
 # To look up an address with the electrum protocol, you need the hash
 # of the locking script (scriptpubkey)
