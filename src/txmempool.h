@@ -153,6 +153,8 @@ public:
     void UpdateDescendantState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount);
     // Adjusts the ancestor state
     void UpdateAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps);
+    // Clears and resets the ancestor state counters to zero
+    void ClearAncestorState();
     // Updates the fee delta used for mining priority score, and the
     // modified fees with descendants.
     void UpdateFeeDelta(int64_t feeDelta);
@@ -199,6 +201,15 @@ private:
     CAmount modifyFee;
     int64_t modifyCount;
     int modifySigOps;
+};
+
+struct clear_ancestor_state
+{
+    clear_ancestor_state()
+    {
+    }
+
+    void operator()(CTxMemPoolEntry &e) { e.ClearAncestorState(); }
 };
 
 struct update_fee_delta
@@ -521,8 +532,11 @@ public:
     typedef std::map<CTxMemPool::txiter, TxMempoolOriginalState, CTxMemPool::CompareIteratorByHash>
         TxMempoolOriginalStateMap;
 
-
+    /** Clear all parents from mapLinks that are associated with this entry */
+    void ClearMemPoolParents(txiter entry);
+    /** Return the set of mempool parents for this entry */
     const setEntries &GetMemPoolParents(txiter entry) const;
+    /** Return the set of mempool children for this entry */
     const setEntries &GetMemPoolChildren(txiter entry) const;
 
 private:
@@ -836,6 +850,19 @@ private:
         TxMempoolOriginalStateMap *changeSet);
     /** Sever link between specified transaction and direct children. */
     void UpdateChildrenForRemoval(txiter entry);
+
+    /** Return a set of all transactions in a block that will still have unconfirmed children in the mempool once
+     *  the block has finished processing and has removed its transactions from the mempool. This set can then be used
+     *  as starting points to tranverse and update the ancestor/descendant states of the unconfirmed chain.
+     */
+    void CalculateTxnChainTips(const std::vector<CTransactionRef> &vtx, setEntries &setTxnChainTips);
+
+    /** Update the ancestor and descendant state for all unconfirmed chains in the mempool that had a transaction
+     *  in the last block. This step is done after a block has finished processing and we have already removed the
+     *  transactions from the mempool
+     */
+    void UpdateTxnChainState(setEntries &setTxnChainTips, std::vector<CTxChange> *txChanges);
+
     /** Internal implementation of transaction per sec rate update logic
      *  Requires that the cs_txPerSec lock be held by the calling method
      */

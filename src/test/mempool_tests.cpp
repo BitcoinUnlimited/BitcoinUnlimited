@@ -12,7 +12,697 @@
 #include <list>
 #include <vector>
 
+struct MempoolData
+{
+    uint256 hash;
+
+    // Ancestor counters
+    uint64_t nCountWithAncestors = 0;
+    uint64_t nSizeWithAncestors = 0;
+    uint64_t nSigopsWithAncestors = 0;
+    uint64_t nFeesWithAncestors = 0;
+
+    // Descendant counters
+    uint64_t nCountWithDescendants = 0;
+    uint64_t nSizeWithDescendants = 0;
+    uint64_t nFeesWithDescendants = 0;
+};
+
 BOOST_FIXTURE_TEST_SUITE(mempool_tests, TestingSetup)
+
+BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
+{
+    TestMemPoolEntryHelper entry;
+    CTxMemPool pool(CFeeRate(0));
+    pool.clear();
+
+    /* Create a complex set of chained transactions and then update their state after removing some from the mempool.
+       (The numbers indicate the tx number, ie. 1 == tx1)
+
+    Chain1:
+
+    1      2   3      4
+    |      |   |      |
+    5      6   7      8
+     \    /     \    /
+      \  /       \  /
+       9          10      20
+       | \        |       /
+       |  \______ 11 ____/
+       |          |\
+       12         | \
+      /|\        13 14      19
+     / | \        | /       /
+    15 16 17      18 ______/
+
+    */
+
+    // Chain:1 Transactions
+
+    // tx1
+    CMutableTransaction tx1 = CMutableTransaction();
+    tx1.vout.resize(1);
+    tx1.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx1.vout[0].nValue = 1 * COIN;
+    pool.addUnchecked(tx1.GetHash(), entry.Fee(1000LL).Priority(10.0).SigOps(1).FromTx(tx1));
+
+    // tx2
+    CMutableTransaction tx2 = CMutableTransaction();
+    tx2.vout.resize(1);
+    tx2.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx2.vout[0].nValue = 2 * COIN;
+    pool.addUnchecked(tx2.GetHash(), entry.Fee(2000LL).Priority(10.0).SigOps(1).FromTx(tx2));
+
+    // tx3
+    CMutableTransaction tx3 = CMutableTransaction();
+    tx3.vout.resize(1);
+    tx3.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx3.vout[0].nValue = 3 * COIN;
+    pool.addUnchecked(tx3.GetHash(), entry.Fee(3000LL).Priority(10.0).SigOps(1).FromTx(tx3));
+
+    // tx4
+    CMutableTransaction tx4 = CMutableTransaction();
+    tx4.vout.resize(1);
+    tx4.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx4.vout[0].nValue = 4 * COIN;
+    pool.addUnchecked(tx4.GetHash(), entry.Fee(4000LL).Priority(10.0).SigOps(1).FromTx(tx4));
+
+
+    // tx5 - child of tx1
+    CMutableTransaction tx5 = CMutableTransaction();
+    tx5.vin.resize(1);
+    tx5.vin[0].scriptSig = CScript() << OP_11;
+    tx5.vin[0].prevout.hash = tx1.GetHash();
+    tx5.vin[0].prevout.n = 0;
+    tx5.vout.resize(1);
+    tx5.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx5.vout[0].nValue = 1 * COIN;
+    pool.addUnchecked(tx5.GetHash(), entry.Fee(1000LL).Priority(10.0).SigOps(1).FromTx(tx5));
+
+
+    // tx6 - child of tx2
+    CMutableTransaction tx6 = CMutableTransaction();
+    tx6.vin.resize(1);
+    tx6.vin[0].scriptSig = CScript() << OP_11;
+    tx6.vin[0].prevout.hash = tx2.GetHash();
+    tx6.vin[0].prevout.n = 0;
+    tx6.vout.resize(1);
+    tx6.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx6.vout[0].nValue = 2 * COIN;
+    pool.addUnchecked(tx6.GetHash(), entry.Fee(2000LL).Priority(10.0).SigOps(1).FromTx(tx6));
+
+    // tx7 - child of tx3
+    CMutableTransaction tx7 = CMutableTransaction();
+    tx7.vin.resize(1);
+    tx7.vin[0].scriptSig = CScript() << OP_11;
+    tx7.vin[0].prevout.hash = tx3.GetHash();
+    tx7.vin[0].prevout.n = 0;
+    tx7.vout.resize(1);
+    tx7.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx7.vout[0].nValue = 3 * COIN;
+    pool.addUnchecked(tx7.GetHash(), entry.Fee(3000LL).Priority(10.0).SigOps(1).FromTx(tx7));
+
+
+    // tx8 - child of tx4
+    CMutableTransaction tx8 = CMutableTransaction();
+    tx8.vin.resize(1);
+    tx8.vin[0].scriptSig = CScript() << OP_11;
+    tx8.vin[0].prevout.hash = tx4.GetHash();
+    tx8.vin[0].prevout.n = 0;
+    tx8.vout.resize(1);
+    tx8.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx8.vout[0].nValue = 4 * COIN;
+    pool.addUnchecked(tx8.GetHash(), entry.Fee(4000LL).Priority(10.0).SigOps(1).FromTx(tx8));
+
+    // tx9 - child of tx5 and tx6 and has two outputs
+    CMutableTransaction tx9 = CMutableTransaction();
+    tx9.vin.resize(2);
+    tx9.vin[0].scriptSig = CScript() << OP_11;
+    tx9.vin[0].prevout.hash = tx5.GetHash();
+    tx9.vin[0].prevout.n = 0;
+    tx9.vin[1].scriptSig = CScript() << OP_11;
+    tx9.vin[1].prevout.hash = tx6.GetHash();
+    tx9.vin[1].prevout.n = 0;
+    tx9.vout.resize(2);
+    tx9.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx9.vout[0].nValue = 1 * COIN;
+    tx9.vout[1].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx9.vout[1].nValue = 2 * COIN;
+    pool.addUnchecked(tx9.GetHash(), entry.Fee(3000LL).Priority(10.0).SigOps(1).FromTx(tx9));
+
+    // tx10 - child of tx7 and tx8 and has one output
+    CMutableTransaction tx10 = CMutableTransaction();
+    tx10.vin.resize(2);
+    tx10.vin[0].scriptSig = CScript() << OP_11;
+    tx10.vin[0].prevout.hash = tx7.GetHash();
+    tx10.vin[0].prevout.n = 0;
+    tx10.vin[1].scriptSig = CScript() << OP_11;
+    tx10.vin[1].prevout.hash = tx8.GetHash();
+    tx10.vin[1].prevout.n = 0;
+    tx10.vout.resize(1);
+    tx10.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx10.vout[0].nValue = 7 * COIN;
+    pool.addUnchecked(tx10.GetHash(), entry.Fee(7000LL).SigOps(1).FromTx(tx10));
+
+    // tx20
+    CMutableTransaction tx20 = CMutableTransaction();
+    tx20.vout.resize(1);
+    tx20.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx20.vout[0].nValue = 5 * COIN;
+    pool.addUnchecked(tx20.GetHash(), entry.Fee(5000LL).Priority(10.0).SigOps(1).FromTx(tx20));
+
+    // tx11 - child of tx9, tx10 and tx20, and has two outputs
+    CMutableTransaction tx11 = CMutableTransaction();
+    tx11.vin.resize(3);
+    tx11.vin[0].scriptSig = CScript() << OP_11;
+    tx11.vin[0].prevout.hash = tx9.GetHash();
+    tx11.vin[0].prevout.n = 1;
+    tx11.vin[1].scriptSig = CScript() << OP_11;
+    tx11.vin[1].prevout.hash = tx10.GetHash();
+    tx11.vin[1].prevout.n = 0;
+    tx11.vin[2].scriptSig = CScript() << OP_11;
+    tx11.vin[2].prevout.hash = tx20.GetHash();
+    tx11.vin[2].prevout.n = 0;
+    tx11.vout.resize(2);
+    tx11.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx11.vout[0].nValue = 1 * COIN;
+    tx11.vout[1].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx11.vout[1].nValue = 2 * COIN;
+    pool.addUnchecked(tx11.GetHash(), entry.Fee(10000LL).SigOps(1).FromTx(tx11));
+
+    // tx12 - child of tx9 and has three outputs
+    CMutableTransaction tx12 = CMutableTransaction();
+    tx12.vin.resize(1);
+    tx12.vin[0].scriptSig = CScript() << OP_11;
+    tx12.vin[0].prevout.hash = tx9.GetHash();
+    tx12.vin[0].prevout.n = 0;
+    tx12.vout.resize(3);
+    tx12.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx12.vout[0].nValue = .5 * COIN;
+    tx12.vout[1].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx12.vout[1].nValue = .2 * COIN;
+    tx12.vout[2].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx12.vout[2].nValue = .3 * COIN;
+    pool.addUnchecked(tx12.GetHash(), entry.Fee(1000LL).Priority(10.0).SigOps(1).FromTx(tx12));
+
+    // tx13 - child of tx11 and has one output
+    CMutableTransaction tx13 = CMutableTransaction();
+    tx13.vin.resize(1);
+    tx13.vin[0].scriptSig = CScript() << OP_11;
+    tx13.vin[0].prevout.hash = tx11.GetHash();
+    tx13.vin[0].prevout.n = 0;
+    tx13.vout.resize(1);
+    tx13.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx13.vout[0].nValue = 1 * COIN;
+    pool.addUnchecked(tx13.GetHash(), entry.Fee(1000LL).SigOps(1).FromTx(tx13));
+
+
+    // tx14 - child of tx11 and has one output
+    CMutableTransaction tx14 = CMutableTransaction();
+    tx14.vin.resize(1);
+    tx14.vin[0].scriptSig = CScript() << OP_11;
+    tx14.vin[0].prevout.hash = tx11.GetHash();
+    tx14.vin[0].prevout.n = 1;
+    tx14.vout.resize(1);
+    tx14.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx14.vout[0].nValue = 1 * COIN;
+    pool.addUnchecked(tx14.GetHash(), entry.Fee(1000LL).SigOps(1).FromTx(tx14));
+
+    // tx15 - child of tx12
+    CMutableTransaction tx15 = CMutableTransaction();
+    tx15.vin.resize(1);
+    tx15.vin[0].scriptSig = CScript() << OP_11;
+    tx15.vin[0].prevout.hash = tx12.GetHash();
+    tx15.vin[0].prevout.n = 0;
+    tx15.vout.resize(1);
+    tx15.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx15.vout[0].nValue = 1 * COIN;
+    pool.addUnchecked(tx15.GetHash(), entry.Fee(500LL).SigOps(1).FromTx(tx15));
+
+    // tx16 - child of tx12
+    CMutableTransaction tx16 = CMutableTransaction();
+    tx16.vin.resize(1);
+    tx16.vin[0].scriptSig = CScript() << OP_11;
+    tx16.vin[0].prevout.hash = tx12.GetHash();
+    tx16.vin[0].prevout.n = 1;
+    tx16.vout.resize(1);
+    tx16.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx16.vout[0].nValue = 1 * COIN;
+    pool.addUnchecked(tx16.GetHash(), entry.Fee(200LL).SigOps(1).FromTx(tx16));
+
+    // tx17 - child of tx12
+    CMutableTransaction tx17 = CMutableTransaction();
+    tx17.vin.resize(1);
+    tx17.vin[0].scriptSig = CScript() << OP_11;
+    tx17.vin[0].prevout.hash = tx12.GetHash();
+    tx17.vin[0].prevout.n = 2;
+    tx17.vout.resize(1);
+    tx17.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx17.vout[0].nValue = 1 * COIN;
+    pool.addUnchecked(tx17.GetHash(), entry.Fee(300LL).SigOps(1).FromTx(tx17));
+
+    // tx19
+    CMutableTransaction tx19 = CMutableTransaction();
+    tx19.vout.resize(1);
+    tx19.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx19.vout[0].nValue = 6 * COIN;
+    pool.addUnchecked(tx19.GetHash(), entry.Fee(6000LL).Priority(10.0).SigOps(1).FromTx(tx19));
+
+    // tx18 - child of tx13, tx14 and 19, and has two outputs
+    CMutableTransaction tx18 = CMutableTransaction();
+    tx18.vin.resize(3);
+    tx18.vin[0].scriptSig = CScript() << OP_11;
+    tx18.vin[0].prevout.hash = tx13.GetHash();
+    tx18.vin[0].prevout.n = 0;
+    tx18.vin[1].scriptSig = CScript() << OP_11;
+    tx18.vin[1].prevout.hash = tx14.GetHash();
+    tx18.vin[1].prevout.n = 0;
+    tx18.vin[2].scriptSig = CScript() << OP_11;
+    tx18.vin[2].prevout.hash = tx19.GetHash();
+    tx18.vin[2].prevout.n = 0;
+    tx18.vout.resize(2);
+    tx18.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx18.vout[0].nValue = 1 * COIN;
+    tx18.vout[1].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx18.vout[1].nValue = 2 * COIN;
+    pool.addUnchecked(tx18.GetHash(), entry.Fee(2000LL).SigOps(1).FromTx(tx18));
+
+
+    // Chain:2 Transactions
+    /*
+
+                            21                     27
+                            |                      /
+            ________________22_______________     /
+           /         /      |      \         \   28
+          /         /       23      \         \  /
+         /         /       / \       \         \/
+        31        32      24 25      33        29
+         \         \       \ /       /         /\
+          \         \       26      /         /  \
+           \         \      |      /         /    \
+           34_________\_____35____/_________/     30
+                           / \
+                          36 37
+                           \ /
+                            38
+    */
+
+    // tx21
+    CMutableTransaction tx21 = CMutableTransaction();
+    tx21.vout.resize(1);
+    tx21.vout[0].scriptPubKey = CScript();
+    tx21.vout[0].nValue = 100 * COIN;
+    pool.addUnchecked(tx21.GetHash(), entry.Fee(100000LL).Priority(10.0).SigOps(1).FromTx(tx21));
+
+
+    // tx22 - child of tx21 and has 5 outputs
+    CMutableTransaction tx22 = CMutableTransaction();
+    tx22.vin.resize(1);
+    tx22.vin[0].scriptSig = CScript();
+    tx22.vin[0].prevout.hash = tx21.GetHash();
+    tx22.vin[0].prevout.n = 0;
+    tx22.vout.resize(5);
+    tx22.vout[0].scriptPubKey = CScript();
+    tx22.vout[0].nValue = 20 * COIN;
+    tx22.vout[1].scriptPubKey = CScript();
+    tx22.vout[1].nValue = 20 * COIN;
+    tx22.vout[2].scriptPubKey = CScript();
+    tx22.vout[2].nValue = 20 * COIN;
+    tx22.vout[3].scriptPubKey = CScript();
+    tx22.vout[3].nValue = 20 * COIN;
+    tx22.vout[4].scriptPubKey = CScript();
+    tx22.vout[4].nValue = 20 * COIN;
+    pool.addUnchecked(tx22.GetHash(), entry.Fee(100000LL).Priority(10.0).SigOps(1).FromTx(tx22));
+
+
+    // tx23 - child of tx22 and has two outputs
+    CMutableTransaction tx23 = CMutableTransaction();
+    tx23.vin.resize(1);
+    tx23.vin[0].scriptSig = CScript();
+    tx23.vin[0].prevout.hash = tx22.GetHash();
+    tx23.vin[0].prevout.n = 2;
+    tx23.vout.resize(2);
+    tx23.vout[0].scriptPubKey = CScript();
+    tx23.vout[0].nValue = 10 * COIN;
+    tx23.vout[1].scriptPubKey = CScript();
+    tx23.vout[1].nValue = 10 * COIN;
+    pool.addUnchecked(tx23.GetHash(), entry.Fee(20000LL).Priority(10.0).SigOps(1).FromTx(tx23));
+
+    // tx24 - child of tx23 and has one output
+    CMutableTransaction tx24 = CMutableTransaction();
+    tx24.vin.resize(1);
+    tx24.vin[0].scriptSig = CScript();
+    tx24.vin[0].prevout.hash = tx23.GetHash();
+    tx24.vin[0].prevout.n = 0;
+    tx24.vout.resize(1);
+    tx24.vout[0].scriptPubKey = CScript();
+    tx24.vout[0].nValue = 10 * COIN;
+    pool.addUnchecked(tx24.GetHash(), entry.Fee(10000LL).SigOps(1).FromTx(tx24));
+
+    // tx25 - child of tx23 and has one output
+    CMutableTransaction tx25 = CMutableTransaction();
+    tx25.vin.resize(1);
+    tx25.vin[0].scriptSig = CScript();
+    tx25.vin[0].prevout.hash = tx23.GetHash();
+    tx25.vin[0].prevout.n = 1;
+    tx25.vout.resize(1);
+    tx25.vout[0].scriptPubKey = CScript();
+    tx25.vout[0].nValue = 10 * COIN;
+    pool.addUnchecked(tx25.GetHash(), entry.Fee(10000LL).SigOps(1).FromTx(tx25));
+
+    // tx26 - child of tx24 and tx25 and has one output
+    CMutableTransaction tx26 = CMutableTransaction();
+    tx26.vin.resize(2);
+    tx26.vin[0].scriptSig = CScript();
+    tx26.vin[0].prevout.hash = tx24.GetHash();
+    tx26.vin[0].prevout.n = 0;
+    tx26.vin[1].scriptSig = CScript();
+    tx26.vin[1].prevout.hash = tx25.GetHash();
+    tx26.vin[1].prevout.n = 0;
+    tx26.vout.resize(1);
+    tx26.vout[0].scriptPubKey = CScript();
+    tx26.vout[0].nValue = 20 * COIN;
+    pool.addUnchecked(tx26.GetHash(), entry.Fee(20000LL).SigOps(1).FromTx(tx26));
+
+    // tx27
+    CMutableTransaction tx27 = CMutableTransaction();
+    tx27.vout.resize(1);
+    tx27.vout[0].scriptPubKey = CScript();
+    tx27.vout[0].nValue = 101 * COIN;
+    pool.addUnchecked(tx27.GetHash(), entry.Fee(101000LL).Priority(10.0).SigOps(1).FromTx(tx27));
+
+    // tx28 - child of tx27 and has one output
+    CMutableTransaction tx28 = CMutableTransaction();
+    tx28.vin.resize(1);
+    tx28.vin[0].scriptSig = CScript();
+    tx28.vin[0].prevout.hash = tx27.GetHash();
+    tx28.vin[0].prevout.n = 0;
+    tx28.vout.resize(1);
+    tx28.vout[0].scriptPubKey = CScript();
+    tx28.vout[0].nValue = 101 * COIN;
+    pool.addUnchecked(tx28.GetHash(), entry.Fee(101000LL).SigOps(1).FromTx(tx28));
+
+    // tx29 - child of tx22 and tx28 and has two outputs
+    CMutableTransaction tx29 = CMutableTransaction();
+    tx29.vin.resize(2);
+    tx29.vin[0].scriptSig = CScript();
+    tx29.vin[0].prevout.hash = tx22.GetHash();
+    tx29.vin[0].prevout.n = 4;
+    tx29.vin[1].scriptSig = CScript();
+    tx29.vin[1].prevout.hash = tx28.GetHash();
+    tx29.vin[1].prevout.n = 0;
+    tx29.vout.resize(2);
+    tx29.vout[0].scriptPubKey = CScript();
+    tx29.vout[0].nValue = 100 * COIN;
+    tx29.vout[1].scriptPubKey = CScript();
+    tx29.vout[1].nValue = 101 * COIN;
+    pool.addUnchecked(tx29.GetHash(), entry.Fee(201000LL).Priority(10.0).SigOps(1).FromTx(tx29));
+
+    // tx30 - child of tx29 and has one output
+    CMutableTransaction tx30 = CMutableTransaction();
+    tx30.vin.resize(1);
+    tx30.vin[0].scriptSig = CScript();
+    tx30.vin[0].prevout.hash = tx29.GetHash();
+    tx30.vin[0].prevout.n = 1;
+    tx30.vout.resize(1);
+    tx30.vout[0].scriptPubKey = CScript();
+    tx30.vout[0].nValue = 101 * COIN;
+    pool.addUnchecked(tx30.GetHash(), entry.Fee(101000LL).SigOps(1).FromTx(tx30));
+
+    // tx31 - child of tx22 and has one output
+    CMutableTransaction tx31 = CMutableTransaction();
+    tx31.vin.resize(1);
+    tx31.vin[0].scriptSig = CScript();
+    tx31.vin[0].prevout.hash = tx22.GetHash();
+    tx31.vin[0].prevout.n = 0;
+    tx31.vout.resize(1);
+    tx31.vout[0].scriptPubKey = CScript();
+    tx31.vout[0].nValue = 20 * COIN;
+    pool.addUnchecked(tx31.GetHash(), entry.Fee(20000LL).SigOps(1).FromTx(tx31));
+
+    // tx32 - child of tx22 and has one output
+    CMutableTransaction tx32 = CMutableTransaction();
+    tx32.vin.resize(1);
+    tx32.vin[0].scriptSig = CScript();
+    tx32.vin[0].prevout.hash = tx22.GetHash();
+    tx32.vin[0].prevout.n = 1;
+    tx32.vout.resize(1);
+    tx32.vout[0].scriptPubKey = CScript();
+    tx32.vout[0].nValue = 20 * COIN;
+    pool.addUnchecked(tx32.GetHash(), entry.Fee(20000LL).SigOps(1).FromTx(tx32));
+
+    // tx33 - child of tx22 and has one output
+    CMutableTransaction tx33 = CMutableTransaction();
+    tx33.vin.resize(1);
+    tx33.vin[0].scriptSig = CScript();
+    tx33.vin[0].prevout.hash = tx22.GetHash();
+    tx33.vin[0].prevout.n = 3;
+    tx33.vout.resize(1);
+    tx33.vout[0].scriptPubKey = CScript();
+    tx33.vout[0].nValue = 20 * COIN;
+    pool.addUnchecked(tx33.GetHash(), entry.Fee(20000LL).SigOps(1).FromTx(tx33));
+
+    // tx34 - child of tx31 and has one output
+    CMutableTransaction tx34 = CMutableTransaction();
+    tx34.vin.resize(1);
+    tx34.vin[0].scriptSig = CScript();
+    tx34.vin[0].prevout.hash = tx31.GetHash();
+    tx34.vin[0].prevout.n = 0;
+    tx34.vout.resize(1);
+    tx34.vout[0].scriptPubKey = CScript();
+    tx34.vout[0].nValue = 20 * COIN;
+    pool.addUnchecked(tx34.GetHash(), entry.Fee(20000LL).SigOps(1).FromTx(tx34));
+
+    // tx35 - child of tx26, tx29, tx32, tx33, tx34 and has two outputs
+    CMutableTransaction tx35 = CMutableTransaction();
+    tx35.vin.resize(5);
+    tx35.vin[0].scriptSig = CScript();
+    tx35.vin[0].prevout.hash = tx26.GetHash();
+    tx35.vin[0].prevout.n = 0;
+    tx35.vin[1].scriptSig = CScript();
+    tx35.vin[1].prevout.hash = tx29.GetHash();
+    tx35.vin[1].prevout.n = 0;
+    tx35.vin[2].scriptSig = CScript();
+    tx35.vin[2].prevout.hash = tx32.GetHash();
+    tx35.vin[2].prevout.n = 0;
+    tx35.vin[3].scriptSig = CScript();
+    tx35.vin[3].prevout.hash = tx33.GetHash();
+    tx35.vin[3].prevout.n = 0;
+    tx35.vin[4].scriptSig = CScript();
+    tx35.vin[4].prevout.hash = tx34.GetHash();
+    tx35.vin[4].prevout.n = 0;
+    tx35.vout.resize(2);
+    tx35.vout[0].scriptPubKey = CScript();
+    tx35.vout[0].nValue = 200 * COIN;
+    tx35.vout[1].scriptPubKey = CScript();
+    tx35.vout[1].nValue = 81 * COIN;
+    pool.addUnchecked(tx35.GetHash(), entry.Fee(281000LL).Priority(10.0).SigOps(1).FromTx(tx35));
+
+    // tx36 - child of tx35 and has one output
+    CMutableTransaction tx36 = CMutableTransaction();
+    tx36.vin.resize(1);
+    tx36.vin[0].scriptSig = CScript();
+    tx36.vin[0].prevout.hash = tx35.GetHash();
+    tx36.vin[0].prevout.n = 0;
+    tx36.vout.resize(1);
+    tx36.vout[0].scriptPubKey = CScript();
+    tx36.vout[0].nValue = 200 * COIN;
+    pool.addUnchecked(tx36.GetHash(), entry.Fee(200000LL).SigOps(1).FromTx(tx36));
+
+    // tx37 - child of tx35 and has one output
+    CMutableTransaction tx37 = CMutableTransaction();
+    tx37.vin.resize(1);
+    tx37.vin[0].scriptSig = CScript();
+    tx37.vin[0].prevout.hash = tx35.GetHash();
+    tx37.vin[0].prevout.n = 1;
+    tx37.vout.resize(1);
+    tx37.vout[0].scriptPubKey = CScript();
+    tx37.vout[0].nValue = 81 * COIN;
+    pool.addUnchecked(tx37.GetHash(), entry.Fee(81000LL).SigOps(1).FromTx(tx37));
+
+    // tx38 - child of tx36 and tx37 and has one output
+    CMutableTransaction tx38 = CMutableTransaction();
+    tx38.vin.resize(2);
+    tx38.vin[0].scriptSig = CScript();
+    tx38.vin[0].prevout.hash = tx36.GetHash();
+    tx38.vin[0].prevout.n = 0;
+    tx38.vin[1].scriptSig = CScript();
+    tx38.vin[1].prevout.hash = tx37.GetHash();
+    tx38.vin[1].prevout.n = 0;
+    tx38.vout.resize(1);
+    tx38.vout[0].scriptPubKey = CScript();
+    tx38.vout[0].nValue = 281 * COIN;
+    pool.addUnchecked(tx38.GetHash(), entry.Fee(2810000LL).SigOps(1).FromTx(tx38));
+
+    // Validate the current state is correct
+    /* clang-format off */
+    BOOST_CHECK_EQUAL(pool.size(), 38);
+    std::vector<MempoolData> txns_expected =
+    {
+        {tx1.GetHash(), 1, 21, 1, 1000, 11, 916, 21000},
+        {tx2.GetHash(), 1, 21, 1, 2000, 11, 916, 23000},
+        {tx3.GetHash(), 1, 21, 1, 3000, 7, 631, 27000},
+        {tx4.GetHash(), 1, 21, 1, 4000, 7, 631, 29000},
+        {tx5.GetHash(), 2, 84, 2, 2000, 10, 895, 20000},
+        {tx6.GetHash(), 2, 84, 2, 4000, 10, 895, 21000},
+        {tx7.GetHash(), 2, 84, 2, 6000, 6, 610, 24000},
+        {tx8.GetHash(), 2, 84, 2, 8000, 6, 610, 25000},
+        {tx9.GetHash(), 5, 284, 5, 9000, 9, 832, 19000},
+        {tx10.GetHash(), 5, 273, 5, 21000, 5, 547, 21000},
+        {tx11.GetHash(), 12, 736, 12, 45000, 4, 442, 14000},
+        {tx12.GetHash(), 6, 369, 6, 10000, 4, 274, 2000},
+        {tx13.GetHash(), 13, 799, 13, 46000, 2, 221, 3000},
+        {tx14.GetHash(), 13, 799, 13, 46000, 2, 221, 3000},
+        {tx15.GetHash(), 7, 432, 7, 10500, 1, 63, 500},
+        {tx16.GetHash(), 7, 432, 7, 10200, 1, 63, 200},
+        {tx17.GetHash(), 7, 432, 7, 10300, 1, 63, 300},
+        {tx18.GetHash(), 16, 1041, 16, 55000, 1, 158, 2000},
+        {tx19.GetHash(), 1, 21, 1, 6000, 2, 179, 8000},
+        {tx20.GetHash(), 1, 21, 1, 5000, 5, 463, 19000}
+    };
+    /* clang-format on */
+    for (size_t i = 0; i < txns_expected.size(); i++)
+    {
+        CTxMemPool::txiter iter = pool.mapTx.find(txns_expected[i].hash);
+        if (iter == pool.mapTx.end())
+        {
+            printf("ERROR: tx %s not found in mempool\n", txns_expected[i].hash.ToString().c_str());
+            throw;
+        }
+
+        BOOST_CHECK_EQUAL(iter->GetCountWithAncestors(), txns_expected[i].nCountWithAncestors);
+        BOOST_CHECK_EQUAL(iter->GetSizeWithAncestors(), txns_expected[i].nSizeWithAncestors);
+        BOOST_CHECK_EQUAL(iter->GetSigOpCountWithAncestors(), txns_expected[i].nSigopsWithAncestors);
+        BOOST_CHECK_EQUAL(iter->GetModFeesWithAncestors(), txns_expected[i].nFeesWithAncestors);
+        BOOST_CHECK_EQUAL(iter->GetCountWithDescendants(), txns_expected[i].nCountWithDescendants);
+        BOOST_CHECK_EQUAL(iter->GetSizeWithDescendants(), txns_expected[i].nSizeWithDescendants);
+        BOOST_CHECK_EQUAL(iter->GetModFeesWithDescendants(), txns_expected[i].nFeesWithDescendants);
+
+        /*
+        printf("tx%d countwanc %d sizewanc %d sigopswanc %d feeswanc %d countwdesc %d sizewdesc %d feeswdesc %d\n",
+            i + 1, iter->GetCountWithAncestors(), iter->GetSizeWithAncestors(), iter->GetSigOpCountWithAncestors(),
+            iter->GetModFeesWithAncestors(), iter->GetCountWithDescendants(), iter->GetSizeWithDescendants(),
+            iter->GetModFeesWithDescendants());
+        */
+    }
+
+
+    /* Do a removeforblock using tx1,tx2,tx3 and tx4 as having been mined and are in the block
+
+    The Resulting in mempool chain should appear as shown below:
+
+    Chain1:
+
+    5      6   7      8
+     \    /     \    /
+      \  /       \  /
+       9          10      20 (unmined chain so it has no entry in txnchaintips)
+       | \        |       /
+       |  \______ 11 ____/
+       |          |\
+       12         | \
+      /|\        13 14     19 (unmined chain so it has no entry in txnchaintips)
+     / | \        | /       /
+    15 16 17      18 ______/
+
+
+    Chain2:
+                                                   27 (unmined chain so it has no entry in txnchaintips)
+                                                   /
+            ________________22_______________     /
+           /         /      |      \         \   28
+          /         /       23      \         \  /
+         /         /       / \       \         \/
+        31        32      24 25      33        29
+         \         \       \ /       /         /\
+          \         \       26      /         /  \
+           \         \      |      /         /    \
+           34_________\_____35____/_________/     30
+                           / \
+                          36 37
+                           \ /
+                            38
+
+
+    */
+
+    std::vector<CTransactionRef> vtx;
+    vtx.push_back(MakeTransactionRef(tx1));
+    vtx.push_back(MakeTransactionRef(tx2));
+    vtx.push_back(MakeTransactionRef(tx3));
+    vtx.push_back(MakeTransactionRef(tx4));
+    std::list<CTransactionRef> dummy;
+    pool.removeForBlock(vtx, 1, dummy, false);
+
+
+    // Validate the new state is correct
+    /* clang-format off */
+    std::vector<MempoolData> txns_result =
+    {
+        {tx1.GetHash(), 0, 0, 0, 0, 0, 0, 0},
+        {tx2.GetHash(), 0, 0, 0, 0, 0, 0, 0},
+        {tx3.GetHash(), 0, 0, 0, 0, 0, 0, 0},
+        {tx4.GetHash(), 0, 0, 0, 0, 0, 0, 0},
+        {tx5.GetHash(), 1, 63, 1, 1000, 10, 811, 20000},
+        {tx6.GetHash(), 1, 63, 1, 2000, 10, 811, 21000},
+        {tx7.GetHash(), 1, 63, 1, 3000, 6, 526, 24000},
+        {tx8.GetHash(), 1, 63, 1, 4000, 6, 526, 25000},
+        {tx9.GetHash(), 3, 242, 3, 6000, 9, 748, 19000},
+        {tx10.GetHash(), 3, 231, 3, 14000, 5, 463, 21000},
+        {tx11.GetHash(), 7, 589, 8, 30000, 4, 358, 14000},
+        {tx12.GetHash(), 4, 327, 4, 7000, 4, 274, 2000},
+        {tx13.GetHash(), 8, 652, 9, 31000, 2, 179, 3000},
+        {tx14.GetHash(), 8, 652, 9, 31000, 2, 179, 3000},
+        {tx15.GetHash(), 5, 390, 5, 7500, 1, 63, 500},
+        {tx16.GetHash(), 5, 390, 5, 7200, 1, 63, 200},
+        {tx17.GetHash(), 5, 390, 5, 7300, 1, 63, 300},
+        {tx18.GetHash(), 10, 831, 12, 34000, 1, 116, 2000},
+        {tx19.GetHash(), 1, 21, 1, 1000, 1, 116, 2000},
+        {tx20.GetHash(), 1, 21, 1, 1000, 1, 116, 2000}
+    };
+    /* clang-format on */
+
+    for (size_t i = 0; i < txns_result.size(); i++)
+    {
+        CTxMemPool::txiter iter = pool.mapTx.find(txns_result[i].hash);
+        if (i < 4)
+        {
+            if (iter != pool.mapTx.end())
+            {
+                printf("ERROR: tx %s was found in mempool when it should not be\n",
+                    txns_result[i].hash.ToString().c_str());
+                throw;
+            }
+            continue;
+        }
+        if (i >= 4 && iter == pool.mapTx.end())
+        {
+            printf("ERROR: tx %s not found in mempool\n", txns_result[i].hash.ToString().c_str());
+            throw;
+        }
+        /*
+        printf("tx%d countwanc %d sizewanc %d sigopswanc %d feeswanc %d countwdesc %d sizewdesc %d feeswdesc %d\n",
+            i + 1, iter->GetCountWithAncestors(), iter->GetSizeWithAncestors(), iter->GetSigOpCountWithAncestors(),
+            iter->GetModFeesWithAncestors(), iter->GetCountWithDescendants(), iter->GetSizeWithDescendants(),
+            iter->GetModFeesWithDescendants());
+        */
+        printf("tx%d: hash %s\n", (int)(i + 1), iter->GetTx().GetHash().ToString().c_str());
+
+        BOOST_CHECK_EQUAL(iter->GetCountWithAncestors(), txns_result[i].nCountWithAncestors);
+        //    BOOST_CHECK_EQUAL(iter->GetSizeWithAncestors(), txns_result[i].nSizeWithAncestors);
+        //    BOOST_CHECK_EQUAL(iter->GetSigOpCountWithAncestors(), txns_result[i].nSigopsWithAncestors);
+        //    BOOST_CHECK_EQUAL(iter->GetModFeesWithAncestors(), txns_result[i].nFeesWithAncestors);
+        //   BOOST_CHECK_EQUAL(iter->GetCountWithDescendants(), txns_result[i].nCountWithDescendants);
+        //   BOOST_CHECK_EQUAL(iter->GetSizeWithDescendants(), txns_result[i].nSizeWithDescendants);
+        //    BOOST_CHECK_EQUAL(iter->GetModFeesWithDescendants(), txns_result[i].nFeesWithDescendants);
+    }
+
+
+    printf("end of chaintip test\n");
+    throw;
+}
+
 
 BOOST_AUTO_TEST_CASE(MempoolRemoveTest)
 {
