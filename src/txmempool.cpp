@@ -459,6 +459,150 @@ void CTxMemPool::UpdateChildrenForRemoval(txiter it)
     }
 }
 
+
+void CTxMemPool::CalculateTxnChainTips(const std::vector<CTransactionRef> &vtx, setEntries &setTxnChainTips)
+{
+    AssertWriteLockHeld(cs_txmempool);
+
+    // Get the children of the block transactions that are still in the mempool. Any
+    // transactions were in the block should no longer be in the mempool.
+    //
+    // GetMemPoolChildren() is only valid for entries in the mempool, so we
+    // iterate mapNextTx and mapTx to find any children.
+    for (auto pblocktx : vtx)
+    {
+        // Check that block txns are not in memory.
+        txiter iter = mapTx.find(pblocktx->GetHash());
+        assert(iter == mapTx.end());
+
+        // Look for children that are still in the mempool and add them to setTxnChainTips.
+        for (unsigned int i = 0; i < pblocktx->vout.size(); i++)
+        {
+            std::map<COutPoint, CInPoint>::iterator it = mapNextTx.find(COutPoint(pblocktx->GetHash(), i));
+            if (it == mapNextTx.end())
+                continue;
+            txiter nextit = mapTx.find(it->second.ptx->GetHash());
+            assert(nextit != mapTx.end());
+            setTxnChainTips.insert(nextit);
+
+            // This txn now a chaintip so make sure we remove any parent iterators that may still exist in mapLinks
+            // but which no longer have a corresponding txn in the mempool.
+            ClearMemPoolParents(nextit);
+        }
+    }
+}
+
+void CTxMemPool::UpdateTxnChainState(setEntries &setTxnChainTips)
+{
+    AssertWriteLockHeld(cs_txmempool);
+
+    // Iterate through each chain, updating the ancestor state finding the enpoints of each chain.
+    // Once you have finished processing all chains for ancestor state then iterate backwards from
+    // the endpoints to update the descendant state.
+
+    setEntries setFirstUpdateCompleted;
+    setEntries setEndPoints;
+    std::map<txiter, setEntries, CompareIteratorByHash> mapAncestorState;
+    for (txiter iter_tip : setTxnChainTips)
+    {
+        // Now iterate through all the decendants in order from beginning to end and update their ancestors state.
+        // In the typical case a chain will consist of transaction with only one input. However chains can be quite
+        // complex in the number of inputs outputs which result in many chains that can merge together at varying
+        // points.
+        // So as we iterate though each chain we can only update one branch of a chain at any time and therefore have
+        // to keep track of any branches we find along that way so we can go back to them and iterate through them as
+        // well.
+        //
+        // Futhermore we also have to keep in mind when two chains merge that we don't double count state. In the
+        // case where we have to iterate through a section of a branch twice we have to "forward" our ancestor state
+        // into an std::set so that we don't end up double counting ancestors.
+        //
+        // If this is a chain endpoint (no more children) then save the iterator so we can then step back
+        // through the ancestors and update the descendant state.
+
+        setEntries children;
+        children.insert(iter_tip);
+
+        // Process each branch by iterating though the children in sequential order.
+        bool fEnd = false;
+        txiter parent = iter_tip;
+        std::map<txiter, setEntries, CompareIteratorByHash> unprocessed_branches;
+        do
+        {
+            while (!children.empty())
+            {
+                // If there is more than one child then save them in a separate "branch" set. We will need to iterate
+                // through those other branches separately since we can only process one branch at a time.
+                if (children.size() > 1)
+                {
+                    setEntries::iterator it = children.begin();
+                    for (txiter child : children)
+                    {
+                        if (child == *children.begin())
+                            continue;
+                        (unprocessed_branches[child]).insert(parent);
+                    }
+                    it++;
+                    children.erase(it, children.end());
+                }
+                assert(children.size() == 1);
+
+                // Just process the first child and of the set of children. The other children will be saved in the
+                // branch set to be iterated through once we're at the end of this current branch.
+                txiter child = *children.begin();
+
+                // For each child carry the previous set of ancestors forward.
+                mapAncestorState[child].insert(child);
+                (mapAncestorState[child]).insert((mapAncestorState[parent]).begin(), (mapAncestorState[parent]).end());
+                parent = child;
+
+                // Get the next set of children in this branch
+                children = GetMemPoolChildren(child);
+
+
+                // Save the endpoint once we get there.
+                if (children.empty())
+                {
+                    setEndPoints.insert(child);
+                }
+            }
+            if (children.empty() && !unprocessed_branches.empty())
+            {
+                auto iter_branch = *unprocessed_branches.begin();
+                parent = *iter_branch.second.begin();
+                children.insert(iter_branch.first);
+                unprocessed_branches.erase(iter_branch.first);
+            }
+            else
+                fEnd = true;
+
+        } while (!fEnd);
+
+
+        // We have all the updated map entries which contain all ancestors now it's a simple matter of
+        // updating the current state.
+        for (auto &pair : mapAncestorState)
+        {
+            uint64_t nAncestorCount = 0;
+            uint64_t nAncestorSize = 0;
+            uint64_t nAncestorSigOps = 0;
+            CAmount nAncestorModifiedFee(0);
+            assert(pair.second.size() > 0);
+            for (txiter it : pair.second)
+            {
+                nAncestorCount += 1;
+                nAncestorSize += it->GetTxSize();
+                nAncestorSigOps += it->GetSigOpCount();
+                nAncestorModifiedFee += it->GetModifiedFee();
+            }
+
+            // Replace the previous counters with the new changes
+            mapTx.modify(pair.first,
+                replace_ancestor_state(nAncestorSize, nAncestorModifiedFee, nAncestorCount, nAncestorSigOps));
+        }
+    }
+}
+
 void CTxMemPool::_UpdateForRemoveFromMempool(const setEntries &entriesToRemove,
     bool updateDescendants,
     CTxMemPool::TxMempoolOriginalStateMap *changeSet)
@@ -564,6 +708,17 @@ void CTxMemPoolEntry::UpdateAncestorState(int64_t modifySize, CAmount modifyFee,
     nCountWithAncestors += modifyCount;
     assert(int64_t(nCountWithAncestors) > 0);
     nSigOpCountWithAncestors += modifySigOps;
+    assert(int(nSigOpCountWithAncestors) >= 0);
+}
+
+void CTxMemPoolEntry::ReplaceAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps)
+{
+    nSizeWithAncestors = modifySize;
+    assert(int64_t(nSizeWithAncestors) > 0);
+    nModFeesWithAncestors = modifyFee;
+    nCountWithAncestors = modifyCount;
+    assert(int64_t(nCountWithAncestors) > 0);
+    nSigOpCountWithAncestors = modifySigOps;
     assert(int(nSigOpCountWithAncestors) >= 0);
 }
 
@@ -890,96 +1045,50 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
     bool fCurrentEstimate,
     std::vector<CTxChange> *txChanges)
 {
-    typedef std::map<txiter, std::vector<txiter>, CompareIteratorByHash> DeferredMap;
-
     WRITELOCK(cs_txmempool);
-    std::vector<txiter> entriesToRemove;
+
+    // Remove all txns that are in the block from the mempool.
     std::vector<CTxMemPoolEntry> entries;
-
-    DeferredMap deferred;
-    std::queue<txiter> ready;
-
-    CTxMemPool::TxMempoolOriginalStateMap changeSet;
-
-    for (const auto &tx : vtx)
+    for (const auto ptx : vtx)
     {
-        setEntries descendants;
-        uint256 hash = tx->GetHash();
-        txiter i = mapTx.find(hash);
-        if (i == mapTx.end())
-            continue; // not in the mempool
-        ready.push(i);
-    }
-
-    while (!ready.empty())
-    {
-        txiter nextTx = ready.front();
-        ready.pop();
-
-        const auto &links = mapLinks.find(nextTx);
-        if (links == mapLinks.end())
-        {
-            DbgAssert(!"should never happen", );
+        txiter it = mapTx.find(ptx->GetHash());
+        if (it == mapTx.end())
             continue;
-        }
-        if (links->second.parents.empty()) // This tx has no ancestors, so its ready to be removed
-        {
-            entries.push_back(*nextTx); // save tx for estimator adjustment at the bottom
-
-            // place any tx that were deferred because this tx was required back onto the ready Q
-            DeferredMap::iterator deferredSet = deferred.find(nextTx);
-            if (deferredSet != deferred.end())
-            {
-                for (auto j = deferredSet->second.begin(); j != deferredSet->second.end(); ++j)
-                {
-                    ready.push(*j);
-                }
-                deferred.erase(deferredSet);
-            }
-            // Remove this tx from the mempool
-            setEntries stage;
-            stage.insert(nextTx); // nextTx is invalid now
-            _RemoveStaged(stage, true, (txChanges) ? &changeSet : nullptr);
-        }
-        else // This tx has ancestors, so put it in the deferred queue waiting for them
-        {
-            auto tmp = links->second.parents.begin();
-            if (tmp != links->second.parents.end())
-            {
-                txiter t = *tmp;
-                std::vector<txiter> &vec = deferred[t];
-                vec.push_back(nextTx);
-            }
-            else // an empty txiter should never be part of the parents
-            {
-                DbgAssert(!"tx parents is corrupt!", {
-                    links->second.parents.clear();
-                    ready.push(nextTx);
-                });
-            }
-        }
-
-        // If we run out of tx in the ready queue, grab everything that was deferred
-        // and put them back in the ready q
-        if (ready.empty() && !deferred.empty())
-        {
-            DbgAssert(!"Impossible tx topology", );
-            for (auto i = deferred.begin(); i != deferred.end(); ++i)
-            {
-                for (auto j = i->second.begin(); j != i->second.end(); ++j)
-                {
-                    ready.push(*j);
-                }
-            }
-            deferred.clear();
-        }
+        // TODO: seems rather inefficient to save the entire entry again for later, must be a faster
+        // way than doing a full copy.
+        entries.push_back(*it); // save tx for estimator adjustment at the bottom
+        removeUnchecked(it);
     }
 
-    // process changeSet into a list of tx and mempool change
+    // Get all the txn chain tips if any exist.
+    setEntries setTxnChainTips;
+    CalculateTxnChainTips(vtx, setTxnChainTips);
+
+    // If long chain transaction forwarding is turned on, get the original descendant state
+    // and save it for later comparison.
+    CTxMemPool::TxMempoolOriginalStateMap changeSet;
     if (txChanges)
     {
-        txChanges->reserve(changeSet.size());
+        for (txiter chaintip : setTxnChainTips)
+        {
+            setEntries setDescendants;
+            _CalculateDescendants(chaintip, setDescendants);
+            for (txiter dit : setDescendants)
+            {
+                if (changeSet.count(dit) == 0)
+                    changeSet.insert({dit, TxMempoolOriginalState(dit)});
+            }
+        }
+    }
+
+    // Update ancestor and descendant state for remaining chains
+    UpdateTxnChainState(setTxnChainTips);
+
+    // After the updates are complete then process changeSet into a list of tx and mempool changes
+    if (txChanges)
+    {
         // Create the change set list and sort into dependency order
+        txChanges->reserve(changeSet.size());
         for (auto &mc : changeSet)
         {
             txChanges->push_back(CTxChange(mc.second));
@@ -1482,6 +1591,15 @@ void CTxMemPool::_UpdateParent(txiter entry, txiter parent, bool add)
     {
         cachedInnerUsage -= memusage::IncrementalDynamicUsage(s);
     }
+}
+
+void CTxMemPool::ClearMemPoolParents(txiter entry)
+{
+    AssertLockHeld(cs_txmempool);
+    assert(entry != mapTx.end());
+    txlinksMap::iterator it = mapLinks.find(entry);
+    assert(it != mapLinks.end());
+    it->second.parents.erase(it->second.parents.begin(), it->second.parents.end());
 }
 
 const CTxMemPool::setEntries &CTxMemPool::GetMemPoolParents(txiter entry) const

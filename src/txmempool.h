@@ -149,10 +149,12 @@ public:
     int64_t GetModifiedFee() const { return nFee + feeDelta; }
     size_t DynamicMemoryUsage() const { return nUsageSize; }
     const LockPoints &GetLockPoints() const { return lockPoints; }
-    // Adjusts the descendant state, if this entry is not dirty.
+    // Increments the descendant state values, if this entry is not dirty.
     void UpdateDescendantState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount);
-    // Adjusts the ancestor state
+    // Increments the ancestor state values
     void UpdateAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps);
+    // Replaces the previous ancestor state with new set of values
+    void ReplaceAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps);
     // Updates the fee delta used for mining priority score, and the
     // modified fees with descendants.
     void UpdateFeeDelta(int64_t feeDelta);
@@ -194,6 +196,21 @@ struct update_ancestor_state
     }
 
     void operator()(CTxMemPoolEntry &e) { e.UpdateAncestorState(modifySize, modifyFee, modifyCount, modifySigOps); }
+private:
+    int64_t modifySize;
+    CAmount modifyFee;
+    int64_t modifyCount;
+    int modifySigOps;
+};
+
+struct replace_ancestor_state
+{
+    replace_ancestor_state(int64_t _modifySize, CAmount _modifyFee, int64_t _modifyCount, int _modifySigOps)
+        : modifySize(_modifySize), modifyFee(_modifyFee), modifyCount(_modifyCount), modifySigOps(_modifySigOps)
+    {
+    }
+
+    void operator()(CTxMemPoolEntry &e) { e.ReplaceAncestorState(modifySize, modifyFee, modifyCount, modifySigOps); }
 private:
     int64_t modifySize;
     CAmount modifyFee;
@@ -521,8 +538,11 @@ public:
     typedef std::map<CTxMemPool::txiter, TxMempoolOriginalState, CTxMemPool::CompareIteratorByHash>
         TxMempoolOriginalStateMap;
 
-
+    /** Clear all parents from mapLinks that are associated with this entry */
+    void ClearMemPoolParents(txiter entry);
+    /** Return the set of mempool parents for this entry */
     const setEntries &GetMemPoolParents(txiter entry) const;
+    /** Return the set of mempool children for this entry */
     const setEntries &GetMemPoolChildren(txiter entry) const;
 
 private:
@@ -836,6 +856,18 @@ private:
         TxMempoolOriginalStateMap *changeSet);
     /** Sever link between specified transaction and direct children. */
     void UpdateChildrenForRemoval(txiter entry);
+
+    /** Return a set of all transactions in a block that will still have unconfirmed children in the mempool once
+     *  the block has finished processing and has removed its transactions from the mempool. This set can then be used
+     *  as starting points to tranverse and update the ancestor/descendant states of the unconfirmed chain.
+     */
+    void CalculateTxnChainTips(const std::vector<CTransactionRef> &vtx, setEntries &setTxnChainTips);
+
+    /** Update the ancestor and descendant state for the set of supplied transaction chains. This step is
+     *  done after a block has finished processing and we have already removed the transactions from the mempool
+     */
+    void UpdateTxnChainState(setEntries &setTxnChainTips);
+
     /** Internal implementation of transaction per sec rate update logic
      *  Requires that the cs_txPerSec lock be held by the calling method
      */
