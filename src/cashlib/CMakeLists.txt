@@ -63,6 +63,8 @@ add_library( # Sets the name of the library.
              ../arith_uint256.h
              ../bloom.cpp
              ../bloom.h
+             ../merkleblock.cpp
+             ../merkleblock.h
              ../streams.h
              ../rsm/include/recursive_shared_mutex.h
              )
