@@ -293,8 +293,8 @@ void TransactionGraphWidget::setTransactionsPerSecond(double nTxPerSec,
     updateTransactionsPerSecondLabelValues();
 
     // Limit redraw requests
-    static int64_t nLastRedrawTime = GetTimeMillis();
-    int64_t nCurrentTime = GetTimeMillis();
+    static uint64_t nLastRedrawTime = (uint64_t)GetTimeMillis();
+    uint64_t nCurrentTime = (uint64_t)GetTimeMillis();
     if (nCurrentTime >= nLastRedrawTime + nRedrawRateMillis)
     {
         update();
@@ -313,7 +313,7 @@ void TransactionGraphWidget::updateTransactionsPerSecondLabelValues()
     size_t countAll = vSmoothedSamples.size();
     size_t countDisplay = countAll < numSamples ? countAll : numSamples;
     float tMaxSamples = 0.0f, tMaxDisplay = 0.0f;
-    for (int i = 0; i < vInstantaneousSamples.size(); i++)
+    for (size_t i = 0; i < (size_t)vInstantaneousSamples.size(); i++)
     {
         float f = vInstantaneousSamples.at(i);
         tSumAll += f;
@@ -348,7 +348,7 @@ void TransactionGraphWidget::updateTransactionsPerSecondLabelValues()
     tSumDisplay = 0.0f;
     tMaxSamples = 0.0f;
     tMaxDisplay = 0.0f;
-    for (int i = 0; i < vSmoothedSamples.size(); i++)
+    for (size_t i = 0; i < (size_t)vSmoothedSamples.size(); i++)
     {
         float f = vSmoothedSamples.at(i);
         tSumAll += f;
