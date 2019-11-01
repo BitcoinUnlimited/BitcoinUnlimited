@@ -781,11 +781,14 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Wal
     jobject ths,
     jobjectArray arg,
     jdouble falsePosRate,
+    jint capacity,
     jint maxSize,
     jint flags,
     jint tweak)
 {
     size_t len = env->GetArrayLength(arg);
+    if (capacity < 10)
+        capacity = 10; // sanity check the capacity
 
     if (!((falsePosRate >= 0) && (falsePosRate <= 1.0)))
     {
@@ -793,7 +796,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Wal
         return nullptr;
     }
 
-    CBloomFilter bloom(std::max((size_t)5, len), falsePosRate, tweak, flags, maxSize);
+    CBloomFilter bloom(std::max((size_t)capacity, len), falsePosRate, tweak, flags, maxSize);
 
     for (size_t i = 0; i < len; i++)
     {
