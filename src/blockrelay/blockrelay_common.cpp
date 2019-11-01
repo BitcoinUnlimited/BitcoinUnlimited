@@ -185,6 +185,7 @@ bool ThinTypeRelay::AreTooManyBlocksInFlight(CNode *pfrom, const std::string thi
 bool ThinTypeRelay::IsBlockInFlight(CNode *pfrom, const std::string thinType, const uint256 &hash)
 {
     // check if this node already has this thinType of block in flight.
+    LOCK(cs_inflight);
     auto range = mapThinTypeBlocksInFlight.equal_range(pfrom->GetId());
     while (range.first != range.second)
     {
