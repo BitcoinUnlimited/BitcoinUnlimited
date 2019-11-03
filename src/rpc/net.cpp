@@ -622,6 +622,8 @@ UniValue clearblockstats(const UniValue &params, bool fHelp)
         thindata.ClearThinBlockStats();
     if (IsGrapheneBlockEnabled())
         graphenedata.ClearGrapheneBlockStats();
+    if (IsCompactBlocksEnabled())
+        compactdata.ClearCompactBlockStats();
 
     return NullUniValue;
 }
