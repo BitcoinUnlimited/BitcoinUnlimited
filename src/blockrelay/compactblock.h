@@ -400,6 +400,7 @@ public:
     std::string CompactBlockToString();
     std::string FullTxToString();
 
+    /** Reset compact block tracking data */
     void ClearCompactBlockStats();
 
     void FillCompactBlockQuickStats(CompactBlockQuickStats &stats);
