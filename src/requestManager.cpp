@@ -1388,17 +1388,17 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         if (IsChainNearlySyncd())
         {
             // Update Thinblock stats
-            if (thinrelay.IsBlockInFlight(pnode, NetMsgType::XTHINBLOCK))
+            if (thinrelay.IsBlockInFlight(pnode, NetMsgType::XTHINBLOCK, hash))
             {
                 thindata.UpdateResponseTime(nResponseTime);
             }
             // Update Graphene stats
-            if (thinrelay.IsBlockInFlight(pnode, NetMsgType::GRAPHENEBLOCK))
+            if (thinrelay.IsBlockInFlight(pnode, NetMsgType::GRAPHENEBLOCK, hash))
             {
                 graphenedata.UpdateResponseTime(nResponseTime);
             }
             // Update CompactBlock stats
-            if (thinrelay.IsBlockInFlight(pnode, NetMsgType::CMPCTBLOCK))
+            if (thinrelay.IsBlockInFlight(pnode, NetMsgType::CMPCTBLOCK, hash))
             {
                 compactdata.UpdateResponseTime(nResponseTime);
             }

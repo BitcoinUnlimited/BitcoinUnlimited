@@ -27,10 +27,23 @@
 
 #include "test/test_bitcoin.h"
 
+#include <algorithm>
 #include <atomic>
 #include <boost/test/unit_test.hpp>
 #include <sstream>
-#include <string.h>
+#include <string>
+
+// Cleanup all maps
+static void CleanupAll(std::vector<CNode *> &vPeers)
+{
+    for (auto pnode : vPeers)
+    {
+        thinrelay.ClearAllBlocksToReconstruct(pnode->GetId());
+        thinrelay.ClearAllBlocksInFlight(pnode->GetId());
+        thinrelay.RemovePeers(pnode);
+    }
+    requester.MapBlocksInFlightClear();
+}
 
 // Return the netmessage string for a block/xthin/graphene request
 static std::string NetMessage(std::deque<CSerializeData> &_vSendMsg)
@@ -39,27 +52,37 @@ static std::string NetMessage(std::deque<CSerializeData> &_vSendMsg)
         return "none";
 
     CInv inv_result;
-    CSerializeData &data = _vSendMsg.front();
+    CSerializeData data = _vSendMsg.front();
     CDataStream ssCommand(SER_NETWORK, PROTOCOL_VERSION);
     ssCommand.insert(ssCommand.begin(), &data[4], &data[16]);
     _vSendMsg.pop_front();
 
+    std::string ss = ssCommand.str();
+    ss.erase(std::remove(ss.begin(), ss.end(), '\000'), ss.end());
+
     // if it's a getdata then we need to find out what type
-    if (ssCommand.str().compare("getdata"))
+    if (ss == "getdata")
     {
+        // We have to add a character/s to the end of the CSerializeData object or we will go out
+        // of bounds when we insert the data into the ssInv datastream since there are only 61
+        // characters in the string and we want to copy up to and including the very last character.
+        std::string aa("end");
+        data.insert(data.end(), aa.begin(), aa.end());
+
         CDataStream ssInv(SER_NETWORK, PROTOCOL_VERSION);
-        ssInv.insert(ssInv.begin(), &data[24], &data[60]);
+        ssInv.insert(ssInv.begin(), &data[25], &data[61]);
 
         CInv inv;
         ssInv >> inv;
 
         if (inv.type == MSG_BLOCK)
             return "getdata";
-        if (inv.type == MSG_CMPCT_BLOCK)
+        else if (inv.type == MSG_CMPCT_BLOCK)
             return "cmpctblock";
+        else
+            return "nothing";
     }
-
-    return ssCommand.str();
+    return ss;
 }
 
 static void ClearThinBlocksInFlight(CNode &node, CInv &inv) { thinrelay.ClearBlockInFlight(&node, inv.hash); }
@@ -85,20 +108,29 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     dummyNodeXthin.state_incoming = ConnectionStateIncoming::READY;
     dummyNodeXthin.state_outgoing = ConnectionStateOutgoing::READY;
     dummyNodeXthin.nServices |= NODE_XTHIN;
+    dummyNodeXthin.nServices &= ~NODE_GRAPHENE;
+    dummyNodeXthin.fSupportsCompactBlocks = false;
     dummyNodeXthin.id = 1;
     dummyNodeGraphene.nVersion = MIN_PEER_PROTO_VERSION;
     dummyNodeGraphene.state_incoming = ConnectionStateIncoming::READY;
     dummyNodeGraphene.state_outgoing = ConnectionStateOutgoing::READY;
     dummyNodeGraphene.nServices |= NODE_GRAPHENE;
+    dummyNodeGraphene.nServices &= ~NODE_XTHIN;
+    dummyNodeGraphene.fSupportsCompactBlocks = false;
     dummyNodeGraphene.id = 2;
     dummyNodeCmpct.nVersion = MIN_PEER_PROTO_VERSION;
     dummyNodeCmpct.state_incoming = ConnectionStateIncoming::READY;
     dummyNodeCmpct.state_outgoing = ConnectionStateOutgoing::READY;
+    dummyNodeCmpct.nServices &= ~NODE_GRAPHENE;
+    dummyNodeCmpct.nServices &= ~NODE_XTHIN;
     dummyNodeCmpct.fSupportsCompactBlocks = true;
     dummyNodeCmpct.id = 3;
     dummyNodeNone.nVersion = MIN_PEER_PROTO_VERSION;
     dummyNodeNone.state_incoming = ConnectionStateIncoming::READY;
     dummyNodeNone.state_outgoing = ConnectionStateOutgoing::READY;
+    dummyNodeNone.nServices &= ~NODE_GRAPHENE;
+    dummyNodeNone.nServices &= ~NODE_XTHIN;
+    dummyNodeNone.fSupportsCompactBlocks = false;
     dummyNodeNone.id = 4;
 
     // Add to vNodes
@@ -118,12 +150,13 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     uint256 hash = GetRandHash();
     uint256 randhash = GetRandHash();
     CInv inv(MSG_BLOCK, hash);
+    CInv inv_cmpct(MSG_CMPCT_BLOCK, hash);
 
     uint64_t nTime = GetTime();
     dosMan.ClearBanned();
 
-    // Test the Generaal Case: Chain synced, graphene ON, Thinblocks ON, Cmpct ON
-    // This should return a Graphene.
+    // Test the General Case: Chain synced, graphene ON, Thinblocks ON, Cmpct ON
+    // This should return a Graphene block.
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", true);
@@ -133,34 +166,28 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddCompactBlockPeer(&dummyNodeCmpct);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeXthin, inv);
-    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg).compare("get_xthin") != 0);
-    requester.MapBlocksInFlightClear();
-
-    requester.RequestBlock(&dummyNodeGraphene, inv);
-    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg).compare("get_graphene") != 0);
-    requester.MapBlocksInFlightClear();
-
-    requester.RequestBlock(&dummyNodeCmpct, inv);
-    BOOST_CHECK(NetMessage(dummyNodeCmpct.vSendMsg).compare("cmpctblock") != 0);
-    requester.MapBlocksInFlightClear();
-
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
-
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeXthin, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg) == "get_xthin");
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    ClearThinBlocksInFlight(dummyNodeCmpct, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeCmpct);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
+
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg) == "get_grblk");
+    thinrelay.ClearBlockRelayTimer(inv.hash);
+    CleanupAll(vNodes);
+
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeCmpct, inv_cmpct) == true);
+    BOOST_CHECK(NetMessage(dummyNodeCmpct.vSendMsg) == "cmpctblock");
+    thinrelay.ClearBlockRelayTimer(inv_cmpct.hash);
+    CleanupAll(vNodes);
+
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
+    thinrelay.ClearBlockRelayTimer(inv.hash);
+    CleanupAll(vNodes);
 
     // Test the General Case: Chain synced, graphene ON, Thinblocks ON, Cmpct ON
-    // This should return a Graphene.
+    // This should return a Graphene block.
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", true);
@@ -170,34 +197,28 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddCompactBlockPeer(&dummyNodeCmpct);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeXthin, inv);
-    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg).compare("get_xthin") != 0);
-    requester.MapBlocksInFlightClear();
-
-    requester.RequestBlock(&dummyNodeGraphene, inv);
-    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg).compare("get_graphene") != 0);
-    requester.MapBlocksInFlightClear();
-
-    requester.RequestBlock(&dummyNodeCmpct, inv);
-    BOOST_CHECK(NetMessage(dummyNodeCmpct.vSendMsg).compare("cmpctblock") != 0);
-    requester.MapBlocksInFlightClear();
-
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
-
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeXthin, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg) == "get_xthin");
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    ClearThinBlocksInFlight(dummyNodeCmpct, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeCmpct);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
+
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg) == "get_grblk");
+    thinrelay.ClearBlockRelayTimer(inv.hash);
+    CleanupAll(vNodes);
+
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeCmpct, inv_cmpct) == true);
+    BOOST_CHECK(NetMessage(dummyNodeCmpct.vSendMsg) == "cmpctblock");
+    thinrelay.ClearBlockRelayTimer(inv_cmpct.hash);
+    CleanupAll(vNodes);
+
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
+    thinrelay.ClearBlockRelayTimer(inv.hash);
+    CleanupAll(vNodes);
 
     // Thin timer disabled: Chain synced, graphene ON, Thinblocks OFF, Cmpct ON
-    // Although the timer would have been on because on rely type was off, here we explicity turn off
+    // Although the timer would have been on because one relay type was off, here we explicity turn off
     // the timer. We should still be able to request a Graphene, or Cmpct or regular block
     IsChainNearlySyncdSet(true);
     SetBoolArg("-use-grapheneblocks", true);
@@ -210,34 +231,30 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddPeers(&dummyNodeNone);
 
     // This test would generally cause a request for a "get_xthin", however xthins is not on and
-    // the timer is off which results in a full block to be requested.
-    requester.RequestBlock(&dummyNodeXthin, inv);
-    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg).compare("getdata") != 0);
-    requester.MapBlocksInFlightClear();
-
-    requester.RequestBlock(&dummyNodeGraphene, inv);
-    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg).compare("get_graphene") != 0);
-    requester.MapBlocksInFlightClear();
-
-    requester.RequestBlock(&dummyNodeCmpct, inv);
-    BOOST_CHECK(NetMessage(dummyNodeCmpct.vSendMsg).compare("cmpctblock") != 0);
-    requester.MapBlocksInFlightClear();
-
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
-
+    // the timer is off which results in a full block request.
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeXthin, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg) == "getdata");
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    ClearThinBlocksInFlight(dummyNodeCmpct, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeCmpct);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
-    // Chain NOT sync'd with any nodes, graphene ON, Thinblocks ON, Cmpct ON
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg) == "get_grblk");
+    thinrelay.ClearBlockRelayTimer(inv.hash);
+    CleanupAll(vNodes);
+
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeCmpct, inv_cmpct) == true);
+    BOOST_CHECK(NetMessage(dummyNodeCmpct.vSendMsg) == "cmpctblock");
+    thinrelay.ClearBlockRelayTimer(inv_cmpct.hash);
+    CleanupAll(vNodes);
+
+    inv.type = MSG_BLOCK;
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
+    thinrelay.ClearBlockRelayTimer(inv.hash);
+    CleanupAll(vNodes);
+    SetArg("-preferential-timer", "10000"); // reset from 0
+
+    // Chain NOT synced with any nodes, graphene ON, Thinblocks ON, Cmpct ON
     IsChainNearlySyncdSet(false);
     SetBoolArg("-use-grapheneblocks", true);
     SetBoolArg("-use-thinblocks", true);
@@ -247,25 +264,17 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddCompactBlockPeer(&dummyNodeCmpct);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeXthin, inv);
-    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeXthin, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg) == "getdata");
 
-    requester.RequestBlock(&dummyNodeGraphene, inv);
-    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg) == "getdata");
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    ClearThinBlocksInFlight(dummyNodeCmpct, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeCmpct);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd: No graphene nodes, No Thinblock nodes, No Cmpct nodes, Thinblocks OFF, Graphene OFF, CMPCT OFF
     IsChainNearlySyncdSet(true);
@@ -274,8 +283,8 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-compactblocks", false);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
     ClearThinBlocksInFlight(dummyNodeNone, inv);
@@ -291,15 +300,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddPeers(&dummyNodeGraphene);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd,  NO graphene nodes, NO Thinblock nodes, No Cmpt nodes, Graphene OFF, Thinblocks ON, Cmpctblocks
     // OFF
@@ -309,13 +314,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-compactblocks", false);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd,  NO graphene nodes, NO Thinblock nodes, No Cmpt nodes, Graphene OFF, Thinblocks OFF,
     // Cmpctblocks ON
@@ -325,13 +328,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-compactblocks", true);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd, HAVE graphene nodes, NO Thinblock nodes, No Cmpct nodes, Graphene OFF, Thinblocks ON,
     // Cmpctblocks OFF
@@ -342,15 +343,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddPeers(&dummyNodeGraphene);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd, HAVE graphene nodes, NO Thinblock nodes, No Cmpct nodes, Graphene OFF, Thinblocks ON,
     // Cmpctblocks ON
@@ -361,15 +358,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddPeers(&dummyNodeGraphene);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd, HAVE graphene nodes, NO Thinblock nodes, No Cmpct nodes, Graphene OFF, Thinblocks OFF,
     // Cmpctblocks ON
@@ -380,15 +373,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddPeers(&dummyNodeGraphene);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd,  NO graphene nodes, HAVE Thinblock nodes, No Cmpct Nodes, Thinblocks OFF, Graphene ON, Cmpct
     // blocks OFF
@@ -399,15 +388,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddPeers(&dummyNodeXthin);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd,  NO graphene nodes, HAVE Thinblock nodes, No Cmpct Nodes, Thinblocks OFF, Graphene ON, Cmpct
     // blocks ON
@@ -418,15 +403,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddPeers(&dummyNodeXthin);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd, NO graphene nodes, HAVE Thinblock nodes, No Cmpct Nodes, Thinblocks OFF, Graphene OFF, Cmpct
     // blocks ON
@@ -437,15 +418,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddPeers(&dummyNodeXthin);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd, NO graphene nodes, HAVE Thinblock nodes, No Cmpct Nodes, Thinblocks OFF, Graphene OFF, Cmpct
     // blocks OFF
@@ -456,15 +433,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddPeers(&dummyNodeXthin);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
 
     // Chains IS sync'd,  NO graphene nodes, NO Thinblock nodes, No Cmpctblock nodes, Thinblocks OFF, Graphene ON, Cmpt
@@ -475,13 +448,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-compactblocks", false);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd,  NO graphene nodes, NO Thinblock nodes, No Cmpctblock nodes, Thinblocks OFF, Graphene ON, Cmpt
     // blocks ON
@@ -491,13 +462,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-compactblocks", true);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd,  NO graphene nodes, NO Thinblock nodes, No Cmpctblock nodes, Thinblocks ON, Graphene ON, Cmpt
     // blocks ON
@@ -507,13 +476,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-compactblocks", true);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd,  NO graphene nodes, NO Thinblock nodes, No Cmpctblock nodes, Thinblocks ON, Graphene ON, Cmpt
     // blocks OFF
@@ -523,13 +490,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetBoolArg("-use-compactblocks", false);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd, HAVE graphene nodes, NO Thinblock nodes, No Cmpct nodes, Thinblocks ON, Graphene ON, Cmpct
     // blocks ON
@@ -540,15 +505,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddPeers(&dummyNodeGraphene);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeGraphene, inv);
-    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg).compare("get_graphene") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg) == "get_grblk");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd, HAVE graphene nodes, NO Thinblock nodes, No Cmpct nodes, Thinblocks OFF, Graphene ON, Cmpct
     // blocks ON
@@ -559,15 +520,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddPeers(&dummyNodeGraphene);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeGraphene, inv);
-    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg).compare("get_graphene") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg) == "get_grblk");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd, HAVE graphene nodes, NO Thinblock nodes, No Cmpct nodes, Thinblocks OFF, Graphene ON, Cmpct
     // blocks OFF
@@ -578,15 +535,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddPeers(&dummyNodeGraphene);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeGraphene, inv);
-    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg).compare("get_graphene") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg) == "get_grblk");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd,  HAVE graphene nodes, HAVE Thinblock nodes, Thinblocks ON, Graphene ON
     IsChainNearlySyncdSet(true);
@@ -596,16 +549,10 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddPeers(&dummyNodeXthin);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeGraphene, inv);
-    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg).compare("get_graphene") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg) == "get_grblk");
 
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd,  NO graphene nodes, HAVE Thinblock nodes, No Cmpct Nodes, Thinblocks ON, Graphene OFF, Cmpct
     // OFF
@@ -616,15 +563,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddPeers(&dummyNodeXthin);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeXthin, inv);
-    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg).compare("get_xthin") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeXthin, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg) == "get_xthin");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd,  NO graphene nodes, HAVE Thinblock nodes, No Cmpct Nodes, Thinblocks ON, Graphene ON, Cmpct ON
     IsChainNearlySyncdSet(true);
@@ -634,15 +577,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddPeers(&dummyNodeXthin);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeXthin, inv);
-    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg).compare("get_xthin") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeXthin, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg) == "get_xthin");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd,  NO graphene nodes, No Thinblock nodes, Have Cmpct Nodes, Thinblocks OFF, Graphene OFF, Cmpct
     // ON
@@ -653,15 +592,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddCompactBlockPeer(&dummyNodeCmpct);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeCmpct, inv);
-    BOOST_CHECK(NetMessage(dummyNodeCmpct.vSendMsg).compare("cmpctblock") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeCmpct, inv_cmpct) == true);
+    BOOST_CHECK(NetMessage(dummyNodeCmpct.vSendMsg) == "cmpctblock");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeCmpct, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeCmpct);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd,  NO graphene nodes, No Thinblock nodes, Have Cmpct Nodes, Thinblocks ON, Graphene ON, Cmpct ON
     IsChainNearlySyncdSet(true);
@@ -671,15 +606,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddCompactBlockPeer(&dummyNodeCmpct);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeCmpct, inv);
-    BOOST_CHECK(NetMessage(dummyNodeCmpct.vSendMsg).compare("cmpctblock") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeCmpct, inv_cmpct) == true);
+    BOOST_CHECK(NetMessage(dummyNodeCmpct.vSendMsg) == "cmpctblock");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeCmpct, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeCmpct);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
 
     /******************************
@@ -698,18 +629,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     thinrelay.AddCompactBlockPeer(&dummyNodeCmpct);
     thinrelay.AddPeers(&dummyNodeNone);
 
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeNone);
-    thinrelay.RemovePeers(&dummyNodeCmpct);
+    CleanupAll(vNodes);
 
 
     /******************************
@@ -737,26 +661,17 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     // Now move the clock ahead so that the timer is exceeded and we should now
     // download a full block
     SetMockTime(nTime + 20);
-    requester.RequestBlock(&dummyNodeNone, inv);
-    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeNone, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeNone.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    ClearThinBlocksInFlight(dummyNodeCmpct, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeCmpct);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
 
     /******************************
      * Check a full block is downloaded when Graphene timer is exceeded but then we get an announcement
      * from a graphene peer (thinblocks is OFF), and then request from that graphene peer before we
      * request from any others.
-     * However this time we already have a grapheneblock in flight for this peer so we end up downloading a full block.
      */
 
     // Chains IS sync'd,  HAVE graphene nodes, HAVE Thinblock nodes, Thinblocks OFF, Graphene ON
@@ -779,24 +694,18 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetMockTime(nTime + 20);
     randhash = GetRandHash();
     thinrelay.AddBlockInFlight(&dummyNodeGraphene, randhash, NetMsgType::GRAPHENEBLOCK);
-    requester.RequestBlock(&dummyNodeGraphene, inv);
-    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg).compare("getdata") != 0);
-    thinrelay.ClearBlockInFlight(&dummyNodeGraphene, randhash);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeGraphene.vSendMsg) == "getdata");
 
-    thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     /******************************
-     * Check an Xthin is downloaded when Graphene timer is exceeded but then we get an announcement
+     * Check another graphene block is downloaded when Graphene timer is exceeded and then we get an announcement
      * from a graphene peer (thinblocks is ON), and then request from that graphene peer before we
      * request from any others.
-     * However this time we already have a grapheneblock in flight for this peer so we end up downloading a thinblock.
+     * However this time we already have a grapheneblock in flight but we end up downloading another graphene block
+     * because we haven't exceeded the limit on number of thintype blocks in flight.
+     * Then proceed to request more thintype blocks until the limit is exceeded.
      */
 
     // Chains IS sync'd,  HAVE graphene nodes, HAVE Thinblock nodes, Thinblocks ON, Graphene ON, Cmpct OFF
@@ -812,27 +721,42 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     nTime = GetTime();
     SetMockTime(nTime);
 
-    // The first request should fail but the timers should be triggered for both xthin and graphene
-    randhash = GetRandHash();
-    thinrelay.AddBlockInFlight(&dummyNodeGraphene, randhash, NetMsgType::GRAPHENEBLOCK);
-    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == false);
+    // The first request should suceed as should successive requests up until the limit of thintype requests in flight
+    inv.hash = GetRandHash();
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 1);
+
+    inv.hash = GetRandHash();
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 2);
+
+    inv.hash = GetRandHash();
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 3);
+
+    inv.hash = GetRandHash();
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 4);
+
+    inv.hash = GetRandHash();
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
+    BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 5);
 
     // Now move the clock ahead so that the timers are exceeded and we should now
     // download an xthin
     SetMockTime(nTime + 20);
-    requester.RequestBlock(&dummyNodeXthin, inv);
-    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg).compare("get_xthin") != 0);
-    thinrelay.ClearBlockInFlight(&dummyNodeGraphene, randhash);
+    dummyNodeXthin.vSendMsg.clear();
+    inv.hash = GetRandHash();
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeXthin, inv) == true);
+    BOOST_CHECK(dummyNodeXthin.vSendMsg.size() == 1);
+
+    // Try to send a 7th block. It should fail to send as it's above the limit of thintype blocks in flight.
+    inv.hash = GetRandHash();
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == false);
+    BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 5);
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeNone);
-
+    CleanupAll(vNodes);
 
     /******************************
      * Check a Xthin is is downloaded when thinblock timer is exceeded but then we get an announcement
@@ -857,17 +781,11 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     // Now move the clock ahead so that the timer is exceeded and we should now
     // download a full block
     SetMockTime(nTime + 20);
-    requester.RequestBlock(&dummyNodeXthin, inv);
-    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg).compare("get_xthin") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeXthin, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg) == "get_xthin");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     /******************************
      * Check a Xthin is is downloaded when thinblock timer is exceeded but then we get an announcement
@@ -895,18 +813,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetMockTime(nTime + 20);
     randhash = GetRandHash();
     thinrelay.AddBlockInFlight(&dummyNodeXthin, randhash, NetMsgType::XTHINBLOCK);
-    requester.RequestBlock(&dummyNodeXthin, inv);
-    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeXthin, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg) == "getdata");
 
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    requester.MapBlocksInFlightClear();
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     /******************************
      * Check a full block is is downloaded when thinblock timer is exceeded but then we get an announcement
@@ -937,19 +849,12 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     SetMockTime(nTime + 20);
     randhash = GetRandHash();
     thinrelay.AddBlockInFlight(&dummyNodeCmpct, randhash, NetMsgType::CMPCTBLOCK);
-    requester.RequestBlock(&dummyNodeCmpct, inv);
-    BOOST_CHECK(NetMessage(dummyNodeCmpct.vSendMsg).compare("getdata") != 0);
+    BOOST_CHECK(requester.RequestBlock(&dummyNodeCmpct, inv) == true);
+    BOOST_CHECK(NetMessage(dummyNodeCmpct.vSendMsg) == "getdata");
 
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
-    ClearThinBlocksInFlight(dummyNodeGraphene, inv);
-    ClearThinBlocksInFlight(dummyNodeNone, inv);
-    ClearThinBlocksInFlight(dummyNodeCmpct, inv);
-    ClearThinBlocksInFlight(dummyNodeXthin, inv);
-    thinrelay.RemovePeers(&dummyNodeGraphene);
-    thinrelay.RemovePeers(&dummyNodeCmpct);
-    thinrelay.RemovePeers(&dummyNodeXthin);
-    thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
 
     // Final cleanup: Unset mocktime

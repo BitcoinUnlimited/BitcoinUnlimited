@@ -143,6 +143,9 @@ bool ThinTypeRelay::HasBlockRelayTimerExpired(const uint256 &hash)
 
 bool ThinTypeRelay::IsBlockRelayTimerEnabled()
 {
+    if (GetArg("-preferential-timer", DEFAULT_PREFERENTIAL_TIMER) == 0)
+        return false;
+
     // Only engage the timer if one or more, but not all, thin type relays are active.
     // If all types are active, or all inactive, then we do not need the timer.
     // Generally speaking all types will be active and we can return early.
@@ -170,18 +173,23 @@ void ThinTypeRelay::ClearBlockRelayTimer(const uint256 &hash)
     }
 }
 
-bool ThinTypeRelay::IsBlockInFlight(CNode *pfrom, const std::string thinType)
+bool ThinTypeRelay::AreTooManyBlocksInFlight(CNode *pfrom, const std::string thinType)
 {
+    // check if we've exceed the max thintype blocks in flight allowed.
     LOCK(cs_inflight);
-    // first check that we are in bounds.
     if (mapThinTypeBlocksInFlight.size() >= MAX_THINTYPE_BLOCKS_IN_FLIGHT)
         return true;
+    return false;
+}
 
+bool ThinTypeRelay::IsBlockInFlight(CNode *pfrom, const std::string thinType, const uint256 &hash)
+{
     // check if this node already has this thinType of block in flight.
+    LOCK(cs_inflight);
     auto range = mapThinTypeBlocksInFlight.equal_range(pfrom->GetId());
     while (range.first != range.second)
     {
-        if (range.first->second.thinType == thinType)
+        if (range.first->second.thinType == thinType && range.first->second.hash == hash)
             return true;
 
         range.first++;
@@ -211,7 +219,7 @@ void ThinTypeRelay::BlockWasReceived(CNode *pfrom, const uint256 &hash)
 bool ThinTypeRelay::AddBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType)
 {
     LOCK(cs_inflight);
-    if (IsBlockInFlight(pfrom, thinType))
+    if (AreTooManyBlocksInFlight(pfrom, thinType))
         return false;
 
     mapThinTypeBlocksInFlight.insert(
