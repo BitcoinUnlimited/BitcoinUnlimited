@@ -75,6 +75,7 @@ public:
         additional_token_quantity = 0;
     }
 
+    bool IsNull() { return tx_type == SLP_NULL; }
     ADD_SERIALIZE_METHODS;
     // this is not that great, it might be better to make a token header
     // and then different types that extend the header to avoid always having all fields
@@ -118,7 +119,7 @@ public:
     SLP_TX_TYPE GetType() { return tx_type; }
     // TODO determine how to count dynamic memory? maybe just return op return max size?
     size_t DynamicMemoryUsage() const { return 223; }
-    bool IsSpent() { return tx_type == SLP_NULL; }
+    bool IsSpent() { return IsNull(); }
     void Spend() { SetNull(); }
     uint64_t GetOutputAmount();
     uint64_t GetOutputAmountAt(uint32_t n);
