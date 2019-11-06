@@ -8,6 +8,7 @@
 #include "policy/policy.h"
 
 #include "amount.h"
+#include "main.h" // for minRelayTxFee
 #include "primitives/transaction.h"
 #include "streams.h"
 #include "txmempool.h"
@@ -87,20 +88,12 @@ void TxConfirmStats::UpdateMovingAverages()
 }
 
 // returns -1 on error conditions
-double TxConfirmStats::EstimateMedianVal(int confTarget,
+CAmount TxConfirmStats::EstimateMedianVal(int confTarget,
     double sufficientTxVal,
     double successBreakPoint,
     unsigned int nBlockHeight)
 {
-    CAmount minTxFee = 0;
-    // its safe just to parse here because the validity of mintxfee was checked in init.cpp
-
-    // DEFAULT_TRANSACTION_MINFEE = 1000 defined in wallet.h, we hardcode it here as a hack fix
-    // due to --disable-wallet configs compiling policy estimator which would use wallet.h
-    // even though wallet.h isnt included when compiled with --disable-wallet
-    ParseMoney(std::to_string(GetArg("-mintxfee", 1000)), minTxFee);
-    // convert from satoshis to COIN
-    minTxFee = minTxFee / COIN;
+    CAmount minTxFee = minRelayTxFee.GetFeePerK(); // sats per 1000 bytes
 
     // Counters for a bucket (or range of buckets)
     double nConf = 0; // Number of tx's confirmed within the confTarget
@@ -162,7 +155,7 @@ double TxConfirmStats::EstimateMedianVal(int confTarget,
         return minTxFee;
     }
 
-    double median = -1;
+    CAmount median = -1;
 
     // check if the historical moving average of txs in this bucket is 0
     if (txCtAvg[selectedBucket] != 0)
@@ -426,7 +419,7 @@ void CBlockPolicyEstimator::processBlock(unsigned int nBlockHeight,
     // were confirmed in 2 blocks and is "unlikely" if <50% were confirmed in 10 blocks
     LOG(ESTIMATEFEE, "Blockpolicy recalculating dynamic cutoffs:\n");
 
-    double feeLikelyEst = feeStats.EstimateMedianVal(2, SUFFICIENT_FEETXS, MIN_SUCCESS_PCT, nBlockHeight);
+    CAmount feeLikelyEst = feeStats.EstimateMedianVal(2, SUFFICIENT_FEETXS, MIN_SUCCESS_PCT, nBlockHeight);
     if (feeLikelyEst == -1)
         feeLikely = CFeeRate(INF_FEERATE);
     else
@@ -452,7 +445,7 @@ CFeeRate CBlockPolicyEstimator::estimateFee(int confTarget)
     if (confTarget <= 0 || (unsigned int)confTarget > feeStats.GetMaxConfirms())
         return CFeeRate(0);
 
-    double median = feeStats.EstimateMedianVal(confTarget, SUFFICIENT_FEETXS, MIN_SUCCESS_PCT, nBestSeenHeight);
+    CAmount median = feeStats.EstimateMedianVal(confTarget, SUFFICIENT_FEETXS, MIN_SUCCESS_PCT, nBestSeenHeight);
 
     if (median < 0)
         return CFeeRate(0);

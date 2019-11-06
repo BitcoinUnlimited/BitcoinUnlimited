@@ -154,7 +154,7 @@ public:
     void UpdateMovingAverages();
 
     /**
-     * Calculate a fee estimate.  Find the lowest value bucket (or range of buckets
+     * Calculate a satoshi per Kb fee estimate.  Find the lowest value bucket (or range of buckets
      * to make sure we have enough data points) whose transactions still have sufficient likelihood
      * of being confirmed within the target number of confirmations
      * @param confTarget target number of confirmations
@@ -165,7 +165,7 @@ public:
      *        return the highest fee such that all lower values fail minSuccess
      * @param nBlockHeight the current block height
      */
-    double EstimateMedianVal(int confTarget, double sufficientTxVal, double minSuccess, unsigned int nBlockHeight);
+    CAmount EstimateMedianVal(int confTarget, double sufficientTxVal, double minSuccess, unsigned int nBlockHeight);
 
     /** Return the max number of confirms we're tracking */
     unsigned int GetMaxConfirms() { return confAvg.size(); }
