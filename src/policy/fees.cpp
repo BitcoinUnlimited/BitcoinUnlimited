@@ -93,6 +93,8 @@ CAmount TxConfirmStats::EstimateMedianVal(int confTarget,
     double successBreakPoint,
     unsigned int nBlockHeight)
 {
+    // bucket calculations are doubles, but the minTxFee is an CAmount, this loss of precision is
+    // intentional and ok as it will only cut off fractions of a satoshi
     CAmount minTxFee = minRelayTxFee.GetFeePerK(); // sats per 1000 bytes
 
     // Counters for a bucket (or range of buckets)
