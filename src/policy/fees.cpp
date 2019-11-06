@@ -150,7 +150,7 @@ CAmount TxConfirmStats::EstimateMedianVal(int confTarget,
     // if our confirm rate for any bucket is never less than 80% selectedBucket will
     // be -1 at the end of the loop.
     // so we return mintxfee
-    if (selectedBucket < 0)
+    if (selectedBucket <= 0)
     {
         return minTxFee;
     }
@@ -162,6 +162,10 @@ CAmount TxConfirmStats::EstimateMedianVal(int confTarget,
     {
         // if it is not, we are in the right bucket
         median = avg[selectedBucket] / txCtAvg[selectedBucket];
+    }
+    else
+    {
+        return minTxFee;
     }
     // if we didnt error but somehow got a value less than the mintxfee return the mintxfee
     if (median > 0 && median < minTxFee)
