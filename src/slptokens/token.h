@@ -48,10 +48,6 @@ private:
     // ONLY IN SEND
     uint64_t additional_token_quantity;
 
-public:
-    // UTXO Fields
-    int nHeight;
-
 private:
     bool DetermineDynamicSize(const CScript &scriptPubKeyIn, size_t &index, uint32_t &return_size);
     SLP_TX_TYPE ParseType(const CScript &scriptPubKeyIn, size_t &index, const uint32_t &tx_type_size);
@@ -62,7 +58,6 @@ private:
     uint8_t _ParseBytes(const CScript &scriptPubKeyIn);
 
 public:
-    CSLPToken(const int &nHeightIn) { nHeight = nHeightIn; }
     CSLPToken() { SetNull(); }
     void SetNull()
     {
@@ -78,7 +73,6 @@ public:
         decimals = 0;
         initial_token_mint_quantity = 0;
         additional_token_quantity = 0;
-        nHeight = 0;
     }
 
     ADD_SERIALIZE_METHODS;

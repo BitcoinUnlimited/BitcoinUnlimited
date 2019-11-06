@@ -34,7 +34,7 @@ BOOST_AUTO_TEST_CASE(slp_script_data)
         }
         std::vector<unsigned char> testdata = ParseHex(test[1].getValStr().c_str());
         CScript scripttest(testdata.begin(), testdata.end());
-        CSLPToken newToken(0);
+        CSLPToken newToken;
         uint8_t result = newToken.ParseBytes(scripttest);
         uint8_t expected = test[2].get_uint8(); // 0 is the only number that means this test should pass
         if (result != expected && (result == 0 || expected == 0))
