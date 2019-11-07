@@ -33,6 +33,7 @@ static const unsigned int nScriptCheckQueues = 4;
 
 std::unique_ptr<CParallelValidation> PV;
 
+bool ShutdownRequested();
 static void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef pblock, const CInv inv);
 
 static void AddScriptCheckThreads(int i, CCheckQueue<CScriptCheck> *pqueue)
@@ -553,7 +554,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
     }
 
     // only launch block validation in a separate thread if PV is enabled.
-    if (PV->Enabled())
+    if (PV->Enabled() && !ShutdownRequested())
     {
         boost::thread thread(boost::bind(&HandleBlockMessageThread, pfrom, strCommand, pblock, inv));
         thread.detach();
@@ -650,17 +651,18 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
     // able to clean up the semaphore, tracking map and node reference.
     try
     {
-        // Clear thread data - this must be done before the thread completes or else some other new
-        // thread may grab the same thread id and we would end up deleting the entry for the new thread instead.
-        PV->Erase(this_id);
-
-        // release semaphores depending on whether this was IBD or not.  We can not use IsChainNearlySyncd()
-        // because the return value will switch over when IBD is nearly finished and we may end up not releasing
-        // the correct semaphore.
+        // release the semaphore.
         PV->Post();
 
         // Remove the CNode reference we aquired just before we launched this thread.
         pfrom->Release();
+
+        // Clear thread data - this must be done before the thread completes or else some other new
+        // thread may grab the same thread id and we would end up deleting the entry for the new thread instead.
+        //
+        // Furthermore this step must also be done as the last step of this thread.
+        // otherwise, shutdown could proceed before the validation thread has entirely completed.
+        PV->Erase(this_id);
     }
     catch (const std::exception &e)
     {
