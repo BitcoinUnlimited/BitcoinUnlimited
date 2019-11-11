@@ -496,88 +496,53 @@ void CTxMemPool::UpdateTxnChainState(setEntries &setTxnChainTips)
 {
     AssertWriteLockHeld(cs_txmempool);
 
-    // Iterate through each chain, updating the ancestor state finding the enpoints of each chain.
-    // Once you have finished processing all chains for ancestor state then iterate backwards from
-    // the endpoints to update the descendant state.
-
+    // Iterate through all the decendants in order from beginning to end and update their ancestors state.
+    // In the typical case a chain will consist of transaction with only one input. However chains can be quite
+    // complex in the number of inputs outputs which result in many chains that can merge together at varying
+    // points.
     setEntries setFirstUpdateCompleted;
     setEntries setEndPoints;
+    uint64_t nCount = 0;
     std::map<txiter, setEntries, CompareIteratorByHash> mapAncestorState;
     for (txiter iter_tip : setTxnChainTips)
     {
-        // Now iterate through all the decendants in order from beginning to end and update their ancestors state.
-        // In the typical case a chain will consist of transaction with only one input. However chains can be quite
-        // complex in the number of inputs outputs which result in many chains that can merge together at varying
-        // points.
-        // So as we iterate though each chain we can only update one branch of a chain at any time and therefore have
-        // to keep track of any branches we find along that way so we can go back to them and iterate through them as
-        // well.
-        //
-        // Futhermore we also have to keep in mind when two chains merge that we don't double count state. In the
-        // case where we have to iterate through a section of a branch twice we have to "forward" our ancestor state
-        // into an std::set so that we don't end up double counting ancestors.
-        //
-        // If this is a chain endpoint (no more children) then save the iterator so we can then step back
-        // through the ancestors and update the descendant state.
-
         setEntries children;
         children.insert(iter_tip);
 
         // Process each branch by iterating though the children in sequential order.
-        bool fEnd = false;
         txiter parent = iter_tip;
-        std::map<txiter, setEntries, CompareIteratorByHash> unprocessed_branches;
-        do
+        setEntries parents;
+        setEntries deferred_parents;
+        while (!children.empty())
         {
-            while (!children.empty())
+            // Just process the first child of the set of children. Each child becomes a deferred parent
+            // which we iterate through after we've finished with this set of children. This way we move
+            // through the chain step by step without having to iterate through the same branch more than one
+            // as the case would be in a very large transaction graph.
+            txiter child = *children.begin();
+            deferred_parents.insert(child);
+            children.erase(child);
+
+            // For each child carry the previous set of ancestors forward.
+            mapAncestorState[child].insert(child);
+            (mapAncestorState[child]).insert((mapAncestorState[parent]).begin(), (mapAncestorState[parent]).end());
+            nCount++;
+
+            // parents = GetMemPoolParents(child);
+
+            while (!deferred_parents.empty() && children.empty())
             {
-                // If there is more than one child then save them in a separate "branch" set. We will need to iterate
-                // through those other branches separately since we can only process one branch at a time.
-                if (children.size() > 1)
-                {
-                    setEntries::iterator it = children.begin();
-                    for (txiter child : children)
-                    {
-                        if (child == *children.begin())
-                            continue;
-                        (unprocessed_branches[child]).insert(parent);
-                    }
-                    it++;
-                    children.erase(it, children.end());
-                }
-                assert(children.size() == 1);
-
-                // Just process the first child and of the set of children. The other children will be saved in the
-                // branch set to be iterated through once we're at the end of this current branch.
-                txiter child = *children.begin();
-
-                // For each child carry the previous set of ancestors forward.
-                mapAncestorState[child].insert(child);
-                (mapAncestorState[child]).insert((mapAncestorState[parent]).begin(), (mapAncestorState[parent]).end());
-                parent = child;
-
-                // Get the next set of children in this branch
-                children = GetMemPoolChildren(child);
-
-
+                parent = *deferred_parents.begin();
+                deferred_parents.erase(parent);
+                children = GetMemPoolChildren(parent);
+  
                 // Save the endpoint once we get there.
                 if (children.empty())
                 {
-                    setEndPoints.insert(child);
+                    setEndPoints.insert(parent);
                 }
             }
-            if (children.empty() && !unprocessed_branches.empty())
-            {
-                auto iter_branch = *unprocessed_branches.begin();
-                parent = *iter_branch.second.begin();
-                children.insert(iter_branch.first);
-                unprocessed_branches.erase(iter_branch.first);
-            }
-            else
-                fEnd = true;
-
-        } while (!fEnd);
-
+        }
 
         // We have all the updated map entries which contain all ancestors now it's a simple matter of
         // updating the current state.
@@ -601,6 +566,7 @@ void CTxMemPool::UpdateTxnChainState(setEntries &setTxnChainTips)
                 replace_ancestor_state(nAncestorSize, nAncestorModifiedFee, nAncestorCount, nAncestorSigOps));
         }
     }
+    printf("updated %d times\n", nCount);
 }
 
 void CTxMemPool::_UpdateForRemoveFromMempool(const setEntries &entriesToRemove,

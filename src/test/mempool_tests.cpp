@@ -44,8 +44,8 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
        | \        |       /
        |  \______ 11 ____/
        |          |\
-       12        13 \
-      /|\         |  14     19
+       12         | \
+      /|\        13 14      19
      / | \        | /       /
     15 16 17      18 ______/
 
@@ -346,8 +346,8 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
        | \        |       /
        |  \______ 11 ____/
        |          |\
-       12        13 \
-      /|\         |  14     19 (unmined chain so it has no entry in txnchaintips)
+       12         | \
+      /|\        13 14     19 (unmined chain so it has no entry in txnchaintips)
      / | \        | /       /
     15 16 17      18 ______/
 
