@@ -357,6 +357,9 @@ CTweak<unsigned int> unconfPushAction("net.unconfChainResendAction",
     "Action to take when this node thinks that a peer will now accept a previously unacceptable unconfirmed transaction"
     "0: do not resend, 1: send an INV, 2: send the TX",
     0);
+CTweak<bool> restrictInputs("net.restrictInputs",
+    "Do we want to restrict max inputs to 1 for unconfirmed transaction chains that are longer than 25 (default: true)",
+    true);
 
 CTweak<CAmount> maxTxFee("wallet.maxTxFee",
     "Maximum total fees to use in a single wallet transaction or raw transaction; setting this too low may abort large "

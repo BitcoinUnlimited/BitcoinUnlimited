@@ -26,11 +26,16 @@ extern void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age);
 
 BOOST_AUTO_TEST_SUITE(txvalidationcache_tests) // BU harmonize suite name with filename
 
-static bool ToMemPool(CMutableTransaction &tx)
+static bool ToMemPool(CMutableTransaction &tx, std::string rejectReason = "")
 {
     CValidationState state;
     bool fMissingInputs = false;
-    return AcceptToMemoryPool(mempool, state, MakeTransactionRef(tx), false, &fMissingInputs, true, false);
+    bool ret = false;
+    ret = AcceptToMemoryPool(mempool, state, MakeTransactionRef(tx), false, &fMissingInputs, true, false);
+
+    if (rejectReason != "")
+        BOOST_CHECK_EQUAL(rejectReason, state.GetRejectReason());
+    return ret;
 }
 
 BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup)
@@ -196,7 +201,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     BOOST_CHECK(fSpent == false);
 
     // Try to add the same tx to the memory pool. The coins should still be present.
-    BOOST_CHECK(!ToMemPool(spends[0]));
+    BOOST_CHECK(!ToMemPool(spends[0], "txn-already-in-mempool"));
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[0].vin[0].prevout, fSpent));
     BOOST_CHECK(fSpent == false);
 
@@ -218,7 +223,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     vchSig2.push_back((unsigned char)sighashType);
     spends[1].vin[0].scriptSig << vchSig2;
 
-    BOOST_CHECK(!ToMemPool(spends[1]));
+    BOOST_CHECK(!ToMemPool(spends[1], "bad-txns-premature-spend-of-coinbase"));
     // not uncached because from a previous txn
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[0].vin[0].prevout, fSpent));
     BOOST_CHECK(fSpent == false);
@@ -396,4 +401,156 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     SetMockTime(0);
 }
 
+BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
+{
+    CScript scriptPubKey = CScript() << ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG;
+
+    unsigned int sighashType = SIGHASH_ALL;
+    if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight))
+        sighashType |= SIGHASH_FORKID;
+
+    uint256 prevout = coinbaseTxns[0].GetHash();
+    uint256 hash;
+
+    // Create a chain of 25 unconfirmed transactions
+    for (int i = 1; i <= 25; i++)
+    {
+        CMutableTransaction tx;
+        tx.vin.resize(1);
+        tx.vin[0].prevout.hash = prevout;
+        tx.vin[0].prevout.n = 0;
+        tx.vout.resize(1);
+        tx.vout[0].nValue = 11 * CENT;
+        tx.vout[0].scriptPubKey = scriptPubKey;
+
+        // Sign:
+        std::vector<unsigned char> vchSig;
+        if (i == 1)
+        {
+            hash = SignatureHash(scriptPubKey, tx, 0, sighashType, coinbaseTxns[0].vout[0].nValue, 0);
+        }
+        else
+        {
+            hash = SignatureHash(scriptPubKey, tx, 0, sighashType, 11 * CENT, 0);
+        }
+        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
+        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
+        vchSig.push_back((unsigned char)sighashType);
+        tx.vin[0].scriptSig << vchSig;
+        BOOST_CHECK(ToMemPool(tx));
+
+        prevout = tx.GetHash();
+    }
+
+
+    // Add one more which should fail because it's over the 25 limit.
+    {
+        CMutableTransaction tx;
+        tx.vin.resize(1);
+        tx.vin[0].prevout.hash = prevout;
+        tx.vin[0].prevout.n = 0;
+        tx.vout.resize(1);
+        tx.vout[0].nValue = 11 * CENT;
+        tx.vout[0].scriptPubKey = scriptPubKey;
+
+        // Sign:
+        std::vector<unsigned char> vchSig;
+        hash = SignatureHash(scriptPubKey, tx, 0, sighashType, 11 * CENT, 0);
+        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
+        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
+        vchSig.push_back((unsigned char)sighashType);
+        tx.vin[0].scriptSig << vchSig;
+        BOOST_CHECK(!ToMemPool(tx, "too-long-mempool-chain"));
+    }
+
+    SetArg("-limitancestorcount", std::to_string(27));
+    SetArg("-limitdescendantcount", std::to_string(27));
+
+    // Add one more which should should work because the limit is now 27
+    {
+        CMutableTransaction tx;
+        tx.vin.resize(1);
+        tx.vin[0].prevout.hash = prevout;
+        tx.vin[0].prevout.n = 0;
+        tx.vout.resize(1);
+        tx.vout[0].nValue = 11 * CENT;
+        tx.vout[0].scriptPubKey = scriptPubKey;
+
+        // Sign:
+        std::vector<unsigned char> vchSig;
+        hash = SignatureHash(scriptPubKey, tx, 0, sighashType, 11 * CENT, 0);
+        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
+        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
+        vchSig.push_back((unsigned char)sighashType);
+        tx.vin[0].scriptSig << vchSig;
+        BOOST_CHECK(ToMemPool(tx));
+
+        prevout = tx.GetHash();
+    }
+
+    // Now try to add a tx with multiple inputs.  It should fail
+    {
+        CMutableTransaction tx;
+        tx.vin.resize(2);
+        tx.vin[1].prevout.hash = prevout;
+        tx.vin[1].prevout.n = 0;
+        tx.vin[0].prevout.hash = coinbaseTxns[0].GetHash();
+        tx.vin[0].prevout.n = 0;
+        tx.vout.resize(1);
+        tx.vout[0].nValue = 11 * CENT;
+        tx.vout[0].scriptPubKey = scriptPubKey;
+
+        // Sign:
+        std::vector<unsigned char> vchSig;
+        hash = SignatureHash(scriptPubKey, tx, 0, sighashType, 11 * CENT, 0);
+        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
+        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
+        vchSig.push_back((unsigned char)sighashType);
+        tx.vin[0].scriptSig << vchSig;
+        BOOST_CHECK(!ToMemPool(tx, "bad-txn-too-many-inputs"));
+    }
+
+    // Now try to add a tx with only one input. It should succeed.
+    {
+        CMutableTransaction tx;
+        tx.vin.resize(1);
+        tx.vin[0].prevout.hash = prevout;
+        tx.vin[0].prevout.n = 0;
+        tx.vout.resize(1);
+        tx.vout[0].nValue = 11 * CENT;
+        tx.vout[0].scriptPubKey = scriptPubKey;
+
+        // Sign:
+        std::vector<unsigned char> vchSig;
+        hash = SignatureHash(scriptPubKey, tx, 0, sighashType, 11 * CENT, 0);
+        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
+        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
+        vchSig.push_back((unsigned char)sighashType);
+        tx.vin[0].scriptSig << vchSig;
+        BOOST_CHECK(ToMemPool(tx));
+
+        prevout = tx.GetHash();
+    }
+
+    // Now try to add one more tx with only one input. It should fail because
+    // we are over the limit of 27.
+    {
+        CMutableTransaction tx;
+        tx.vin.resize(1);
+        tx.vin[0].prevout.hash = prevout;
+        tx.vin[0].prevout.n = 0;
+        tx.vout.resize(1);
+        tx.vout[0].nValue = 11 * CENT;
+        tx.vout[0].scriptPubKey = scriptPubKey;
+
+        // Sign:
+        std::vector<unsigned char> vchSig;
+        hash = SignatureHash(scriptPubKey, tx, 0, sighashType, 11 * CENT, 0);
+        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
+        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
+        vchSig.push_back((unsigned char)sighashType);
+        tx.vin[0].scriptSig << vchSig;
+        BOOST_CHECK(!ToMemPool(tx, "too-long-mempool-chain"));
+    }
+}
 BOOST_AUTO_TEST_SUITE_END()

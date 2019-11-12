@@ -41,9 +41,11 @@ class MyTest (BitcoinTestFramework):
              "-limitdescendantsize=%d" % (BCH_UNCONF_SIZE_KB*2),
              "-limitancestorcount=%d" % (BCH_UNCONF_DEPTH*2),
              "-limitdescendantcount=%d" % (BCH_UNCONF_DEPTH*2),
-             "-net.unconfChainResendAction=2"],
+             "-net.unconfChainResendAction=2",
+             "-net.restrictInputs=0"],
             ["-blockprioritysize=2000000", "-limitdescendantcount=1000", "-limitancestorcount=1000",
-             "-limitancestorsize=1000", "-limitdescendantsize=1000", "-net.unconfChainResendAction=2"],
+             "-limitancestorsize=1000", "-limitdescendantsize=1000", "-net.unconfChainResendAction=2",
+             "-net.restrictInputs=0"],
             ["-blockprioritysize=2000000", "-limitancestorsize=150","-net.unconfChainResendAction=2"]
             ]
         self.nodes = start_nodes(4, self.options.tmpdir, mempoolConf)
@@ -63,7 +65,7 @@ class MyTest (BitcoinTestFramework):
         txhex = []
         for i in range(0,BCH_UNCONF_DEPTH*2):
           try:
-            txhex.append(self.nodes[1].sendtoaddress(addr, bal-1))  # enough so that it uses all UTXO, but has fee left over
+              txhex.append(self.nodes[1].sendtoaddress(addr, bal-1))  # enough so that it uses all UTXO, but has fee left over
           except JSONRPCException as e: # an exception you don't catch is a testing error
               print(str(e))
               raise

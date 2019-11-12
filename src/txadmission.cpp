@@ -1130,6 +1130,51 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         size_t nLimitDescendants = GetArg("-limitdescendantcount", BU_DEFAULT_DESCENDANT_LIMIT);
         size_t nLimitDescendantSize = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
         std::string errString;
+        CTxMemPool::setEntries setAncestors;
+        {
+            READLOCK(pool.cs_txmempool);
+            // note we could resolve ancestors to hashes and return those if that saves time in the txc thread
+            if (!pool._CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize,
+                    nLimitDescendants, nLimitDescendantSize, errString))
+            {
+                if (debugger)
+                {
+                    debugger->AddInvalidReason("too-long-mempool-chain");
+                    debugger->mineable = false;
+                }
+                else
+                {
+                    // If the chain is not sync'd entirely then we'll defer this tx until the new block is processed.
+                    if (!IsChainSyncd() && IsChainNearlySyncd())
+                        return state.DoS(0, false, REJECT_WAITING, "too-long-mempool-chain");
+                    else
+                        return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
+                }
+            }
+        }
+        // If restrict inputs is enabled and we are extending a long unconfirmed chain past the network
+        // default limit, then make sure to check that the txn only has one input. This prevents the reverse
+        // double spend attack.
+        if (setAncestors.size() >= BCH_DEFAULT_ANCESTOR_LIMIT && restrictInputs.Value() == true)
+        {
+            if (tx->vin.size() > 1)
+                return state.DoS(0, false, REJECT_NONSTANDARD, "bad-txn-too-many-inputs");
+        }
+
+        if (txProps) // This is inefficient since _CalculateMemPoolAncestors also calculates this
+        {
+            txProps->countWithAncestors = setAncestors.size();
+            uint64_t size = tx->GetTxSize();
+            for (auto ancestor : setAncestors)
+            {
+                size += ancestor->GetTxSize();
+            }
+            txProps->sizeWithAncestors = size;
+
+            // How can something we are just adding have any descendants?  It can't so these values are just this tx
+            txProps->countWithDescendants = 1;
+            txProps->sizeWithDescendants = tx->GetTxSize();
+        }
 
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
@@ -1208,44 +1253,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             else
             {
                 return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
-            }
-        }
-
-        {
-            READLOCK(pool.cs_txmempool);
-            CTxMemPool::setEntries setAncestors;
-            // note we could resolve ancestors to hashes and return those if that saves time in the txc thread
-            if (!pool._CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize,
-                    nLimitDescendants, nLimitDescendantSize, errString))
-            {
-                if (debugger)
-                {
-                    debugger->AddInvalidReason("too-long-mempool-chain");
-                    debugger->mineable = false;
-                }
-                else
-                {
-                    // If the chain is not sync'd entirely then we'll defer this tx until the new block is processed.
-                    if (!IsChainSyncd() && IsChainNearlySyncd())
-                        return state.DoS(0, false, REJECT_WAITING, "too-long-mempool-chain");
-                    else
-                        return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
-                }
-            }
-
-            if (txProps) // This is inefficient since _CalculateMemPoolAncestors also calculates this
-            {
-                txProps->countWithAncestors = setAncestors.size();
-                uint64_t size = tx->GetTxSize();
-                for (auto ancestor : setAncestors)
-                {
-                    size += ancestor->GetTxSize();
-                }
-                txProps->sizeWithAncestors = size;
-
-                // How can something we are just adding have any descendants?  It can't so these values are just this tx
-                txProps->countWithDescendants = 1;
-                txProps->sizeWithDescendants = tx->GetTxSize();
             }
         }
 

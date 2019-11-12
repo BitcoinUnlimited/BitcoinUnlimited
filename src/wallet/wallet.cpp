@@ -3634,8 +3634,13 @@ bool CMerkleTx::AcceptToMemoryPool(bool fLimitFree, bool fRejectAbsurdFee)
     CValidationState state;
     // Skip mempool commit because the commit informs the wallet but with the accounts stripped.
     // By not committing inline, the caller wallet code can place this tx into the wallet first
-    return ::AcceptToMemoryPool(mempool, state, MakeTransactionRef(*this), fLimitFree, nullptr, false, fRejectAbsurdFee,
-        TransactionClass::DEFAULT);
+    bool ret = ::AcceptToMemoryPool(mempool, state, MakeTransactionRef(*this), fLimitFree, nullptr, false,
+        fRejectAbsurdFee, TransactionClass::DEFAULT);
+    if (!ret)
+    {
+        LOGA("ERROR: Transaction not sent - %s\n", state.GetRejectReason());
+    }
+    return ret;
 }
 
 
