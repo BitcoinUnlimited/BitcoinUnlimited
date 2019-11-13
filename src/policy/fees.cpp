@@ -21,6 +21,10 @@ void TxConfirmStats::Initialize(std::vector<double> &defaultBuckets,
     double _decay,
     std::string _dataTypeString)
 {
+    if (_decay <= 0.00 || _decay >= 1.00)
+    {
+        throw std::runtime_error("Decay must be between 0 and 1 (non-inclusive)");
+    }
     decay = _decay;
     dataTypeString = _dataTypeString;
     for (unsigned int i = 0; i < defaultBuckets.size(); i++)
