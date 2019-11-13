@@ -73,6 +73,9 @@ TestingSetup::TestingSetup(const std::string &chainName) : BasicTestingSetup(cha
     bool worked = InitBlockIndex(chainparams);
     assert(worked);
 
+    // -limitfreerelay is diabled by default but some tests rely on it so make sure to set it here.
+    SetArg("-limitfreerelay", std::to_string(15));
+
     // Initial dbcache settings so that the automatic cache setting don't kick in and allow
     // us to accidentally use up our RAM on Travis, and also so that we are not prevented from flushing the
     // dbcache if the need arises in the unit tests (dbcache must be less than the DEFAULT_HIGH_PERF_MEM_CUTOFF
