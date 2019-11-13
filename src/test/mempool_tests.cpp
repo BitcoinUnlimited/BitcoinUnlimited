@@ -540,6 +540,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     BOOST_CHECK_EQUAL(pool.size(), 38);
     std::vector<MempoolData> txns_expected =
     {
+        // Chain1:
         {tx1.GetHash(), 1, 21, 1, 1000, 11, 916, 21000},
         {tx2.GetHash(), 1, 21, 1, 2000, 11, 916, 23000},
         {tx3.GetHash(), 1, 21, 1, 3000, 7, 631, 27000},
@@ -559,7 +560,27 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
         {tx17.GetHash(), 7, 432, 7, 10300, 1, 63, 300},
         {tx18.GetHash(), 16, 1041, 16, 55000, 1, 158, 2000},
         {tx19.GetHash(), 1, 21, 1, 6000, 2, 179, 8000},
-        {tx20.GetHash(), 1, 21, 1, 5000, 5, 463, 19000}
+        {tx20.GetHash(), 1, 21, 1, 5000, 5, 463, 19000},
+
+        // Chain2:
+        {tx21.GetHash(), 1, 19, 1, 100000, 16, 1269, 4014000},
+        {tx22.GetHash(), 2, 115, 2, 200000, 15, 1250, 3914000},
+        {tx23.GetHash(), 3, 184, 3, 220000, 8, 744, 3432000},
+        {tx24.GetHash(), 4, 244, 4, 230000, 6, 615, 3402000},
+        {tx25.GetHash(), 4, 244, 4, 230000, 6, 615, 3402000},
+        {tx26.GetHash(), 6, 405, 6, 260000, 5, 555, 3392000},
+        {tx27.GetHash(), 1, 19, 1, 101000, 8, 703, 3876000},
+        {tx28.GetHash(), 2, 79, 2, 202000, 7, 684, 3775000},
+        {tx29.GetHash(), 5, 304, 5, 603000, 6, 624, 3674000},
+        {tx30.GetHash(), 6, 364, 6, 704000, 1, 60, 101000},
+        {tx31.GetHash(), 3, 175, 3, 220000, 6, 574, 3412000},
+        {tx32.GetHash(), 3, 175, 3, 220000, 5, 514, 3392000},
+        {tx33.GetHash(), 3, 175, 3, 220000, 5, 514, 3392000},
+        {tx34.GetHash(), 4, 235, 4, 240000, 5, 514, 3392000},
+        {tx35.GetHash(), 14, 1067, 14, 1024000, 4, 454, 3372000},
+        {tx36.GetHash(), 15, 1127, 15, 1224000, 2, 161, 3010000},
+        {tx37.GetHash(), 15, 1127, 15, 1105000, 2, 161, 2891000},
+        {tx38.GetHash(), 17, 1288, 17, 4115000, 1, 101, 2810000}
     };
     /* clang-format on */
     for (size_t i = 0; i < txns_expected.size(); i++)
@@ -627,11 +648,17 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
     */
 
+    // Add txns that will be mined
     std::vector<CTransactionRef> vtx;
+    // Chain1:
     vtx.push_back(MakeTransactionRef(tx1));
     vtx.push_back(MakeTransactionRef(tx2));
     vtx.push_back(MakeTransactionRef(tx3));
     vtx.push_back(MakeTransactionRef(tx4));
+    // Chain2:
+    vtx.push_back(MakeTransactionRef(tx21));
+
+    // Now assume they were mined and do a removeForBlock()
     std::list<CTransactionRef> dummy;
     pool.removeForBlock(vtx, 1, dummy, false);
 
@@ -640,10 +667,12 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     /* clang-format off */
     std::vector<MempoolData> txns_result =
     {
+        // Chain1:
         {tx1.GetHash(), 0, 0, 0, 0, 0, 0, 0},
         {tx2.GetHash(), 0, 0, 0, 0, 0, 0, 0},
         {tx3.GetHash(), 0, 0, 0, 0, 0, 0, 0},
         {tx4.GetHash(), 0, 0, 0, 0, 0, 0, 0},
+
         {tx5.GetHash(), 1, 63, 1, 1000, 10, 811, 20000},
         {tx6.GetHash(), 1, 63, 1, 2000, 10, 811, 21000},
         {tx7.GetHash(), 1, 63, 1, 3000, 6, 526, 24000},
@@ -659,14 +688,35 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
         {tx17.GetHash(), 5, 390, 5, 7300, 1, 63, 300},
         {tx18.GetHash(), 10, 831, 12, 34000, 1, 116, 2000},
         {tx19.GetHash(), 1, 21, 1, 1000, 1, 116, 2000},
-        {tx20.GetHash(), 1, 21, 1, 1000, 1, 116, 2000}
+        {tx20.GetHash(), 1, 21, 1, 1000, 1, 116, 2000},
+
+        // Chain2:
+        {tx21.GetHash(), 0, 0, 0, 0, 0, 0, 0},
+
+        {tx22.GetHash(), 1, 115, 2, 200000, 15, 1250, 3914000},
+        {tx23.GetHash(), 2, 184, 3, 220000, 8, 744, 3432000},
+        {tx24.GetHash(), 3, 244, 4, 230000, 6, 615, 3402000},
+        {tx25.GetHash(), 3, 244, 4, 230000, 6, 615, 3402000},
+        {tx26.GetHash(), 5, 405, 6, 260000, 5, 555, 3392000},
+        {tx27.GetHash(), 1, 19, 1, 101000, 8, 703, 3876000},
+        {tx28.GetHash(), 2, 79, 2, 202000, 7, 684, 3775000},
+        {tx29.GetHash(), 4, 304, 5, 603000, 6, 624, 3674000},
+        {tx30.GetHash(), 5, 364, 6, 704000, 1, 60, 101000},
+        {tx31.GetHash(), 2, 175, 3, 220000, 6, 574, 3412000},
+        {tx32.GetHash(), 2, 175, 3, 220000, 5, 514, 3392000},
+        {tx33.GetHash(), 2, 175, 3, 220000, 5, 514, 3392000},
+        {tx34.GetHash(), 3, 235, 4, 240000, 5, 514, 3392000},
+        {tx35.GetHash(), 13, 1067, 14, 1024000, 4, 454, 3372000},
+        {tx36.GetHash(), 14, 1127, 15, 1224000, 2, 161, 3010000},
+        {tx37.GetHash(), 14, 1127, 15, 1105000, 2, 161, 2891000},
+        {tx38.GetHash(), 16, 1288, 17, 4115000, 1, 101, 2810000}
     };
     /* clang-format on */
 
     for (size_t i = 0; i < txns_result.size(); i++)
     {
         CTxMemPool::txiter iter = pool.mapTx.find(txns_result[i].hash);
-        if (i < 4)
+        if (i < 4 || i == 20)
         {
             if (iter != pool.mapTx.end())
             {
