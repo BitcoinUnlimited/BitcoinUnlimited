@@ -31,6 +31,7 @@ using namespace std;
 
 int64_t nWalletUnlockTime;
 static CCriticalSection cs_nWalletUnlockTime;
+static CCriticalSection serializeCreateTx;
 
 std::string HelpRequiringPassphrase()
 {
@@ -122,7 +123,7 @@ UniValue getnewaddress(const UniValue &params, bool fHelp)
                             "\nExamples:\n" +
                             HelpExampleCli("getnewaddress", "") + HelpExampleRpc("getnewaddress", ""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     // Parse the account first so we don't generate a key if there's an error
     string strAccount;
@@ -201,7 +202,7 @@ UniValue getaccountaddress(const UniValue &params, bool fHelp)
             HelpExampleCli("getaccountaddress", "\"myaccount\"") +
             HelpExampleRpc("getaccountaddress", "\"myaccount\""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     // Parse the account first so we don't generate a key if there's an error
     string strAccount = AccountFromValue(params[0]);
@@ -227,7 +228,7 @@ UniValue getrawchangeaddress(const UniValue &params, bool fHelp)
                             "\nExamples:\n" +
                             HelpExampleCli("getrawchangeaddress", "") + HelpExampleRpc("getrawchangeaddress", ""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     if (!pwalletMain->IsLocked())
         pwalletMain->TopUpKeyPool();
@@ -260,7 +261,7 @@ UniValue setaccount(const UniValue &params, bool fHelp)
             HelpExampleCli("setaccount", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\" \"tabby\"") +
             HelpExampleRpc("setaccount", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\", \"tabby\""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     CTxDestination dest = DecodeDestination(params[0].get_str());
     if (!IsValidDestination(dest))
@@ -307,7 +308,7 @@ UniValue getaccount(const UniValue &params, bool fHelp)
                             HelpExampleCli("getaccount", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\"") +
                             HelpExampleRpc("getaccount", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     CTxDestination dest = DecodeDestination(params[0].get_str());
     if (!IsValidDestination(dest))
@@ -343,7 +344,7 @@ UniValue getaddressesbyaccount(const UniValue &params, bool fHelp)
                             HelpExampleCli("getaddressesbyaccount", "\"tabby\"") +
                             HelpExampleRpc("getaddressesbyaccount", "\"tabby\""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     string strAccount = AccountFromValue(params[0]);
 
@@ -376,26 +377,31 @@ static void SendMoney(const CTxDestination &address, CAmount nValue, bool fSubtr
     CScript scriptPubKey = GetScriptForDestination(address);
 
     // Create and send the transaction
-    CReserveKey reservekey(pwalletMain);
-    CAmount nFeeRequired;
-    std::string strError;
-    vector<CRecipient> vecSend;
-    int nChangePosRet = -1;
-    CRecipient recipient = {scriptPubKey, nValue, fSubtractFeeFromAmount};
-    vecSend.push_back(recipient);
-    if (!pwalletMain->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strError))
     {
-        if (!fSubtractFeeFromAmount && nValue + nFeeRequired > pwalletMain->GetBalance())
-            strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its "
-                                 "amount, complexity, or use of recently received funds!",
-                FormatMoney(nFeeRequired));
-        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+        LOCK(serializeCreateTx);
+
+        CReserveKey reservekey(pwalletMain);
+        CAmount nFeeRequired;
+        std::string strError;
+        vector<CRecipient> vecSend;
+        int nChangePosRet = -1;
+        CRecipient recipient = {scriptPubKey, nValue, fSubtractFeeFromAmount};
+        vecSend.push_back(recipient);
+        if (!pwalletMain->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strError))
+        {
+            if (!fSubtractFeeFromAmount && nValue + nFeeRequired > pwalletMain->GetBalance())
+                strError = strprintf("Error: This transaction requires a transaction fee of at least %s because of its "
+                                     "amount, complexity, or use of recently received funds!",
+                    FormatMoney(nFeeRequired));
+            throw JSONRPCError(RPC_WALLET_ERROR, strError);
+        }
+        if (!pwalletMain->CommitTransaction(wtxNew, reservekey))
+            throw JSONRPCError(RPC_WALLET_ERROR,
+                "Error: The transaction was rejected! This might happen if some of the "
+                "coins in your wallet were already spent, such as if you used a copy of "
+                "wallet.dat and coins were spent in the copy but not marked as spent "
+                "here.");
     }
-    if (!pwalletMain->CommitTransaction(wtxNew, reservekey))
-        throw JSONRPCError(RPC_WALLET_ERROR, "Error: The transaction was rejected! This might happen if some of the "
-                                             "coins in your wallet were already spent, such as if you used a copy of "
-                                             "wallet.dat and coins were spent in the copy but not marked as spent "
-                                             "here.");
 }
 
 UniValue sendtoaddress(const UniValue &params, bool fHelp)
@@ -487,7 +493,7 @@ UniValue listaddressgroupings(const UniValue &params, bool fHelp)
                             "\nExamples:\n" +
                             HelpExampleCli("listaddressgroupings", "") + HelpExampleRpc("listaddressgroupings", ""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     UniValue jsonGroupings(UniValue::VARR);
     std::map<CTxDestination, CAmount> balances = pwalletMain->GetAddressBalances();
@@ -537,7 +543,7 @@ UniValue signmessage(const UniValue &params, bool fHelp)
             "\nAs json rpc\n" +
             HelpExampleRpc("signmessage", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\", \"my message\""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     EnsureWalletIsUnlocked();
 
@@ -598,7 +604,7 @@ UniValue signdata(const UniValue &params, bool fHelp)
             HelpExampleRpc(
                 "signdata", "\"bitcoincash:qq5lslagrktm5qtxfw4ltpd5krehhrh595fc04hv0k\", \"string\", \"my message\""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     EnsureWalletIsUnlocked();
 
@@ -692,7 +698,7 @@ UniValue getreceivedbyaddress(const UniValue &params, bool fHelp)
                             "\nAs a json rpc call\n" +
                             HelpExampleRpc("getreceivedbyaddress", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\", 6"));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     // Bitcoin address
     CTxDestination dest = DecodeDestination(params[0].get_str());
@@ -754,7 +760,7 @@ UniValue getreceivedbyaccount(const UniValue &params, bool fHelp)
             HelpExampleCli("getreceivedbyaccount", "\"tabby\" 6") + "\nAs a json rpc call\n" +
             HelpExampleRpc("getreceivedbyaccount", "\"tabby\", 6"));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     // Minimum confirmations
     int nMinDepth = 1;
@@ -849,6 +855,8 @@ UniValue getbalance(const UniValue &params, bool fHelp)
                             HelpExampleCli("getbalance", "\"*\" 6") + "\nAs a json rpc call\n" +
                             HelpExampleRpc("getbalance", "\"*\", 6"));
 
+    // Nothing relies on cs_main, but by locking it here, we ensure that a chain reorg doesn't
+    // cause us to give inconsistent results
     LOCK2(cs_main, pwalletMain->cs_wallet);
 
     if (params.size() == 0)
@@ -913,6 +921,8 @@ UniValue getunconfirmedbalance(const UniValue &params, bool fHelp)
         throw runtime_error("getunconfirmedbalance\n"
                             "Returns the server's total unconfirmed balance\n");
 
+    // Nothing relies on cs_main, but by locking it here, we ensure that a chain reorg doesn't
+    // cause AvailableCoins to give inconsistent results
     LOCK2(cs_main, pwalletMain->cs_wallet);
 
     return ValueFromAmount(pwalletMain->GetUnconfirmedBalance());
@@ -948,7 +958,7 @@ UniValue movecmd(const UniValue &params, bool fHelp)
             HelpExampleCli("move", "\"timotei\" \"akiko\" 0.01 6 \"happy birthday!\"") + "\nAs a json rpc call\n" +
             HelpExampleRpc("move", "\"timotei\", \"akiko\", 0.01, 6, \"happy birthday!\""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     string strFrom = AccountFromValue(params[0]);
     string strTo = AccountFromValue(params[1]);
@@ -1034,8 +1044,6 @@ UniValue sendfrom(const UniValue &params, bool fHelp)
             "\nAs a json rpc call\n" +
             HelpExampleRpc("sendfrom",
                 "\"tabby\", \"1M72Sfpbz1BPpXFHz9m3CdqATR44Jvaydd\", 0.01, 6, \"donation\", \"seans outpost\""));
-
-    LOCK2(cs_main, pwalletMain->cs_wallet);
 
     std::string strAccount = AccountFromValue(params[0]);
     CTxDestination dest = DecodeDestination(params[1].get_str());
@@ -1182,21 +1190,25 @@ UniValue sendmany(const UniValue &params, bool fHelp)
     EnsureWalletIsUnlocked();
 
     // Check funds
-    CAmount nBalance = GetAccountBalance(strAccount, nMinDepth, ISMINE_SPENDABLE);
-    if (totalAmount > nBalance)
-        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Account has insufficient funds");
+    {
+        LOCK(serializeCreateTx);
 
-    // Send
-    CReserveKey keyChange(pwalletMain);
-    CAmount nFeeRequired = 0;
-    int nChangePosRet = -1;
-    string strFailReason;
-    bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, nChangePosRet, strFailReason);
-    if (!fCreated)
-        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, strFailReason);
-    if (!pwalletMain->CommitTransaction(wtx, keyChange))
-        throw JSONRPCError(RPC_WALLET_ERROR, "Transaction commit failed");
+        CAmount nBalance = GetAccountBalance(strAccount, nMinDepth, ISMINE_SPENDABLE);
+        if (totalAmount > nBalance)
+            throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Account has insufficient funds");
 
+        // Send
+        CReserveKey keyChange(pwalletMain);
+        CAmount nFeeRequired = 0;
+        int nChangePosRet = -1;
+        string strFailReason;
+        bool fCreated =
+            pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, nChangePosRet, strFailReason);
+        if (!fCreated)
+            throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, strFailReason);
+        if (!pwalletMain->CommitTransaction(wtx, keyChange))
+            throw JSONRPCError(RPC_WALLET_ERROR, "Transaction commit failed");
+    }
     return wtx.GetHash().GetHex();
 }
 
@@ -1239,7 +1251,7 @@ UniValue addmultisigaddress(const UniValue &params, bool fHelp)
         throw runtime_error(msg);
     }
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     string strAccount;
     if (params.size() > 2)
@@ -1436,7 +1448,7 @@ UniValue listreceivedbyaddress(const UniValue &params, bool fHelp)
             HelpExampleCli("listreceivedbyaddress", "") + HelpExampleCli("listreceivedbyaddress", "6 true") +
             HelpExampleRpc("listreceivedbyaddress", "6, true, true"));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     return ListReceived(params, false);
 }
@@ -1476,7 +1488,7 @@ UniValue listreceivedbyaccount(const UniValue &params, bool fHelp)
             HelpExampleCli("listreceivedbyaccount", "") + HelpExampleCli("listreceivedbyaccount", "6 true") +
             HelpExampleRpc("listreceivedbyaccount", "6, true, true"));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     return ListReceived(params, true);
 }
@@ -1671,7 +1683,7 @@ UniValue listtransactions(const UniValue &params, bool fHelp)
             HelpExampleCli("listtransactions", "\"*\" 20 100") + "\nAs a json rpc call\n" +
             HelpExampleRpc("listtransactions", "\"*\", 20, 100"));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     string strAccount = "*";
     if (params.size() > 0)
@@ -1819,7 +1831,7 @@ UniValue listtransactionsfrom(const UniValue &params, bool fHelp)
             HelpExampleCli("listtransactionsfrom", "\"*\" 20 100") + "\nAs a json rpc call\n" +
             HelpExampleRpc("listtransactionsfrom", "\"*\", 20, 100"));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     string strAccount = "*";
     if (params.size() > 0)
@@ -1888,56 +1900,61 @@ UniValue listaccounts(const UniValue &params, bool fHelp)
             HelpExampleCli("listaccounts", "0") + "\nList account balances for 6 or more confirmations\n" +
             HelpExampleCli("listaccounts", "6") + "\nAs json rpc call\n" + HelpExampleRpc("listaccounts", "6"));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
-
-    int nMinDepth = 1;
-    if (params.size() > 0)
-        nMinDepth = params[0].get_int();
-    isminefilter includeWatchonly = ISMINE_SPENDABLE;
-    if (params.size() > 1)
-        if (params[1].get_bool())
-            includeWatchonly = includeWatchonly | ISMINE_WATCH_ONLY;
-
     map<string, CAmount> mapAccountBalances;
-    for (const PAIRTYPE(CTxDestination, CAddressBookData) & entry : pwalletMain->mapAddressBook)
-    {
-        if (IsMine(*pwalletMain, entry.first, chainActive.Tip()) & includeWatchonly) // This address belongs to me
-            mapAccountBalances[entry.second.name] = 0;
-    }
 
-    for (map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end();
-         ++it)
     {
-        const CWalletTx &wtx = (*it).second;
-        CAmount nFee;
-        string strSentAccount;
-        list<COutputEntry> listReceived;
-        list<COutputEntry> listSent;
-        int nDepth = wtx.GetDepthInMainChain();
-        if (wtx.GetBlocksToMaturity() > 0 || nDepth < 0)
-            continue;
-        wtx.GetAmounts(listReceived, listSent, nFee, strSentAccount, includeWatchonly);
-        mapAccountBalances[strSentAccount] -= nFee;
-        for (const COutputEntry &s : listSent)
+        // Locking cs_main ensures that the chain doesn't progress during our summation of balances.  This means that
+        // the balances will be consistent, although they may not point to the tip.  This API should report the tip
+        LOCK2(cs_main, pwalletMain->cs_wallet);
+
+        int nMinDepth = 1;
+        if (params.size() > 0)
+            nMinDepth = params[0].get_int();
+        isminefilter includeWatchonly = ISMINE_SPENDABLE;
+        if (params.size() > 1)
+            if (params[1].get_bool())
+                includeWatchonly = includeWatchonly | ISMINE_WATCH_ONLY;
+
+        for (const PAIRTYPE(CTxDestination, CAddressBookData) & entry : pwalletMain->mapAddressBook)
         {
-            mapAccountBalances[strSentAccount] -= s.amount;
+            if (IsMine(*pwalletMain, entry.first, chainActive.Tip()) & includeWatchonly) // This address belongs to me
+                mapAccountBalances[entry.second.name] = 0;
         }
-        if (nDepth >= nMinDepth)
+
+        for (map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end();
+             ++it)
         {
-            for (const COutputEntry &r : listReceived)
+            const CWalletTx &wtx = (*it).second;
+            CAmount nFee;
+            string strSentAccount;
+            list<COutputEntry> listReceived;
+            list<COutputEntry> listSent;
+            int nDepth = wtx.GetDepthInMainChain();
+            if (wtx.GetBlocksToMaturity() > 0 || nDepth < 0)
+                continue;
+            wtx.GetAmounts(listReceived, listSent, nFee, strSentAccount, includeWatchonly);
+            mapAccountBalances[strSentAccount] -= nFee;
+            for (const COutputEntry &s : listSent)
             {
-                if (pwalletMain->mapAddressBook.count(r.destination))
-                    mapAccountBalances[pwalletMain->mapAddressBook[r.destination].name] += r.amount;
-                else
-                    mapAccountBalances[""] += r.amount;
+                mapAccountBalances[strSentAccount] -= s.amount;
+            }
+            if (nDepth >= nMinDepth)
+            {
+                for (const COutputEntry &r : listReceived)
+                {
+                    if (pwalletMain->mapAddressBook.count(r.destination))
+                        mapAccountBalances[pwalletMain->mapAddressBook[r.destination].name] += r.amount;
+                    else
+                        mapAccountBalances[""] += r.amount;
+                }
             }
         }
-    }
 
-    const list<CAccountingEntry> &acentries = pwalletMain->laccentries;
-    for (const CAccountingEntry &entry : acentries)
-    {
-        mapAccountBalances[entry.strAccount] += entry.nCreditDebit;
+        const list<CAccountingEntry> &acentries = pwalletMain->laccentries;
+        for (const CAccountingEntry &entry : acentries)
+        {
+            mapAccountBalances[entry.strAccount] += entry.nCreditDebit;
+        }
     }
 
     UniValue ret(UniValue::VOBJ);
@@ -2005,7 +2022,7 @@ UniValue listsinceblock(const UniValue &params, bool fHelp)
             HelpExampleRpc(
                 "listsinceblock", "\"000000000000000bacf66f7497b7dc45ef753ee9a7d38571037cdb1a57f663ad\", 6"));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     CBlockIndex *pindex = nullptr;
     int target_confirms = 1;
@@ -2106,7 +2123,7 @@ UniValue gettransaction(const UniValue &params, bool fHelp)
                 "gettransaction", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\" true") +
             HelpExampleRpc("gettransaction", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     uint256 hash;
     hash.SetHex(params[0].get_str());
@@ -2165,7 +2182,7 @@ UniValue abandontransaction(const UniValue &params, bool fHelp)
             HelpExampleRpc(
                 "abandontransaction", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     uint256 hash;
     hash.SetHex(params[0].get_str());
@@ -2193,7 +2210,7 @@ UniValue backupwallet(const UniValue &params, bool fHelp)
             "\nExamples:\n" +
             HelpExampleCli("backupwallet", "\"backup.dat\"") + HelpExampleRpc("backupwallet", "\"backup.dat\""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     string strDest = params[0].get_str();
     if (!BackupWallet(*pwalletMain, strDest))
@@ -2218,7 +2235,7 @@ UniValue keypoolrefill(const UniValue &params, bool fHelp)
                             "\nExamples:\n" +
                             HelpExampleCli("keypoolrefill", "") + HelpExampleRpc("keypoolrefill", ""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     // 0 is interpreted by TopUpKeyPool() as the default keypool size given by -keypool
     unsigned int kpSize = 0;
@@ -2268,7 +2285,7 @@ UniValue walletpassphrase(const UniValue &params, bool fHelp)
             "\nLock the wallet again (before 60 seconds)\n" + HelpExampleCli("walletlock", "") +
             "\nAs json rpc call\n" + HelpExampleRpc("walletpassphrase", "\"my pass phrase\", 60"));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     if (fHelp)
         return true;
@@ -2318,7 +2335,7 @@ UniValue walletpassphrasechange(const UniValue &params, bool fHelp)
                             HelpExampleCli("walletpassphrasechange", "\"old one\" \"new one\"") +
                             HelpExampleRpc("walletpassphrasechange", "\"old one\", \"new one\""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     if (fHelp)
         return true;
@@ -2366,7 +2383,7 @@ UniValue walletlock(const UniValue &params, bool fHelp)
                             HelpExampleCli("walletlock", "") + "\nAs json rpc call\n" +
                             HelpExampleRpc("walletlock", ""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     if (fHelp)
         return true;
@@ -2410,7 +2427,7 @@ UniValue encryptwallet(const UniValue &params, bool fHelp)
             "\nNow lock the wallet again by removing the passphrase\n" + HelpExampleCli("walletlock", "") +
             "\nAs a json rpc call\n" + HelpExampleRpc("encryptwallet", "\"my pass phrase\""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     if (fHelp)
         return true;
@@ -2487,7 +2504,7 @@ UniValue lockunspent(const UniValue &params, bool fHelp)
                                                                      "\\\"a08e6907dbbd3d809776dbfc5d82e371b764ed838b565"
                                                                      "5e72f463568df1aadf0\\\",\\\"vout\\\":1}]\""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     if (params.size() == 1)
         RPCTypeCheck(params, boost::assign::list_of(UniValue::VBOOL));
@@ -2564,7 +2581,7 @@ UniValue listlockunspent(const UniValue &params, bool fHelp)
                                                           "df1aadf0\\\",\\\"vout\\\":1}]\"") +
                             "\nAs a json rpc call\n" + HelpExampleRpc("listlockunspent", ""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     vector<COutPoint> vOutpts;
     pwalletMain->ListLockedCoins(vOutpts);
@@ -2599,7 +2616,7 @@ UniValue settxfee(const UniValue &params, bool fHelp)
                                             "\nExamples:\n" +
                             HelpExampleCli("settxfee", "0.00001") + HelpExampleRpc("settxfee", "0.00001"));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     // Amount
     CAmount nAmount = AmountFromValue(params[0]);
@@ -2640,7 +2657,7 @@ UniValue getwalletinfo(const UniValue &params, bool fHelp)
                             "\nExamples:\n" +
             HelpExampleCli("getwalletinfo", "") + HelpExampleRpc("getwalletinfo", ""));
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     UniValue obj(UniValue::VOBJ);
     obj.pushKV("walletversion", pwalletMain->GetVersion());
@@ -2671,7 +2688,7 @@ UniValue resendwallettransactions(const UniValue &params, bool fHelp)
                             "automatically.\n"
                             "Returns array of transaction ids that were re-broadcast.\n");
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
+    LOCK(pwalletMain->cs_wallet);
 
     std::vector<uint256> txids = pwalletMain->ResendWalletTransactionsBefore(GetTime());
     UniValue result(UniValue::VARR);
@@ -2758,6 +2775,8 @@ UniValue listunspent(const UniValue &params, bool fHelp)
     UniValue results(UniValue::VARR);
     vector<COutput> vecOutputs;
     assert(pwalletMain != nullptr);
+    // Nothing relies on cs_main, but by locking it here, we ensure that a chain reorg doesn't
+    // cause AvailableCoins to give inconsistent results
     LOCK2(cs_main, pwalletMain->cs_wallet);
     pwalletMain->AvailableCoins(vecOutputs, false, nullptr, true);
     for (const COutput &out : vecOutputs)
