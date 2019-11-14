@@ -95,7 +95,7 @@ class MyTest (BitcoinTestFramework):
         startBlockHash = self.nodes[0].getbestblockhash()
 
         for j in range(0,100):
-          for i in range(1,20):
+          for i in range(1,15):
             print("Loop: ", i,j)
             # multiplying the list by a random number will cause the command to be included between 0 and i times
             cmds = []
@@ -157,7 +157,7 @@ class MyTest (BitcoinTestFramework):
                     logging.info("stdout: " + r[1].decode())
                     if len(r[2])>0:
                         logging.info("stderr:" + r[2].decode())
-                        pdb.set_trace()
+                        # pdb.set_trace()
                 cnt+=1
 
             if random.randint(0,10)==1:
@@ -176,7 +176,7 @@ def Test():
     bitcoinConf = {
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
         "blockprioritysize": 2000000,  # we don't want any transactions rejected due to insufficient fees...
-        "rpcworkqueue": 256
+        "rpcworkqueue": 1024
     }
 
     flags = standardFlags()

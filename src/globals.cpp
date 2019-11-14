@@ -86,11 +86,8 @@ std::atomic<CBlockIndex *> pindexBestInvalid{nullptr};
 std::atomic<int64_t> nCoinCacheMaxSize{0};
 
 CCriticalSection cs_main;
-CChain chainActive GUARDED_BY(cs_main); // however, chainActive.Tip() is lock free
-// BU variables moved to globals.cpp
-// - moved CCriticalSection cs_main;
-// - moved BlockMap mapBlockIndex;
-// - movedCChain chainActive;
+CChain chainActive; // chainActive.Tip() is lock free, other APIs take an internal lock
+
 CFeeRate minRelayTxFee GUARDED_BY(cs_main) = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
 /** A cache to store headers that have arrived but can not yet be connected **/
 std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders GUARDED_BY(cs_main);
