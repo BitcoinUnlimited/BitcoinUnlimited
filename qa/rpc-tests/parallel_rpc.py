@@ -168,7 +168,7 @@ class MyTest (BitcoinTestFramework):
 
 
 if __name__ == '__main__':
-    MyTest ().main ()
+    MyTest ().main (None, { "blockprioritysize": 2000000, "rpcworkqueue": 1024 })
 
 # Create a convenient function for an interactive python debugging session
 def Test():

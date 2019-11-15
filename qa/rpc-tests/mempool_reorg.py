@@ -24,7 +24,6 @@ class MempoolCoinbaseTest(BitcoinTestFramework):
         self.nodes.append(start_node(1, self.options.tmpdir, args))
         connect_nodes(self.nodes[1], 0)
         self.is_network_split = False
-        self.sync_all()
 
     def run_test(self):
 

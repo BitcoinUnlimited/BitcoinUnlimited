@@ -514,7 +514,7 @@ class P2PDataStore(SingleNodeConnCB):
             elif inv.type == CInv.MSG_BLOCK and inv.hash in self.block_store.keys():
                 self.send_message(msg_block(self.block_store[inv.hash]))
             else:
-                logger.debug(
+                logging.debug(
                     'getdata message type {} received.'.format(hex(inv.type)))
 
     def on_getheaders(self, conn, message):
@@ -540,7 +540,7 @@ class P2PDataStore(SingleNodeConnCB):
                     # if this is the hashstop header, stop here
                     break
             else:
-                logger.debug('block hash {} not found in block store'.format(
+                logging.debug('block hash {} not found in block store'.format(
                     hex(prev_block_hash)))
                 break
 

@@ -33,9 +33,33 @@ env:
 
 matrix:
   include:
+    #x86_64 Linux + deps as via system lib
+    - compiler: gcc
+      env:
+        - A="ia64 linux  full tests  system deps, enable debug, debug boost"
+        - CXX=g++ CC=gcc
+        - HOST=x86_64-unknown-linux-gnu
+        - PACKAGES="python python3-zmq libzmq3-dev qttools5-dev-tools qttools5-dev libssl1.0-dev libevent-dev bsdmainutils libboost-system-dev libboost-program-options-dev libboost-filesystem-dev libboost-chrono-dev libboost-test-dev libboost-thread-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libprotobuf-dev protobuf-compiler libqrencode-dev"
+        - NODEPENDS=true
+        - RUN_FORMATTING_CHECK=true
+        - RUN_TESTS=true
+        - GOAL="install"
+        - BITCOIN_CONFIG="--enable-debug --with-incompatible-bdb --with-gui=qt5 --enable-glibc-back-compat --enable-reduce-exports"
+    #bitcoind
+    - compiler: gcc
+      env:
+        - A="ia64 linux  gcc   full test"
+        - CXX=g++ CC=gcc
+        - HOST=x86_64-unknown-linux-gnu
+        - PACKAGES="libedit2 python3-zmq"
+        - DEP_OPTS="NO_UPNP=1 DEBUG=1"
+        - RUN_TESTS=true
+        - GOAL="install"
+        - BITCOIN_CONFIG="--enable-shared --enable-zmq --enable-glibc-back-compat --enable-reduce-exports CPPFLAGS=-DDEBUG_LOCKORDER" #need to test also libdb 4.8
     #bitcoind clang (no depend, only system lib installed via apt)
     - compiler: clang
       env:
+        - A="ia64 linux clang  no test"
         - CXX=clang++-5.0 CC=clang-5.0
         - CXXFLAGS="-std=c++14"
         - HOST=x86_64-unknown-linux-gnu
@@ -44,20 +68,10 @@ matrix:
         - GOAL="install"
         - BITCOIN_CONFIG="--enable-zmq --with-gui=qt5 CC=clang-5.0 --with-incompatible-bdb CXX=clang++-5.0 CPPFLAGS=-DDEBUG_LOCKORDER CXXFLAGS=\"-std=c++14\""
         - NODEPENDS=true
-    #bitcoind
-    - compiler: gcc
-      env:
-        - CXX=g++ CC=gcc
-        - HOST=x86_64-unknown-linux-gnu
-        - PACKAGES="libedit2 python python3-zmq"
-        - DEP_OPTS="NO_UPNP=1 DEBUG=1"
-        - RUN_TESTS=true
-        - RUN_FORMATTING_CHECK=true
-        - GOAL="install"
-        - BITCOIN_CONFIG="--enable-shared --enable-zmq --enable-glibc-back-compat --enable-reduce-exports CPPFLAGS=-DDEBUG_LOCKORDER" #need to test also libdb 4.8
     #ARM64
     - compiler: gcc
       env:
+        - A="ARM64 linux  no test"
         - CXX=g++ CC=gcc
         - HOST=aarch64-linux-gnu
         - PACKAGES="g++-aarch64-linux-gnu"
@@ -66,6 +80,7 @@ matrix:
     #ARM32
     - compiler: gcc
       env:
+        - A="ARM32 linux  no test"
         - CXX=g++ CC=gcc
         - HOST=arm-linux-gnueabihf
         - PACKAGES="g++-arm-linux-gnueabihf"
@@ -74,6 +89,7 @@ matrix:
     #Win32
     - compiler: gcc
       env:
+        - A="ia32 win32  no test"
         - CXX=g++ CC=gcc
         - HOST=i686-w64-mingw32
         - DPKG_ADD_ARCH="i386"
@@ -84,6 +100,7 @@ matrix:
     #Win64
     - compiler: gcc
       env:
+        - A="ia64 win64  no test"
         - CXX=g++ CC=gcc
         - HOST=x86_64-w64-mingw32
         - DEP_OPTS="NO_QT=1"
@@ -93,23 +110,17 @@ matrix:
     #Linux32-bit + dash
     - compiler: gcc
       env:
+        - A="ia32 linux gcc  full test" 
         - CXX=g++ CC=gcc
         - HOST=i686-pc-linux-gnu
         - PACKAGES="g++-multilib bc python3-zmq"
         - DEP_OPTS="NO_QT=1" RUN_TESTS=true GOAL="install"
         - BITCOIN_CONFIG="--enable-zmq --enable-glibc-back-compat --enable-reduce-exports LDFLAGS=-static-libstdc++"
         - USE_SHELL="/bin/dash"
-    #x86_64 Linux + deps as via system lib
-    - compiler: gcc
-      env:
-        - CXX=g++ CC=gcc
-        - HOST=x86_64-unknown-linux-gnu
-        - PACKAGES="python3-zmq libzmq3-dev qttools5-dev-tools qttools5-dev libssl1.0-dev libevent-dev bsdmainutils libboost-system-dev libboost-program-options-dev libboost-filesystem-dev libboost-chrono-dev libboost-test-dev libboost-thread-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libprotobuf-dev protobuf-compiler libqrencode-dev"
-        - NODEPENDS=true
-        - RUN_TESTS=true GOAL="install" BITCOIN_CONFIG="--enable-debug --with-incompatible-bdb --with-gui=qt5 --enable-glibc-back-compat --enable-reduce-exports"
     #Cross-Mac
     - compiler: gcc
       env:
+        - A="ia64 apple gcc  no test"
         - HOST=x86_64-apple-darwin11
         - PACKAGES="cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python-dev python3-setuptools-git"
         - BITCOIN_CONFIG="--enable-reduce-exports"
@@ -117,6 +128,7 @@ matrix:
 
     - compiler: gcc
       env:
+        - A="ia64 centos  no test"
         - CXX=g++ CC=gcc
         - HOST=x86_64-unknown-linux-gnu
         - DOCKER_NAME_TAG=centos:7.6.1810
