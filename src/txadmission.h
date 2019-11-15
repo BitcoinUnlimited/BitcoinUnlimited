@@ -57,7 +57,7 @@ static const bool DEFAULT_RELAYPRIORITY = false;
 class Snapshot
 {
 public:
-    CCriticalSection cs_snapshot;
+    CSharedCriticalSection cs_snapshot;
     uint64_t tipHeight;
     uint64_t tipMedianTimePast;
     int64_t adjustedTime;

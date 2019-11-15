@@ -48,7 +48,7 @@ static const unsigned int DEFAULT_KEYPOOL_SIZE = 100;
 //! -paytxfee default
 static const CAmount DEFAULT_TRANSACTION_FEE = 0;
 //! -fallbackfee default
-static const CAmount DEFAULT_FALLBACK_FEE = 20000;
+static const CAmount DEFAULT_FALLBACK_FEE = 1000;
 //! -mintxfee default
 static const CAmount DEFAULT_TRANSACTION_MINFEE = 1000;
 //! minimum change amount
@@ -403,8 +403,12 @@ public:
 class COutput
 {
 public:
-    const CWalletTx *tx;
-    int i;
+    const CWalletTx *tx; //*< transaction
+    int i; //*< index of this output in transaction's vout
+
+    /** output of GetDepthInMainChain().  That is, how many blocks from the tip did this output get created in.  0 means
+     * not in blockchain (unconfirmed)
+     */
     int nDepth;
     bool fSpendable;
 
@@ -417,7 +421,55 @@ public:
     }
 
     std::string ToString() const;
+
+    inline int cmp(const COutput &rhs) const
+    {
+        if (tx->GetHash() == rhs.tx->GetHash())
+        {
+            if (i < rhs.i)
+                return -1;
+            if (i > rhs.i)
+                return 1;
+            return 0;
+        }
+        if (tx->GetHash() < rhs.tx->GetHash())
+            return -1;
+        return 1;
+    }
 };
+
+inline bool operator==(const COutput &lhs, const COutput &rhs) { return lhs.cmp(rhs) == 0; }
+inline bool operator!=(const COutput &lhs, const COutput &rhs) { return lhs.cmp(rhs) != 0; }
+inline bool operator<(const COutput &lhs, const COutput &rhs) { return lhs.cmp(rhs) < 0; }
+inline bool operator>(const COutput &lhs, const COutput &rhs) { return lhs.cmp(rhs) > 0; }
+inline bool operator<=(const COutput &lhs, const COutput &rhs) { return lhs.cmp(rhs) <= 0; }
+inline bool operator>=(const COutput &lhs, const COutput &rhs) { return lhs.cmp(rhs) >= 0; }
+typedef std::multimap<CAmount, COutput> SpendableTxos;
+
+struct TxoIterLess // : binary_function <T,T,bool>
+{
+    typedef SpendableTxos::iterator T;
+    bool operator()(const T &x, const T &y) const
+    {
+        if (x->first == y->first)
+        {
+            return x->second < y->second;
+        }
+        return x->first < y->first;
+    }
+};
+
+typedef std::set<SpendableTxos::iterator, TxoIterLess> TxoItVec;
+typedef std::pair<CAmount, TxoItVec> TxoGroup; // A set of coins and how much they sum to.
+
+// Select a group of UTXOs that sum up to above targetvalue.  The best choice is to be within dust of targetValue
+// because
+// that will mean that I do not create any change.
+extern TxoGroup CoinSelection(/* const */ SpendableTxos &available,
+    const CAmount targetValue,
+    const CAmount &dust,
+    CFeeRate fee,
+    unsigned int changeLen);
 
 
 /** Private key that includes an expiration date in case it never gets used. */
@@ -542,9 +594,11 @@ private:
      * if they are not ours
      */
     bool SelectCoins(const CAmount &nTargetValue,
+        CFeeRate fee,
+        unsigned int changeLen,
         std::set<std::pair<const CWalletTx *, unsigned int> > &setCoinsRet,
         CAmount &nValueRet,
-        const CCoinControl *coinControl = nullptr) const;
+        const CCoinControl *coinControl = nullptr);
 
     CWalletDB *pwalletdbEncryption;
 
@@ -586,6 +640,9 @@ public:
      *      strWalletFile (immutable after instantiation)
      */
     mutable CCriticalSection cs_wallet;
+
+    SpendableTxos available;
+    bool fOnlyConfirmed; // Only allow spending of confirmed coins
 
     bool fFileBacked;
     std::string strWalletFile;
@@ -645,6 +702,9 @@ public:
     int64_t nTimeFirstKey;
 
     const CWalletTx *GetWalletTx(const uint256 &hash) const;
+
+    bool IsTxSpendable(const CWalletTx *) const;
+    void FillAvailableCoins(const CCoinControl *coinControl); // populate available COutputs.
 
     //! check whether we are allowed to upgrade (or already support) to the named feature
     bool CanSupportFeature(enum WalletFeature wf)

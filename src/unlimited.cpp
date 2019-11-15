@@ -1969,7 +1969,23 @@ uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uint256> &
     return merkle_root;
 }
 
-/** Mining-Candidate end */
+#ifdef DEBUG
+// This RPC is very useful for checking that the test system works, but we don't want it to be part of the
+// normal release
+UniValue crash(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() >= 1)
+        throw runtime_error("crash \n"
+                            "\nCrashes this program, generating a core dump.\n"
+                            "\nArguments\n"
+                            "none\n"
+                            "\nResult:\n" +
+                            HelpExampleCli("crash", "") + HelpExampleRpc("crash", ""));
+
+
+    abort();
+}
+#endif
 
 /* clang-format off */
 static const CRPCCommand commands[] =
@@ -2001,7 +2017,8 @@ static const CRPCCommand commands[] =
     { "util",               "set",                    &settweak,               true  },
     { "util",               "validatechainhistory",   &validatechainhistory,   true  },
 #ifdef DEBUG
-    { "util",               "getstructuresizes",      &getstructuresizes,      true  },  // BU
+    { "util",               "getstructuresizes",      &getstructuresizes,      true  },
+    { "util",               "crash",                  &crash,                  true  },
 #endif
     { "util",               "getaddressforms",        &getaddressforms,        true  },
     { "util",               "log",                    &setlog,                 true  },
@@ -2373,6 +2390,7 @@ UniValue getaddressforms(const UniValue &params, bool fHelp)
     node.pushKV("bitpay", bitpayAddr);
     return node;
 }
+
 
 std::string CStatusString::GetPrintable() const
 {

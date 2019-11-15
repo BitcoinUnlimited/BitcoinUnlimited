@@ -796,6 +796,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         CAmount nValueIn = 0;
         LockPoints lp;
         {
+            READLOCK(ss.cs_snapshot);
             READLOCK(pool.cs_txmempool);
             CCoinsViewMemPool &viewMemPool(*ss.cvMempool);
             view.SetBackend(viewMemPool);
@@ -1371,7 +1372,7 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
 
 void Snapshot::Load(void)
 {
-    LOCK(cs_snapshot);
+    WRITELOCK(cs_snapshot);
     tipHeight = chainActive.Height();
     tip = chainActive.Tip();
     if (tip)

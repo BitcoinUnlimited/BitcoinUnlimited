@@ -364,14 +364,9 @@ UniValue getaddressesbyaccount(const UniValue &params, bool fHelp)
 
 static void SendMoney(const CTxDestination &address, CAmount nValue, bool fSubtractFeeFromAmount, CWalletTx &wtxNew)
 {
-    CAmount curBalance = pwalletMain->GetBalance();
-
     // Check amount
     if (nValue <= 0)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid amount");
-
-    if (nValue > curBalance)
-        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
 
     // Parse Bitcoin address
     CScript scriptPubKey = GetScriptForDestination(address);
@@ -803,13 +798,14 @@ CAmount GetAccountBalance(CWalletDB &walletdb, const string &strAccount, int nMi
          ++it)
     {
         const CWalletTx &wtx = (*it).second;
-        if (!CheckFinalTx(MakeTransactionRef(wtx)) || wtx.GetBlocksToMaturity() > 0 || wtx.GetDepthInMainChain() < 0)
+        int depth = wtx.GetDepthInMainChain();
+        if (!CheckFinalTx(MakeTransactionRef(wtx)) || wtx.GetBlocksToMaturity() > 0 || depth < 0)
             continue;
 
         CAmount nReceived, nSent, nFee;
         wtx.GetAccountAmounts(strAccount, nReceived, nSent, nFee, filter);
 
-        if (nReceived != 0 && wtx.GetDepthInMainChain() >= nMinDepth)
+        if (nReceived != 0 && depth >= nMinDepth)
             nBalance += nReceived;
         nBalance -= nSent + nFee;
     }
@@ -1067,10 +1063,13 @@ UniValue sendfrom(const UniValue &params, bool fHelp)
 
     EnsureWalletIsUnlocked();
 
-    // Check funds
-    CAmount nBalance = GetAccountBalance(strAccount, nMinDepth, ISMINE_SPENDABLE);
-    if (nAmount > nBalance)
-        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Account has insufficient funds");
+    // Check funds, if an account is selected
+    if (strAccount != "")
+    {
+        CAmount nBalance = GetAccountBalance(strAccount, nMinDepth, ISMINE_SPENDABLE);
+        if (nAmount > nBalance)
+            throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Account has insufficient funds");
+    }
 
     SendMoney(dest, nAmount, false, wtx);
 
@@ -1193,9 +1192,14 @@ UniValue sendmany(const UniValue &params, bool fHelp)
     {
         LOCK(serializeCreateTx);
 
-        CAmount nBalance = GetAccountBalance(strAccount, nMinDepth, ISMINE_SPENDABLE);
-        if (totalAmount > nBalance)
-            throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Account has insufficient funds");
+        // If an account is provided we need to make sure it doesn't exceed our account balance.
+        // Otherwise, skip this expensive step because coin selection will fail if the amount exceeds the balance.
+        if (strAccount != "")
+        {
+            CAmount nBalance = GetAccountBalance(strAccount, nMinDepth, ISMINE_SPENDABLE);
+            if (totalAmount > nBalance)
+                throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Account has insufficient funds");
+        }
 
         // Send
         CReserveKey keyChange(pwalletMain);

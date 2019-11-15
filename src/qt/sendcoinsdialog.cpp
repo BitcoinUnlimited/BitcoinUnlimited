@@ -262,7 +262,24 @@ void SendCoinsDialog::on_sendButton_clicked()
     WalletModelTransaction currentTransaction(recipients);
     WalletModel::SendCoinsReturn prepareStatus;
     if (model->getOptionsModel()->getCoinControlFeatures()) // coin control enabled
+    {
+        // The way the GUI works is that removing all checked coins automatically switches to allowing other inputs.
+        // We need to make the coinControl structure consistent with this GUI behavior.  We could do it in many places
+        // as coins are selected and unselected in various UI ways, or we can have a single catch-all rule here.
+        if (CoinControlDialog::coinControl)
+        {
+            if (!CoinControlDialog::coinControl->HasSelected())
+            {
+                CoinControlDialog::coinControl->fAllowOtherInputs = true;
+            }
+            else // The GUI has no way to use some coins and supplement with additional -- instead it errors
+            {
+                CoinControlDialog::coinControl->fAllowOtherInputs = false;
+            }
+        }
+
         prepareStatus = model->prepareTransaction(currentTransaction, CoinControlDialog::coinControl);
+    }
     else
         prepareStatus = model->prepareTransaction(currentTransaction);
 

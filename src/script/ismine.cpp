@@ -83,13 +83,11 @@ bool isFreezeCLTV(const CKeyStore &keystore, const CScript &scriptPubKey, CScrip
     return false;
 }
 
-isminetype IsMine(const CKeyStore &keystore, const CTxDestination &dest, CBlockIndex *bestBlock)
-{
-    CScript script = GetScriptForDestination(dest);
-    return IsMine(keystore, script, bestBlock);
-}
 
-isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey, CBlockIndex *bestBlock)
+static isminetype IsMine(const CKeyStore &keystore,
+    const CScript &scriptPubKey,
+    CBlockIndex *bestBlock,
+    bool alreadyLocked)
 {
     vector<valtype> vSolutions;
     txnouttype whichType;
@@ -108,15 +106,21 @@ isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey, CBlock
     case TX_LABELPUBLIC:
         break;
     case TX_PUBKEY:
+    {
         keyID = CPubKey(vSolutions[0]).GetID();
-        if (keystore.HaveKey(keyID))
+        bool haveKey = alreadyLocked ? keystore._HaveKey(keyID) : keystore.HaveKey(keyID);
+        if (haveKey)
             return ISMINE_SPENDABLE;
-        break;
+    }
+    break;
     case TX_PUBKEYHASH:
+    {
         keyID = CKeyID(uint160(vSolutions[0]));
-        if (keystore.HaveKey(keyID))
+        bool haveKey = alreadyLocked ? keystore._HaveKey(keyID) : keystore.HaveKey(keyID);
+        if (haveKey)
             return ISMINE_SPENDABLE;
-        break;
+    }
+    break;
     case TX_SCRIPTHASH:
     {
         CScriptID scriptID = CScriptID(uint160(vSolutions[0]));
@@ -146,7 +150,8 @@ isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey, CBlock
     case TX_CLTV:
     {
         keyID = CPubKey(vSolutions[1]).GetID();
-        if (keystore.HaveKey(keyID))
+        bool haveKey = alreadyLocked ? keystore._HaveKey(keyID) : keystore.HaveKey(keyID);
+        if (haveKey)
         {
             CScriptNum nFreezeLockTime(vSolutions[0], true, 5);
 
@@ -185,4 +190,22 @@ isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey, CBlock
                                                                                              ISMINE_WATCH_UNSOLVABLE;
     }
     return ISMINE_NO;
+}
+
+
+isminetype IsMine(const CKeyStore &keystore, const CTxDestination &dest, CBlockIndex *bestBlock)
+{
+    CScript script = GetScriptForDestination(dest);
+    return IsMine(keystore, script, bestBlock);
+}
+
+isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey, CBlockIndex *bestBlock)
+{
+    return IsMine(keystore, scriptPubKey, bestBlock, false);
+}
+
+isminetype _IsMine(const CKeyStore &keystore, const CScript &scriptPubKey, CBlockIndex *bestBlock)
+{
+    AssertLockHeld(keystore.cs_KeyStore);
+    return IsMine(keystore, scriptPubKey, bestBlock, true);
 }
