@@ -265,7 +265,7 @@ bool AcceptBlock(CBlock &block, CValidationState &state, CBlockIndex **pindex, b
 CBlockIndex *FindForkInGlobalIndex(const CChain &chain, const CBlockLocator &locator);
 
 
-/** The currently-connected chain of blocks (protected by cs_main). */
+/** The currently-connected chain of blocks (protected internally). */
 extern CChain chainActive;
 
 /** Global variable that points to the active CCoinsView (protected by cs_utxo) */

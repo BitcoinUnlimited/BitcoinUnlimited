@@ -874,6 +874,7 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
  * Add a transaction to the wallet, or update it.
  * pblock is optional, but should be provided if the transaction is known to be in a block.
  * If fUpdate is true, existing transactions will be updated.
+ * @return true if the wallet was updated
  */
 bool CWallet::AddToWalletIfInvolvingMe(const CTransactionRef &ptx, const CBlock *pblock, bool fUpdate, int txIndex)
 {
@@ -921,7 +922,7 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransactionRef &ptx, const CBlock 
 
 bool CWallet::AbandonTransaction(const uint256 &hashTx)
 {
-    LOCK2(cs_main, cs_wallet);
+    LOCK(cs_wallet);
 
     // Do not flush the wallet here for performance reasons
     CWalletDB walletdb(strWalletFile, "r+", false);
@@ -988,7 +989,7 @@ bool CWallet::AbandonTransaction(const uint256 &hashTx)
 
 void CWallet::MarkConflicted(const uint256 &hashBlock, const uint256 &hashTx)
 {
-    LOCK2(cs_main, cs_wallet); // cs_main needed for chainActive
+    LOCK(cs_wallet);
 
     int conflictconfirms = 0;
     CBlockIndex *pindex = LookupBlockIndex(hashBlock);
@@ -1053,7 +1054,7 @@ void CWallet::MarkConflicted(const uint256 &hashBlock, const uint256 &hashTx)
 
 void CWallet::SyncTransaction(const CTransactionRef &ptx, const CBlock *pblock, int txIdx)
 {
-    LOCK2(cs_main, cs_wallet);
+    LOCK(cs_wallet);
 
     if (!AddToWalletIfInvolvingMe(ptx, pblock, true, txIdx))
         return; // Not one of ours
@@ -1411,12 +1412,21 @@ int CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate)
 
     CBlockIndex *pindex = pindexStart;
     {
-        LOCK2(cs_main, cs_wallet);
+        LOCK(cs_wallet);
 
         // no need to read and scan block, if block was created before
         // our wallet birthday (as adjusted for block time variability)
         while (pindex && nTimeFirstKey && (pindex->GetBlockTime() < (nTimeFirstKey - 7200)))
             pindex = chainActive.Next(pindex);
+
+        // If pindex is zero here, the wallet's first time key must be at least 7200 seconds in the future,
+        // since pindex advanced to the end of the chain.  So this is generally an impossible situation.
+        // 7200 was chosen because blocks can misreport their time by no more than 2 hours.
+        if (pindex == nullptr)
+        {
+            fRescan = false;
+            return 0;
+        }
 
         // show rescan progress in GUI as dialog or on splashscreen, if -rescan on startup
         ShowProgress(_("Rescanning..."), 0);
@@ -1445,8 +1455,9 @@ int CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate)
             if (GetTime() >= nNow + 60)
             {
                 nNow = GetTime();
-                LOGA("Still rescanning. At block %d. Progress=%f\n", pindex->nHeight,
-                    Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), pindex));
+                if (pindex) // if pindex is nullptr we are done anyway so no need to show the log
+                    LOGA("Still rescanning. At block %d. Progress=%f\n", pindex->nHeight,
+                        Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), pindex));
             }
         }
         ShowProgress(_("Rescanning..."), 100); // hide progress dialog in GUI
@@ -1465,7 +1476,7 @@ void CWallet::ReacceptWalletTransactions()
     std::map<int64_t, CTransactionRef> mapSorted;
 
     {
-        LOCK2(cs_main, cs_wallet);
+        LOCK(cs_wallet);
 
         // Sort pending wallet transactions based on their initial wallet insertion order
         for (PAIRTYPE(const uint256, CWalletTx) & item : mapWallet)
@@ -1784,7 +1795,7 @@ CAmount CWallet::GetBalance() const
 {
     CAmount nTotal = 0;
     {
-        LOCK2(cs_main, cs_wallet);
+        LOCK(cs_wallet);
         for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
         {
             const CWalletTx *pcoin = &(*it).second;
@@ -1800,7 +1811,7 @@ CAmount CWallet::GetUnconfirmedBalance() const
 {
     CAmount nTotal = 0;
     {
-        LOCK2(cs_main, cs_wallet);
+        LOCK(cs_wallet);
         for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
         {
             const CWalletTx *pcoin = &(*it).second;
@@ -1815,7 +1826,7 @@ CAmount CWallet::GetImmatureBalance() const
 {
     CAmount nTotal = 0;
     {
-        LOCK2(cs_main, cs_wallet);
+        LOCK(cs_wallet);
         for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
         {
             const CWalletTx *pcoin = &(*it).second;
@@ -1829,7 +1840,7 @@ CAmount CWallet::GetWatchOnlyBalance() const
 {
     CAmount nTotal = 0;
     {
-        LOCK2(cs_main, cs_wallet);
+        LOCK(cs_wallet);
         for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
         {
             const CWalletTx *pcoin = &(*it).second;
@@ -1845,7 +1856,7 @@ CAmount CWallet::GetUnconfirmedWatchOnlyBalance() const
 {
     CAmount nTotal = 0;
     {
-        LOCK2(cs_main, cs_wallet);
+        LOCK(cs_wallet);
         for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
         {
             const CWalletTx *pcoin = &(*it).second;
@@ -1860,7 +1871,7 @@ CAmount CWallet::GetImmatureWatchOnlyBalance() const
 {
     CAmount nTotal = 0;
     {
-        LOCK2(cs_main, cs_wallet);
+        LOCK(cs_wallet);
         for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
         {
             const CWalletTx *pcoin = &(*it).second;
@@ -1878,7 +1889,7 @@ void CWallet::AvailableCoins(vector<COutput> &vCoins,
     vCoins.clear();
 
     {
-        LOCK2(cs_main, cs_wallet);
+        LOCK(cs_wallet);
         for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
         {
             const uint256 &wtxid = it->first;
@@ -2284,7 +2295,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
     assert(txNew.nLockTime < LOCKTIME_THRESHOLD);
 
     {
-        LOCK2(cs_main, cs_wallet);
+        LOCK(cs_wallet);
         {
             nFeeRet = 0;
             // Start with no fee and loop until there is enough fee
@@ -2570,7 +2581,7 @@ bool CWallet::CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey)
             }
         }
 
-        LOCK2(cs_main, cs_wallet);
+        LOCK(cs_wallet);
         {
             // This is only to keep the database open to defeat the auto-flush for the
             // duration of this scope.  This is the only place where this optimization
@@ -3117,7 +3128,7 @@ void CWallet::GetAllReserveKeys(set<CKeyID> &setAddress) const
 
     CWalletDB walletdb(strWalletFile);
 
-    LOCK2(cs_main, cs_wallet);
+    LOCK(cs_wallet);
     for (const int64_t &id : setKeyPool)
     {
         CKeyPool keypool;
@@ -3453,7 +3464,6 @@ bool CWallet::InitLoadWallet()
         CBlockLocator locator;
         if (walletdb.ReadBestBlock(locator))
         {
-            LOCK(cs_main);
             pindexRescan = FindForkInGlobalIndex(chainActive, locator);
         }
         else
@@ -3588,7 +3598,6 @@ CWalletKey::CWalletKey(int64_t nExpires)
 
 int CMerkleTx::SetMerkleBranch(const CBlock &block, int txIdx)
 {
-    AssertLockHeld(cs_main); // for chainActive
     // txIdx never == -1 since the caller already know txIdx
     assert(txIdx >= 0);
     CBlock blockTmp;
@@ -3613,7 +3622,6 @@ int CMerkleTx::GetDepthInMainChain(const CBlockIndex *&pindexRet) const
 
     // Find the block it claims to be in
     const CBlockIndex *pindex = LookupBlockIndex(hashBlock);
-    LOCK(cs_main);
     if (!pindex || !chainActive.Contains(pindex))
         return 0;
 

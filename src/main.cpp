@@ -221,7 +221,6 @@ void UnregisterNodeSignals(CNodeSignals &nodeSignals)
 CBlockIndex *FindForkInGlobalIndex(const CChain &chain, const CBlockLocator &locator)
 {
     // Find the first block the caller has in the main chain
-    AssertLockHeld(cs_main); // for chain
     READLOCK(cs_mapBlockIndex);
     for (const uint256 &hash : locator.vHave)
     {

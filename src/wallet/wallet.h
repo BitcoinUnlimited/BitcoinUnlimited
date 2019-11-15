@@ -168,9 +168,11 @@ private:
     static const uint256 ABANDON_HASH;
 
 public:
+    /** Hash of the block containing this transaction */
     uint256 hashBlock;
 
-    /* An nIndex == -1 means that hashBlock (in nonzero) refers to the earliest
+    /** Position of the transaction in the block.
+     * An nIndex == -1 means that hashBlock (in nonzero) refers to the earliest
      * block in the chain we know this or any in-wallet dependency conflicts
      * with. Older clients interpret nIndex == -1 as unconfirmed for backward
      * compatibility.
@@ -739,8 +741,23 @@ public:
     void MarkDirty();
     bool AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletDB *pwalletdb);
     void SyncTransaction(const CTransactionRef &ptx, const CBlock *pblock, int txIndex = -1);
+
+    /**
+     * Add a transaction to the wallet, or update it.
+     * pblock is optional, but should be provided if the transaction is known to be in a block.
+     * If fUpdate is true, existing transactions will be updated.
+     * @return true if the wallet was updated
+     */
     bool AddToWalletIfInvolvingMe(const CTransactionRef &ptx, const CBlock *pblock, bool fUpdate, int txIndex = -1);
+
+    /**
+     * Scan the block chain (starting in pindexStart) for transactions
+     * from or to us. If fUpdate is true, found transactions that already
+     * exist in the wallet will be updated.
+     * @return the number of wallet updates
+     */
     int ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate = false);
+
     void ReacceptWalletTransactions();
     void ResendWalletTransactions(int64_t nBestBlockTime);
     std::vector<uint256> ResendWalletTransactionsBefore(int64_t nTime);
