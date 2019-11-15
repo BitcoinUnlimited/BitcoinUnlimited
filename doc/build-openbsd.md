@@ -17,12 +17,12 @@ pkg_add autoconf # (select highest version, e.g. 2.69)
 pkg_add automake # (select highest version, e.g. 1.16)
 pkg_add python # (select highest version, e.g. 3.7)
 ```
-To install openSSL, find download link here [[https://www.openssl.org/source/]].
+To install openSSL, find download link here https://www.openssl.org/source/.
 
 Still as root (while modifying the version as apropriate) run
 
 ```bash
-curl https://www.openssl.org/source/openssl-1.1.0l.tar.gz -o openssl-1.1.0l.tar.gz
+curl 'https://www.openssl.org/source/openssl-1.1.0l.tar.gz' -o openssl-1.1.0l.tar.gz
 echo '74a2f756c64fd7386a29184dc0344f4831192d61dc2481a93a4c5dd727f41148 openssl-1.1.0l.tar.gz' | sha256 -c
 # MUST output: (SHA256) openssl-1.1.0l.tar.gz: OK
 tar xvzf openssl-1.1.0l.tar.gz
@@ -37,7 +37,7 @@ See [dependencies.md](dependencies.md) for a complete overview.
 
 ## Building Bitcoin Unlimited
 
-As your normal, non root go through the relevant steps below
+As your normal (non root) user, go through the steps below
 
 ### Fetch the code
 
@@ -89,7 +89,7 @@ BDB_PREFIX=$(pwd)/db4
 mkdir -p $BDB_PREFIX
 
 # Fetch the source and verify that it is not tampered with
-curl https://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz -o db-4.8.30.NC.tar.gz
+curl 'https://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz' -o db-4.8.30.NC.tar.gz
 echo '12edc0df75bf9abd7f82f821795bcee50f42cb2e5f76a6a281b85732798364ef  db-4.8.30.NC.tar.gz' | sha256 -c
 # MUST output: (SHA256) db-4.8.30.NC.tar.gz: OK
 tar -xzf db-4.8.30.NC.tar.gz
@@ -114,6 +114,7 @@ You should now have the required files in `db4/lib/` and `db4/include/`.
 
 Make sure `BDB_PREFIX` is set to the appropriate path from building BDB. See above.
 
+While in the `BitcoinUnlimited` directory.
 
 ```bash
 ./autogen.sh
