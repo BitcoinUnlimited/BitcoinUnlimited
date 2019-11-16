@@ -336,8 +336,6 @@ bool LoadBlockIndexDB()
         return false;
     }
     LOCK(cs_main);
-    WRITELOCK(cs_mapBlockIndex);
-
     /** This sync method will break on pruned nodes so we cant use if pruned*/
     // Check whether we have ever pruned block & undo files
     pblocktree->ReadFlag("prunedblockfiles", fHavePruned);
@@ -351,6 +349,10 @@ bool LoadBlockIndexDB()
 
     delete pblocktreeother;
     pblocktreeother = nullptr;
+    // lock cs_mapBlockIndex after running SyncStorage to avoid an issue with
+    // deadlocks, this is only safe to do because only the programs main thread
+    // is running at the time LocdBlockIndexDB is called.
+    WRITELOCK(cs_mapBlockIndex);
     try
     {
         if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
