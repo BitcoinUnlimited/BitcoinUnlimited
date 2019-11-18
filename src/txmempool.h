@@ -611,7 +611,7 @@ public:
     void removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed);
     void _removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed);
     void removeForBlock(const std::vector<CTransactionRef> &vtx,
-        unsigned int nBlockHeight,
+        uint64_t nBlockHeight,
         std::list<CTransactionRef> &conflicted,
         bool fCurrentEstimate = true,
         std::vector<CTxChange> *txChange = nullptr);
@@ -784,23 +784,8 @@ public:
     TxMempoolInfo info(const uint256 &hash) const;
     std::vector<TxMempoolInfo> AllTxMempoolInfo() const;
 
-    /** Estimate fee rate needed to get into the next nBlocks
-     *  If no answer can be given at nBlocks, return an estimate
-     *  at the lowest number of blocks where one can be given
-     */
-    CFeeRate estimateSmartFee(int nBlocks, int *answerFoundAtBlocks = nullptr) const;
-
     /** Estimate fee rate needed to get into the next nBlocks */
     CFeeRate estimateFee(int nBlocks) const;
-
-    /** Estimate priority needed to get into the next nBlocks
-     *  If no answer can be given at nBlocks, return an estimate
-     *  at the lowest number of blocks where one can be given
-     */
-    double estimateSmartPriority(int nBlocks, int *answerFoundAtBlocks = nullptr) const;
-
-    /** Estimate priority needed to get into the next nBlocks */
-    double estimatePriority(int nBlocks) const;
 
     /** Write/Read estimates to disk */
     bool WriteFeeEstimates(CAutoFile &fileout) const;
