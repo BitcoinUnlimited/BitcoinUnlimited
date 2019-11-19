@@ -53,24 +53,18 @@ static std::string NetMessage(std::deque<CSerializeData> &_vSendMsg)
 
     CInv inv_result;
     CSerializeData data = _vSendMsg.front();
-    CDataStream ssCommand(SER_NETWORK, PROTOCOL_VERSION);
-    ssCommand.insert(ssCommand.begin(), &data[4], &data[16]);
+    std::string ssData(data.begin(), data.end());
+    std::string ss(ssData.begin() + 4, ssData.begin() + 16);
     _vSendMsg.pop_front();
 
-    std::string ss = ssCommand.str();
+    // Remove whitespace
     ss.erase(std::remove(ss.begin(), ss.end(), '\000'), ss.end());
 
     // if it's a getdata then we need to find out what type
     if (ss == "getdata")
     {
-        // We have to add a character/s to the end of the CSerializeData object or we will go out
-        // of bounds when we insert the data into the ssInv datastream since there are only 61
-        // characters in the string and we want to copy up to and including the very last character.
-        std::string aa("end");
-        data.insert(data.end(), aa.begin(), aa.end());
-
         CDataStream ssInv(SER_NETWORK, PROTOCOL_VERSION);
-        ssInv.insert(ssInv.begin(), &data[25], &data[61]);
+        ssInv.insert(ssInv.begin(), ssData.begin() + 25, ssData.begin() + 61);
 
         CInv inv;
         ssInv >> inv;
