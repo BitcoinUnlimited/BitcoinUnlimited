@@ -32,9 +32,6 @@ void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache,
     const int64_t &_nBlockDBCache,
     const int64_t &_nBlockUndoDBCache);
 
-/** Determine if the block db mode we started with is behind another one already on disk*/
-bool DetermineStorageSync();
-
 /** Catch leveldb up with sequential block files */
 void SyncStorage(const CChainParams &chainparams);
 
