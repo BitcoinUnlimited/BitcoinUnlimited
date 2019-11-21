@@ -110,6 +110,9 @@ public:
 
 class CParallelValidation
 {
+public:
+    CCriticalSection cs_blockvalidationthread;
+
 private:
     /** txn hashes that are in the previous block */
     CCriticalSection cs_previousblock;
@@ -138,9 +141,7 @@ private:
         bool fIsValidating; // is the block currently in connectblock() and validating inputs
         bool fIsReorgInProgress; // has a re-org to another chain been triggered.
     };
-    CCriticalSection cs_blockvalidationthread;
     std::map<boost::thread::id, CHandleBlockMsgThreads> mapBlockValidationThreads GUARDED_BY(cs_blockvalidationthread);
-
 
 public:
     /**
@@ -201,7 +202,7 @@ public:
     void SetLocks(const bool fParallel);
 
     /** Is there a re-org in progress */
-    void IsReorgInProgress(const boost::thread::id this_id, const bool fReorg, const bool fParallel);
+    void MarkReorgInProgress(const boost::thread::id this_id, const bool fReorg, const bool fParallel);
     bool IsReorgInProgress();
 
     /** Update the nMostWorkOurFork when a new header arrives */

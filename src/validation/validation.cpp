@@ -1338,6 +1338,10 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
         setDirtyBlockIndex.insert(pindex);
         setBlockIndexCandidates.erase(pindex);
 
+        // Lock block validation threads to make sure no new inbound block announcements
+        // cause any block validation state to change while we're unwinding the chain.
+        LOCK(PV->cs_blockvalidationthread);
+
         while (chainActive.Contains(pindex))
         {
             CBlockIndex *pindexWalk = chainActive.Tip();
@@ -2969,6 +2973,7 @@ static void ResubmitTransactions(CBlock &block)
 bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusParams, const bool fRollBack)
 {
     AssertLockHeld(cs_main);
+    AssertLockHeld(PV->cs_blockvalidationthread);
 
     CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
@@ -3132,6 +3137,7 @@ bool ConnectTip(CValidationState &state,
     // If some kind of unconfirmed push is turned on, then do the forwarding.
     if (unconfPushAction.Value() != 0)
         ForwardAcceptableTransactions(txChanges);
+
     return true;
 }
 
@@ -3190,21 +3196,29 @@ bool ActivateBestChainStep(CValidationState &state,
 
     while (chainActive.Tip() && chainActive.Tip() != pindexFork)
     {
+        // Indicate that this thread has now initiated a re-org
+        LOCK(PV->cs_blockvalidationthread);
+        if (!fBlocksDisconnected)
+            PV->MarkReorgInProgress(this_id, true, fParallel);
+
         // When running in parallel block validation mode it is possible that this competing block could get to this
         // point just after the chaintip had already been advanced.  If that were to happen then it could initiate a
         // re-org when in fact a Quit had already been called on this thread.  So we do a check if Quit was previously
         // called and return if true.
         if (PV->QuitReceived(this_id, fParallel))
+        {
+            PV->MarkReorgInProgress(this_id, false, fParallel);
             return false;
-
-        // Indicate that this thread has now initiated a re-org
-        PV->IsReorgInProgress(this_id, true, fParallel);
+        }
 
         // Disconnect active blocks which are no longer in the best chain. We do not need to concern ourselves with any
         // block validation threads that may be running for the chain we are rolling back. They will automatically fail
         // validation during ConnectBlock() once the chaintip has changed..
         if (!DisconnectTip(state, chainparams.GetConsensus()))
+        {
+            PV->MarkReorgInProgress(this_id, false, fParallel);
             return false;
+        }
 
         fBlocksDisconnected = true;
     }
