@@ -1517,6 +1517,10 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
                             " blocks. Set "
                             "the override to true if you want rollback more than the default");
 
+    // Lock block validation threads to make sure no new inbound block announcements
+    // cause any block validation state to change while we're unwinding the chain.
+    LOCK(PV->cs_blockvalidationthread);
+
     while (chainActive.Height() > nRollBackHeight)
     {
         // save the current tip

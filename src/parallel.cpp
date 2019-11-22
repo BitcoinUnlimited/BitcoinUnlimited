@@ -379,7 +379,7 @@ void CParallelValidation::SetLocks(const bool fParallel)
     }
 }
 
-void CParallelValidation::IsReorgInProgress(const boost::thread::id this_id, const bool fReorg, const bool fParallel)
+void CParallelValidation::MarkReorgInProgress(const boost::thread::id this_id, const bool fReorg, const bool fParallel)
 {
     if (fParallel)
     {
