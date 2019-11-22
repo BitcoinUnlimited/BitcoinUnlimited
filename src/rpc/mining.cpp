@@ -1000,7 +1000,10 @@ UniValue estimatesmartfee(const UniValue &params, bool fHelp)
                             "\nArguments:\n"
                             "1. nblocks     (numeric)\n"
                             "\nResult:\n"
-                            "n              (numeric) estimated fee-per-kilobyte\n"
+                            "{\n"
+                            "  \"feerate\" : x.x,     (numeric) estimate fee-per-kilobyte (in BCH)\n"
+                            "  \"blocks\" : 1         (numeric) hardcoded to 1 for backwards compatibility reasons\n"
+                            "}\n"
                             "\n"
                             "A negative value is returned if not enough transactions and blocks\n"
                             "have been observed to make an estimate.\n"
@@ -1013,11 +1016,11 @@ UniValue estimatesmartfee(const UniValue &params, bool fHelp)
     if (nBlocks < 1)
         nBlocks = 1;
 
+    UniValue result(UniValue::VOBJ);
     CFeeRate feeRate = mempool.estimateFee(nBlocks);
-    if (feeRate == CFeeRate(0))
-        return -1.0;
-
-    return ValueFromAmount(feeRate.GetFeePerK());
+    result.pushKV("feerate", feeRate == CFeeRate(0) ? -1.0 : ValueFromAmount(feeRate.GetFeePerK()));
+    result.pushKV("blocks", 1);
+    return result;
 }
 
 
