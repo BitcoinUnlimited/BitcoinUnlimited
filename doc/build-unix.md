@@ -4,31 +4,103 @@ Some notes on how to build Bitcoin Unlimited in Unix. Mostly with at Ubuntu / De
 
 For RPM based distros, see [build-unix-rpm.md](build-unix-rpm.md).
 For OpenBSD specific instructions, see [build-openbsd.md](build-openbsd.md).
+For FreeBSD specific instructions, see [build-freebsd.md](build-freebsd.md).
 
-## Note
 
-Always use absolute paths to configure and compile bitcoin and the dependencies,
-for example, when specifying the path of the dependency:
+# Installing dependencies
 
-```bash
-../dist/configure --enable-cxx --disable-shared --with-pic --prefix=$BDB_PREFIX
-```
+Run the following to install the base dependencies for building:
 
-Here BDB_PREFIX must absolute path - it is defined using $(pwd) which ensures
-the usage of the absolute path.
-
-## To Build
 
 ```bash
-git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git
-cd BitcoinUnlimited
-./autogen.sh
-./configure
-make
-make install # optional
+sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils
 ```
 
-This will build bitcoin-qt as well if the dependencies are met.
+On at least Ubuntu 14.04+ and Debian 7+ there are generic names for the
+individual boost development packages, so the following can be used to only
+install necessary parts of boost:
+
+```bash
+sudo apt-get install libboost-system-dev libboost-filesystem-dev libboost-chrono-dev libboost-program-options-dev libboost-test-dev libboost-thread-dev
+```
+
+If that doesn't work, you can install all boost development packages with:
+
+```bash
+sudo apt-get install libboost-all-dev
+```
+
+## Optional
+
+### miniupnpc
+
+[miniupnpc](http://miniupnp.free.fr/) may be used for UPnP port mapping.  It can be downloaded from [here](
+http://miniupnp.tuxfamily.org/files/).  UPnP support is compiled in and
+turned off by default.
+To install the dependencies
+```bash
+sudo apt-get install libminiupnpc-dev
+```
+
+See the configure options for upnp behavior desired:
+```bash
+--without-miniupnpc      #No UPnP support miniupnp not required
+--disable-upnp-default   #(the default) UPnP support turned off by default at runtime
+--enable-upnp-default    #UPnP support turned on by default at runtime
+```
+
+### ZMQ
+
+```bash
+sudo apt-get install libzmq3-dev # provides ZMQ API 4.x
+```
+
+
+## Installing dependencies for wallet support
+
+
+BerkeleyDB is required for the wallet. If you don't need wallet support, but just want a node, you don't need this.
+
+db4.8 packages are available [here](https://launchpad.net/~bitcoin-unlimited/+archive/ubuntu/bucash).
+
+You can add the repository and install using the following commands:
+
+```bash
+sudo add-apt-repository ppa:bitcoin-unlimited/bu-ppa
+sudo apt-get update
+sudo apt-get install libdb4.8-dev libdb4.8++-dev
+```
+
+Ubuntu and Debian have their own libdb-dev and libdb++-dev packages, but these will install
+BerkeleyDB 5.1 or later, which break binary wallet compatibility with the distributed executables which
+are based on BerkeleyDB 4.8. If you do not care about wallet compatibility,
+pass `--with-incompatible-bdb` to configure.
+
+See the section "Disable-wallet mode" to build Bitcoin Unlimited without wallet.
+
+You can also build BDB4.8 your self. See [below](#berkeley-db)
+
+
+## Installing dependencies for the GUI
+
+If you want to build Bitcoin-Qt, make sure that the required packages for Qt development
+are installed. Qt 5.3 or higher is necessary to build the GUI.
+To build without GUI pass `--without-gui`.
+
+To build with Qt 5.3 or higher you need the following:
+
+```bash
+sudo apt-get install libqt5gui5 libqt5core5a libqt5dbus5 qttools5-dev qttools5-dev-tools libprotobuf-dev protobuf-compiler
+```
+
+libqrencode (optional) can be installed with:
+
+```bash
+sudo apt-get install libqrencode-dev
+```
+
+Once these are installed, they will be found by configure and a bitcoin-qt executable will be
+built by default.
 
 ## Dependencies
 
@@ -53,105 +125,55 @@ Optional dependencies:
 
 For the versions used, see [dependencies.md](dependencies.md)
 
-## System requirements
+# Building Bitcoin Unlimited
 
-C++ compilers are memory-hungry. It is recommended to have at least 1 GB of
-memory available when compiling Bitcoin Unlimited. With 512MB of memory or less
-compilation will take much longer due to swap thrashing.
-
-## Dependency Build Instructions: Ubuntu & Debian
-
-Build requirements:
+Start out by fetching the code
 
 ```bash
-sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils
+git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git
+cd BitcoinUnlimited/
 ```
+## To build without wallet
 
-On at least Ubuntu 14.04+ and Debian 7+ there are generic names for the
-individual boost development packages, so the following can be used to only
-install necessary parts of boost:
+If you only need to run a node, and have no need for a wallet or GUI you can build the binaries with:
+
+In this case there is no dependency on Berkeley DB 4.8 or Qt5.
+
+Mining is also possible in disable-wallet mode, but only using the `getblocktemplate` RPC
+call not `getwork`.
+
+
 
 ```bash
-sudo apt-get install libboost-system-dev libboost-filesystem-dev libboost-chrono-dev libboost-program-options-dev libboost-test-dev libboost-thread-dev
+./autogen.sh
+./configure --disable-wallet --with-gui=no
+make
+make install # optional
 ```
 
-If that doesn't work, you can install all boost development packages with:
+You will find the `bitcoind` binary in the `src/` folder.
+
+## To build with wallet
+
+
+It is recommended to use Berkeley DB 4.8.
+
+If you install the package from the BU Launchpad ppa, as descibed (above)[## Installing dependencies for wallet support] you can build with
+
 
 ```bash
-sudo apt-get install libboost-all-dev
+./autogen.sh
+./configure
+make
+make install # optional
 ```
 
-BerkeleyDB is required for the wallet. db4.8 packages are available [here](https://launchpad.net/~bitcoin-unlimited/+archive/ubuntu/bucash).
-You can add the repository and install using the following commands:
-
-```bash
-sudo add-apt-repository ppa:bitcoin-unlimited/bu-ppa
-sudo apt-get update
-sudo apt-get install libdb4.8-dev libdb4.8++-dev
-```
-
-Ubuntu and Debian have their own libdb-dev and libdb++-dev packages, but these will install
-BerkeleyDB 5.1 or later, which break binary wallet compatibility with the distributed executables which
-are based on BerkeleyDB 4.8. If you do not care about wallet compatibility,
-pass `--with-incompatible-bdb` to configure.
-
-See the section "Disable-wallet mode" to build Bitcoin Unlimited without wallet.
-
-Optional:
-
-```bash
-sudo apt-get install libminiupnpc-dev (see --with-miniupnpc and --enable-upnp-default)
-```
-
-ZMQ dependencies:
-
-```bash
-sudo apt-get install libzmq3-dev (provides ZMQ API 4.x)
-```
-
-## Dependencies for the GUI: Ubuntu & Debian
-
-If you want to build Bitcoin-Qt, make sure that the required packages for Qt development
-are installed. Qt 5.3 or higher is necessary to build the GUI (QT 4 is not supported).
-To build without GUI pass `--without-gui`.
-
-To build with Qt 5.3 or higher you need the following:
-
-```bash
-sudo apt-get install libqt5gui5 libqt5core5a libqt5dbus5 qttools5-dev qttools5-dev-tools libprotobuf-dev protobuf-compiler
-```
-
-libqrencode (optional) can be installed with:
-
-```bash
-sudo apt-get install libqrencode-dev
-```
-
-Once these are installed, they will be found by configure and a bitcoin-qt executable will be
-built by default.
-
-## Notes
-
-The release is built with GCC and then "strip bitcoind" to strip the debug
-symbols, which reduces the executable size by about 90%.
+You will find the `bitcoind` binary in the `src/` folder. This will build `bitcoin-qt` as well, if the dependencies are met.
 
 
-## miniupnpc
+### Berkeley DB
 
-[miniupnpc](http://miniupnp.free.fr/) may be used for UPnP port mapping.  It can be downloaded from [here](
-http://miniupnp.tuxfamily.org/files/).  UPnP support is compiled in and
-turned off by default.  See the configure options for upnp behavior desired:
-
-```bash
---without-miniupnpc      #No UPnP support miniupnp not required
---disable-upnp-default   #(the default) UPnP support turned off by default at runtime
---enable-upnp-default    #UPnP support turned on by default at runtime
-```
-
-
-## Berkeley DB
-
-It is recommended to use Berkeley DB 4.8. If you have to build it yourself:
+If you want to build BDB4.8 yourself and then build Bitcoin Unlimited, do as follows from the Bitcoin Unlimited directory:
 
 ```bash
 BITCOIN_ROOT=$(pwd)
@@ -171,14 +193,49 @@ cd db-4.8.30.NC/build_unix/
 #  Note: Do a static build so that it can be embedded into the executable, instead of having to find a .so at runtime
 ../dist/configure --enable-cxx --disable-shared --with-pic --prefix=$BDB_PREFIX
 make install
-
-# Configure Bitcoin Unlimited to use our own-built instance of BDB
 cd $BITCOIN_ROOT
 ./autogen.sh
 ./configure LDFLAGS="-L${BDB_PREFIX}/lib/" CPPFLAGS="-I${BDB_PREFIX}/include/" # (other args...)
+make
+make install # optional
 ```
 
-**Note**: You only need Berkeley DB if the wallet is enabled (see the section *Disable-Wallet mode* below).
+**Note**: You only need Berkeley DB if the wallet is enabled.
+
+
+# Notes
+
+## Additional Configure Flags
+
+A list of additional configure flags can be displayed with:
+
+```bash
+./configure --help
+```
+
+## Absolute path
+
+Always use absolute paths to configure and compile bitcoin and the dependencies,
+for example, when specifying the path of the dependency:
+
+```bash
+../dist/configure --enable-cxx --disable-shared --with-pic --prefix=$BDB_PREFIX
+```
+
+Here BDB_PREFIX must absolute path - it is defined using $(pwd) which ensures
+the usage of the absolute path.
+
+## System requirements
+
+C++ compilers are memory-hungry. It is recommended to have at least 1 GB of
+memory available when compiling Bitcoin Unlimited. With 512MB of memory or less
+compilation will take much longer due to swap thrashing.
+
+## Strip debug symbols
+
+The release is built with GCC and then `strip bitcoind` to strip the debug
+symbols, which reduces the executable size by about 90%.
+
 
 ## Boost
 
@@ -242,27 +299,6 @@ scanelf -e ./bitcoin
 
     The STK RW- means that the stack is readable and writeable but not executable.
 
-## Disable-wallet mode
-
-When the intention is to run only a P2P node without a wallet, bitcoin may be compiled in
-disable-wallet mode with:
-
-```bash
-./configure --disable-wallet
-```
-
-In this case there is no dependency on Berkeley DB 4.8.
-
-Mining is also possible in disable-wallet mode, but only using the `getblocktemplate` RPC
-call not `getwork`.
-
-## Additional Configure Flags
-
-A list of additional configure flags can be displayed with:
-
-```bash
-./configure --help
-```
 
 ## Produce Static Binaries
 
