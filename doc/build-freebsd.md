@@ -12,8 +12,7 @@ We will not cover building the GUI.
 Run the following as root to install the base dependencies for building:
 
 ```bash
-pkg install autoconf automake gmake git libevent libtool boost-libs pkgconf openssl
-pkg install python
+pkg install autoconf automake gmake git libevent libtool boost-libs pkgconf openssl python
 ```
 
 See [dependencies.md](dependencies.md) for a complete overview.
@@ -70,20 +69,20 @@ mkdir -p $BDB_PREFIX
 
 # Fetch the source and verify that it is not tampered with
 curl 'https://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz' -o db-4.8.30.NC.tar.gz
-echo '12edc0df75bf9abd7f82f821795bcee50f42cb2e5f76a6a281b85732798364ef  db-4.8.30.NC.tar.gz' | sha256 -c
-# MUST output: (SHA256) db-4.8.30.NC.tar.gz: OK
+echo '12edc0df75bf9abd7f82f821795bcee50f42cb2e5f76a6a281b85732798364ef  db-4.8.30.NC.tar.gz' | shasum -c
+# MUST output: db-4.8.30.NC.tar.gz: OK
 tar -xzf db-4.8.30.NC.tar.gz
 
 # Fetch, verify that it is not tampered with and apply clang related patch
 cd db-4.8.30.NC/
 curl 'https://gist.githubusercontent.com/LnL7/5153b251fd525fe15de69b67e63a6075/raw/7778e9364679093a32dec2908656738e16b6bdcb/clang.patch' -o clang.patch
-echo '7a9a47b03fd5fb93a16ef42235fa9512db9b0829cfc3bdf90edd3ec1f44d637c  clang.patch' | sha256 -c
-# MUST output: (SHA256) clang.patch: OK
+echo '7a9a47b03fd5fb93a16ef42235fa9512db9b0829cfc3bdf90edd3ec1f44d637c  clang.patch' | shasum -c
+# MUST output: clang.patch: OK
 patch -p2 < clang.patch
 
 # Build the library and install to specified prefix
 cd build_unix/
-../dist/configure --enable-cxx --disable-shared --with-pic --prefix=$BDB_PREFIX
+./../dist/configure --enable-cxx --disable-shared --with-pic --prefix=$BDB_PREFIX
 gmake install
 cd ../..
 ```
