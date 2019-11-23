@@ -2970,8 +2970,7 @@ static void ResubmitTransactions(CBlock &block)
         mempool.ResubmitCommitQ();
     }
 }
-/** Disconnect chainActive's tip. You probably want to call mempool.removeForReorg and manually re-limit mempool size
- * after this, with cs_main held. */
+/** Disconnect chainActive's tip. */
 bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusParams, const bool fRollBack)
 {
     AssertLockHeld(cs_main);
@@ -3108,12 +3107,23 @@ bool ConnectTip(CValidationState &state,
     LOG(BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
 
     // Remove transactions from the mempool, both those confirmed in the block and conflicting transactions.
+    //
+    // If we are still in initial block download then skip this step and just clear the mempool. There should
+    // be no transactions in the mempool during initial sync, and also there is no need then to parse through each
+    // blocks transactions in removeForBlock() looking for transactions to remove.
     std::list<CTransactionRef> txConflicted;
     std::vector<CTxChange> txChanges;
-    // txChanges: only if some unconfirmed tx push is turned on, track what transactions may need to be pushed while
-    // confirmed transactions are removed from the mempool.
-    mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload(),
-        (unconfPushAction.Value() == 0) ? nullptr : &txChanges);
+    if (!IsInitialBlockDownload() && !fReindex)
+    {
+        // txChanges: only if some unconfirmed tx push is turned on, track what transactions may need to be pushed while
+        // confirmed transactions are removed from the mempool.
+        mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload(),
+            (unconfPushAction.Value() == 0) ? nullptr : &txChanges);
+    }
+    else
+    {
+        mempool.clear();
+    }
     // Update chainActive & related variables.
     UpdateTip(pindexNew);
     // Tell wallet about transactions that went from mempool
@@ -3137,7 +3147,7 @@ bool ConnectTip(CValidationState &state,
     LOG(BENCH, "- Connect block: %.2fms [%.2fs]\n", (nTime6 - nTime1) * 0.001, nTimeTotal * 0.000001);
 
     // If some kind of unconfirmed push is turned on, then do the forwarding.
-    if (unconfPushAction.Value() != 0)
+    if (!IsInitialBlockDownload() && !fReindex && unconfPushAction.Value() != 0)
         ForwardAcceptableTransactions(txChanges);
 
     return true;
