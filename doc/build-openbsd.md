@@ -7,7 +7,7 @@ As OpenBSD is most common as a server OS, we will not bother with the GUI.
 
 **Important**: use `gmake`, not `make`. The non-GNU `make` will exit with a horrible error.
 
-## Preparation
+## Installing dependencies
 
 Run the following as root to install the base dependencies for building:
 
