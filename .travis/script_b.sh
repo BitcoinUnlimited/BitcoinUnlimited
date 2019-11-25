@@ -11,6 +11,8 @@ fi
 
 cd "build" || (echo "could not enter distdir build"; exit 1)
 
+# Create location to place core files, and change the kernel setting to direct
+# cores into the newly created directory
 mkdir /tmp/cores
 DOCKER_EXEC mkdir /tmp/cores
 echo '/tmp/cores/core.%e.%p.%h.%t' | sudo tee /proc/sys/kernel/core_pattern

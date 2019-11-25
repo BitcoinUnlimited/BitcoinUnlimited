@@ -556,12 +556,12 @@ class RPCTestHandler:
                         try:
                             comms(0.1)
                         except subprocess.TimeoutExpired as e:
-                            # print("%s: communicate timed out, but process should have been killed already!" % proc.args[0])
+                            # communicate timed out, but process should have been killed already!
                             proc.terminate()
                             try:
                                 comms(1)
                             except subprocess.TimeoutExpired as e:
-                                # print("%s: terminate didn't work" % proc.args[0])
+                                # terminate didn't work as expected
                                 proc.kill()
                                 try:
                                     comms(5)
@@ -573,7 +573,6 @@ class RPCTestHandler:
                     try:
                         coreDir = "/tmp/cores"
                         cores = os.listdir(coreDir)
-                        # print("\nfiles in %s: %s" % (coreDir, cores))
                         for core in cores:
                             fullCoreFile = os.path.join(coreDir, core)
                             bitcoindBin = os.environ["BITCOIND"]
@@ -582,7 +581,6 @@ class RPCTestHandler:
                                 popenList = ["gdb", "-core", fullCoreFile, bitcoindBin, "-x", CORE_ANALYSIS_SCRIPT, "-batch"]
                             else:
                                 popenList = ["gdb", "-core", fullCoreFile, bitcoindBin, "-ex", "thread apply all bt", "-ex", "set pagination 0", "-batch"]
-                            # print("running %s" % str(popenList))
                             gdb = subprocess.Popen(popenList, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                             (out, err) = gdb.communicate(None, 60)
                             fold_start = ("\ntravis_fold:start:%s\nCore dump analysis\n" % core) if inTravis() else ""

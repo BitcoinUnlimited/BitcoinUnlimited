@@ -153,7 +153,7 @@ class SchnorrTest(BitcoinTestFramework):
             [block], self.nodes[0], success=False, reject_reason=reject_reason, expect_ban=True)
 
     def run_test(self):
-        print("Initializing test directory "+self.options.tmpdir)
+        logging.info("Initializing test directory "+self.options.tmpdir)
         node = self.nodes[0]
 
         self.bootstrap_p2p()
