@@ -48,6 +48,10 @@ if sourcePath != outOfSourceBuildPath:
 from tests_config import *
 from test_classes import RpcTest, Disabled, Skip, WhenElectrumFound
 
+def inTravis():
+  return os.environ.get("TRAVIS", None) == "true"
+
+
 BOLD = ("","")
 if os.name == 'posix':
     # primitive formatting on supported
@@ -55,6 +59,8 @@ if os.name == 'posix':
     BOLD = ('\033[0m', '\033[1m')
 
 RPC_TESTS_DIR = SRCDIR + '/qa/rpc-tests/'
+
+CORE_ANALYSIS_SCRIPT = SRCDIR + '/contrib/devtools/coreanalysis.gdb'
 
 #If imported values are not defined then set to zero (or disabled)
 if 'ENABLE_WALLET' not in vars():
@@ -181,7 +187,6 @@ if ENABLE_ZMQ:
 #Tests
 testScripts = [ RpcTest(t) for t in [
     'txindex',
-    'mempool_push',
     Disabled('schnorr-activation', 'Need to be updated to work with BU'),
     'schnorrsig',
     'segwit_recovery',
@@ -218,6 +223,7 @@ testScripts = [ RpcTest(t) for t in [
     'mempool_persist',
     'mempool_validate',
     'mempoolsync',
+    'mempool_push',
     'httpbasics',
     'multi_rpc',
     'zapwallettxes',
@@ -255,7 +261,7 @@ testScripts = [ RpcTest(t) for t in [
     'rpc_getblockstats',
     WhenElectrumFound('electrum_cashaccount'),
     'minimaldata-activation',
-    'schnorrmultisig-activation',
+    'schnorrmultisig_activation',
     WhenElectrumFound('electrum_subscriptions')
 
 ] ]
@@ -419,20 +425,31 @@ def runtests():
         all_passed = True
 
         for _ in range(len(tests_to_run)):
-            (name, stdout, stderr, stderr_filtered, passed, duration) = job_queue.get_next()
+            (name, retCode, coreOutput, stdout, stderr, stderr_filtered, passed, duration) = job_queue.get_next()
             test_passed.append(passed)
             all_passed = all_passed and passed
             time_sum += duration
-
-            print("\n"+"#"*50)
-            print(BOLD[1] + name + BOLD[0] + ":")
-            print("-"*50+'\nstdout:\n' if not stdout == '' else '', stdout)
-            print("-"*50+'\nstderr:\n' if not stderr == '' else '', stderr)
-            #print('stderr_filtered:\n' if not stderr_filtered == '' else '', repr(stderr_filtered))
-            if stderr!="" or stdout!="":
-                print("-"*50)
             results += "%s | %s | %s s\n" % (name.ljust(max_len_name), str(passed).ljust(6), duration)
-            print("Pass: %s%s%s, Duration: %s s\n" % (BOLD[1], passed, BOLD[0], duration))
+
+            print("")
+            if inTravis():
+                print("travis_fold:start:%s_%s" % (name, passed))
+            print(BOLD[1] + name + BOLD[0] + ": Pass: %s%s%s, Duration: %s s" % (BOLD[1], passed, BOLD[0], duration))
+            print("#"*50)
+            print("- " + retCode)
+            if stdout != "":
+                print('- stdout '+("-"*50)+"\n", stdout)
+            if stderr != "":
+                print('- stderr '+("-"*50)+"\n", stderr)
+            if coreOutput != "":
+                if inTravis():  # if in travis we already folded this
+                    print(coreOutput)
+                else: # so no need for another header
+                    print('- core dump '+("-"*50)+"\n", coreOutput)
+            #print('stderr_filtered:\n' if not stderr_filtered == '' else '', repr(stderr_filtered))
+            print("#"*25)
+            if inTravis():
+                print("travis_fold:end:%s_%s" % (name, passed))
 
         results += BOLD[1] + "\n%s | %s | %s s (accumulated)" % ("ALL".ljust(max_len_name), str(all_passed).ljust(6), time_sum) + BOLD[0]
         print(results)
@@ -504,6 +521,8 @@ class RPCTestHandler:
                     # providing useful output.
                     proc.send_signal(signal.SIGINT)
 
+                # print("handling " + str(proc))
+
                 def comms(timeout):
                     stdout_data, stderr_data = proc.communicate(timeout=timeout)
                     log_stdout.write(stdout_data)
@@ -531,9 +550,54 @@ class RPCTestHandler:
                 except subprocess.TimeoutExpired:
                     pass
 
-                if proc.poll() is not None:
+                retval = proc.poll()
+                if not retval is None:
                     if not got_outputs[0]:
-                        comms(50)
+                        try:
+                            comms(0.1)
+                        except subprocess.TimeoutExpired as e:
+                            # communicate timed out, but process should have been killed already!
+                            proc.terminate()
+                            try:
+                                comms(1)
+                            except subprocess.TimeoutExpired as e:
+                                # terminate didn't work as expected
+                                proc.kill()
+                                try:
+                                    comms(5)
+                                except subprocess.TimeoutExpired as e:
+                                     print("%s: Expect a core dump" % proc.args[0])
+                                     dumpLogs = True
+
+                    coreOutput = ""
+                    try:
+                        coreDir = "/tmp/cores"
+                        cores = os.listdir(coreDir)
+                        for core in cores:
+                            fullCoreFile = os.path.join(coreDir, core)
+                            bitcoindBin = os.environ["BITCOIND"]
+                            path, fil = os.path.split(bitcoindBin)
+                            if os.path.isfile(CORE_ANALYSIS_SCRIPT):
+                                popenList = ["gdb", "-core", fullCoreFile, bitcoindBin, "-x", CORE_ANALYSIS_SCRIPT, "-batch"]
+                            else:
+                                popenList = ["gdb", "-core", fullCoreFile, bitcoindBin, "-ex", "thread apply all bt", "-ex", "set pagination 0", "-batch"]
+                            gdb = subprocess.Popen(popenList, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                            (out, err) = gdb.communicate(None, 60)
+                            fold_start = ("\ntravis_fold:start:%s\nCore dump analysis\n" % core) if inTravis() else ""
+                            fold_end = ("\ntravis_fold:end:%s\n" % core) if inTravis() else ""
+                            coreOutput = fold_start + out + "\n-------\n" + err + fold_end
+                            # Now delete this file so we don't dump it repeatedly.  Better would be to move it somewhere for export out of the container.
+                            coreDest = os.environ.get("CORE_SAVE_DIR", None)
+                            if coreDest is not None:
+                                shutil.move(fullCoreFile, os.path.join(coreDest, core))
+                            else:
+                                os.remove(fullCoreFile)
+                    except FileNotFoundError:
+                        print("No directory /tmp/cores")
+                    except Exception as e:
+                        print("Exception trying to show core:" + str(e))
+
+                    returnCode = "Process %s return code: %d" % (" ".join(proc.args),retval)
                     log_stdout.seek(0), log_stderr.seek(0)
                     stdout = log_stdout.read()
                     stderr = log_stderr.read()
@@ -554,7 +618,7 @@ class RPCTestHandler:
                     passed = stderr_filtered == "" and proc.returncode == 0
                     self.num_running -= 1
                     self.jobs.remove(j)
-                    return name, stdout, stderr, stderr_filtered, passed, int(time.time() - time0)
+                    return name, returnCode, coreOutput, stdout, stderr, stderr_filtered, passed, int(time.time() - time0)
             print('.', end='', flush=True)
 
 class RPCCoverage(object):

@@ -10,11 +10,11 @@ if [ $DIST != "RPM" ]; then
 fi
 
 travis_retry docker pull "$DOCKER_NAME_TAG"
-env | grep -E '^(CCACHE_|WINEDEBUG|LC_ALL|BOOST_TEST_RANDOM|CONFIG_SHELL)' | tee /tmp/env
+env | grep -E '^(CCACHE_|WINEDEBUG|LC_ALL|BOOST_TEST_RANDOM|CONFIG_SHELL|TRAVIS)' | tee /tmp/env
 if [[ $HOST = *-mingw32 ]]; then
   DOCKER_ADMIN="--cap-add SYS_ADMIN";
 fi
-DOCKER_ID=$(docker run $DOCKER_ADMIN -idt --mount type=bind,src=$TRAVIS_BUILD_DIR,dst=$TRAVIS_BUILD_DIR --mount type=bind,src=$CCACHE_DIR,dst=$CCACHE_DIR -w $TRAVIS_BUILD_DIR --env-file /tmp/env $DOCKER_NAME_TAG)
+DOCKER_ID=$(docker run --ulimit core=99999999999:99999999999 $DOCKER_ADMIN -idt --mount type=bind,src=$TRAVIS_BUILD_DIR,dst=$TRAVIS_BUILD_DIR --mount type=bind,src=$CCACHE_DIR,dst=$CCACHE_DIR -w $TRAVIS_BUILD_DIR --env-file /tmp/env $DOCKER_NAME_TAG)
 DOCKER_EXEC () {
   docker exec $DOCKER_ID bash -c "cd $PWD && $*";
 }
@@ -24,6 +24,7 @@ fi
 if [ $DIST = "DEB" ]; then
   travis_retry DOCKER_EXEC apt-get update
   travis_retry DOCKER_EXEC apt-get install --no-install-recommends --no-upgrade -qq $PACKAGES $DOCKER_PACKAGES
+  travis_retry DOCKER_EXEC apt-get install -y gdb
 fi
 if [ $DIST = "RPM" ]; then
   travis_retry DOCKER_EXEC yum update -y

@@ -22,24 +22,29 @@ def thereExists(lst, fn):
 class CtorTest (BitcoinTestFramework):
 
     def setup_chain(self,bitcoinConfDict=None, wallets=None):
-        print("Initializing test directory "+self.options.tmpdir)
+        logging.info("Initializing test directory "+self.options.tmpdir)
         # we don't want the cache because we want to definitely have dtor blocks initially
         initialize_chain_clean(self.options.tmpdir, 7, bitcoinConfDict, wallets)
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(4, self.options.tmpdir,[["-debug"],["-debug"],["-debug"],["-debug"]])
+        self.nodes = start_nodes(4, self.options.tmpdir, binary=[self.bitcoindBin]*4)
         setup_connection_tracking(self.nodes)
         # Now interconnect the nodes
         connect_nodes_full(self.nodes[:3])
         connect_nodes_bi(self.nodes,2,3)
         self.is_network_split=False
-        self.sync_blocks()
 
     def run_test (self):
         decimal.getcontext().prec = 16  # 8 digits to get to 21million, and each bitcoin is 100 million satoshis
 
-        self.nodes[0].generate(101)
+        for i in range(0,10):
+            logging.info("generate 10 blocks")
+            self.nodes[0].generate(10)
+            self.sync_blocks()
+        self.nodes[0].generate(1)
         self.sync_blocks()
+        logging.info("initial blocks generated")
+
         assert_equal(self.nodes[0].getbalance(), 50)
 
         # create an alternate node that we'll use to test rollback across the fork point
@@ -244,7 +249,7 @@ class CtorTest (BitcoinTestFramework):
 
 
 if __name__ == '__main__':
-    CtorTest().main (bitcoinConfDict={"limitdescendantsize": 50,
+    CtorTest().main (bitcoinConfDict={"keypool": 5, "limitdescendantsize": 50,
                                      "use-thinblocks": 1,
                                      "use-grapheneblocks": 0,
                                      "consensus.enableCanonicalTxOrder" : 0})
@@ -254,9 +259,14 @@ def Test():
     t = CtorTest()
     t.drop_to_pdb=True
     bitcoinConf = {
-        "debug": ["all", "net", "blk", "thin", "mempool", "req", "bench", "evict"],
-        "limitdescendantsize": 50 # allow lots of child tx so we can tease apart ctor vs dependent order
+        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
+        "limitdescendantsize": 50, # allow lots of child tx so we can tease apart ctor vs dependent order
+        "use-thinblocks": 1,
+        "use-grapheneblocks": 0,
+        "consensus.enableCanonicalTxOrder" : 0,
+        "keypool": 5
     }
 
     flags = standardFlags()
+    # flags[0] = "--tmpdir=/tmp/test/t"
     t.main(flags, bitcoinConf, None)

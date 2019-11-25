@@ -222,6 +222,8 @@ class BitcoinTestFramework(object):
 
         os.environ['PATH'] = self.options.srcdir + ":" + os.path.join(self.options.srcdir, "qt") + ":" + os.environ['PATH']
 
+        self.bitcoindBin = os.path.join(self.options.srcdir, "bitcoind")
+
         check_json_precision()
 
         # By setting the environment variable BITCOIN_CONF_OVERRIDE to "key=value,key2=value2,..." you can inject bitcoin configuration into every test

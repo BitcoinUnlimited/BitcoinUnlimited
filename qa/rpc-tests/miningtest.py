@@ -16,7 +16,7 @@ from test_framework.nodemessages import *
 from test_framework.script import *
 
 
-class MyTest (BitcoinTestFramework):
+class MiningTest (BitcoinTestFramework):
 
     def setup_chain(self, bitcoinConfDict=None, wallets=None):
         logging.info("Initializing test directory " + self.options.tmpdir)
@@ -157,23 +157,23 @@ class MyTest (BitcoinTestFramework):
         self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
         self.sync_all()
         assert_equal(str(self.nodes[0].getnetworkinfo()["relayfee"]), "0.01000000")
-        self.nodes[0].generate(1);
+        self.nodes[0].generate(1)
         self.sync_all()
-        print(str(self.nodes[0].getmempoolinfo()["mempoolminfee"]))
         assert_equal(self.nodes[0].getmempoolinfo()["size"], 0)
 
 
 if __name__ == '__main__':
-    MyTest().main()
+    MiningTest().main(None, {  "blockprioritysize": 2000000, "blockminsize":200000 })
 
 # Create a convenient function for an interactive python debugging session
 
 
 def Test():
-    t = MyTest()
+    t = MiningTest()
     bitcoinConf = {
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
-        "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
+        "blockprioritysize": 2000000,  # we don't want any transactions rejected due to insufficient fees...
+        "blockminsize":200000
     }
 
     flags = standardFlags()

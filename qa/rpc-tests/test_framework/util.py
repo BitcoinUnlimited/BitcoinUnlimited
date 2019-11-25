@@ -433,6 +433,7 @@ def wait_for_bitcoind_start(process, url, i):
     Wait for bitcoind to start. This means that RPC is accessible and fully initialized.
     Raise an exception if bitcoind exits during initialization.
     '''
+    rpc = None
     while True:
         if process.poll() is not None:
             raise Exception('bitcoind exited with status %i during initialization' % process.returncode)
@@ -447,6 +448,7 @@ def wait_for_bitcoind_start(process, url, i):
             if e.error['code'] != -28: # RPC in warmup?
                 raise # unkown JSON RPC exception
         time.sleep(0.25)
+    return rpc
 
 def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
     """
@@ -615,14 +617,55 @@ def start_nodes(num_nodes, dirname, extra_args=None, rpchost=None, binary=None,t
     """
     if extra_args is None: extra_args = [ None for _ in range(num_nodes) ]
     if binary is None: binary = [ None for _ in range(num_nodes) ]
-    rpcs = []
-    try:
-        for i in range(num_nodes):
-            rpcs.append(start_node(i, dirname, extra_args[i], rpchost, binary=binary[i],timewait=timewait))
-    except: # If one node failed to start, stop the others
+
+    def start(i):
+        if binary[i] is None:
+            bin = os.getenv("BITCOIND", "bitcoind")
+        else:
+            bin = binary[i]
+        datadir = os.path.join(dirname, "node"+str(i))
+        # RPC tests still depend on free transactions
+        args = [ bin, "-datadir="+datadir, "-rest", "-mocktime="+str(get_mocktime()) ] # // BU removed, "-keypool=1","-blockprioritysize=50000" ]
+        if extra_args[i] is not None: args.extend(extra_args[i])
+
+        process = subprocess.Popen(args)
+        logging.info("Started '%s' %d as pid %d at %s dir %s  " % (" ".join(args), i, process.pid, "127.0.0.1:"+str(p2p_port(i)), datadir))
+        return(process,datadir)
+
+    rpcs = [None]*num_nodes
+    datadir = [None]*num_nodes
+    retry = 0
+    while retry < 4:
+        retry+=1
+        workingOn = 0
+        try:
+            for i in range(num_nodes):
+                if not i in bitcoind_processes:
+                    tmp = start(i)
+                    bitcoind_processes[i] = tmp[0]
+                    datadir[i] = tmp[1]
+
+            for i in range(num_nodes):
+                workingOn = i
+                url = rpc_url(i, rpchost)
+                rpcs[i] = wait_for_bitcoind_start(bitcoind_processes[i], url, i)
+                # log all the info you need for debugging access
+                logging.info("bitcoind %d startup complete" % i)
+            break
+        except Exception as exc:
+                # this may not be an error because every once in a while bitcoind uses a port that's already in use.
+                logging.error("Error bringing up bitcoind #%d, this might be retried. Problem is: %s", workingOn, str(exc))
+                do_and_ignore_failure(lambda x: bitcoind_processes[workingOn].kill())
+                # commented out because looks like an error: traceback.print_exc(file=sys.stdout)
+                remap_ports(workingOn)
+                fixup_ports_in_configfile(workingOn)
+                del bitcoind_processes[workingOn]
+
+    if retry == 4:
         stop_nodes(rpcs)
-        raise
-    return rpcs
+        raise Exception("all nodes did not start")
+
+    return [test_node.TestNode(r,d) for (r,d) in zip(rpcs,datadir)]
 
 def node_regtest_dir(dirname, n_node):
     return os.path.join(dirname, "node"+str(n_node), "regtest")

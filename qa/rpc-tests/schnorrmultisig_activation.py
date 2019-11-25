@@ -153,6 +153,7 @@ class SchnorrTest(BitcoinTestFramework):
             [block], self.nodes[0], success=False, reject_reason=reject_reason, expect_ban=True)
 
     def run_test(self):
+        logging.info("Initializing test directory "+self.options.tmpdir)
         node = self.nodes[0]
 
         self.bootstrap_p2p()
@@ -380,6 +381,22 @@ class SchnorrTest(BitcoinTestFramework):
         assert set(tx.rehash() for tx in tip.vtx).issuperset(
             {ecdsa0tx_2.hash, schnorr1tx.hash})
 
-
 if __name__ == '__main__':
     SchnorrTest().main()
+
+    # Create a convenient function for an interactive python debugging session
+def Test():
+    from test_framework.util import standardFlags 
+    t = SchnorrTest()
+    t.drop_to_pdb = True
+    bitcoinConf = {
+        "debug": ["dbase", "selectcoins"], # ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
+        "blockprioritysize": 2000000,  # we don't want any transactions rejected due to insufficient fees...
+        "logtimemicros":1,
+        "checkmempool":0,
+        # "par":1  # Reduce the # of threads in bitcoind for easier debugging
+    }
+
+
+    flags = standardFlags()
+    t.main(flags, bitcoinConf, None)
