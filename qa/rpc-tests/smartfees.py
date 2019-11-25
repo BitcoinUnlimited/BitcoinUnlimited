@@ -101,6 +101,8 @@ def check_estimates(node, fees_seen, max_invalid, print_estimates = True):
     meet certain invariants.
     '''
     all_estimates = [ node.estimatefee(i) for i in range(1,26) ]
+    all_smartestimates = [ node.estimatesmartfee(i)['feerate'] for i in range(1,26) ]
+    assert_equal(all_estimates, all_smartestimates)
     if print_estimates:
         print([str(all_estimates[e-1]) for e in [1,2,3,6,15,25]])
     delta = 1.0e-6 # account for rounding error
@@ -130,7 +132,8 @@ def check_estimates(node, fees_seen, max_invalid, print_estimates = True):
             approx_estimate = node.estimatesmartfee(i+1)["feerate"]
             answer_found = node.estimatesmartfee(i+1)["blocks"]
             assert(approx_estimate > 0)
-            assert(answer_found > i+1)
+            # this is no longer used, just kept for backwards compatibility reasons
+            #assert(answer_found > i+1)
 
             # Once we're at a high enough confirmation count that we can give an estimate
             # We should have estimates for all higher confirmation counts
@@ -192,7 +195,7 @@ class EstimateFeeTest(BitcoinTestFramework):
         # NOTE: the CreateNewBlock code starts counting block size at 1,000 bytes,
         # (17k is room enough for 110 or so transactions)
         self.nodes.append(start_node(1, self.options.tmpdir,
-                                     ["-blockprioritysize=1500", "-blockmaxsize=17000",
+                                     ["-blockprioritysize=1500", "-blockmaxsize=17000", "-maxlimitertxfee=1000", "-minlimitertxfee=1000",
                                       "-maxorphantx=1000", "-relaypriority=0", "-debug=estimatefee"]))
         connect_nodes(self.nodes[1], 0)
 
