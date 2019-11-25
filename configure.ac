@@ -236,6 +236,13 @@ AC_ARG_ENABLE([debug],
     [enable_debug=$enableval],
     [enable_debug=no])
 
+# Enable std library debug
+AC_ARG_ENABLE([std-debug],
+    [AS_HELP_STRING([--enable-std-debug],
+                    [use glib std debug library with range checking on containers, etc.  This requires boost to be built with "./b2 define=_GLIBCXX_DEBUG define=GLIB_CXX_DEBUG_PEDANTIC" options.])],
+    [enable_std_debug=$enableval],
+    [enable_std_debug=no])
+
 # Turn warnings into errors
 AC_ARG_ENABLE([werror],
     [AS_HELP_STRING([--enable-werror],
@@ -261,6 +268,10 @@ if test "x$enable_debug" = xyes; then
     if test "x$GXX" = xyes; then
         CXXFLAGS="$CXXFLAGS -g3 -O0"
     fi
+fi
+
+if test "x$enable_std_debug" = xyes; then
+    CPPFLAGS="$CPPFLAGS -D_GLIBCXX_DEBUG -DGLIB_CXX_DEBUG_PEDANTIC"
 fi
 
 ERROR_CXXFLAGS=
