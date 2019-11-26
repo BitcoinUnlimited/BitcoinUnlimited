@@ -1335,8 +1335,9 @@ UniValue mempoolInfoToJSON()
     ret.pushKV("usage", (int64_t)mempool.DynamicMemoryUsage());
     size_t maxmempool = GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
     ret.pushKV("maxmempool", (int64_t)maxmempool);
-    ret.pushKV("mempoolminfee", ValueFromAmount(mempool.GetMinFee(maxmempool).GetFeePerK()));
-
+    int64_t minfee =
+        std::max((int64_t)::minRelayTxFee.GetFeePerK(), (int64_t)mempool.GetMinFee(maxmempool).GetFeePerK());
+    ret.pushKV("mempoolminfee", ValueFromAmount(minfee));
     double smoothedTps = 0.0, instantaneousTps = 0.0, peakTps = 0.0;
     mempool.GetTransactionRateStatistics(smoothedTps, instantaneousTps, peakTps);
     try
