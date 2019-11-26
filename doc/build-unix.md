@@ -13,7 +13,7 @@ Run the following to install the base dependencies for building:
 
 
 ```bash
-sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils
+sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils git
 ```
 
 On at least Ubuntu 14.04+ and Debian 7+ there are generic names for the
@@ -158,7 +158,7 @@ You will find the `bitcoind` binary in the `src/` folder.
 
 It is recommended to use Berkeley DB 4.8.
 
-If you install the package from the BU Launchpad ppa, as descibed (above)[## Installing dependencies for wallet support] you can build with
+If you install the package from the BU Launchpad ppa, as descibed [above](#installing-dependencies-for-wallet-support) you can build with
 
 
 ```bash
