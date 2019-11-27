@@ -1560,6 +1560,10 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
             pfrom->GetLogName());
     }
 
+    int blockSize = pblock->GetBlockSize();
+    graphenedata.UpdateInBound(pblock->grapheneblock->GetSize(), blockSize);
+    LOG(GRAPHENE, "Graphene block stats: %s\n", graphenedata.ToString().c_str());
+
     return true;
 }
 
@@ -1576,6 +1580,8 @@ CRequestGrapheneReceiverRecover::CRequestGrapheneReceiverRecover(std::vector<uin
     pReceiverFilter = std::make_shared<CVariableFastFilter>(
         grapheneBlock.pGrapheneSet->FailureRecoveryFilter(relevantHashes, nItems, nSenderFilterPositives,
             nReceiverUniverseItems, FAILURE_RECOVERY_SUCCESS_RATE, grapheneBlock.fpr, grapheneSetVersion));
+
+    graphenedata.UpdateFilter(::GetSerializeSize(*pReceiverFilter, SER_NETWORK, PROTOCOL_VERSION));
 }
 
 CGrapheneReceiverRecover::CGrapheneReceiverRecover(CVariableFastFilter &receiverFilter,
@@ -1606,6 +1612,8 @@ CGrapheneReceiverRecover::CGrapheneReceiverRecover(CVariableFastFilter &receiver
         grapheneSetVersion, (uint32_t)grapheneBlock.shorttxidk0));
     std::vector<CTransaction> vTx = TransactionsFromBlockByCheapHash(vMissingCheapHashes, blockhash, pfrom);
     std::copy(vTx.begin(), vTx.end(), back_inserter(vMissingTxs));
+
+    graphenedata.UpdateIblt(::GetSerializeSize(*pRevisedIblt, SER_NETWORK, PROTOCOL_VERSION));
 }
 
 CMemPoolInfo GetGrapheneMempoolInfo()
