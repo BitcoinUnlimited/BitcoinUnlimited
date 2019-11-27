@@ -418,9 +418,9 @@ bool CTxMemPool::ValidateMemPoolAncestors(const std::vector<CTxIn> &txIn,
 void CTxMemPool::_UpdateAncestorsOf(bool add, txiter it, setEntries &setAncestors)
 {
     AssertWriteLockHeld(cs_txmempool);
-    setEntries parentIters = GetMemPoolParents(it);
+    setEntries setParents = GetMemPoolParents(it);
     // add or remove this tx as a child of each parent
-    for (txiter piter : parentIters)
+    for (txiter piter : setParents)
     {
         _UpdateChild(piter, it, add);
     }
@@ -440,11 +440,23 @@ void CTxMemPool::_UpdateEntryForAncestors(txiter it, const setEntries &setAncest
     int64_t updateSize = 0;
     CAmount updateFee = 0;
     int updateSigOps = 0;
-    for (txiter ancestorIt : setAncestors)
+
+    setEntries setParents = GetMemPoolParents(it);
+    if (setParents.size() > 1)
     {
-        updateSize += ancestorIt->GetTxSize();
-        updateFee += ancestorIt->GetModifiedFee();
-        updateSigOps += ancestorIt->GetSigOpCount();
+        for (txiter ancestorIt : setAncestors)
+        {
+            updateSize += ancestorIt->GetTxSize();
+            updateFee += ancestorIt->GetModifiedFee();
+            updateSigOps += ancestorIt->GetSigOpCount();
+        }
+    }
+    else if (setParents.size() == 1)
+    {
+        txiter parent = *setParents.begin();
+        updateSize += parent->GetSizeWithAncestors();
+        updateFee += parent->GetModFeesWithAncestors();
+        updateSigOps += parent->GetSigOpCountWithAncestors();
     }
     mapTx.modify(it, update_ancestor_state(updateSize, updateFee, updateCount, updateSigOps));
 }
@@ -642,28 +654,22 @@ bool CTxMemPool::addUnchecked(const uint256 &hash,
     cachedInnerUsage += entry.DynamicMemoryUsage();
 
     const CTransaction &tx = newit->GetTx();
-    std::set<uint256> setParentTransactions;
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        mapNextTx[tx.vin[i].prevout] = CInPoint(&tx, i);
-        setParentTransactions.insert(tx.vin[i].prevout.hash);
-    }
-    // Don't bother worrying about child transactions of this one.
-    // Normal case of a new transaction arriving is that there can't be any
-    // children, because such children would be orphans.
-    // An exception to that is if a transaction enters that used to be in a block.
-    // In that case, our disconnect block logic will call UpdateTransactionsFromBlock
-    // to clean up the mess we're leaving here.
+        mapNextTx.emplace(tx.vin[i].prevout, CInPoint{&tx, i});
 
-    // Update ancestors with information about this tx
-    for (const uint256 &phash : setParentTransactions)
-    {
-        txiter pit = mapTx.find(phash);
+        // Update ancestors with information about this tx
+        txiter pit = mapTx.find(tx.vin[i].prevout.hash);
         if (pit != mapTx.end())
         {
             _UpdateParent(newit, pit, true);
         }
     }
+    // Don't bother worrying about child transactions of this one.
+    // Normal case of a new transaction arriving is that there can't be any
+    // children, because such children would be orphans.
+    // An exception to that is if a transaction enters that used to be in a block.
+    // In that case, our disconnect block logic will clean up the mess we're leaving here.
     _UpdateAncestorsOf(true, newit, setAncestors);
     _UpdateEntryForAncestors(newit, setAncestors);
 
