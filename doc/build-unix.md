@@ -246,14 +246,6 @@ The release is built with GCC and then `strip bitcoind` to strip the debug
 symbols, which reduces the executable size by about 90%.
 
 
-## Boost
-
-If you need to build Boost yourself:
-```bash
-sudo su
-./bootstrap.sh
-./bjam install
-```
 
 ## Security
 
