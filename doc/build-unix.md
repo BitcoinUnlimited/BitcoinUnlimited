@@ -273,10 +273,10 @@ Hardening enables the following features:
     On an AMD64 processor where a library was not compiled with -fPIC, this will cause an error
     such as: "relocation R_X86_64_32 against `......' can not be used when making a shared object;"
 
-    To test that you have built PIE executable, install scanelf, part of paxutils, and use:
+    To test that you have built PIE executable, install `scanelf`, part of `pax-utils`, and use:
 
 ```bash
-scanelf -e ./bitcoin
+scanelf -e ./bitcoind
 ```
 
     The output should contain:
@@ -292,7 +292,7 @@ scanelf -e ./bitcoin
     executable without the non-executable stack protection.
 
     To verify that the stack is non-executable after compiling use:
-    `scanelf -e ./bitcoin`
+    `scanelf -e ./bitcoind`
 
     the output should contain:
 	STK/REL/PTL
