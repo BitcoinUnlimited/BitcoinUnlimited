@@ -168,7 +168,8 @@ make
 make install # optional
 ```
 
-You will find the `bitcoind` binary in the `src/` folder. This will build `bitcoin-qt` as well, if the dependencies are met.
+You will find the `bitcoind` binary in the `src/` folder. This will build `bitcoin-qt` as well (in `src/qt`), if the dependencies are met.
+
 
 
 ### Berkeley DB
