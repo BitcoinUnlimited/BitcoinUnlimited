@@ -1561,8 +1561,6 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
     }
 
     int blockSize = pblock->GetBlockSize();
-    graphenedata.UpdateInBound(pblock->grapheneblock->GetSize(), blockSize);
-    LOG(GRAPHENE, "Graphene block stats: %s\n", graphenedata.ToString().c_str());
 
     return true;
 }
