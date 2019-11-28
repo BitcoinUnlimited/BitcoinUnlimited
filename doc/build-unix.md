@@ -186,14 +186,22 @@ mkdir -p $BDB_PREFIX
 # Fetch the source and verify that it is not tampered with
 wget 'https://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz'
 echo '12edc0df75bf9abd7f82f821795bcee50f42cb2e5f76a6a281b85732798364ef  db-4.8.30.NC.tar.gz' | sha256sum -c
-# -> db-4.8.30.NC.tar.gz: OK
+# MUST output: db-4.8.30.NC.tar.gz: OK
 tar -xzvf db-4.8.30.NC.tar.gz
 
+# Fetch, verify that it is not tampered with and apply clang related patch
+cd db-4.8.30.NC
+wget 'https://gist.githubusercontent.com/LnL7/5153b251fd525fe15de69b67e63a6075/raw/7778e9364679093a32dec2908656738e16b6bdcb/clang.patch'
+echo '7a9a47b03fd5fb93a16ef42235fa9512db9b0829cfc3bdf90edd3ec1f44d637c clang.patch' | sha256sum -c
+# MUTST output: clang.patch: OK
+
 # Build the library and install to our prefix
-cd db-4.8.30.NC/build_unix/
+cd build_unix/
 #  Note: Do a static build so that it can be embedded into the executable, instead of having to find a .so at runtime
 ../dist/configure --enable-cxx --disable-shared --with-pic --prefix=$BDB_PREFIX
 make install
+
+# Build Bitcoin Unlimited with the BDB you just compiled.
 cd $BITCOIN_ROOT
 ./autogen.sh
 ./configure LDFLAGS="-L${BDB_PREFIX}/lib/" CPPFLAGS="-I${BDB_PREFIX}/include/" # (other args...)
