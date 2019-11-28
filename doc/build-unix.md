@@ -305,13 +305,14 @@ scanelf -e ./bitcoind
 
 If you want to build statically linked binaries so that you could compile in one machine
 and deploy in same parch/platform boxes without the need of installing all the dependencies
-just follow these steps:
+just follow these steps. You will need to install `curl`.
 
 ```bash
 git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git BU
 cd BU/depends
 make HOST=x86_64-pc-linux-gnu NO_QT=1 -j4
 cd ..
+./autogen.sh
 ./configure --prefix=$PWD/depends/x86_64-pc-linux-gnu --without-gui
 make -j4
 ```
@@ -338,6 +339,7 @@ To build executables for ARM:
 cd depends
 make HOST=arm-linux-gnueabihf NO_QT=1
 cd ..
+./autogen.sh
 ./configure --prefix=$PWD/depends/arm-linux-gnueabihf --enable-glibc-back-compat --enable-reduce-exports LDFLAGS=-static-libstdc++
 make
 ```
