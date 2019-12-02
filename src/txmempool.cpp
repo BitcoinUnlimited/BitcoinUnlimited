@@ -635,13 +635,15 @@ void CTxMemPoolEntry::UpdateDescendantState(int64_t modifySize, CAmount modifyFe
 
 void CTxMemPoolEntry::UpdateAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps)
 {
+    // Ancestor state can be modified by subtraction so we use a DbgAssert here to make sure
+    // we don't accitdentally trigger these asserts on mainnet.
     nSizeWithAncestors += modifySize;
-    assert(int64_t(nSizeWithAncestors) > 0);
+    DbgAssert(int64_t(nSizeWithAncestors) > 0, );
     nModFeesWithAncestors += modifyFee;
     nCountWithAncestors += modifyCount;
-    assert(int64_t(nCountWithAncestors) > 0);
+    DbgAssert(int64_t(nCountWithAncestors) > 0, );
     nSigOpCountWithAncestors += modifySigOps;
-    assert(int(nSigOpCountWithAncestors) >= 0);
+    DbgAssert(int(nSigOpCountWithAncestors) >= 0, );
 }
 
 void CTxMemPoolEntry::ReplaceAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps)
