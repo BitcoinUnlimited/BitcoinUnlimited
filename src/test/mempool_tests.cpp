@@ -30,8 +30,9 @@ struct MempoolData
     uint64_t nFeesWithDescendants = 0;
 };
 
-void CheckAncestors(CTxMemPool::txiter iter, MempoolData &expected_result, CTxMemPool &pool)
+void CheckAncestors(MempoolData &expected_result, CTxMemPool &pool)
 {
+    CTxMemPool::txiter iter = pool.mapTx.find(expected_result.hash);
     if (iter == pool.mapTx.end())
     {
         printf("ERROR: tx %s not found in mempool\n", expected_result.hash.ToString().c_str());
@@ -45,6 +46,16 @@ void CheckAncestors(CTxMemPool::txiter iter, MempoolData &expected_result, CTxMe
     BOOST_CHECK_EQUAL(iter->GetCountWithDescendants(), expected_result.nCountWithDescendants);
     BOOST_CHECK_EQUAL(iter->GetSizeWithDescendants(), expected_result.nSizeWithDescendants);
     BOOST_CHECK_EQUAL(iter->GetModFeesWithDescendants(), expected_result.nFeesWithDescendants);
+}
+
+void VerifyTxNotInMempool(MempoolData &expected_result, CTxMemPool &pool)
+{
+    CTxMemPool::txiter iter = pool.mapTx.find(expected_result.hash);
+    if (iter != pool.mapTx.end())
+    {
+        printf("ERROR: tx %s was found in mempool when it should not be\n", expected_result.hash.ToString().c_str());
+        throw;
+    }
 }
 
 BOOST_FIXTURE_TEST_SUITE(mempool_tests, TestingSetup)
@@ -771,7 +782,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
         printf("tx%d: hash %s\n", (int)(i + 1), iter->GetTx().GetHash().ToString().c_str());
         */
 
-        CheckAncestors(iter, txns_expected[i], pool);
+        CheckAncestors(txns_expected[i], pool);
     }
 
 
@@ -910,28 +921,12 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
     for (size_t i = 0; i < txns_result.size(); i++)
     {
-        CTxMemPool::txiter iter = pool.mapTx.find(txns_result[i].hash);
         if (i < 4 || i == 20 || i == 38 || i == 43 || i == 46)
         {
-            if (iter != pool.mapTx.end())
-            {
-                printf("ERROR: tx %s was found in mempool when it should not be\n",
-                    txns_result[i].hash.ToString().c_str());
-                throw;
-            }
+            VerifyTxNotInMempool(txns_result[i], pool);
             continue;
         }
-
-        /*
-        printf(
-            "tx%ld countwanc %ld sizewanc %ld sigopswanc %u feeswanc %ld countwdesc %ld sizewdesc %ld feeswdesc %ld\n",
-            i + 1, iter->GetCountWithAncestors(), iter->GetSizeWithAncestors(), iter->GetSigOpCountWithAncestors(),
-            iter->GetModFeesWithAncestors(), iter->GetCountWithDescendants(), iter->GetSizeWithDescendants(),
-            iter->GetModFeesWithDescendants());
-        printf("tx%d: hash %s\n", (int)(i + 1), iter->GetTx().GetHash().ToString().c_str());
-        */
-
-        CheckAncestors(iter, txns_result[i], pool);
+        CheckAncestors(txns_result[i], pool);
     }
 
     // Mine two transactions which end up giving us the same txnchaintip.
@@ -961,19 +956,13 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
     for (size_t i = 0; i < txns_result2.size(); i++)
     {
-        CTxMemPool::txiter iter = pool.mapTx.find(txns_result2[i].hash);
         if (i <= 2 || i == 5 || i == 8)
         {
-            if (iter != pool.mapTx.end())
-            {
-                printf("ERROR: tx %s was found in mempool when it should not be\n",
-                    txns_result2[i].hash.ToString().c_str());
-                throw;
-            }
+            VerifyTxNotInMempool(txns_result2[i], pool);
             continue;
         }
 
-        CheckAncestors(iter, txns_result2[i], pool);
+        CheckAncestors(txns_result2[i], pool);
     }
 
     // Starting to simulate mining all the rest of the transactions in the chains defined in the
@@ -1014,19 +1003,12 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
     for (size_t i = 0; i < txns_result3.size(); i++)
     {
-        CTxMemPool::txiter iter = pool.mapTx.find(txns_result3[i].hash);
         if (i < 7)
         {
-            if (iter != pool.mapTx.end())
-            {
-                printf("ERROR: tx %s was found in mempool when it should not be\n",
-                    txns_result3[i].hash.ToString().c_str());
-                throw;
-            }
+            VerifyTxNotInMempool(txns_result3[i], pool);
             continue;
         }
-
-        CheckAncestors(iter, txns_result3[i], pool);
+        CheckAncestors(txns_result3[i], pool);
     }
 
 
@@ -1066,19 +1048,12 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
     for (size_t i = 0; i < txns_result4.size(); i++)
     {
-        CTxMemPool::txiter iter = pool.mapTx.find(txns_result4[i].hash);
         if (i < 10)
         {
-            if (iter != pool.mapTx.end())
-            {
-                printf("ERROR: tx %s was found in mempool when it should not be\n",
-                    txns_result4[i].hash.ToString().c_str());
-                throw;
-            }
+            VerifyTxNotInMempool(txns_result4[i], pool);
             continue;
         }
-
-        CheckAncestors(iter, txns_result4[i], pool);
+        CheckAncestors(txns_result4[i], pool);
     }
 
 
@@ -1117,19 +1092,12 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
     for (size_t i = 0; i < txns_result5.size(); i++)
     {
-        CTxMemPool::txiter iter = pool.mapTx.find(txns_result5[i].hash);
         if (i < 11 || i == 13 || i == 19)
         {
-            if (iter != pool.mapTx.end())
-            {
-                printf("ERROR: tx %s was found in mempool when it should not be\n",
-                    txns_result5[i].hash.ToString().c_str());
-                throw;
-            }
+            VerifyTxNotInMempool(txns_result5[i], pool);
             continue;
         }
-
-        CheckAncestors(iter, txns_result5[i], pool);
+        CheckAncestors(txns_result5[i], pool);
     }
 
     vtx.push_back(MakeTransactionRef(tx12));
@@ -1167,19 +1135,12 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
     for (size_t i = 0; i < txns_result6.size(); i++)
     {
-        CTxMemPool::txiter iter = pool.mapTx.find(txns_result6[i].hash);
         if (i < 15 || i == 19)
         {
-            if (iter != pool.mapTx.end())
-            {
-                printf("ERROR: tx %s was found in mempool when it should not be\n",
-                    txns_result6[i].hash.ToString().c_str());
-                throw;
-            }
+            VerifyTxNotInMempool(txns_result6[i], pool);
             continue;
         }
-
-        CheckAncestors(iter, txns_result6[i], pool);
+        CheckAncestors(txns_result6[i], pool);
     }
 
     // The following is one of the most important edge conditions. Where we remove the first transaction
@@ -1236,19 +1197,12 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
     for (size_t i = 0; i < txns_result7.size(); i++)
     {
-        CTxMemPool::txiter iter = pool.mapTx.find(txns_result7[i].hash);
         if (i <= 2)
         {
-            if (iter != pool.mapTx.end())
-            {
-                printf("ERROR: tx %s was found in mempool when it should not be\n",
-                    txns_result7[i].hash.ToString().c_str());
-                throw;
-            }
+            VerifyTxNotInMempool(txns_result7[i], pool);
             continue;
         }
-
-        CheckAncestors(iter, txns_result7[i], pool);
+        CheckAncestors(txns_result7[i], pool);
     }
 
 
@@ -1285,19 +1239,12 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
     for (size_t i = 0; i < txns_result8.size(); i++)
     {
-        CTxMemPool::txiter iter = pool.mapTx.find(txns_result8[i].hash);
         if (i <= 2 || i == 10 || i == 12 || i == 13)
         {
-            if (iter != pool.mapTx.end())
-            {
-                printf("ERROR: tx %s was found in mempool when it should not be\n",
-                    txns_result8[i].hash.ToString().c_str());
-                throw;
-            }
+            VerifyTxNotInMempool(txns_result8[i], pool);
             continue;
         }
-
-        CheckAncestors(iter, txns_result8[i], pool);
+        CheckAncestors(txns_result8[i], pool);
     }
 
     vtx.push_back(MakeTransactionRef(tx24));
@@ -1334,19 +1281,12 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
     for (size_t i = 0; i < txns_result9.size(); i++)
     {
-        CTxMemPool::txiter iter = pool.mapTx.find(txns_result9[i].hash);
         if (i <= 4 || i == 6 || i == 7 || i == 10 || i == 12 || i == 13)
         {
-            if (iter != pool.mapTx.end())
-            {
-                printf("ERROR: tx %s was found in mempool when it should not be\n",
-                    txns_result9[i].hash.ToString().c_str());
-                throw;
-            }
+            VerifyTxNotInMempool(txns_result9[i], pool);
             continue;
         }
-
-        CheckAncestors(iter, txns_result9[i], pool);
+        CheckAncestors(txns_result9[i], pool);
     }
 
     vtx.push_back(MakeTransactionRef(tx26));
@@ -1383,15 +1323,9 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
     for (size_t i = 0; i < txns_result10.size(); i++)
     {
-        CTxMemPool::txiter iter = pool.mapTx.find(txns_result10[i].hash);
         if (i <= 8 || (i >= 10 && i <= 14))
         {
-            if (iter != pool.mapTx.end())
-            {
-                printf("ERROR: tx %s was found in mempool when it should not be\n",
-                    txns_result9[i].hash.ToString().c_str());
-                throw;
-            }
+            VerifyTxNotInMempool(txns_result10[i], pool);
             continue;
         }
 
@@ -1404,7 +1338,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
         printf("tx%d: hash %s\n", (int)(i + 1), iter->GetTx().GetHash().ToString().c_str());
         */
 
-        CheckAncestors(iter, txns_result10[i], pool);
+        CheckAncestors(txns_result10[i], pool);
     }
 }
 

@@ -464,8 +464,28 @@ void CTxMemPool::UpdateTxnChainState(mapEntryHistory &mapTxnChainTips)
 {
     AssertWriteLockHeld(cs_txmempool);
 
-    // As a starting point, re-calculate all chaintips ancestor state. Although at least one chaintip
+    // As a starting point, re-calculate all chaintip ancestor states. Although at least one chaintip
     // parent will have been mined there could still be other chaintip parents that were not mined.
+    //
+    /*
+       Chain prior to being mined:
+
+       tx1        tx2      tx3
+         \        |       /
+          \______ tx4____/
+
+
+       Chain after being mined:
+       Only tx1 and tx2 are mined leaving tx4 as the chaintip, and tx3 becomes an unmined
+       chaintip parent and is not considered a chaintip in the program logic even though clearly
+       it is in fact the new chaintip.
+
+                         tx3 (unmined chain so it has no entry in mapTxnChainTips)
+                          /
+                  tx4____/   (tx4 becomes the chaintip in mapTxnChainTips)
+
+    */
+
     for (auto iter_tip : mapTxnChainTips)
     {
         uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
