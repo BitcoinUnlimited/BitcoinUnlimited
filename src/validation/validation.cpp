@@ -3338,6 +3338,10 @@ bool ActivateBestChainStep(CValidationState &state,
                     */
                 }
             }
+
+            // If we're shutting down then don't connect any more blocks.
+            if (shutdown_threads.load())
+                return false;
         }
 
         // Notify the UI with the new block tip information.
