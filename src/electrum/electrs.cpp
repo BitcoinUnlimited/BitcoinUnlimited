@@ -2,9 +2,12 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "electrum/electrs.h"
+#include "netaddress.h"
 #include "util.h"
 #include "utilhttp.h"
 #include "utilprocess.h"
+#include "xversionkeys.h"
+#include "xversionmessage.h"
 
 #include <map>
 #include <regex>
@@ -31,6 +34,25 @@ static std::string rpc_port(const std::string &network)
 
     return GetArg("-electrum.port", defaultPort->second);
 }
+
+static bool is_electrum_server_public()
+{
+    const auto host = rpc_host();
+
+    // Special case, CNetAddr treats "0.0.0.0" as local, but electrs
+    // treats it as listen on all IPs.
+    if (host == "0.0.0.0")
+    {
+        return true;
+    }
+
+    // Assume the server is public if it's not listening on localhost and
+    // not listening on a private network (RFC1918)
+    const CNetAddr listenaddr(host);
+
+    return !listenaddr.IsLocal() && !listenaddr.IsRFC1918();
+}
+
 static void remove_conflicting_arg(std::vector<std::string> &args, const std::string &override_arg)
 {
     // special case: verboseness argument
@@ -192,4 +214,20 @@ std::map<std::string, int64_t> fetch_electrs_info()
     return info;
 }
 
+void set_xversion_flags(CXVersionMessage &xver, const std::string &network)
+{
+    if (!GetBoolArg("-electrum", false))
+    {
+        return;
+    }
+    if (!is_electrum_server_public())
+    {
+        return;
+    }
+
+    constexpr double PROTOCOL_VERSION = 1.4;
+
+    xver.set_u64c(XVer::BU_ELECTRUM_SERVER_PORT_TCP, std::stoul(rpc_port(network)));
+    xver.set_u64c(XVer::BU_ELECTRUM_SERVER_PROTOCOL_VERSION, static_cast<uint64_t>(PROTOCOL_VERSION * 1000000));
+}
 } // ns electrum

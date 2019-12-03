@@ -43,6 +43,11 @@ KEY i BU_MEMPOOL_ANCESTOR_SIZE_LIMIT            0x0002                   0x000A 
 KEY i BU_MEMPOOL_DESCENDANT_COUNT_LIMIT         0x0002                   0x000B         u64c
 KEY i BU_MEMPOOL_DESCENDANT_SIZE_LIMIT          0x0002                   0x000C         u64c
 
+# Port number for unencrypted electrum server RPC, if node is running one.
+KEY i BU_ELECTRUM_SERVER_PORT_TCP               0x0002                   0xF00D         u64c
+# Electrum protocol version, if node is running one.
+KEY i BU_ELECTRUM_SERVER_PROTOCOL_VERSION       0x0002                   0xF00E         u64c
+
 # KEY i ABC_...                                0x0000                   ...
 # KEY i XT_DOUBLESPEND_FORWARDING_SCHEME       0x0003                   ...            vector
 # ...
