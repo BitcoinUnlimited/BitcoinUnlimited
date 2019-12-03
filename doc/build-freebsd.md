@@ -1,34 +1,18 @@
 # OpenBSD build guide
-(Tested with OpenBSD 6.6)
+(updated for FreeBSD 12.1)
 
-This guide describes how to build bitcoind and command-line utilities on OpenBSD.
+This guide describes how to build bitcoind and command-line utilities on FreeBSD.
 
-As OpenBSD is most common as a server OS, we will not bother with the GUI.
+We will not cover building the GUI.
 
 **Important**: use `gmake`, not `make`. The non-GNU `make` will exit with a horrible error.
 
-## Installing dependencies
+## Preparation
 
 Run the following as root to install the base dependencies for building:
 
 ```bash
-pkg_add gmake libtool libevent git boost
-pkg_add autoconf # (select highest version, e.g. 2.69)
-pkg_add automake # (select highest version, e.g. 1.16)
-pkg_add python # (select highest version, e.g. 3.7)
-```
-To install openSSL, find download link here https://www.openssl.org/source/.
-
-Still as root (while modifying the version as apropriate) run
-
-```bash
-curl 'https://www.openssl.org/source/openssl-1.1.0l.tar.gz' -o openssl-1.1.0l.tar.gz
-echo '74a2f756c64fd7386a29184dc0344f4831192d61dc2481a93a4c5dd727f41148 openssl-1.1.0l.tar.gz' | sha256 -c
-# MUST output: (SHA256) openssl-1.1.0l.tar.gz: OK
-tar xvzf openssl-1.1.0l.tar.gz
-cd openssl-1.1.0l
-./config
-gmake install
+pkg install autoconf automake gmake git libevent libtool boost-libs pkgconf openssl python
 ```
 
 See [dependencies.md](dependencies.md) for a complete overview.
@@ -48,10 +32,6 @@ cd BitcoinUnlimited/
 ### Preparation
 
 ```bash
-export AUTOCONF_VERSION=2.69 # replace this with the autoconf version that you installed
-export AUTOMAKE_VERSION=1.16 # replace this with the automake version that you installed
-export CC=cc
-export CXX=c++
 export MAKE=gmake
 ```
 
@@ -89,20 +69,20 @@ mkdir -p $BDB_PREFIX
 
 # Fetch the source and verify that it is not tampered with
 curl 'https://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz' -o db-4.8.30.NC.tar.gz
-echo '12edc0df75bf9abd7f82f821795bcee50f42cb2e5f76a6a281b85732798364ef  db-4.8.30.NC.tar.gz' | sha256 -c
-# MUST output: (SHA256) db-4.8.30.NC.tar.gz: OK
+echo '12edc0df75bf9abd7f82f821795bcee50f42cb2e5f76a6a281b85732798364ef  db-4.8.30.NC.tar.gz' | shasum -c
+# MUST output: db-4.8.30.NC.tar.gz: OK
 tar -xzf db-4.8.30.NC.tar.gz
 
 # Fetch, verify that it is not tampered with and apply clang related patch
 cd db-4.8.30.NC/
 curl 'https://gist.githubusercontent.com/LnL7/5153b251fd525fe15de69b67e63a6075/raw/7778e9364679093a32dec2908656738e16b6bdcb/clang.patch' -o clang.patch
-echo '7a9a47b03fd5fb93a16ef42235fa9512db9b0829cfc3bdf90edd3ec1f44d637c  clang.patch' | sha256 -c
-# MUST output: (SHA256) clang.patch: OK
+echo '7a9a47b03fd5fb93a16ef42235fa9512db9b0829cfc3bdf90edd3ec1f44d637c  clang.patch' | shasum -c
+# MUST output: clang.patch: OK
 patch -p2 < clang.patch
 
 # Build the library and install to specified prefix
 cd build_unix/
-../dist/configure --enable-cxx --disable-shared --with-pic --prefix=$BDB_PREFIX
+./../dist/configure --enable-cxx --disable-shared --with-pic --prefix=$BDB_PREFIX
 gmake install
 cd ../..
 ```
