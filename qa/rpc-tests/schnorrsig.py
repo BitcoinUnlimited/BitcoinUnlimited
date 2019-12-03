@@ -158,7 +158,7 @@ class SchnorrSigTest (BitcoinTestFramework):
                     alltx.append(txhex)
 
         # because enqueuerawtransaction and propagation is asynchronous we need to wait for it
-        waitFor(10, lambda: self.nodes[1].getmempoolinfo()['size'] == txcount+1)
+        waitFor(30, lambda: self.nodes[1].getmempoolinfo()['size'] == txcount+1)
         mp = [i.getmempoolinfo() for i in self.nodes]
         assert txcount+1 == mp[0]['size'] == mp[1]['size']
 
@@ -166,7 +166,7 @@ class SchnorrSigTest (BitcoinTestFramework):
         self.nodes[0].generate(1)
 
         assert self.nodes[0].getmempoolinfo()['size'] == 0
-        waitFor(10, lambda: self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
+        waitFor(30, lambda: self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
         FEEINSAT = 5000
         # now spend all the new utxos again
@@ -203,10 +203,10 @@ class SchnorrSigTest (BitcoinTestFramework):
                 txidHolder.data = txid
 
             # because enqueuerawtransaction and propagation is asynchronous we need to wait for it
-            waitFor(10, lambda: self.nodes[0].getmempoolinfo()['size'] == len(incomingWallet))
+            waitFor(30, lambda: self.nodes[0].getmempoolinfo()['size'] == len(incomingWallet))
             while self.nodes[0].getmempoolinfo()['size'] != 0:
                 self.nodes[0].generate(1)
-            waitFor(10, lambda: self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
+            waitFor(30, lambda: self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
 if __name__ == '__main__':
     binpath = findBitcoind()
