@@ -40,7 +40,7 @@ integer values to variable-sized byte vectors. The message itself is
 encoded in the standard Bitcoin message frame that is documented elsewhere.
 
 The `map` is encoded using Bitcoin's usual network de-/serialization
-schemes while using `COMPACT_SIZE` size encodings whenever possible.
+schemes while using `COMPACTSIZE` size encodings whenever possible.
 Note that this is different from using the default encoding you would
 get when serializing through the `std::map` serializer (which is
 commonly found in `serialize.h` in most current C++ implementations based
@@ -134,7 +134,7 @@ unsigned integers (named `u64c`), allowing to use it as a simple
 unsigned to unsigned integer map.
 
 A value of `type` is encoded in Bitcoin's message serialization as a
-COMPACT_SIZE integer *within* the generic byte vector value of the `xmap`.
+COMPACTSIZE integer *within* the generic byte vector value of the `xmap`.
 For example, a value of `0x1000` (4096) is encoded like this as the `xmap`
 value:
 `FD 00 10`
