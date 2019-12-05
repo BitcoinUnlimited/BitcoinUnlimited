@@ -13,10 +13,10 @@
 # short handle in lowercase and an underscore, so e.g. abc_integer, xt_string, bcash_address
 
 #parsing marker (KEY for now)
-#   key name
-#    type of key ('i'nitial or 'c'hangeable)
-#                                             16 bit prefix (currently)
-#                                                                      16 bit suffix  <value type>
+#   type of key ('i'nitial or 'c'hangeable)
+#     key name
+#                                               16 bit prefix (currently)
+#                                                                        16 bit suffix  <value type>
 
 # this is the listening
 KEY i BU_LISTEN_PORT                            0x0002                   0x0000         u64c
