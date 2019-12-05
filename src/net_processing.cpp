@@ -15,6 +15,7 @@
 #include "blockstorage/blockstorage.h"
 #include "chain.h"
 #include "dosman.h"
+#include "electrum/electrs.h"
 #include "expedited.h"
 #include "main.h"
 #include "merkleblock.h"
@@ -597,6 +598,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT, nLimitAncestorSize);
         xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT, nLimitDescendants);
         xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT, nLimitDescendantSize);
+
+        electrum::set_xversion_flags(xver, chainparams.NetworkIDString());
 
         pfrom->PushMessage(NetMsgType::XVERSION, xver);
 
