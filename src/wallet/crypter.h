@@ -171,16 +171,20 @@ public:
 
     virtual bool AddCryptedKey(const CPubKey &vchPubKey, const std::vector<unsigned char> &vchCryptedSecret);
     bool AddKeyPubKey(const CKey &key, const CPubKey &pubkey);
+
     bool HaveKey(const CKeyID &address) const
     {
-        {
-            LOCK(cs_KeyStore);
-            if (!IsCrypted())
-                return CBasicKeyStore::HaveKey(address);
-            return mapCryptedKeys.count(address) > 0;
-        }
-        return false;
+        LOCK(cs_KeyStore);
+        return _HaveKey(address);
     }
+
+    bool _HaveKey(const CKeyID &address) const
+    {
+        if (!IsCrypted())
+            return CBasicKeyStore::_HaveKey(address);
+        return mapCryptedKeys.count(address) > 0;
+    }
+
     bool GetKey(const CKeyID &address, CKey &keyOut) const;
     bool GetPubKey(const CKeyID &address, CPubKey &vchPubKeyOut) const;
     void GetKeys(std::set<CKeyID> &setAddress) const

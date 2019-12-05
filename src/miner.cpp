@@ -282,8 +282,8 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
 
         nLastBlockTx = nBlockTx;
         nLastBlockSize = nBlockSize;
-        LOGA("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
-            nBlockSigOps);
+        LOGA("CreateNewBlock: total size %llu txs: %llu of %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx,
+            mempool._size(), nFees, nBlockSigOps);
 
 
         // sort tx if there are any and the feature is enabled

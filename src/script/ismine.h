@@ -35,7 +35,18 @@ typedef uint8_t isminefilter;
 std::string getLabelPublic(const CScript &scriptPubKey);
 bool isFreezeCLTV(const CKeyStore &keystore, const CScript &scriptPubKey, CScriptNum &nFreezeLockTime); // Freeze
 // bestBlock - Freeze CLTV
+
+/** Determines if an output is spendable by this wallet
+ */
 isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey, CBlockIndex *bestBlock);
+
+/** Determines if an output is spendable by this wallet
+ */
 isminetype IsMine(const CKeyStore &keystore, const CTxDestination &dest, CBlockIndex *bestBlock);
+
+/** Determines if an output is spendable by this wallet -- lockless version (you must take cs_KeyStore)
+ */
+isminetype _IsMine(const CKeyStore &keystore, const CScript &scriptPubKey, CBlockIndex *bestBlock);
+
 
 #endif // BITCOIN_SCRIPT_ISMINE_H
