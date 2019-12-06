@@ -27,7 +27,7 @@ public:
 
     bool AddOutpointConflict(const COutPoint &out,
         const CTxMemPool::txiter mempoolEntry,
-        const CTransactionRef &respendTx,
+        const CTransactionRef respendTx,
         bool fRespentBefore,
         bool fIsEquivalent) override
     {

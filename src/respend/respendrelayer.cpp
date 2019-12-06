@@ -32,7 +32,7 @@ class RelayLimiter
 {
 public:
     RelayLimiter() : respendCount(0), lastRespendTime(0) {}
-    bool HasLimitExceeded(const CTransactionRef &pDoubleSpend)
+    bool HasLimitExceeded(const CTransactionRef pDoubleSpend)
     {
         unsigned int size = pDoubleSpend->GetTxSize();
 
@@ -59,7 +59,7 @@ private:
 RespendRelayer::RespendRelayer() : interesting(false), valid(false) {}
 bool RespendRelayer::AddOutpointConflict(const COutPoint &,
     const CTxMemPool::txiter,
-    const CTransactionRef &pRespendTx,
+    const CTransactionRef pRespendTx,
     bool seenBefore,
     bool isEquivalent)
 {
