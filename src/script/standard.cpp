@@ -169,7 +169,7 @@ static bool MatchFreezeCLTV(const CScript &script, std::vector<valtype> &pubkeys
         return false;
     }
     pubkeys.emplace_back(std::move(data));
-    // after key extraction we should still have on byte which represent OP_CHECKSIG
+    // after key extraction we should still have one byte which represent OP_CHECKSIG
     return (it + 1 == script.end());
 }
 
