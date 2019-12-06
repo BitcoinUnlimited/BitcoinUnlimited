@@ -40,6 +40,7 @@ public:
     static constexpr unsigned int COMPRESSED_PUBLIC_KEY_SIZE = 33;
     static constexpr unsigned int SIGNATURE_SIZE = 72;
     static constexpr unsigned int COMPACT_SIGNATURE_SIZE = 65;
+    static constexpr unsigned int PUBLIC_KEY_HASH160_SIZE = 20;
     /**
      * see www.keylength.com
      * script supports up to 75 for single byte push

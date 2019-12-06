@@ -70,10 +70,10 @@ static bool MatchPayToPubkeyHash(const CScript &script, valtype &pubkeyhash)
     // Bitcoin address tx, sender provides hash of pubkey, receiver provides signature and pubkey
     // Template: "OP_DUP << OP_HASH160 << OP_PUBKEYHASH << OP_EQUALVERIFY << OP_CHECKSIG"
 
-    if (script.size() == 25 && script[0] == OP_DUP && script[1] == OP_HASH160 && script[2] == 20 &&
-        script[23] == OP_EQUALVERIFY && script[24] == OP_CHECKSIG)
+    if (script.size() == 25 && script[0] == OP_DUP && script[1] == OP_HASH160 &&
+        script[2] == CPubKey::PUBLIC_KEY_HASH160_SIZE && script[23] == OP_EQUALVERIFY && script[24] == OP_CHECKSIG)
     {
-        pubkeyhash = valtype(script.begin() + 3, script.begin() + 23);
+        pubkeyhash = valtype(script.begin() + 3, script.begin() + CPubKey::PUBLIC_KEY_HASH160_SIZE + 3);
         return true;
     }
     return false;
