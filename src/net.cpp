@@ -2695,7 +2695,7 @@ void NetCleanup()
 }
 
 
-void RelayTransaction(const CTransactionRef &ptx, const bool fRespend, const CTxProperties *txProperties)
+void RelayTransaction(const CTransactionRef ptx, const bool fRespend, const CTxProperties *txProperties)
 {
     if (ptx->GetTxSize() > maxTxSize.Value())
     {
