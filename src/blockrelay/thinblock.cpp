@@ -1549,7 +1549,7 @@ void BuildSeededBloomFilter(CBloomFilter &filterMemPool,
             uint64_t nBlockSize = 0;
             while (mi != mempool.mapTx.get<3>().end())
             {
-                const CTransactionRef &tx = mi->GetSharedTx();
+                const CTransactionRef tx = mi->GetSharedTx();
                 const uint256 &txHash = tx->GetHash();
 
                 if (!IsFinalTx(tx, nHeight, nLockTimeCutoff))
