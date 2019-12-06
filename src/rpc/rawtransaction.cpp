@@ -1470,7 +1470,7 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
         // push to local node and sync with wallets
         CValidationState state;
         bool fMissingInputs;
-        if (!AcceptToMemoryPool(mempool, state, std::move(ptx), false, &fMissingInputs, false, !fOverrideFees, txClass))
+        if (!AcceptToMemoryPool(mempool, state, ptx, false, &fMissingInputs, false, !fOverrideFees, txClass))
         {
             if (state.IsInvalid())
             {
