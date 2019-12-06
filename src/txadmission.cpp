@@ -443,7 +443,7 @@ void ThreadTxAdmission()
                     txInQ.pop();
                 }
 
-                CTransactionRef &tx = txd.tx;
+                CTransactionRef tx = txd.tx;
                 CInv inv(MSG_TX, tx->GetHash());
 
                 if (!TxAlreadyHave(inv))
@@ -1393,7 +1393,7 @@ void Snapshot::Load(void)
     cvMempool = new CCoinsViewMemPool(coins, mempool);
 }
 
-bool CheckSequenceLocks(const CTransactionRef &tx,
+bool CheckSequenceLocks(const CTransactionRef tx,
     int flags,
     LockPoints *lp,
     bool useExistingLockPoints,
@@ -1479,7 +1479,7 @@ bool CheckSequenceLocks(const CTransactionRef &tx,
     return EvaluateSequenceLocks(index, lockPair);
 }
 
-bool CheckFinalTx(const CTransactionRef &tx, int flags, const Snapshot *ss)
+bool CheckFinalTx(const CTransactionRef tx, int flags, const Snapshot *ss)
 {
     // By convention a negative value for flags indicates that the
     // current network-enforced consensus rules should be used. In
