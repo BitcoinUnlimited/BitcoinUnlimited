@@ -139,38 +139,34 @@ static bool MatchFreezeCLTV(const CScript &script, std::vector<valtype> &pubkeys
 
     try
     {
+        // extracting the bignum in a try-catch because if the provided number is not
+        // a big int CScriptNum will raise an error.
         CScriptNum nLockFreezeTime(data, true, 5);
+
         pubkeys.emplace_back(data);
+        if ((*s != OP_CHECKLOCKTIMEVERIFY) || (*(s + 1) != OP_DROP))
+        {
+            return false;
+        }
+
+        // starting from pubkeys (4/5 byte nlock time + 1 OP_CLTV + 1 OP_DROP)
+        s = s + 2;
+        if (!script.GetOp(s, opcode, data))
+        {
+            return false;
+        }
+        if (!CPubKey::ValidSize(data))
+        {
+            return false;
+        }
+        pubkeys.emplace_back(std::move(data));
+        // after key extraction we should still have one byte which represent OP_CHECKSIG
+        return (s + 1 == script.end());
     }
     catch (scriptnum_error)
     {
         return false;
     }
-
-    CScriptNum nLockFreezeTime(data, true, 5);
-    uint8_t pos = 5;
-    if (nLockFreezeTime < LOCKTIME_THRESHOLD)
-    {
-        pos = 4;
-    }
-    if ((script[pos] != OP_CHECKLOCKTIMEVERIFY) || (script[pos + 1] != OP_DROP))
-    {
-        return false;
-    }
-
-    // starting from pubkeys (4/5 byte nlock time + 1 OP_CLTV + 1 OP_DROP)
-    CScript::const_iterator it = script.begin() + pos + 2;
-    if (!script.GetOp(it, opcode, data))
-    {
-        return false;
-    }
-    if (!CPubKey::ValidSize(data))
-    {
-        return false;
-    }
-    pubkeys.emplace_back(std::move(data));
-    // after key extraction we should still have one byte which represent OP_CHECKSIG
-    return (it + 1 == script.end());
 }
 
 /** Test for "small positive integer" script opcodes - OP_1 through OP_16. */
