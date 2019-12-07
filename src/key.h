@@ -213,12 +213,13 @@ bool ECC_InitSanityCheck(void);
 int Hd32DeriveChildKey(CKey key, int externalChainCounter, CKey &secret, std::string *keypath);
 
 /** Derive a BIP-0044 heirarchial deterministic wallet key */
-int Hd44DeriveChildKey(CKey key,
-    int purpose,
-    int coinType,
-    int account,
+int Hd44DeriveChildKey(unsigned char *secretSeed,
+    unsigned int secretSeedLen,
+    unsigned int purpose,
+    unsigned int coinType,
+    unsigned int account,
     bool change,
-    int index,
+    unsigned int index,
     CKey &secret,
     std::string *keypath);
 

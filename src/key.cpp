@@ -50,12 +50,13 @@ int Hd32DeriveChildKey(CKey key, int externalChainCounter, CKey &secret, std::st
     return externalChainCounter + 1;
 }
 
-int Hd44DeriveChildKey(CKey key,
-    int purpose,
-    int coinType,
-    int account,
+int Hd44DeriveChildKey(unsigned char *secretSeed,
+    unsigned int secretSeedLen,
+    unsigned int purpose,
+    unsigned int coinType,
+    unsigned int account,
     bool change,
-    int index,
+    unsigned int index,
     CKey &secret,
     std::string *keypath)
 {
@@ -66,13 +67,13 @@ int Hd44DeriveChildKey(CKey key,
     CExtKey changeKey; // key at m/purpose'/coinType'/account'/change
     CExtKey childKey; // key at m/purpose'/coinType'/account'/change/index
 
-    masterKey.SetMaster(key.begin(), key.size());
+    masterKey.SetMaster(secretSeed, secretSeedLen);
 
     // use hardened derivation (child keys >= 0x80000000 are hardened after bip32)
-    masterKey.Derive(purposeKey, purpose + BIP32_HARDENED_KEY_LIMIT);
-    purposeKey.Derive(coinTypeKey, coinType + BIP32_HARDENED_KEY_LIMIT);
-    coinTypeKey.Derive(accountKey, account + BIP32_HARDENED_KEY_LIMIT);
-    accountKey.Derive(changeKey, change);
+    masterKey.Derive(purposeKey, purpose | BIP32_HARDENED_KEY_LIMIT);
+    purposeKey.Derive(coinTypeKey, coinType | BIP32_HARDENED_KEY_LIMIT);
+    coinTypeKey.Derive(accountKey, account | BIP32_HARDENED_KEY_LIMIT);
+    accountKey.Derive(changeKey, change ? 1 : 0);
     changeKey.Derive(childKey, index);
 
     // Fill the return values

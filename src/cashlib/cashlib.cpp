@@ -928,27 +928,28 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Pay
     return bArray;
 }
 
-extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Key_Hd44DeriveChildKey(JNIEnv *env,
+// many of the args are long so that the hardened selectors (i.e. 0x80000000) are not negative
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_AddressDerivationKey_Hd44DeriveChildKey(
+    JNIEnv *env,
     jobject ths,
     jbyteArray masterSecretBytes,
-    jint purpose,
-    jint coinType,
-    jint account,
+    jlong purpose,
+    jlong coinType,
+    jlong account,
     jint change,
     jint index)
 {
     size_t mslen = env->GetArrayLength(masterSecretBytes);
-    if (mslen != 32)
+    if ((mslen < 16) || (mslen > 64))
     {
         triggerJavaIllegalStateException(env, "key derivation failure -- master secret is incorrect length");
         return nullptr;
     }
 
     jbyte *msdata = env->GetByteArrayElements(masterSecretBytes, 0);
-    CKey masterSecret = LoadKey((unsigned char *)msdata);
 
     CKey secret;
-    Hd44DeriveChildKey(masterSecret, purpose, coinType, account, change, index, secret, nullptr);
+    Hd44DeriveChildKey((unsigned char *)msdata, mslen, purpose, coinType, account, change, index, secret, nullptr);
 
     jbyteArray bArray = env->NewByteArray(32);
     jbyte *data = env->GetByteArrayElements(bArray, 0);
