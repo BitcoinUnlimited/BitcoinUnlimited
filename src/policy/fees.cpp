@@ -16,6 +16,7 @@
 #include "util.h"
 #include "utilmoneystr.h"
 
+
 void TxConfirmStats::Initialize(std::vector<double> &defaultBuckets,
     unsigned int maxConfirms,
     double _decay,
@@ -405,7 +406,7 @@ void CBlockPolicyEstimator::processBlockTx(unsigned int nBlockHeight, const CTxM
 }
 
 void CBlockPolicyEstimator::processBlock(unsigned int nBlockHeight,
-    std::vector<CTxMemPoolEntry> &entries,
+    const CTxMemPool::setEntries &setTxnsInBlock,
     bool fCurrentEstimate)
 {
     if (nBlockHeight <= nBestSeenHeight)
@@ -439,14 +440,14 @@ void CBlockPolicyEstimator::processBlock(unsigned int nBlockHeight,
     feeStats.ClearCurrent(nBlockHeight);
 
     // Repopulate the current block states
-    for (unsigned int i = 0; i < entries.size(); i++)
-        processBlockTx(nBlockHeight, entries[i]);
+    for (auto &it : setTxnsInBlock)
+        processBlockTx(nBlockHeight, *it);
 
     // Update all exponential averages with the current block states
     feeStats.UpdateMovingAverages();
 
     LOG(ESTIMATEFEE, "Blockpolicy after updating estimates for %u confirmed entries, new mempool map size %u\n",
-        entries.size(), mapMemPoolTxs.size());
+        setTxnsInBlock.size(), mapMemPoolTxs.size());
 }
 
 CFeeRate CBlockPolicyEstimator::estimateFee(int confTarget)

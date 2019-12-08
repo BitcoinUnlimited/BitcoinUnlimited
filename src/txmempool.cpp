@@ -1007,7 +1007,6 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
     // While we're updating the child transactions prior to removal we can also gather the
     // mapTxnChaiTips.
     mapEntryHistory mapTxnChainTips;
-    std::vector<CTxMemPoolEntry> entries;
     setEntries setAncestorsFromBlock;
     {
         setEntries setTxnsInBlock;
@@ -1028,10 +1027,9 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
             std::string dummy;
             _CalculateMemPoolAncestors(
                 *it, setAncestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy, &setAncestorsFromBlock, false);
-            setAncestorsFromBlock.insert(setAncestors.begin(), setAncestors.end());
 
+            setAncestorsFromBlock.insert(setAncestors.begin(), setAncestors.end());
             setTxnsInBlock.insert(it);
-            entries.push_back(*it); // TODO: seems inefficient to do a full copy here?
 
             const setEntries &setMemPoolChildren = GetMemPoolChildren(it);
             for (txiter updateIt : setMemPoolChildren)
@@ -1045,6 +1043,13 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
                 _UpdateParent(updateIt, it, false);
             }
         }
+
+        // Before the txs in the new block have been removed from the mempool, update policy estimates
+        minerPolicyEstimator->processBlock(nBlockHeight, setTxnsInBlock, fCurrentEstimate);
+        lastRollingFeeUpdate = GetTime();
+        blockSinceLastRollingFeeBump = true;
+
+        // Remove Transactions that were in the block from the mempool.
         for (txiter it : setTxnsInBlock)
         {
             setAncestorsFromBlock.erase(it);
@@ -1116,11 +1121,6 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
         _ClearPrioritisation(tx->GetHash());
     }
 
-    // After the txs in the new block have been removed from the mempool, update policy estimates
-    minerPolicyEstimator->processBlock(nBlockHeight, entries, fCurrentEstimate);
-    lastRollingFeeUpdate = GetTime();
-    blockSinceLastRollingFeeBump = true;
-
     // With the cs_txmepool lock on, resubmit the txCommitQ so we don't allow txns back into
     // the mempool that may be ancestors of txns that were in the block we just processed.  If we allowed
     // this then the txns would essentialy be orphans within the mempool.
@@ -1138,22 +1138,26 @@ void CTxMemPool::removeForBlock_Legacy(const std::vector<CTransactionRef> &vtx,
 
     WRITELOCK(cs_txmempool);
     std::vector<txiter> entriesToRemove;
-    std::vector<CTxMemPoolEntry> entries;
 
     DeferredMap deferred;
     std::queue<txiter> ready;
 
     CTxMemPool::TxMempoolOriginalStateMap changeSet;
 
+    setEntries setTxnsInBlock;
     for (const auto &tx : vtx)
     {
-        setEntries descendants;
         uint256 hash = tx->GetHash();
         txiter i = mapTx.find(hash);
         if (i == mapTx.end())
             continue; // not in the mempool
         ready.push(i);
+        setTxnsInBlock.insert(i);
     }
+    // Before the txs in the new block have been removed from the mempool, update policy estimates
+    minerPolicyEstimator->processBlock(nBlockHeight, setTxnsInBlock, fCurrentEstimate);
+    lastRollingFeeUpdate = GetTime();
+    blockSinceLastRollingFeeBump = true;
 
     while (!ready.empty())
     {
@@ -1168,8 +1172,6 @@ void CTxMemPool::removeForBlock_Legacy(const std::vector<CTransactionRef> &vtx,
         }
         if (links->second.parents.empty()) // This tx has no ancestors, so its ready to be removed
         {
-            entries.push_back(*nextTx); // save tx for estimator adjustment at the bottom
-
             // place any tx that were deferred because this tx was required back onto the ready Q
             DeferredMap::iterator deferredSet = deferred.find(nextTx);
             if (deferredSet != deferred.end())
@@ -1239,10 +1241,6 @@ void CTxMemPool::removeForBlock_Legacy(const std::vector<CTransactionRef> &vtx,
         _removeConflicts(*tx, conflicts);
         _ClearPrioritisation(tx->GetHash());
     }
-    // After the txs in the new block have been removed from the mempool, update policy estimates
-    minerPolicyEstimator->processBlock(nBlockHeight, entries, fCurrentEstimate);
-    lastRollingFeeUpdate = GetTime();
-    blockSinceLastRollingFeeBump = true;
 }
 
 void CTxMemPool::_clear()
