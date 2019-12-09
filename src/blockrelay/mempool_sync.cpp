@@ -62,16 +62,21 @@ bool HandleMempoolSyncRequest(CDataStream &vRecv, CNode *pfrom)
 {
     LOG(MPOOLSYNC, "Handling mempool sync request from peer %s\n", pfrom->GetLogName());
     CMempoolSyncInfo mempoolinfo;
-    CInv inv;
-    vRecv >> inv >> mempoolinfo;
-    NodeId nodeId = pfrom->GetId();
-
-    // Message consistency checking
-    if (!(inv.type == MSG_MEMPOOLSYNC))
+    if (NegotiateMempoolSyncVersion(pfrom) > 0)
+        vRecv >> mempoolinfo;
+    else
     {
-        dosMan.Misbehaving(pfrom, 100);
-        return error("invalid GET_MEMPOOLSYNC message type=%u\n", inv.type);
+        CInv inv;
+        vRecv >> inv >> mempoolinfo;
+
+        // Message consistency checking
+        if (!(inv.type == MSG_MEMPOOLSYNC))
+        {
+            dosMan.Misbehaving(pfrom, 100);
+            return error("invalid GET_MEMPOOLSYNC message type=%u\n", inv.type);
+        }
     }
+    NodeId nodeId = pfrom->GetId();
 
     // Requester should only contact peers that support mempool sync
     if (!syncMempoolWithPeers.Value())
@@ -98,52 +103,43 @@ bool HandleMempoolSyncRequest(CDataStream &vRecv, CNode *pfrom)
             CMempoolSyncState(GetStopwatchMicros(), mempoolinfo.shorttxidk0, mempoolinfo.shorttxidk1, false);
     }
 
-    if (inv.type == MSG_MEMPOOLSYNC)
+    LOG(MPOOLSYNC, "Mempool currently holds %d transactions\n", mempool.size());
+
+    std::vector<uint256> mempoolTxHashes;
+    // cycle through mempool txs in order of ancestor_score
     {
-        LOG(MPOOLSYNC, "Mempool currently holds %d transactions\n", mempool.size());
+        READLOCK(mempool.cs_txmempool);
 
-        std::vector<uint256> mempoolTxHashes;
-        // cycle through mempool txs in order of ancestor_score
+        int64_t nRemainingMempoolBytes = mempoolinfo.nRemainingMempoolBytes;
+        typename CTxMemPool::indexed_transaction_set::index<ancestor_score>::type::iterator it =
+            mempool.mapTx.get<ancestor_score>().begin();
+        for (; it != mempool.mapTx.get<ancestor_score>().end() && nRemainingMempoolBytes > 0; ++it)
         {
-            READLOCK(mempool.cs_txmempool);
+            size_t nTxSize = it->GetTx().GetTxSize();
+            int64_t nFee = it->GetFee();
+            CFeeRate feeRate(nFee, nTxSize);
 
-            int64_t nRemainingMempoolBytes = mempoolinfo.nRemainingMempoolBytes;
-            typename CTxMemPool::indexed_transaction_set::index<ancestor_score>::type::iterator it =
-                mempool.mapTx.get<ancestor_score>().begin();
-            for (; it != mempool.mapTx.get<ancestor_score>().end() && nRemainingMempoolBytes > 0; ++it)
-            {
-                size_t nTxSize = it->GetTx().GetTxSize();
-                int64_t nFee = it->GetFee();
-                CFeeRate feeRate(nFee, nTxSize);
+            // Skip tx if fee rate is too low
+            if (feeRate.GetFeePerK() < (int)mempoolinfo.nSatoshiPerK)
+                continue;
 
-                // Skip tx if fee rate is too low
-                if (feeRate.GetFeePerK() < (int)mempoolinfo.nSatoshiPerK)
-                    continue;
-
-                mempoolTxHashes.push_back(it->GetTx().GetHash());
-                nRemainingMempoolBytes -= nTxSize;
-            }
+            mempoolTxHashes.push_back(it->GetTx().GetHash());
+            nRemainingMempoolBytes -= nTxSize;
         }
-
-        if (mempoolTxHashes.size() == 0)
-        {
-            LOG(MPOOLSYNC, "Mempool is empty; aborting mempool sync with peer %s\n", pfrom->GetLogName());
-            return true;
-        }
-
-        // Assemble mempool sync object
-        CMempoolSync mempoolSync(mempoolTxHashes, mempoolinfo.nTxInMempool, mempoolTxHashes.size(),
-            mempoolinfo.shorttxidk0, mempoolinfo.shorttxidk1, NegotiateMempoolSyncVersion(pfrom));
-
-        pfrom->PushMessage(NetMsgType::MEMPOOLSYNC, mempoolSync);
-        LOG(MPOOLSYNC, "Sent mempool sync to peer %s using version %d\n", pfrom->GetLogName(), mempoolSync.version);
     }
-    else
+
+    if (mempoolTxHashes.size() == 0)
     {
-        dosMan.Misbehaving(pfrom, 100);
-
-        return false;
+        LOG(MPOOLSYNC, "Mempool is empty; aborting mempool sync with peer %s\n", pfrom->GetLogName());
+        return true;
     }
+
+    // Assemble mempool sync object
+    CMempoolSync mempoolSync(mempoolTxHashes, mempoolinfo.nTxInMempool, mempoolTxHashes.size(), mempoolinfo.shorttxidk0,
+        mempoolinfo.shorttxidk1, NegotiateMempoolSyncVersion(pfrom));
+
+    pfrom->PushMessage(NetMsgType::MEMPOOLSYNC, mempoolSync);
+    LOG(MPOOLSYNC, "Sent mempool sync to peer %s using version %d\n", pfrom->GetLogName(), mempoolSync.version);
 
     return true;
 }
