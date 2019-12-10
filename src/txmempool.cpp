@@ -1041,10 +1041,13 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
         // This is a safeguard in the case where ancestors of transactions in this block have re-entered
         // the mempool, possibly from a re-org. This should never happen and would likely indicate a locking
         // issue if it did.
-        for (txiter it : setAncestorsFromBlock)
+        if (!setAncestorsFromBlock.empty())
         {
             DbgAssert("Ancestors in the mempool when they should not be", );
-            removeUnchecked(it);
+            for (txiter it : setAncestorsFromBlock)
+            {
+                removeUnchecked(it);
+            }
         }
     }
 
