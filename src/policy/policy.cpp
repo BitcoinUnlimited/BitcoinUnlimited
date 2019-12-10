@@ -62,7 +62,7 @@ bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType)
     return whichType != TX_NONSTANDARD;
 }
 
-bool IsStandardTx(const CTransactionRef &tx, std::string &reason)
+bool IsStandardTx(const CTransactionRef tx, std::string &reason)
 {
     if (tx->nVersion > CTransaction::MAX_STANDARD_VERSION || tx->nVersion < 1)
     {
@@ -135,7 +135,7 @@ bool IsStandardTx(const CTransactionRef &tx, std::string &reason)
     return true;
 }
 
-bool AreInputsStandard(const CTransactionRef &tx, const CCoinsViewCache &mapInputs)
+bool AreInputsStandard(const CTransactionRef tx, const CCoinsViewCache &mapInputs)
 {
     if (tx->IsCoinBase())
         return true; // Coinbases don't use vin normally

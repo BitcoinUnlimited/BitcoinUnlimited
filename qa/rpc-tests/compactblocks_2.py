@@ -134,6 +134,23 @@ class TestNode(SingleNodeConnCB):
            if  timeout <= 0:
                raise AssertionError("Sync getdata failed to complete")
 
+    def check_mempool(self, tx_list, peer, timeout=10):
+       success = False
+       while success is False:
+           success = True
+           mempool = peer.getrawmempool()
+
+           for tx in tx_list:
+                if tx.hash not in mempool:
+                    success = False
+
+           time.sleep(self.sleep_time)
+           timeout -= self.sleep_time
+
+           if success == True:
+               return
+           if  timeout <= 0:
+               raise AssertionError("Sync getdata failed to complete")
 
 class CompactBlocksTest(BitcoinTestFramework):
     def __init__(self):
@@ -485,10 +502,10 @@ class CompactBlocksTest(BitcoinTestFramework):
         self.announce_new_block(block)
         self.utxos.append([ordered_txs[-1].sha256, 0, ordered_txs[-1].vout[0].nValue])
         for tx in ordered_txs[1:]:
-            self.test_node.send_message(msg_tx(tx))
+            self.test_node.send_and_ping(msg_tx(tx))
 
         # Make sure all transactions were accepted.
-        self.test_node.check_mempools(ordered_txs[1:], self.nodes[0], timeout=30)
+        self.test_node.check_mempool(ordered_txs[1:], self.nodes[0], timeout=30)
 
         # Clear out last request.
         with mininode_lock:
@@ -567,7 +584,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         for tx in ordered_txs[1:6]:
             self.test_node.send_message(msg_tx(tx))
 
-        # Make sure all transactions were accepted.
+        # Make sure all transactions were accepted in either the tx pool or orphan pool.
         self.test_node.check_mempools(ordered_txs[1:6], self.nodes[0], timeout=30)
 
         # Send compact block

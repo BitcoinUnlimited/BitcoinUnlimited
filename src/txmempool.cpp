@@ -35,7 +35,7 @@ CTxMemPoolEntry::CTxMemPoolEntry()
     sighashType = 0;
 }
 
-CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef &_tx,
+CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef _tx,
     const CAmount &_nFee,
     int64_t _nTime,
     double _entryPriority,

@@ -119,7 +119,7 @@ private:
 public:
     unsigned char sighashType;
     CTxMemPoolEntry();
-    CTxMemPoolEntry(const CTransactionRef &_tx,
+    CTxMemPoolEntry(const CTransactionRef _tx,
         const CAmount &_nFee,
         int64_t _nTime,
         double _entryPriority,

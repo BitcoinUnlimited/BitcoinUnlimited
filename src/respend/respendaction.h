@@ -24,7 +24,7 @@ public:
         // Existing mempool entry
         const CTxMemPool::txiter mempoolEntry,
         // Current TX that is respending
-        const CTransactionRef &pRespendTx,
+        const CTransactionRef pRespendTx,
         // If we've seen a valid tx respending this output before
         bool seenBefore,
         // If original and respend tx only differ in script
