@@ -275,7 +275,14 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
         if (inBlock)
         {
             if (!inBlock->count(stageit))
+            {
                 setAncestors.insert(stageit);
+            }
+            else
+            {
+                parentHashes.erase(stageit);
+                continue;
+            }
         }
         else
         {
@@ -309,15 +316,7 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
             // If this is a new ancestor, add it.
             if (setAncestors.count(phash) == 0)
             {
-                if (inBlock)
-                {
-                    if (!inBlock->count(phash))
-                        parentHashes.insert(phash);
-                }
-                else
-                {
-                    parentHashes.insert(phash);
-                }
+                parentHashes.insert(phash);
             }
 
             // removed +1 from test below as per BU: Fix use after free bug
