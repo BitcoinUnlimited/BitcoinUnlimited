@@ -266,6 +266,7 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
 
     while (!parentHashes.empty())
     {
+        auto parentElemIter = parentHashes.begin();
         txiter stageit = *parentHashes.begin();
 
         // If inBlock then we only return a set of ancestors that have not yet been added to a block.
@@ -328,7 +329,7 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
             }
         }
 
-        parentHashes.erase(stageit); // BU: Fix use after free bug by removing this last
+        parentHashes.erase(parentElemIter); // BU: Fix use after free bug by removing this last
     }
 
     return true;
