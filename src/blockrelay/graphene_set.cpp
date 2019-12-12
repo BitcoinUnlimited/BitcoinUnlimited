@@ -29,7 +29,7 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     bool fDeterministic)
     : ordered(_ordered), nReceiverUniverseItems(_nReceiverUniverseItems), shorttxidk0(_shorttxidk0),
       shorttxidk1(_shorttxidk1), version(_version), ibltSalt(ibltEntropy), computeOptimized(_computeOptimized),
-      pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr), fBloomFPR(1.0)
+      pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr), bloomFPR(1.0)
 {
     // Below is the parameter "n" from the graphene paper
     uint64_t nItems = _itemHashes.size();
@@ -39,28 +39,28 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     GrapheneSetOptimizationParams params =
         DetermineGrapheneSetOptimizationParams(nReceiverUniverseItems, nSenderUniverseItems, nItems, version);
     double optSymDiff = params.optSymDiff;
-    fBloomFPR = params.fBloomFPR;
+    bloomFPR = params.bloomFPR;
 
     // For testing stage 2, allow FPR to be set to specific value
     if (grapheneBloomFprOverride.Value() > 0.0)
-        fBloomFPR = grapheneBloomFprOverride.Value();
+        bloomFPR = grapheneBloomFprOverride.Value();
 
     // Construct Bloom filter
     if (computeOptimized)
     {
         LOG(GRAPHENE, "using compute-optimized Bloom filter\n");
-        pFastFilter = std::make_shared<CVariableFastFilter>(CVariableFastFilter(nItems, fBloomFPR));
+        pFastFilter = std::make_shared<CVariableFastFilter>(CVariableFastFilter(nItems, bloomFPR));
     }
     else
     {
         LOG(GRAPHENE, "using regular Bloom filter\n");
         pSetFilter = std::make_shared<CBloomFilter>(CBloomFilter(
-            nItems, fBloomFPR, insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max()));
+            nItems, bloomFPR, insecure_rand.rand32(), BLOOM_UPDATE_ALL, true, std::numeric_limits<uint32_t>::max()));
     }
-    LOG(GRAPHENE, "fp rate: %f Num elements in bloom filter: %d\n", fBloomFPR, nItems);
+    LOG(GRAPHENE, "fp rate: %f Num elements in bloom filter: %d\n", bloomFPR, nItems);
 
     pSetIblt = std::make_shared<CIblt>(CGrapheneSet::ConstructIblt(
-        nReceiverUniverseItems, optSymDiff, fBloomFPR, ibltSalt, version, grapheneIbltSizeOverride.Value()));
+        nReceiverUniverseItems, optSymDiff, bloomFPR, ibltSalt, version, grapheneIbltSizeOverride.Value()));
 
     std::map<uint64_t, uint256> mapCheapHashes;
 
@@ -356,31 +356,31 @@ std::vector<uint64_t> CGrapheneSet::Reconcile(const std::set<uint64_t> &setSende
 
 double CGrapheneSet::TruePositiveMargin(uint64_t nSenderFilterPositiveItems,
     uint64_t nReceiverUniverseItems,
-    double fSenderBloomFpr,
+    double senderBloomFpr,
     uint64_t nLowerBoundTruePositives)
 {
     return (nSenderFilterPositiveItems - nLowerBoundTruePositives) /
-               ((nReceiverUniverseItems - nLowerBoundTruePositives) * fSenderBloomFpr) -
+               ((nReceiverUniverseItems - nLowerBoundTruePositives) * senderBloomFpr) -
            1;
 }
 
 double CGrapheneSet::TruePositiveProbability(uint64_t nSenderFilterPositiveItems,
     uint64_t nReceiverUniverseItems,
-    double fSenderBloomFpr,
+    double senderBloomFpr,
     uint64_t nLowerBoundTruePositives)
 {
     double margin = TruePositiveMargin(
-        nSenderFilterPositiveItems, nReceiverUniverseItems, fSenderBloomFpr, nLowerBoundTruePositives);
+        nSenderFilterPositiveItems, nReceiverUniverseItems, senderBloomFpr, nLowerBoundTruePositives);
     double margin_plus_1 = margin + 1;
 
     return pow(exp(margin) / pow(margin_plus_1, margin_plus_1),
-        (nReceiverUniverseItems - nLowerBoundTruePositives) * fSenderBloomFpr);
+        (nReceiverUniverseItems - nLowerBoundTruePositives) * senderBloomFpr);
 }
 
 uint64_t CGrapheneSet::LowerBoundTruePositives(uint64_t nTargetItems,
     uint64_t nSenderFilterPositiveItems,
     uint64_t nReceiverUniverseItems,
-    double fSenderBloomFpr,
+    double senderBloomFpr,
     double successRate)
 {
     // x* in the graphene paper
@@ -390,14 +390,14 @@ uint64_t CGrapheneSet::LowerBoundTruePositives(uint64_t nTargetItems,
 
     uint64_t nLowerBoundTruePositives = 0;
     double prob = TruePositiveProbability(
-        nSenderFilterPositiveItems, nReceiverUniverseItems, fSenderBloomFpr, nLowerBoundTruePositives);
+        nSenderFilterPositiveItems, nReceiverUniverseItems, senderBloomFpr, nLowerBoundTruePositives);
 
     while (prob <= (1 - successRate) &&
            ((int)nLowerBoundTruePositives <= (int)std::min(nSenderFilterPositiveItems, nTargetItems)))
     {
         nLowerBoundTruePositives += 1;
         prob += TruePositiveProbability(
-            nSenderFilterPositiveItems, nReceiverUniverseItems, fSenderBloomFpr, nLowerBoundTruePositives);
+            nSenderFilterPositiveItems, nReceiverUniverseItems, senderBloomFpr, nLowerBoundTruePositives);
     }
 
     return (uint64_t)std::max(0, (int)(nLowerBoundTruePositives - 1));
@@ -405,12 +405,12 @@ uint64_t CGrapheneSet::LowerBoundTruePositives(uint64_t nTargetItems,
 
 double CGrapheneSet::FalsePositiveMargin(uint64_t nLowerBoundTruePositives,
     uint64_t nReceiverUniverseItems,
-    double fSenderBloomFpr,
+    double senderBloomFpr,
     double successRate)
 {
     // delta in the graphene paper
     double log_b = log(1 - successRate);
-    double s = -log_b / ((nReceiverUniverseItems - nLowerBoundTruePositives) * fSenderBloomFpr);
+    double s = -log_b / ((nReceiverUniverseItems - nLowerBoundTruePositives) * senderBloomFpr);
 
     return 0.5 * (s + sqrt(pow(s, 2) + 8 * s));
 }
@@ -418,21 +418,21 @@ double CGrapheneSet::FalsePositiveMargin(uint64_t nLowerBoundTruePositives,
 uint64_t CGrapheneSet::UpperBoundFalsePositives(uint64_t nTargetItems,
     uint64_t nSenderFilterPositiveItems,
     uint64_t nReceiverUniverseItems,
-    double fSenderBloomFpr,
+    double senderBloomFpr,
     double successRate)
 {
     // y* in the graphene paper
     uint64_t nLowerBoundTruePositives = LowerBoundTruePositives(
-        nTargetItems, nSenderFilterPositiveItems, nReceiverUniverseItems, fSenderBloomFpr, successRate);
-    double margin = FalsePositiveMargin(nLowerBoundTruePositives, nReceiverUniverseItems, fSenderBloomFpr, successRate);
+        nTargetItems, nSenderFilterPositiveItems, nReceiverUniverseItems, senderBloomFpr, successRate);
+    double margin = FalsePositiveMargin(nLowerBoundTruePositives, nReceiverUniverseItems, senderBloomFpr, successRate);
 
     return (uint64_t)std::min((double)nSenderFilterPositiveItems,
-        (1 + margin) * (nReceiverUniverseItems - nLowerBoundTruePositives) * fSenderBloomFpr);
+        (1 + margin) * (nReceiverUniverseItems - nLowerBoundTruePositives) * senderBloomFpr);
 }
 
 double CGrapheneSet::FailureRecoveryFpr(uint64_t nItems,
     uint64_t nReceiverUniverseItems,
-    double fSenderBloomFpr,
+    double senderBloomFpr,
     double successRate)
 {
     return 1;
@@ -443,14 +443,14 @@ CVariableFastFilter CGrapheneSet::FailureRecoveryFilter(std::vector<uint256> &re
     uint64_t nSenderFilterPositiveItems,
     uint64_t nReceiverRevisedUniverseItems,
     double successRate,
-    double fSenderBloomFPR,
+    double senderBloomFpr,
     uint64_t grapheneSetVersion)
 {
     uint64_t nLowerBoundTruePositives = LowerBoundTruePositives(
-        nItems, nSenderFilterPositiveItems, nReceiverRevisedUniverseItems, fSenderBloomFPR, successRate);
+        nItems, nSenderFilterPositiveItems, nReceiverRevisedUniverseItems, senderBloomFpr, successRate);
     GrapheneSetOptimizationParams params = DetermineGrapheneSetOptimizationParams(
         nSenderFilterPositiveItems, nItems, nLowerBoundTruePositives, grapheneSetVersion);
-    CVariableFastFilter filter(relevantHashes.size(), params.fBloomFPR);
+    CVariableFastFilter filter(relevantHashes.size(), params.bloomFPR);
 
     for (auto &hash : relevantHashes)
         filter.insert(hash);
@@ -463,16 +463,16 @@ CIblt CGrapheneSet::FailureRecoveryIblt(std::set<uint64_t> &relevantCheapHashes,
     uint64_t nSenderFilterPositiveItems,
     uint64_t nReceiverRevisedUniverseItems,
     double successRate,
-    double fSenderBloomFPR,
+    double senderBloomFpr,
     uint64_t grapheneSetVersion,
     uint32_t ibltSaltRevised)
 {
     GrapheneSetOptimizationParams params = DetermineGrapheneSetOptimizationParams(
         nSenderFilterPositiveItems, nItems, relevantCheapHashes.size(), grapheneSetVersion);
     uint64_t nUpperBoundFalsePositives = UpperBoundFalsePositives(
-        nItems, nSenderFilterPositiveItems, nReceiverRevisedUniverseItems, fSenderBloomFPR, successRate);
+        nItems, nSenderFilterPositiveItems, nReceiverRevisedUniverseItems, senderBloomFpr, successRate);
     CIblt iblt = CGrapheneSet::ConstructIblt(nReceiverRevisedUniverseItems,
-        params.optSymDiff + nUpperBoundFalsePositives, params.fBloomFPR, ibltSaltRevised, version, 0);
+        params.optSymDiff + nUpperBoundFalsePositives, params.bloomFPR, ibltSaltRevised, version, 0);
 
     for (auto &cheapHash : relevantCheapHashes)
     {
@@ -586,20 +586,20 @@ GrapheneSetOptimizationParams CGrapheneSet::DetermineGrapheneSetOptimizationPara
     }
 
     // Set false positive rate for Bloom filter based on optSymDiff
-    double fBloomFPR = CGrapheneSet::BloomFalsePositiveRate(optSymDiff, nReceiverExcessItems);
+    double bloomFPR = CGrapheneSet::BloomFalsePositiveRate(optSymDiff, nReceiverExcessItems);
 
     // So far we have only made room for false positives in the IBLT
     // Make more room for missing items
     optSymDiff += nReceiverMissingItems;
 
-    GrapheneSetOptimizationParams params = {nReceiverExcessItems, nReceiverMissingItems, optSymDiff, fBloomFPR};
+    GrapheneSetOptimizationParams params = {nReceiverExcessItems, nReceiverMissingItems, optSymDiff, bloomFPR};
 
     return params;
 }
 
 CIblt CGrapheneSet::ConstructIblt(uint64_t nReceiverUniverseItems,
     double optSymDiff,
-    double fBloomFPR,
+    double bloomFPR,
     uint32_t ibltSalt,
     uint64_t graphenSetVersion,
     uint64_t nOverrideValue)
@@ -615,7 +615,7 @@ CIblt CGrapheneSet::ConstructIblt(uint64_t nReceiverUniverseItems,
     if (ibltVersion >= 2)
     {
         nCheckSumBits = CGrapheneSet::NChecksumBits(nIbltCells * CIblt::OptimalOverhead(nIbltCells),
-            CIblt::OptimalNHash(nIbltCells), nReceiverUniverseItems, fBloomFPR, UNCHECKED_ERROR_TOL);
+            CIblt::OptimalNHash(nIbltCells), nReceiverUniverseItems, bloomFPR, UNCHECKED_ERROR_TOL);
     }
     else
         nCheckSumBits = MAX_CHECKSUM_BITS;
@@ -634,14 +634,14 @@ CIblt CGrapheneSet::ConstructIblt(uint64_t nReceiverUniverseItems,
 uint8_t CGrapheneSet::NChecksumBits(size_t nIbltEntries,
     uint8_t nIbltHashFuncs,
     uint64_t nReceiverUniverseItems,
-    double fBloomFPR,
+    double bloomFPR,
     double fUncheckedErrorTol)
 {
     if (nIbltEntries < nIbltHashFuncs)
         return 32;
 
     return (uint8_t)std::max((double)MIN_CHECKSUM_BITS,
-        std::ceil(std::log2(nIbltEntries * (1 - std::pow(1 - fBloomFPR * (nIbltHashFuncs / (double)nIbltEntries),
+        std::ceil(std::log2(nIbltEntries * (1 - std::pow(1 - bloomFPR * (nIbltHashFuncs / (double)nIbltEntries),
                                                     nReceiverUniverseItems))) -
                                  std::log2(fUncheckedErrorTol)));
 }

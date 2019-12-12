@@ -40,7 +40,7 @@ struct GrapheneSetOptimizationParams
     uint64_t nReceiverExcessItems;
     uint64_t nReceiverMissingItems;
     double optSymDiff;
-    double fBloomFPR;
+    double bloomFPR;
 };
 
 class CGrapheneSet
@@ -56,7 +56,7 @@ private:
     std::shared_ptr<CBloomFilter> pSetFilter;
     std::shared_ptr<CVariableFastFilter> pFastFilter;
     std::shared_ptr<CIblt> pSetIblt;
-    double fBloomFPR;
+    double bloomFPR;
 
     static const uint8_t SHORTTXIDS_LENGTH = 8;
 
@@ -74,18 +74,18 @@ public:
     // The default constructor is for 2-phase construction via deserialization
     CGrapheneSet()
         : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), version(1), ibltSalt(0),
-          computeOptimized(false), pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr), fBloomFPR(1.0)
+          computeOptimized(false), pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr), bloomFPR(1.0)
     {
     }
     CGrapheneSet(uint64_t _version)
         : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), version(_version), ibltSalt(0),
-          computeOptimized(false), pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr), fBloomFPR(1.0)
+          computeOptimized(false), pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr), bloomFPR(1.0)
     {
     }
     CGrapheneSet(uint64_t _version, bool _computeOptimized)
         : ordered(false), nReceiverUniverseItems(0), shorttxidk0(0), shorttxidk1(0), version(_version), ibltSalt(0),
           computeOptimized(_computeOptimized), pSetFilter(nullptr), pFastFilter(nullptr), pSetIblt(nullptr),
-          fBloomFPR(1.0)
+          bloomFPR(1.0)
     {
     }
     CGrapheneSet(size_t _nReceiverUniverseItems,
@@ -176,7 +176,7 @@ public:
 
     static CIblt ConstructIblt(uint64_t nReceiverUniverseItems,
         double optSymDiff,
-        double fBloomFPR,
+        double bloomFPR,
         uint32_t ibltSalt,
         uint64_t graphenSetVersion,
         uint64_t nOverrideValue);
@@ -189,34 +189,34 @@ public:
 
     static double TruePositiveMargin(uint64_t nSenderFilterPositiveItems,
         uint64_t nReceiverUniverseItems,
-        double fSenderBloomFpr,
+        double senderBloomFpr,
         uint64_t nLowerBoundTruePositives);
 
     static double TruePositiveProbability(uint64_t nSenderFilterPositiveItems,
         uint64_t nReceiverUniverseItems,
-        double fSenderBloomFpr,
+        double senderBloomFpr,
         uint64_t nLowerBoundTruePositives);
 
     static uint64_t LowerBoundTruePositives(uint64_t nTargetItems,
         uint64_t nSenderFilterPositiveItems,
         uint64_t nReceiverUniverseItems,
-        double fSenderBloomFpr,
+        double senderBloomFpr,
         double successRate);
 
     static double FalsePositiveMargin(uint64_t nLowerBoundTruePositives,
         uint64_t nReceiverUniverseItems,
-        double fSenderBloomFpr,
+        double senderBloomFpr,
         double successRate);
 
     static uint64_t UpperBoundFalsePositives(uint64_t nTargetItems,
         uint64_t nSenderFilterPositiveItems,
         uint64_t nReceiverUniverseItems,
-        double fSenderBloomFpr,
+        double senderBloomFpr,
         double successRate);
 
     static double FailureRecoveryFpr(uint64_t nItems,
         uint64_t nReceiverUniverseItems,
-        double fSenderBloomFpr,
+        double senderBloomFpr,
         double successRate);
 
     CVariableFastFilter FailureRecoveryFilter(std::vector<uint256> &relevantHashes,
@@ -224,7 +224,7 @@ public:
         uint64_t nSenderFilterPositiveItems,
         uint64_t nReceiverRevisedUniverseItems,
         double successRate,
-        double fSenderBloomFPR,
+        double senderBloomFpr,
         uint64_t grapheneSetVersion);
 
     CIblt FailureRecoveryIblt(std::set<uint64_t> &relevantCheapHashes,
@@ -232,7 +232,7 @@ public:
         uint64_t nSenderFilterPositiveItems,
         uint64_t nReceiverRevisedUniverseItems,
         double successRate,
-        double fSenderBloomFPR,
+        double senderBloomFpr,
         uint64_t grapheneSetVersion,
         uint32_t ibltSaltRevised);
 
@@ -243,7 +243,7 @@ public:
     static uint8_t NChecksumBits(size_t nIbltEntries,
         uint8_t nIbltHashFuncs,
         uint64_t nReceiverUniverseItems,
-        double fBloomFPR,
+        double bloomFPR,
         double fUncheckedErrorTol);
 
     uint64_t GetFilterSerializationSize()
@@ -307,7 +307,7 @@ public:
             pSetIblt = std::make_shared<CIblt>(CIblt(CGrapheneSet::GetCIbltVersion(version)));
         READWRITE(*pSetIblt);
         if (version >= 5)
-            READWRITE(fBloomFPR);
+            READWRITE(bloomFPR);
     }
 };
 
