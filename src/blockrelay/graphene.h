@@ -409,7 +409,7 @@ extern CGrapheneBlockData graphenedata; // Singleton class
 
 /**
  * If CGrapheneSet fails to decode, then receiver communicates relevant contents of mempool by sending
- * a Bloom filter which contains all transactions from her mempool that passed through the sender's
+ * a Bloom filter which contains all transactions from its mempool that passed through the sender's
  * Bloom filter.
  **/
 class CRequestGrapheneReceiverRecover
