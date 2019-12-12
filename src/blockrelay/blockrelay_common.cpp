@@ -78,11 +78,6 @@ void ThinTypeRelay::RemovePeers(CNode *pfrom)
     nThinBlockPeers = setThinBlockPeers.size();
     nGraphenePeers = setGraphenePeers.size();
     nCompactBlockPeers = setCompactBlockPeers.size();
-
-    {
-        LOCK(cs_graphene_sender);
-        mapGrapheneSentBlocks.erase(pfrom->GetId());
-    }
 }
 
 // Preferential Block Relay Timer:
@@ -263,6 +258,12 @@ void ThinTypeRelay::ClearAllBlocksInFlight(NodeId id)
     LOCK(cs_inflight);
     auto range = mapThinTypeBlocksInFlight.equal_range(id);
     mapThinTypeBlocksInFlight.erase(range.first, range.second);
+}
+
+void ThinTypeRelay::ClearSentGrapheneBlocks(NodeId id)
+{
+    LOCK(cs_graphene_sender);
+    mapGrapheneSentBlocks.erase(id);
 }
 
 void ThinTypeRelay::CheckForDownloadTimeout(CNode *pfrom)

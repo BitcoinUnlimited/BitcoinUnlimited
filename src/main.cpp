@@ -161,6 +161,9 @@ void FinalizeNode(NodeId nodeid)
     thinrelay.ClearAllBlocksToReconstruct(nodeid);
     thinrelay.ClearAllBlocksInFlight(nodeid);
 
+    // Clear Graphene blocks held by sender for this receiver
+    thinrelay.ClearSentGrapheneBlocks(nodeid);
+
     // Update block sync counters
     {
         CNodeStateAccessor state(nodestate, nodeid);
