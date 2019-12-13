@@ -88,6 +88,7 @@ CDBWrapper::CDBWrapper(const fs::path &path,
     iteroptions.verify_checksums = true;
     iteroptions.fill_cache = false;
     syncoptions.sync = true;
+    writeoptions.sync = false;
     options = GetDefaultOptions(nCacheSize);
 
     // Modify default database options
