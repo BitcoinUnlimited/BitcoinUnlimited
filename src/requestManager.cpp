@@ -1329,7 +1329,10 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                 // disconnecting.
                 //
                 // We disconnect a peer only if their average response time is more than 4 times the overall average.
-                if (nOutbound >= nMaxOutConnections - 1 && IsInitialBlockDownload() && nIterations > nOverallRange &&
+                static uint32_t nStartDisconnections GUARDED_BY(cs_overallaverage) = BEGIN_PRUNING_PEERS;
+                if (!pnode->fDisconnectRequest &&
+                    (nOutbound >= nMaxOutConnections - 1 || nOutbound >= nStartDisconnections) &&
+                    IsInitialBlockDownload() && nIterations > nOverallRange &&
                     pnode->nAvgBlkResponseTime > nOverallAverageResponseTime * 4)
                 {
                     LOG(IBD, "disconnecting %s because too slow , overall avg %d peer avg %d\n", pnode->GetLogName(),
@@ -1337,6 +1340,14 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                     pnode->InitiateGracefulDisconnect();
                     // We must not return here but continue in order
                     // to update the vBlocksInFlight stats.
+
+                    // Increment so we start disconnecting at a higher number of peers each time. This
+                    // helps to improve the very beginning of IBD such that we don't have to wait for all outbound
+                    // connections to be established before we start pruning the slow peers and yet we don't end
+                    // up suddenly overpruning.
+                    nStartDisconnections = nOutbound;
+                    if (nStartDisconnections < nMaxOutConnections)
+                        nStartDisconnections++;
                 }
             }
 
