@@ -71,7 +71,10 @@ static const unsigned int VERACK_TIMEOUT = 60;
 /** Number of headers sent in one getheaders result. We rely on the assumption that if a peer sends
  *  less than this number, we reached its tip. Changing this value is a protocol upgrade. */
 static const unsigned int MAX_HEADERS_RESULTS = 2000;
+/** Time to wait (in seconds) between flushing the blocks and the blockindex to disk */
 static const unsigned int DATABASE_WRITE_INTERVAL = 60 * 60;
+/** Time to wait (in seconds) between flushing the blocks and the blockindex to disk during IBD */
+static const unsigned int IBD_DATABASE_WRITE_INTERVAL = 5 * 60;
 /** Time to wait (in seconds) between flushing chainstate to disk. */
 static const unsigned int DATABASE_FLUSH_INTERVAL = 24 * 60 * 60;
 /** Maximum length of reject messages. */
