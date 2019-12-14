@@ -614,10 +614,15 @@ bool FlushStateToDiskInternal(CValidationState &state,
         {
             return state.Error("out of disk space");
         }
-        // First make sure all block and undo data is flushed to disk. This is not used for levelDB block storage
+        // First make sure all block and undo data is flushed to disk.
         if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
         {
             FlushBlockFile();
+        }
+        else
+        {
+            if (pblockdb)
+                pblockdb->Flush();
         }
         // Then update all block file information (which may refer to block and undo files).
         {
