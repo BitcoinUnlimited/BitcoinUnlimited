@@ -758,25 +758,25 @@ CacheConfig CacheSizeCalculations(int64_t _nTotalCache)
     _nTotalCache -= cache.nBlockTreeDBCache;
     if (BLOCK_DB_MODE == LEVELDB_BLOCK_STORAGE)
     {
-        // use up to 5% for the level db block cache but no bigger than 256MB
-        cache.nBlockDBCache = _nTotalCache * 0.05;
+        // use up to 10% for the level db block cache but no bigger than 256MB
+        cache.nBlockDBCache = _nTotalCache * 0.10;
         if (cache.nBlockDBCache < cache.nBlockTreeDBCache)
             cache.nBlockDBCache = cache.nBlockTreeDBCache;
-        else if (cache.nBlockDBCache > 256 << 20)
-            cache.nBlockDBCache = 256 << 20;
+        else if (cache.nBlockDBCache > 1024 << 20)
+            cache.nBlockDBCache = 1024 << 20;
 
-        // use up to 1% for the level db undo cache but no bigger than 64MB
-        cache.nBlockUndoDBCache = _nTotalCache * 0.01;
+        // use up to 2% for the level db undo cache but no bigger than 64MB
+        cache.nBlockUndoDBCache = _nTotalCache * 0.02;
         if (cache.nBlockUndoDBCache < cache.nBlockTreeDBCache)
             cache.nBlockUndoDBCache = cache.nBlockTreeDBCache;
-        else if (cache.nBlockUndoDBCache > 64 << 20)
-            cache.nBlockUndoDBCache = 64 << 20;
+        else if (cache.nBlockUndoDBCache > 128 << 20)
+            cache.nBlockUndoDBCache = 128 << 20;
     }
 
-    // use 25%-50% of the remainder for the utxo leveldb disk cache
+    // use 12.5%-25% of the remainder for the utxo leveldb disk cache
     _nTotalCache -= cache.nBlockDBCache;
     _nTotalCache -= cache.nBlockUndoDBCache;
-    cache.nCoinDBCache = std::min(_nTotalCache / 2, (_nTotalCache / 4) + (1 << 23));
+    cache.nCoinDBCache = std::min(_nTotalCache / 4, (_nTotalCache / 8) + (1 << 23));
     if (!GetBoolArg("-txindex", DEFAULT_TXINDEX))
     {
         cache.nTxIndexCache = 0;

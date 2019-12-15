@@ -12,7 +12,7 @@ CBlockLevelDB::CBlockLevelDB(size_t nCacheSizeBlock, size_t nCacheSizeUndo, bool
 {
     COverrideOptions overrideblock;
     // we want to have much larger file sizes for the blocks db so override the default.
-    overrideblock.max_file_size = nCacheSizeBlock / 2;
+    overrideblock.max_file_size = nCacheSizeBlock / 15;
     pwrapperblock =
         new CDBWrapper(GetDataDir() / "blockdb" / "blocks", nCacheSizeBlock, fMemory, fWipe, obfuscate, &overrideblock);
 
