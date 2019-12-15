@@ -440,6 +440,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         comp_block = HeaderAndShortIDs()
         comp_block.initialize_from_block(block)
 
+        self.test_node.last_getblocktxn = None
         self.test_node.send_and_ping(msg_cmpctblock(comp_block.to_p2p()))
         with mininode_lock:
             waitFor(30, lambda: self.test_node.last_getblocktxn is not None)
