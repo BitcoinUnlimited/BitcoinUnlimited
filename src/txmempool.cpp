@@ -235,9 +235,10 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
 
     if (fSearchForParents)
     {
-        // Get parents of this transaction that are in the mempool
-        // GetMemPoolParents() is only valid for entries in the mempool, so we
-        // iterate mapTx to find parents.
+        // Get parents of this transaction that are in the mempool.
+        // Our current transaction ("entry") is not yet in the mempool so we can not look for its
+        // parents using GetMemPoolParents(). Therefore we need to instead lookup the parents
+        // by using the inputs of this transaction.
         for (unsigned int i = 0; i < tx.vin.size(); i++)
         {
             txiter piter = mapTx.find(tx.vin[i].prevout.hash);
