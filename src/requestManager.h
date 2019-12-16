@@ -37,6 +37,9 @@ successful receipt, "requester.Rejected(...)" to indicate a bad object (request 
 // Max requests allowed in a 10 minute window
 static const uint8_t MAX_THINTYPE_OBJECT_REQUESTS = 100;
 
+// How many peers are connected before we start looking for slow peers to disconnect.
+static const uint32_t BEGIN_PRUNING_PEERS = 4;
+
 // When should I request a tx from someone else (in microseconds). cmdline/bitcoin.conf: -txretryinterval
 extern unsigned int txReqRetryInterval;
 extern unsigned int MIN_TX_REQUEST_RETRY_INTERVAL;
