@@ -2088,7 +2088,7 @@ bool ProcessMessages(CNode *pfrom)
                 pfrom->GetLogName());
             if (!pfrom->fWhitelisted)
             {
-                dosMan.Ban(pfrom->addr, BanReasonNodeMisbehaving, 4 * 60 * 60); // ban for 4 hours
+                dosMan.Ban(pfrom->addr, BanReasonInvalidMessageStart, 4 * 60 * 60); // ban for 4 hours
             }
             fOk = false;
             break;

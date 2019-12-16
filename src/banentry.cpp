@@ -49,9 +49,15 @@ std::string CBanEntry::banReasonToString()
     switch (banReason)
     {
     case BanReasonNodeMisbehaving:
-        return "node misbehaving";
+        return "Node Misbehaving";
     case BanReasonManuallyAdded:
-        return "manually added";
+        return "Manually Banned";
+    case BanReasonTooManyEvictions:
+        return "Too Many Evictions";
+    case BanReasonTooManyConnectionAttempts:
+        return "Too Many Connection Attempts";
+    case BanReasonInvalidMessageStart:
+        return "Invalid Message Start";
     default:
         return "unknown";
     }

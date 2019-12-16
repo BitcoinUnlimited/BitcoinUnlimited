@@ -30,6 +30,8 @@ bool BannedNodeLessThan::operator()(const CCombinedBan &left, const CCombinedBan
         return pLeft->subnet.ToString().compare(pRight->subnet.ToString()) < 0;
     case BanTableModel::Bantime:
         return pLeft->banEntry.nBanUntil < pRight->banEntry.nBanUntil;
+    case BanTableModel::BanReason:
+        return pLeft->banEntry.banReason < pRight->banEntry.banReason;
     }
 
     return false;
@@ -79,7 +81,7 @@ public:
 
 BanTableModel::BanTableModel(ClientModel *parent) : QAbstractTableModel(parent), clientModel(parent)
 {
-    columns << tr("IP/Netmask") << tr("Banned Until");
+    columns << tr("IP/Netmask") << tr("Banned Until") << tr("Ban Reason");
     priv.reset(new BanTablePriv());
     // default to unsorted
     priv->sortColumn = -1;
@@ -119,6 +121,8 @@ QVariant BanTableModel::data(const QModelIndex &index, int role) const
         {
         case Address:
             return QString::fromStdString(rec->subnet.ToString());
+        case BanReason:
+            return QString::fromStdString(rec->banEntry.banReasonToString());
         case Bantime:
             QDateTime date = QDateTime::fromMSecsSinceEpoch(0);
             date = date.addSecs(rec->banEntry.nBanUntil);
