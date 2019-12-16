@@ -1204,17 +1204,19 @@ void CRequestManager::RequestMempoolSync(CNode *pto)
         pto->canSyncMempoolWithPeers)
     {
         // Similar to Graphene, receiver must send CMempoolInfo
-        CInv inv;
-        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-
-        inv.type = MSG_MEMPOOLSYNC;
         CMempoolSyncInfo receiverMemPoolInfo = GetMempoolSyncInfo();
-        ss << inv;
-        ss << receiverMemPoolInfo;
-
         mempoolSyncRequested[nodeId] = CMempoolSyncState(
             GetStopwatchMicros(), receiverMemPoolInfo.shorttxidk0, receiverMemPoolInfo.shorttxidk1, false);
-        pto->PushMessage(NetMsgType::GET_MEMPOOLSYNC, ss);
+        if (NegotiateMempoolSyncVersion(pto) > 0)
+            pto->PushMessage(NetMsgType::GET_MEMPOOLSYNC, receiverMemPoolInfo);
+        else
+        {
+            CInv inv;
+            CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+            ss << inv;
+            ss << receiverMemPoolInfo;
+            pto->PushMessage(NetMsgType::GET_MEMPOOLSYNC, ss);
+        }
         LOG(MPOOLSYNC, "Requesting mempool synchronization from peer %s\n", pto->GetLogName());
 
         lastMempoolSync = GetStopwatchMicros();
