@@ -1043,7 +1043,7 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
         // issue if it did.
         if (!setAncestorsFromBlock.empty())
         {
-            DbgAssert("Ancestors in the mempool when they should not be", );
+            DbgAssert(!"Ancestors in the mempool when they should not be", );
             for (txiter it : setAncestorsFromBlock)
             {
                 removeUnchecked(it);
