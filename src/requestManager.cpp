@@ -1334,7 +1334,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                 // disconnecting.
                 //
                 // We disconnect a peer only if their average response time is more than 4 times the overall average.
-                static uint32_t nStartDisconnections GUARDED_BY(cs_overallaverage) = BEGIN_PRUNING_PEERS;
+                static int nStartDisconnections GUARDED_BY(cs_overallaverage) = BEGIN_PRUNING_PEERS;
                 if (!pnode->fDisconnectRequest &&
                     (nOutbound >= nMaxOutConnections - 1 || nOutbound >= nStartDisconnections) &&
                     IsInitialBlockDownload() && nIterations > nOverallRange &&

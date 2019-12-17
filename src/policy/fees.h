@@ -8,6 +8,7 @@
 
 #include "amount.h"
 #include "random.h"
+#include "txmempool.h"
 #include "uint256.h"
 
 #include <deque>
@@ -17,8 +18,6 @@
 
 class CAutoFile;
 class CFeeRate;
-class CTxMemPoolEntry;
-class CTxMemPool;
 
 /** \class CBlockPolicyEstimator
  * The BlockPolicyEstimator is used for estimating the fee needed
@@ -215,7 +214,7 @@ public:
     CBlockPolicyEstimator(const CFeeRate &minRelayFeem);
 
     /** Process all the transactions that have been included in a block */
-    void processBlock(unsigned int nBlockHeight, std::vector<CTxMemPoolEntry> &entries, bool fCurrentEstimate);
+    void processBlock(unsigned int nBlockHeight, const CTxMemPool::setEntries &setTxnsInBlock, bool fCurrentEstimate);
 
     /** Process a transaction confirmed in a block*/
     void processBlockTx(unsigned int nBlockHeight, const CTxMemPoolEntry &entry);
