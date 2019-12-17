@@ -12,7 +12,7 @@
 
 #include <boost/test/unit_test.hpp>
 
-BOOST_FIXTURE_TEST_SUITE(policyestimator_tests, BasicTestingSetup)
+BOOST_FIXTURE_TEST_SUITE(policyestimator_tests, TestingSetup)
 
 // used in all tests in this file, declare once here so editing is easier
 static const int32_t txHashesSize = 45;

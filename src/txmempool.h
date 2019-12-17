@@ -149,10 +149,12 @@ public:
     int64_t GetModifiedFee() const { return nFee + feeDelta; }
     size_t DynamicMemoryUsage() const { return nUsageSize; }
     const LockPoints &GetLockPoints() const { return lockPoints; }
-    // Adjusts the descendant state, if this entry is not dirty.
+    // Increments the descendant state values, if this entry is not dirty.
     void UpdateDescendantState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount);
-    // Adjusts the ancestor state
+    // Increments the ancestor state values
     void UpdateAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps);
+    // Replaces the previous ancestor state with new set of values
+    void ReplaceAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps);
     // Updates the fee delta used for mining priority score, and the
     // modified fees with descendants.
     void UpdateFeeDelta(int64_t feeDelta);
@@ -195,6 +197,35 @@ struct update_ancestor_state
 
     void operator()(CTxMemPoolEntry &e) { e.UpdateAncestorState(modifySize, modifyFee, modifyCount, modifySigOps); }
 private:
+    int64_t modifySize;
+    CAmount modifyFee;
+    int64_t modifyCount;
+    int modifySigOps;
+};
+
+struct replace_ancestor_state
+{
+    replace_ancestor_state(int64_t _modifySize, CAmount _modifyFee, int64_t _modifyCount, int _modifySigOps)
+        : modifySize(_modifySize), modifyFee(_modifyFee), modifyCount(_modifyCount), modifySigOps(_modifySigOps)
+    {
+    }
+
+    void operator()(CTxMemPoolEntry &e) { e.ReplaceAncestorState(modifySize, modifyFee, modifyCount, modifySigOps); }
+private:
+    int64_t modifySize;
+    CAmount modifyFee;
+    int64_t modifyCount;
+    int modifySigOps;
+};
+
+struct ancestor_state
+{
+    ancestor_state(int64_t _modifySize, CAmount _modifyFee, int64_t _modifyCount, int _modifySigOps)
+        : modifySize(_modifySize), modifyFee(_modifyFee), modifyCount(_modifyCount), modifySigOps(_modifySigOps)
+    {
+    }
+
+public:
     int64_t modifySize;
     CAmount modifyFee;
     int64_t modifyCount;
@@ -520,9 +551,11 @@ public:
     typedef std::set<txiter, CompareIteratorByHash> setEntries;
     typedef std::map<CTxMemPool::txiter, TxMempoolOriginalState, CTxMemPool::CompareIteratorByHash>
         TxMempoolOriginalStateMap;
+    typedef std::map<txiter, ancestor_state, CTxMemPool::CompareIteratorByHash> mapEntryHistory;
 
-
+    /** Return the set of mempool parents for this entry */
     const setEntries &GetMemPoolParents(txiter entry) const;
+    /** Return the set of mempool children for this entry */
     const setEntries &GetMemPoolChildren(txiter entry) const;
 
 private:
@@ -615,6 +648,11 @@ public:
         std::list<CTransactionRef> &conflicted,
         bool fCurrentEstimate = true,
         std::vector<CTxChange> *txChange = nullptr);
+    void removeForBlock_Legacy(const std::vector<CTransactionRef> &vtx,
+        unsigned int nBlockHeight,
+        std::list<CTransactionRef> &conflicted,
+        bool fCurrentEstimate = true,
+        std::vector<CTxChange> *txChange = nullptr);
     void clear();
     void _clear(); // lock free
     void queryHashes(std::vector<uint256> &vtxid) const;
@@ -697,7 +735,7 @@ public:
 
     /** Populate setDescendants with all in-mempool descendants of hash.  Assumes that setDescendants includes
      *  all in-mempool descendants of anything already in it.  */
-    void _CalculateDescendants(txiter it, setEntries &setDescendants);
+    void _CalculateDescendants(txiter it, setEntries &setDescendants, mapEntryHistory *mapTxnChainTips = nullptr);
 
     /** Similar to CalculateMemPoolAncestors, except only requires the inputs and just returns true/false depending on
      * whether the input set conforms to the passed limits */
@@ -821,6 +859,12 @@ private:
         TxMempoolOriginalStateMap *changeSet);
     /** Sever link between specified transaction and direct children. */
     void UpdateChildrenForRemoval(txiter entry);
+
+    /** Update the ancestor state for the set of supplied transaction chains. This step is done after
+     *  a block has finished processing and we have already removed the transactions from the mempool
+     */
+    void UpdateTxnChainState(mapEntryHistory &mapTxnChainTips);
+
     /** Internal implementation of transaction per sec rate update logic
      *  Requires that the cs_txPerSec lock be held by the calling method
      */
