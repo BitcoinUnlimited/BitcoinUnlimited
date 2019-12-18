@@ -763,14 +763,14 @@ CacheConfig CacheSizeCalculations(int64_t _nTotalCache)
     _nTotalCache -= cache.nBlockTreeDBCache;
     if (BLOCK_DB_MODE == LEVELDB_BLOCK_STORAGE)
     {
-        // use up to 10% for the level db block cache but no bigger than 256MB
+        // use up to 10% for the level db block cache but no bigger than 1GB
         cache.nBlockDBCache = _nTotalCache * 0.10;
         if (cache.nBlockDBCache < cache.nBlockTreeDBCache)
             cache.nBlockDBCache = cache.nBlockTreeDBCache;
         else if (cache.nBlockDBCache > 1024 << 20)
             cache.nBlockDBCache = 1024 << 20;
 
-        // use up to 2% for the level db undo cache but no bigger than 64MB
+        // use up to 2% for the level db undo cache but no bigger than 128MB
         cache.nBlockUndoDBCache = _nTotalCache * 0.02;
         if (cache.nBlockUndoDBCache < cache.nBlockTreeDBCache)
             cache.nBlockUndoDBCache = cache.nBlockTreeDBCache;
