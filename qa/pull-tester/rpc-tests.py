@@ -262,7 +262,8 @@ testScripts = [ RpcTest(t) for t in [
     WhenElectrumFound('electrum_cashaccount'),
     'minimaldata-activation',
     'schnorrmultisig_activation',
-    WhenElectrumFound('electrum_subscriptions')
+    WhenElectrumFound('electrum_subscriptions'),
+    'randompruning'
 
 ] ]
 
@@ -292,8 +293,7 @@ testScriptsExt = [ RpcTest(t) for t in [
     Disabled('maxblocksinflight', "needs a rewrite and is already somewhat tested in sendheaders.py"),
     'p2p-acceptblock',
     'mempool_packages',
-    'maxuploadtarget',
-    'randompruning'
+    'maxuploadtarget'
 ] ]
 
 #Enable ZMQ tests
