@@ -110,8 +110,8 @@ BOOST_FIXTURE_TEST_CASE(cache_configuration, TestChain100Setup)
     BOOST_CHECK(cacheConfig1.nBlockUndoDBCache == 0);
     BOOST_CHECK(cacheConfig1.nBlockTreeDBCache == 2097152);
     BOOST_CHECK(cacheConfig1.nTxIndexCache == 0);
-    BOOST_CHECK(cacheConfig1.nCoinDBCache == 138936320);
-    BOOST_CHECK(nCoinCacheMaxSize == 383254528);
+    BOOST_CHECK(cacheConfig1.nCoinDBCache == 73662464);
+    BOOST_CHECK(nCoinCacheMaxSize == 448528384);
 
     // Check non-default values are returned
     CacheConfig cacheConfig2 = DiscoverCacheConfiguration();
@@ -119,39 +119,39 @@ BOOST_FIXTURE_TEST_CASE(cache_configuration, TestChain100Setup)
     BOOST_CHECK(cacheConfig2.nBlockUndoDBCache == 0);
     BOOST_CHECK(cacheConfig2.nBlockTreeDBCache == 655360);
     BOOST_CHECK(cacheConfig2.nTxIndexCache == 0);
-    BOOST_CHECK(cacheConfig2.nCoinDBCache == 2293760);
-    BOOST_CHECK(nCoinCacheMaxSize == 2293760);
+    BOOST_CHECK(cacheConfig2.nCoinDBCache == 1146880);
+    BOOST_CHECK(nCoinCacheMaxSize == 3440640);
 
 
     // check default values are honored if blockdb storage is on
     BLOCK_DB_MODE = LEVELDB_BLOCK_STORAGE;
     cacheConfig1 = DiscoverCacheConfiguration(true);
-    BOOST_CHECK(cacheConfig1.nBlockDBCache == 26109542);
-    BOOST_CHECK(cacheConfig1.nBlockUndoDBCache == 5221908);
+    BOOST_CHECK(cacheConfig1.nBlockDBCache == 52219084);
+    BOOST_CHECK(cacheConfig1.nBlockUndoDBCache == 10443816);
     BOOST_CHECK(cacheConfig1.nBlockTreeDBCache == 2097152);
     BOOST_CHECK(cacheConfig1.nTxIndexCache == 0);
-    BOOST_CHECK(cacheConfig1.nCoinDBCache == 131103457);
-    BOOST_CHECK(nCoinCacheMaxSize == 359755941);
+    BOOST_CHECK(cacheConfig1.nCoinDBCache == 65829601);
+    BOOST_CHECK(nCoinCacheMaxSize == 393698347);
 
     // check settings when txindex is on
     bool nTemp = GetBoolArg("-txindex", 0);
     SetBoolArg("-txindex", true);
     cacheConfig1 = DiscoverCacheConfiguration(true);
-    BOOST_CHECK(cacheConfig1.nBlockDBCache == 26109542);
-    BOOST_CHECK(cacheConfig1.nBlockUndoDBCache == 5221908);
+    BOOST_CHECK(cacheConfig1.nBlockDBCache == 52219084);
+    BOOST_CHECK(cacheConfig1.nBlockUndoDBCache == 10443816);
     BOOST_CHECK(cacheConfig1.nBlockTreeDBCache == 2097152);
-    BOOST_CHECK(cacheConfig1.nTxIndexCache == 65551728);
-    BOOST_CHECK(cacheConfig1.nCoinDBCache == 65551728);
-    BOOST_CHECK(nCoinCacheMaxSize == 359755942);
+    BOOST_CHECK(cacheConfig1.nTxIndexCache == 32914800);
+    BOOST_CHECK(cacheConfig1.nCoinDBCache == 32914800);
+    BOOST_CHECK(nCoinCacheMaxSize == 393698348);
 
     // Check non-default values are returned
     cacheConfig2 = DiscoverCacheConfiguration();
     BOOST_CHECK(cacheConfig2.nBlockDBCache == 655360);
     BOOST_CHECK(cacheConfig2.nBlockUndoDBCache == 655360);
     BOOST_CHECK(cacheConfig2.nBlockTreeDBCache == 655360);
-    BOOST_CHECK(cacheConfig2.nTxIndexCache == 819200);
-    BOOST_CHECK(cacheConfig2.nCoinDBCache == 819200);
-    BOOST_CHECK(nCoinCacheMaxSize == 1638400);
+    BOOST_CHECK(cacheConfig2.nTxIndexCache == 409600);
+    BOOST_CHECK(cacheConfig2.nCoinDBCache == 409600);
+    BOOST_CHECK(nCoinCacheMaxSize == 2457600);
 
     // Cleanup
     SetBoolArg("-txindex", nTemp);
