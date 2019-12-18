@@ -260,6 +260,23 @@ void ThinTypeRelay::ClearAllBlocksInFlight(NodeId id)
     mapThinTypeBlocksInFlight.erase(range.first, range.second);
 }
 
+void ThinTypeRelay::SetSentGrapheneBlocks(NodeId id, CGrapheneBlock &grapheneBlock)
+{
+    LOCK(cs_graphene_sender);
+    mapGrapheneSentBlocks[id] = std::make_shared<CGrapheneBlock>(grapheneBlock);
+}
+
+std::shared_ptr<CGrapheneBlock> ThinTypeRelay::GetSentGrapheneBlocks(NodeId id)
+{
+    LOCK(cs_graphene_sender);
+
+    auto it = mapGrapheneSentBlocks.find(id);
+    if (it != mapGrapheneSentBlocks.end())
+        return it->second;
+    else
+        return std::shared_ptr<CGrapheneBlock>();
+}
+
 void ThinTypeRelay::ClearSentGrapheneBlocks(NodeId id)
 {
     LOCK(cs_graphene_sender);

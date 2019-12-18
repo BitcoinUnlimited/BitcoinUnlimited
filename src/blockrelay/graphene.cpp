@@ -1331,7 +1331,6 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
             }
             else
             {
-                LOCK(thinrelay.cs_graphene_sender);
                 graphenedata.UpdateOutBound(nSizeGrapheneBlock, nSizeBlock);
                 pfrom->PushMessage(NetMsgType::GRAPHENEBLOCK, grapheneBlock);
 
@@ -1341,7 +1340,7 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
                     grapheneBlock.vTxHashes256.push_back(tx->GetHash());
                 }
                 // Next store graphene block in case receiver attempts failure recovery
-                thinrelay.mapGrapheneSentBlocks[pfrom->GetId()] = std::make_shared<CGrapheneBlock>(grapheneBlock);
+                thinrelay.SetSentGrapheneBlocks(pfrom->GetId(), grapheneBlock);
                 LOG(GRAPHENE, "Sent graphene block - size: %d vs block size: %d => peer: %s\n", nSizeGrapheneBlock,
                     nSizeBlock, pfrom->GetLogName());
 
@@ -1426,17 +1425,9 @@ bool HandleGrapheneBlockRecoveryRequest(CDataStream &vRecv, CNode *pfrom, const 
     CRequestGrapheneReceiverRecover recoveryRequest;
     vRecv >> recoveryRequest;
 
-    std::shared_ptr<CGrapheneBlock> grapheneBlock;
-    {
-        LOCK(thinrelay.cs_graphene_sender);
-        auto it = thinrelay.mapGrapheneSentBlocks.find(pfrom->GetId());
-        if (it != thinrelay.mapGrapheneSentBlocks.end())
-            grapheneBlock = it->second;
-        else
-        {
-            return error("No block available to reconstruct for graphenetx");
-        }
-    }
+    std::shared_ptr<CGrapheneBlock> grapheneBlock = thinrelay.GetSentGrapheneBlocks(pfrom->GetId());
+    if (!grapheneBlock)
+        return error("No block available to reconstruct for get_grrec");
 
     // We had a block stored but it was the wrong one
     if (grapheneBlock->header.GetHash() != recoveryRequest.blockhash)
@@ -1456,7 +1447,7 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
 
     auto pblock = thinrelay.GetBlockToReconstruct(pfrom, recoveryResponse.blockhash);
     if (pblock == nullptr)
-        return error("No block available to reconstruct for graphenetx");
+        return error("No block available to reconstruct for grrec");
     DbgAssert(pblock->grapheneblock != nullptr, return false);
     CGrapheneBlock grapheneBlock = *(pblock->grapheneblock);
 
