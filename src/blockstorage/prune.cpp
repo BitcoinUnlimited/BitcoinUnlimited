@@ -95,7 +95,7 @@ void GenerateRandomPruningHashMask()
 }
 
 /** Get important pruning bits from a block hash and compare their value to our pruning threshold*/
-bool hashMaskCompare(uint256 _blockHash)
+bool IsBlockHashBelowPruneThreshold(uint256 _blockHash)
 {
     uint64_t value = UintToArith256(_blockHash).GetLow64();
     uint64_t valxmask = value ^ pruneHashMask;
@@ -307,7 +307,7 @@ uint64_t PruneDB(uint64_t nLastBlockWeCanPrune)
         {
             break;
         }
-        if (fPruneWithMask == true && hashMaskCompare(pindexOldest->GetBlockHash()))
+        if (fPruneWithMask && IsBlockHashBelowPruneThreshold(pindexOldest->GetBlockHash()))
         {
             pindexOldest = chainActive.Next(pindexOldest);
             continue;
