@@ -109,36 +109,50 @@ bool IsBlockHashBelowPruneThreshold(uint256 _blockHash)
     return false;
 }
 
-bool SetupPruning()
+bool SetupPruning(std::string &strLoadError)
 {
-    // block pruning; get the amount of disk space (in MiB) to allot for block & undo files
-    int64_t nSignedPruneTarget = GetArg("-prune", 0) * 1024 * 1024;
-    bool useMask = GetBoolArg("-prunewithmask", DEFAULT_PRUNE_WITH_MASK);
-    if (nSignedPruneTarget < 0)
-    {
-        return InitError(_("Prune cannot be configured with a negative value."));
-    }
-    nPruneTarget = (uint64_t)nSignedPruneTarget;
-    if (nPruneTarget && useMask)
-    {
-        return InitError(_("Prune and prunewithmask are incompatible, please choose only one"));
-    }
-    // standard pruning
-    if (nPruneTarget)
-    {
-        if (nPruneTarget < MIN_DISK_SPACE_FOR_BLOCK_FILES)
-        {
-            return InitError(strprintf(_("Prune configured below the minimum of %d MiB.  Please use a higher number."),
-                MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024));
-        }
-        LOGA("Prune configured to target %uMiB on disk for block and undo files.\n", nPruneTarget / 1024 / 1024);
-        fPruneMode = true;
-        return true;
-    }
-    // pruning using a hash mask
+    // check if we have pruned with some method before
+    pblocktree->ReadFlag("prunedblockfiles", fHavePruned);
+
+    // mask pruning: check if we want to use or have previously used a hash mask to prune
     bool haveUsedMask = false;
     pblocktree->ReadFlag("hashmaskexists", haveUsedMask);
-    if (haveUsedMask || useMask)
+    bool useMask = GetBoolArg("-prunewithmask", DEFAULT_PRUNE_WITH_MASK);
+    bool maskPruning = (haveUsedMask || useMask);
+
+    // standard pruning; get the amount of disk space (in MiB) to allot for block & undo files
+    int64_t nSignedPruneTarget = GetArg("-prune", 0) * 1024 * 1024;
+    bool standardPruning = (nSignedPruneTarget != 0 || (!maskPruning && fHavePruned));
+
+    // check if we have valid pruning mode set
+    if (standardPruning && maskPruning)
+    {
+        strLoadError = _("Prune and prunewithmask are incompatible, please choose only one. If you have previously pruned with one method you must either continue to use that method or you will need to redownload the blockchain again");
+        return false;
+    }
+
+    if(standardPruning)
+    {
+        if (nSignedPruneTarget < 0)
+        {
+            strLoadError = _("Prune cannot be configured with a negative value.");
+            return false;
+        }
+        nPruneTarget = (uint64_t)nSignedPruneTarget;
+        // standard pruning
+        if (nPruneTarget) // > 0
+        {
+            if (nPruneTarget < MIN_DISK_SPACE_FOR_BLOCK_FILES)
+            {
+                strLoadError = _(strprintf(_("Prune configured below the minimum of %d MiB.  Please use a higher number."),
+                    MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024).c_str());
+                return false;
+            }
+            LOGA("Prune configured to target %uMiB on disk for block and undo files.\n", nPruneTarget / 1024 / 1024);
+            fPruneMode = true;
+        }
+    }
+    else if (maskPruning)
     {
         fPruneWithMask = true;
         GenerateRandomPruningHashMask();
@@ -151,7 +165,7 @@ bool SetupPruning()
         {
             hashMaskThresholdTweak.Set(DEFAULT_THRESHOLD_PERCENT);
         }
-        uint8_t potentialThreshold = GetArg("-prunethreshold", DEFAULT_THRESHOLD_PERCENT);
+        uint8_t potentialThreshold = GetArg("-prune.hashMaskThreshold", DEFAULT_THRESHOLD_PERCENT);
         if (potentialThreshold < hashMaskThresholdTweak.Value())
         {
             hashMaskThresholdTweak.Set(potentialThreshold);
@@ -163,13 +177,49 @@ bool SetupPruning()
                 potentialThreshold, hashMaskThresholdTweak.Value());
             if (hashMaskThresholdTweak.Value() == 0)
             {
-                LOGA("CRITICAL ERROR, THRESHOLD == 0, PLEASE REPORT THIS\n");
+                strLoadError = _("Threashold == 0, Critical Error. Please report this to a developer");
                 return false;
             }
         }
         normalized_threshold = hashMaskThresholdTweak.Value() * ONE_THRESHOLD_PERCENT;
         fPruneMode = true;
     }
+
+    // if using block pruning, then disable txindex
+    if (fPruneMode)
+    {
+        if (GetBoolArg("-txindex", DEFAULT_TXINDEX))
+        {
+            strLoadError = _("Prune mode is incompatible with -txindex.");
+            return false;
+        }
+#ifdef ENABLE_WALLET
+        if (GetBoolArg("-rescan", false))
+        {
+            strLoadError = _("Rescans are not possible in pruned mode. You will need to use -reindex which will "
+                               "download the whole blockchain again.");
+            return false;
+        }
+#endif
+    }
+    else
+    {
+        // raise preallocation size of block and undo files
+        blockfile_chunk_size = MAX_BLOCKFILE_SIZE;
+        // multiply by 8 as this is the same difference between default and max blockfile size
+        // we do not have a define max undofile size
+        undofile_chunk_size = undofile_chunk_size * 8;
+    }
+
+    // Check for changed -prune state.  What we are concerned about is a user who has pruned blocks
+    // in the past, but is now trying to run unpruned.
+    if (fHavePruned && !fPruneMode)
+    {
+        strLoadError = _("You need to rebuild the database using -reindex to go back to unpruned mode.  "
+                         "This will redownload the entire blockchain");
+        return false;
+    }
+
     return true;
 }
 

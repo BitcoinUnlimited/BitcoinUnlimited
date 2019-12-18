@@ -26,7 +26,7 @@ extern std::atomic<uint64_t> normalized_threshold;
 extern uint64_t nDBUsedSpace;
 
 std::string hashMaskThresholdValidator(const uint8_t &value, uint8_t *item, bool validate);
-bool SetupPruning();
+bool SetupPruning(std::string &strLoadError);
 /**
  *  Actually unlink the specified files
  */

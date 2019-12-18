@@ -78,7 +78,7 @@ class RandomPruning (BitcoinTestFramework):
             # assert this is the case
             valxmask = int(low64block, 16) ^ hashMask64
             if valxmask >= normalized_threshold:
-                assert_raises_rpc_error(-32603, "Block not available (pruned data)", self.nodes[1].getblock, block)
+                assert_raises_rpc_error(-1, "Block not available (pruned data)", self.nodes[1].getblock, block)
             else:
                 kept.append(self.nodes[1].getblock(block)['height'])
 
@@ -109,12 +109,12 @@ class RandomPruning (BitcoinTestFramework):
 
 
         blocks_mined2 = []
-        for i in range(500):
+        for i in range(200):
             blockhash = self.nodes[0].generate(1)[0]
             # dont add blocks above the min blocks to keep line
-            if (i + 100 < 680):
+            if (i + 100 < 380):
                 blocks_mined.append(blockhash)
-            if (i % 50 == 0):
+            if (i % 100 == 0):
                 self.sync_blocks()
         self.sync_blocks()
 
@@ -131,7 +131,7 @@ class RandomPruning (BitcoinTestFramework):
             # assert this is the case
             valxmask = (int(low64block, 16) ^ int(hashMask64, 16))
             if valxmask >= normalized_threshold:
-                assert_raises_rpc_error(-32603, "Block not available (pruned data)", self.nodes[1].getblock, block)
+                assert_raises_rpc_error(-1, "Block not available (pruned data)", self.nodes[1].getblock, block)
             else:
                 kept2.append(self.nodes[1].getblock(block)['height'])
 

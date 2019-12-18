@@ -724,28 +724,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 
     // also see: InitParameterInteraction()
 
-    // if using block pruning, then disable txindex
-    if (GetArg("-prune", 0))
-    {
-        if (GetBoolArg("-txindex", DEFAULT_TXINDEX))
-            return InitError(_("Prune mode is incompatible with -txindex."));
-#ifdef ENABLE_WALLET
-        if (GetBoolArg("-rescan", false))
-        {
-            return InitError(_("Rescans are not possible in pruned mode. You will need to use -reindex which will "
-                               "download the whole blockchain again."));
-        }
-#endif
-    }
-    else
-    {
-        // raise preallocation size of block and undo files
-        blockfile_chunk_size = MAX_BLOCKFILE_SIZE;
-        // multiply by 8 as this is the same difference between default and max blockfile size
-        // we do not have a define max undofile size
-        undofile_chunk_size = undofile_chunk_size * 8;
-    }
-
     // Make sure enough file descriptors are available
     int nBind = std::max((int)mapArgs.count("-bind") + (int)mapArgs.count("-whitebind"), 1);
     int nUserMaxConnections = GetArg("-maxconnections", DEFAULT_MAX_PEER_CONNECTIONS);
@@ -1129,6 +1107,12 @@ bool AppInit2(Config &config, thread_group &threadGroup)
                 uiInterface.InitMessage(_("Opening Coins Cache database..."));
                 pcoinsTip = new CCoinsViewCache(pcoinscatcher);
 
+                // we need to setup pruning before we LoadBlockIndex but after we have created our db pointers
+                if (!SetupPruning(strLoadError))
+                {
+                    break;
+                }
+
                 if (fReindex)
                 {
                     pblocktree->WriteReindexing(true);
@@ -1165,15 +1149,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
                 if (!InitBlockIndex(chainparams))
                 {
                     strLoadError = _("Error initializing block database");
-                    break;
-                }
-
-                // Check for changed -prune state.  What we are concerned about is a user who has pruned blocks
-                // in the past, but is now trying to run unpruned.
-                if (fHavePruned && !fPruneMode)
-                {
-                    strLoadError = _("You need to rebuild the database using -reindex to go back to unpruned mode.  "
-                                     "This will redownload the entire blockchain");
                     break;
                 }
 

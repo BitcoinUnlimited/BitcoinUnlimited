@@ -58,7 +58,7 @@ public:
 
     //! Flush database files to disk
     virtual void Flush() = 0;
-    
+
     //! Remove undo data from the database via its key
     virtual bool EraseUndo(const std::string &key) = 0;
 

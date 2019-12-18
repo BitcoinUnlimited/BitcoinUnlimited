@@ -339,7 +339,6 @@ bool LoadBlockIndexDB()
     LOCK(cs_main);
     /** This sync method will break on pruned nodes so we cant use if pruned*/
     // Check whether we have ever pruned block & undo files
-    pblocktree->ReadFlag("prunedblockfiles", fHavePruned);
     if (!fHavePruned)
     {
         // by default we want to sync from disk instead of network if possible
