@@ -312,6 +312,7 @@ uint64_t PruneDB(uint64_t nLastBlockWeCanPrune)
             pindexOldest = chainActive.Next(pindexOldest);
             continue;
         }
+        // We have chosen to prune this block
         unsigned int blockSize = pindexOldest->nDataPos;
         std::ostringstream key;
         key << pindexOldest->GetBlockTime() << ":" << pindexOldest->GetBlockHash().ToString();
