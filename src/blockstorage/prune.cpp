@@ -65,9 +65,12 @@ std::string hashMaskThresholdValidator(const uint8_t &value, uint8_t *item, bool
     else
     {
         uint8_t newValue = *item;
-        if (!pblocktree->WriteHashMaskThreshold(newValue))
+        if(pblocktree)
         {
-            strReturn = "Error writing new threshold to disk";
+            if (!pblocktree->WriteHashMaskThreshold(newValue))
+            {
+                strReturn = "Error writing new threshold to disk";
+            }
         }
         normalized_threshold = (newValue * ONE_THRESHOLD_PERCENT);
         RelayNewXUpdate(XVer::BU_PRUNE_THRESHOLD, normalized_threshold);
