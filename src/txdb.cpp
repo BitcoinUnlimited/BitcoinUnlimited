@@ -57,8 +57,13 @@ struct CoinEntry
 };
 }
 
-CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool fMemory, bool fWipe)
-    : db(GetDataDir() / "chainstate", nCacheSize, fMemory, fWipe, true)
+
+CCoinsViewDB::CCoinsViewDB(size_t nCacheSize,
+    bool fMemory,
+    bool fWipe,
+    bool fObfuscate,
+    COverrideOptions *overridecache)
+    : db(GetDataDir() / "chainstate", nCacheSize, fMemory, fWipe, fObfuscate, overridecache)
 {
 }
 

@@ -623,7 +623,9 @@ bool FlushStateToDiskInternal(CValidationState &state,
         else
         {
             if (pblockdb)
+            {
                 pblockdb->Flush();
+            }
         }
         // Then update all block file information (which may refer to block and undo files).
         {

@@ -123,7 +123,11 @@ protected:
     CDBWrapper db;
 
 public:
-    CCoinsViewDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);
+    CCoinsViewDB(size_t nCacheSize,
+        bool fMemory = false,
+        bool fWipe = false,
+        bool fObfuscate = false,
+        COverrideOptions *overridecache = nullptr);
 
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
