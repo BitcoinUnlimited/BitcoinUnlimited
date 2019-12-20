@@ -3244,12 +3244,13 @@ void CNode::DisconnectIfBanned()
         else if (addr.IsLocal())
         {
             nMisbehavior.store(0);
+            nBanType = (BanReason)-1;
             LOGA("Warning: not banning local peer %s!\n", GetLogName());
         }
         else
         {
             fDisconnect = true;
-            dosMan.Ban(addr, BanReasonNodeMisbehaving);
+            dosMan.Ban(addr, nBanType);
         }
     }
 }

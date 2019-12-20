@@ -487,7 +487,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (pfrom->strSubVer.find("Bitcoin SV") != std::string::npos ||
                 pfrom->strSubVer.find("(SV;") != std::string::npos)
             {
-                dosMan.Misbehaving(pfrom, 100);
+                dosMan.Misbehaving(pfrom, 100, BanReasonInvalidPeer);
             }
         }
         if (!vRecv.empty())
@@ -957,7 +957,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
             else if (inv.hash.IsNull())
             {
-                dosMan.Misbehaving(pfrom, 20);
+                dosMan.Misbehaving(pfrom, 20, BanReasonInvalidInventory);
                 LOG(NET, "message inv has null hash %s", inv.type, inv.hash.ToString());
                 return false;
             }
@@ -1050,7 +1050,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK) || (inv.type == MSG_FILTERED_BLOCK) ||
                     (inv.type == MSG_CMPCT_BLOCK)))
             {
-                dosMan.Misbehaving(pfrom, 20);
+                dosMan.Misbehaving(pfrom, 20, BanReasonInvalidInventory);
                 return error("message inv invalid type = %u", inv.type);
             }
 

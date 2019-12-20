@@ -489,6 +489,7 @@ public:
     std::atomic<int> nMisbehavior;
     //! Whether this peer should be disconnected and banned (unless whitelisted).
     bool fShouldBan;
+    BanReason nBanType = (BanReason)-1;
 
     // BUIP010 Xtreme Thinblocks: begin section
     std::atomic<uint32_t> nXthinBloomfilterSize; // Max xthin bloom filter size (in bytes) that our peer will accept.

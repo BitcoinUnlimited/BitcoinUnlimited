@@ -55,7 +55,7 @@ public:
      * @param[in] pNode    The node which is misbehaving.  No effect if nullptr.
      * @param[in] howmuch  Incremental misbehaving score for the latest infraction by this node.
      */
-    void Misbehaving(CNode *pNode, int howmuch);
+    void Misbehaving(CNode *pNode, int howmuch, BanReason reason = (BanReason)-1);
 
     /**
      * Increment the misbehaving score for this node.  If the ban threshold is reached, flag the node to be

@@ -16,7 +16,9 @@ typedef enum BanReason {
     BanReasonManuallyAdded = 2,
     BanReasonTooManyEvictions = 3,
     BanReasonTooManyConnectionAttempts = 4,
-    BanReasonInvalidMessageStart = 5
+    BanReasonInvalidMessageStart = 5,
+    BanReasonInvalidInventory = 6,
+    BanReasonInvalidPeer = 7
 } BanReason;
 
 class CBanEntry

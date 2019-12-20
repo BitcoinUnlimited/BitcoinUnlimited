@@ -58,6 +58,10 @@ std::string CBanEntry::banReasonToString()
         return "Too Many Connection Attempts";
     case BanReasonInvalidMessageStart:
         return "Invalid Message Start";
+    case BanReasonInvalidInventory:
+        return "Invalid Inventory";
+    case BanReasonInvalidPeer:
+        return "Invalid Peer for this Network";
     default:
         return "unknown";
     }
