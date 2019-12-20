@@ -717,9 +717,9 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Cod
     jstring jdata)
 {
     std::string data = toString(env, jdata);
-    bool valid = false;
-    auto dataBytes = DecodeBase64(data.c_str(), &valid);
-    if (!valid)
+    bool invalid = true;
+    auto dataBytes = DecodeBase64(data.c_str(), &invalid);
+    if (invalid)
     {
         triggerJavaIllegalStateException(env, "bad encoding");
         return jbyteArray();
