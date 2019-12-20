@@ -67,7 +67,7 @@ typedef enum {
     AddrBlockchainNol = 4,
 } ChainSelector;
 
-static CChainParams *GetChainParams(ChainSelector chainSelector)
+CChainParams *GetChainParams(ChainSelector chainSelector)
 {
     if (chainSelector == AddrBlockchainBCH)
         return &Params(CBaseChainParams::MAIN);
