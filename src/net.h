@@ -113,6 +113,8 @@ void AddOneShot(const std::string &strDest);
 CNodeRef FindNodeRef(const std::string &addrName);
 // Find a node by id.  Returns a null ref if no node found
 CNodeRef FindNodeRef(const NodeId id);
+// Find a node by ip.  Returns a null ref if no node found
+CNodeRef FindNodeRef(const CNetAddr &ip);
 int DisconnectSubNetNodes(const CSubNet &subNet);
 bool OpenNetworkConnection(const CAddress &addrConnect,
     bool fCountFailure,

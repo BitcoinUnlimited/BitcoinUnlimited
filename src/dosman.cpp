@@ -108,10 +108,14 @@ bool CDoSManager::IsBanned(CSubNet subnet)
 * @param[in] bantimeoffset   The duration of the ban in seconds, either a duration or an absolute time
 * @param[in] sinceUnixEpoch  Whether or not the bantimeoffset is a relative duration, or absolute time
 */
-void CDoSManager::Ban(const CNetAddr &addr, const BanReason &banReason, int64_t bantimeoffset, bool sinceUnixEpoch)
+void CDoSManager::Ban(const CNetAddr &addr,
+    const std::string &userAgent,
+    const BanReason &banReason,
+    int64_t bantimeoffset,
+    bool sinceUnixEpoch)
 {
     CSubNet subNet(addr);
-    Ban(subNet, banReason, bantimeoffset, sinceUnixEpoch);
+    Ban(subNet, userAgent, banReason, bantimeoffset, sinceUnixEpoch);
 }
 
 /**
@@ -123,9 +127,14 @@ void CDoSManager::Ban(const CNetAddr &addr, const BanReason &banReason, int64_t 
 * @param[in] bantimeoffset   The duration of the ban in seconds, either a duration or an absolute time
 * @param[in] sinceUnixEpoch  Whether or not the bantimeoffset is a relative duration, or absolute time
 */
-void CDoSManager::Ban(const CSubNet &subNet, const BanReason &banReason, int64_t bantimeoffset, bool sinceUnixEpoch)
+void CDoSManager::Ban(const CSubNet &subNet,
+    const std::string &userAgent,
+    const BanReason &banReason,
+    int64_t bantimeoffset,
+    bool sinceUnixEpoch)
 {
     CBanEntry banEntry(GetTime());
+    banEntry.userAgent = userAgent;
     banEntry.banReason = banReason;
     if (bantimeoffset <= 0)
     {
@@ -133,6 +142,7 @@ void CDoSManager::Ban(const CSubNet &subNet, const BanReason &banReason, int64_t
         sinceUnixEpoch = false;
     }
     banEntry.nBanUntil = (sinceUnixEpoch ? 0 : GetTime()) + bantimeoffset;
+
 
     LOCK(cs_setBanned);
     if (setBanned[subNet].nBanUntil < banEntry.nBanUntil)

@@ -29,6 +29,7 @@ public:
     int64_t nCreateTime;
     int64_t nBanUntil;
     uint8_t banReason;
+    std::string userAgent;
 
     CBanEntry();
     CBanEntry(int64_t nCreateTimeIn);
@@ -42,6 +43,7 @@ public:
         READWRITE(nCreateTime);
         READWRITE(nBanUntil);
         READWRITE(banReason);
+        READWRITE(userAgent);
     }
 
     void SetNull();

@@ -86,8 +86,16 @@ public:
     void ClearBanned(); // needed for unit testing
     bool IsBanned(CNetAddr ip);
     bool IsBanned(CSubNet subnet);
-    void Ban(const CNetAddr &ip, const BanReason &banReason, int64_t bantimeoffset = 0, bool sinceUnixEpoch = false);
-    void Ban(const CSubNet &subNet, const BanReason &banReason, int64_t bantimeoffset = 0, bool sinceUnixEpoch = false);
+    void Ban(const CNetAddr &ip,
+        const std::string &userAgent,
+        const BanReason &banReason,
+        int64_t bantimeoffset = 0,
+        bool sinceUnixEpoch = false);
+    void Ban(const CSubNet &subNet,
+        const std::string &userAgent,
+        const BanReason &banReason,
+        int64_t bantimeoffset = 0,
+        bool sinceUnixEpoch = false);
     bool Unban(const CNetAddr &ip);
     bool Unban(const CSubNet &ip);
     void GetBanned(banmap_t &banmap);

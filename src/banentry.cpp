@@ -37,6 +37,7 @@ void CBanEntry::SetNull()
     nCreateTime = 0;
     nBanUntil = 0;
     banReason = BanReasonUnknown;
+    userAgent.clear();
 }
 
 /**

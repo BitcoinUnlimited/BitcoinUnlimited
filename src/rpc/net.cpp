@@ -680,8 +680,12 @@ UniValue setban(const UniValue &params, bool fHelp)
         if (params.size() == 4 && params[3].isTrue())
             absolute = true;
 
-        isSubnet ? dosMan.Ban(subNet, BanReasonManuallyAdded, banTime, absolute) :
-                   dosMan.Ban(netAddr, BanReasonManuallyAdded, banTime, absolute);
+        std::string userAgent = "unknown";
+        CNodeRef bannedNode = FindNodeRef(netAddr);
+        if (bannedNode)
+            userAgent = bannedNode.get()->cleanSubVer;
+        isSubnet ? dosMan.Ban(subNet, userAgent, BanReasonManuallyAdded, banTime, absolute) :
+                   dosMan.Ban(netAddr, userAgent, BanReasonManuallyAdded, banTime, absolute);
 
         // disconnect possible nodes
         if (!isSubnet)

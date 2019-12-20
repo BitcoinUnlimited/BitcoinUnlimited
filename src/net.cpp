@@ -425,6 +425,13 @@ CNodeRef FindNodeRef(const std::string &addrName)
     return CNodeRef(FindNode(addrName));
 }
 
+CNodeRef FindNodeRef(const CNetAddr &ip)
+{
+    LOCK(cs_vNodes);
+    return CNodeRef(FindNode(ip));
+}
+
+
 int DisconnectSubNetNodes(const CSubNet &subNet)
 {
     int nDisconnected = 0;
@@ -947,7 +954,9 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
         if (nEvictions > 15)
         {
             int nHoursToBan = 4;
-            dosMan.Ban(ipAddress, BanReasonTooManyEvictions, nHoursToBan * 60 * 60);
+            std::string userAgent = vEvictionCandidatesByActivity[0]->cleanSubVer;
+            mapInboundConnectionTracker[ipAddress].userAgent = userAgent;
+            dosMan.Ban(ipAddress, userAgent, BanReasonTooManyEvictions, nHoursToBan * 60 * 60);
             LOGA("Banning %s for %d hours: Too many evictions - connection dropped\n",
                 vEvictionCandidatesByActivity[0]->addr.ToString(), nHoursToBan);
         }
@@ -1094,7 +1103,8 @@ static void AcceptConnection(const ListenSocket &hListenSocket)
         if (nConnections > 4 && !whitelisted && !addr.IsLocal()) // local connections are auto-whitelisted
         {
             int nHoursToBan = 4;
-            dosMan.Ban((CNetAddr)addr, BanReasonTooManyConnectionAttempts, nHoursToBan * 60 * 60);
+            std::string userAgent = mapInboundConnectionTracker[ipAddress].userAgent;
+            dosMan.Ban((CNetAddr)addr, userAgent, BanReasonTooManyConnectionAttempts, nHoursToBan * 60 * 60);
             LOGA("Banning %s for %d hours: Too many connection attempts - connection dropped\n", addr.ToString(),
                 nHoursToBan);
             CloseSocket(hSocket);
@@ -3250,7 +3260,7 @@ void CNode::DisconnectIfBanned()
         else
         {
             fDisconnect = true;
-            dosMan.Ban(addr, nBanType);
+            dosMan.Ban(addr, cleanSubVer, nBanType);
         }
     }
 }

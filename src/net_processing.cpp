@@ -634,6 +634,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CNetAddr ipAddress = (CNetAddr)pfrom->addr;
         mapInboundConnectionTracker[ipAddress].nEvictions += 1;
         mapInboundConnectionTracker[ipAddress].nLastEvictionTime = GetTime();
+        mapInboundConnectionTracker[ipAddress].userAgent = pfrom->cleanSubVer;
 
         return true; // return true so we don't get any process message failures in the log.
     }
@@ -2088,7 +2089,8 @@ bool ProcessMessages(CNode *pfrom)
                 pfrom->GetLogName());
             if (!pfrom->fWhitelisted)
             {
-                dosMan.Ban(pfrom->addr, BanReasonInvalidMessageStart, 4 * 60 * 60); // ban for 4 hours
+                // ban for 4 hours
+                dosMan.Ban(pfrom->addr, pfrom->cleanSubVer, BanReasonInvalidMessageStart, 4 * 60 * 60);
             }
             fOk = false;
             break;
