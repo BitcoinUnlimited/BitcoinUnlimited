@@ -29,6 +29,11 @@
 
 extern CTweak<unsigned int> unconfPushAction;
 
+// Stores hashes of blocks that have already successfully passed CheckBlock().
+std::set<uint256> setBlocksAlreadyChecked GUARDED_BY(cs_main);
+// We don't let this set grow unbounded just in case we forget to erase values later.
+const unsigned int MAX_SETBLOCKSALREADYCHECKED_SIZE = 5000;
+
 struct CBlockIndexWorkComparator
 {
     bool operator()(CBlockIndex *pa, CBlockIndex *pb) const
@@ -1979,11 +1984,26 @@ bool ConnectBlockPrevalidations(const CBlock &block,
 {
     int64_t nTimeStart = GetStopwatchMicros();
 
-    // Check it again in case a previous version let a bad block in
-    if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
+    // If we're not in IBD then check it again in case a previous version let a bad block in
+    //
+    // During IBD setBlocksAlreadyChecked is used rather than the internal block flag block.fChecked because
+    // blocks are typcially stored 1000 blocks ahead and get writting to disk but fChecked is not stored
+    // to disk, so when the block is finally read again for processing it ends up going through CheckBlock() again
+    // unnecessarily. So by storing the hash of the block during IBD just after the first successful CheckBlock()
+    // we can avoid doing CheckBlock() again later in IBD and which saves us a significant amount of time.
+    //
+    // In addition, if we had just restarted the node and continued IBD, started a Reindex, or found a new block
+    // then setBlockAlreadyChecked would be empty and we'd have to run CheckBlock() at least one time, which is
+    // correct behavior.
+    if (!setBlocksAlreadyChecked.count(block.GetHash()))
     {
-        return false;
+        if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
+        {
+            return false;
+        }
     }
+    else
+        setBlocksAlreadyChecked.erase(block.GetHash());
 
     // verify that the view's current state corresponds to the previous block
     uint256 hashPrevBlock = pindex->pprev == nullptr ? uint256() : pindex->pprev->GetBlockHash();
@@ -3598,6 +3618,12 @@ bool ProcessNewBlock(CValidationState &state,
     {
         LOGA("Invalid block: ver:%x time:%d Tx size:%d len:%d\n", pblock->nVersion, pblock->nTime, pblock->vtx.size(),
             pblock->GetBlockSize());
+    }
+    else if (IsInitialBlockDownload())
+    {
+        setBlocksAlreadyChecked.insert(pblock->GetHash());
+        if (setBlocksAlreadyChecked.size() > MAX_SETBLOCKSALREADYCHECKED_SIZE)
+            setBlocksAlreadyChecked.erase(setBlocksAlreadyChecked.begin());
     }
 
     // WARNING: cs_main is not locked here throughout but is released and then re-locked during ActivateBestChain
