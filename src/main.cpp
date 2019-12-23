@@ -105,9 +105,6 @@ extern std::map<uint256, NodeId> mapBlockSource;
 extern std::set<int> setDirtyFileInfo;
 extern uint64_t nBlockSequenceId;
 
-extern CCriticalSection cs_graphenerecovery;
-extern std::map<NodeId, CGrapheneBlock> grapheneRecoveryBlock;
-
 
 /** Number of nodes with fSyncStarted. */
 int nSyncStarted = 0;
@@ -148,12 +145,6 @@ void InitializeNode(const CNode *pnode)
 
 void FinalizeNode(NodeId nodeid)
 {
-    // Clear graphene block kept around for failure recovery
-    {
-        LOCK(cs_graphenerecovery);
-        grapheneRecoveryBlock.erase(nodeid);
-    }
-
     // Clean up the sync maps
     ClearDisconnectedFromMempoolSyncMaps(nodeid);
 

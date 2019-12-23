@@ -31,8 +31,6 @@ static bool ReconstructBlock(CNode *pfrom,
 extern CTweak<uint64_t> grapheneMinVersionSupported;
 extern CTweak<uint64_t> grapheneMaxVersionSupported;
 extern CTweak<uint64_t> grapheneFastFilterCompatibility;
-extern CCriticalSection cs_graphenerecovery;
-extern std::map<NodeId, CGrapheneBlock> grapheneRecoveryBlock;
 
 CMemPoolInfo::CMemPoolInfo(uint64_t _nTx) : nTx(_nTx) {}
 CMemPoolInfo::CMemPoolInfo() { this->nTx = 0; }
@@ -1308,11 +1306,6 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
 
             CGrapheneBlock grapheneBlock(pblock, mempoolinfo.nTx, nSenderMempoolPlusBlock,
                 NegotiateGrapheneVersion(pfrom), NegotiateFastFilterSupport(pfrom));
-
-            {
-                LOCK(cs_graphenerecovery);
-                grapheneRecoveryBlock[pfrom->GetId()] = grapheneBlock;
-            }
 
             LOG(GRAPHENE, "Block %s to peer %s using Graphene version %d\n", grapheneBlock.header.GetHash().ToString(),
                 pfrom->GetLogName(), grapheneBlock.version);
