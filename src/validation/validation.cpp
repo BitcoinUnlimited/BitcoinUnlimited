@@ -30,7 +30,8 @@
 extern CTweak<unsigned int> unconfPushAction;
 
 // Stores hashes of blocks that have already successfully passed CheckBlock().
-std::set<uint256> setBlocksAlreadyChecked GUARDED_BY(cs_main);
+CCriticalSection cs_BlocksAlreadyChecked;
+std::set<uint256> setBlocksAlreadyChecked GUARDED_BY(cs_BlocksAlreadyChecked);
 // We don't let this set grow unbounded just in case we forget to erase values later.
 const unsigned int MAX_SETBLOCKSALREADYCHECKED_SIZE = 5000;
 
@@ -1995,15 +1996,18 @@ bool ConnectBlockPrevalidations(const CBlock &block,
     // In addition, if we had just restarted the node and continued IBD, started a Reindex, or found a new block
     // then setBlockAlreadyChecked would be empty and we'd have to run CheckBlock() at least one time, which is
     // correct behavior.
-    if (!setBlocksAlreadyChecked.count(block.GetHash()))
     {
-        if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
+        LOCK(cs_BlocksAlreadyChecked);
+        if (!setBlocksAlreadyChecked.count(block.GetHash()))
         {
-            return false;
+            if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
+            {
+                return false;
+            }
         }
+        else
+            setBlocksAlreadyChecked.erase(block.GetHash());
     }
-    else
-        setBlocksAlreadyChecked.erase(block.GetHash());
 
     // verify that the view's current state corresponds to the previous block
     uint256 hashPrevBlock = pindex->pprev == nullptr ? uint256() : pindex->pprev->GetBlockHash();
@@ -3621,6 +3625,7 @@ bool ProcessNewBlock(CValidationState &state,
     }
     else if (IsInitialBlockDownload())
     {
+        LOCK(cs_BlocksAlreadyChecked);
         setBlocksAlreadyChecked.insert(pblock->GetHash());
         if (setBlocksAlreadyChecked.size() > MAX_SETBLOCKSALREADYCHECKED_SIZE)
             setBlocksAlreadyChecked.erase(setBlocksAlreadyChecked.begin());
