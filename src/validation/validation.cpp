@@ -26,12 +26,24 @@
 #include "validationinterface.h"
 
 #include <boost/scope_exit.hpp>
+#include <unordered_set>
 
 extern CTweak<unsigned int> unconfPushAction;
 
+class Hasher
+{
+private:
+    /** Salt */
+    const uint64_t k0, k1;
+
+public:
+    Hasher() : k0(GetRand(std::numeric_limits<uint64_t>::max())), k1(GetRand(std::numeric_limits<uint64_t>::max())) {}
+    uint64_t operator()(const uint256 &hash) const { return SipHashUint256(k0, k1, hash); }
+};
+
 // Stores hashes of blocks that have already successfully passed CheckBlock().
 CCriticalSection cs_BlocksAlreadyChecked;
-std::set<uint256> setBlocksAlreadyChecked GUARDED_BY(cs_BlocksAlreadyChecked);
+std::unordered_set<uint256, Hasher> setBlocksAlreadyChecked GUARDED_BY(cs_BlocksAlreadyChecked);
 // We don't let this set grow unbounded just in case we forget to erase values later.
 const unsigned int MAX_SETBLOCKSALREADYCHECKED_SIZE = 5000;
 
