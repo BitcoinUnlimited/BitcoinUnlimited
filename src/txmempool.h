@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (C) 2019-2020 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -26,6 +27,8 @@ class CAutoFile;
 class CBlockIndex;
 class TxMempoolOriginalState;
 class CTxChange;
+class DoubleSpendProofStorage;
+class DoubleSpendProof;
 
 inline double AllowFreeThreshold() { return COIN * 144 / 250; }
 inline bool AllowFree(double dPriority)
@@ -118,6 +121,7 @@ private:
 
 public:
     unsigned char sighashType;
+    int dsproof = -1;
     CTxMemPoolEntry();
     CTxMemPoolEntry(const CTransactionRef _tx,
         const CAmount &_nFee,
@@ -558,6 +562,14 @@ public:
     /** Return the set of mempool children for this entry */
     const setEntries &GetMemPoolChildren(txiter entry) const;
 
+    /**
+     * Add a double spend proof we received elsewhere to an existing mempool-entry.
+     * Return CTransaction of the mempool entry we added this to.
+     */
+    CTransactionRef addDoubleSpendProof(const DoubleSpendProof &proof);
+
+    DoubleSpendProofStorage *doubleSpendProofStorage() const;
+
 private:
     typedef std::map<txiter, setEntries, CompareIteratorByHash> cacheMap;
 
@@ -881,6 +893,8 @@ private:
      *  removal.
      */
     void removeUnchecked(txiter entry);
+
+    DoubleSpendProofStorage *m_dspStorage;
 };
 
 /** This internal class holds the original state of mempool state values.
