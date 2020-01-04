@@ -143,6 +143,8 @@ BITCOIN_CORE_H = \
   core_io.h \
   core_memusage.h \
   cuckoocache.h \
+  DoubleSpendProof.h \
+  DoubleSpendProofStorage.h \
   deadlock-detection/locklocation.h \
   deadlock-detection/lockorder.h \
   deadlock-detection/threaddeadlock.h \
@@ -276,6 +278,8 @@ libbitcoin_server_a_SOURCES = \
   checkpoints.cpp \
   connmgr.cpp \
   consensus/tx_verify.cpp \
+  DoubleSpendProof.cpp \
+  DoubleSpendProofStorage.cpp \
   dosman.cpp \
   expedited.cpp \
   electrum/electrs.cpp \

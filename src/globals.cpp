@@ -197,11 +197,11 @@ const char *sampleNames[] = {"sec10", "min5", "hourly", "daily", "monthly"};
 int operateSampleCount[] = {30, 12, 24, 30};
 int interruptIntervals[] = {30, 30 * 12, 30 * 12 * 24, 30 * 12 * 24 * 30};
 
-CTxMemPool mempool(::minRelayTxFee);
-CTxOrphanPool orphanpool;
-
 std::chrono::milliseconds statMinInterval(10000);
 boost::asio::io_service stat_io_service;
+
+CTxMemPool mempool(::minRelayTxFee);
+CTxOrphanPool orphanpool;
 
 std::list<CStatBase *> mallocedStats;
 CStatMap statistics;

@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (C) 2020 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -350,6 +351,11 @@ extern const char *GETBLOCKTXN;
  * @since protocol version 70014 as described by BIP 152
  */
 extern const char *BLOCKTXN;
+
+/**
+ * Double spend proof
+ */
+extern const char *DSPROOF;
 };
 
 
@@ -499,6 +505,8 @@ enum
     MSG_THINBLOCK = MSG_CMPCT_BLOCK,
     // Uses Graphene set reconciliation to syncronize mempools between two peers.
     MSG_MEMPOOLSYNC,
+
+    MSG_DOUBLESPENDPROOF = 0x94a0
 };
 
 #endif // BITCOIN_PROTOCOL_H

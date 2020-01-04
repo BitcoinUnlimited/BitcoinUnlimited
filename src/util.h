@@ -199,7 +199,9 @@ enum
     CMPCT = 0x80000000, // compact blocks
 
     ELECTRUM = 0x100000000,
-    MPOOLSYNC = 0x200000000
+    MPOOLSYNC = 0x200000000,
+
+    DSPROOF = 0x400000000
 };
 
 namespace Logging
@@ -209,7 +211,7 @@ extern uint64_t categoriesEnabled;
 /*
 To add a new log category:
 1) Create a unique 1 bit category mask. (Easiest is to 2* the last enum entry.)
-   Put it at the end of enum below.
+   Put it at the end of enum above.
 2) Add an category/string pair to LOGLABELMAP macro below.
 */
 
@@ -223,7 +225,7 @@ To add a new log category:
             {REQ, "req"}, {BLOOM, "bloom"}, {LCK, "lck"}, {PROXY, "proxy"}, {DBASE, "dbase"},                   \
             {SELECTCOINS, "selectcoins"}, {ESTIMATEFEE, "estimatefee"}, {QT, "qt"}, {IBD, "ibd"},               \
             {GRAPHENE, "graphene"}, {RESPEND, "respend"}, {WB, "weakblocks"}, {CMPCT, "cmpctblock"},            \
-            {ELECTRUM, "electrum"}, {MPOOLSYNC, "mempoolsync"},                                                 \
+            {ELECTRUM, "electrum"}, {MPOOLSYNC, "mempoolsync"}, {DSPROOF, "dsproof"},                           \
         {                                                                                                       \
             ZMQ, "zmq"                                                                                          \
         }                                                                                                       \

@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (C) 2020 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -191,4 +192,18 @@ inline uint160 uint160S(const std::string &str)
     rv.SetHex(str);
     return rv;
 }
+
+/**
+ * Useful structure to use for maps.
+ * For instance:
+ *
+ *  typedef boost::unordered_map<uint256, int, HashShortener> MyMap;
+ */
+struct HashShortener
+{
+    inline size_t operator()(const uint256& hash) const {
+        return hash.GetCheapHash();
+    }
+};
+
 #endif // BITCOIN_UINT256_H
