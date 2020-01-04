@@ -95,6 +95,7 @@ class CTxCommitData
 public:
     CTxMemPoolEntry entry;
     uint256 hash;
+    std::list<std::pair<int, int>> rescuedOrphans;
 };
 
 /** Communicate what class of transaction is acceptable to add to the memory pool
