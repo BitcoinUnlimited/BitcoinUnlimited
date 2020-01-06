@@ -2009,8 +2009,13 @@ bool ConnectBlockPrevalidations(const CBlock &block,
     // then setBlockAlreadyChecked would be empty and we'd have to run CheckBlock() at least one time, which is
     // correct behavior.
     {
-        LOCK(cs_BlocksAlreadyChecked);
-        if (!setBlocksAlreadyChecked.count(block.GetHash()))
+        bool fAlreadyChecked = true;
+        {
+            LOCK(cs_BlocksAlreadyChecked);
+            if (!setBlocksAlreadyChecked.count(block.GetHash()))
+                fAlreadyChecked = false;
+        }
+        if (!fAlreadyChecked)
         {
             if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
             {
@@ -2018,7 +2023,10 @@ bool ConnectBlockPrevalidations(const CBlock &block,
             }
         }
         else
+        {
+            LOCK(cs_BlocksAlreadyChecked);
             setBlocksAlreadyChecked.erase(block.GetHash());
+        }
     }
 
     // verify that the view's current state corresponds to the previous block
