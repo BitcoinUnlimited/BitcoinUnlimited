@@ -958,7 +958,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
             else if (inv.hash.IsNull())
             {
-                dosMan.Misbehaving(pfrom, 20, BanReasonInvalidInventory);
                 LOG(NET, "message inv has null hash %s", inv.type, inv.hash.ToString());
                 return false;
             }
