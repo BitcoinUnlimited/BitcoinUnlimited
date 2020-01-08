@@ -257,6 +257,8 @@ struct ConnectionHistory
 
     double nEvictions; // number of times a connection was de-prioritized and disconnected in last 30 minutes
     int64_t nLastEvictionTime; // the time the last eviction occurred.
+
+    std::string userAgent;
 };
 extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
 extern CCriticalSection cs_mapInboundConnectionTracker;

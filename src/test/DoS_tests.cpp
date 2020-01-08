@@ -70,10 +70,10 @@ void SetKnownBanlistContents()
     dosMan.ClearBanned();
 
     // Add test ban of specific IP
-    dosMan.Ban(CNetAddr("192.168.1.1"), BanReasonNodeMisbehaving, DEFAULT_MISBEHAVING_BANTIME, false);
+    dosMan.Ban(CNetAddr("192.168.1.1"), "unknown", BanReasonNodeMisbehaving, DEFAULT_MISBEHAVING_BANTIME, false);
 
     // Add test ban of specific subnet
-    dosMan.Ban(CSubNet("10.168.1.0/28"), BanReasonManuallyAdded, DEFAULT_MISBEHAVING_BANTIME, false);
+    dosMan.Ban(CSubNet("10.168.1.0/28"), "unknown", BanReasonManuallyAdded, DEFAULT_MISBEHAVING_BANTIME, false);
 }
 
 BOOST_AUTO_TEST_CASE(DoS_persistence_tests)
@@ -147,11 +147,11 @@ BOOST_AUTO_TEST_CASE(DoS_basic_ban_tests)
     BOOST_CHECK(GetNumberBanEntries() == 0);
 
     // Add a CNetAddr entry to banlist
-    dosMan.Ban(CNetAddr("192.168.1.1"), BanReasonNodeMisbehaving, DEFAULT_MISBEHAVING_BANTIME, false);
+    dosMan.Ban(CNetAddr("192.168.1.1"), "unknown", BanReasonNodeMisbehaving, DEFAULT_MISBEHAVING_BANTIME, false);
     // Ensure we have exactly 1 entry in our banlist
     BOOST_CHECK(GetNumberBanEntries() == 1);
     // Add a CSubNet entry to banlist
-    dosMan.Ban(CSubNet("10.168.1.0/28"), BanReasonManuallyAdded, DEFAULT_MISBEHAVING_BANTIME, false);
+    dosMan.Ban(CSubNet("10.168.1.0/28"), "unknown", BanReasonManuallyAdded, DEFAULT_MISBEHAVING_BANTIME, false);
     // Ensure we have exactly 2 entries in our banlist
     BOOST_CHECK(GetNumberBanEntries() == 2);
 

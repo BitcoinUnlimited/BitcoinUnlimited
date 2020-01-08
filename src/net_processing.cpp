@@ -487,7 +487,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (pfrom->strSubVer.find("Bitcoin SV") != std::string::npos ||
                 pfrom->strSubVer.find("(SV;") != std::string::npos)
             {
-                dosMan.Misbehaving(pfrom, 100);
+                dosMan.Misbehaving(pfrom, 100, BanReasonInvalidPeer);
             }
         }
         if (!vRecv.empty())
@@ -634,6 +634,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CNetAddr ipAddress = (CNetAddr)pfrom->addr;
         mapInboundConnectionTracker[ipAddress].nEvictions += 1;
         mapInboundConnectionTracker[ipAddress].nLastEvictionTime = GetTime();
+        mapInboundConnectionTracker[ipAddress].userAgent = pfrom->cleanSubVer;
 
         return true; // return true so we don't get any process message failures in the log.
     }
@@ -957,7 +958,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
             else if (inv.hash.IsNull())
             {
-                dosMan.Misbehaving(pfrom, 20);
+                dosMan.Misbehaving(pfrom, 20, BanReasonInvalidInventory);
                 LOG(NET, "message inv has null hash %s", inv.type, inv.hash.ToString());
                 return false;
             }
@@ -1050,7 +1051,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK) || (inv.type == MSG_FILTERED_BLOCK) ||
                     (inv.type == MSG_CMPCT_BLOCK)))
             {
-                dosMan.Misbehaving(pfrom, 20);
+                dosMan.Misbehaving(pfrom, 20, BanReasonInvalidInventory);
                 return error("message inv invalid type = %u", inv.type);
             }
 
@@ -2088,7 +2089,8 @@ bool ProcessMessages(CNode *pfrom)
                 pfrom->GetLogName());
             if (!pfrom->fWhitelisted)
             {
-                dosMan.Ban(pfrom->addr, BanReasonInvalidMessageStart, 4 * 60 * 60); // ban for 4 hours
+                // ban for 4 hours
+                dosMan.Ban(pfrom->addr, pfrom->cleanSubVer, BanReasonInvalidMessageStart, 4 * 60 * 60);
             }
             fOk = false;
             break;

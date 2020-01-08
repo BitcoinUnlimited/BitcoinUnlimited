@@ -55,7 +55,7 @@ public:
      * @param[in] pNode    The node which is misbehaving.  No effect if nullptr.
      * @param[in] howmuch  Incremental misbehaving score for the latest infraction by this node.
      */
-    void Misbehaving(CNode *pNode, int howmuch);
+    void Misbehaving(CNode *pNode, int howmuch, BanReason reason = (BanReason)-1);
 
     /**
      * Increment the misbehaving score for this node.  If the ban threshold is reached, flag the node to be
@@ -86,8 +86,16 @@ public:
     void ClearBanned(); // needed for unit testing
     bool IsBanned(CNetAddr ip);
     bool IsBanned(CSubNet subnet);
-    void Ban(const CNetAddr &ip, const BanReason &banReason, int64_t bantimeoffset = 0, bool sinceUnixEpoch = false);
-    void Ban(const CSubNet &subNet, const BanReason &banReason, int64_t bantimeoffset = 0, bool sinceUnixEpoch = false);
+    void Ban(const CNetAddr &ip,
+        const std::string &userAgent,
+        const BanReason &banReason,
+        int64_t bantimeoffset = 0,
+        bool sinceUnixEpoch = false);
+    void Ban(const CSubNet &subNet,
+        const std::string &userAgent,
+        const BanReason &banReason,
+        int64_t bantimeoffset = 0,
+        bool sinceUnixEpoch = false);
     bool Unban(const CNetAddr &ip);
     bool Unban(const CSubNet &ip);
     void GetBanned(banmap_t &banmap);

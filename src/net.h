@@ -113,6 +113,8 @@ void AddOneShot(const std::string &strDest);
 CNodeRef FindNodeRef(const std::string &addrName);
 // Find a node by id.  Returns a null ref if no node found
 CNodeRef FindNodeRef(const NodeId id);
+// Find a node by ip.  Returns a null ref if no node found
+CNodeRef FindNodeRef(const CNetAddr &ip);
 int DisconnectSubNetNodes(const CSubNet &subNet);
 bool OpenNetworkConnection(const CAddress &addrConnect,
     bool fCountFailure,
@@ -489,6 +491,7 @@ public:
     std::atomic<int> nMisbehavior;
     //! Whether this peer should be disconnected and banned (unless whitelisted).
     bool fShouldBan;
+    BanReason nBanType = (BanReason)-1;
 
     // BUIP010 Xtreme Thinblocks: begin section
     std::atomic<uint32_t> nXthinBloomfilterSize; // Max xthin bloom filter size (in bytes) that our peer will accept.
