@@ -26,8 +26,26 @@
 #include "validationinterface.h"
 
 #include <boost/scope_exit.hpp>
+#include <unordered_set>
 
 extern CTweak<unsigned int> unconfPushAction;
+
+class Hasher
+{
+private:
+    /** Salt */
+    const uint64_t k0, k1;
+
+public:
+    Hasher() : k0(GetRand(std::numeric_limits<uint64_t>::max())), k1(GetRand(std::numeric_limits<uint64_t>::max())) {}
+    uint64_t operator()(const uint256 &hash) const { return SipHashUint256(k0, k1, hash); }
+};
+
+// Stores hashes of blocks that have already successfully passed CheckBlock().
+CCriticalSection cs_BlocksAlreadyChecked;
+std::unordered_set<uint256, Hasher> setBlocksAlreadyChecked GUARDED_BY(cs_BlocksAlreadyChecked);
+// We don't let this set grow unbounded just in case we forget to erase values later.
+const unsigned int MAX_SETBLOCKSALREADYCHECKED_SIZE = 5000;
 
 struct CBlockIndexWorkComparator
 {
@@ -1979,10 +1997,36 @@ bool ConnectBlockPrevalidations(const CBlock &block,
 {
     int64_t nTimeStart = GetStopwatchMicros();
 
-    // Check it again in case a previous version let a bad block in
-    if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
+    // If we're not in IBD then check it again in case a previous version let a bad block in
+    //
+    // During IBD setBlocksAlreadyChecked is used rather than the internal block flag block.fChecked because
+    // blocks are typcially stored 1000 blocks ahead and get writting to disk but fChecked is not stored
+    // to disk, so when the block is finally read again for processing it ends up going through CheckBlock() again
+    // unnecessarily. So by storing the hash of the block during IBD just after the first successful CheckBlock()
+    // we can avoid doing CheckBlock() again later in IBD and which saves us a significant amount of time.
+    //
+    // In addition, if we had just restarted the node and continued IBD, started a Reindex, or found a new block
+    // then setBlockAlreadyChecked would be empty and we'd have to run CheckBlock() at least one time, which is
+    // correct behavior.
     {
-        return false;
+        bool fAlreadyChecked = true;
+        {
+            LOCK(cs_BlocksAlreadyChecked);
+            if (!setBlocksAlreadyChecked.count(block.GetHash()))
+                fAlreadyChecked = false;
+        }
+        if (!fAlreadyChecked)
+        {
+            if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            LOCK(cs_BlocksAlreadyChecked);
+            setBlocksAlreadyChecked.erase(block.GetHash());
+        }
     }
 
     // verify that the view's current state corresponds to the previous block
@@ -3598,6 +3642,13 @@ bool ProcessNewBlock(CValidationState &state,
     {
         LOGA("Invalid block: ver:%x time:%d Tx size:%d len:%d\n", pblock->nVersion, pblock->nTime, pblock->vtx.size(),
             pblock->GetBlockSize());
+    }
+    else if (IsInitialBlockDownload())
+    {
+        LOCK(cs_BlocksAlreadyChecked);
+        setBlocksAlreadyChecked.insert(pblock->GetHash());
+        if (setBlocksAlreadyChecked.size() > MAX_SETBLOCKSALREADYCHECKED_SIZE)
+            setBlocksAlreadyChecked.erase(setBlocksAlreadyChecked.begin());
     }
 
     // WARNING: cs_main is not locked here throughout but is released and then re-locked during ActivateBestChain
