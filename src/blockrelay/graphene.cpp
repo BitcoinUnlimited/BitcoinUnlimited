@@ -1473,7 +1473,7 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
     // Insert latest transactions just sent over
     for (auto &tx : recoveryResponse.vMissingTxs)
     {
-        uint256 hash = tx.GetHash();
+        const uint256 &hash = tx.GetHash();
         uint64_t cheapHash = pblock->grapheneblock->pGrapheneSet->GetShortID(hash);
 
         mapTxFromPools[cheapHash] = hash;
