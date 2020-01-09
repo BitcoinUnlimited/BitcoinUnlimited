@@ -483,6 +483,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             vRecv >> LIMITED_STRING(pfrom->strSubVer, MAX_SUBVERSION_LENGTH);
             pfrom->cleanSubVer = SanitizeString(pfrom->strSubVer);
 
+            // Track the user agent string
+            {
+                LOCK(cs_mapInboundConnectionTracker);
+                mapInboundConnectionTracker[(CNetAddr)pfrom->addr].userAgent = pfrom->cleanSubVer;
+            }
+
             // ban SV peers
             if (pfrom->strSubVer.find("Bitcoin SV") != std::string::npos ||
                 pfrom->strSubVer.find("(SV;") != std::string::npos)

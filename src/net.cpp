@@ -955,7 +955,6 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
         {
             int nHoursToBan = 4;
             std::string userAgent = vEvictionCandidatesByActivity[0]->cleanSubVer;
-            mapInboundConnectionTracker[ipAddress].userAgent = userAgent;
             dosMan.Ban(ipAddress, userAgent, BanReasonTooManyEvictions, nHoursToBan * 60 * 60);
             LOGA("Banning %s for %d hours: Too many evictions - connection dropped\n",
                 vEvictionCandidatesByActivity[0]->addr.ToString(), nHoursToBan);
