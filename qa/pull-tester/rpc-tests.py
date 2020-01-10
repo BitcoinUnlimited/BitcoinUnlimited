@@ -265,6 +265,7 @@ testScripts = [ RpcTest(t) for t in [
     WhenElectrumFound('electrum_subscriptions'),
     WhenElectrumFound('electrum_scripthash_gethistory'),
     WhenElectrumFound('electrum_transaction_get'),
+    WhenElectrumFound('electrum_server_features'),
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
