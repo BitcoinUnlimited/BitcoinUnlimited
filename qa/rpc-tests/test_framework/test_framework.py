@@ -191,11 +191,15 @@ class BitcoinTestFramework(object):
         parser.add_option("--no-ipv6-rpc-listen", dest="no_ipv6_rpc_listen", default=False, action="store_true",
                           help="Switch off listening on the IPv6 ::1 localhost RPC port. "
                           "This is meant to deal with travis which is currently not supporting IPv6 sockets.")
+        parser.add_option("--electrum.exec", dest="electrumexec",
+            help="Set a custom path to the electrum server executable", default=None)
+
 
         self.add_options(parser)
         (self.options, self.args) = parser.parse_args(argsOverride)
 
         UtilOptions.no_ipv6_rpc_listen = self.options.no_ipv6_rpc_listen
+        UtilOptions.electrumexec = self.options.electrumexec
 
         # BU: initialize RNG seed based on time if no seed specified
         if self.options.randomseed:
