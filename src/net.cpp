@@ -1519,7 +1519,7 @@ void ThreadSocketHandler()
                                 fEmpty = true;
                         }
 
-                        if (!noderef.get()->fDisconnect && !lock_sendtwo)
+                        if (!pfrom->fDisconnect && !lock_sendtwo)
                         {
                             // Only if we failed to lock, then push to the back of the queue an try later.
                             //
