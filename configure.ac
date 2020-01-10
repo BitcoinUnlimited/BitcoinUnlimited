@@ -15,7 +15,7 @@ define(_CLIENT_VERSION_REVISION, 0)
 define(_CLIENT_VERSION_BUILD, 0)  # version 99 here indicates an unreleased version
 define(_CLIENT_VERSION_RC, 0)
 define(_CLIENT_VERSION_IS_RELEASE, true)
-define(_COPYRIGHT_YEAR, 2019)
+define(_COPYRIGHT_YEAR, 2020)
 define(_COPYRIGHT_HOLDERS,[The %s developers])
 define(_COPYRIGHT_HOLDERS_SUBSTITUTION,[Bitcoin Bitcoin XT and Bitcoin Unlimited])
 AC_INIT([Bitcoin Unlimited Cash Edition],m4_join([.],_CLIENT_VERSION_MAJOR,_CLIENT_VERSION_MINOR,_CLIENT_VERSION_REVISION,_CLIENT_VERSION_BUILD)m4_if(_CLIENT_VERSION_RC, [0], [], [rc]_CLIENT_VERSION_RC),[https://github.com/BitcoinUnlimited/BitcoinUnlimited/issues],[BUcash])
