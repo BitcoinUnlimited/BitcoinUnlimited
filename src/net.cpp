@@ -528,7 +528,7 @@ void CNode::CloseSocketDisconnect()
     // Purge any noderef's in the priority message queue relating to this peer. If we don't
     // remove the node references here then we won't be able to complete the disconnection.
     {
-        LOCK(cs_PrioritySendQ);
+        LOCK(cs_prioritySendQ);
         auto it = vPrioritySendQ.begin();
         while (it != vPrioritySendQ.end())
         {
@@ -708,7 +708,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                 // If the message is a priority message then move it into the priority queue.
                 if (IsPriorityMsg(strCommand))
                 {
-                    LOCK(cs_PriorityRecvQ);
+                    LOCK(cs_priorityRecvQ);
                     // As a safeguard on some peer trying to dominate our networking
                     // don't allow unlimited simultaneous priority messages. There should in general only be
                     // one priority message at any one time with the exception of block HEADERS announcements
@@ -1480,7 +1480,7 @@ void ThreadSocketHandler()
                 // message from another peer which would happen in the case of block announcements.
                 //
                 // The following presents a more difficult issue in maintaining locking orders. cs_vSend must be
-                // taken before cs_PrioritySendQ and hence the following blocks of code needed to preserve that order.
+                // taken before cs_prioritySendQ and hence the following blocks of code needed to preserve that order.
                 while (fPrioritySendMsg)
                 {
                     // Check if anything is really in queue and pop the noderef. If we're empty then set the
@@ -1488,7 +1488,7 @@ void ThreadSocketHandler()
                     // twice.
                     CNodeRef noderef;
                     {
-                        LOCK(cs_PrioritySendQ);
+                        LOCK(cs_prioritySendQ);
                         if (!vPrioritySendQ.empty())
                         {
                             noderef = vPrioritySendQ.front();
@@ -1528,7 +1528,7 @@ void ThreadSocketHandler()
                             //       to start a possible infinite loop where a socket could be hung or network could
                             //       be backed up. The remainder of the message is at the front of the queue so
                             //       it will get sent (if it can) at some point.
-                            LOCK(cs_PrioritySendQ);
+                            LOCK(cs_prioritySendQ);
                             vPrioritySendQ.push_back(noderef);
                             fPrioritySendMsg = true;
                             break;
@@ -3274,7 +3274,7 @@ CNode::~CNode()
 
 void CNode::PrioritizeSendMsg(CNode *pnode)
 {
-    LOCK(cs_PrioritySendQ);
+    LOCK(cs_prioritySendQ);
     vPrioritySendQ.push_back(CNodeRef(pnode));
 
     // if there are more priority messages than the one we just added then find out how many
@@ -3415,6 +3415,9 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
         nSendSize.fetch_add((*it).size());
     }
 
+    // if write queue emtpy, attempt "optimisitic" write
+    if (it == vSendMsg.begin())
+        SocketSendData(this);
 
     LEAVE_CRITICAL_SECTION(cs_vSend);
 }

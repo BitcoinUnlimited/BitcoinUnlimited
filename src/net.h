@@ -54,8 +54,8 @@ namespace boost
 class thread_group;
 } // namespace boost
 
-extern CCriticalSection cs_PriorityRecvQ;
-extern CCriticalSection cs_PrioritySendQ;
+extern CCriticalSection cs_priorityRecvQ;
+extern CCriticalSection cs_prioritySendQ;
 extern CTweak<unsigned int> numMsgHandlerThreads;
 extern std::deque<std::pair<CNodeRef, CNetMessage> > vPriorityRecvQ;
 extern std::deque<CNodeRef> vPrioritySendQ;

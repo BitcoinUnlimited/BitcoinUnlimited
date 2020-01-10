@@ -222,10 +222,10 @@ CDoSManager dosMan;
 // A message queue used for priority messages such as graheneblocks or other thintype block messages
 std::atomic<bool> fPriorityRecvMsg{false};
 std::atomic<bool> fPrioritySendMsg{false};
-CCriticalSection cs_PriorityRecvQ;
-CCriticalSection cs_PrioritySendQ;
-deque<pair<CNodeRef, CNetMessage> > vPriorityRecvQ GUARDED_BY(cs_PriorityRecvQ);
-deque<CNodeRef> vPrioritySendQ GUARDED_BY(cs_PrioritySendQ);
+CCriticalSection cs_priorityRecvQ;
+CCriticalSection cs_prioritySendQ;
+deque<pair<CNodeRef, CNetMessage> > vPriorityRecvQ GUARDED_BY(cs_priorityRecvQ);
+deque<CNodeRef> vPrioritySendQ GUARDED_BY(cs_prioritySendQ);
 
 // Transaction mempool admission globals
 

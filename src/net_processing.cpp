@@ -2087,7 +2087,7 @@ bool ProcessMessages(CNode *pfrom)
             // a node reference to the priority peer.
             if (fPriorityRecvMsg.load())
             {
-                TRY_LOCK(cs_PriorityRecvQ, locked);
+                TRY_LOCK(cs_priorityRecvQ, locked);
                 if (locked && !vPriorityRecvQ.empty())
                 {
                     // check if we should process the message.
