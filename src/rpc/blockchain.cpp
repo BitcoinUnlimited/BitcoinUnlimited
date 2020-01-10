@@ -1971,7 +1971,7 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
     const CBlock block = GetBlockChecked(pindex);
     const CBlockUndo blockUndo = pindex->pprev ? GetUndoChecked(pindex) : CBlockUndo();
     // This property is required in the for loop below (and ofc every tx should have undo data)
-    DbgAssert(blockUndo.vtxundo.size() >= block.vtx.size() - 1,
+    DbgAssert(blockUndo.vtxundo.size() >= block.numTransactions() - 1,
         throw JSONRPCError(RPC_DATABASE_ERROR, "Block undo data is corrupt"));
 
     const bool do_all = stats.size() == 0; // Calculate everything if nothing selected (default)
@@ -2002,33 +2002,33 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
     std::vector<std::pair<CAmount, int64_t> > feerate_array;
     std::vector<int64_t> txsize_array;
 
-    for (size_t i = 0; i < block.vtx.size(); ++i)
+    for (size_t i = 0; i < block.numTransactions(); ++i)
     {
-        const auto &tx = block.vtx.at(i);
-        outputs += tx->vout.size();
+        CTransactionRef txref = block.by_pos(i);
+        outputs += txref->vout.size();
 
         CAmount tx_total_out = 0;
         if (loop_outputs)
         {
-            for (const CTxOut &out : tx->vout)
+            for (const CTxOut &out : txref->vout)
             {
                 tx_total_out += out.nValue;
                 utxo_size_inc += GetSerializeSize(out, SER_NETWORK, PROTOCOL_VERSION) + PER_UTXO_OVERHEAD;
             }
         }
 
-        if (tx->IsCoinBase())
+        if (txref->IsCoinBase())
         {
             continue;
         }
 
-        inputs += tx->vin.size(); // Don't count coinbase's fake input
+        inputs += txref->vin.size(); // Don't count coinbase's fake input
         total_out += tx_total_out; // Don't count coinbase reward
 
         int64_t tx_size = 0;
         if (do_calculate_size)
         {
-            tx_size = tx->GetTxSize();
+            tx_size = txref->GetTxSize();
             if (do_mediantxsize)
             {
                 txsize_array.push_back(tx_size);
@@ -2080,9 +2080,9 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
     }
 
     UniValue ret_all(UniValue::VOBJ);
-    ret_all.pushKV("avgfee", ValueFromAmount((block.vtx.size() > 1) ? totalfee / (block.vtx.size() - 1) : 0));
+    ret_all.pushKV("avgfee", ValueFromAmount((block.numTransactions() > 1) ? totalfee / (block.numTransactions() - 1) : 0));
     ret_all.pushKV("avgfeerate", ValueFromAmount(total_size ? totalfee / total_size : 0)); // Unit: sat/byte
-    ret_all.pushKV("avgtxsize", (block.vtx.size() > 1) ? total_size / (block.vtx.size() - 1) : 0);
+    ret_all.pushKV("avgtxsize", (block.numTransactions() > 1) ? total_size / (block.numTransactions() - 1) : 0);
     ret_all.pushKV("blockhash", pindex->GetBlockHash().GetHex());
     ret_all.pushKV("feerate_percentiles", feerates_res);
     ret_all.pushKV("height", (int64_t)pindex->nHeight);
@@ -2102,7 +2102,7 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
     ret_all.pushKV("total_out", ValueFromAmount(total_out));
     ret_all.pushKV("total_size", total_size);
     ret_all.pushKV("totalfee", ValueFromAmount(totalfee));
-    ret_all.pushKV("txs", (int64_t)block.vtx.size());
+    ret_all.pushKV("txs", (int64_t)block.numTransactions());
     ret_all.pushKV("utxo_increase", outputs - inputs);
     ret_all.pushKV("utxo_size_inc", utxo_size_inc);
 

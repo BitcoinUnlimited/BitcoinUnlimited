@@ -35,7 +35,7 @@ extern unsigned int weakPOWfromPOW(unsigned int nBits) {
 
 bool CDeltaBlock::isEnabled(const CChainParams& params, const CBlockIndex *pindexPrev) {
     // FIXME: completely broken!
-    bool canonical = enableCanonicalTxOrder.Value();
+    bool canonical = fCanonicalTxsOrder;
     return canonical;
 }
 

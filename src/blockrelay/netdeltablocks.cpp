@@ -28,7 +28,7 @@ static std::map<uint64_t, uint256> getPartialTxHashesFromAllSources(
     const uint64_t version = 2;
 
     // Do the orphans first before taking the mempool.cs lock, so that we maintain correct locking order.
-    READLOCK(orphanpool.cs);
+    READLOCK(orphanpool.cs_orphanpool);
     for (auto &kv : orphanpool.mapOrphanTransactions)
     {
         uint64_t cheapHash = GetShortID(_shorttxidk0, _shorttxidk1, kv.first, version);
@@ -220,7 +220,7 @@ bool CNetDeltaBlock::reconstruct(CDeltaBlockRef& dbr, CNetDeltaRequestMissing** 
     for (auto txr : delta_tx_additional)
         delta_map[txr->GetHash()] = txr;
 
-    READLOCK(orphanpool.cs);
+    READLOCK(orphanpool.cs_orphanpool);
     std::vector<CTransactionRef> delta_tx;
     for (auto cheaphash : deltaCheapHashes) {
         const uint256& hash = mapPartialTxHash[cheaphash];

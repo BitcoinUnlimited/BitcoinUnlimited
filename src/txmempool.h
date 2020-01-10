@@ -343,7 +343,7 @@ public:
             // we won't bail out early due to package insertion failures. Secondly it also preserves some
             // sense of fairness that, all other things begin equal, the first transation to arrive in the
             // mempool has priority over ones that follow.
-            return a.GetTime() < b.GetTime();
+            return a.GetTimeMicros() < b.GetTimeMicros();
         }
 
         return f1 > f2;
@@ -647,6 +647,11 @@ public:
     void removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed);
     void _removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed);
     void removeForBlock(const CBlock &block,
+        unsigned int nBlockHeight,
+        std::list<CTransactionRef> &conflicted,
+        bool fCurrentEstimate = true,
+        std::vector<CTxChange> *txChange = nullptr);
+    void removeForBlock_Legacy(const CBlock &block,
         unsigned int nBlockHeight,
         std::list<CTransactionRef> &conflicted,
         bool fCurrentEstimate = true,

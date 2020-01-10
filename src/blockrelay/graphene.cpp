@@ -44,7 +44,7 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
       nSize(0), nWaitingFor(0), shorttxidk0(0), shorttxidk1(0), version(_version), computeOptimized(_computeOptimized)
 {
     header = pblock->GetBlockHeader();
-    nBlockTxs = pblock->vtx.size();
+    nBlockTxs = pblock->numTransactions();
     uint64_t grapheneSetVersion = CGrapheneBlock::GetGrapheneSetVersion(version);
 
     if (version >= 2)

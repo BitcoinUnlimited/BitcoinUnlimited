@@ -404,7 +404,6 @@ BOOST_AUTO_TEST_CASE(graphene_block_can_serde)
         stream >> tx;
         const CTransactionRef ptx = MakeTransactionRef(tx);
         block.add(ptx);
-        block.vtx.push_back(ptx);
         CGrapheneBlock senderGrapheneBlock(MakeBlockRef(block), 5, 6, version, true);
         CGrapheneBlock receiverGrapheneBlock(4, true);
         CDataStream ss(SER_DISK, 0);

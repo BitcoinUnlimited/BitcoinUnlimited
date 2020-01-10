@@ -838,22 +838,22 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     */
 
     // Add txns that will be mined
-    std::vector<CTransactionRef> vtx;
+    CBlock block;
     // Chain1:
-    vtx.push_back(MakeTransactionRef(tx1));
-    vtx.push_back(MakeTransactionRef(tx2));
-    vtx.push_back(MakeTransactionRef(tx3));
-    vtx.push_back(MakeTransactionRef(tx4));
+    block.add(MakeTransactionRef(tx1));
+    block.add(MakeTransactionRef(tx2));
+    block.add(MakeTransactionRef(tx3));
+    block.add(MakeTransactionRef(tx4));
     // Chain2:
-    vtx.push_back(MakeTransactionRef(tx21));
+    block.add(MakeTransactionRef(tx21));
     // Chain3:
-    vtx.push_back(MakeTransactionRef(tx39));
-    vtx.push_back(MakeTransactionRef(tx44));
-    vtx.push_back(MakeTransactionRef(tx47));
+    block.add(MakeTransactionRef(tx39));
+    block.add(MakeTransactionRef(tx44));
+    block.add(MakeTransactionRef(tx47));
 
     // Now assume they were mined and do a removeForBlock()
     std::list<CTransactionRef> dummy;
-    pool.removeForBlock(vtx, 1, dummy, false);
+    pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 41);
 
     // Validate the new state is correct
@@ -930,9 +930,9 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     }
 
     // Mine two transactions which end up giving us the same txnchaintip.
-    vtx.push_back(MakeTransactionRef(tx40));
-    vtx.push_back(MakeTransactionRef(tx41));
-    pool.removeForBlock(vtx, 1, dummy, false);
+    block.add(MakeTransactionRef(tx40));
+    block.add(MakeTransactionRef(tx41));
+    pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 39);
 
 
@@ -967,10 +967,10 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
     // Starting to simulate mining all the rest of the transactions in the chains defined in the
     // above tests and following that with a mempool consistency
-    vtx.push_back(MakeTransactionRef(tx5));
-    vtx.push_back(MakeTransactionRef(tx6));
-    vtx.push_back(MakeTransactionRef(tx7));
-    pool.removeForBlock(vtx, 1, dummy, false);
+    block.add(MakeTransactionRef(tx5));
+    block.add(MakeTransactionRef(tx6));
+    block.add(MakeTransactionRef(tx7));
+    pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 36);
 
     /* clang-format off */
@@ -1012,10 +1012,10 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     }
 
 
-    vtx.push_back(MakeTransactionRef(tx8));
-    vtx.push_back(MakeTransactionRef(tx9));
-    vtx.push_back(MakeTransactionRef(tx10));
-    pool.removeForBlock(vtx, 1, dummy, false);
+    block.add(MakeTransactionRef(tx8));
+    block.add(MakeTransactionRef(tx9));
+    block.add(MakeTransactionRef(tx10));
+    pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 33);
 
     /* clang-format off */
@@ -1057,10 +1057,10 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     }
 
 
-    vtx.push_back(MakeTransactionRef(tx11));
-    vtx.push_back(MakeTransactionRef(tx14));
-    vtx.push_back(MakeTransactionRef(tx20));
-    pool.removeForBlock(vtx, 1, dummy, false);
+    block.add(MakeTransactionRef(tx11));
+    block.add(MakeTransactionRef(tx14));
+    block.add(MakeTransactionRef(tx20));
+    pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 30);
 
     /* clang-format off */
@@ -1100,10 +1100,10 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
         CheckAncestors(txns_result5[i], pool);
     }
 
-    vtx.push_back(MakeTransactionRef(tx12));
-    vtx.push_back(MakeTransactionRef(tx13));
-    vtx.push_back(MakeTransactionRef(tx15));
-    pool.removeForBlock(vtx, 1, dummy, false);
+    block.add(MakeTransactionRef(tx12));
+    block.add(MakeTransactionRef(tx13));
+    block.add(MakeTransactionRef(tx15));
+    pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 27);
 
     /* clang-format off */
@@ -1164,9 +1164,9 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
                             26
     */
 
-    vtx.push_back(MakeTransactionRef(tx22));
-    vtx.push_back(MakeTransactionRef(tx23));
-    pool.removeForBlock(vtx, 1, dummy, false);
+    block.add(MakeTransactionRef(tx22));
+    block.add(MakeTransactionRef(tx23));
+    pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 25);
 
     /* clang-format off */
@@ -1206,10 +1206,10 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     }
 
 
-    vtx.push_back(MakeTransactionRef(tx31));
-    vtx.push_back(MakeTransactionRef(tx33));
-    vtx.push_back(MakeTransactionRef(tx34));
-    pool.removeForBlock(vtx, 1, dummy, false);
+    block.add(MakeTransactionRef(tx31));
+    block.add(MakeTransactionRef(tx33));
+    block.add(MakeTransactionRef(tx34));
+    pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 22);
 
     /* clang-format off */
@@ -1247,11 +1247,11 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
         CheckAncestors(txns_result8[i], pool);
     }
 
-    vtx.push_back(MakeTransactionRef(tx24));
-    vtx.push_back(MakeTransactionRef(tx25));
-    vtx.push_back(MakeTransactionRef(tx27));
-    vtx.push_back(MakeTransactionRef(tx28));
-    pool.removeForBlock(vtx, 1, dummy, false);
+    block.add(MakeTransactionRef(tx24));
+    block.add(MakeTransactionRef(tx25));
+    block.add(MakeTransactionRef(tx27));
+    block.add(MakeTransactionRef(tx28));
+    pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 18);
 
     /* clang-format off */
@@ -1289,11 +1289,11 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
         CheckAncestors(txns_result9[i], pool);
     }
 
-    vtx.push_back(MakeTransactionRef(tx26));
-    vtx.push_back(MakeTransactionRef(tx29));
-    vtx.push_back(MakeTransactionRef(tx32));
-    vtx.push_back(MakeTransactionRef(tx35));
-    pool.removeForBlock(vtx, 1, dummy, false);
+    block.add(MakeTransactionRef(tx26));
+    block.add(MakeTransactionRef(tx29));
+    block.add(MakeTransactionRef(tx32));
+    block.add(MakeTransactionRef(tx35));
+    pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 14);
 
     /* clang-format off */

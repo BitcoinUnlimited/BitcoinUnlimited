@@ -3290,6 +3290,7 @@ bool ConnectTip(CValidationState &state,
     LOG(BENCH, "- Connect block: %.2fms [%.2fs]\n", (nTime6 - nTime1) * 0.001, nTimeTotal * 0.000001);
 
     // If some kind of unconfirmed push is turned on, then do the forwarding.
+    std::vector<CTxChange> txChanges;
     if (!IsInitialBlockDownload() && !fReindex && unconfPushAction.Value() != 0)
         ForwardAcceptableTransactions(txChanges);
 
