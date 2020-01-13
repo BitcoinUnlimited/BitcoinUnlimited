@@ -2104,6 +2104,13 @@ bool ProcessMessages(CNode *pfrom)
         // Scan for message start
         if (memcmp(msg.hdr.pchMessageStart, pfrom->GetMagic(chainparams), MESSAGE_START_SIZE) != 0)
         {
+            // Setting the cleanSubVer string allows us to present this peer in the bantable
+            // with a likely peer type if it uses the BitcoinCore network magic.
+            if (memcmp(msg.hdr.pchMessageStart, chainparams.MessageStart(), MESSAGE_START_SIZE) == 0)
+            {
+                pfrom->cleanSubVer = "BitcoinCore Network application";
+            }
+
             LOG(NET, "PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%s\n", SanitizeString(msg.hdr.GetCommand()),
                 pfrom->GetLogName());
             if (!pfrom->fWhitelisted)
