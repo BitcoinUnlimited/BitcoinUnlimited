@@ -42,6 +42,9 @@ extern CTweak<uint64_t> syncMempoolWithPeers;
 
 extern CTweak<uint32_t> randomlyDontInv;
 
+/** How many inbound connections will we track before pruning entries */
+const uint32_t MAX_INBOUND_CONNECTIONS_TRACKED = 10000;
+
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
 {
@@ -486,6 +489,16 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             // Track the user agent string
             {
                 LOCK(cs_mapInboundConnectionTracker);
+
+                // Remove a random entry if we've gotten too big.
+                if (mapInboundConnectionTracker.size() >= MAX_INBOUND_CONNECTIONS_TRACKED)
+                {
+                    size_t nIndex = GetRandInt(mapInboundConnectionTracker.size() - 1);
+                    auto rand_iter = std::next(mapInboundConnectionTracker.begin(), nIndex);
+                    mapInboundConnectionTracker.erase(rand_iter);
+                }
+
+                // Add the subver string.
                 mapInboundConnectionTracker[(CNetAddr)pfrom->addr].userAgent = pfrom->cleanSubVer;
             }
 
