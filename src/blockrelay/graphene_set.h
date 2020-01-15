@@ -214,11 +214,6 @@ public:
         double senderBloomFpr,
         double successRate);
 
-    static double FailureRecoveryFpr(uint64_t nItems,
-        uint64_t nReceiverUniverseItems,
-        double senderBloomFpr,
-        double successRate);
-
     CVariableFastFilter FailureRecoveryFilter(std::vector<uint256> &relevantHashes,
         uint64_t nItems,
         uint64_t nSenderFilterPositiveItems,

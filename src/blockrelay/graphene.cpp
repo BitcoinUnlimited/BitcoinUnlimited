@@ -1544,8 +1544,6 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
             pfrom->GetLogName());
     }
 
-    int blockSize = pblock->GetBlockSize();
-
     return true;
 }
 

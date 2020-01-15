@@ -430,14 +430,6 @@ uint64_t CGrapheneSet::UpperBoundFalsePositives(uint64_t nTargetItems,
         (1 + margin) * (nReceiverUniverseItems - nLowerBoundTruePositives) * senderBloomFpr);
 }
 
-double CGrapheneSet::FailureRecoveryFpr(uint64_t nItems,
-    uint64_t nReceiverUniverseItems,
-    double senderBloomFpr,
-    double successRate)
-{
-    return 1;
-}
-
 CVariableFastFilter CGrapheneSet::FailureRecoveryFilter(std::vector<uint256> &relevantHashes,
     uint64_t nItems,
     uint64_t nSenderFilterPositiveItems,
