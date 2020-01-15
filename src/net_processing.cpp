@@ -42,6 +42,9 @@ extern CTweak<uint64_t> syncMempoolWithPeers;
 
 extern CTweak<uint32_t> randomlyDontInv;
 
+/** How many inbound connections will we track before pruning entries */
+const uint32_t MAX_INBOUND_CONNECTIONS_TRACKED = 10000;
+
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
 {
@@ -482,6 +485,22 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         {
             vRecv >> LIMITED_STRING(pfrom->strSubVer, MAX_SUBVERSION_LENGTH);
             pfrom->cleanSubVer = SanitizeString(pfrom->strSubVer);
+
+            // Track the user agent string
+            {
+                LOCK(cs_mapInboundConnectionTracker);
+
+                // Remove a random entry if we've gotten too big.
+                if (mapInboundConnectionTracker.size() >= MAX_INBOUND_CONNECTIONS_TRACKED)
+                {
+                    size_t nIndex = GetRandInt(mapInboundConnectionTracker.size() - 1);
+                    auto rand_iter = std::next(mapInboundConnectionTracker.begin(), nIndex);
+                    mapInboundConnectionTracker.erase(rand_iter);
+                }
+
+                // Add the subver string.
+                mapInboundConnectionTracker[(CNetAddr)pfrom->addr].userAgent = pfrom->cleanSubVer;
+            }
 
             // ban SV peers
             if (pfrom->strSubVer.find("Bitcoin SV") != std::string::npos ||
@@ -2084,6 +2103,13 @@ bool ProcessMessages(CNode *pfrom)
         // Scan for message start
         if (memcmp(msg.hdr.pchMessageStart, pfrom->GetMagic(chainparams), MESSAGE_START_SIZE) != 0)
         {
+            // Setting the cleanSubVer string allows us to present this peer in the bantable
+            // with a likely peer type if it uses the BitcoinCore network magic.
+            if (memcmp(msg.hdr.pchMessageStart, chainparams.MessageStart(), MESSAGE_START_SIZE) == 0)
+            {
+                pfrom->cleanSubVer = "BitcoinCore Network application";
+            }
+
             LOG(NET, "PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%s\n", SanitizeString(msg.hdr.GetCommand()),
                 pfrom->GetLogName());
             if (!pfrom->fWhitelisted)
