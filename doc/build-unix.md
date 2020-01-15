@@ -66,7 +66,7 @@ db4.8 packages are available [here](https://launchpad.net/~bitcoin-unlimited/+ar
 You can add the repository and install using the following commands:
 
 ```bash
-sudo add-apt-repository ppa:bitcoin-unlimited/bu-ppa
+sudo add-apt-repository ppa:bitcoin-unlimited/bucash
 sudo apt-get update
 sudo apt-get install libdb4.8-dev libdb4.8++-dev
 ```
