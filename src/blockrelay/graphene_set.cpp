@@ -11,6 +11,7 @@
 #include "uint256.h"
 #include "util.h"
 
+#include <cfenv>
 #include <cmath>
 #include <numeric>
 
@@ -359,9 +360,12 @@ double CGrapheneSet::TruePositiveMargin(uint64_t nSenderFilterPositiveItems,
     double senderBloomFpr,
     uint64_t nLowerBoundTruePositives)
 {
-    return (nSenderFilterPositiveItems - nLowerBoundTruePositives) /
-               ((nReceiverUniverseItems - nLowerBoundTruePositives) * senderBloomFpr) -
-           1;
+    double denominator = (nReceiverUniverseItems - nLowerBoundTruePositives) * senderBloomFpr;
+
+    if (denominator == 0.0)
+        return 0.0;
+
+    return (nSenderFilterPositiveItems - nLowerBoundTruePositives) / denominator - 1;
 }
 
 double CGrapheneSet::TruePositiveProbability(uint64_t nSenderFilterPositiveItems,
@@ -373,8 +377,22 @@ double CGrapheneSet::TruePositiveProbability(uint64_t nSenderFilterPositiveItems
         nSenderFilterPositiveItems, nReceiverUniverseItems, senderBloomFpr, nLowerBoundTruePositives);
     double margin_plus_1 = margin + 1;
 
-    return pow(exp(margin) / pow(margin_plus_1, margin_plus_1),
-        (nReceiverUniverseItems - nLowerBoundTruePositives) * senderBloomFpr);
+    std::feclearexcept(FE_ALL_EXCEPT);
+    double denominator = 1.0;
+    if (margin_plus_1 != 0)
+        denominator = pow(margin_plus_1, margin_plus_1);
+
+    if (denominator == 0.0)
+        return 0.0;
+
+    double probability =
+        pow(exp(margin) / denominator, (nReceiverUniverseItems - nLowerBoundTruePositives) * senderBloomFpr);
+
+    if (std::fetestexcept(FE_DIVBYZERO) || std::fetestexcept(FE_OVERFLOW) || std::fetestexcept(FE_UNDERFLOW) ||
+        std::fetestexcept(FE_INVALID))
+        return 0.0;
+
+    return probability;
 }
 
 uint64_t CGrapheneSet::LowerBoundTruePositives(uint64_t nTargetItems,
@@ -409,10 +427,21 @@ double CGrapheneSet::FalsePositiveMargin(uint64_t nLowerBoundTruePositives,
     double successRate)
 {
     // delta in the graphene paper
-    double log_b = log(1 - successRate);
-    double s = -log_b / ((nReceiverUniverseItems - nLowerBoundTruePositives) * senderBloomFpr);
 
-    return 0.5 * (s + sqrt(pow(s, 2) + 8 * s));
+    double denominator = (nReceiverUniverseItems - nLowerBoundTruePositives) * senderBloomFpr;
+    if (denominator == 0.0)
+        return 0.0;
+
+    std::feclearexcept(FE_ALL_EXCEPT);
+    double log_b = log(1 - successRate);
+    double s = -log_b / denominator;
+    double result = 0.5 * (s + sqrt(pow(s, 2) + 8 * s));
+
+    if (std::fetestexcept(FE_DIVBYZERO) || std::fetestexcept(FE_OVERFLOW) || std::fetestexcept(FE_UNDERFLOW) ||
+        std::fetestexcept(FE_INVALID))
+        return 0.0;
+
+    return result;
 }
 
 uint64_t CGrapheneSet::UpperBoundFalsePositives(uint64_t nTargetItems,
@@ -531,7 +560,7 @@ std::vector<uint64_t> CGrapheneSet::DecodeRank(std::vector<unsigned char> encode
 double CGrapheneSet::BloomFalsePositiveRate(double optSymDiff, uint64_t nReceiverExcessItems)
 {
     double fpr;
-    if (optSymDiff >= nReceiverExcessItems)
+    if (optSymDiff >= nReceiverExcessItems || nReceiverExcessItems == 0)
         fpr = FILTER_FPR_MAX;
     else
         fpr = optSymDiff / float(nReceiverExcessItems);
@@ -629,7 +658,7 @@ uint8_t CGrapheneSet::NChecksumBits(size_t nIbltEntries,
     double bloomFPR,
     double fUncheckedErrorTol)
 {
-    if (nIbltEntries < nIbltHashFuncs)
+    if (nIbltEntries < nIbltHashFuncs || nIbltEntries == 0)
         return 32;
 
     return (uint8_t)std::max((double)MIN_CHECKSUM_BITS,
