@@ -6,8 +6,8 @@ import sys
 import shutil
 PROJECT_NAME = "ElectrsCash"
 GIT_REPO = "https://github.com/BitcoinUnlimited/{}.git".format(PROJECT_NAME)
-GIT_BRANCH = "v1.0.0"
-EXPECT_HEAD = "aa95d64d050c286356dadb78d19c2e687dec85cf"
+GIT_BRANCH = "master" # When released put a tag here
+EXPECT_HEAD = None # When released put a hash here: "aa95d64d050c286356dadb78d19c2e687dec85cf"
 
 ROOT_DIR = os.path.realpath(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
@@ -75,7 +75,7 @@ def verify_repo(allow_modified):
         logging.error("Validation failed - %s has local modifications.", ELECTRS_DIR)
         allow_modified or bail("Bailing")
 
-    if repo.head.object.hexsha != EXPECT_HEAD:
+    if EXPECT_HEAD != None and repo.head.object.hexsha != EXPECT_HEAD:
         # TODO: Add command line option to reset HEAD to GIT_BRANCH at EXPECT_HEAD
         logging.error("Validation failed - %s HEAD differs from expected (%s vs %s)",
                 PROJECT_NAME, repo.head.object.hexsha, EXPECT_HEAD)
