@@ -406,6 +406,8 @@ public:
     CCriticalSection cs_vRecvMsg;
     uint64_t nRecvBytes GUARDED_BY(vRecvMsg);
     std::deque<CNetMessage> vRecvMsg GUARDED_BY(vRecvMsg);
+    // the next message we receive from the socket
+    CNetMessage msg GUARDED_BY(vRecvMsg) = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
     CStatHistory<uint64_t> currentRecvMsgSize;
 
     uint64_t nServices;
@@ -643,8 +645,8 @@ public:
     {
         AssertLockHeld(cs_vRecvMsg);
         unsigned int total = 0;
-        for (const CNetMessage &msg : vRecvMsg)
-            total += msg.vRecv.size() + 24;
+        for (const CNetMessage &message : vRecvMsg)
+            total += message.vRecv.size() + 24;
         return total;
     }
 
@@ -655,8 +657,8 @@ public:
     {
         LOCK(cs_vRecvMsg);
         nRecvVersion = nVersionIn;
-        for (CNetMessage &msg : vRecvMsg)
-            msg.SetVersion(nVersionIn);
+        for (CNetMessage &message : vRecvMsg)
+            message.SetVersion(nVersionIn);
     }
 
     const CMessageHeader::MessageStartChars &GetMagic(const CChainParams &params) const

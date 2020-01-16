@@ -668,12 +668,6 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
     AssertLockHeld(cs_vRecvMsg);
     while (nBytes > 0)
     {
-        // get current incomplete message, or create a new one
-        if (vRecvMsg.empty() || vRecvMsg.back().complete())
-            vRecvMsg.push_back(CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion));
-
-        CNetMessage &msg = vRecvMsg.back();
-
         // Absorb network data.
         int handled;
         if (!msg.in_data)
@@ -696,6 +690,11 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 
         if (msg.complete())
         {
+            bool fLowPriority = true;
+
+            msg.nStopwatch = GetStopwatchMicros();
+            msg.nTime = GetTimeMicros();
+
             // Connection slot attack mitigation.  We don't want to add useful bytes for outgoing INV, PING, ADDR,
             // VERSION or VERACK messages since attackers will often just connect and listen to INV messages.
             // We want to make sure that connected nodes are doing useful work in sending us data or requesting data.
@@ -716,30 +715,29 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                     if (vPriorityRecvQ.size() <= 5)
                     {
                         // Move the this message to the priority queue.
-                        CNetMessage priority;
-                        std::swap(priority, msg);
-                        vRecvMsg.pop_back();
                         vPriorityRecvQ.push_back(
-                            std::make_pair<CNodeRef, CNetMessage>(CNodeRef(this), std::move(priority)));
+                            std::make_pair<CNodeRef, CNetMessage>(CNodeRef(this), std::move(msg)));
+                        msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
 
                         // Check we moved the message
                         std::string strFirstMsgCommand = vPriorityRecvQ.back().second.hdr.GetCommand();
                         DbgAssert(strFirstMsgCommand == strCommand, );
                         LOG(THIN | GRAPHENE | CMPCT,
-                            "Receive Queue: pushed %s to the front of the queue, %d bytes, peer(%d)\n",
-                            strFirstMsgCommand, vPriorityRecvQ.back().second.hdr.nMessageSize, this->GetId());
+                            "Receive Queue: pushed %s to the priority queue, %d bytes, peer(%d)\n", strFirstMsgCommand,
+                            vPriorityRecvQ.back().second.hdr.nMessageSize, this->GetId());
 
-                        // Set nTime. We must do this separately for priority messages because
-                        // we swapped "msg" to the priority queue.
-                        vPriorityRecvQ.back().second.nTime = GetTimeMicros();
+                        // Indicate we have a priority message to process
                         fPriorityRecvMsg.store(true);
-                        messageHandlerCondition.notify_one();
-                        continue;
+                        fLowPriority = false;
                     }
                 }
             }
-            msg.nStopwatch = GetStopwatchMicros();
-            msg.nTime = GetTimeMicros();
+
+            if (fLowPriority)
+            {
+                vRecvMsg.push_back(std::move(msg));
+                msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
+            }
             messageHandlerCondition.notify_one();
         }
     }
