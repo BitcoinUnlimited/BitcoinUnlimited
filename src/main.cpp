@@ -44,6 +44,7 @@
 #include "tinyformat.h"
 #include "txadmission.h"
 #include "txdb.h"
+#include "txlookup.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
 #include "ui_interface.h"
@@ -284,21 +285,24 @@ bool GetTransaction(const uint256 &hash,
 {
     const CBlockIndex *pindexSlow = blockIndex;
 
-    if (blockIndex == nullptr)
+    CTransactionRef ptx = mempool.get(hash);
+    if (ptx)
     {
-        CTransactionRef ptx = mempool.get(hash);
-        if (ptx)
+        txOut = ptx;
+        return true;
+    }
+
+    if (fTxIndex)
+    {
+        if (g_txindex->FindTx(hash, hashBlock, txOut))
         {
-            txOut = ptx;
             return true;
         }
+    }
 
-        if (fTxIndex)
-        {
-            return g_txindex->FindTx(hash, hashBlock, txOut);
-        }
-
-        // use coin database to locate block that contains transaction, and scan it
+    if (blockIndex == nullptr)
+    {
+        // attempt to use coin database to locate block that contains transaction, and scan it
         if (fAllowSlow)
         {
             CoinAccessor coin(*pcoinsTip, hash);
@@ -312,15 +316,14 @@ bool GetTransaction(const uint256 &hash,
         CBlock block;
         if (ReadBlockFromDisk(block, pindexSlow, consensusParams))
         {
-            for (const auto &tx : block.vtx)
+            bool ctor_enabled = pindexSlow->nHeight >= consensusParams.nov2018Height;
+            int64_t pos = FindTxPosition(block, hash, ctor_enabled);
+            if (pos == TX_NOT_FOUND)
             {
-                if (tx->GetHash() == hash)
-                {
-                    txOut = tx;
-                    hashBlock = pindexSlow->GetBlockHash();
-                    return true;
-                }
+                return false;
             }
+            txOut = block.vtx.at(pos);
+            return true;
         }
     }
 
