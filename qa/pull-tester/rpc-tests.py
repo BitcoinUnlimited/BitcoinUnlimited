@@ -262,7 +262,8 @@ testScripts = [ RpcTest(t) for t in [
     WhenElectrumFound('electrum_cashaccount'),
     'minimaldata-activation',
     'schnorrmultisig_activation',
-    WhenElectrumFound('electrum_subscriptions')
+    WhenElectrumFound('electrum_subscriptions'),
+    WhenElectrumFound('electrum_scripthash_gethistory')
 
 ] ]
 
