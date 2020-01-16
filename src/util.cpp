@@ -247,6 +247,8 @@ void LogInit()
 const char *const BITCOIN_CONF_FILENAME = "bitcoin.conf";
 const char *const BITCOIN_PID_FILENAME = "bitcoind.pid";
 const char *const FORKS_CSV_FILENAME = "forks.csv"; // bip135 added
+// Application startup time (used for uptime calculation)
+const int64_t nStartupTime = GetTime();
 
 std::map<std::string, std::string> mapArgs;
 std::map<std::string, std::vector<std::string> > mapMultiArgs;
@@ -1030,6 +1032,8 @@ std::string CopyrightHolders(const std::string &strPrefix)
     return strCopyrightHolders;
 }
 
+// Obtain the application startup time (used for uptime calculation)
+int64_t GetStartupTime() { return nStartupTime; }
 bool IsStringTrue(const std::string &str)
 {
     static const std::set<std::string> strOn = {"enable", "1", "true", "True", "on"};

@@ -6,7 +6,7 @@
 
 /**
  * Server/client environment: argument handling, config file parsing,
- * logging, thread wrappers
+ * logging, thread wrappers, startup time
  */
 #ifndef BITCOIN_UTIL_H
 #define BITCOIN_UTIL_H
@@ -110,6 +110,9 @@ extern "C" void DbgResume();
 /// UNIQUIFY is a macro that appends the current file's line number to the passed prefix, creating a symbol
 // that is unique in this file.
 #define UNIQUIFY(pfx) UNIQUE1(pfx, __LINE__)
+
+// Application startup time (used for uptime calculation)
+int64_t GetStartupTime();
 
 static const bool DEFAULT_LOGTIMEMICROS = false;
 static const bool DEFAULT_LOGIPS = true;
