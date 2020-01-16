@@ -379,36 +379,39 @@ public:
     /** This node's max acceptable sum of all descendant transaction sizes.  Used to decide whether this node will
      * accept a particular transaction. */
     size_t nLimitDescendantSize = BCH_DEFAULT_DESCENDANT_SIZE_LIMIT * 1000;
-    // Does this node support mempool synchronization?
+    /** Does this node support mempool synchronization? */
     bool canSyncMempoolWithPeers = false;
-    // Minimum supported mempool synchronization version
+    /** Minimum supported mempool synchronization version */
     uint64_t nMempoolSyncMinVersionSupported = 0;
-    // Maximum supported mempool synchronization version
+    /** Maximum supported mempool synchronization version */
     uint64_t nMempoolSyncMaxVersionSupported = 0;
 
     // This is shared-locked whenever messages are processed.
     // Take it exclusive-locked to finish all ongoing processing
     CSharedCriticalSection csMsgSerializer;
+
     // socket
-    uint64_t nServices;
     SOCKET hSocket;
-    CDataStream ssSend;
-    std::atomic<uint64_t> nSendSize; // total size in bytes of all vSendMsg entries
-    size_t nSendOffset; // offset inside the first vSendMsg already sent
-    uint64_t nSendBytes;
-    std::deque<CSerializeData> vSendMsg;
+
     CCriticalSection cs_vSend;
+    CDataStream ssSend GUARDED_BY(cs_vSend);
+    size_t nSendOffset GUARDED_BY(cs_vSend); // offset inside the first vSendMsg already sent
+    uint64_t nSendBytes GUARDED_BY(cs_vSend);
+    std::deque<CSerializeData> vSendMsg GUARDED_BY(cs_vSend);
+    std::atomic<uint64_t> nSendSize; // total size in bytes of all vSendMsg entries
 
     CCriticalSection csRecvGetData;
-    std::deque<CInv> vRecvGetData;
-    std::deque<CNetMessage> vRecvMsg;
-    CStatHistory<uint64_t> currentRecvMsgSize;
+    std::deque<CInv> vRecvGetData GUARDED_BY(csRecvGetData);
+
     CCriticalSection cs_vRecvMsg;
-    uint64_t nRecvBytes;
+    uint64_t nRecvBytes GUARDED_BY(vRecvMsg);
+    std::deque<CNetMessage> vRecvMsg GUARDED_BY(vRecvMsg);
+    CStatHistory<uint64_t> currentRecvMsgSize;
+
+    uint64_t nServices;
     int nRecvVersion;
 
-    // BU connection de-prioritization
-    //* Total bytes sent and received
+    /** Connection de-prioritization - Total useful bytes sent and received */
     uint64_t nActivityBytes;
 
     int64_t nLastSend;
@@ -416,6 +419,7 @@ public:
     int64_t nTimeConnected; /** Calendar time this node was connected */
     uint64_t nStopwatchConnected; /** Stopwatch time this node was connected */
     int64_t nTimeOffset;
+
     /** The address of the remote peer */
     CAddress addr;
 
@@ -442,7 +446,7 @@ public:
 
     /** the intial xversion message sent in the handshake */
     CCriticalSection cs_xversion;
-    CXVersionMessage xVersion;
+    CXVersionMessage xVersion GUARDED_BY(cs_xversion);
 
     /** strSubVer is whatever byte array we read from the wire. However, this field is intended
         to be printed out, displayed to humans in various forms and so on. So we sanitize it and
