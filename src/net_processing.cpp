@@ -2104,6 +2104,11 @@ bool ProcessMessages(CNode *pfrom)
                     if (vPriorityRecvQ.empty())
                         fPriorityRecvMsg.store(false);
                 }
+                else if (locked && vPriorityRecvQ.empty())
+                {
+                    fPriorityRecvMsg.store(false);
+                    continue;
+                }
                 else
                     continue;
             }

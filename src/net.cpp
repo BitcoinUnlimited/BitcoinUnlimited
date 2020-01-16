@@ -715,8 +715,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                     if (vPriorityRecvQ.size() <= 5)
                     {
                         // Move the this message to the priority queue.
-                        vPriorityRecvQ.push_back(
-                            std::make_pair<CNodeRef, CNetMessage>(CNodeRef(this), std::move(msg)));
+                        vPriorityRecvQ.push_back(std::make_pair<CNodeRef, CNetMessage>(CNodeRef(this), std::move(msg)));
                         msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
 
                         // Check we moved the message
