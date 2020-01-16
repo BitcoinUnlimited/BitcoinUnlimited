@@ -2115,20 +2115,9 @@ bool ProcessMessages(CNode *pfrom)
                 if (pfrom->vRecvMsg.empty())
                     break;
 
-                // If the message at the front of the queue is not complete then do not continue. We must/can not
-                // swap an incomplete message in the following step.
-                if (!pfrom->vRecvMsg.front().complete())
-                {
-                    // LogPrintf("%s: partial message %d of size %d. Recvd bytes: %d\n", pfrom->GetLogName(),
-                    // msgOnQ.nDataPos, msgOnQ.size(), pfrom->currentRecvMsgSize.value);
-                    break;
-                }
-                else
-                {
-                    // Must have a complete message here before we can swap
-                    std::swap(msg, pfrom->vRecvMsg.front());
-                    pfrom->vRecvMsg.pop_front();
-                }
+                // get the message from the queue
+                std::swap(msg, pfrom->vRecvMsg.front());
+                pfrom->vRecvMsg.pop_front();
             }
 
 

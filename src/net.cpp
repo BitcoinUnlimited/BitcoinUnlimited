@@ -1340,9 +1340,10 @@ void ThreadSocketHandler()
                 }
                 {
                     TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                    if (lockRecv && (pnode->vRecvMsg.empty() || !pnode->vRecvMsg.front().complete() ||
-                                        pnode->GetTotalRecvSize() <= ReceiveFloodSize()))
+                    if (lockRecv && (pnode->vRecvMsg.empty() || pnode->GetTotalRecvSize() <= ReceiveFloodSize()))
+                    {
                         FD_SET(hSocket, &fdsetRecv);
+                    }
                 }
             }
         }
@@ -2389,15 +2390,17 @@ static bool threadProcessMessages(CNode *pnode)
     // Discover if there's more work to be done
     if (pnode->nSendSize < SendBufferSize())
     {
-        { // If already locked some other thread is working on it, so no work for this thread
+        {
+            // If already locked some other thread is working on it, so no work for this thread
             TRY_LOCK(pnode->csRecvGetData, lockRecv);
             if (lockRecv && (!pnode->vRecvGetData.empty()))
                 fSleep = false;
         }
         if (fSleep)
-        { // If already locked some other thread is working on it, so no work for this thread
+        {
+            // If already locked some other thread is working on it, so no work for this thread
             TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-            if (lockRecv && (!pnode->vRecvMsg.empty() && pnode->vRecvMsg[0].complete()))
+            if (lockRecv && !pnode->vRecvMsg.empty())
                 fSleep = false;
         }
     }
