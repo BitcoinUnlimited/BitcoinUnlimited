@@ -2079,6 +2079,7 @@ bool ProcessMessages(CNode *pfrom)
         bool fIsPriority = false;
         READLOCK(pfrom->csMsgSerializer);
         CNetMessage msg;
+        bool fUseLowPriorityMsg = true;
         {
             // Get next message to process checking whether it is a priority messasge and if so then
             // process it right away. It doesn't matter that the peer where the message came from is
@@ -2093,7 +2094,9 @@ bool ProcessMessages(CNode *pfrom)
                     // check if we should process the message.
                     CNode *pnode = vPriorityRecvQ.front().first.get();
                     if (pnode->fDisconnect || pnode->nSendSize > SendBufferSize())
+                    {
                         break;
+                    }
 
                     // Get the message out of queue.
                     std::swap(noderef, vPriorityRecvQ.front().first);
@@ -2103,16 +2106,16 @@ bool ProcessMessages(CNode *pfrom)
 
                     if (vPriorityRecvQ.empty())
                         fPriorityRecvMsg.store(false);
+
+                    fUseLowPriorityMsg = false;
                 }
                 else if (locked && vPriorityRecvQ.empty())
                 {
                     fPriorityRecvMsg.store(false);
-                    continue;
                 }
-                else
-                    continue;
             }
-            else
+
+            if (fUseLowPriorityMsg)
             {
                 TRY_LOCK(pfrom->cs_vRecvMsg, lockRecv);
                 if (!lockRecv)
@@ -2124,7 +2127,6 @@ bool ProcessMessages(CNode *pfrom)
                 std::swap(msg, pfrom->vRecvMsg.front());
                 pfrom->vRecvMsg.pop_front();
             }
-
 
             // Check if this is a priority message and if so then modify pfrom to be the peer which
             // this priority message came from.
