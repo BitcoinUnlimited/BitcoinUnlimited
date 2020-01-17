@@ -41,6 +41,9 @@ static void CleanupAll(std::vector<CNode *> &vPeers)
         thinrelay.ClearAllBlocksToReconstruct(pnode->GetId());
         thinrelay.ClearAllBlocksInFlight(pnode->GetId());
         thinrelay.RemovePeers(pnode);
+
+        pnode->vSendMsg.clear();
+        pnode->vLowPrioritySendMsg.clear();
     }
     requester.MapBlocksInFlightClear();
 }
@@ -284,6 +287,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearThinBlocksInFlight(dummyNodeNone, inv);
     requester.MapBlocksInFlightClear();
     thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd: HAVE graphene nodes, NO Thinblock nodes, No Cmpt nodes, Graphene OFF, Thinblocks OFF,
     // Compactblocks OFF
@@ -715,7 +719,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     nTime = GetTime();
     SetMockTime(nTime);
 
-    // The first request should suceed as should successive requests up until the limit of thintype requests in flight
+    // The first request should succeed as should successive requests up until the limit of thintype requests in flight
     inv.hash = GetRandHash();
     BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
     BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 1);
@@ -776,7 +780,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     // download a full block
     SetMockTime(nTime + 20);
     BOOST_CHECK(requester.RequestBlock(&dummyNodeXthin, inv) == true);
-    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg) == "get_xthin");
+    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
     CleanupAll(vNodes);
