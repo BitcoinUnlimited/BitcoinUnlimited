@@ -3375,11 +3375,11 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
     }
 
     // if only 1 message is in queue then attempt and "optimistic" send
-    if (it == vSendMsg.begin())
+    if (vSendMsg.size() == 1)
     {
         SocketSendData(this);
     }
-    else if (vSendMsg.empty() && (it == vLowPrioritySendMsg.begin()))
+    else if (vSendMsg.empty() && (vLowPrioritySendMsg.size() == 1))
     {
         SocketSendData(this);
     }
