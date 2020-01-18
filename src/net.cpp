@@ -690,7 +690,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 
         if (msg.complete())
         {
-            bool fLowPriority = true;
+            bool fSendLowPriority = true;
 
             msg.nStopwatch = GetStopwatchMicros();
             msg.nTime = GetTimeMicros();
@@ -718,21 +718,17 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                         vPriorityRecvQ.push_back(std::make_pair<CNodeRef, CNetMessage>(CNodeRef(this), std::move(msg)));
                         msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
 
-                        // Check we moved the message
-                        std::string strFirstMsgCommand = vPriorityRecvQ.back().second.hdr.GetCommand();
-                        DbgAssert(strFirstMsgCommand == strCommand, );
                         LOG(THIN | GRAPHENE | CMPCT,
-                            "Receive Queue: pushed %s to the priority queue, %d bytes, peer(%d)\n", strFirstMsgCommand,
+                            "Receive Queue: pushed %s to the priority queue, %d bytes, peer(%d)\n", strCommand,
                             vPriorityRecvQ.back().second.hdr.nMessageSize, this->GetId());
-
                         // Indicate we have a priority message to process
                         fPriorityRecvMsg.store(true);
-                        fLowPriority = false;
+                        fSendLowPriority = false;
                     }
                 }
             }
 
-            if (fLowPriority)
+            if (fSendLowPriority)
             {
                 vRecvMsg.push_back(std::move(msg));
                 msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
@@ -835,7 +831,6 @@ int SocketSendData(CNode *pnode, bool fSendTwo)
             continue;
         }
         DbgAssert(data.size() > pnode->nSendOffset, );
-
         int amt2Send = min((int64_t)(data.size() - pnode->nSendOffset), sendShaper.available(SEND_SHAPER_MIN_FRAG));
         if (amt2Send == 0)
             break;
@@ -1346,7 +1341,7 @@ void ThreadSocketHandler()
                 // * We process a message in the buffer (message handler thread).
                 {
                     TRY_LOCK(pnode->cs_vSend, lockSend);
-                    if (lockSend && !pnode->vSendMsg.empty())
+                    if (lockSend && (!pnode->vSendMsg.empty() || !pnode->vLowPrioritySendMsg.empty()))
                     {
                         FD_SET(hSocket, &fdsetSend);
                         continue;
@@ -3192,6 +3187,8 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nPingUsecTime = 0;
     fPingQueued = false;
     nMinPingUsecTime = std::numeric_limits<int64_t>::max();
+
+    msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
 
     // xthinblocks
     nXthinBloomfilterSize = 0;

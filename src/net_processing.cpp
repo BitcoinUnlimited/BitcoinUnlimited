@@ -2091,27 +2091,28 @@ bool ProcessMessages(CNode *pfrom)
                 TRY_LOCK(cs_priorityRecvQ, locked);
                 if (locked && !vPriorityRecvQ.empty())
                 {
-                    // check if we should process the message.
-                    CNode *pnode = vPriorityRecvQ.front().first.get();
-                    if (pnode->fDisconnect || pnode->nSendSize > SendBufferSize())
-                    {
-                        break;
-                    }
-
                     // Get the message out of queue.
                     std::swap(noderef, vPriorityRecvQ.front().first);
                     std::swap(msg, vPriorityRecvQ.front().second);
                     vPriorityRecvQ.pop_front();
-                    fIsPriority = true;
 
                     if (vPriorityRecvQ.empty())
                         fPriorityRecvMsg.store(false);
 
+                    // check if we should process the message.
+                    CNode *pnode = noderef.get();
+                    if (pnode->fDisconnect || pnode->nSendSize > SendBufferSize())
+                    {
+                        continue;
+                    }
+
+                    fIsPriority = true;
                     fUseLowPriorityMsg = false;
                 }
                 else if (locked && vPriorityRecvQ.empty())
                 {
                     fPriorityRecvMsg.store(false);
+                    fUseLowPriorityMsg = true;
                 }
             }
 

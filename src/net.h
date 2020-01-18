@@ -408,7 +408,7 @@ public:
     uint64_t nRecvBytes GUARDED_BY(vRecvMsg);
     std::deque<CNetMessage> vRecvMsg GUARDED_BY(vRecvMsg);
     // the next message we receive from the socket
-    CNetMessage msg GUARDED_BY(vRecvMsg) = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
+    CNetMessage msg GUARDED_BY(vRecvMsg);
     CStatHistory<uint64_t> currentRecvMsgSize;
 
     uint64_t nServices;
