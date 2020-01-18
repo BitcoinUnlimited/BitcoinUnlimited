@@ -75,6 +75,8 @@ def verify_repo(allow_modified):
         logging.error("Validation failed - %s has local modifications.", ELECTRS_DIR)
         allow_modified or bail("Bailing")
 
+    if EXPECT_HEAD == None:
+        logging.warning("ElectrsCash is not fixed to a specific revision.  Please assign the EXPECT_HEAD variable in build_electrs.py before releasing.")
     if EXPECT_HEAD != None and repo.head.object.hexsha != EXPECT_HEAD:
         # TODO: Add command line option to reset HEAD to GIT_BRANCH at EXPECT_HEAD
         logging.error("Validation failed - %s HEAD differs from expected (%s vs %s)",
