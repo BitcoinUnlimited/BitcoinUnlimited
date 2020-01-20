@@ -1561,38 +1561,40 @@ void ThreadSocketHandler()
             }
 
             //
-            // Inactivity checking
+            // Inactivity checking every TIMEOUT_INTERVAL
             //
             int64_t stopwatchTime = GetStopwatchMicros();
-            if (stopwatchTime - pnode->nStopwatchConnected > 60 * 1000000)
+            if (stopwatchTime - pnode->nStopwatchConnected > TIMEOUT_INTERVAL * 1000000)
             {
-                int64_t nTime = GetTime();
-                if (pnode->nLastRecv == 0 || pnode->nLastSend == 0)
+                pnode->nStopwatchConnected = GetTimeMicros();
+                if (ignoreNetTimeouts.Value() == false)
                 {
-                    LOG(NET, "Node %s socket no message in first 60 seconds, %d %d from %d\n", pnode->GetLogName(),
-                        pnode->nLastRecv != 0, pnode->nLastSend != 0, pnode->id);
-                    if (ignoreNetTimeouts.Value() == false)
+                    int64_t nTime = GetTime();
+                    if (pnode->nLastRecv == 0 || pnode->nLastSend == 0)
+                    {
+                        LOG(NET, "Node %s: no message sent or received after startup, %d %d from %d\n",
+                            pnode->GetLogName(), pnode->nLastRecv != 0, pnode->nLastSend != 0, pnode->id);
                         pnode->fDisconnect = true;
-                }
-                else if (nTime - pnode->nLastSend > TIMEOUT_INTERVAL)
-                {
-                    LOG(NET, "Node %s socket sending timeout: %is\n", pnode->GetLogName(), nTime - pnode->nLastSend);
-                    if (ignoreNetTimeouts.Value() == false)
+                    }
+                    else if (nTime - pnode->nLastSend > TIMEOUT_INTERVAL)
+                    {
+                        LOG(NET, "Node %s: socket sending timeout: %is\n", pnode->GetLogName(),
+                            nTime - pnode->nLastSend);
                         pnode->fDisconnect = true;
-                }
-                else if (nTime - pnode->nLastRecv > TIMEOUT_INTERVAL)
-                {
-                    LOG(NET, "Node %s socket receive timeout: %is\n", pnode->GetLogName(), nTime - pnode->nLastRecv);
-                    if (ignoreNetTimeouts.Value() == false)
+                    }
+                    else if (nTime - pnode->nLastRecv > TIMEOUT_INTERVAL)
+                    {
+                        LOG(NET, "Node %s: socket receive timeout: %is\n", pnode->GetLogName(),
+                            nTime - pnode->nLastRecv);
                         pnode->fDisconnect = true;
-                }
-                else if (pnode->nPingNonceSent &&
-                         pnode->nPingUsecStart + (TIMEOUT_INTERVAL * 1000000) < (int64_t)GetStopwatchMicros())
-                {
-                    LOG(NET, "Node %s ping timeout: %fs\n", pnode->GetLogName(),
-                        0.000001 * (GetStopwatchMicros() - pnode->nPingUsecStart));
-                    if (ignoreNetTimeouts.Value() == false)
+                    }
+                    else if (pnode->nPingNonceSent &&
+                             pnode->nPingUsecStart + (TIMEOUT_INTERVAL * 1000000) < (int64_t)GetStopwatchMicros())
+                    {
+                        LOG(NET, "Node %s: ping timeout: %fs\n", pnode->GetLogName(),
+                            0.000001 * (GetStopwatchMicros() - pnode->nPingUsecStart));
                         pnode->fDisconnect = true;
+                    }
                 }
             }
         }
