@@ -41,6 +41,9 @@ static void CleanupAll(std::vector<CNode *> &vPeers)
         thinrelay.ClearAllBlocksToReconstruct(pnode->GetId());
         thinrelay.ClearAllBlocksInFlight(pnode->GetId());
         thinrelay.RemovePeers(pnode);
+
+        pnode->vSendMsg.clear();
+        pnode->vLowPrioritySendMsg.clear();
     }
     requester.MapBlocksInFlightClear();
 }
@@ -53,24 +56,18 @@ static std::string NetMessage(std::deque<CSerializeData> &_vSendMsg)
 
     CInv inv_result;
     CSerializeData data = _vSendMsg.front();
-    CDataStream ssCommand(SER_NETWORK, PROTOCOL_VERSION);
-    ssCommand.insert(ssCommand.begin(), &data[4], &data[16]);
+    std::string ssData(data.begin(), data.end());
+    std::string ss(ssData.begin() + 4, ssData.begin() + 16);
     _vSendMsg.pop_front();
 
-    std::string ss = ssCommand.str();
+    // Remove whitespace
     ss.erase(std::remove(ss.begin(), ss.end(), '\000'), ss.end());
 
     // if it's a getdata then we need to find out what type
     if (ss == "getdata")
     {
-        // We have to add a character/s to the end of the CSerializeData object or we will go out
-        // of bounds when we insert the data into the ssInv datastream since there are only 61
-        // characters in the string and we want to copy up to and including the very last character.
-        std::string aa("end");
-        data.insert(data.end(), aa.begin(), aa.end());
-
         CDataStream ssInv(SER_NETWORK, PROTOCOL_VERSION);
-        ssInv.insert(ssInv.begin(), &data[25], &data[61]);
+        ssInv.insert(ssInv.begin(), ssData.begin() + 25, ssData.begin() + 61);
 
         CInv inv;
         ssInv >> inv;
@@ -290,6 +287,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     ClearThinBlocksInFlight(dummyNodeNone, inv);
     requester.MapBlocksInFlightClear();
     thinrelay.RemovePeers(&dummyNodeNone);
+    CleanupAll(vNodes);
 
     // Chains IS sync'd: HAVE graphene nodes, NO Thinblock nodes, No Cmpt nodes, Graphene OFF, Thinblocks OFF,
     // Compactblocks OFF
@@ -721,7 +719,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     nTime = GetTime();
     SetMockTime(nTime);
 
-    // The first request should suceed as should successive requests up until the limit of thintype requests in flight
+    // The first request should succeed as should successive requests up until the limit of thintype requests in flight
     inv.hash = GetRandHash();
     BOOST_CHECK(requester.RequestBlock(&dummyNodeGraphene, inv) == true);
     BOOST_CHECK(dummyNodeGraphene.vSendMsg.size() == 1);
@@ -782,7 +780,7 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     // download a full block
     SetMockTime(nTime + 20);
     BOOST_CHECK(requester.RequestBlock(&dummyNodeXthin, inv) == true);
-    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg) == "get_xthin");
+    BOOST_CHECK(NetMessage(dummyNodeXthin.vSendMsg) == "getdata");
 
     thinrelay.ClearBlockRelayTimer(inv.hash);
     CleanupAll(vNodes);

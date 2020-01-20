@@ -59,7 +59,7 @@ const char *GET_MEMPOOLSYNCTX = "getmemsynctx";
 // Mempool sync - end section
 const char *XPEDITEDREQUEST = "req_xpedited";
 const char *XPEDITEDBLK = "Xb";
-const char *XPEDITEDTxn = "Xt";
+const char *XPEDITEDTXN = "Xt";
 const char *BUVERSION = "buversion";
 const char *BUVERACK = "buverack";
 const char *XVERSION = "xversion";
@@ -91,7 +91,7 @@ const static std::string allNetMessageTypes[] = {
     NetMsgType::XTHINBLOCK, NetMsgType::XBLOCKTX, NetMsgType::GET_XBLOCKTX, NetMsgType::GET_XTHIN, NetMsgType::GET_THIN,
     NetMsgType::GRAPHENEBLOCK, NetMsgType::GRAPHENETX, NetMsgType::GET_GRAPHENETX, NetMsgType::GET_GRAPHENE,
     NetMsgType::MEMPOOLSYNC, NetMsgType::MEMPOOLSYNCTX, NetMsgType::GET_MEMPOOLSYNC, NetMsgType::GET_MEMPOOLSYNCTX,
-    NetMsgType::XPEDITEDREQUEST, NetMsgType::XPEDITEDBLK, NetMsgType::XPEDITEDTxn, NetMsgType::BUVERSION,
+    NetMsgType::XPEDITEDREQUEST, NetMsgType::XPEDITEDBLK, NetMsgType::XPEDITEDTXN, NetMsgType::BUVERSION,
     NetMsgType::BUVERACK, NetMsgType::XVERSION, NetMsgType::XVERACK, NetMsgType::XUPDATE, NetMsgType::SENDCMPCT,
     NetMsgType::SENDCMPCT, NetMsgType::CMPCTBLOCK, NetMsgType::GETBLOCKTXN, NetMsgType::BLOCKTXN,
 

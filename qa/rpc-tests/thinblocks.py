@@ -22,6 +22,7 @@ class ThinBlockTest(BitcoinTestFramework):
         node_opts1 = [
             "-rpcservertimeout=0",
             "-debug=thin",
+            "-debug=net",
             "-use-grapheneblocks=0",
             "-use-thinblocks=1",
             "-use-bloom-filter-targeting=0",
@@ -34,6 +35,7 @@ class ThinBlockTest(BitcoinTestFramework):
         node_opts2 = [
             "-rpcservertimeout=0",
             "-debug=thin",
+            "-debug=net",
             "-use-grapheneblocks=0",
             "-use-thinblocks=1",
             "-use-bloom-filter-targeting=0",
@@ -46,6 +48,7 @@ class ThinBlockTest(BitcoinTestFramework):
         node_opts3 = [
             "-rpcservertimeout=0",
             "-debug=thin",
+            "-debug=net",
             "-use-grapheneblocks=0",
             "-use-thinblocks=1",
             "-use-bloom-filter-targeting=1",

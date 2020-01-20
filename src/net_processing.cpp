@@ -2060,6 +2060,8 @@ bool ProcessMessages(CNode *pfrom)
     //
     bool fOk = true;
 
+    // Check getdata requests first if there are no priority messages waiting.
+    if (!fPriorityRecvMsg.load())
     {
         TRY_LOCK(pfrom->csRecvGetData, locked);
         if (locked && !pfrom->vRecvGetData.empty())
@@ -2070,28 +2072,70 @@ bool ProcessMessages(CNode *pfrom)
 
     int msgsProcessed = 0;
     // Don't bother if send buffer is too full to respond anyway
+    CNode *pfrom_original = pfrom;
     while ((!pfrom->fDisconnect) && (pfrom->nSendSize < SendBufferSize()) && (shutdown_threads.load() == false))
     {
+        CNodeRef noderef;
+        bool fIsPriority = false;
         READLOCK(pfrom->csMsgSerializer);
         CNetMessage msg;
+        bool fUseLowPriorityMsg = true;
         {
-            TRY_LOCK(pfrom->cs_vRecvMsg, lockRecv);
-            if (!lockRecv)
-                break;
-
-            if (pfrom->vRecvMsg.empty())
-                break;
-            CNetMessage &msgOnQ = pfrom->vRecvMsg.front();
-            if (!msgOnQ.complete()) // end if an incomplete message is on the top
+            // Get next message to process checking whether it is a priority messasge and if so then
+            // process it right away. It doesn't matter that the peer where the message came from is
+            // different than the one we are currently procesing as we will switch to the correct peer
+            // automatically. Furthermore by using and holding the CNodeRef we automatically maintain
+            // a node reference to the priority peer.
+            if (fPriorityRecvMsg.load())
             {
-                // LogPrintf("%s: partial message %d of size %d. Recvd bytes: %d\n", pfrom->GetLogName(),
-                // msgOnQ.nDataPos, msgOnQ.size(), pfrom->currentRecvMsgSize.value);
-                break;
+                TRY_LOCK(cs_priorityRecvQ, locked);
+                if (locked && !vPriorityRecvQ.empty())
+                {
+                    // Get the message out of queue.
+                    std::swap(noderef, vPriorityRecvQ.front().first);
+                    std::swap(msg, vPriorityRecvQ.front().second);
+                    vPriorityRecvQ.pop_front();
+
+                    if (vPriorityRecvQ.empty())
+                        fPriorityRecvMsg.store(false);
+
+                    // check if we should process the message.
+                    CNode *pnode = noderef.get();
+                    if (pnode->fDisconnect || pnode->nSendSize > SendBufferSize())
+                    {
+                        continue;
+                    }
+
+                    fIsPriority = true;
+                    fUseLowPriorityMsg = false;
+                }
+                else if (locked && vPriorityRecvQ.empty())
+                {
+                    fPriorityRecvMsg.store(false);
+                    fUseLowPriorityMsg = true;
+                }
             }
-            msg = msgOnQ;
-            // at this point, any failure means we can delete the current message
-            pfrom->vRecvMsg.pop_front();
-            pfrom->currentRecvMsgSize -= msg.size();
+
+            if (fUseLowPriorityMsg)
+            {
+                TRY_LOCK(pfrom->cs_vRecvMsg, lockRecv);
+                if (!lockRecv)
+                    break;
+                if (pfrom->vRecvMsg.empty())
+                    break;
+
+                // get the message from the queue
+                std::swap(msg, pfrom->vRecvMsg.front());
+                pfrom->vRecvMsg.pop_front();
+            }
+
+            // Check if this is a priority message and if so then modify pfrom to be the peer which
+            // this priority message came from.
+            if (fIsPriority)
+                pfrom = noderef.get();
+            else
+                pfrom->currentRecvMsgSize -= msg.size();
+
             msgsProcessed++;
         }
 
@@ -2203,6 +2247,10 @@ bool ProcessMessages(CNode *pfrom)
 
         if (msgsProcessed > 2000)
             break; // let someone else do something periodically
+
+        // Swap back to the original peer if we just processed a priority message
+        if (fIsPriority)
+            pfrom = pfrom_original;
     }
 
     return fOk;
