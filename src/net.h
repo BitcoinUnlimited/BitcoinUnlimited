@@ -415,7 +415,7 @@ public:
     int nRecvVersion;
 
     /** Connection de-prioritization - Total useful bytes sent and received */
-    uint64_t nActivityBytes;
+    std::atomic<uint64_t> nActivityBytes{0};
 
     int64_t nLastSend;
     int64_t nLastRecv;

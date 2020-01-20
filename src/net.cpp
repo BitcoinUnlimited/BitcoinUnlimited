@@ -702,7 +702,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
             if (strCommand != NetMsgType::PONG && strCommand != NetMsgType::PING && strCommand != NetMsgType::ADDR &&
                 strCommand != NetMsgType::VERSION && strCommand != NetMsgType::VERACK)
             {
-                nActivityBytes += msg.hdr.nMessageSize;
+                nActivityBytes.fetch_add(msg.hdr.nMessageSize);
 
                 // If the message is a priority message then move it into the priority queue.
                 if (IsPriorityMsg(strCommand))
@@ -960,12 +960,18 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
         static int64_t nLastTime = GetTime();
         for (CNode *node : vNodes)
         {
-            // Decay the activity bytes for each node over a period of 2 hours.  This gradually de-prioritizes a
-            // connection
-            // that was once active but has gone stale for some reason and allows lower priority active nodes to climb
-            // the ladder.
+            // Decay the activity bytes for each node over a period of 2 hours.  This gradually de-prioritizes
+            // a connection that was once active but has gone stale for some reason and allows lower priority
+            // active nodes to climb the ladder.
             int64_t nNow = GetTime();
-            node->nActivityBytes *= pow(1.0 - 1.0 / 7200, (double)(nNow - nLastTime)); // exponential 2 hour decay
+
+            while (true)
+            {
+                uint64_t nOldActivityBytes = node->nActivityBytes;
+                uint64_t nNewActivityBytes = nOldActivityBytes * pow(1.0 - 1.0 / 7200, (double)(nNow - nLastTime));
+                if (node->nActivityBytes.compare_exchange_weak(nNewActivityBytes, nOldActivityBytes))
+                    break;
+            }
 
             if (node->fWhitelisted)
                 continue;
@@ -3147,7 +3153,6 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nLastRecv = 0;
     nSendBytes = 0;
     nRecvBytes = 0;
-    nActivityBytes = 0; // BU connection slot exhaustion mitigation
     nTimeConnected = GetTime();
     nStopwatchConnected = GetStopwatchMicros();
     nTimeOffset = 0;
@@ -3348,7 +3353,7 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
         strcmp(strCommand, NetMsgType::ADDR) != 0 && strcmp(strCommand, NetMsgType::VERSION) != 0 &&
         strcmp(strCommand, NetMsgType::VERACK) != 0 && strcmp(strCommand, NetMsgType::INV) != 0)
     {
-        nActivityBytes += nSize;
+        nActivityBytes.fetch_add(nSize);
     }
 
     // If the message is a priority message then move it to priority queue.
