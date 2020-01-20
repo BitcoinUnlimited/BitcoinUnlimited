@@ -33,6 +33,36 @@ extern CTweak<double> dMaxLimiterTxFee;
 
 using namespace std;
 
+//* Helper function
+/** Returns, given services flags, a list of humanly readable (known) network services */
+UniValue GetServicesNames(uint64_t services)
+{
+    UniValue servicesNames(UniValue::VARR);
+
+    if (services & NODE_NETWORK)
+        servicesNames.push_back("NETWORK");
+    if (services & NODE_GETUTXO)
+        servicesNames.push_back("GETUTXO");
+    if (services & NODE_BLOOM)
+        servicesNames.push_back("BLOOM");
+    if (services & NODE_WITNESS)
+        servicesNames.push_back("WITNESS");
+    if (services & NODE_XTHIN)
+        servicesNames.push_back("XTHIN");
+    if (services & NODE_BITCOIN_CASH)
+        servicesNames.push_back("CASH");
+    if (services & NODE_GRAPHENE)
+        servicesNames.push_back("GRAPHENE");
+    if (services & NODE_WEAKBLOCKS)
+        servicesNames.push_back("WEAKBLOCKS");
+    if (services & NODE_CF)
+        servicesNames.push_back("CF");
+    if (services & NODE_NETWORK_LIMITED)
+        servicesNames.push_back("NETWORK_LIMITED");
+
+    return servicesNames;
+}
+
 UniValue getconnectioncount(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -97,6 +127,11 @@ UniValue getpeerinfo(const UniValue &params, bool fHelp)
             "    \"addr\":\"host:port\",            (string) The ip address and port of the peer\n"
             "    \"addrlocal\":\"ip:port\",         (string) local address\n"
             "    \"services\":\"xxxxxxxxxxxxxxxx\", (string) The services offered\n"
+            "    \"services\":\"xxxxxxxxxxxxxxxx\", (string) The services offered\n"
+            "    \"servicesnames\":[              (array) the services offered, in human-readable form\n"
+            "        \"SERVICE_NAME\",         (string) the service name if it is recognised\n"
+            "         ...\n"
+            "     ],\n"
             "    \"relaytxes\":true|false,        (boolean) Whether peer has asked us to relay transactions to it\n"
             "    \"lastsend\": ttt,               (numeric) The time in seconds since epoch (Jan 1 1970 GMT) of the "
             "last send\n"
@@ -157,6 +192,7 @@ UniValue getpeerinfo(const UniValue &params, bool fHelp)
             if (!(stats.addrLocal.empty()))
                 obj.pushKV("addrlocal", stats.addrLocal);
             obj.pushKV("services", strprintf("%016x", stats.nServices));
+            obj.pushKV("servicesnames", GetServicesNames(stats.nServices));
             obj.pushKV("relaytxes", stats.fRelayTxes);
             obj.pushKV("lastsend", stats.nLastSend);
             obj.pushKV("lastrecv", stats.nLastRecv);
@@ -535,6 +571,11 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
             "  \"subversion\": \"/BUCash:x.x.x/\",      (string) the server subversion string\n"
             "  \"protocolversion\": xxxxx,            (numeric) the protocol version\n"
             "  \"localservices\": \"xxxxxxxxxxxxxxxx\", (string) the services we offer to the network\n"
+            "  \"localservicesnames\": [                (array) the services we offer to the network, in "
+            "human-readable form\n"
+            "      \"SERVICE_NAME\",                    (string) the service name\n"
+            "       ...\n"
+            "   ],\n"
             "  \"timeoffset\": xxxxx,                 (numeric) the time offset\n"
             "  \"connections\": xxxxx,                (numeric) the number of connections\n"
             "  \"networks\": [                        (array) information per network\n"
@@ -581,6 +622,7 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
     obj.pushKV("subversion", FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, BUComments));
     obj.pushKV("protocolversion", PROTOCOL_VERSION);
     obj.pushKV("localservices", strprintf("%016x", nLocalServices));
+    obj.pushKV("localservicesnames", GetServicesNames(nLocalServices));
     obj.pushKV("timeoffset", GetTimeOffset());
     obj.pushKV("connections", (int)vNodes.size());
     obj.pushKV("networks", GetNetworksInfo());
