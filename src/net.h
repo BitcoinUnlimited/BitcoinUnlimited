@@ -416,11 +416,15 @@ public:
 
     /** Connection de-prioritization - Total useful bytes sent and received */
     std::atomic<uint64_t> nActivityBytes{0};
+    /** The last time bytes were sent to the remote peer */
+    std::atomic<int64_t> nLastSend{0};
+    /** The last time bytes were received from the remote peer */
+    std::atomic<int64_t> nLastRecv{0};
+    /** Calendar time this node was connected */
+    std::atomic<int64_t> nTimeConnected;
+    /** Stopwatch time this node was connected */
+    std::atomic<uint64_t> nStopwatchConnected;
 
-    int64_t nLastSend;
-    int64_t nLastRecv;
-    int64_t nTimeConnected; /** Calendar time this node was connected */
-    uint64_t nStopwatchConnected; /** Stopwatch time this node was connected */
     int64_t nTimeOffset;
 
     /** The address of the remote peer */

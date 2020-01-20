@@ -3149,8 +3149,6 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nServices = 0;
     hSocket = hSocketIn;
     nRecvVersion = INIT_PROTO_VERSION;
-    nLastSend = 0;
-    nLastRecv = 0;
     nSendBytes = 0;
     nRecvBytes = 0;
     nTimeConnected = GetTime();
