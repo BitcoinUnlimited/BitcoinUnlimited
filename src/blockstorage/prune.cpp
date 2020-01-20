@@ -34,6 +34,8 @@ uint8_t hashMaskThreshold;
 std::atomic<uint64_t> normalized_threshold;
 extern CTweakRef<uint8_t> hashMaskThresholdTweak;
 
+std::atomic<int> lastHeightPruned{0};
+
 /** Global flag to indicate we should check to see if there are
  *  block/undo files that should be deleted.  Set on startup
  *  or if we allocate more file space when we're in prune mode
@@ -65,7 +67,7 @@ std::string hashMaskThresholdValidator(const uint8_t &value, uint8_t *item, bool
     else
     {
         uint8_t newValue = *item;
-        if(pblocktree)
+        if (pblocktree)
         {
             if (!pblocktree->WriteHashMaskThreshold(newValue))
             {
@@ -127,11 +129,13 @@ bool SetupPruning(std::string &strLoadError)
     // check if we have valid pruning mode set
     if (standardPruning && maskPruning)
     {
-        strLoadError = _("Prune and prunewithmask are incompatible, please choose only one. If you have previously pruned with one method you must either continue to use that method or you will need to redownload the blockchain again");
+        strLoadError = _("Prune and prunewithmask are incompatible, please choose only one. If you have previously "
+                         "pruned with one method you must either continue to use that method or you will need to "
+                         "redownload the blockchain again");
         return false;
     }
 
-    if(standardPruning)
+    if (standardPruning)
     {
         if (nSignedPruneTarget < 0)
         {
@@ -144,8 +148,10 @@ bool SetupPruning(std::string &strLoadError)
         {
             if (nPruneTarget < MIN_DISK_SPACE_FOR_BLOCK_FILES)
             {
-                strLoadError = _(strprintf(_("Prune configured below the minimum of %d MiB.  Please use a higher number."),
-                    MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024).c_str());
+                strLoadError =
+                    _(strprintf(_("Prune configured below the minimum of %d MiB.  Please use a higher number."),
+                          MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024)
+                            .c_str());
                 return false;
             }
             LOGA("Prune configured to target %uMiB on disk for block and undo files.\n", nPruneTarget / 1024 / 1024);
@@ -197,7 +203,7 @@ bool SetupPruning(std::string &strLoadError)
         if (GetBoolArg("-rescan", false))
         {
             strLoadError = _("Rescans are not possible in pruned mode. You will need to use -reindex which will "
-                               "download the whole blockchain again.");
+                             "download the whole blockchain again.");
             return false;
         }
 #endif
@@ -331,10 +337,19 @@ void PruneFiles(std::set<int> &setFilesToPrune, uint64_t nLastBlockWeCanPrune)
 
 uint64_t PruneDB(uint64_t nLastBlockWeCanPrune)
 {
-    CBlockIndex *pindexOldest = chainActive.Tip();
-    while (pindexOldest->pprev)
+    CBlockIndex *pindexOldest = nullptr;
+    if (lastHeightPruned.load() <= 0)
     {
-        pindexOldest = pindexOldest->pprev;
+        pindexOldest = chainActive.Genesis();
+    }
+    else
+    {
+        pindexOldest = chainActive[lastHeightPruned.load()];
+    }
+    if (pindexOldest == nullptr)
+    {
+        LOGA("ERROR: error when pruining db, pindexoldest was a nullptr \n");
+        return 0;
     }
     uint64_t prunedCount = 0;
     std::vector<std::string> blockBatch;
@@ -366,12 +381,11 @@ uint64_t PruneDB(uint64_t nLastBlockWeCanPrune)
             continue;
         }
         // We have chosen to prune this block
-        unsigned int blockSize = pindexOldest->nDataPos;
         std::ostringstream key;
         key << pindexOldest->GetBlockTime() << ":" << pindexOldest->GetBlockHash().ToString();
         blockBatch.push_back(key.str());
         undoBatch.push_back(key.str());
-        nDBUsedSpace = nDBUsedSpace - blockSize;
+        nDBUsedSpace = nDBUsedSpace - pindexOldest->nDataPos;
         pindexOldest->nStatus &= ~BLOCK_HAVE_DATA;
         pindexOldest->nStatus &= ~BLOCK_HAVE_UNDO;
         pindexOldest->nFile = 0;
@@ -379,6 +393,7 @@ uint64_t PruneDB(uint64_t nLastBlockWeCanPrune)
         pindexOldest->nUndoPos = 0;
         setDirtyBlockIndex.insert(pindexOldest);
         prunedCount = prunedCount + 1;
+        lastHeightPruned.store(pindexOldest->nHeight);
         pindexOldest = chainActive.Next(pindexOldest);
     }
     CValidationState state;
