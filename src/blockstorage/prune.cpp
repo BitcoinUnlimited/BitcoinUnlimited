@@ -335,6 +335,23 @@ void PruneFiles(std::set<int> &setFilesToPrune, uint64_t nLastBlockWeCanPrune)
         ((int64_t)nPruneTarget - (int64_t)nCurrentUsage) / 1024 / 1024, nLastBlockWeCanPrune, count);
 }
 
+void updateBlockDbDisk(const std::vector<std::string> blockBatch, const std::vector<std::string> undoBatch)
+{
+    if (pblockdb)
+    {
+        for (const auto &key : blockBatch)
+        {
+            pblockdb->EraseBlock(key);
+        }
+        for (const auto &key : undoBatch)
+        {
+            pblockdb->EraseUndo(key);
+        }
+        pblockdb->CondenseBlockData();
+        pblockdb->CondenseUndoData();
+    }
+}
+
 uint64_t PruneDB(uint64_t nLastBlockWeCanPrune)
 {
     CBlockIndex *pindexOldest = nullptr;
@@ -398,16 +415,8 @@ uint64_t PruneDB(uint64_t nLastBlockWeCanPrune)
     }
     CValidationState state;
     FlushStateToDiskInternal(state);
-    for (const auto &key : blockBatch)
-    {
-        pblockdb->EraseBlock(key);
-    }
-    for (const auto &key : undoBatch)
-    {
-        pblockdb->EraseUndo(key);
-    }
-    pblockdb->CondenseBlockData();
-    pblockdb->CondenseUndoData();
+    std::thread t(updateBlockDbDisk, blockBatch, undoBatch); // thread runs free
+    t.detach();
     LOG(PRUNE, "Pruned %u blocks, size on disk %u\n", prunedCount, nDBUsedSpace);
     return prunedCount;
 }
