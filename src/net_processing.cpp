@@ -7,6 +7,8 @@
 
 #include "net_processing.h"
 
+#include "DoubleSpendProof.h"
+#include "DoubleSpendProofStorage.h"
 #include "addrman.h"
 #include "blockrelay/blockrelay_common.h"
 #include "blockrelay/compactblock.h"
@@ -15,8 +17,6 @@
 #include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
 #include "chain.h"
-#include "DoubleSpendProof.h"
-#include "DoubleSpendProofStorage.h"
 #include "dosman.h"
 #include "electrum/electrs.h"
 #include "expedited.h"
@@ -1026,14 +1026,16 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 // transaction volumes increase.
                 else if (!fAlreadyHaveTx && !IsInitialBlockDownload())
                 {
-                    if (inv.type == MSG_DOUBLESPENDPROOF) {
+                    if (inv.type == MSG_DOUBLESPENDPROOF)
+                    {
                         // this is a bit hacky because I'm not going to find out why BU no longer supports
                         // generic INV/GETDATA pairs, as the requester.AskFor fails.
                         std::vector<CInv> vGetData;
                         vGetData.push_back(inv);
                         pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
-                    } else
-                    requester.AskFor(inv, pfrom);
+                    }
+                    else
+                        requester.AskFor(inv, pfrom);
                 }
             }
 
@@ -1986,10 +1988,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->fRelayTxes = true;
     }
 
-    if (strCommand == NetMsgType::DSPROOF) {
+    if (strCommand == NetMsgType::DSPROOF)
+    {
         LOG(DSPROOF, "Received a Double Spend Proof from peer %d\n", pfrom->id);
         uint256 hash;
-        try {
+        try
+        {
             DoubleSpendProof dsp;
             vRecv >> dsp;
             if (dsp.isEmpty())
@@ -1997,21 +2001,28 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
             hash = dsp.createHash();
             CInv inv(MSG_DOUBLESPENDPROOF, hash);
-            switch (dsp.validate()) {
-            case DoubleSpendProof::Valid: {
+            switch (dsp.validate())
+            {
+            case DoubleSpendProof::Valid:
+            {
                 const auto tx = mempool.addDoubleSpendProof(dsp);
-                if (tx.get()) { // added to mempool correctly, then forward to nodes.
+                if (tx.get())
+                { // added to mempool correctly, then forward to nodes.
                     LOG(DSPROOF, "  Good DSP, broadcasting an INV\n");
                     LOCK(cs_vNodes);
-                    for (CNode* pnode : vNodes) {
-                        if(!pnode->fRelayTxes || pnode == pfrom)
+                    for (CNode *pnode : vNodes)
+                    {
+                        if (!pnode->fRelayTxes || pnode == pfrom)
                             continue;
                         LOCK(pnode->cs_filter);
-                        if (pnode->pfilter) {
+                        if (pnode->pfilter)
+                        {
                             // For nodes that we sent this Tx before, send a proof.
                             if (pnode->pfilter->IsRelevantAndUpdate(tx))
                                 pnode->PushInventory(inv);
-                        } else {
+                        }
+                        else
+                        {
                             pnode->PushInventory(inv);
                         }
                     }
@@ -2028,7 +2039,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             default:
                 return false;
             }
-        } catch (const std::exception &e) {
+        }
+        catch (const std::exception &e)
+        {
             LOG(DSPROOF, "Failure handling double spend proof. Peer: %d Reason: %s\n", pfrom->GetId(), e.what());
             if (!hash.IsNull())
                 mempool.doubleSpendProofStorage()->markProofRejected(hash);

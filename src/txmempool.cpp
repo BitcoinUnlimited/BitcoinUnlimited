@@ -7,11 +7,11 @@
 
 #include "txmempool.h"
 
+#include "DoubleSpendProof.h"
+#include "DoubleSpendProofStorage.h"
 #include "consensus/consensus.h"
 #include "consensus/tx_verify.h"
 #include "consensus/validation.h"
-#include "DoubleSpendProof.h"
-#include "DoubleSpendProofStorage.h"
 #include "init.h"
 #include "main.h"
 #include "parallel.h"
@@ -674,8 +674,7 @@ void CTxMemPoolEntry::ReplaceAncestorState(int64_t modifySize, CAmount modifyFee
 }
 
 CTxMemPool::CTxMemPool(const CFeeRate &_minReasonableRelayFee)
-    : nTransactionsUpdated(0),
-    m_dspStorage(new DoubleSpendProofStorage())
+    : nTransactionsUpdated(0), m_dspStorage(new DoubleSpendProofStorage())
 {
     _clear(); // lock free clear
 
@@ -1749,7 +1748,7 @@ CTransactionRef CTxMemPool::addDoubleSpendProof(const DoubleSpendProof &proof)
 
     auto iter = mapTx.find(oldTx->second.ptx->GetHash());
     assert(mapTx.end() != iter);
-    if (iter->dsproof != -1)   // A DSProof already exists for this tx.
+    if (iter->dsproof != -1) // A DSProof already exists for this tx.
         return CTransactionRef(); // don't propagate new one.
 
     auto item = *iter;
@@ -1758,11 +1757,7 @@ CTransactionRef CTxMemPool::addDoubleSpendProof(const DoubleSpendProof &proof)
     return _get(oldTx->second.ptx->GetHash());
 }
 
-DoubleSpendProofStorage *CTxMemPool::doubleSpendProofStorage() const
-{
-    return m_dspStorage;
-}
-
+DoubleSpendProofStorage *CTxMemPool::doubleSpendProofStorage() const { return m_dspStorage; }
 CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const
 {
     READLOCK(cs_txmempool);

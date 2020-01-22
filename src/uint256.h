@@ -201,9 +201,7 @@ inline uint160 uint160S(const std::string &str)
  */
 struct HashShortener
 {
-    inline size_t operator()(const uint256& hash) const {
-        return hash.GetCheapHash();
-    }
+    inline size_t operator()(const uint256 &hash) const { return hash.GetCheapHash(); }
 };
 
 #endif // BITCOIN_UINT256_H
