@@ -380,7 +380,6 @@ BOOST_AUTO_TEST_CASE(cltv_freeze)
         BOOST_CHECK(EncodeDestination(newAddr1) == EncodeDestination(addr));
     BOOST_CHECK(nRequiredReturn == 1);
 
-
     // check cltv solve for datetime
     CPubKey newKey2 = ToByteVector(key[0].GetPubKey());
     CTxDestination newAddr2 = CTxDestination(newKey2.GetID());
