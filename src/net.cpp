@@ -702,7 +702,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
             if (strCommand != NetMsgType::PONG && strCommand != NetMsgType::PING && strCommand != NetMsgType::ADDR &&
                 strCommand != NetMsgType::VERSION && strCommand != NetMsgType::VERACK)
             {
-                nActivityBytes += msg.hdr.nMessageSize;
+                nActivityBytes.fetch_add(msg.hdr.nMessageSize);
 
                 // If the message is a priority message then move it into the priority queue.
                 if (IsPriorityMsg(strCommand))
@@ -960,12 +960,18 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
         static int64_t nLastTime = GetTime();
         for (CNode *node : vNodes)
         {
-            // Decay the activity bytes for each node over a period of 2 hours.  This gradually de-prioritizes a
-            // connection
-            // that was once active but has gone stale for some reason and allows lower priority active nodes to climb
-            // the ladder.
+            // Decay the activity bytes for each node over a period of 2 hours.  This gradually de-prioritizes
+            // a connection that was once active but has gone stale for some reason and allows lower priority
+            // active nodes to climb the ladder.
             int64_t nNow = GetTime();
-            node->nActivityBytes *= pow(1.0 - 1.0 / 7200, (double)(nNow - nLastTime)); // exponential 2 hour decay
+
+            while (true)
+            {
+                uint64_t nOldActivityBytes = node->nActivityBytes;
+                uint64_t nNewActivityBytes = nOldActivityBytes * pow(1.0 - 1.0 / 7200, (double)(nNow - nLastTime));
+                if (node->nActivityBytes.compare_exchange_weak(nOldActivityBytes, nNewActivityBytes))
+                    break;
+            }
 
             if (node->fWhitelisted)
                 continue;
@@ -1555,38 +1561,40 @@ void ThreadSocketHandler()
             }
 
             //
-            // Inactivity checking
+            // Inactivity checking every TIMEOUT_INTERVAL
             //
             int64_t stopwatchTime = GetStopwatchMicros();
-            if (stopwatchTime - pnode->nStopwatchConnected > 60 * 1000000)
+            if (stopwatchTime - pnode->nStopwatchConnected > TIMEOUT_INTERVAL * 1000000)
             {
-                int64_t nTime = GetTime();
-                if (pnode->nLastRecv == 0 || pnode->nLastSend == 0)
+                pnode->nStopwatchConnected = GetTimeMicros();
+                if (ignoreNetTimeouts.Value() == false)
                 {
-                    LOG(NET, "Node %s socket no message in first 60 seconds, %d %d from %d\n", pnode->GetLogName(),
-                        pnode->nLastRecv != 0, pnode->nLastSend != 0, pnode->id);
-                    if (ignoreNetTimeouts.Value() == false)
+                    int64_t nTime = GetTime();
+                    if (pnode->nLastRecv == 0 || pnode->nLastSend == 0)
+                    {
+                        LOG(NET, "Node %s: no message sent or received after startup, %d %d from %d\n",
+                            pnode->GetLogName(), pnode->nLastRecv != 0, pnode->nLastSend != 0, pnode->id);
                         pnode->fDisconnect = true;
-                }
-                else if (nTime - pnode->nLastSend > TIMEOUT_INTERVAL)
-                {
-                    LOG(NET, "Node %s socket sending timeout: %is\n", pnode->GetLogName(), nTime - pnode->nLastSend);
-                    if (ignoreNetTimeouts.Value() == false)
+                    }
+                    else if (nTime - pnode->nLastSend > TIMEOUT_INTERVAL)
+                    {
+                        LOG(NET, "Node %s: socket sending timeout: %is\n", pnode->GetLogName(),
+                            nTime - pnode->nLastSend);
                         pnode->fDisconnect = true;
-                }
-                else if (nTime - pnode->nLastRecv > TIMEOUT_INTERVAL)
-                {
-                    LOG(NET, "Node %s socket receive timeout: %is\n", pnode->GetLogName(), nTime - pnode->nLastRecv);
-                    if (ignoreNetTimeouts.Value() == false)
+                    }
+                    else if (nTime - pnode->nLastRecv > TIMEOUT_INTERVAL)
+                    {
+                        LOG(NET, "Node %s: socket receive timeout: %is\n", pnode->GetLogName(),
+                            nTime - pnode->nLastRecv);
                         pnode->fDisconnect = true;
-                }
-                else if (pnode->nPingNonceSent &&
-                         pnode->nPingUsecStart + (TIMEOUT_INTERVAL * 1000000) < (int64_t)GetStopwatchMicros())
-                {
-                    LOG(NET, "Node %s ping timeout: %fs\n", pnode->GetLogName(),
-                        0.000001 * (GetStopwatchMicros() - pnode->nPingUsecStart));
-                    if (ignoreNetTimeouts.Value() == false)
+                    }
+                    else if (pnode->nPingNonceSent &&
+                             pnode->nPingUsecStart + (TIMEOUT_INTERVAL * 1000000) < (int64_t)GetStopwatchMicros())
+                    {
+                        LOG(NET, "Node %s: ping timeout: %fs\n", pnode->GetLogName(),
+                            0.000001 * (GetStopwatchMicros() - pnode->nPingUsecStart));
                         pnode->fDisconnect = true;
+                    }
                 }
             }
         }
@@ -3143,11 +3151,8 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nServices = 0;
     hSocket = hSocketIn;
     nRecvVersion = INIT_PROTO_VERSION;
-    nLastSend = 0;
-    nLastRecv = 0;
     nSendBytes = 0;
     nRecvBytes = 0;
-    nActivityBytes = 0; // BU connection slot exhaustion mitigation
     nTimeConnected = GetTime();
     nStopwatchConnected = GetStopwatchMicros();
     nTimeOffset = 0;
@@ -3348,7 +3353,7 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
         strcmp(strCommand, NetMsgType::ADDR) != 0 && strcmp(strCommand, NetMsgType::VERSION) != 0 &&
         strcmp(strCommand, NetMsgType::VERACK) != 0 && strcmp(strCommand, NetMsgType::INV) != 0)
     {
-        nActivityBytes += nSize;
+        nActivityBytes.fetch_add(nSize);
     }
 
     // If the message is a priority message then move it to priority queue.

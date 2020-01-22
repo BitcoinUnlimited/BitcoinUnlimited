@@ -107,5 +107,36 @@ class NodeHandlingTest (BitcoinTestFramework):
         waitFor(10, lambda: self.nodes[2].getinfo()["peers_xthinblock"] == 2)
         waitFor(10, lambda: self.nodes[2].getinfo()["peers_cmpctblock"] == 2)
 
+        #############################
+        # Test peer eviction
+        #############################
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+        # Node 3 is the one we will use to evict a connection. It is set to maxconnection=3 however
+        # it will only allow 2 inbound connections because "1" outbound feeler connection is assumed
+        # making the total connections possible equal to three.
+        self.node_args = [['-debug=net', '-maxconnections=1', '-maxoutconnections=1'],
+                          ['-debug=net', '-maxconnections=1', '-maxoutconnections=1'],
+                          ['-debug=net', '-maxconnections=1', '-maxoutconnections=1'],
+                          ['-debug=net', '-maxconnections=3', '-maxoutconnections=0', '-debug=evict']]
+        self.nodes = start_nodes(4, self.options.tmpdir, self.node_args)
+        for node in self.nodes:
+            node.clearbanned();
+        connect_nodes(self.nodes[0], 3)
+        waitFor(10, lambda: self.nodes[0].getinfo()["connections"] == 1)
+        waitFor(10, lambda: self.nodes[3].getinfo()["connections"] == 1)
+        connect_nodes(self.nodes[1], 3)
+        waitFor(10, lambda: self.nodes[0].getinfo()["connections"] == 1)
+        waitFor(10, lambda: self.nodes[1].getinfo()["connections"] == 1)
+        waitFor(10, lambda: self.nodes[3].getinfo()["connections"] == 2)
+
+        # Connect one more that the max which causes the first peer to be evicted
+        connect_nodes(self.nodes[2], 3)
+        waitFor(10, lambda: self.nodes[0].getinfo()["connections"] == 0)
+        waitFor(10, lambda: self.nodes[1].getinfo()["connections"] == 1)
+        waitFor(10, lambda: self.nodes[2].getinfo()["connections"] == 1)
+        waitFor(10, lambda: self.nodes[3].getinfo()["connections"] == 2)
+
+
 if __name__ == '__main__':
     NodeHandlingTest ().main ()

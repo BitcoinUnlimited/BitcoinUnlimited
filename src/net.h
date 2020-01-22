@@ -415,12 +415,16 @@ public:
     int nRecvVersion;
 
     /** Connection de-prioritization - Total useful bytes sent and received */
-    uint64_t nActivityBytes;
+    std::atomic<uint64_t> nActivityBytes{0};
+    /** The last time bytes were sent to the remote peer */
+    std::atomic<int64_t> nLastSend{0};
+    /** The last time bytes were received from the remote peer */
+    std::atomic<int64_t> nLastRecv{0};
+    /** Calendar time this node was connected */
+    std::atomic<int64_t> nTimeConnected;
+    /** Stopwatch time this node was connected */
+    std::atomic<uint64_t> nStopwatchConnected;
 
-    int64_t nLastSend;
-    int64_t nLastRecv;
-    int64_t nTimeConnected; /** Calendar time this node was connected */
-    uint64_t nStopwatchConnected; /** Stopwatch time this node was connected */
     int64_t nTimeOffset;
 
     /** The address of the remote peer */
@@ -494,10 +498,13 @@ public:
     bool fRelayTxes;
     bool fSentAddr;
     CSemaphoreGrant grantOutbound;
+
     CCriticalSection cs_filter;
-    CBloomFilter *pfilter;
-    // BU - Xtreme Thinblocks: a bloom filter which is separate from the one used by SPV wallets
-    CBloomFilter *pThinBlockFilter;
+    /** A bloom filter which is used by SPV wallets */
+    CBloomFilter *pfilter GUARDED_BY(cs_filter);
+    /** Xtreme Thinblocks bloom filter which is send with a get_xthin request */
+    CBloomFilter *pThinBlockFilter GUARDED_BY(cs_filter);
+
     std::atomic<int> nRefCount;
     NodeId id;
 
@@ -507,34 +514,27 @@ public:
     bool fShouldBan;
     BanReason nBanType = (BanReason)-1;
 
-    // BUIP010 Xtreme Thinblocks: begin section
-    std::atomic<uint32_t> nXthinBloomfilterSize; // Max xthin bloom filter size (in bytes) that our peer will accept.
-
+    // Xtreme Thinblocks
     CCriticalSection cs_xthinblock;
-    // BUIP010 Xtreme Thinblocks: end section
+    /** Max xthin bloom filter size (in bytes) that our peer will accept */
+    std::atomic<uint32_t> nXthinBloomfilterSize;
 
-    // Graphene blocks: begin section
+    // Graphene blocks
     CCriticalSection cs_graphene;
+    /** Stores the grapheneblock salt to be used for this peer */
+    uint64_t gr_shorttxidk0 GUARDED_BY(cs_graphene);
+    uint64_t gr_shorttxidk1 GUARDED_BY(cs_graphene);
 
-    // Store the grapheneblock salt to be used for this peer
-    uint64_t gr_shorttxidk0;
-    uint64_t gr_shorttxidk1;
-    // Graphene blocks: end section
-
-    // Compact Blocks : begin
+    // Compact Blocks
     CCriticalSection cs_compactblock;
-
-    // Store the compactblock salt to be used for this peer
-    uint64_t shorttxidk0;
-    uint64_t shorttxidk1;
-
-    // Whether this peer supports CompactBlocks
+    /** Stores the compactblock salt to be used for this peer */
+    uint64_t shorttxidk0 GUARDED_BY(cs_compactblock);
+    uint64_t shorttxidk1 GUARDED_BY(cs_compactblock);
+    /** Does this peer support CompactBlocks */
     std::atomic<bool> fSupportsCompactBlocks;
 
-    // Compact Blocks : end
-
     CCriticalSection cs_nAvgBlkResponseTime;
-    double nAvgBlkResponseTime;
+    double nAvgBlkResponseTime GUARDED_BY(cs_nAvgBlkResponseTime);
     std::atomic<int64_t> nMaxBlocksInTransit;
 
     unsigned short addrFromPort;
