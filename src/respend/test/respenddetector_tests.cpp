@@ -3,11 +3,10 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "respend/respenddetector.h"
-#include "key.h"
-#include "random.h"
+#include "primitives/transaction.h"
 #include "respend/respendaction.h"
-#include "script/standard.h"
 #include "test/test_bitcoin.h"
+#include "test/testutil.h"
 #include "txmempool.h"
 
 #include <boost/test/unit_test.hpp>
@@ -55,22 +54,6 @@ public:
     CTxMemPool mempool;
     std::shared_ptr<DummyRespendAction> dummyaction;
 };
-
-CMutableTransaction CreateRandomTx()
-{
-    CKey key;
-    key.MakeNewKey(true);
-
-    CMutableTransaction tx;
-    tx.vin.resize(1);
-    tx.vin[0].prevout.n = 0;
-    tx.vin[0].prevout.hash = GetRandHash();
-    tx.vin[0].scriptSig << OP_1;
-    tx.vout.resize(1);
-    tx.vout[0].nValue = 1 * CENT;
-    tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
-    return tx;
-}
 
 } // ns anon
 

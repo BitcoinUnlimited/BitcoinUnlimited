@@ -373,6 +373,7 @@ test/thinblock_tests.cpp
 test/thinblock_util_tests.cpp
 test/timedata_tests.cpp
 test/transaction_tests.cpp
+test/txlookup_tests.cpp
 test/txvalidationcache_tests.cpp
 test/uahf_test.cpp
 test/uint256_tests.cpp
@@ -381,6 +382,8 @@ test/util_tests.cpp
 test/utilhttp_tests.cpp
 test/utilprocess_tests.cpp
 test/versionbits_tests.cpp
+txlookup.cpp
+txlookup.h
 wallet/crypter.cpp
 wallet/crypter.h
 wallet/db.cpp
