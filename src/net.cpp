@@ -969,7 +969,7 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
             {
                 uint64_t nOldActivityBytes = node->nActivityBytes;
                 uint64_t nNewActivityBytes = nOldActivityBytes * pow(1.0 - 1.0 / 7200, (double)(nNow - nLastTime));
-                if (node->nActivityBytes.compare_exchange_weak(nNewActivityBytes, nOldActivityBytes))
+                if (node->nActivityBytes.compare_exchange_weak(nOldActivityBytes, nNewActivityBytes))
                     break;
             }
 
