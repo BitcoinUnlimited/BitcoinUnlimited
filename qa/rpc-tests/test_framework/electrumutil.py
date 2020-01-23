@@ -86,4 +86,8 @@ def sync_electrum_height(node, timeout = 10):
     waitFor(timeout, lambda: compare(node, "index_height", node.getblockcount()))
 
 def wait_for_electrum_mempool(node, *, count, timeout = 10):
-    waitFor(timeout, lambda: compare(node, "mempool_count", count, True))
+    try:
+        waitFor(timeout, lambda: compare(node, "mempool_count", count, True))
+    except Exception as e:
+        print("Waited for {} txs, had {}".format(count, node.getelectruminfo()['debuginfo']['electrscash_mempool_count']))
+        raise

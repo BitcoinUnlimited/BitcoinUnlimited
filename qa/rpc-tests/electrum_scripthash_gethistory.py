@@ -66,7 +66,6 @@ class ElectrumScripthashGetHistory(BitcoinTestFramework):
         assert_equal(blocks[-1].hash, n.getbestblockhash())
 
         # Return coinbases for spending later
-        print(blocks[-1].vtx[0])
         return [b.vtx[0] for b in blocks]
 
 
@@ -79,6 +78,62 @@ class ElectrumScripthashGetHistory(BitcoinTestFramework):
         self.client = create_electrum_connection()
         self.test_blockheight_confirmed(n, coinbases.pop(0))
         self.test_blockheight_unconfirmed(n, coinbases.pop(0))
+        self.test_chain_tofrom_one_scripthash(n, coinbases.pop(0))
+
+    def create_tx_chain(self, unspent, scriptpubkey, chain_len, num_outputs):
+        assert(num_outputs > 0)
+
+        tx_chain = [unspent]
+        for i in range(chain_len):
+            prev_tx = tx_chain[-1]
+            prev_n = i % num_outputs
+
+            amount = prev_tx.vout[prev_n].nValue // num_outputs
+
+            tx = create_transaction(prev_tx,
+                    n = prev_n, value = [amount] * num_outputs,
+                    sig = CScript([OP_TRUE]), out = scriptpubkey)
+            pad_tx(tx)
+            tx_chain.append(tx)
+
+        tx_chain.pop(0) # the initial unspent is not part of the chain
+        return tx_chain
+
+    def test_chain_tofrom_one_scripthash(self, n, unspent):
+        """
+        Creates a tx chain where the same scripthash is both funder and spender
+        """
+        scriptpubkey = CScript([OP_TRUE, OP_TRUE, OP_DROP, OP_DROP])
+        scripthash = script_to_scripthash(scriptpubkey)
+        assert_equal(0, len(self.client.call(GET_HISTORY, scripthash)))
+
+        def has_tx(res, txhash):
+            for tx in res:
+                if tx['tx_hash'] == txhash:
+                    return True
+            return False
+
+        CHAIN_LENGTH = 25
+        NUM_OUTPUTS = 1
+        tx_chain = self.create_tx_chain(unspent, scriptpubkey,
+            CHAIN_LENGTH, NUM_OUTPUTS)
+
+        # Check mempool
+        assert(len(n.getrawmempool()) == 0)
+        self.p2p.send_txs_and_test(tx_chain, n)
+        wait_for_electrum_mempool(n, count = len(tx_chain),
+            timeout = 20)
+
+        res = self.client.call(GET_HISTORY, scripthash)
+        assert_equal(len(tx_chain), len(res))
+        assert(all([ has_tx(res, tx.hash) for tx in tx_chain ]))
+
+        # Check when confirmed in a block
+        self.mine_blocks(n, 1, tx_chain)
+        sync_electrum_height(n)
+        res = self.client.call(GET_HISTORY, scripthash)
+        assert_equal(len(tx_chain), len(res))
+        assert(all([ has_tx(res, tx.hash) for tx in tx_chain ]))
 
     def test_blockheight_confirmed(self, n, unspent):
         # Just unique anyone-can-spend scriptpubkey
@@ -154,6 +209,11 @@ class ElectrumScripthashGetHistory(BitcoinTestFramework):
         assert_equal(n.getblockcount(), get_tx(tx1.hash)['height'])
         assert_equal(0, get_tx(tx2.hash)['height'])
         assert_equal(-1, get_tx(tx3.hash)['height'])
+
+        # cleanup mempool for next test
+        self.mine_blocks(n, 1, [tx2, tx3])
+        sync_electrum_height(n)
+        assert(len(n.getrawmempool()) == 0)
 
 if __name__ == '__main__':
     ElectrumScripthashGetHistory().main()
