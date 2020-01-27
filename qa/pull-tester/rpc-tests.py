@@ -263,8 +263,8 @@ testScripts = [ RpcTest(t) for t in [
     'minimaldata-activation',
     'schnorrmultisig_activation',
     WhenElectrumFound('electrum_subscriptions'),
-    WhenElectrumFound('electrum_scripthash_gethistory')
-
+    WhenElectrumFound('electrum_scripthash_gethistory'),
+    WhenElectrumFound('electrum_transaction_get'),
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
