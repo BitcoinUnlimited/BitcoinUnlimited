@@ -192,7 +192,7 @@ std::map<std::string, int64_t> fetch_electrs_info()
 
     std::stringstream infostream = http_get(monitoring_host(), std::stoi(monitoring_port()), "/");
 
-    const std::regex keyval("^([a-z_]+)\\s(\\d+)\\s*$");
+    const std::regex keyval("^([a-z_{}=\"\\+]+)\\s(\\d+)\\s*$");
     std::map<std::string, int64_t> info;
     std::string line;
     std::smatch match;
