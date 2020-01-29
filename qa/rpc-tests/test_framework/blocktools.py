@@ -17,7 +17,11 @@ def create_block(hashprev, coinbase, nTime=None, txns=None, ctor=True):
         import time
         block.nTime = int(time.time()+600)
     else:
+        if type(nTime) is not int:
+            raise ValueError("nTime should be int, got {}".format(type(nTime)))
         block.nTime = nTime
+    if type(hashprev) is str:
+        hashprev = int(hashprev, 16)
     block.hashPrevBlock = hashprev
     block.nBits = 0x207fffff # Will break after a difficulty adjustment...
     if coinbase:

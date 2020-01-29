@@ -64,12 +64,7 @@ class ElectrumConnection:
 def create_electrum_connection():
     return ElectrumConnection()
 
-# To look up an address with the electrum protocol, you need the hash
-# of the locking script (scriptpubkey)
-def address_to_scripthash(addr):
-    _, _, hash160 = cashaddr.decode(addr)
-    script = CScript([OP_DUP, OP_HASH160, hash160, OP_EQUALVERIFY, OP_CHECKSIG])
-
+def script_to_scripthash(script):
     import hashlib
     scripthash = hashlib.sha256(script).digest()
 
@@ -79,5 +74,20 @@ def address_to_scripthash(addr):
 
     return scripthash.hex()
 
+
+# To look up an address with the electrum protocol, you need the hash
+# of the locking script (scriptpubkey). Assumes P2PKH.
+def address_to_scripthash(addr):
+    _, _, hash160 = cashaddr.decode(addr)
+    script = CScript([OP_DUP, OP_HASH160, hash160, OP_EQUALVERIFY, OP_CHECKSIG])
+    return script_to_scripthash(script)
+
 def sync_electrum_height(node, timeout = 10):
     waitFor(timeout, lambda: compare(node, "index_height", node.getblockcount()))
+
+def wait_for_electrum_mempool(node, *, count, timeout = 10):
+    try:
+        waitFor(timeout, lambda: compare(node, "mempool_count", count, True))
+    except Exception as e:
+        print("Waited for {} txs, had {}".format(count, node.getelectruminfo()['debuginfo']['electrscash_mempool_count']))
+        raise
