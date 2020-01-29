@@ -348,11 +348,47 @@ CBlockIndex *InsertBlockIndex(const uint256 &hash)
 
 bool LoadBlockIndexDB()
 {
+    // Open and read all ldb index files so that they are in the Operating System file cache before we iterate
+    // through the index files and load the block index. While this is a bit of a hack, it has an enormous
+    // effect on speeding up the reading in of the block index data particularly when the index data is stored
+    // on spinning disk. The problem appears to lie in some issue with leveldb cache innefficiency.
+    fs::path path_index;
+    if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
+    {
+        path_index = GetDataDir() / "blocks" / "index";
+    }
+    else
+    {
+        path_index = GetDataDir() / "blockdb" / "index";
+    }
+    std::vector<fs::path> vIndexFiles;
+    std::copy(fs::directory_iterator(path_index), fs::directory_iterator(), std::back_inserter(vIndexFiles));
+    for (const auto path_file : vIndexFiles)
+    {
+        if (fs::extension(path_file) == ".ldb")
+        {
+            FILE *file = fsbridge::fopen(path_file, "rb");
+            const unsigned int nBuffSize = 65536;
+            char buff[nBuffSize];
+            if (file)
+            {
+                // Just read (but do nothing with) the contents of the
+                // file so that it ends up in the OS cache
+                while (fgets(buff, nBuffSize, file))
+                {
+                }
+                fclose(file);
+            }
+        }
+    }
+
+    // Load the block index data
     const CChainParams &chainparams = Params();
     if (!pblocktree->LoadBlockIndexGuts())
     {
         return false;
     }
+
     LOCK(cs_main);
     /** This sync method will break on pruned nodes so we cant use if pruned*/
     // Check whether we have ever pruned block & undo files
