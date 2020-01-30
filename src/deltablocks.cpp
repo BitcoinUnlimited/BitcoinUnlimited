@@ -541,3 +541,59 @@ void CDeltaBlock::resetAll() {
 bool CDeltaBlock::spendsOutput(const COutPoint &out) const {
     return spent.contains(out);
 }
+
+bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, uint8_t k, unsigned int nBits)
+{
+    bool fNegative;
+    bool fOverflow;
+    arith_uint256 bnTarget;
+
+    bnTarget.SetCompact(nBits, &fNegative, &fOverflow);
+
+    if (k < 1)
+    {
+        LOG(WB, "Illegal value for k=%d, value must exceed 0\n", k);
+        return false;
+    }
+
+    if (fNegative || fOverflow)
+    {
+        LOG(WB, "Illegal value encountered when decoding target bits=%d\n", nBits);
+        return false;
+    }
+
+    std::vector<uint256> ancestors = deltaBlock->ancestorHashes();
+
+    if (ancestors.size() < (uint8_t)(k-1))
+        return false;
+
+    std::sort(ancestors.begin(), ancestors.end()); 
+    std::vector<arith_uint256> lowestK;
+    for (int i=0;i < k-1;i++)
+    {
+        lowestK.push_back(UintToArith256(ancestors[i]));
+    }
+
+    arith_uint256 childTarget = UintToArith256(deltaBlock->GetHash());
+    if (ancestors.size() == (uint8_t)(k-1))
+        lowestK.push_back(childTarget);
+    else
+    {
+        arith_uint256 parentTarget = UintToArith256(ancestors[k-1]);
+        if (parentTarget < childTarget)
+            lowestK.push_back(parentTarget);
+        else
+            lowestK.push_back(childTarget);
+    }
+
+    arith_uint256 average = arith_uint256(0);
+    arith_uint256 kTarget = arith_uint256(k);
+    for (auto proof : lowestK)
+        average += proof;
+    average /= kTarget;
+
+    if (average < bnTarget)
+        return true;
+
+    return false;
+}

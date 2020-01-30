@@ -162,6 +162,6 @@ private:
     friend int weakPOW_internal(const std::vector<ConstCDeltaBlockRef>& merge_set, const uint256& hashPrevBlock);
 };
 
-
+bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, uint8_t k, unsigned int nBits);
 
 #endif

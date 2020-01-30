@@ -294,4 +294,40 @@ BOOST_AUTO_TEST_CASE(deltatree)
     }
 }
 
+BOOST_AUTO_TEST_CASE(bobtail_pow)
+{
+    CDeltaBlock::resetAll();
+    CDeltaBlock::newStrong(hash1);
+    std::vector<uint256> ancestorHashes;
+
+    for (int i=0;i < 3;i++)
+    {
+        CBlockHeader parentHeader;
+        parentHeader.hashPrevBlock = hash1;
+        parentHeader.nNonce = i;
+        ancestorHashes.push_back(parentHeader.GetHash());
+        CMutableTransaction parentCb;
+        parentCb.vin.resize(1);
+        parentCb.vin[0].prevout.SetNull();
+        CDeltaBlockRef parentDelta(new CDeltaBlock(parentHeader, CTransactionRef(new CTransaction(parentCb))));
+        addSomeTx(parentDelta, 100);
+        finalize(parentDelta);
+        CDeltaBlock::tryRegister(parentDelta);
+    }
+
+    CBlockHeader childHeader;
+    CMutableTransaction childCb;
+    CDeltaBlock::addAncestorOPRETURNs(childCb, ancestorHashes);
+
+    CDeltaBlockRef childDelta(new CDeltaBlock(childHeader, MakeTransactionRef(childCb)));
+
+    std::vector<uint256> ah = childDelta->ancestorHashes();
+    BOOST_CHECK_EQUAL(ah.size(), 3);
+    BOOST_CHECK_EQUAL(ah[0], ancestorHashes[0]);
+    BOOST_CHECK_EQUAL(ah[1], ancestorHashes[1]);
+    BOOST_CHECK_EQUAL(ah[2], ancestorHashes[2]);
+
+    CheckBobtailPoW(childDelta, 2, 0x0001);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
