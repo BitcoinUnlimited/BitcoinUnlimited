@@ -330,4 +330,21 @@ BOOST_AUTO_TEST_CASE(check_bobtail_pow)
     CheckBobtailPoW(childDelta, 2, 0x0001);
 }
 
+BOOST_AUTO_TEST_CASE(check_bobtail_statistic)
+{
+    arith_uint256 p1(3);
+    arith_uint256 p2(5);
+    arith_uint256 p3(10);
+    std::vector<arith_uint256> proofs;
+    proofs.push_back(p1);
+    proofs.push_back(p2);
+    proofs.push_back(p3);
+
+    arith_uint256 targetHigh(7);
+    arith_uint256 targetLow(5);
+
+    BOOST_CHECK_EQUAL(CheckBobtailPoWFromOrderedProofs(proofs, targetHigh, 3), true);
+    BOOST_CHECK_EQUAL(CheckBobtailPoWFromOrderedProofs(proofs, targetLow, 3), false);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
