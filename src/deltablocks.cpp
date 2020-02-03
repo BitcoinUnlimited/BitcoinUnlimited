@@ -568,11 +568,6 @@ bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, uint8_t k, unsigned int nBits)
             lowestK.push_back(childTarget);
     }
 
-    return CheckBobtailPoWFromOrderedProofs(lowestK, k, nBits);
-}
-
-bool CheckBobtailPoWFromOrderedProofs(std::vector<arith_uint256> proofs, uint8_t k, unsigned int nBits)
-{
     bool fNegative;
     bool fOverflow;
     arith_uint256 bnTarget;
@@ -591,13 +586,18 @@ bool CheckBobtailPoWFromOrderedProofs(std::vector<arith_uint256> proofs, uint8_t
         return false;
     }
 
+    return CheckBobtailPoWFromOrderedProofs(lowestK, bnTarget, k);
+}
+
+bool CheckBobtailPoWFromOrderedProofs(std::vector<arith_uint256> proofs, arith_uint256 target, uint8_t k)
+{
     arith_uint256 average = arith_uint256(0);
     arith_uint256 kTarget = arith_uint256(k);
     for (auto proof : proofs)
         average += proof;
     average /= kTarget;
 
-    if (average < bnTarget)
+    if (average < target)
         return true;
 
     return false;
