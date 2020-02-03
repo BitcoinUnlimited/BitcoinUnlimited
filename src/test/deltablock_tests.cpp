@@ -294,7 +294,7 @@ BOOST_AUTO_TEST_CASE(deltatree)
     }
 }
 
-BOOST_AUTO_TEST_CASE(bobtail_pow)
+BOOST_AUTO_TEST_CASE(check_bobtail_pow)
 {
     CDeltaBlock::resetAll();
     CDeltaBlock::newStrong(hash1);

@@ -591,8 +591,8 @@ bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, uint8_t k, unsigned int nBits)
 
 bool CheckBobtailPoWFromOrderedProofs(std::vector<arith_uint256> proofs, arith_uint256 target, uint8_t k)
 {
-    arith_uint256 average = arith_uint256(0);
-    arith_uint256 kTarget = arith_uint256(k);
+    arith_uint256 average(0);
+    arith_uint256 kTarget(k);
     for (auto proof : proofs)
         average += proof;
     average /= kTarget;
