@@ -544,24 +544,6 @@ bool CDeltaBlock::spendsOutput(const COutPoint &out) const {
 
 bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, uint8_t k, unsigned int nBits)
 {
-    bool fNegative;
-    bool fOverflow;
-    arith_uint256 bnTarget;
-
-    bnTarget.SetCompact(nBits, &fNegative, &fOverflow);
-
-    if (k < 1)
-    {
-        LOG(WB, "Illegal value for k=%d, value must exceed 0\n", k);
-        return false;
-    }
-
-    if (fNegative || fOverflow)
-    {
-        LOG(WB, "Illegal value encountered when decoding target bits=%d\n", nBits);
-        return false;
-    }
-
     std::vector<uint256> ancestors = deltaBlock->ancestorHashes();
 
     if (ancestors.size() < (uint8_t)(k-1))
@@ -586,9 +568,32 @@ bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, uint8_t k, unsigned int nBits)
             lowestK.push_back(childTarget);
     }
 
+    return CheckBobtailPoWFromOrderedProofs(lowestK, k, nBits);
+}
+
+bool CheckBobtailPoWFromOrderedProofs(std::vector<arith_uint256> proofs, uint8_t k, unsigned int nBits)
+{
+    bool fNegative;
+    bool fOverflow;
+    arith_uint256 bnTarget;
+
+    bnTarget.SetCompact(nBits, &fNegative, &fOverflow);
+
+    if (k < 1)
+    {
+        LOG(WB, "Illegal value for k=%d, value must exceed 0\n", k);
+        return false;
+    }
+
+    if (fNegative || fOverflow)
+    {
+        LOG(WB, "Illegal value encountered when decoding target bits=%d\n", nBits);
+        return false;
+    }
+
     arith_uint256 average = arith_uint256(0);
     arith_uint256 kTarget = arith_uint256(k);
-    for (auto proof : lowestK)
+    for (auto proof : proofs)
         average += proof;
     average /= kTarget;
 

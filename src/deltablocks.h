@@ -163,5 +163,6 @@ private:
 };
 
 bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, uint8_t k, unsigned int nBits);
+bool CheckBobtailPoWFromOrderedProofs(std::vector<arith_uint256> proofs, uint8_t k, unsigned int nBits);
 
 #endif
