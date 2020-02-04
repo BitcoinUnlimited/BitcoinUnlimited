@@ -1,6 +1,7 @@
 #ifndef BITCOIN_DELTABLOCKS_H
 #define BITCOIN_DELTABLOCKS_H
 
+#include "consensus/params.h"
 #include "primitives/transaction.h"
 #include "primitives/block.h"
 #include "persistent_map.h"
@@ -162,7 +163,7 @@ private:
     friend int weakPOW_internal(const std::vector<ConstCDeltaBlockRef>& merge_set, const uint256& hashPrevBlock);
 };
 
-bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, uint8_t k, unsigned int nBits);
+bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, const Consensus::Params &params, uint8_t k, unsigned int nBits);
 bool CheckBobtailPoWFromOrderedProofs(std::vector<arith_uint256> proofs, arith_uint256 target, uint8_t k);
 
 #endif

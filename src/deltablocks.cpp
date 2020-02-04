@@ -542,8 +542,26 @@ bool CDeltaBlock::spendsOutput(const COutPoint &out) const {
     return spent.contains(out);
 }
 
-bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, uint8_t k, unsigned int nBits)
+bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, const Consensus::Params &params, uint8_t k, unsigned int nBits)
 {
+    bool fNegative;
+    bool fOverflow;
+    arith_uint256 bnTarget;
+
+    bnTarget.SetCompact(nBits, &fNegative, &fOverflow);
+
+    if (fNegative || fOverflow)
+    {
+        LOG(WB, "Illegal value encountered when decoding target bits=%d\n", nBits);
+        return false;
+    }
+
+    if (bnTarget > UintToArith256(params.powLimit))
+    {
+        LOG(WB, "Illegal target value bnTarget=%d for pow limit\n", bnTarget.getdouble());
+        return false;
+    }
+
     std::vector<uint256> ancestors = deltaBlock->ancestorHashes();
 
     if (ancestors.size() < (uint8_t)(k-1))
@@ -568,21 +586,9 @@ bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, uint8_t k, unsigned int nBits)
             lowestK.push_back(childTarget);
     }
 
-    bool fNegative;
-    bool fOverflow;
-    arith_uint256 bnTarget;
-
-    bnTarget.SetCompact(nBits, &fNegative, &fOverflow);
-
     if (k < 1)
     {
         LOG(WB, "Illegal value for k=%d, value must exceed 0\n", k);
-        return false;
-    }
-
-    if (fNegative || fOverflow)
-    {
-        LOG(WB, "Illegal value encountered when decoding target bits=%d\n", nBits);
         return false;
     }
 

@@ -3,6 +3,7 @@
 #include "arith_uint256.h"
 #include "deltablocks.h"
 #include "consensus/merkle.h"
+#include "consensus/params.h"
 #include <boost/test/unit_test.hpp>
 #include <map>
 #include <iostream>
@@ -296,6 +297,7 @@ BOOST_AUTO_TEST_CASE(deltatree)
 
 BOOST_AUTO_TEST_CASE(check_bobtail_pow)
 {
+    const Consensus::Params &consensusParams = Params().GetConsensus();
     CDeltaBlock::resetAll();
     CDeltaBlock::newStrong(hash1);
     std::vector<uint256> ancestorHashes;
@@ -327,7 +329,7 @@ BOOST_AUTO_TEST_CASE(check_bobtail_pow)
     BOOST_CHECK_EQUAL(ah[1], ancestorHashes[1]);
     BOOST_CHECK_EQUAL(ah[2], ancestorHashes[2]);
 
-    CheckBobtailPoW(childDelta, 2, 0x0001);
+    CheckBobtailPoW(childDelta, consensusParams, 2, 0x0001);
 }
 
 BOOST_AUTO_TEST_CASE(check_bobtail_statistic)
