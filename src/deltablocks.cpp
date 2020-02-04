@@ -542,17 +542,17 @@ bool CDeltaBlock::spendsOutput(const COutPoint &out) const {
     return spent.contains(out);
 }
 
-bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, const Consensus::Params &params, uint8_t k, unsigned int nBits)
+bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, const Consensus::Params &params, uint8_t k)
 {
     bool fNegative;
     bool fOverflow;
     arith_uint256 bnTarget;
 
-    bnTarget.SetCompact(nBits, &fNegative, &fOverflow);
+    bnTarget.SetCompact(deltaBlock->nBits, &fNegative, &fOverflow);
 
     if (fNegative || fOverflow)
     {
-        LOG(WB, "Illegal value encountered when decoding target bits=%d\n", nBits);
+        LOG(WB, "Illegal value encountered when decoding target bits=%d\n", deltaBlock->nBits);
         return false;
     }
 

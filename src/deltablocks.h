@@ -163,7 +163,7 @@ private:
     friend int weakPOW_internal(const std::vector<ConstCDeltaBlockRef>& merge_set, const uint256& hashPrevBlock);
 };
 
-bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, const Consensus::Params &params, uint8_t k, unsigned int nBits);
+bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, const Consensus::Params &params, uint8_t k);
 bool CheckBobtailPoWFromOrderedProofs(std::vector<arith_uint256> proofs, arith_uint256 target, uint8_t k);
 
 #endif

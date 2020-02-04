@@ -329,7 +329,7 @@ BOOST_AUTO_TEST_CASE(check_bobtail_pow)
     BOOST_CHECK_EQUAL(ah[1], ancestorHashes[1]);
     BOOST_CHECK_EQUAL(ah[2], ancestorHashes[2]);
 
-    CheckBobtailPoW(childDelta, consensusParams, 2, 0x0001);
+    CheckBobtailPoW(childDelta, consensusParams, 2);
 }
 
 BOOST_AUTO_TEST_CASE(check_bobtail_statistic)
