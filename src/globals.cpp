@@ -362,7 +362,7 @@ CTweak<unsigned int> numMsgHandlerThreads("net.msgHandlerThreads", "Max message 
 CTweak<unsigned int> numTxAdmissionThreads("net.txAdmissionThreads", "Max transaction mempool admission threads", 0);
 CTweak<unsigned int> unconfPushAction("net.unconfChainResendAction",
     "Action to take when this node thinks that a peer will now accept a previously unacceptable unconfirmed "
-    "transaction (default: 0) "
+    "transaction (default: 2) "
     "0: do not resend, 1: send an INV, 2: send the TX",
     0);
 CTweak<bool> restrictInputs("net.restrictInputs",
