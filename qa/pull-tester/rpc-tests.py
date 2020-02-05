@@ -92,13 +92,17 @@ private_single_opts = ('-h',
                        '-list',
                        '-extended',
                        '-extended-only',
+                       '-electrum-only',
                        '-only-extended',
+                       '-only-electrum',
                        '-force-enable',
                        '-win')
 private_double_opts = ('--list',
                        '--extended',
                        '--extended-only',
+                       '--electrum-only',
                        '--only-extended',
+                       '--only-electrum',
                        '--force-enable',
                        '--win')
 framework_opts = ('--tracerpc',
@@ -255,17 +259,9 @@ testScripts = [ RpcTest(t) for t in [
     'sighashmatch',
     'getlogcategories',
     'getrawtransaction',
-    WhenElectrumFound('electrum_basics'),
-    WhenElectrumFound('electrum_reorg'),
-    WhenElectrumFound('electrum_shutdownonerror'),
     'rpc_getblockstats',
-    WhenElectrumFound('electrum_cashaccount'),
     'minimaldata-activation',
     'schnorrmultisig_activation',
-    WhenElectrumFound('electrum_subscriptions'),
-    WhenElectrumFound('electrum_scripthash_gethistory'),
-    WhenElectrumFound('electrum_transaction_get'),
-    WhenElectrumFound('electrum_server_features'),
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
@@ -297,6 +293,17 @@ testScriptsExt = [ RpcTest(t) for t in [
     'maxuploadtarget'
 ] ]
 
+testScriptsElectrum = [ RpcTest(WhenElectrumFound(t)) for t in [
+    'electrum_basics',
+    'electrum_reorg',
+    'electrum_shutdownonerror',
+    'electrum_cashaccount',
+    'electrum_subscriptions',
+    'electrum_scripthash_gethistory',
+    'electrum_transaction_get',
+    'electrum_server_features',
+] ]
+
 #Enable ZMQ tests
 if ENABLE_ZMQ == 1:
     testScripts.append(RpcTest('zmq_test'))
@@ -309,6 +316,7 @@ def show_wrapper_options():
     print("  -extended/--extended  run the extended set of tests")
     print("  -only-extended / -extended-only\n" + \
           "  --only-extended / --extended-only\n" + \
+          "  --only-electrum / --electrum-only\n" + \
           "                        run ONLY the extended tests")
     print("  -list / --list        only list test names")
     print("  -win / --win          signal running on Windows and run those tests")
@@ -326,13 +334,19 @@ def runtests():
 
     force_enable = option_passed('force-enable') or '-f' in opts
     run_only_extended = option_passed('only-extended') or option_passed('extended-only')
+    run_only_electrum = option_passed('only-electrum') or option_passed('electrum-only')
+    if run_only_electrum and (run_only_extended or option_passed('extended')):
+        raise Exception("electrum only and extended are not compatible options")
 
     if option_passed('list'):
-        if run_only_extended:
+        if run_only_electrum:
+            for t in testScriptsElectrum:
+                print(t)
+        elif run_only_extended:
             for t in testScriptsExt:
                 print(t)
         else:
-            for t in testScripts:
+            for t in testScripts + testScriptsElectrum:
                 print(t)
             if option_passed('extended'):
                 for t in testScriptsExt:
@@ -359,7 +373,7 @@ def runtests():
             for o in opts:
                 if not o.startswith('-'):
                     found = False
-                    for t in testScripts + testScriptsExt:
+                    for t in testScripts + testScriptsElectrum + testScriptsExt:
                         t_rep = str(t).split(' ')
                         if (t_rep[0] == o or t_rep[0] == o + '.py') and len(t_rep) > 1:
                             # it is a test with args - check all args match what was passed, otherwise don't add this test
@@ -386,10 +400,13 @@ def runtests():
 
         # if no explicit tests specified, use the lists
         if not len(tests_to_run):
-            if run_only_extended:
+            if run_only_electrum:
+                tests_to_run = testScriptsElectrum
+            elif run_only_extended:
                 tests_to_run = testScriptsExt
             else:
                 tests_to_run += testScripts
+                tests_to_run += testScriptsElectrum
                 if run_extended:
                     tests_to_run += testScriptsExt
 
