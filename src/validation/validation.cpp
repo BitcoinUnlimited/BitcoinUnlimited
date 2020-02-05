@@ -156,6 +156,21 @@ bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state, bool f
 }
 
 
+bool CheckBlockHeader(const CDeltaBlock &block, CValidationState &state, bool fCheckPOW, uint8_t k)
+{
+    // Check proof of work matches claimed amount
+    if (fCheckPOW && !CheckBobtailPoW(std::make_shared<CDeltaBlock>(block), Params().GetConsensus(), k))
+        return state.DoS(50, error("CheckBlockHeader(): proof of work failed"), REJECT_INVALID, "high-hash");
+
+    // Check timestamp
+    if (block.GetBlockTime() > GetAdjustedTime() + 2 * 60 * 60)
+        return state.Invalid(
+            error("CheckBlockHeader(): block timestamp too far in the future"), REJECT_INVALID, "time-too-new");
+
+    return true;
+}
+
+
 bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex *const pindexPrev)
 {
     const Consensus::Params &consensusParams = Params().GetConsensus();
