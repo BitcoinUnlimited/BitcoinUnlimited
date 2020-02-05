@@ -361,7 +361,8 @@ CTweakRef<bool> enableCanonicalTxOrder("consensus.enableCanonicalTxOrder",
 CTweak<unsigned int> numMsgHandlerThreads("net.msgHandlerThreads", "Max message handler threads", 0);
 CTweak<unsigned int> numTxAdmissionThreads("net.txAdmissionThreads", "Max transaction mempool admission threads", 0);
 CTweak<unsigned int> unconfPushAction("net.unconfChainResendAction",
-    "Action to take when this node thinks that a peer will now accept a previously unacceptable unconfirmed transaction"
+    "Action to take when this node thinks that a peer will now accept a previously unacceptable unconfirmed "
+    "transaction (default: 0) "
     "0: do not resend, 1: send an INV, 2: send the TX",
     0);
 CTweak<bool> restrictInputs("net.restrictInputs",
