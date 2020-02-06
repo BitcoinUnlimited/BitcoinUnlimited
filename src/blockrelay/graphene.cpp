@@ -248,6 +248,10 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     if (pblock == nullptr)
         return error("No block available to reconstruct for graphenetx");
     DbgAssert(pblock->grapheneblock != nullptr, return false);
+
+    // Copy backup block for failover
+    std::shared_ptr<CBlockThinRelay> backup = std::make_shared<CBlockThinRelay>(*pblock);
+
     std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
     if (grapheneBlock->vTxHashes256.size() < grapheneBlockTx.vMissingTx.size())
     {
@@ -273,7 +277,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // request a failover block instead.
     if (grapheneBlockTx.vMissingTx.size() < grapheneBlock->nWaitingFor)
     {
-        RequestFailoverBlock(pfrom, pblock);
+        RequestFailoverBlock(pfrom, backup);
         return error("Still missing transactions from those returned by sender, peer=%s: re-requesting failover block",
             pfrom->GetLogName());
     }
@@ -292,7 +296,7 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     // while we were retreiving missing transactions.
     if (missingCount > 0)
     {
-        RequestFailoverBlock(pfrom, pblock);
+        RequestFailoverBlock(pfrom, backup);
         return error("Still missing transactions after reconstructing block, peer=%s: re-requesting failover block",
             pfrom->GetLogName());
     }
