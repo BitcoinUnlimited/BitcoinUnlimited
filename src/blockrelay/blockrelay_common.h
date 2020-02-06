@@ -8,6 +8,7 @@
 #include "net.h"
 #include "utiltime.h"
 
+#include <set>
 #include <stdint.h>
 
 class CNode;
@@ -20,7 +21,17 @@ struct CThinTypeBlockInFlight
     int64_t nRequestTime;
     bool fReceived;
     const std::string thinType;
+    bool operator==(const CThinTypeBlockInFlight &b) { return ((hash == b.hash) && (thinType == b.thinType)); }
+    friend bool operator<(const CThinTypeBlockInFlight &a, const CThinTypeBlockInFlight &b)
+    {
+        if ((a.hash == b.hash) && (a.thinType == b.thinType))
+        {
+            return false;
+        }
+        return (a.hash < b.hash);
+    }
 };
+
 
 class ThinTypeRelay
 {
@@ -35,7 +46,7 @@ private:
     std::map<uint256, std::pair<uint64_t, bool> > mapBlockRelayTimer GUARDED_BY(cs_blockrelaytimer);
 
     // thin type blocks in flight and the time they were requested.
-    std::multimap<const NodeId, CThinTypeBlockInFlight> mapThinTypeBlocksInFlight GUARDED_BY(cs_inflight);
+    std::map<const NodeId, std::set<CThinTypeBlockInFlight> > mapThinTypeBlocksInFlight GUARDED_BY(cs_inflight);
 
     // blocks that are currently being reconstructed.
     std::multimap<NodeId, std::pair<uint256, std::shared_ptr<CBlockThinRelay> > > mapBlocksReconstruct GUARDED_BY(

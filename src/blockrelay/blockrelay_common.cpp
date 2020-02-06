@@ -177,22 +177,25 @@ bool ThinTypeRelay::AreTooManyBlocksInFlight()
 {
     // check if we've exceed the max thintype blocks in flight allowed.
     LOCK(cs_inflight);
-    if (mapThinTypeBlocksInFlight.size() >= MAX_THINTYPE_BLOCKS_IN_FLIGHT)
-        return true;
-    return false;
+    size_t mapSize = 0;
+    for (auto &entry : mapThinTypeBlocksInFlight)
+    {
+        // add the size of the sets of each entry
+        // it is possible for a set to be empty
+        mapSize = mapSize + entry.second.size();
+    }
+    return (mapSize >= MAX_THINTYPE_BLOCKS_IN_FLIGHT);
 }
 
 bool ThinTypeRelay::IsBlockInFlight(CNode *pfrom, const std::string thinType, const uint256 &hash)
 {
     // check if this node already has this thinType of block in flight.
     LOCK(cs_inflight);
-    auto range = mapThinTypeBlocksInFlight.equal_range(pfrom->GetId());
-    while (range.first != range.second)
+    auto key = mapThinTypeBlocksInFlight.find(pfrom->GetId());
+    if (key != mapThinTypeBlocksInFlight.end())
     {
-        if (range.first->second.thinType == thinType && range.first->second.hash == hash)
-            return true;
-
-        range.first++;
+        // time and recieved arent checked in the comparator, so they dont matter here
+        return key->second.count(CThinTypeBlockInFlight{hash, 0, false, thinType});
     }
     return false;
 }
@@ -200,13 +203,18 @@ bool ThinTypeRelay::IsBlockInFlight(CNode *pfrom, const std::string thinType, co
 void ThinTypeRelay::BlockWasReceived(CNode *pfrom, const uint256 &hash)
 {
     LOCK(cs_inflight);
-    auto range = mapThinTypeBlocksInFlight.equal_range(pfrom->GetId());
-    while (range.first != range.second)
+    auto key = mapThinTypeBlocksInFlight.find(pfrom->GetId());
+    if (key != mapThinTypeBlocksInFlight.end())
     {
-        if (range.first->second.hash == hash)
-            range.first->second.fReceived = true;
-
-        range.first++;
+        for (auto entry : key->second)
+        {
+            if (entry.hash == hash)
+            {
+                entry.fReceived = true;
+                // we can break here and end exit early because entries in sets are unique
+                break;
+            }
+        }
     }
 }
 
@@ -216,33 +224,38 @@ bool ThinTypeRelay::AddBlockInFlight(CNode *pfrom, const uint256 &hash, const st
     if (AreTooManyBlocksInFlight())
         return false;
 
-    // Verify that we haven't already added this entry before since mapThinTypeBlocksInFlight
-    // is a multi-map and we could end up adding two identical entries.
-    if (!IsBlockInFlight(pfrom, thinType, hash))
+    // this insert returns a pair <iterator,bool> where the bool denotes whether the insertion took place
+    auto key = mapThinTypeBlocksInFlight.find(pfrom->GetId());
+    if (key != mapThinTypeBlocksInFlight.end())
     {
-        mapThinTypeBlocksInFlight.insert(
-            std::pair<const NodeId, CThinTypeBlockInFlight>(pfrom->GetId(), {hash, GetTime(), false, thinType}));
-        return true;
+        return key->second.emplace(CThinTypeBlockInFlight{hash, GetTime(), false, thinType}).second;
     }
-    else
+    auto result = mapThinTypeBlocksInFlight.emplace(pfrom->GetId(), std::set<CThinTypeBlockInFlight>());
+    // strong guarantee, if emplace fails there are no changes made to the map
+    if (result.second == true)
     {
-        return false;
+        return result.first->second.emplace(CThinTypeBlockInFlight{hash, GetTime(), false, thinType}).second;
     }
+    return false;
 }
 
 void ThinTypeRelay::ClearBlockInFlight(NodeId id, const uint256 &hash)
 {
     LOCK(cs_inflight);
-    auto range = mapThinTypeBlocksInFlight.equal_range(id);
-    while (range.first != range.second)
+    auto key = mapThinTypeBlocksInFlight.find(id);
+    if (key != mapThinTypeBlocksInFlight.end())
     {
-        if (range.first->second.hash == hash)
+        for (auto entry = key->second.begin(); entry != key->second.end();)
         {
-            range.first = mapThinTypeBlocksInFlight.erase(range.first);
-        }
-        else
-        {
-            range.first++;
+            if (entry->hash == hash)
+            {
+                // it is safe to erase elements while iterating through sets since c++14
+                entry = key->second.erase(entry);
+            }
+            else
+            {
+                ++entry;
+            }
         }
     }
 }
@@ -250,8 +263,11 @@ void ThinTypeRelay::ClearBlockInFlight(NodeId id, const uint256 &hash)
 void ThinTypeRelay::ClearAllBlocksInFlight(NodeId id)
 {
     LOCK(cs_inflight);
-    auto range = mapThinTypeBlocksInFlight.equal_range(id);
-    mapThinTypeBlocksInFlight.erase(range.first, range.second);
+    auto key = mapThinTypeBlocksInFlight.find(id);
+    if (key != mapThinTypeBlocksInFlight.end())
+    {
+        key->second.clear();
+    }
 }
 
 void ThinTypeRelay::SetSentGrapheneBlocks(NodeId id, CGrapheneBlock &grapheneBlock)
@@ -280,29 +296,26 @@ void ThinTypeRelay::ClearSentGrapheneBlocks(NodeId id)
 void ThinTypeRelay::CheckForDownloadTimeout(CNode *pfrom)
 {
     LOCK(cs_inflight);
-    if (mapThinTypeBlocksInFlight.size() == 0)
-        return;
-
-    auto range = mapThinTypeBlocksInFlight.equal_range(pfrom->GetId());
-    while (range.first != range.second)
+    auto key = mapThinTypeBlocksInFlight.find(pfrom->GetId());
+    if (key != mapThinTypeBlocksInFlight.end())
     {
-        // Use a timeout of 6 times the retry inverval before disconnecting.  This way only a max of 6
-        // re-requested thinblocks or graphene blocks could be in memory at any one time.
-        if (!range.first->second.fReceived &&
-            (GetTime() - range.first->second.nRequestTime) >
-                (int)MAX_THINTYPE_BLOCKS_IN_FLIGHT * blkReqRetryInterval / 1000000)
+        for (auto &entry : (*key).second)
         {
-            if (!pfrom->fWhitelisted && Params().NetworkIDString() != "regtest")
+            // Use a timeout of 6 times the retry inverval before disconnecting.  This way only a max of 6
+            // re-requested thinblocks or graphene blocks could be in memory at any one time.
+            if (!entry.fReceived &&
+                (GetTime() - entry.nRequestTime) > (int)MAX_THINTYPE_BLOCKS_IN_FLIGHT * blkReqRetryInterval / 1000000)
             {
-                LOG(THIN | GRAPHENE | CMPCT,
-                    "ERROR: Disconnecting peer %s due to thinblock download timeout exceeded (%d secs)\n",
-                    pfrom->GetLogName(), (GetTime() - range.first->second.nRequestTime));
-                pfrom->fDisconnect = true;
-                return;
+                if (!pfrom->fWhitelisted && Params().NetworkIDString() != "regtest")
+                {
+                    LOG(THIN | GRAPHENE | CMPCT,
+                        "ERROR: Disconnecting peer %s due to thinblock download timeout exceeded (%d secs)\n",
+                        pfrom->GetLogName(), (GetTime() - entry.nRequestTime));
+                    pfrom->fDisconnect = true;
+                    return;
+                }
             }
         }
-
-        range.first++;
     }
 }
 
