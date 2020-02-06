@@ -87,7 +87,7 @@ public:
     uint64_t GetMaxAllowedBlockSize();
 
     // Clear all block data
-    void ClearAllBlockData(CNode *pnode, std::shared_ptr<CBlockThinRelay> pblock);
+    void ClearAllBlockData(CNode *pnode, const uint256 &hash);
 };
 extern ThinTypeRelay thinrelay;
 

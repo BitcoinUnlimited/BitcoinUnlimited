@@ -139,7 +139,7 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     if (!IsCompactBlockValid(pfrom, compactBlock))
     {
         dosMan.Misbehaving(pfrom, 100);
-        thinrelay.ClearAllBlockData(pfrom, pblock);
+        thinrelay.ClearAllBlockData(pfrom, pblock->GetHash());
         return error("Received an invalid compactblock from peer %s\n", pfrom->GetLogName());
     }
 
@@ -174,7 +174,7 @@ bool CompactBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     if (AlreadyHaveBlock(inv))
     {
         requester.AlreadyReceived(pfrom, inv);
-        thinrelay.ClearAllBlockData(pfrom, pblock);
+        thinrelay.ClearAllBlockData(pfrom, inv.hash);
 
         LOG(CMPCT, "Received compactblock but returning because we already have this block %s on disk, peer=%s\n",
             inv.hash.ToString(), pfrom->GetLogName());
@@ -297,7 +297,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock
                 if (setHashesToRequest.size() > std::numeric_limits<uint16_t>::max())
                 {
                     // Since we can't process this compactblock then clear out the data from memory
-                    thinrelay.ClearAllBlockData(pfrom, pblock);
+                    thinrelay.ClearAllBlockData(pfrom, pblock->GetHash());
 
                     thinrelay.RequestBlock(pfrom, header.GetHash());
                     return error("Too many re-requested hashes for compactblock: requesting a full block");
@@ -334,7 +334,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock
     {
         return error("mismatched merkle root on compactblock: rerequesting a full block, peer=%s", pfrom->GetLogName());
 
-        thinrelay.ClearAllBlockData(pfrom, pblock);
+        thinrelay.ClearAllBlockData(pfrom, header.GetHash());
         thinrelay.RequestBlock(pfrom, header.GetHash());
         return true;
     }
@@ -373,7 +373,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock
     if (missingCount > 0)
     {
         // Since we can't process this compactblock then clear out the data from memory
-        thinrelay.ClearAllBlockData(pfrom, pblock);
+        thinrelay.ClearAllBlockData(pfrom, header.GetHash());
 
         thinrelay.RequestBlock(pfrom, header.GetHash());
         return error("Still missing transactions for compactblock: re-requesting a full block");
@@ -477,7 +477,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     if (AlreadyHaveBlock(inv))
     {
         requester.AlreadyReceived(pfrom, inv);
-        thinrelay.ClearAllBlockData(pfrom, pblock);
+        thinrelay.ClearAllBlockData(pfrom, inv.hash);
 
         LOG(CMPCT,
             "Received compactReReqResponse but returning because we already have this block %s on disk, peer=%s\n",
@@ -517,7 +517,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     uint256 merkleroot = ComputeMerkleRoot(cmpctBlock->vTxHashes256, &mutated);
     if (pblock->hashMerkleRoot != merkleroot || mutated)
     {
-        thinrelay.ClearAllBlockData(pfrom, pblock);
+        thinrelay.ClearAllBlockData(pfrom, inv.hash);
         return error("Merkle root for %s does not match computed merkle root, peer=%s", inv.hash.ToString(),
             pfrom->GetLogName());
     }
@@ -538,7 +538,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     if (missingCount > 0)
     {
         // Since we can't process this compactblock then clear out the data from memory
-        thinrelay.ClearAllBlockData(pfrom, pblock);
+        thinrelay.ClearAllBlockData(pfrom, inv.hash);
 
         thinrelay.RequestBlock(pfrom, inv.hash);
         return error("Still missing transactions after reconstructing block, peer=%s: re-requesting a full block",
@@ -582,7 +582,7 @@ static bool ReconstructBlock(CNode *pfrom,
         std::set<uint256> setHashes(pblock->cmpctblock->vTxHashes256.begin(), pblock->cmpctblock->vTxHashes256.end());
         if (setHashes.size() != pblock->cmpctblock->vTxHashes256.size())
         {
-            thinrelay.ClearAllBlockData(pfrom, pblock);
+            thinrelay.ClearAllBlockData(pfrom, pblock->GetHash());
             return error("Duplicate transaction ids, peer=%s", pfrom->GetLogName());
         }
     }
@@ -660,7 +660,7 @@ static bool ReconstructBlock(CNode *pfrom,
         if (pblock->nCurrentBlockSize > thinrelay.GetMaxAllowedBlockSize())
         {
             uint64_t nBlockBytes = pblock->nCurrentBlockSize;
-            thinrelay.ClearAllBlockData(pfrom, pblock);
+            thinrelay.ClearAllBlockData(pfrom, pblock->GetHash());
             pfrom->fDisconnect = true;
             return error("Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be "
                          "exceeded, peer=%s",

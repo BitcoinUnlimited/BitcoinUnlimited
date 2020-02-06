@@ -369,16 +369,9 @@ void ThinTypeRelay::AddBlockBytes(uint64_t bytes, std::shared_ptr<CBlockThinRela
 }
 
 uint64_t ThinTypeRelay::GetMaxAllowedBlockSize() { return maxMessageSizeMultiplier * excessiveBlockSize; }
-void ThinTypeRelay::ClearAllBlockData(CNode *pnode, std::shared_ptr<CBlockThinRelay> pblock)
+void ThinTypeRelay::ClearAllBlockData(CNode *pnode, const uint256 &hash)
 {
-    // We must make sure to clear the block data first before clearing the thinblock in flight.
-    uint256 hash = pblock->GetBlockHeader().GetHash();
+    // Clear the entries for block to reconstruct and block in flight
     ClearBlockToReconstruct(pnode->GetId(), hash);
-
-    // Clear block data
-    if (pblock)
-        pblock->SetNull();
-
-    // Now clear the block in flight.
     ClearBlockInFlight(pnode, hash);
 }
