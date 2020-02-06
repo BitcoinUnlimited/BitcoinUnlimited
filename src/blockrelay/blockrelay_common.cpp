@@ -222,10 +222,18 @@ bool ThinTypeRelay::AddBlockInFlight(CNode *pfrom, const uint256 &hash, const st
     if (AreTooManyBlocksInFlight(pfrom, thinType))
         return false;
 
-    mapThinTypeBlocksInFlight.insert(
-        std::pair<const NodeId, CThinTypeBlockInFlight>(pfrom->GetId(), {hash, GetTime(), false, thinType}));
-
-    return true;
+    // Verify that we haven't already added this entry before since mapThinTypeBlocksInFlight
+    // is a multi-map and we could end up adding two identical entries.
+    if (!IsBlockInFlight(pfrom, thinType, &hash))
+    {
+        mapThinTypeBlocksInFlight.insert(
+            std::pair<const NodeId, CThinTypeBlockInFlight>(pfrom->GetId(), {hash, GetTime(), false, thinType}));
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
 void ThinTypeRelay::ClearBlockInFlight(CNode *pfrom, const uint256 &hash)

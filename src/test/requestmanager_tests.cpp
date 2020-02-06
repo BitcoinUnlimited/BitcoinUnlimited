@@ -152,6 +152,25 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     uint64_t nTime = GetTime();
     dosMan.ClearBanned();
 
+    /** Block in flight tests */
+    // Try to add the same block twice. We shoul only be allowed one unique thintype block in flight
+    thinrelay.AddBlockInFlight(&dummyNodeGraphene, hash, NetMsgType::GRAPHENEBLOCK);
+    BOOST_CHECK(thinrelay.AreTooManyBlocksInFlight());
+    BOOST_CHECK(thinrelay.AddBlockInFlight(&dummyNodeGraphene, hash, NetMsgType::GRAPHENEBLOCK));
+
+    // Add 4 blocks in flight
+    thinrelay.AddBlockInFlight(&dummyNodeGraphene, GetRandHash(), NetMsgType::GRAPHENEBLOCK);
+    thinrelay.AddBlockInFlight(&dummyNodeGraphene, GetRandHash(), NetMsgType::GRAPHENEBLOCK);
+    thinrelay.AddBlockInFlight(&dummyNodeGraphene, GetRandHash(), NetMsgType::GRAPHENEBLOCK);
+    thinrelay.AddBlockInFlight(&dummyNodeGraphene, GetRandHash(), NetMsgType::GRAPHENEBLOCK);
+    BOOST_CHECK(!thinrelay.AreTooManyBlocksInFlight());
+
+    // Add one more which is the max blocks in flight. A call to TooManyBlocksInFlight() will now
+    // return false.
+    thinrelay.AddBlockInFlight(&dummyNodeGraphene, hash, NetMsgType::GRAPHENEBLOCK);
+    BOOST_CHECK(thinrelay.AreTooManyBlocksInFlight());
+
+
     // Test the General Case: Chain synced, graphene ON, Thinblocks ON, Cmpct ON
     // This should return a Graphene block.
     IsChainNearlySyncdSet(true);
