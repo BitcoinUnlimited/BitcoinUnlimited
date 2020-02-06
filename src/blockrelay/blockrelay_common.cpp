@@ -197,12 +197,6 @@ bool ThinTypeRelay::IsBlockInFlight(CNode *pfrom, const std::string thinType, co
     return false;
 }
 
-unsigned int ThinTypeRelay::TotalBlocksInFlight()
-{
-    LOCK(cs_inflight);
-    return mapThinTypeBlocksInFlight.size();
-}
-
 void ThinTypeRelay::BlockWasReceived(CNode *pfrom, const uint256 &hash)
 {
     LOCK(cs_inflight);
