@@ -99,6 +99,9 @@ void CGrapheneBlock::AddNewTransactions(std::vector<CTransaction> vMissingTx, CN
         }
     }
 
+    if (vMissingTx.size() != missingTxIdxs.size())
+        throw std::runtime_error("Could not accommodate all vMissingTx in vTxHashes256");
+
     size_t idx = 0;
     for (const CTransaction &tx : vMissingTx)
     {
@@ -111,7 +114,12 @@ void CGrapheneBlock::AddNewTransactions(std::vector<CTransaction> vMissingTx, CN
 
         // Insert in arbitrary order if canonical ordering is enabled and xversion is recent enough
         if (fCanonicalTxsOrder && NegotiateGrapheneVersion(pfrom) >= 1)
-            vTxHashes256[missingTxIdxs[idx++]] = hash;
+        {
+            if (idx >= missingTxIdxs.size())
+                throw std::runtime_error("Range exceeded in missingTxIdxs");
+            vTxHashes256[missingTxIdxs[idx]] = hash;
+            idx++;
+        }
         // Otherwise, use ordering information
         else
             vTxHashes256[mapHashOrderIndex[cheapHash]] = hash;
@@ -138,7 +146,10 @@ void CGrapheneBlock::OrderTxHashes(CNode *pfrom)
         {
             uint64_t cheapHash =
                 GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash, NegotiateGrapheneVersion(pfrom));
-            orderedTxHashes256[mapHashOrderIndex[cheapHash]] = hash;
+            const auto &orderIdx = mapHashOrderIndex.find(cheapHash);
+            if (orderIdx == mapHashOrderIndex.end())
+                throw std::runtime_error("Could not locate cheapHash in mapHashOrderIndex");
+            orderedTxHashes256[orderIdx->second] = hash;
         }
         std::copy(orderedTxHashes256.begin(), orderedTxHashes256.end(), vTxHashes256.begin());
     }
