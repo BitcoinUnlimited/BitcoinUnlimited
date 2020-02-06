@@ -173,7 +173,7 @@ void ThinTypeRelay::ClearBlockRelayTimer(const uint256 &hash)
     }
 }
 
-bool ThinTypeRelay::AreTooManyBlocksInFlight(CNode *pfrom, const std::string thinType)
+bool ThinTypeRelay::AreTooManyBlocksInFlight()
 {
     // check if we've exceed the max thintype blocks in flight allowed.
     LOCK(cs_inflight);
@@ -219,13 +219,21 @@ void ThinTypeRelay::BlockWasReceived(CNode *pfrom, const uint256 &hash)
 bool ThinTypeRelay::AddBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType)
 {
     LOCK(cs_inflight);
-    if (AreTooManyBlocksInFlight(pfrom, thinType))
+    if (AreTooManyBlocksInFlight())
         return false;
 
-    mapThinTypeBlocksInFlight.insert(
-        std::pair<const NodeId, CThinTypeBlockInFlight>(pfrom->GetId(), {hash, GetTime(), false, thinType}));
-
-    return true;
+    // Verify that we haven't already added this entry before since mapThinTypeBlocksInFlight
+    // is a multi-map and we could end up adding two identical entries.
+    if (!IsBlockInFlight(pfrom, thinType, hash))
+    {
+        mapThinTypeBlocksInFlight.insert(
+            std::pair<const NodeId, CThinTypeBlockInFlight>(pfrom->GetId(), {hash, GetTime(), false, thinType}));
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
 void ThinTypeRelay::ClearBlockInFlight(CNode *pfrom, const uint256 &hash)

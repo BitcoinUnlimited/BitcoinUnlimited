@@ -64,7 +64,7 @@ public:
     bool HasBlockRelayTimerExpired(const uint256 &hash);
     bool IsBlockRelayTimerEnabled();
     void ClearBlockRelayTimer(const uint256 &hash);
-    bool AreTooManyBlocksInFlight(CNode *pfrom, const std::string thinType);
+    bool AreTooManyBlocksInFlight();
     bool IsBlockInFlight(CNode *pfrom, const std::string thinType, const uint256 &hash);
     unsigned int TotalBlocksInFlight();
     void BlockWasReceived(CNode *pfrom, const uint256 &hash);
