@@ -413,6 +413,8 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
     uint256 hash;
 
     // Create a chain of 25 unconfirmed transactions
+    SetArg("-limitancestorcount", std::to_string(25));
+    SetArg("-limitdescendantcount", std::to_string(25));
     for (int i = 1; i <= 25; i++)
     {
         CMutableTransaction tx;
