@@ -1200,7 +1200,7 @@ bool TestBlockValidity(CValidationState &state,
         return false;
     if (!CheckBlock(block, state, fCheckPOW, fCheckMerkleRoot))
         return false;
-    if (!ContextualCheckBlock(block, state, pindexPrev))
+    if (!ContextualCheckBlock(block, viewNew, state, pindexPrev))
         return false;
     if (!ConnectBlock(block, state, &indexDummy, viewNew, chainparams, true))
         return false;
@@ -1506,6 +1506,7 @@ void InvalidChainFound(CBlockIndex *pindexNew)
 }
 
 bool ContextualCheckBlock(const CBlock &block,
+    CCoinsViewCache &view,
     CValidationState &state,
     CBlockIndex *const pindexPrev,
     const bool fConservative)
@@ -1593,7 +1594,8 @@ bool ContextualCheckBlock(const CBlock &block,
     {
         nTx++;
 
-        nSigOps += GetLegacySigOpCount(tx, flags);
+        nSigOps += GetLegacySigOpCount(tx, flags) + GetP2SHSigOpCount(tx, view, flags);
+
         if (tx->GetTxSize() > nLargestTx)
             nLargestTx = tx->GetTxSize();
     }
@@ -1781,19 +1783,24 @@ bool AcceptBlock(const CBlock &block,
         if (fTooFarAhead)
             return true; // Block height is too high
     }
-    if ((!CheckBlock(block, state)) || !ContextualCheckBlock(block, state, pindex->pprev))
+
     {
-        if (state.IsInvalid() && !state.CorruptionPossible())
+        CCoinsViewCache view(pcoinsTip);
+
+        if ((!CheckBlock(block, state)) || !ContextualCheckBlock(block, view, state, pindex->pprev))
         {
+            if (state.IsInvalid() && !state.CorruptionPossible())
             {
-                WRITELOCK(cs_mapBlockIndex);
-                pindex->nStatus |= BLOCK_FAILED_VALID;
-                setDirtyBlockIndex.insert(pindex);
+                {
+                    WRITELOCK(cs_mapBlockIndex);
+                    pindex->nStatus |= BLOCK_FAILED_VALID;
+                    setDirtyBlockIndex.insert(pindex);
+                }
+                // Now mark every block index on every chain that contains pindex as child of invalid
+                MarkAllContainingChainsInvalid(pindex);
             }
-            // Now mark every block index on every chain that contains pindex as child of invalid
-            MarkAllContainingChainsInvalid(pindex);
+            return false;
         }
-        return false;
     }
     int nHeight = pindex->nHeight;
     // Write block to history file
@@ -2186,12 +2193,10 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
 
     // Get the script flags for this block
     uint32_t flags = GetBlockScriptFlags(pindex, chainparams.GetConsensus());
-    bool fStrictPayToScriptHash = flags & SCRIPT_VERIFY_P2SH;
 
     ValidationResourceTracker resourceTracker;
     std::vector<int> prevheights;
     int nInputs = 0;
-    unsigned int nSigOps = 0;
     CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
     int nChecked = 0;
@@ -2240,10 +2245,6 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
             const CTransactionRef &txref = block.vtx[i];
 
             nInputs += tx.vin.size();
-            nSigOps += GetLegacySigOpCount(txref, flags);
-            // if (nSigOps > MAX_BLOCK_SIGOPS)
-            //    return state.DoS(100, error("ConnectBlock(): too many sigops"),
-            //                    REJECT_INVALID, "bad-blk-sigops");
 
             if (!tx.IsCoinBase())
             {
@@ -2279,14 +2280,6 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                     return state.DoS(100, error("%s: block %s contains a non-BIP68-final transaction", __func__,
                                               block.GetHash().ToString()),
                         REJECT_INVALID, "bad-txns-nonfinal");
-                }
-
-                if (fStrictPayToScriptHash)
-                {
-                    // Add in sigops done by pay-to-script-hash inputs;
-                    // this is to prevent a "rogue miner" from creating
-                    // an incredibly-expensive-to-validate block.
-                    nSigOps += GetP2SHSigOpCount(txref, view, flags);
                 }
 
                 nFees += view.GetValueIn(tx) - tx.GetValueOut();
@@ -2392,12 +2385,10 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
 
     // Get the script flags for this block
     uint32_t flags = GetBlockScriptFlags(pindex, chainparams.GetConsensus());
-    bool fStrictPayToScriptHash = flags & SCRIPT_VERIFY_P2SH;
 
     ValidationResourceTracker resourceTracker;
     std::vector<int> prevheights;
     int nInputs = 0;
-    unsigned int nSigOps = 0;
     CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
     int nChecked = 0;
@@ -2480,7 +2471,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             const CTransactionRef &txref = block.vtx[i];
 
             nInputs += tx.vin.size();
-            nSigOps += GetLegacySigOpCount(txref, flags);
 
             if (!tx.IsCoinBase())
             {
@@ -2516,14 +2506,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                     return state.DoS(100, error("%s: block %s contains a non-BIP68-final transaction", __func__,
                                               block.GetHash().ToString()),
                         REJECT_INVALID, "bad-txns-nonfinal");
-                }
-
-                if (fStrictPayToScriptHash)
-                {
-                    // Add in sigops done by pay-to-script-hash inputs;
-                    // this is to prevent a "rogue miner" from creating
-                    // an incredibly-expensive-to-validate block.
-                    nSigOps += GetP2SHSigOpCount(txref, view, flags);
                 }
 
                 nFees += view.GetValueIn(tx) - tx.GetValueOut();
