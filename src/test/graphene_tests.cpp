@@ -185,7 +185,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_finds_brute_force_opt_for_small_blocks)
         }
     }
 
-    BOOST_CHECK_EQUAL(grapheneSet.OptimalSymDiff(n, m, m - mu, 1), best_a);
+    BOOST_CHECK_EQUAL(grapheneSet.OptimalSymDiff(version, n, m, m - mu, 1), best_a);
 }
 
 BOOST_AUTO_TEST_CASE(graphene_set_finds_approx_opt_for_large_blocks)
@@ -196,7 +196,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_finds_approx_opt_for_large_blocks)
     int mu = 1000;
     int m = approx_items_thresh + mu;
     CGrapheneSet grapheneSet(version);
-    double optSymDiff = grapheneSet.OptimalSymDiff(n, m, m - mu, 0);
+    double optSymDiff = grapheneSet.OptimalSymDiff(version, n, m, m - mu, 0);
     double fpr = CGrapheneSet::BloomFalsePositiveRate(optSymDiff, m - mu);
     uint8_t checksumBits = CGrapheneSet::NChecksumBits(n * CIblt::OptimalOverhead(n), CIblt::OptimalNHash(n), m, fpr, UNCHECKED_ERROR_TOL);
     auto approxSymDiff = [n, checksumBits]() {
@@ -216,7 +216,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_approx_opt_close_to_optimal)
         int m = (int)std::ceil(n / APPROX_EXCESS_RATE) + mu;
         CGrapheneSet grapheneSet(version);
 
-        float totalBytesApprox = (float)ProjectedGrapheneSizeBytes(version, n, m - mu, grapheneSet.ApproxOptimalSymDiff(n));
+        float totalBytesApprox = (float)ProjectedGrapheneSizeBytes(version, n, m - mu, CGrapheneSet::ApproxOptimalSymDiff(version, n));
         float totalBytesBrute =
             (float)ProjectedGrapheneSizeBytes(version, n, m - mu, grapheneSet.BruteForceSymDiff(n, m, m - mu, MAX_CHECKSUM_BITS));
         float totalBytesBruteOpt =
@@ -419,6 +419,64 @@ BOOST_AUTO_TEST_CASE(nchecksumbits_gives_correct_value)
     uint8_t bits = CGrapheneSet::NChecksumBits(10, 2, 1, 0.5, tol);
 
     BOOST_CHECK_EQUAL(bits, 11);
+}
+
+BOOST_AUTO_TEST_CASE(graphene_failure_recovery_primitives)
+{
+    size_t nItems = 100;
+    int nNumHashes = 0;
+    uint64_t grapheneSetVersion = CGrapheneBlock::GetGrapheneSetVersion(GRAPHENE_MAX_VERSION_SUPPORTED);
+    uint32_t ibltSalt = 3;
+
+    std::vector<uint256> senderItems;
+    std::set<uint64_t> senderCheapHashes;
+    std::vector<uint256> baseReceiverItems;
+    for (size_t i = 1; i <= nItems; i++)
+    {
+        nNumHashes++;
+        const uint256 &hash = GetHash(nNumHashes);
+        senderItems.push_back(hash);
+        senderCheapHashes.insert(hash.GetCheapHash());
+        baseReceiverItems.push_back(hash);
+    }
+
+    // Add 10000 more items to receiver mempool
+    std::vector<uint256> receiverItems = baseReceiverItems;
+    for (size_t j = 1; j < 10000; j++)
+    {
+        nNumHashes++;
+        receiverItems.push_back(SerializeHash(GetHash(nNumHashes)));
+    }
+
+    CGrapheneSet fastGrapheneSet(
+        receiverItems.size(), receiverItems.size(), senderItems, 0, 0, MAX_GRAPHENE_SET_VERSION, 0, true, false, true);
+    fastGrapheneSet.Reconcile(receiverItems);
+
+    uint64_t nPassedFilterItems = 12;
+    uint64_t nReceiverUniverseItems = 200;
+    double fSenderBloomFpr = 1.0;
+
+	CVariableFastFilter receiverFilter = fastGrapheneSet.FailureRecoveryFilter(senderItems, nItems, nPassedFilterItems, nReceiverUniverseItems, FAILURE_RECOVERY_SUCCESS_RATE, fSenderBloomFpr, grapheneSetVersion);
+    CIblt recoveryIblt = fastGrapheneSet.FailureRecoveryIblt(senderCheapHashes, nItems, nPassedFilterItems, nReceiverUniverseItems, FAILURE_RECOVERY_SUCCESS_RATE, fSenderBloomFpr, grapheneSetVersion, ibltSalt);
+}
+
+BOOST_AUTO_TEST_CASE(graphene_failure_recovery_params_sanity)
+{
+    // exmple from https://github.com/bissias/graphene-experiments/blob/master/jupyter/graphene_v2_param_estimates.ipynb
+    // variable names are from graphene paper https://people.cs.umass.edu/~gbiss/graphene.sigcomm.pdf
+    uint64_t z = 10; 
+    uint64_t n = 10; 
+    uint64_t m = 20; 
+    double f_S = 0.1; 
+    double beta = 0.9;
+    uint64_t x_star_desired = 4;
+    uint64_t y_star_desired = 5;
+
+    uint64_t x_star_actual = CGrapheneSet::LowerBoundTruePositives(n, z, m, f_S, beta);
+    uint64_t y_star_actual = CGrapheneSet::UpperBoundFalsePositives(n, z, m, f_S, beta);
+
+    BOOST_CHECK_EQUAL(x_star_desired, x_star_actual);
+    BOOST_CHECK_EQUAL(y_star_desired, y_star_actual);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

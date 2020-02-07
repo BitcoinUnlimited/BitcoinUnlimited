@@ -27,6 +27,7 @@ class ThinTypeRelay
 public:
     CCriticalSection cs_inflight;
     CCriticalSection cs_reconstruct;
+    CCriticalSection cs_graphene_sender;
 
 private:
     // block relay timer
@@ -54,6 +55,9 @@ private:
     std::atomic<int32_t> nGraphenePeers{0};
     std::atomic<int32_t> nCompactBlockPeers{0};
 
+    // blocks still in flight sent by the sender.
+    std::map<NodeId, std::shared_ptr<CGrapheneBlock> > mapGrapheneSentBlocks GUARDED_BY(cs_graphene_sender);
+
 public:
     void AddPeers(CNode *pfrom);
     uint32_t GetGraphenePeers() { return nGraphenePeers.load(); }
@@ -71,6 +75,9 @@ public:
     bool AddBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType);
     void ClearBlockInFlight(NodeId id, const uint256 &hash);
     void ClearAllBlocksInFlight(NodeId id);
+    void SetSentGrapheneBlocks(NodeId id, CGrapheneBlock &grapheneBlock);
+    std::shared_ptr<CGrapheneBlock> GetSentGrapheneBlocks(NodeId id);
+    void ClearSentGrapheneBlocks(NodeId id);
     void CheckForDownloadTimeout(CNode *pfrom);
     void RequestBlock(CNode *pfrom, const uint256 &hash);
 

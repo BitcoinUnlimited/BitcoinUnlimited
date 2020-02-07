@@ -1700,6 +1700,24 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         return CGrapheneBlockTx::HandleMessage(vRecv, pfrom);
     }
 
+    else if (strCommand == NetMsgType::GET_GRAPHENE_RECOVERY && IsGrapheneBlockEnabled() && grapheneVersionCompatible)
+    {
+        if (!requester.CheckForRequestDOS(pfrom, chainparams))
+            return false;
+
+        LOCK(pfrom->cs_graphene);
+        return HandleGrapheneBlockRecoveryRequest(vRecv, pfrom, chainparams);
+    }
+
+    else if (strCommand == NetMsgType::GRAPHENE_RECOVERY && IsGrapheneBlockEnabled() && grapheneVersionCompatible)
+    {
+        if (!requester.CheckForRequestDOS(pfrom, chainparams))
+            return false;
+
+        LOCK(pfrom->cs_graphene);
+        return HandleGrapheneBlockRecoveryResponse(vRecv, pfrom, chainparams);
+    }
+
     // Handle Compact Blocks
     else if (strCommand == NetMsgType::CMPCTBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsCompactBlocksEnabled())
