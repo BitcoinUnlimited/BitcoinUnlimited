@@ -208,11 +208,16 @@ void ThinTypeRelay::BlockWasReceived(CNode *pfrom, const uint256 &hash)
     {
         for (auto entry : key->second)
         {
+            // our sets uniqueness is based on hash + thinType so just checking the hash
+            // does not guaranteed that all entries with that hash are marked as received
             if (entry.hash == hash)
             {
                 entry.fReceived = true;
-                // we can break here and end exit early because entries in sets are unique
-                break;
+                // intended behavior should clear failed entries when making a failover request
+                // so there should only ever be 1 entry in the set with any given block hash
+                // across all thinType
+                // we do not break here to prevent a disconnect from a peer in the event
+                // that we did not properly clean up entries when a failover request was made.
             }
         }
     }
@@ -251,6 +256,8 @@ void ThinTypeRelay::ClearBlockInFlight(NodeId id, const uint256 &hash)
             {
                 // it is safe to erase elements while iterating through sets since c++14
                 entry = key->second.erase(entry);
+                // set entry uniqueness is based on hash + thinType so dont break here to make sure
+                // that all entries with this block hash regardless of thinType are cleared
             }
             else
             {

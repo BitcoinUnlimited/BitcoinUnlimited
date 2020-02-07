@@ -49,7 +49,7 @@ private:
     std::map<const NodeId, std::set<CThinTypeBlockInFlight> > mapThinTypeBlocksInFlight GUARDED_BY(cs_inflight);
 
     // blocks that are currently being reconstructed.
-    std::map<NodeId, std::map<uint256, std::shared_ptr<CBlockThinRelay> > >  mapBlocksReconstruct GUARDED_BY(
+    std::map<NodeId, std::map<uint256, std::shared_ptr<CBlockThinRelay> > > mapBlocksReconstruct GUARDED_BY(
         cs_reconstruct);
 
     // put a cap on the total number of thin type blocks we can have in flight. This lowers any possible
