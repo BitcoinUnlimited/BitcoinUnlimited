@@ -626,9 +626,9 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
         }
 
         // When we request a thin type block we may get back a regular block if it is smaller than
-        // either of the former.  Therefore we have to remove the thintype block in flight if it
-        // exists and we also need to check that the block didn't arrive from some other peer.
-        thinrelay.ClearBlockInFlight(pfrom, inv.hash);
+        // either of the former.  Therefore we have to remove the thintype block in flight and any
+        // associated data.
+        thinrelay.ClearAllBlockData(pfrom, inv.hash);
 
         // Increment block counter
         pfrom->firstBlock += 1;
