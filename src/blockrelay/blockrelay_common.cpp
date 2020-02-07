@@ -232,11 +232,11 @@ bool ThinTypeRelay::AddBlockInFlight(CNode *pfrom, const uint256 &hash, const st
     }
     auto result = mapThinTypeBlocksInFlight.emplace(pfrom->GetId(), std::set<CThinTypeBlockInFlight>());
     // strong guarantee, if emplace fails there are no changes made to the map
-    if (result.second == true)
+    if (result.second == false)
     {
-        return result.first->second.emplace(CThinTypeBlockInFlight{hash, GetTime(), false, thinType}).second;
+        return false;
     }
-    return false;
+    return result.first->second.emplace(CThinTypeBlockInFlight{hash, GetTime(), false, thinType}).second;
 }
 
 void ThinTypeRelay::ClearBlockInFlight(NodeId id, const uint256 &hash)
@@ -331,14 +331,10 @@ std::shared_ptr<CBlockThinRelay> ThinTypeRelay::SetBlockToReconstruct(CNode *pfr
     LOCK(cs_reconstruct);
     // If another thread has already created an instance then return it.
     // Currently we can only have one block hash in flight per node so make sure it's the same hash.
-    auto range = mapBlocksReconstruct.equal_range(pfrom->GetId());
-    while (range.first != range.second)
+    std::shared_ptr<CBlockThinRelay> existing_entry = GetBlockToReconstruct(pfrom, hash);
+    if (existing_entry != nullptr)
     {
-        if (range.first->second.first == hash)
-        {
-            return range.first->second.second;
-        }
-        range.first++;
+        return existing_entry;
     }
     // Otherwise, start with a fresh instance.
     // Store and empty block which can be used later
@@ -350,7 +346,9 @@ std::shared_ptr<CBlockThinRelay> ThinTypeRelay::SetBlockToReconstruct(CNode *pfr
     pblock->xthinblock = std::make_shared<CXThinBlock>(CXThinBlock());
     pblock->cmpctblock = std::make_shared<CompactBlock>(CompactBlock());
     pblock->grapheneblock = std::make_shared<CGrapheneBlock>(CGrapheneBlock());
-    mapBlocksReconstruct.insert(std::make_pair(pfrom->GetId(), std::make_pair(hash, pblock)));
+    // unless we run out of memory, emplace should never fail
+    auto newKey = mapBlocksReconstruct.emplace(pfrom->GetId(), std::map<uint256, std::shared_ptr<CBlockThinRelay> >());
+    newKey.first->second.emplace(hash, pblock);
     return pblock;
 }
 
@@ -359,14 +357,14 @@ std::shared_ptr<CBlockThinRelay> ThinTypeRelay::GetBlockToReconstruct(CNode *pfr
     // Retrieve a current instance of a block being reconstructed. This is typically used
     // when we have received the response of a re-request for more transactions.
     LOCK(cs_reconstruct);
-    auto range = mapBlocksReconstruct.equal_range(pfrom->GetId());
-    while (range.first != range.second)
+    auto key_node = mapBlocksReconstruct.find(pfrom->GetId());
+    if (key_node != mapBlocksReconstruct.end())
     {
-        if (range.first->second.first == hash)
+        auto key_hash = key_node->second.find(hash);
+        if (key_hash != key_node->second.end())
         {
-            return range.first->second.second;
+            return key_hash->second;
         }
-        range.first++;
     }
     return nullptr;
 }
@@ -374,23 +372,24 @@ std::shared_ptr<CBlockThinRelay> ThinTypeRelay::GetBlockToReconstruct(CNode *pfr
 void ThinTypeRelay::ClearBlockToReconstruct(NodeId id, const uint256 &hash)
 {
     LOCK(cs_reconstruct);
-    auto range = mapBlocksReconstruct.equal_range(id);
-    while (range.first != range.second)
+    auto key = mapBlocksReconstruct.find(id);
+    if (key != mapBlocksReconstruct.end())
     {
-        if (range.first->second.first == hash)
-        {
-            mapBlocksReconstruct.erase(range.first);
-            break;
-        }
-        range.first++;
+        key->second.erase(hash);
     }
 }
 
 void ThinTypeRelay::ClearAllBlocksToReconstruct(NodeId id)
 {
     LOCK(cs_reconstruct);
-    auto range = mapBlocksReconstruct.equal_range(id);
-    mapBlocksReconstruct.erase(range.first, range.second);
+    auto key = mapBlocksReconstruct.find(id);
+    if (key != mapBlocksReconstruct.end())
+    {
+        // we could just erase the entire id key in the outer map, but then we would have to reallocate
+        // space for that node in the event we get another block from them.
+        // only clearing the inner map will take more memory but less cpu time
+        key->second.clear();
+    }
 }
 
 void ThinTypeRelay::AddBlockBytes(uint64_t bytes, std::shared_ptr<CBlockThinRelay> pblock)
