@@ -82,7 +82,7 @@ static std::string NetMessage(std::deque<CSerializeData> &_vSendMsg)
     return ss;
 }
 
-static void ClearThinBlocksInFlight(CNode &node, CInv &inv) { thinrelay.ClearBlockInFlight(&node, inv.hash); }
+static void ClearThinBlocksInFlight(CNode &node, CInv &inv) { thinrelay.ClearBlockInFlight(node.GetId(), inv.hash); }
 BOOST_FIXTURE_TEST_SUITE(requestmanager_tests, TestingSetup)
 
 BOOST_AUTO_TEST_CASE(blockrequest_tests)

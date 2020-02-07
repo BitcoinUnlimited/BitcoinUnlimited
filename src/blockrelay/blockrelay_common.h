@@ -69,7 +69,7 @@ public:
     unsigned int TotalBlocksInFlight();
     void BlockWasReceived(CNode *pfrom, const uint256 &hash);
     bool AddBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType);
-    void ClearBlockInFlight(CNode *pfrom, const uint256 &hash);
+    void ClearBlockInFlight(NodeId id, const uint256 &hash);
     void ClearAllBlocksInFlight(NodeId id);
     void CheckForDownloadTimeout(CNode *pfrom);
     void RequestBlock(CNode *pfrom, const uint256 &hash);
@@ -87,7 +87,7 @@ public:
     uint64_t GetMaxAllowedBlockSize();
 
     // Clear all block data
-    void ClearAllBlockData(CNode *pnode, std::shared_ptr<CBlockThinRelay> pblock);
+    void ClearAllBlockData(CNode *pnode, const uint256 &hash);
 };
 extern ThinTypeRelay thinrelay;
 
