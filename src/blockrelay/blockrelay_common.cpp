@@ -236,10 +236,10 @@ bool ThinTypeRelay::AddBlockInFlight(CNode *pfrom, const uint256 &hash, const st
     }
 }
 
-void ThinTypeRelay::ClearBlockInFlight(CNode *pfrom, const uint256 &hash)
+void ThinTypeRelay::ClearBlockInFlight(NodeId id, const uint256 &hash)
 {
     LOCK(cs_inflight);
-    auto range = mapThinTypeBlocksInFlight.equal_range(pfrom->GetId());
+    auto range = mapThinTypeBlocksInFlight.equal_range(id);
     while (range.first != range.second)
     {
         if (range.first->second.hash == hash)
@@ -373,5 +373,5 @@ void ThinTypeRelay::ClearAllBlockData(CNode *pnode, const uint256 &hash)
 {
     // Clear the entries for block to reconstruct and block in flight
     ClearBlockToReconstruct(pnode->GetId(), hash);
-    ClearBlockInFlight(pnode, hash);
+    ClearBlockInFlight(pnode->GetId(), hash);
 }
