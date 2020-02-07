@@ -172,7 +172,7 @@ bool CGrapheneBlock::ValidateAndRecontructBlock(int &missingCount,
     uint256 merkleroot = ComputeMerkleRoot(vTxHashes256, &mutated);
     if (pblock->hashMerkleRoot != merkleroot || mutated)
     {
-        thinrelay.ClearAllBlockData(pfrom, pblock);
+        thinrelay.ClearAllBlockData(pfrom, pblock->GetHash());
         return error("Merkle root for block %s does not match computed merkle root, peer=%s", blockhash.ToString(),
             pfrom->GetLogName());
     }
@@ -386,7 +386,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
     if (!LookupBlockIndex(grapheneBlock->header.hashPrevBlock))
     {
         dosMan.Misbehaving(pfrom, 10);
-        thinrelay.ClearAllBlockData(pfrom, pblock);
+        thinrelay.ClearAllBlockData(pfrom, pblock->GetHash());
         return error(GRAPHENE, "Graphene block from peer %s will not connect, unknown previous block %s",
             pfrom->GetLogName(), grapheneBlock->header.hashPrevBlock.ToString());
     }
