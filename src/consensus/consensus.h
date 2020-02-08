@@ -18,6 +18,7 @@ static const unsigned int BLOCKSTREAM_CORE_MAX_BLOCK_SIZE = 1000000;
  * per (MB rounded up) in blocks > 1MB. */
 static const unsigned int MAX_BLOCK_SIGOPS_PER_MB = 20000;
 static const unsigned int MAX_TX_SIGOPS_COUNT = 20000;
+static const unsigned int MAY2020_MAX_TX_SIGCHECK_COUNT = 3000;
 /** The maximum suggested length of a transaction.  If greater, the transaction is not relayed, and the > 1MB block is
    considered "excessive".
     For blocks < 1MB, there is no largest transaction so it is defacto 1MB.
@@ -40,6 +41,9 @@ static const int COINBASE_MATURITY = 100;
 static const unsigned int MIN_EXCESSIVE_BLOCK_SIZE = 32000000;
 static const unsigned int MIN_EXCESSIVE_BLOCK_SIZE_REGTEST = 1000;
 static const unsigned int DEFAULT_EXCESSIVE_BLOCK_SIZE = MIN_EXCESSIVE_BLOCK_SIZE;
+
+static const unsigned int MAY2020_MAX_BLOCK_SIGCHECK_COUNT = MIN_EXCESSIVE_BLOCK_SIZE / 141;
+static_assert(MAY2020_MAX_BLOCK_SIGCHECK_COUNT == 226950, "Max block sigcheck value differs from specification");
 
 /** Allowed messages lengths will be this * the excessive block size */
 static const unsigned int DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER = 2;

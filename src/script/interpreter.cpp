@@ -1990,9 +1990,13 @@ bool VerifyScript(const CScript &scriptSig,
     {
         const vector<vector<unsigned char> > &smStack = sm.getStack();
         if (smStack.empty())
+        {
             return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
+        }
         if (CastToBool(smStack.back()) == false)
+        {
             return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
+        }
     }
 
     // Additional validation for spend-to-script-hash transactions:
@@ -2033,9 +2037,13 @@ bool VerifyScript(const CScript &scriptSig,
         {
             const vector<vector<unsigned char> > &smStack = sm.getStack();
             if (smStack.empty())
+            {
                 return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
+            }
             if (!CastToBool(smStack.back()))
+            {
                 return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
+            }
         }
     }
 

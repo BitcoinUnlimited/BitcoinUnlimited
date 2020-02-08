@@ -127,7 +127,8 @@ enum
     // logic verifies faster, and only allows Schnorr signatures)
     SCRIPT_ENABLE_SCHNORR_MULTISIG = (1U << 21),
 
-    // 1U << 22 is reserved for SCRIPT_VERIFY_INPUT_SIGCHECKS
+    // May2020: Require the number of sigchecks in an input to not exceed (the scriptSig length + 60) // 43
+    SCRIPT_VERIFY_INPUT_SIGCHECKS = (1U << 22),
 
     // Whether the new OP_REVERSEBYTES opcode can be used.
     SCRIPT_ENABLE_OP_REVERSEBYTES = (1U << 23),

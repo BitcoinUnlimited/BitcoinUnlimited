@@ -1030,100 +1030,106 @@ bool CheckInputs(const CTransactionRef &tx,
                 }
 
                 // Verify signature
-                CScriptCheck check(resourceTracker, scriptPubKey, amount, *tx, i, flags, maxOps, cacheStore);
                 if (pvChecks)
                 {
-                    pvChecks->push_back(CScriptCheck());
-                    check.swap(pvChecks->back());
+                    pvChecks->push_back(
+                        CScriptCheck(resourceTracker, scriptPubKey, amount, *tx, i, flags, maxOps, cacheStore));
                 }
-                else if (!check())
+                else
                 {
-                    ScriptError scriptError = check.GetScriptError();
-                    // Compute flags without the optional standardness flags.
-                    // This differs from MANDATORY_SCRIPT_VERIFY_FLAGS as it contains
-                    // additional upgrade flags (see ParallelAcceptToMemoryPool variable
-                    // featureFlags).
-                    uint32_t mandatoryFlags = (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS);
-                    if (flags != mandatoryFlags)
+                    CScriptCheck check(resourceTracker, scriptPubKey, amount, *tx, i, flags, maxOps, cacheStore);
+                    if (!check())
                     {
-                        // Check whether the failure was caused by a
-                        // non-mandatory script verification check, such as
-                        // non-standard DER encodings or non-null dummy
-                        // arguments; if so, don't trigger DoS protection to
-                        // avoid splitting the network between upgraded and
-                        // non-upgraded nodes.
-                        CScriptCheck check2(nullptr, scriptPubKey, amount, *tx, i, mandatoryFlags, maxOps, cacheStore);
-                        if (check2())
+                        ScriptError scriptError = check.GetScriptError();
+                        // Compute flags without the optional standardness flags.
+                        // This differs from MANDATORY_SCRIPT_VERIFY_FLAGS as it contains
+                        // additional upgrade flags (see ParallelAcceptToMemoryPool variable
+                        // featureFlags).
+                        uint32_t mandatoryFlags =
+                            (flags & ~(STANDARD_NOT_MANDATORY_VERIFY_FLAGS | SCRIPT_VERIFY_INPUT_SIGCHECKS));
+                        if (flags != mandatoryFlags)
+                        {
+                            // Check whether the failure was caused by a
+                            // non-mandatory script verification check, such as
+                            // non-standard DER encodings or non-null dummy
+                            // arguments; if so, don't trigger DoS protection to
+                            // avoid splitting the network between upgraded and
+                            // non-upgraded nodes.
+                            CScriptCheck check2(
+                                nullptr, scriptPubKey, amount, *tx, i, mandatoryFlags, maxOps, cacheStore);
+                            if (check2())
+                            {
+                                if (debugger)
+                                {
+                                    debugger->AddInputCheckError(strprintf(
+                                        "non-mandatory-script-verify-flag (%s)", ScriptErrorString(scriptError)));
+                                    inputVerified = false;
+                                    allPassed = false;
+                                }
+                                else
+                                {
+                                    return state.Invalid(
+                                        false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)",
+                                                                       ScriptErrorString(scriptError)));
+                                }
+                            }
+                            // update the error message to reflect the mandatory violation.
+                            scriptError = check2.GetScriptError();
+                        }
+
+                        // Before banning, we need to check whether the transaction would
+                        // be valid on the other side of the upgrade, so as to avoid
+                        // splitting the network between upgraded and non-upgraded nodes.
+                        // Note that this will create strange error messages like
+                        // "upgrade-conditional-script-failure (Opcode missing or not
+                        // understood)".
+                        CScriptCheck check3(nullptr, scriptPubKey, amount, *tx, i,
+                            mandatoryFlags ^ SCRIPT_ENABLE_OP_REVERSEBYTES, maxOps, cacheStore);
+                        if (check3())
                         {
                             if (debugger)
                             {
-                                debugger->AddInputCheckError(
-                                    strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(scriptError)));
+                                debugger->AddInputCheckError(strprintf("upgrade-conditional-script-failure (%s)",
+                                    ScriptErrorString(check.GetScriptError())));
                                 inputVerified = false;
                                 allPassed = false;
                             }
                             else
                             {
-                                return state.Invalid(false, REJECT_NONSTANDARD,
-                                    strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(scriptError)));
+                                return state.Invalid(
+                                    false, REJECT_INVALID, strprintf("upgrade-conditional-script-failure (%s)",
+                                                               ScriptErrorString(check.GetScriptError())));
                             }
                         }
-                        // update the error message to reflect the mandatory violation.
-                        scriptError = check2.GetScriptError();
-                    }
 
-                    // Before banning, we need to check whether the transaction would
-                    // be valid on the other side of the upgrade, so as to avoid
-                    // splitting the network between upgraded and non-upgraded nodes.
-                    // Note that this will create strange error messages like
-                    // "upgrade-conditional-script-failure (Opcode missing or not
-                    // understood)".
-                    CScriptCheck check3(nullptr, scriptPubKey, amount, *tx, i,
-                        mandatoryFlags ^ SCRIPT_ENABLE_OP_REVERSEBYTES, maxOps, cacheStore);
-                    if (check3())
-                    {
+                        // Failures of other flags indicate a transaction that is
+                        // invalid in new blocks, e.g. a invalid P2SH. We DoS ban
+                        // such nodes as they are not following the protocol. That
+                        // said during an upgrade careful thought should be taken
+                        // as to the correct behavior - we may want to continue
+                        // peering with non-upgraded nodes even after a soft-fork
+                        // super-majority vote has passed.
                         if (debugger)
                         {
-                            debugger->AddInputCheckError(strprintf(
-                                "upgrade-conditional-script-failure (%s)", ScriptErrorString(check.GetScriptError())));
                             inputVerified = false;
                             allPassed = false;
+                            debugger->AddInputCheckError(
+                                strprintf("mandatory-script-verify-flag-failed (%s)", ScriptErrorString(scriptError)));
                         }
                         else
                         {
-                            return state.Invalid(
-                                false, REJECT_INVALID, strprintf("upgrade-conditional-script-failure (%s)",
-                                                           ScriptErrorString(check.GetScriptError())));
+                            return state.DoS(100, false, REJECT_INVALID,
+                                strprintf("mandatory-script-verify-flag-failed (%s)", ScriptErrorString(scriptError)));
                         }
                     }
-
-                    // Failures of other flags indicate a transaction that is
-                    // invalid in new blocks, e.g. a invalid P2SH. We DoS ban
-                    // such nodes as they are not following the protocol. That
-                    // said during an upgrade careful thought should be taken
-                    // as to the correct behavior - we may want to continue
-                    // peering with non-upgraded nodes even after a soft-fork
-                    // super-majority vote has passed.
-                    if (debugger)
-                    {
-                        inputVerified = false;
-                        allPassed = false;
-                        debugger->AddInputCheckError(
-                            strprintf("mandatory-script-verify-flag-failed (%s)", ScriptErrorString(scriptError)));
-                    }
-                    else
-                    {
-                        return state.DoS(100, false, REJECT_INVALID,
-                            strprintf("mandatory-script-verify-flag-failed (%s)", ScriptErrorString(scriptError)));
-                    }
+                    if (sighashType)
+                        *sighashType = check.sighashType;
                 }
                 if (debugger)
                 {
                     debugger->SetInputCheckValidity(inputVerified);
                     debugger->IncrementCheckIndex();
                 }
-                if (sighashType)
-                    *sighashType = check.sighashType;
             }
         }
     }
@@ -1518,6 +1524,7 @@ bool ContextualCheckBlock(const CBlock &block,
 {
     const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
     const Consensus::Params &consensusParams = Params().GetConsensus();
+    bool may2020Enabled = IsMay2020Enabled(consensusParams, pindexPrev);
 
     // Start enforcing BIP113 (Median Time Past)
     int nLockTimeFlags = 0;
@@ -1544,16 +1551,8 @@ bool ContextualCheckBlock(const CBlock &block,
             return state.DoS(
                 10, error("%s: contains a non-final transaction", __func__), REJECT_INVALID, "bad-txns-nonfinal");
         }
-
-        // Make sure tx size is equal or higher to 100 bytes if we are on the BCH chain and Nov 15th 2018 activated
-        if (IsNov2018Activated(consensusParams, chainActive.Tip()))
-        {
-            if (tx->GetTxSize() < MIN_TX_SIZE)
-            {
-                return state.DoS(10, error("%s: contains transactions that are too small", __func__), REJECT_INVALID,
-                    "txn-undersize");
-            }
-        }
+        if (!ContextualCheckTransaction(tx, state, pindexPrev, Params()))
+            return false;
 
         nTx++;
         if (tx->GetTxSize() > nLargestTx)
@@ -1596,8 +1595,6 @@ bool ContextualCheckBlock(const CBlock &block,
 
     // Check whether this block exceeds what we want to relay.
     block.fExcessive = CheckExcessive(block, block.GetBlockSize(), nTx, nLargestTx);
-
-
     return true;
 }
 
@@ -3011,7 +3008,7 @@ void UpdateTip(CBlockIndex *pindexNew)
     }
 }
 
-static void ResubmitTransactions(CBlock &block)
+static void ResubmitTransactions(CBlock *block = nullptr)
 {
     // To be very safe let's force everything in the mempool to be re-admitted.  This reduces this rare case
     // quickly to a very common operation mode.  If we do not do this, we must guarantee that all tx coming from
@@ -3025,15 +3022,18 @@ static void ResubmitTransactions(CBlock &block)
     // the mempool from the csCommitQFinal.
     WRITELOCK(mempool.cs_txmempool);
     {
-        // Resubmit the block first
-        for (const auto &ptx : block.vtx)
+        if (block)
         {
-            if (!ptx->IsCoinBase())
+            // Resubmit the block first
+            for (const auto &ptx : block->vtx)
             {
-                CTxInputData txd;
-                txd.tx = ptx;
-                txd.nodeName = "rollback";
-                EnqueueTxForAdmission(txd);
+                if (!ptx->IsCoinBase())
+                {
+                    CTxInputData txd;
+                    txd.tx = ptx;
+                    txd.nodeName = "rollback";
+                    EnqueueTxForAdmission(txd);
+                }
             }
         }
 
@@ -3102,7 +3102,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     }
     else
     {
-        ResubmitTransactions(block);
+        ResubmitTransactions(&block);
     }
 
     return true;
@@ -3737,6 +3737,13 @@ bool ProcessNewBlock(CValidationState &state,
             return error("%s: ActivateBestChain failed", __func__);
         else
             return false;
+    }
+
+    // If the fork activates on the next block, we need to reevaluate all tx in the mempool because they may now break
+    // the new sigops rule
+    if (IsMay2020Next(chainparams.GetConsensus(), chainActive.Tip()))
+    {
+        ResubmitTransactions();
     }
 
     int64_t end = GetStopwatchMicros();

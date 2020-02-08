@@ -621,6 +621,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     CValidationDebugger *debugger,
     CTxProperties *txProps)
 {
+    const CChainParams &chainparams = Params();
+    bool may2020Enabled = IsMay2020Enabled(chainparams.GetConsensus(), chainActive.Tip());
     if (isRespend)
         *isRespend = false;
     unsigned int nSigOps = 0;
@@ -630,13 +632,12 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     if (pfMissingInputs)
         *pfMissingInputs = false;
 
-    const CChainParams &chainparams = Params();
     if (debugger)
     {
         debugger->txid = tx->GetHash().ToString();
     }
 
-    if (!CheckTransaction(tx, state))
+    if (!CheckTransaction(tx, state) || !ContextualCheckTransaction(tx, state, chainActive.Tip(), chainparams))
     {
         if (state.GetDebugMessage() == "")
             state.SetDebugMessage("CheckTransaction failed");
@@ -693,9 +694,9 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     }
 
     uint32_t featureFlags = 0;
-    if (IsMay2020Enabled(chainparams.GetConsensus(), chainActive.Tip()))
+    if (may2020Enabled)
     {
-        featureFlags |= SCRIPT_ENABLE_OP_REVERSEBYTES;
+        featureFlags |= SCRIPT_ENABLE_OP_REVERSEBYTES | SCRIPT_VERIFY_INPUT_SIGCHECKS;
     }
 
     uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;
@@ -888,8 +889,11 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
         }
 
-        nSigOps = GetLegacySigOpCount(tx, STANDARD_SCRIPT_VERIFY_FLAGS);
-        nSigOps += GetP2SHSigOpCount(tx, view, STANDARD_SCRIPT_VERIFY_FLAGS);
+        if (!may2020Enabled) // Old sigop counting -- the new sigchecks must wait for script evaluation
+        {
+            nSigOps = GetLegacySigOpCount(tx, STANDARD_SCRIPT_VERIFY_FLAGS);
+            nSigOps += GetP2SHSigOpCount(tx, view, STANDARD_SCRIPT_VERIFY_FLAGS);
+        }
 
         CAmount nValueOut = tx->GetValueOut();
         CAmount nFees = nValueIn - nValueOut;
@@ -920,19 +924,22 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
         nSize = entry.GetTxSize();
 
-        // Check that the transaction doesn't have an excessive number of
-        // sigops, making it impossible to mine.
-        if (nSigOps > MAX_TX_SIGOPS_COUNT)
+        // Check that the transaction doesn't have an excessive number of sigops, making it impossible to mine.
+
+        if (!may2020Enabled)
         {
-            if (debugger)
+            if (nSigOps > MAX_TX_SIGOPS_COUNT)
             {
-                debugger->AddInvalidReason("bad-txns-too-many-sigops");
-                debugger->mineable = false;
-            }
-            else
-            {
-                return state.DoS(
-                    0, false, REJECT_NONSTANDARD, "bad-txns-too-many-sigops", false, strprintf("%d", nSigOps));
+                if (debugger)
+                {
+                    debugger->AddInvalidReason("bad-txns-too-many-sigops");
+                    debugger->mineable = false;
+                }
+                else
+                {
+                    return state.DoS(
+                        0, false, REJECT_NONSTANDARD, "bad-txns-too-many-sigops", false, strprintf("%d", nSigOps));
+                }
             }
         }
 
@@ -1188,6 +1195,15 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
         }
         entry.UpdateRuntimeSigOps(resourceTracker.GetSigOps(), resourceTracker.GetSighashBytes());
+
+        if (may2020Enabled) // Enforce May 2020 consensus sigops rule
+        {
+            auto cSigOps = resourceTracker.GetConsensusSigOps();
+            if (cSigOps > MAY2020_MAX_TX_SIGCHECK_COUNT)
+            {
+                return state.DoS(0, false, REJECT_INVALID, "bad-txns-too-many-sigops", false, strprintf("%d", cSigOps));
+            }
+        }
 
         // Check again against just the consensus-critical mandatory script
         // verification flags, in case of bugs in the standard flags that cause
