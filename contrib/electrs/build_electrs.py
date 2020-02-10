@@ -72,7 +72,7 @@ def verify_repo(allow_modified):
     import git
     repo = git.Repo(ELECTRS_DIR)
     if repo.is_dirty():
-        logging.error("Validation failed - %s has local modifications.", ELECTRS_DIR)
+        logging.error("Validation failed - %s has local modifications. Use `--allow-modified` if you wanted to build from a dirty repository", ELECTRS_DIR)
         allow_modified or bail("Bailing")
 
     if EXPECT_HEAD == None:
