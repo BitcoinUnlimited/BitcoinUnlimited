@@ -24,9 +24,9 @@ struct CThinTypeBlockInFlight
     bool operator==(const CThinTypeBlockInFlight &b) { return ((hash == b.hash) && (thinType == b.thinType)); }
     friend bool operator<(const CThinTypeBlockInFlight &a, const CThinTypeBlockInFlight &b)
     {
-        if ((a.hash == b.hash) && (a.thinType == b.thinType))
+        if (a.hash == b.hash)
         {
-            return false;
+            return (a.thinType < b.thinType);
         }
         return (a.hash < b.hash);
     }
