@@ -206,18 +206,29 @@ void ThinTypeRelay::BlockWasReceived(CNode *pfrom, const uint256 &hash)
     auto key = mapThinTypeBlocksInFlight.find(pfrom->GetId());
     if (key != mapThinTypeBlocksInFlight.end())
     {
-        for (auto entry : key->second)
+        // elements in a set are immutable. they can be added/removed but not edited
+        // inserting/emplacing new elements in a set while iterating through a set is safe behavior
+        for (auto entry = key->second.begin(); entry != key->second.end();)
         {
             // our sets uniqueness is based on hash + thinType so just checking the hash
             // does not guaranteed that all entries with that hash are marked as received
-            if (entry.hash == hash)
+            if (entry->hash == hash && entry->fReceived == false)
             {
-                entry.fReceived = true;
-                // intended behavior should clear failed entries when making a failover request
-                // so there should only ever be 1 entry in the set with any given block hash
-                // across all thinType
+                CThinTypeBlockInFlight updatedEntry = *entry;
+                updatedEntry.fReceived = true;
+                // we have to erase before emplacing to comply with comparator uniqueness
+                // erase never throws exceptions
+                entry = key->second.erase(entry);
+                key->second.emplace(updatedEntry);
+                // intended thin type block relay behavior should clear failed entries when making
+                // a failover request so there should only ever be 1 entry in the set with any
+                // given block hash across all thinType
                 // we do not break here to prevent a disconnect from a peer in the event
                 // that we did not properly clean up entries when a failover request was made.
+            }
+            else
+            {
+                ++entry;
             }
         }
     }
