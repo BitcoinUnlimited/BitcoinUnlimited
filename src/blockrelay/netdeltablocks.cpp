@@ -530,4 +530,9 @@ void CNetDeltaBlock::processNew(CDeltaBlockRef dbr, CNode *pfrom) {
         }
     }
 
+    LOG(WB, "Bobtail PoW:\n");
+    for (auto &hash : dbr->ancestorHashes())
+    {
+        LOG(WB, "\t%s\n", hash.ToString());
+    }
 }
