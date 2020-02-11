@@ -1,7 +1,6 @@
-sudo: required
 dist: xenial
 os: linux
-language: minimal
+language: shell
 cache:
   ccache: true
   directories:
@@ -31,7 +30,7 @@ env:
     - DIST=DEB
     - CACHE_ERR_MSG="Error! Initial build successful, but not enough time remains to run later build stages and tests. Please manually re-run this job by using the travis restart button or asking a bitcoin maintainer to restart.  The next run should not time out because the build cache has been saved."
 
-matrix:
+jobs:
   include:
     #x86_64 Linux + deps as via system lib
     - compiler: gcc
