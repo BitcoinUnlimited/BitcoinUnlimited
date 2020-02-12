@@ -1428,39 +1428,6 @@ void LoadFilter(CNode *pfrom, CBloomFilter *filter)
     }
 }
 
-// Similar to TestBlockValidity but is very conservative in parameters (used in mining)
-bool TestConservativeBlockValidity(CValidationState &state,
-    const CChainParams &chainparams,
-    const CBlock &block,
-    CBlockIndex *pindexPrev,
-    bool fCheckPOW,
-    bool fCheckMerkleRoot)
-{
-    AssertLockHeld(cs_main);
-    assert(pindexPrev && pindexPrev == chainActive.Tip());
-    // Ensure that if there is a checkpoint on this height, that this block is the one.
-    if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindexPrev->nHeight + 1, block.GetHash(), chainparams))
-        return error("%s: CheckAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
-
-    CCoinsViewCache viewNew(pcoinsTip);
-    CBlockIndex indexDummy(block);
-    indexDummy.pprev = pindexPrev;
-    indexDummy.nHeight = pindexPrev->nHeight + 1;
-
-    // NOTE: CheckBlockHeader is called by CheckBlock
-    if (!ContextualCheckBlockHeader(block, state, pindexPrev))
-        return false;
-    if (!CheckBlock(block, state, fCheckPOW, fCheckMerkleRoot))
-        return false;
-    if (!ContextualCheckBlock(block, state, pindexPrev, true))
-        return false;
-    if (!ConnectBlock(block, state, &indexDummy, viewNew, chainparams, true))
-        return false;
-    assert(state.IsValid());
-
-    return true;
-}
-
 // Statistics:
 
 CStatBase *FindStatistic(const char *name)
