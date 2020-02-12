@@ -101,7 +101,6 @@ void InvalidChainFound(CBlockIndex *pindexNew);
 
 /** Context-dependent validity block checks */
 bool ContextualCheckBlock(const CBlock &block,
-    CCoinsViewCache &view,
     CValidationState &state,
     CBlockIndex *pindexPrev,
     const bool fConservative = false);
