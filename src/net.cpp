@@ -648,6 +648,7 @@ static bool IsPriorityMsg(std::string strCommand)
     //       sending process. We prefer small objects that can be forwarded with one SockeSendData() attempt.
     if (strCommand == NetMsgType::HEADERS || strCommand == NetMsgType::GRAPHENEBLOCK ||
         strCommand == NetMsgType::GET_GRAPHENE || strCommand == NetMsgType::GRAPHENETX ||
+        strCommand == NetMsgType::GET_GRAPHENE_RECOVERY || strCommand == NetMsgType::GRAPHENE_RECOVERY ||
         strCommand == NetMsgType::GET_GRAPHENETX || strCommand == NetMsgType::GET_XTHIN ||
         strCommand == NetMsgType::GET_THIN || strCommand == NetMsgType::XTHINBLOCK ||
         strCommand == NetMsgType::THINBLOCK || strCommand == NetMsgType::XBLOCKTX ||
