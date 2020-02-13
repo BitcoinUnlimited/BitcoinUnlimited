@@ -17,11 +17,7 @@
 #include <boost/test/unit_test.hpp>
 
 int ApplyTxInUndo(Coin &&undo, CCoinsViewCache &view, const COutPoint &out);
-void UpdateCoins(const CTransaction &tx,
-    CValidationState &state,
-    CCoinsViewCache &inputs,
-    CTxUndo &txundo,
-    int nHeight);
+void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, CTxUndo &txundo, int nHeight);
 
 namespace
 {

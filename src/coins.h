@@ -414,16 +414,12 @@ protected:
 void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight);
 
 //! Mark a transaction's inputs as spent in the passed CCoinsViewCache, and create the needed undo information.
-void SpendCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCache &utxo, CTxUndo &txundo, int nHeight);
+void SpendCoins(const CTransaction &tx, CCoinsViewCache &utxo, CTxUndo &txundo, int nHeight);
 
 /** Apply the effects of this transaction on the UTXO set represented by view.  This function is equivalent to
 SpendCoins(...); AddCoins(...);
 */
-void UpdateCoins(const CTransaction &tx,
-    CValidationState &state,
-    CCoinsViewCache &inputs,
-    CTxUndo &txundo,
-    int nHeight);
-void UpdateCoins(const CTransaction &tx, CValidationState &state, CCoinsViewCache &inputs, int nHeight);
+void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, CTxUndo &txundo, int nHeight);
+void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, int nHeight);
 
 #endif // BITCOIN_COINS_H
