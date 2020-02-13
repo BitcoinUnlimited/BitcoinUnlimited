@@ -2043,7 +2043,7 @@ UniValue getchaintxstats(const UniValue &params, bool fHelp)
         }
     }
 
-    DbgAssert(pindex != nullptr, );
+    DbgAssert(pindex != nullptr, throw std::runtime_error(__func__));
 
     if (blockcount < 1 || blockcount >= pindex->nHeight)
     {
