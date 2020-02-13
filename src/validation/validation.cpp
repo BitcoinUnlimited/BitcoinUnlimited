@@ -2248,22 +2248,6 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
 
             if (!tx.IsCoinBase())
             {
-                if (!view.HaveInputs(tx))
-                {
-                    // If we were validating at the same time as another block and the other block wins the validation
-                    // race
-                    // and updates the UTXO first, then we may end up here with missing inputs.  Therefore we checke to
-                    // see
-                    // if the chainwork has advanced or if we recieved a quit and if so return without DOSing the node.
-                    if (PV->ChainWorkHasChanged(nStartingChainWork) || PV->QuitReceived(this_id, fParallel))
-                    {
-                        return false;
-                    }
-                    return state.DoS(100, error("%s: block %s inputs missing/spent in tx %d %s", __func__,
-                                              block.GetHash().ToString(), i, tx.GetHash().ToString()),
-                        REJECT_INVALID, "bad-txns-inputs-missingorspent");
-                }
-
                 // Check that transaction is BIP68 final
                 // BIP68 lock checks (as opposed to nLockTime checks) must
                 // be in ConnectBlock because they require the UTXO set
@@ -2271,9 +2255,27 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                 {
                     for (size_t j = 0; j < tx.vin.size(); j++)
                     {
-                        prevheights[j] = CoinAccessor(view, tx.vin[j].prevout)->nHeight;
+                        CoinAccessor coin(view, tx.vin[j].prevout);
+                        // isSpend is true for empty coin object (coinEmpty)
+                        if (coin->IsSpent())
+                        {
+                            // If we were validating at the same time as another block and the other block wins the
+                            // validation race and updates the UTXO first, then we may end up here with missing inputs.
+                            // Therefore we check to see if the chainwork has advanced or if we recieved a quit and if
+                            // so return without DOSing the node.
+                            if (PV->ChainWorkHasChanged(nStartingChainWork) || PV->QuitReceived(this_id, fParallel))
+                            {
+                                return false;
+                            }
+                            return state.DoS(100, error("%s: block %s inputs missing/spent in tx %d %s", __func__,
+                                                      block.GetHash().ToString(), i, tx.GetHash().ToString()),
+                                REJECT_INVALID, "bad-txns-inputs-missingorspent");
+                        }
+                        prevheights[j] = coin->nHeight;
+                        nFees = nFees + coin->out.nValue;
                     }
                 }
+                nFees = nFees - tx.GetValueOut();
 
                 if (!SequenceLocks(txref, nLockTimeFlags, &prevheights, *pindex))
                 {
@@ -2281,8 +2283,6 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                                               block.GetHash().ToString()),
                         REJECT_INVALID, "bad-txns-nonfinal");
                 }
-
-                nFees += view.GetValueIn(tx) - tx.GetValueOut();
 
                 uint256 hash = tx.GetHash();
                 {
@@ -2474,22 +2474,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
 
             if (!tx.IsCoinBase())
             {
-                if (!view.HaveInputs(tx))
-                {
-                    // If we were validating at the same time as another block and the other block wins the validation
-                    // race
-                    // and updates the UTXO first, then we may end up here with missing inputs.  Therefore we checke to
-                    // see
-                    // if the chainwork has advanced or if we recieved a quit and if so return without DOSing the node.
-                    if (PV->ChainWorkHasChanged(nStartingChainWork) || PV->QuitReceived(this_id, fParallel))
-                    {
-                        return false;
-                    }
-                    return state.DoS(100, error("%s: block %s inputs missing/spent in tx %d %s", __func__,
-                                              block.GetHash().ToString(), i, tx.GetHash().ToString()),
-                        REJECT_INVALID, "bad-txns-inputs-missingorspent");
-                }
-
                 // Check that transaction is BIP68 final
                 // BIP68 lock checks (as opposed to nLockTime checks) must
                 // be in ConnectBlock because they require the UTXO set
@@ -2497,9 +2481,27 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                 {
                     for (size_t j = 0; j < tx.vin.size(); j++)
                     {
-                        prevheights[j] = CoinAccessor(view, tx.vin[j].prevout)->nHeight;
+                        CoinAccessor coin(view, tx.vin[j].prevout);
+                        // isSpend is true for empty coin object (coinEmpty)
+                        if (coin->IsSpent())
+                        {
+                            // If we were validating at the same time as another block and the other block wins the
+                            // validation race and updates the UTXO first, then we may end up here with missing inputs.
+                            // Therefore we check to see if the chainwork has advanced or if we recieved a quit and if
+                            // so return without DOSing the node.
+                            if (PV->ChainWorkHasChanged(nStartingChainWork) || PV->QuitReceived(this_id, fParallel))
+                            {
+                                return false;
+                            }
+                            return state.DoS(100, error("%s: block %s inputs missing/spent in tx %d %s", __func__,
+                                                      block.GetHash().ToString(), i, tx.GetHash().ToString()),
+                                REJECT_INVALID, "bad-txns-inputs-missingorspent");
+                        }
+                        prevheights[j] = coin->nHeight;
+                        nFees = nFees + coin->out.nValue;
                     }
                 }
+                nFees = nFees - tx.GetValueOut();
 
                 if (!SequenceLocks(txref, nLockTimeFlags, &prevheights, *pindex))
                 {
@@ -2507,8 +2509,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                                               block.GetHash().ToString()),
                         REJECT_INVALID, "bad-txns-nonfinal");
                 }
-
-                nFees += view.GetValueIn(tx) - tx.GetValueOut();
 
                 uint256 hash = tx.GetHash();
                 {
