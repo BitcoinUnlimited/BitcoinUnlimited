@@ -457,6 +457,7 @@ bench/bloom.cpp
 bench/crypto_hash.cpp
 bench/Examples.cpp
 bench/verify_script.cpp
+bench/merkle_root.cpp
 bench/murmur_hash.cpp
 compat/byteswap.h
 compat/endian.h
