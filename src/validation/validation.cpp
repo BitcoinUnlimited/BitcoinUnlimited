@@ -1200,7 +1200,7 @@ bool TestBlockValidity(CValidationState &state,
         return false;
     if (!CheckBlock(block, state, fCheckPOW, fCheckMerkleRoot))
         return false;
-    if (!ContextualCheckBlock(block, viewNew, state, pindexPrev))
+    if (!ContextualCheckBlock(block, state, pindexPrev))
         return false;
     if (!ConnectBlock(block, state, &indexDummy, viewNew, chainparams, true))
         return false;
@@ -1506,7 +1506,6 @@ void InvalidChainFound(CBlockIndex *pindexNew)
 }
 
 bool ContextualCheckBlock(const CBlock &block,
-    CCoinsViewCache &view,
     CValidationState &state,
     CBlockIndex *const pindexPrev,
     const bool fConservative)
@@ -1594,17 +1593,20 @@ bool ContextualCheckBlock(const CBlock &block,
     {
         nTx++;
 
-        nSigOps += GetLegacySigOpCount(tx, flags) + GetP2SHSigOpCount(tx, view, flags);
+        // Use the *pcoinsTip view rather than creating a new view when getting p2sh sigops. This
+        // way we don't have to copy coins into a new view. We can do this because we're not adding
+        // any coins to the cache but are just looking them up.
+        nSigOps += GetLegacySigOpCount(tx, flags) + GetP2SHSigOpCount(tx, *pcoinsTip, flags);
 
         if (tx->GetTxSize() > nLargestTx)
             nLargestTx = tx->GetTxSize();
     }
 
-    // BU only enforce sigops during block generation not acceptance
+    // Only enforce sigops during block generation not acceptance
     if (fConservative && (nSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS))
         return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"), REJECT_INVALID, "bad-blk-sigops", true);
 
-    // BU: Check whether this block exceeds what we want to relay.
+    // Check whether this block exceeds what we want to relay.
     block.fExcessive = CheckExcessive(block, block.GetBlockSize(), nSigOps, nTx, nLargestTx);
 
 
@@ -1785,9 +1787,7 @@ bool AcceptBlock(const CBlock &block,
     }
 
     {
-        CCoinsViewCache view(pcoinsTip);
-
-        if ((!CheckBlock(block, state)) || !ContextualCheckBlock(block, view, state, pindex->pprev))
+        if ((!CheckBlock(block, state)) || !ContextualCheckBlock(block, state, pindex->pprev))
         {
             if (state.IsInvalid() && !state.CorruptionPossible())
             {

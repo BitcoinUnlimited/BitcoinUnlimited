@@ -1473,7 +1473,7 @@ bool TestConservativeBlockValidity(CValidationState &state,
         return false;
     if (!CheckBlock(block, state, fCheckPOW, fCheckMerkleRoot))
         return false;
-    if (!ContextualCheckBlock(block, viewNew, state, pindexPrev, true))
+    if (!ContextualCheckBlock(block, state, pindexPrev, true))
         return false;
     if (!ConnectBlock(block, state, &indexDummy, viewNew, chainparams, true))
         return false;
