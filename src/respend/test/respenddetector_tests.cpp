@@ -55,22 +55,6 @@ public:
     std::shared_ptr<DummyRespendAction> dummyaction;
 };
 
-CMutableTransaction CreateRandomTx()
-{
-    CKey key;
-    key.MakeNewKey(true);
-
-    CMutableTransaction tx;
-    tx.vin.resize(1);
-    tx.vin[0].prevout.n = 0;
-    tx.vin[0].prevout.hash = InsecureRand256();
-    tx.vin[0].scriptSig << OP_1;
-    tx.vout.resize(1);
-    tx.vout[0].nValue = 1 * CENT;
-    tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
-    return tx;
-}
-
 } // ns anon
 
 BOOST_FIXTURE_TEST_SUITE(respenddetector_tests, RespendFixture);
