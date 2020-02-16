@@ -1572,7 +1572,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     if (fTxIndex)
     {
         uiInterface.InitMessage(_("Starting txindex"));
-        auto txindex_db = new TxIndexDB(cacheConfig.nTxIndexCache, false, fReindex);
+        auto txindex_db = new TxIndexDB(cacheConfig.nTxIndexCache, false, GetBoolArg("-reindex", DEFAULT_REINDEX));
         g_txindex = std::make_unique<TxIndex>(txindex_db);
         g_txindex->Start();
     }
