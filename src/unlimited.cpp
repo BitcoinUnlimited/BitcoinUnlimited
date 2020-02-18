@@ -965,14 +965,11 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, u
         }
 
         // check proportional sigops
-        uint64_t blockMbSize =
-            1 + ((blockSize - 1) /
-                    1000000); // block size in megabytes rounded up. 1-1000000 -> 1, 1000001-2000000 -> 2, etc.
-        if (nSigOps > blockSigopsPerMb.Value() * blockMbSize)
+        if (nSigOps > GetMaxBlockSigOpsCount(blockSize))
         {
             LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
                  " Sig:%d  :too many sigops.  Expected less than: %d\n",
-                block.nVersion, block.nTime, blockSize, nTx, nSigOps, blockSigopsPerMb.Value() * blockMbSize);
+                block.nVersion, block.nTime, blockSize, nTx, nSigOps, GetMaxBlockSigOpsCount(blockSize));
             return true;
         }
     }
@@ -981,11 +978,11 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, u
         // Within a 1MB block transactions can be 1MB, so nothing to check WRT transaction size
 
         // Check max sigops
-        if (nSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS)
+        if (nSigOps > MAX_BLOCK_SIGOPS_PER_MB)
         {
             LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
                  " Sig:%d  :too many sigops.  Expected < 1MB defined constant: %d\n",
-                block.nVersion, block.nTime, blockSize, nTx, nSigOps, BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
+                block.nVersion, block.nTime, blockSize, nTx, nSigOps, MAX_BLOCK_SIGOPS_PER_MB);
             return true;
         }
     }

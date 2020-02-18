@@ -27,8 +27,6 @@ static std::vector<unsigned char> Serialize(const CScript &s)
     return sSerialized;
 }
 
-const uint64_t MAX_BLOCK_SIGOPS_PER_MB = BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS;
-
 BOOST_FIXTURE_TEST_SUITE(sigopcount_tests, BasicTestingSetup)
 
 void CheckScriptSigOps(const CScript &script, uint32_t accurate_sigops, uint32_t inaccurate_sigops, uint32_t datasigops)
@@ -234,7 +232,7 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx)
     }
 
     // Get just before the limit.
-    for (size_t i = 0; i < MAX_TX_SIGOPS; i++)
+    for (size_t i = 0; i < MAX_TX_SIGOPS_COUNT; i++)
     {
         tx.vout[0].scriptPubKey << OP_CHECKSIG;
     }

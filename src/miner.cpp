@@ -396,11 +396,11 @@ bool BlockAssembler::IsIncrementallyGood(uint64_t nExtraSize, unsigned int nExtr
     if (nBlockSize + nExtraSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
     {
         // BU: be conservative about what is generated
-        if (nBlockSigOps + nExtraSigOps >= BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS)
+        if (nBlockSigOps + nExtraSigOps >= MAX_BLOCK_SIGOPS_PER_MB)
         {
             // BU: so a block that is near the sigops limit might be shorter than it could be if
             // the high sigops tx was backed out and other tx added.
-            if (nBlockSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS - 2)
+            if (nBlockSigOps > MAX_BLOCK_SIGOPS_PER_MB - 2)
                 blockFinished = true;
             return false;
         }

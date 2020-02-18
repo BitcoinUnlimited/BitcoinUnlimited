@@ -150,31 +150,31 @@ BOOST_AUTO_TEST_CASE(excessiveChecks)
 
     // Maintain compatibility with the old sigops calculator for blocks <= 1MB
     BOOST_CHECK_MESSAGE(false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE - 1,
-                                     BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS, 100, 100),
+                                     MAX_BLOCK_SIGOPS_PER_MB, 100, 100),
         "improper sigops");
     BOOST_CHECK_MESSAGE(false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE - 1,
-                                     BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS, 100, 100),
+                                     MAX_BLOCK_SIGOPS_PER_MB, 100, 100),
         "improper sigops");
     BOOST_CHECK_MESSAGE(
-        false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE, BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS, 100, 100),
+        false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB, 100, 100),
         "improper sigops");
 
     BOOST_CHECK_MESSAGE(true == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE - 1,
-                                    BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS + 1, 100, 100),
+                                    MAX_BLOCK_SIGOPS_PER_MB + 1, 100, 100),
         "improper sigops");
     BOOST_CHECK_MESSAGE(
-        true == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE, BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS + 1, 100, 100),
+        true == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB + 1, 100, 100),
         "improper sigops");
 
 
     // Check sigops > 1MB.
     BOOST_CHECK_MESSAGE(
-        false == CheckExcessive(block, 1000000 + 1, (blockSigopsPerMb.Value() * 2), 100, 100), "improper sigops");
+        false == CheckExcessive(block, 1000000 + 1, (MAX_BLOCK_SIGOPS_PER_MB * 2), 100, 100), "improper sigops");
     BOOST_CHECK_MESSAGE(
-        true == CheckExcessive(block, 1000000 + 1, (blockSigopsPerMb.Value() * 2) + 1, 100, 100), "improper sigops");
+        true == CheckExcessive(block, 1000000 + 1, (MAX_BLOCK_SIGOPS_PER_MB * 2) + 1, 100, 100), "improper sigops");
     BOOST_CHECK_MESSAGE(
-        true == CheckExcessive(block, (2 * 1000000), (blockSigopsPerMb.Value() * 2) + 1, 100, 100), "improper sigops");
-    BOOST_CHECK_MESSAGE(false == CheckExcessive(block, (2 * 1000000) + 1, (blockSigopsPerMb.Value() * 2) + 1, 100, 100),
+        true == CheckExcessive(block, (2 * 1000000), (MAX_BLOCK_SIGOPS_PER_MB * 2) + 1, 100, 100), "improper sigops");
+    BOOST_CHECK_MESSAGE(false == CheckExcessive(block, (2 * 1000000) + 1, (MAX_BLOCK_SIGOPS_PER_MB * 2) + 1, 100, 100),
         "improper sigops");
 
 

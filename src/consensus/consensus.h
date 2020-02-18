@@ -16,8 +16,8 @@
 static const unsigned int BLOCKSTREAM_CORE_MAX_BLOCK_SIZE = 1000000;
 /** The maximum allowed number of signature check operations in a 1MB block (network rule), and the suggested max sigops
  * per (MB rounded up) in blocks > 1MB. */
-static const unsigned int BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS = 20000;
-static const unsigned int MAX_TX_SIGOPS = 20000;
+static const unsigned int MAX_BLOCK_SIGOPS_PER_MB = 20000;
+static const unsigned int MAX_TX_SIGOPS_COUNT = 20000;
 /** The maximum suggested length of a transaction.  If greater, the transaction is not relayed, and the > 1MB block is
    considered "excessive".
     For blocks < 1MB, there is no largest transaction so it is defacto 1MB.
@@ -48,7 +48,7 @@ static const unsigned int DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER = 2;
 inline uint64_t GetMaxBlockSigOpsCount(uint64_t nBlockSize)
 {
     auto nMbRoundedUp = 1 + ((nBlockSize - 1) / 1000000);
-    return nMbRoundedUp * BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS;
+    return nMbRoundedUp * MAX_BLOCK_SIGOPS_PER_MB;
 }
 
 /** Flags for nSequence and nLockTime locks */
