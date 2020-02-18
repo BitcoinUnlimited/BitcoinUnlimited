@@ -147,8 +147,10 @@ before_script:
 script:
     - export CONTINUE=1
     - if [ $SECONDS -gt 1200 ]; then export CONTINUE=0; fi  # Likely the depends build took very long
+    - if [ $TRAVIS_REPO_SLUG = "BitcoinUnlimited/BitcoinUnlimited" ]; then export CONTINUE=1; fi  # Whitelisted repo (180 minutes build time)
     - if [ $CONTINUE = "1" ]; then set -o errexit; source .travis/script_a.sh; else set +o errexit; echo "$CACHE_ERR_MSG"; false; fi
     - if [ $SECONDS -gt 2100 -a "$RUN_TESTS"="true" ]; then export CONTINUE=0; echo "$SECONDS"; fi  # Likely the build took very long
+    - if [ $TRAVIS_REPO_SLUG = "BitcoinUnlimited/BitcoinUnlimited" ]; then export CONTINUE=1; fi  # Whitelisted repo (180 minutes build time)
     - if [ $CONTINUE = "1" ]; then set -o errexit; source .travis/script_b.sh; else set +o errexit; echo "$CACHE_ERR_MSG"; false; fi
 
 after_script:
