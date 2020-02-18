@@ -1527,7 +1527,10 @@ bool ContextualCheckBlock(const CBlock &block,
         nLockTimeCutoff =
             (nLockTimeFlags & LOCKTIME_MEDIAN_TIME_PAST) ? pindexPrev->GetMedianTimePast() : block.GetBlockTime();
 
-    // Check that all transactions are finalized
+    // Check that all transactions are finalized and count the number of
+    // transactions to check for excessive transaction limits.
+    uint64_t nTx = 0;
+    uint64_t nLargestTx = 0;
     for (const auto &tx : block.vtx)
     {
         if (!IsFinalTx(tx, nHeight, nLockTimeCutoff))
@@ -1545,6 +1548,10 @@ bool ContextualCheckBlock(const CBlock &block,
                     "txn-undersize");
             }
         }
+
+        nTx++;
+        if (tx->GetTxSize() > nLargestTx)
+            nLargestTx = tx->GetTxSize();
     }
 
     // Enforce block nVersion=2 rule that the coinbase starts with serialized block height
@@ -1580,16 +1587,6 @@ bool ContextualCheckBlock(const CBlock &block,
     CBlockIndex indexDummy(block);
     indexDummy.pprev = pindexPrev;
     indexDummy.nHeight = pindexPrev == nullptr ? 1 : pindexPrev->nHeight + 1;
-
-    // Count the number of transactions to check for excessive transaction limits
-    uint64_t nTx = 0;
-    uint64_t nLargestTx = 0;
-    for (const auto &tx : block.vtx)
-    {
-        nTx++;
-        if (tx->GetTxSize() > nLargestTx)
-            nLargestTx = tx->GetTxSize();
-    }
 
     // Check whether this block exceeds what we want to relay.
     block.fExcessive = CheckExcessive(block, block.GetBlockSize(), nTx, nLargestTx);
