@@ -944,12 +944,12 @@ int isChainExcessive(const CBlockIndex *blk, unsigned int goBack)
     return (recentExcessive && !oldExcessive);
 }
 
-bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, uint64_t nTx, uint64_t largestTx)
+bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nTx, uint64_t largestTx)
 {
     if (blockSize > excessiveBlockSize)
     {
-        LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " Sig:%d  :too many bytes\n",
-            block.nVersion, block.nTime, blockSize, nTx, nSigOps);
+        LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 "  :too many bytes\n",
+            block.nVersion, block.nTime, blockSize, nTx);
         return true;
     }
 
@@ -963,32 +963,14 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, u
                 block.nVersion, block.nTime, blockSize, nTx, largestTx, maxTxSize.Value());
             return true;
         }
-
-        // check proportional sigops
-        if (nSigOps > GetMaxBlockSigOpsCount(blockSize))
-        {
-            LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
-                 " Sig:%d  :too many sigops.  Expected less than: %d\n",
-                block.nVersion, block.nTime, blockSize, nTx, nSigOps, GetMaxBlockSigOpsCount(blockSize));
-            return true;
-        }
     }
     else
     {
         // Within a 1MB block transactions can be 1MB, so nothing to check WRT transaction size
-
-        // Check max sigops
-        if (nSigOps > MAX_BLOCK_SIGOPS_PER_MB)
-        {
-            LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
-                 " Sig:%d  :too many sigops.  Expected < 1MB defined constant: %d\n",
-                block.nVersion, block.nTime, blockSize, nTx, nSigOps, MAX_BLOCK_SIGOPS_PER_MB);
-            return true;
-        }
     }
 
-    LOGA("Acceptable block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " Sig:%d\n", block.nVersion, block.nTime,
-        blockSize, nTx, nSigOps);
+    LOGA("Acceptable block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " \n", block.nVersion, block.nTime,
+        blockSize, nTx);
     return false;
 }
 

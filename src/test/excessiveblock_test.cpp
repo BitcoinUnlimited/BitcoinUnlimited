@@ -146,50 +146,18 @@ BOOST_AUTO_TEST_CASE(excessiveChecks)
 
     excessiveBlockSize = 16000000; // Ignore excessive block size when checking sigops and block effort
 
-    // Check sigops values
-
-    // Maintain compatibility with the old sigops calculator for blocks <= 1MB
-    BOOST_CHECK_MESSAGE(false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE - 1,
-                                     MAX_BLOCK_SIGOPS_PER_MB, 100, 100),
-        "improper sigops");
-    BOOST_CHECK_MESSAGE(false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE - 1,
-                                     MAX_BLOCK_SIGOPS_PER_MB, 100, 100),
-        "improper sigops");
-    BOOST_CHECK_MESSAGE(
-        false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB, 100, 100),
-        "improper sigops");
-
-    BOOST_CHECK_MESSAGE(true == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE - 1,
-                                    MAX_BLOCK_SIGOPS_PER_MB + 1, 100, 100),
-        "improper sigops");
-    BOOST_CHECK_MESSAGE(
-        true == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB + 1, 100, 100),
-        "improper sigops");
-
-
-    // Check sigops > 1MB.
-    BOOST_CHECK_MESSAGE(
-        false == CheckExcessive(block, 1000000 + 1, (MAX_BLOCK_SIGOPS_PER_MB * 2), 100, 100), "improper sigops");
-    BOOST_CHECK_MESSAGE(
-        true == CheckExcessive(block, 1000000 + 1, (MAX_BLOCK_SIGOPS_PER_MB * 2) + 1, 100, 100), "improper sigops");
-    BOOST_CHECK_MESSAGE(
-        true == CheckExcessive(block, (2 * 1000000), (MAX_BLOCK_SIGOPS_PER_MB * 2) + 1, 100, 100), "improper sigops");
-    BOOST_CHECK_MESSAGE(false == CheckExcessive(block, (2 * 1000000) + 1, (MAX_BLOCK_SIGOPS_PER_MB * 2) + 1, 100, 100),
-        "improper sigops");
-
-
     // Check tx size values
     maxTxSize.Set(DEFAULT_LARGEST_TRANSACTION);
 
     // Within a 1 MB block, a 1MB transaction is not excessive
     BOOST_CHECK_MESSAGE(
-        false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE, 1, 1, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE),
+        false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE, 1, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE),
         "improper max tx");
 
     // With a > 1 MB block, use the maxTxSize to determine
-    BOOST_CHECK_MESSAGE(false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE + 1, 1, 1, maxTxSize.Value()),
+    BOOST_CHECK_MESSAGE(false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE + 1, 1, maxTxSize.Value()),
         "improper max tx");
-    BOOST_CHECK_MESSAGE(true == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE + 1, 1, 1, maxTxSize.Value() + 1),
+    BOOST_CHECK_MESSAGE(true == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE + 1, 1, maxTxSize.Value() + 1),
         "improper max tx");
 }
 

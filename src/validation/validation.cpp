@@ -1592,7 +1592,7 @@ bool ContextualCheckBlock(const CBlock &block,
     }
 
     // Check whether this block exceeds what we want to relay.
-    block.fExcessive = CheckExcessive(block, block.GetBlockSize(), 0, nTx, nLargestTx);
+    block.fExcessive = CheckExcessive(block, block.GetBlockSize(), nTx, nLargestTx);
 
 
     return true;
