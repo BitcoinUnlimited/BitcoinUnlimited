@@ -27,13 +27,6 @@ static std::vector<unsigned char> Serialize(const CScript &s)
     return sSerialized;
 }
 
-// FIXME: This should be properly factored out of unlimited.cpp as well
-uint64_t GetMaxBlockSigOpsCount(uint64_t blockSize)
-{
-    uint64_t blockMbSize = 1 + ((blockSize - 1) / 1000000);
-    return blockSigopsPerMb.Value() * blockMbSize;
-}
-
 const uint64_t MAX_BLOCK_SIGOPS_PER_MB = BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS;
 
 BOOST_FIXTURE_TEST_SUITE(sigopcount_tests, BasicTestingSetup)
