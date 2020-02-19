@@ -1898,7 +1898,7 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
 
     // This will check if current blocki is the first boock of the fork,
     // hence we add SCRIPT_ENABLE_SCHNORR_MULTISIG to the set of supported flags.
-    if (IsNov2019Enabled(consensusparams, pindex->pprev))
+    if (IsNov2019Activated(consensusparams, pindex->pprev))
     {
         flags |= SCRIPT_ENABLE_SCHNORR_MULTISIG;
         flags |= SCRIPT_VERIFY_MINIMALDATA;

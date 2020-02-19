@@ -232,7 +232,7 @@ std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool valida
     {
         if (*item == 1)
         {
-            *item = Params().GetConsensus().nov2019ActivationTime;
+            *item = Params().GetConsensus().may2020ActivationTime;
         }
         settingsToUserAgentString();
     }
@@ -446,7 +446,7 @@ void UnlimitedSetup(void)
 
     // If the user configures it to 1, assume this means default
     if (miningForkTime.Value() == 1)
-        miningForkTime = Params().GetConsensus().nov2019ActivationTime;
+        miningForkTime = Params().GetConsensus().may2020ActivationTime;
 
     if (maxGeneratedBlock > excessiveBlockSize)
     {
