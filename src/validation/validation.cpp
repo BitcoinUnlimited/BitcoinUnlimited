@@ -2231,8 +2231,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
             nInputs += tx.vin.size();
             nSigOps += GetLegacySigOpCount(txref, flags);
             if (nSigOps > GetMaxBlockSigOpsCount(block.GetBlockSize()))
-               return state.DoS(100, error("ConnectBlock(): too many sigops"),
-                               REJECT_INVALID, "bad-blk-sigops");
+                return state.DoS(100, error("ConnectBlock(): too many sigops"), REJECT_INVALID, "bad-blk-sigops");
 
             if (!tx.IsCoinBase())
             {
@@ -2277,8 +2276,8 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                     // an incredibly-expensive-to-validate block.
                     nSigOps += GetP2SHSigOpCount(txref, view, flags);
                     if (nSigOps > GetMaxBlockSigOpsCount(block.GetBlockSize()))
-                        return state.DoS(100, error("ConnectBlock(): too many sigops"),
-                                        REJECT_INVALID, "bad-blk-sigops");
+                        return state.DoS(
+                            100, error("ConnectBlock(): too many sigops"), REJECT_INVALID, "bad-blk-sigops");
                 }
 
                 nFees += view.GetValueIn(tx) - tx.GetValueOut();
@@ -2474,8 +2473,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             nInputs += tx.vin.size();
             nSigOps += GetLegacySigOpCount(txref, flags);
             if (nSigOps > GetMaxBlockSigOpsCount(block.GetBlockSize()))
-               return state.DoS(100, error("ConnectBlock(): too many sigops"),
-                               REJECT_INVALID, "bad-blk-sigops");
+                return state.DoS(100, error("ConnectBlock(): too many sigops"), REJECT_INVALID, "bad-blk-sigops");
 
             if (!tx.IsCoinBase())
             {
@@ -2520,8 +2518,8 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                     // an incredibly-expensive-to-validate block.
                     nSigOps += GetP2SHSigOpCount(txref, view, flags);
                     if (nSigOps > GetMaxBlockSigOpsCount(block.GetBlockSize()))
-                        return state.DoS(100, error("ConnectBlock(): too many sigops"),
-                                        REJECT_INVALID, "bad-blk-sigops");
+                        return state.DoS(
+                            100, error("ConnectBlock(): too many sigops"), REJECT_INVALID, "bad-blk-sigops");
                 }
 
                 nFees += view.GetValueIn(tx) - tx.GetValueOut();

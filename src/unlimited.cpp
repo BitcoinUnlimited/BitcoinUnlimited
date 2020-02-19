@@ -948,8 +948,8 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nTx, uint6
 {
     if (blockSize > excessiveBlockSize)
     {
-        LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 "  :too many bytes\n",
-            block.nVersion, block.nTime, blockSize, nTx);
+        LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 "  :too many bytes\n", block.nVersion,
+            block.nTime, blockSize, nTx);
         return true;
     }
 
@@ -969,8 +969,8 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nTx, uint6
         // Within a 1MB block transactions can be 1MB, so nothing to check WRT transaction size
     }
 
-    LOGA("Acceptable block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " \n", block.nVersion, block.nTime,
-        blockSize, nTx);
+    LOGA("Acceptable block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " \n", block.nVersion, block.nTime, blockSize,
+        nTx);
     return false;
 }
 

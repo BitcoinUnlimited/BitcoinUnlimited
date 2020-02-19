@@ -155,8 +155,8 @@ BOOST_AUTO_TEST_CASE(excessiveChecks)
         "improper max tx");
 
     // With a > 1 MB block, use the maxTxSize to determine
-    BOOST_CHECK_MESSAGE(false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE + 1, 1, maxTxSize.Value()),
-        "improper max tx");
+    BOOST_CHECK_MESSAGE(
+        false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE + 1, 1, maxTxSize.Value()), "improper max tx");
     BOOST_CHECK_MESSAGE(true == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE + 1, 1, maxTxSize.Value() + 1),
         "improper max tx");
 }
