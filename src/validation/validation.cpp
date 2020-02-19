@@ -951,7 +951,25 @@ void CheckBlockIndex(const Consensus::Params &consensusParams)
 
 bool CheckInputs(const CTransactionRef &tx,
     CValidationState &state,
+    const CCoinsViewCache &view,
+    bool fScriptChecks,
+    unsigned int flags,
+    unsigned int maxOps,
+    bool cacheStore,
+    ValidationResourceTracker *resourceTracker,
+    std::vector<CScriptCheck> *pvChecks,
+    unsigned char *sighashType,
+    CValidationDebugger *debugger)
+{
+    CBlockDelta blockDelta;
+    return CheckInputs(tx, state, view, blockDelta, fScriptChecks, flags, maxOps, cacheStore,
+            resourceTracker, pvChecks, sighashType, debugger);
+}
+
+bool CheckInputs(const CTransactionRef &tx,
+    CValidationState &state,
     const CCoinsViewCache &inputs,
+    const CBlockDelta &blockDelta,
     bool fScriptChecks,
     unsigned int flags,
     unsigned int maxOps,
@@ -964,7 +982,7 @@ bool CheckInputs(const CTransactionRef &tx,
     bool allPassed = true;
     if (!tx->IsCoinBase())
     {
-        if (!Consensus::CheckTxInputs(tx, state, inputs))
+        if (!Consensus::CheckTxInputs(tx, state, inputs, blockDelta))
         {
             if (debugger)
             {
@@ -993,11 +1011,23 @@ bool CheckInputs(const CTransactionRef &tx,
             {
                 const COutPoint &prevout = tx->vin[i].prevout;
                 const CScript &scriptSig = tx->vin[i].scriptSig;
-                CoinAccessor coin(inputs, prevout);
-
+                const Coin* coin = nullptr;
+                CoinAccessor pcoin(inputs, prevout);
+                if (pcoin->IsSpent())
+                {
+                    auto iter = blockDelta.blockOutputs.find(prevout);
+                    if (iter != blockDelta.blockOutputs.end())
+                    {
+                        coin = &(iter->second);
+                    }
+                }
+                else
+                {
+                    coin = pcoin.Get();
+                }
                 if (debugger)
                 {
-                    if (coin->IsSpent())
+                    if (coin == nullptr || coin->IsSpent())
                     {
                         debugger->SetInputCheckResult(false);
                         debugger->AddInputCheckError(strprintf("COutPoint %s is spent", prevout.ToString().c_str()));
@@ -1007,6 +1037,7 @@ bool CheckInputs(const CTransactionRef &tx,
                 }
                 else
                 {
+                    assert(coin != nullptr);
                     assert(!coin->IsSpent());
                 }
 
@@ -1128,7 +1159,6 @@ bool CheckInputs(const CTransactionRef &tx,
     }
     return true;
 }
-
 
 //////////////////////////////////////////////////////////////////
 //
@@ -2233,7 +2263,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
         }
         BOOST_SCOPE_EXIT_END
 
-
+        CBlockDelta blockDelta;
         // Start checking Inputs
         // When in parallel mode then unlock cs_main for this loop to give any other threads
         // a chance to process in parallel. This is crucial for parallel validation to work.
@@ -2248,22 +2278,6 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
 
             if (!tx.IsCoinBase())
             {
-                if (!view.HaveInputs(tx))
-                {
-                    // If we were validating at the same time as another block and the other block wins the validation
-                    // race
-                    // and updates the UTXO first, then we may end up here with missing inputs.  Therefore we checke to
-                    // see
-                    // if the chainwork has advanced or if we recieved a quit and if so return without DOSing the node.
-                    if (PV->ChainWorkHasChanged(nStartingChainWork) || PV->QuitReceived(this_id, fParallel))
-                    {
-                        return false;
-                    }
-                    return state.DoS(100, error("%s: block %s inputs missing/spent in tx %d %s", __func__,
-                                              block.GetHash().ToString(), i, tx.GetHash().ToString()),
-                        REJECT_INVALID, "bad-txns-inputs-missingorspent");
-                }
-
                 // Check that transaction is BIP68 final
                 // BIP68 lock checks (as opposed to nLockTime checks) must
                 // be in ConnectBlock because they require the UTXO set
@@ -2271,9 +2285,40 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                 {
                     for (size_t j = 0; j < tx.vin.size(); j++)
                     {
-                        prevheights[j] = CoinAccessor(view, tx.vin[j].prevout)->nHeight;
+                        const Coin* coin = nullptr;
+                        CoinAccessor pcoin(view, tx.vin[j].prevout);
+                        if (pcoin->IsSpent())
+                        {
+                            auto iter = blockDelta.blockOutputs.find(tx.vin[j].prevout);
+                            if (iter != blockDelta.blockOutputs.end())
+                            {
+                                coin = &(iter->second);
+                            }
+                        }
+                        else
+                        {
+                            coin = pcoin.Get();
+                        }
+                        // isSpend is true for empty coin object (coinEmpty)
+                        if (coin == nullptr || coin->IsSpent())
+                        {
+                            // If we were validating at the same time as another block and the other block wins the
+                            // validation race and updates the UTXO first, then we may end up here with missing inputs.
+                            // Therefore we check to see if the chainwork has advanced or if we recieved a quit and if
+                            // so return without DOSing the node.
+                            if (PV->ChainWorkHasChanged(nStartingChainWork) || PV->QuitReceived(this_id, fParallel))
+                            {
+                                return false;
+                            }
+                            return state.DoS(100, error("%s: block %s inputs missing/spent in tx %d %s", __func__,
+                                                      block.GetHash().ToString(), i, tx.GetHash().ToString()),
+                                REJECT_INVALID, "bad-txns-inputs-missingorspent");
+                        }
+                        prevheights[j] = coin->nHeight;
+                        nFees = nFees + coin->out.nValue;
                     }
                 }
+                nFees = nFees - tx.GetValueOut();
 
                 if (!SequenceLocks(txref, nLockTimeFlags, &prevheights, *pindex))
                 {
@@ -2281,8 +2326,6 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                                               block.GetHash().ToString()),
                         REJECT_INVALID, "bad-txns-nonfinal");
                 }
-
-                nFees += view.GetValueIn(tx) - tx.GetValueOut();
 
                 uint256 hash = tx.GetHash();
                 {
@@ -2297,7 +2340,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                         std::vector<CScriptCheck> vChecks;
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
                                                             (still consult the cache, though) */
-                        if (!CheckInputs(txref, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
+                        if (!CheckInputs(txref, state, view, blockDelta, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
                                 &resourceTracker, PV->ThreadCount() ? &vChecks : nullptr))
                         {
                             return error("%s: block %s CheckInputs on %s failed with %s", __func__,
@@ -2314,7 +2357,9 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
             {
                 blockundo.vtxundo.push_back(CTxUndo());
             }
-            UpdateCoins(tx, state, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
+            //UpdateCoins(tx, state, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
+            blockDelta.AddOutputsToDelta(tx, pindex->nHeight);
+            blockDelta.SpendCoins(tx, view, i == 0 ? undoDummy : blockundo.vtxundo.back());
             vPos.push_back(std::make_pair(tx.GetHash(), pos));
             pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
 
@@ -2328,6 +2373,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
             if (GetArg("-pvtest", false))
                 MilliSleep(1000);
         }
+        blockDelta.AddNewOutputsToView(view);
         LOG(THIN, "Number of CheckInputs() performed: %d  Unverified count: %d\n", nChecked, nUnVerifiedChecked);
 
 
@@ -2425,6 +2471,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
         }
         BOOST_SCOPE_EXIT_END
 
+        CBlockDelta blockDelta;
         // Outputs then Inputs algorithm: add outputs to the coin cache
         // and validate lexical ordering
         uint256 prevTxHash;
@@ -2433,7 +2480,8 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             const CTransaction &tx = *(block.vtx[i]);
             try
             {
-                AddCoins(view, tx, pindex->nHeight);
+                //AddCoins(view, tx, pindex->nHeight);
+                blockDelta.AddOutputsToDelta(tx, pindex->nHeight);
             }
             catch (std::logic_error &e)
             {
@@ -2474,22 +2522,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
 
             if (!tx.IsCoinBase())
             {
-                if (!view.HaveInputs(tx))
-                {
-                    // If we were validating at the same time as another block and the other block wins the validation
-                    // race
-                    // and updates the UTXO first, then we may end up here with missing inputs.  Therefore we checke to
-                    // see
-                    // if the chainwork has advanced or if we recieved a quit and if so return without DOSing the node.
-                    if (PV->ChainWorkHasChanged(nStartingChainWork) || PV->QuitReceived(this_id, fParallel))
-                    {
-                        return false;
-                    }
-                    return state.DoS(100, error("%s: block %s inputs missing/spent in tx %d %s", __func__,
-                                              block.GetHash().ToString(), i, tx.GetHash().ToString()),
-                        REJECT_INVALID, "bad-txns-inputs-missingorspent");
-                }
-
                 // Check that transaction is BIP68 final
                 // BIP68 lock checks (as opposed to nLockTime checks) must
                 // be in ConnectBlock because they require the UTXO set
@@ -2497,9 +2529,40 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                 {
                     for (size_t j = 0; j < tx.vin.size(); j++)
                     {
-                        prevheights[j] = CoinAccessor(view, tx.vin[j].prevout)->nHeight;
+                        const Coin* coin = nullptr;
+                        CoinAccessor pcoin(view, tx.vin[j].prevout);
+                        if (pcoin->IsSpent())
+                        {
+                            auto iter = blockDelta.blockOutputs.find(tx.vin[j].prevout);
+                            if (iter != blockDelta.blockOutputs.end())
+                            {
+                                coin = &(iter->second);
+                            }
+                        }
+                        else
+                        {
+                            coin = pcoin.Get();
+                        }
+                        // isSpend is true for empty coin object (coinEmpty)
+                        if (coin == nullptr || coin->IsSpent())
+                        {
+                            // If we were validating at the same time as another block and the other block wins the
+                            // validation race and updates the UTXO first, then we may end up here with missing inputs.
+                            // Therefore we check to see if the chainwork has advanced or if we recieved a quit and if
+                            // so return without DOSing the node.
+                            if (PV->ChainWorkHasChanged(nStartingChainWork) || PV->QuitReceived(this_id, fParallel))
+                            {
+                                return false;
+                            }
+                            return state.DoS(100, error("%s: block %s inputs missing/spent in tx %d %s", __func__,
+                                                      block.GetHash().ToString(), i, tx.GetHash().ToString()),
+                                REJECT_INVALID, "bad-txns-inputs-missingorspent");
+                        }
+                        prevheights[j] = coin->nHeight;
+                        nFees = nFees + coin->out.nValue;
                     }
                 }
+                nFees = nFees - tx.GetValueOut();
 
                 if (!SequenceLocks(txref, nLockTimeFlags, &prevheights, *pindex))
                 {
@@ -2507,8 +2570,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                                               block.GetHash().ToString()),
                         REJECT_INVALID, "bad-txns-nonfinal");
                 }
-
-                nFees += view.GetValueIn(tx) - tx.GetValueOut();
 
                 uint256 hash = tx.GetHash();
                 {
@@ -2523,7 +2584,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                         std::vector<CScriptCheck> vChecks;
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
                                                             (still consult the cache, though) */
-                        if (!CheckInputs(txref, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
+                        if (!CheckInputs(txref, state, view, blockDelta, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
                                 &resourceTracker, PV->ThreadCount() ? &vChecks : nullptr))
                         {
                             return error("%s: block %s CheckInputs on %s failed with %s", __func__,
@@ -2541,7 +2602,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                 blockundo.vtxundo.push_back(CTxUndo());
             }
 
-            SpendCoins(tx, state, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
+            blockDelta.SpendCoins(tx, view, i == 0 ? undoDummy : blockundo.vtxundo.back());
 
             vPos.push_back(std::make_pair(tx.GetHash(), pos));
             pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
@@ -2556,6 +2617,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             if (GetArg("-pvtest", false))
                 MilliSleep(1000);
         }
+        blockDelta.AddNewOutputsToView(view);
         LOG(THIN, "Number of CheckInputs() performed: %d  Unverified count: %d\n", nChecked, nUnVerifiedChecked);
 
 

@@ -11,6 +11,7 @@
 #include "script/interpreter.h"
 #include "unlimited.h"
 #include "validation.h"
+#include "validation/blockdelta.h"
 
 // TODO remove the following dependencies
 #include "chain.h"
@@ -234,12 +235,25 @@ static int GetSpendHeight(const CCoinsViewCache &inputs)
     throw std::runtime_error("GetSpendHeight(): best block does not exist");
 }
 
-bool Consensus::CheckTxInputs(const CTransactionRef tx, CValidationState &state, const CCoinsViewCache &inputs)
+bool Consensus::CheckTxInputs(const CTransactionRef tx, CValidationState &state, const CCoinsViewCache &inputs, const CBlockDelta &blockDelta)
 {
     // This doesn't trigger the DoS code on purpose; if it did, it would make it easier
     // for an attacker to attempt to split the network.
-    if (!inputs.HaveInputs(*tx))
-        return state.Invalid(false, 0, "", "Inputs unavailable");
+
+    // no inputs for coinbase
+    if (!tx->IsCoinBase())
+    {
+        for (unsigned int i = 0; i < tx->vin.size(); i++)
+        {
+            if (blockDelta.blockOutputs.count(tx->vin[i].prevout) == 0)
+            {
+                if (!inputs.HaveCoin(tx->vin[i].prevout))
+                {
+                    return state.Invalid(false, 0, "", "Inputs unavailable");
+                }
+            }
+        }
+    }
 
     CAmount nValueIn = 0;
     CAmount nFees = 0;
@@ -249,7 +263,10 @@ bool Consensus::CheckTxInputs(const CTransactionRef tx, CValidationState &state,
         {
             const COutPoint &prevout = tx->vin[i].prevout;
             Coin coin;
-            inputs.GetCoin(prevout, coin); // Make a copy so I don't hold the utxo lock
+            if (blockDelta.GetCoin(prevout, coin) == false)
+            {
+                inputs.GetCoin(prevout, coin); // Make a copy so I don't hold the utxo lock
+            }
             assert(!coin.IsSpent());
 
             // If prev is coinbase, check that it's matured

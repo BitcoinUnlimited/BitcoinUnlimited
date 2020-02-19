@@ -225,6 +225,7 @@ BITCOIN_CORE_H = \
   util.h \
   utilmoneystr.h \
   utiltime.h \
+  validation/blockdelta.h \
   validation/forks.h \
   validation/validation.h \
   validation/verifydb.h \
@@ -326,6 +327,7 @@ libbitcoin_server_a_SOURCES = \
   utilhttp.cpp \
   utilprocess.cpp \
   requestManager.cpp \
+  validation/blockdelta.cpp \
   validation/forks.cpp \
   validation/validation.cpp \
   validation/verifydb.cpp \

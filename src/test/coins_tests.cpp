@@ -18,7 +18,6 @@
 
 int ApplyTxInUndo(Coin &&undo, CCoinsViewCache &view, const COutPoint &out);
 void UpdateCoins(const CTransaction &tx,
-    CValidationState &state,
     CCoinsViewCache &inputs,
     CTxUndo &txundo,
     int nHeight);

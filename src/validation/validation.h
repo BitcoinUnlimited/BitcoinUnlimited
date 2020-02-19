@@ -8,6 +8,7 @@
 #ifndef BITCOIN_VALIDATION_H
 #define BITCOIN_VALIDATION_H
 
+#include "blockdelta.h"
 #include "chainparams.h"
 #include "consensus/validation.h"
 #include "forks.h"
@@ -61,6 +62,19 @@ void CheckBlockIndex(const Consensus::Params &consensusParams);
  * This does not modify the UTXO set. If pvChecks is not nullptr, script checks are pushed onto it
  * instead of being performed inline.
  */
+bool CheckInputs(const CTransactionRef &tx,
+    CValidationState &state,
+    const CCoinsViewCache &view,
+    const CBlockDelta &blockDelta,
+    bool fScriptChecks,
+    unsigned int flags,
+    unsigned int maxOps,
+    bool cacheStore,
+    ValidationResourceTracker *resourceTracker,
+    std::vector<CScriptCheck> *pvChecks = nullptr,
+    unsigned char *sighashType = nullptr,
+    CValidationDebugger *debugger = nullptr);
+
 bool CheckInputs(const CTransactionRef &tx,
     CValidationState &state,
     const CCoinsViewCache &view,
