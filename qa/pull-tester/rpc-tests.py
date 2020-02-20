@@ -261,8 +261,8 @@ testScripts = [ RpcTest(t) for t in [
     'getlogcategories',
     'getrawtransaction',
     'rpc_getblockstats',
-    'minimaldata-activation',
-    'schnorrmultisig_activation',
+    'minimaldata',
+    'schnorrmultisig',
     'uptime'
 ] ]
 

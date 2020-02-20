@@ -703,7 +703,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     {
         featureFlags |= SCRIPT_ENABLE_CHECKDATASIG;
     }
-    if (IsNov2019Enabled(chainparams.GetConsensus(), chainActive.Tip()))
+    if (IsNov2019Activated(chainparams.GetConsensus(), chainActive.Tip()))
     {
         featureFlags |= SCRIPT_ENABLE_SCHNORR_MULTISIG;
         featureFlags |= SCRIPT_VERIFY_MINIMALDATA;
