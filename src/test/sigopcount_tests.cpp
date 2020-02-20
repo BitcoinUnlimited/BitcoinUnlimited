@@ -170,19 +170,22 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
         // scriptPubKeys of a transaction and does not take the actual executed
         // sig operations into account. spendingTx in itself does not contain a
         // signature operation.
-        BOOST_CHECK_EQUAL(GetTransactionSigOpCount(CTransaction(spendingTx), coins, flags), 0);
+        BOOST_CHECK_EQUAL(GetTransactionSigOpCount(MakeTransactionRef(CTransaction(spendingTx)), coins, flags), 0);
         // creationTx contains two signature operations in its scriptPubKey, but
         // legacy counting is not accurate.
-        BOOST_CHECK_EQUAL(GetTransactionSigOpCount(CTransaction(creationTx), coins, flags), MAX_PUBKEYS_PER_MULTISIG);
+        BOOST_CHECK_EQUAL(GetTransactionSigOpCount(MakeTransactionRef(CTransaction(creationTx)), coins, flags),
+            MAX_PUBKEYS_PER_MULTISIG);
         // Sanity check: script verification fails because of an invalid
         // signature.
         BOOST_CHECK_EQUAL(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags), SCRIPT_ERR_CHECKMULTISIGVERIFY);
 
         // Make sure non P2SH sigops are counted even if the flag for P2SH is
         // not passed in.
-        BOOST_CHECK_EQUAL(GetTransactionSigOpCount(CTransaction(spendingTx), coins, SCRIPT_VERIFY_NONE), 0);
         BOOST_CHECK_EQUAL(
-            GetTransactionSigOpCount(CTransaction(creationTx), coins, SCRIPT_VERIFY_NONE), MAX_PUBKEYS_PER_MULTISIG);
+            GetTransactionSigOpCount(MakeTransactionRef(CTransaction(spendingTx)), coins, SCRIPT_VERIFY_NONE), 0);
+        BOOST_CHECK_EQUAL(
+            GetTransactionSigOpCount(MakeTransactionRef(CTransaction(creationTx)), coins, SCRIPT_VERIFY_NONE),
+            MAX_PUBKEYS_PER_MULTISIG);
     }
 
     // Multisig nested in P2SH
@@ -193,12 +196,13 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
         CScript scriptSig = CScript() << OP_0 << OP_0 << ToByteVector(redeemScript);
 
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig);
-        BOOST_CHECK_EQUAL(GetTransactionSigOpCount(CTransaction(spendingTx), coins, flags), 2);
+        BOOST_CHECK_EQUAL(GetTransactionSigOpCount(MakeTransactionRef(CTransaction(spendingTx)), coins, flags), 2);
         BOOST_CHECK_EQUAL(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags), SCRIPT_ERR_CHECKMULTISIGVERIFY);
 
         // Make sure P2SH sigops are not counted if the flag for P2SH is not
         // passed in.
-        BOOST_CHECK_EQUAL(GetTransactionSigOpCount(CTransaction(spendingTx), coins, SCRIPT_VERIFY_NONE), 0);
+        BOOST_CHECK_EQUAL(
+            GetTransactionSigOpCount(MakeTransactionRef(CTransaction(spendingTx)), coins, SCRIPT_VERIFY_NONE), 0);
     }
 }
 

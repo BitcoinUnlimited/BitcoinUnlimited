@@ -300,7 +300,7 @@ bool Consensus::CheckTxInputs(const CTransactionRef tx, CValidationState &state,
     return true;
 }
 
-uint64_t GetTransactionSigOpCount(const CTransaction &tx, const CCoinsViewCache &coins, const uint32_t flags)
+uint64_t GetTransactionSigOpCount(const CTransactionRef ptx, const CCoinsViewCache &coins, const uint32_t flags)
 {
-    return GetLegacySigOpCount(MakeTransactionRef(tx), flags) + GetP2SHSigOpCount(MakeTransactionRef(tx), coins, flags);
+    return GetLegacySigOpCount(ptx, flags) + GetP2SHSigOpCount(ptx, coins, flags);
 }

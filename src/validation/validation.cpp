@@ -2175,7 +2175,6 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
 
     // Get the script flags for this block
     uint32_t flags = GetBlockScriptFlags(pindex, chainparams.GetConsensus());
-    bool fStrictPayToScriptHash = flags & SCRIPT_VERIFY_P2SH;
 
     ValidationResourceTracker resourceTracker;
     std::vector<int> prevheights;
@@ -2229,7 +2228,9 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
             const CTransactionRef &txref = block.vtx[i];
 
             nInputs += tx.vin.size();
-            nSigOps += GetLegacySigOpCount(txref, flags);
+
+            // Get total sigop count for both legacy and p2sh sigops
+            nSigOps += GetTransactionSigOpCount(txref, view, flags);
             if (nSigOps > GetMaxBlockSigOpsCount(block.GetBlockSize()))
                 return state.DoS(100, error("ConnectBlock(): too many sigops"), REJECT_INVALID, "bad-blk-sigops");
 
@@ -2267,17 +2268,6 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                     return state.DoS(100, error("%s: block %s contains a non-BIP68-final transaction", __func__,
                                               block.GetHash().ToString()),
                         REJECT_INVALID, "bad-txns-nonfinal");
-                }
-
-                if (fStrictPayToScriptHash)
-                {
-                    // Add in sigops done by pay-to-script-hash inputs;
-                    // this is to prevent a "rogue miner" from creating
-                    // an incredibly-expensive-to-validate block.
-                    nSigOps += GetP2SHSigOpCount(txref, view, flags);
-                    if (nSigOps > GetMaxBlockSigOpsCount(block.GetBlockSize()))
-                        return state.DoS(
-                            100, error("ConnectBlock(): too many sigops"), REJECT_INVALID, "bad-blk-sigops");
                 }
 
                 nFees += view.GetValueIn(tx) - tx.GetValueOut();
@@ -2383,7 +2373,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
 
     // Get the script flags for this block
     uint32_t flags = GetBlockScriptFlags(pindex, chainparams.GetConsensus());
-    bool fStrictPayToScriptHash = flags & SCRIPT_VERIFY_P2SH;
 
     ValidationResourceTracker resourceTracker;
     std::vector<int> prevheights;
@@ -2471,7 +2460,9 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             const CTransactionRef &txref = block.vtx[i];
 
             nInputs += tx.vin.size();
-            nSigOps += GetLegacySigOpCount(txref, flags);
+
+            // Get total sigop count for both legacy and p2sh sigops
+            nSigOps += GetTransactionSigOpCount(txref, view, flags);
             if (nSigOps > GetMaxBlockSigOpsCount(block.GetBlockSize()))
                 return state.DoS(100, error("ConnectBlock(): too many sigops"), REJECT_INVALID, "bad-blk-sigops");
 
@@ -2509,17 +2500,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                     return state.DoS(100, error("%s: block %s contains a non-BIP68-final transaction", __func__,
                                               block.GetHash().ToString()),
                         REJECT_INVALID, "bad-txns-nonfinal");
-                }
-
-                if (fStrictPayToScriptHash)
-                {
-                    // Add in sigops done by pay-to-script-hash inputs;
-                    // this is to prevent a "rogue miner" from creating
-                    // an incredibly-expensive-to-validate block.
-                    nSigOps += GetP2SHSigOpCount(txref, view, flags);
-                    if (nSigOps > GetMaxBlockSigOpsCount(block.GetBlockSize()))
-                        return state.DoS(
-                            100, error("ConnectBlock(): too many sigops"), REJECT_INVALID, "bad-blk-sigops");
                 }
 
                 nFees += view.GetValueIn(tx) - tx.GetValueOut();
