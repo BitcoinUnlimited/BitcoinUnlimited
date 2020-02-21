@@ -65,7 +65,6 @@ bool TxIndex::Init()
             return false;
     }
 
-    fSynced = pbestindex.load() == chainActive.Tip();
     return true;
 }
 
@@ -109,7 +108,7 @@ static const CBlockIndex *NextSyncBlock(const CBlockIndex *pindex_prev)
 
 void TxIndex::ThreadSync()
 {
-    while (fReindex)
+    while (fReindex || fImporting || IsInitialBlockDownload())
     {
         MilliSleep(1000);
         if (shutdown_threads.load() == true)
