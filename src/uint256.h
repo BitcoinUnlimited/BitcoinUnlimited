@@ -102,6 +102,13 @@ public:
                ((uint64_t)ptr[4]) << 32 | ((uint64_t)ptr[5]) << 40 | ((uint64_t)ptr[6]) << 48 |
                ((uint64_t)ptr[7]) << 56;
     }
+    uint8_t GetFirstNibble() const
+    {
+        uint8_t firstByte = data[0];
+        firstByte = firstByte & 0xF0;
+        firstByte = (firstByte >> 4);
+        return firstByte;
+    }
 
     template <typename Stream>
     void Serialize(Stream &s) const

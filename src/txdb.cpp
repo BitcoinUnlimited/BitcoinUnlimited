@@ -191,55 +191,60 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
     size_t nBatchWrites = 0;
     size_t batch_size = nMaxDBBatchSize;
 
-    for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();)
+    for (uint8_t num_map = 0; num_map < mapCoins.numMaps(); num_map++)
     {
-        if (it->second.flags & CCoinsCacheEntry::DIRTY)
+        for (CCoinsMap::iterator it = mapCoins.begin_partial(num_map); it != mapCoins.end_multi();)
         {
-            CoinEntry entry(&it->first);
-            size_t nUsage = it->second.coin.DynamicMemoryUsage();
-            if (it->second.coin.IsSpent())
+            if (it->second.flags & CCoinsCacheEntry::DIRTY)
             {
-                batch.Erase(entry);
-
-                // Update the usage of the child cache before deleting the entry in the child cache
-                nChildCachedCoinsUsage -= nUsage;
-                it = mapCoins.erase(it);
-            }
-            else
-            {
-                batch.Write(entry, it->second.coin);
-
-                // Only delete valid coins from the cache when we're nearly syncd.  During IBD, and also
-                // if BlockOnly mode is turned on, these coins will be used, whereas, once the chain is
-                // syncd we only need the coins that have come from accepting txns into the memory pool.
-                if (IsChainNearlySyncd() && !fImporting && !fReindex && !fBlocksOnly &&
-                    (nCoinCacheMaxSize < DEFAULT_HIGH_PERF_MEM_CUTOFF))
+                CoinEntry entry(&it->first);
+                size_t nUsage = it->second.coin.DynamicMemoryUsage();
+                if (it->second.coin.IsSpent())
                 {
+                    batch.Erase(entry);
+
                     // Update the usage of the child cache before deleting the entry in the child cache
                     nChildCachedCoinsUsage -= nUsage;
                     it = mapCoins.erase(it);
                 }
                 else
                 {
-                    it->second.flags = 0;
-                    it++;
+                    batch.Write(entry, it->second.coin);
+
+                    // Only delete valid coins from the cache when we're nearly syncd.  During IBD, and also
+                    // if BlockOnly mode is turned on, these coins will be used, whereas, once the chain is
+                    // syncd we only need the coins that have come from accepting txns into the memory pool.
+                    if (IsChainNearlySyncd() && !fImporting && !fReindex && !fBlocksOnly &&
+                        (nCoinCacheMaxSize < DEFAULT_HIGH_PERF_MEM_CUTOFF))
+                    {
+                        // Update the usage of the child cache before deleting the entry in the child cache
+                        nChildCachedCoinsUsage -= nUsage;
+                        it = mapCoins.erase(it);
+                    }
+                    else
+                    {
+                        it->second.flags = 0;
+                        it++;
+                    }
+                }
+                changed++;
+
+                // In order to prevent the spikes in memory usage that used to happen when we prepared large as
+                // was possible, we instead break up the batches such that the performance gains for writing to
+                // leveldb are still realized but the memory spikes are not seen.
+                if (batch.SizeEstimate() > batch_size)
+                {
+                    db.WriteBatch(batch);
+                    batch.Clear();
+                    nBatchWrites++;
                 }
             }
-            changed++;
-
-            // In order to prevent the spikes in memory usage that used to happen when we prepared large as
-            // was possible, we instead break up the batches such that the performance gains for writing to
-            // leveldb are still realized but the memory spikes are not seen.
-            if (batch.SizeEstimate() > batch_size)
+            else
             {
-                db.WriteBatch(batch);
-                batch.Clear();
-                nBatchWrites++;
+                it++;
             }
+            count++;
         }
-        else
-            it++;
-        count++;
     }
     if (!hashBlock.IsNull())
         _WriteBestBlock(hashBlock);

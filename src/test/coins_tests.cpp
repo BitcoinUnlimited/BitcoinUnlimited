@@ -20,14 +20,6 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, CTxUndo &txund
 
 namespace
 {
-//! equality test
-bool operator==(const Coin &a, const Coin &b)
-{
-    // Empty Coin objects are always equal.
-    if (a.IsSpent() && b.IsSpent())
-        return true;
-    return a.fCoinBase == b.fCoinBase && a.nHeight == b.nHeight && a.out == b.out;
-}
 
 class CCoinsViewTest : public CCoinsView
 {
@@ -63,25 +55,32 @@ public:
         const uint64_t nBestCoinHeight,
         size_t &nChildCachedCoinsUsage)
     {
-        for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();)
+        for (uint8_t num_map = 0; num_map < mapCoins.numMaps(); num_map++)
         {
-            if (it->second.flags & CCoinsCacheEntry::DIRTY)
+            for (CCoinsMap::iterator it = mapCoins.begin_partial(num_map); it != mapCoins.end_multi();)
             {
-                // Same optimization used in CCoinsViewDB is to only write dirty entries.
-                map_[it->first] = it->second.coin;
-                if (it->second.coin.IsSpent() && InsecureRandRange(3) == 0)
+                if (it->second.flags & CCoinsCacheEntry::DIRTY)
                 {
-                    // Randomly delete empty entries on write.
-                    map_.erase(it->first);
+                    // Same optimization used in CCoinsViewDB is to only write dirty entries.
+                    map_[it->first] = it->second.coin;
+                    if (it->second.coin.IsSpent() && insecure_rand() % 3 == 0)
+                    {
+                        // Randomly delete empty entries on write.
+                        map_.erase(it->first);
+                    }
+                    nChildCachedCoinsUsage -= it->second.coin.DynamicMemoryUsage();
+                    mapCoins.erase(it++);
                 }
-                nChildCachedCoinsUsage -= it->second.coin.DynamicMemoryUsage();
-                mapCoins.erase(it++);
+                else
+                {
+                    it++;
+                }
             }
-            else
-                it++;
         }
         if (!hashBlock.IsNull())
+        {
             hashBestBlock_ = hashBlock;
+        }
         return true;
     }
 
@@ -95,12 +94,15 @@ public:
     void SelfTest() const
     {
         // Manually recompute the dynamic usage of the whole data, and compare it.
-        size_t ret = memusage::DynamicUsage(cacheCoins);
+        size_t ret = cacheCoins.DynamicUsage();
         size_t count = 0;
-        for (CCoinsMap::iterator it = cacheCoins.begin(); it != cacheCoins.end(); it++)
+        for (uint8_t num_map = 0; num_map < cacheCoins.numMaps(); num_map++)
         {
-            ret += it->second.coin.DynamicMemoryUsage();
-            ++count;
+            for (CCoinsMap::iterator it = cacheCoins.begin_partial(num_map); it != cacheCoins.end_multi(); it++)
+            {
+                ret += it->second.coin.DynamicMemoryUsage();
+                ++count;
+            }
         }
         BOOST_CHECK_EQUAL(GetCacheSize(), count);
         BOOST_CHECK_EQUAL(DynamicMemoryUsage(), ret);
@@ -439,15 +441,15 @@ size_t InsertCoinsMapEntry(CCoinsMap &map, CAmount value, char flags)
     CCoinsCacheEntry entry;
     entry.flags = flags;
     SetCoinsValue(value, entry.coin);
-    auto inserted = map.emplace(OUTPOINT, std::move(entry));
+    auto inserted = map.emplace(OUTPOINT, entry);
     assert(inserted.second);
     return inserted.first->second.coin.DynamicMemoryUsage();
 }
 
-void GetCoinsMapEntry(const CCoinsMap &map, CAmount &value, char &flags)
+void GetCoinsMapEntry(CCoinsMap &map, CAmount &value, char &flags)
 {
     auto it = map.find(OUTPOINT);
-    if (it == map.end())
+    if (it == map.end_multi())
     {
         value = ABSENT;
         flags = NO_ENTRY;

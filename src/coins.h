@@ -71,6 +71,15 @@ public:
     {
     }
 
+    //! equality test
+    friend bool operator==(const Coin &a, const Coin &b)
+    {
+        // Empty Coin objects are always equal.
+        if (a.IsSpent() && b.IsSpent())
+            return true;
+        return a.fCoinBase == b.fCoinBase && a.nHeight == b.nHeight && a.out == b.out;
+    }
+
     void Clear()
     {
         out.SetNull();
@@ -129,9 +138,163 @@ struct CCoinsCacheEntry
 
     CCoinsCacheEntry() : flags(0) {}
     explicit CCoinsCacheEntry(Coin &&coin_) : coin(std::move(coin_)), flags(0) {}
+
+    friend bool operator==(CCoinsCacheEntry a, CCoinsCacheEntry b)
+    {
+        return (a.coin == b.coin);
+    }
+
 };
 
-typedef std::unordered_map<COutPoint, CCoinsCacheEntry, SaltedOutpointHasher> CCoinsMap;
+typedef std::unordered_map<COutPoint, CCoinsCacheEntry, SaltedOutpointHasher> _coin_map;
+static const uint8_t _0_3 = 0x03;
+static const uint8_t _4_7 = 0x07;
+static const uint8_t _8_B = 0x0B;
+static const uint8_t _C_F = 0x0F;
+
+class CCoinsMap
+{
+private:
+    // it is better if these maps are not accessed directly
+    // instead they should be accessed through vMaps and vCs
+    mutable CSharedCriticalSection cs_0_3;
+    mutable _coin_map map_0_3;
+
+    mutable CSharedCriticalSection cs_4_7;
+    mutable _coin_map map_4_7;
+
+    mutable CSharedCriticalSection cs_8_b;
+    mutable _coin_map map_8_b;
+
+    mutable CSharedCriticalSection cs_c_f;
+    mutable _coin_map map_c_f;
+protected:
+    uint8_t getMapForNibble(uint8_t &nibble)
+    {
+        if (nibble < _0_3)
+        {
+            return 0;
+        }
+        else if (nibble >= _4_7 && nibble < _8_B)
+        {
+            return 1;
+        }
+        else if (nibble >= _8_B && nibble < _C_F)
+        {
+            return 2;
+        }
+        else // nibble >= _C_F
+        {
+            return 3;
+        }
+    }
+    _coin_map* vMaps[4];
+    CSharedCriticalSection* vCs[4];
+public:
+    typedef _coin_map::iterator iterator;
+    typedef _coin_map::const_iterator const_iterator;
+
+    CCoinsMap()
+    {
+        clear();
+        vMaps[0] = &(this->map_0_3);
+        vMaps[1] = &(this->map_4_7);
+        vMaps[2] = &(this->map_8_b);
+        vMaps[3] = &(this->map_c_f);
+        vCs[0]= &(this->cs_0_3);
+        vCs[1]= &(this->cs_4_7);
+        vCs[2]= &(this->cs_8_b);
+        vCs[3]= &(this->cs_c_f);
+    }
+
+    void clear()
+    {
+        map_0_3.clear();
+        map_4_7.clear();
+        map_8_b.clear();
+        map_c_f.clear();
+    }
+
+    uint8_t numMaps()
+    {
+        return 4;
+    }
+
+    iterator begin_partial(uint8_t map_num)
+    {
+        if (map_num > numMaps() - 1)
+        {
+            map_num = numMaps() - 1;
+        }
+        return vMaps[map_num]->begin();
+    }
+
+    // the end() of all maps point to the same invalid memory so we can Compare
+    // the end of any of the _coin_map to the end of map_c_f without issue
+    iterator end_multi()
+    {
+        return map_c_f.end();
+    }
+
+    CCoinsCacheEntry& operator[] (const COutPoint& outpoint)
+    {
+        uint8_t nibble = outpoint.hash.GetFirstNibble();
+        uint8_t map_num = getMapForNibble(nibble);
+        _coin_map* selectedMap = vMaps[map_num];
+        return (*selectedMap)[outpoint];
+    }
+
+    iterator erase(iterator it)
+    {
+        uint8_t nibble = it->first.hash.GetFirstNibble();
+        uint8_t map_num = getMapForNibble(nibble);
+        auto new_it =  vMaps[map_num]->erase(it);
+        // we dont want to get the begin of the next map if we are on the last map
+        if (new_it == end_multi() && map_num < (numMaps() - 1))
+        {
+            new_it = vMaps[map_num + 1]->begin();
+        }
+        return new_it;
+    }
+
+    iterator find(const COutPoint &outpoint)
+    {
+        uint8_t nibble = outpoint.hash.GetFirstNibble();
+        uint8_t map_num = getMapForNibble(nibble);
+        return vMaps[map_num]->find(outpoint);
+    }
+
+    std::pair<iterator, bool> emplace(const COutPoint& outpoint)
+    {
+        uint8_t nibble = outpoint.hash.GetFirstNibble();
+        uint8_t map_num = getMapForNibble(nibble);
+        return vMaps[map_num]->emplace(std::piecewise_construct, std::forward_as_tuple(outpoint), std::tuple<>());
+    }
+
+    std::pair<iterator, bool> emplace(const COutPoint& outpoint, const CCoinsCacheEntry& entry)
+    {
+        uint8_t nibble = outpoint.hash.GetFirstNibble();
+        uint8_t map_num = getMapForNibble(nibble);
+        return vMaps[map_num]->emplace(outpoint, std::move(entry));
+    }
+
+    std::pair<iterator, bool> emplace(const COutPoint& outpoint, Coin& coin)
+    {
+        uint8_t nibble = outpoint.hash.GetFirstNibble();
+        uint8_t map_num = getMapForNibble(nibble);
+        return vMaps[map_num]->emplace(std::piecewise_construct, std::forward_as_tuple(outpoint), std::forward_as_tuple(std::move(coin)));
+    }
+
+    size_t size()
+    {
+        return (map_0_3.size() + map_4_7.size() + map_8_b.size() + map_c_f.size());
+    }
+
+    size_t DynamicUsage()
+    {
+        return (memusage::DynamicUsage(map_0_3) + memusage::DynamicUsage(map_4_7) + memusage::DynamicUsage(map_8_b) + memusage::DynamicUsage(map_c_f));
+    }
+};
 
 /** Cursor for iterating over CoinsView state */
 class CCoinsViewCursor
