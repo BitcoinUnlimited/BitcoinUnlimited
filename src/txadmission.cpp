@@ -933,7 +933,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
         // Check that the transaction doesn't have an excessive number of
         // sigops, making it impossible to mine.
-        if (nSigOps > MAX_TX_SIGOPS)
+        if (nSigOps > MAX_TX_SIGOPS_COUNT)
         {
             if (debugger)
             {

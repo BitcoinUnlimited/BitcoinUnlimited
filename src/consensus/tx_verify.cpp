@@ -166,7 +166,7 @@ bool CheckTransaction(const CTransactionRef tx, CValidationState &state)
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vout-empty");
     // Check that the transaction doesn't have an excessive number of sigops
     unsigned int nSigOps = GetLegacySigOpCount(tx, STANDARD_SCRIPT_VERIFY_FLAGS);
-    if (nSigOps > MAX_TX_SIGOPS)
+    if (nSigOps > MAX_TX_SIGOPS_COUNT)
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-too-many-sigops");
 
     // Size limits
@@ -300,7 +300,7 @@ bool Consensus::CheckTxInputs(const CTransactionRef tx, CValidationState &state,
     return true;
 }
 
-uint64_t GetTransactionSigOpCount(const CTransaction &tx, const CCoinsViewCache &coins, const uint32_t flags)
+uint64_t GetTransactionSigOpCount(const CTransactionRef ptx, const CCoinsViewCache &coins, const uint32_t flags)
 {
-    return GetLegacySigOpCount(MakeTransactionRef(tx), flags) + GetP2SHSigOpCount(MakeTransactionRef(tx), coins, flags);
+    return GetLegacySigOpCount(ptx, flags) + GetP2SHSigOpCount(ptx, coins, flags);
 }

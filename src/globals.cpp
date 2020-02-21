@@ -281,9 +281,6 @@ CTweakRef<uint64_t> ebTweak("net.excessiveBlock",
     "Excessive block size in bytes",
     &excessiveBlockSize,
     &ExcessiveBlockValidator);
-CTweak<uint64_t> blockSigopsPerMb("net.excessiveSigopsPerMb",
-    "Excessive effort per block, denoted in cost (# inputs * txsize) per MB",
-    BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
 CTweak<bool> ignoreNetTimeouts("net.ignoreTimeouts", "ignore inactivity timeouts, used during debugging", false);
 CTweakRef<bool> displayArchInSubver("net.displayArchInSubver",
     "Show box architecture, 32/64bit, in node user agent string (subver)",
@@ -292,9 +289,6 @@ CTweakRef<bool> displayArchInSubver("net.displayArchInSubver",
 CTweak<bool> miningCPFP("mining.childPaysForParent",
     "If enabled then we will mine ancestor packages and allow child pays for parent.",
     true);
-CTweak<uint64_t> blockMiningSigopsPerMb("mining.excessiveSigopsPerMb",
-    "Excessive effort per block, denoted in cost (# inputs * txsize) per MB",
-    BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
 CTweak<uint64_t> coinbaseReserve("mining.coinbaseReserve",
     "How much space to reserve for the coinbase transaction, in bytes",
     DEFAULT_COINBASE_RESERVE_SIZE);

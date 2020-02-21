@@ -1527,7 +1527,10 @@ bool ContextualCheckBlock(const CBlock &block,
         nLockTimeCutoff =
             (nLockTimeFlags & LOCKTIME_MEDIAN_TIME_PAST) ? pindexPrev->GetMedianTimePast() : block.GetBlockTime();
 
-    // Check that all transactions are finalized
+    // Check that all transactions are finalized and count the number of
+    // transactions to check for excessive transaction limits.
+    uint64_t nTx = 0;
+    uint64_t nLargestTx = 0;
     for (const auto &tx : block.vtx)
     {
         if (!IsFinalTx(tx, nHeight, nLockTimeCutoff))
@@ -1545,6 +1548,10 @@ bool ContextualCheckBlock(const CBlock &block,
                     "txn-undersize");
             }
         }
+
+        nTx++;
+        if (tx->GetTxSize() > nLargestTx)
+            nLargestTx = tx->GetTxSize();
     }
 
     // Enforce block nVersion=2 rule that the coinbase starts with serialized block height
@@ -1581,33 +1588,8 @@ bool ContextualCheckBlock(const CBlock &block,
     indexDummy.pprev = pindexPrev;
     indexDummy.nHeight = pindexPrev == nullptr ? 1 : pindexPrev->nHeight + 1;
 
-    const uint32_t flags = GetBlockScriptFlags(&indexDummy, Params().GetConsensus());
-
-
-    uint64_t nSigOps = 0;
-    // Count the number of transactions in case the CheckExcessive function wants to use this as criteria
-    uint64_t nTx = 0;
-    uint64_t nLargestTx = 0;
-
-    for (const auto &tx : block.vtx)
-    {
-        nTx++;
-
-        // Use the *pcoinsTip view rather than creating a new view when getting p2sh sigops. This
-        // way we don't have to copy coins into a new view. We can do this because we're not adding
-        // any coins to the cache but are just looking them up.
-        nSigOps += GetLegacySigOpCount(tx, flags) + GetP2SHSigOpCount(tx, *pcoinsTip, flags);
-
-        if (tx->GetTxSize() > nLargestTx)
-            nLargestTx = tx->GetTxSize();
-    }
-
-    // Only enforce sigops during block generation not acceptance
-    if (fConservative && (nSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS))
-        return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"), REJECT_INVALID, "bad-blk-sigops", true);
-
     // Check whether this block exceeds what we want to relay.
-    block.fExcessive = CheckExcessive(block, block.GetBlockSize(), nSigOps, nTx, nLargestTx);
+    block.fExcessive = CheckExcessive(block, block.GetBlockSize(), nTx, nLargestTx);
 
 
     return true;
@@ -2197,6 +2179,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
     ValidationResourceTracker resourceTracker;
     std::vector<int> prevheights;
     int nInputs = 0;
+    unsigned int nSigOps = 0;
     CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
     int nChecked = 0;
@@ -2245,6 +2228,11 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
             const CTransactionRef &txref = block.vtx[i];
 
             nInputs += tx.vin.size();
+
+            // Get total sigop count for both legacy and p2sh sigops
+            nSigOps += GetTransactionSigOpCount(txref, view, flags);
+            if (nSigOps > GetMaxBlockSigOpsCount(block.GetBlockSize()))
+                return state.DoS(100, error("ConnectBlock(): too many sigops"), REJECT_INVALID, "bad-blk-sigops");
 
             if (!tx.IsCoinBase())
             {
@@ -2389,6 +2377,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     ValidationResourceTracker resourceTracker;
     std::vector<int> prevheights;
     int nInputs = 0;
+    unsigned int nSigOps = 0;
     CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
     int nChecked = 0;
@@ -2471,6 +2460,11 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             const CTransactionRef &txref = block.vtx[i];
 
             nInputs += tx.vin.size();
+
+            // Get total sigop count for both legacy and p2sh sigops
+            nSigOps += GetTransactionSigOpCount(txref, view, flags);
+            if (nSigOps > GetMaxBlockSigOpsCount(block.GetBlockSize()))
+                return state.DoS(100, error("ConnectBlock(): too many sigops"), REJECT_INVALID, "bad-blk-sigops");
 
             if (!tx.IsCoinBase())
             {

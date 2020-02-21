@@ -351,8 +351,7 @@ bool BlockAssembler::isStillDependent(CTxMemPool::txiter iter)
 
 bool BlockAssembler::TestPackageSigOps(uint64_t packageSize, unsigned int packageSigOps)
 {
-    uint64_t blockMbSize = 1 + (nBlockSize + packageSize - 1) / 1000000;
-    uint64_t nMaxSigOpsAllowed = blockMiningSigopsPerMb.Value() * blockMbSize;
+    uint64_t nMaxSigOpsAllowed = GetMaxBlockSigOpsCount(nBlockSize + packageSize);
     if (nBlockSigOps + packageSigOps >= nMaxSigOpsAllowed)
         return false;
     return true;
@@ -397,21 +396,20 @@ bool BlockAssembler::IsIncrementallyGood(uint64_t nExtraSize, unsigned int nExtr
     if (nBlockSize + nExtraSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
     {
         // BU: be conservative about what is generated
-        if (nBlockSigOps + nExtraSigOps >= BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS)
+        if (nBlockSigOps + nExtraSigOps >= MAX_BLOCK_SIGOPS_PER_MB)
         {
             // BU: so a block that is near the sigops limit might be shorter than it could be if
             // the high sigops tx was backed out and other tx added.
-            if (nBlockSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS - 2)
+            if (nBlockSigOps > MAX_BLOCK_SIGOPS_PER_MB - 2)
                 blockFinished = true;
             return false;
         }
     }
     else
     {
-        uint64_t blockMbSize = 1 + (nBlockSize + nExtraSize - 1) / 1000000;
-        if (nBlockSigOps + nExtraSigOps > blockMiningSigopsPerMb.Value() * blockMbSize)
+        if (nBlockSigOps + nExtraSigOps > GetMaxBlockSigOpsCount(nBlockSize))
         {
-            if (nBlockSigOps > blockMiningSigopsPerMb.Value() * blockMbSize - 2)
+            if (nBlockSigOps > GetMaxBlockSigOpsCount(nBlockSize) - 2)
                 // very close to the limit, so the block is finished.  So a block that is near the sigops limit
                 // might be shorter than it could be if the high sigops tx was backed out and other tx added.
                 blockFinished = true;
