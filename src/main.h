@@ -159,7 +159,7 @@ extern std::atomic<CBlockIndex *> pindexBestInvalid;
 extern int64_t nLastOrphanCheck;
 
 /** Minimum disk space required - used in CheckDiskSpace() */
-static const uint64_t nMinDiskSpace = 52428800;
+static const uint64_t nMinDiskSpace = 100000000;
 
 /** Pruning-related variables and constants */
 /** True if any block files have ever been pruned. */
