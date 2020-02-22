@@ -229,16 +229,7 @@ void TxIndex::BlockConnected(const CBlock &block, CBlockIndex *pindex)
     }
 }
 
-bool TxIndex::IsSynced()
-{
-    if (!fSynced.load())
-    {
-        LOGA("%s: txindex is catching up on block notifications\n", __func__);
-        return false;
-    }
-    return true;
-}
-
+bool TxIndex::IsSynced() { return fSynced.load(); }
 bool TxIndex::FindTx(const uint256 &txhash, uint256 &blockhash, CTransactionRef &ptx) const
 {
     CDiskTxPos postx;
