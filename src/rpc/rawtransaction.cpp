@@ -1186,7 +1186,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
         view.SetBackend(viewMempool); // temporarily switch cache backend to db+mempool view
 
         {
-            WRITELOCK(view.cs_utxo);
+            RECURSIVEREADLOCK(view.cs_all_cacheCoins_maps);
             for (const CTxIn &txin : mergedTx.vin)
             {
                 // Load entries from viewChain into view; can fail.

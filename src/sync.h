@@ -137,6 +137,7 @@ public:
 #pragma clang diagnostic ignored "-Wthread-safety-analysis"
 #endif
     CDeferredSharedLocker(CSharedCriticalSection &scsp) : scs(scsp), state(LockState::UNLOCKED) {}
+    CSharedCriticalSection &get() { return scs; }
     void lock_shared()
     {
         if (state == LockState::UNLOCKED)

@@ -16,7 +16,11 @@
 Coin emptyCoin;
 bool CCoinsView::GetCoin(const COutPoint &outpoint, Coin &coin) const { return false; }
 bool CCoinsView::HaveCoin(const COutPoint &outpoint) const { return false; }
-uint256 CCoinsView::_GetBestBlock() const { return uint256(); }
+uint256 CCoinsView::GetBestBlock() const
+{
+    RECURSIVEREADLOCK(cs_utxo);
+    return uint256();
+}
 bool CCoinsView::BatchWrite(CCoinsMap &mapCoins,
     const uint256 &hashBlock,
     const uint64_t nBestCoinHeight,
@@ -28,7 +32,7 @@ CCoinsViewCursor *CCoinsView::Cursor() const { return nullptr; }
 CCoinsViewBacked::CCoinsViewBacked(CCoinsView *viewIn) : base(viewIn) {}
 bool CCoinsViewBacked::GetCoin(const COutPoint &outpoint, Coin &coin) const { return base->GetCoin(outpoint, coin); }
 bool CCoinsViewBacked::HaveCoin(const COutPoint &outpoint) const { return base->HaveCoin(outpoint); }
-uint256 CCoinsViewBacked::_GetBestBlock() const { return base->GetBestBlock(); }
+uint256 CCoinsViewBacked::GetBestBlock() const { return base->GetBestBlock(); }
 void CCoinsViewBacked::SetBackend(CCoinsView &viewIn) { base = &viewIn; }
 bool CCoinsViewBacked::BatchWrite(CCoinsMap &mapCoins,
     const uint256 &hashBlock,
@@ -50,23 +54,21 @@ CCoinsViewCache::CCoinsViewCache(CCoinsView *baseIn) : CCoinsViewBacked(baseIn),
 
 size_t CCoinsViewCache::DynamicMemoryUsage() const
 {
-    READLOCK(cs_utxo);
+    RECURSIVEREADLOCK(cs_all_cacheCoins_maps);
     return cacheCoins.DynamicUsage() + cachedCoinsUsage;
 }
-size_t CCoinsViewCache::_DynamicMemoryUsage() const
-{
-    return cacheCoins.DynamicUsage() + cachedCoinsUsage;
-}
+size_t CCoinsViewCache::_DynamicMemoryUsage() const { return cacheCoins.DynamicUsage() + cachedCoinsUsage; }
 size_t CCoinsViewCache::ResetCachedCoinUsage() const
 {
     bool drifted = false;
     size_t newCachedCoinsUsage = 0;
     {
-        READLOCK(cs_utxo);
+        RECURSIVEREADLOCK(cs_all_cacheCoins_maps);
 
+        CCoinsMap::iterator it;
         for (uint8_t num_map = 0; num_map < cacheCoins.numMaps(); num_map++)
         {
-            for (CCoinsMap::iterator it = cacheCoins.begin_partial(num_map); it != cacheCoins.end_multi(); it++)
+            for (it = cacheCoins.begin_partial(num_map); it != cacheCoins.end_partial(num_map); it++)
             {
                 newCachedCoinsUsage += it->second.coin.DynamicMemoryUsage();
             }
@@ -90,7 +92,7 @@ CCoinsMap::iterator CCoinsViewCache::FetchCoin(const COutPoint &outpoint, CDefer
         if (lock)
             lock->lock_shared();
         CCoinsMap::iterator it = cacheCoins.find(outpoint);
-        if (it != cacheCoins.end_multi())
+        if (it != cacheCoins.end_partial(outpoint))
         {
             return it;
         }
@@ -100,7 +102,7 @@ CCoinsMap::iterator CCoinsViewCache::FetchCoin(const COutPoint &outpoint, CDefer
     Coin tmp;
     if (!base->GetCoin(outpoint, tmp))
     {
-        return cacheCoins.end_multi();
+        return cacheCoins.end_partial(outpoint);
     }
 
     // But if the coin is NOT in the cache, we need to grab the exclusive lock in order to modify the cache
@@ -125,9 +127,10 @@ CCoinsMap::iterator CCoinsViewCache::FetchCoin(const COutPoint &outpoint, CDefer
 
 bool CCoinsViewCache::GetCoin(const COutPoint &outpoint, Coin &coin) const
 {
-    CDeferredSharedLocker lock(cs_utxo);
+    RECURSIVEREADLOCK(cs_all_cacheCoins_maps);
+    CDeferredSharedLocker lock(cacheCoins.getLockForOutpoint(outpoint));
     CCoinsMap::const_iterator it = FetchCoin(outpoint, &lock);
-    if (it != cacheCoins.end_multi())
+    if (it != cacheCoins.end_partial(outpoint))
     {
         coin = it->second.coin;
         return true;
@@ -137,7 +140,8 @@ bool CCoinsViewCache::GetCoin(const COutPoint &outpoint, Coin &coin) const
 
 void CCoinsViewCache::AddCoin(const COutPoint &outpoint, Coin &&coin, bool possible_overwrite)
 {
-    WRITELOCK(cs_utxo);
+    RECURSIVEREADLOCK(cs_all_cacheCoins_maps);
+    WRITELOCK(cacheCoins.getLockForOutpoint(outpoint));
     assert(!coin.IsSpent());
     if (coin.out.scriptPubKey.IsUnspendable())
         return;
@@ -166,9 +170,10 @@ void CCoinsViewCache::AddCoin(const COutPoint &outpoint, Coin &&coin, bool possi
 
 void CCoinsViewCache::SpendCoin(const COutPoint &outpoint, Coin *moveout)
 {
-    WRITELOCK(cs_utxo);
+    RECURSIVEREADLOCK(cs_all_cacheCoins_maps);
+    WRITELOCK(cacheCoins.getLockForOutpoint(outpoint));
     CCoinsMap::iterator it = FetchCoin(outpoint, nullptr);
-    if (it == cacheCoins.end_multi())
+    if (it == cacheCoins.end_partial(outpoint))
         return;
     cachedCoinsUsage -= it->second.coin.DynamicMemoryUsage();
     if (moveout)
@@ -190,9 +195,9 @@ static const Coin coinEmpty;
 
 const Coin &CCoinsViewCache::_AccessCoin(const COutPoint &outpoint) const
 {
-    AssertLockHeld(cs_utxo);
+    AssertLockHeld(cs_all_cacheCoins_maps);
     CCoinsMap::const_iterator it = FetchCoin(outpoint, nullptr);
-    if (it == cacheCoins.end_multi())
+    if (it == cacheCoins.end_partial(outpoint))
     {
         return coinEmpty;
     }
@@ -204,9 +209,10 @@ const Coin &CCoinsViewCache::_AccessCoin(const COutPoint &outpoint) const
 
 bool CCoinsViewCache::HaveCoin(const COutPoint &outpoint) const
 {
-    CDeferredSharedLocker lock(cs_utxo);
+    RECURSIVEREADLOCK(cs_all_cacheCoins_maps);
+    CDeferredSharedLocker lock(cacheCoins.getLockForOutpoint(outpoint));
     CCoinsMap::const_iterator it = FetchCoin(outpoint, &lock);
-    return (it != cacheCoins.end_multi() && !it->second.coin.IsSpent());
+    return (it != cacheCoins.end_partial(outpoint) && !it->second.coin.IsSpent());
 }
 
 bool CCoinsViewCache::GetCoinFromDB(const COutPoint &outpoint) const
@@ -215,7 +221,8 @@ bool CCoinsViewCache::GetCoinFromDB(const COutPoint &outpoint) const
     if (!base->GetCoin(outpoint, coin))
         return false;
 
-    WRITELOCK(cs_utxo);
+    RECURSIVEREADLOCK(cs_all_cacheCoins_maps);
+    WRITELOCK(cacheCoins.getLockForOutpoint(outpoint));
     CCoinsMap::iterator ret = cacheCoins.emplace(outpoint, coin).first;
     if (ret->second.coin.IsSpent())
     {
@@ -233,9 +240,10 @@ bool CCoinsViewCache::GetCoinFromDB(const COutPoint &outpoint) const
 
 bool CCoinsViewCache::HaveCoinInCache(const COutPoint &outpoint, bool &fSpent) const
 {
-    READLOCK(cs_utxo);
+    RECURSIVEREADLOCK(cs_all_cacheCoins_maps);
+    READLOCK(cacheCoins.getLockForOutpoint(outpoint));
     CCoinsMap::const_iterator it = cacheCoins.find(outpoint);
-    bool fHave = (it != cacheCoins.end_multi());
+    bool fHave = (it != cacheCoins.end_partial(outpoint));
     if (fHave)
         fSpent = it->second.coin.IsSpent();
     return fHave;
@@ -243,14 +251,7 @@ bool CCoinsViewCache::HaveCoinInCache(const COutPoint &outpoint, bool &fSpent) c
 
 uint256 CCoinsViewCache::GetBestBlock() const
 {
-    READLOCK(cs_utxo);
-    if (hashBlock.IsNull())
-        hashBlock = base->GetBestBlock();
-    return hashBlock;
-}
-
-uint256 CCoinsViewCache::_GetBestBlock() const
-{
+    RECURSIVEREADLOCK(cs_utxo);
     if (hashBlock.IsNull())
         hashBlock = base->GetBestBlock();
     return hashBlock;
@@ -258,7 +259,7 @@ uint256 CCoinsViewCache::_GetBestBlock() const
 
 void CCoinsViewCache::SetBestBlock(const uint256 &hashBlockIn)
 {
-    WRITELOCK(cs_utxo);
+    RECURSIVEWRITELOCK(cs_utxo);
     hashBlock = hashBlockIn;
 }
 
@@ -267,10 +268,10 @@ bool CCoinsViewCache::BatchWrite(CCoinsMap &mapCoins,
     const uint64_t nBestCoinHeightIn,
     size_t &nChildCachedCoinsUsage)
 {
-    WRITELOCK(cs_utxo);
+    RECURSIVEWRITELOCK(cs_all_cacheCoins_maps);
     for (uint8_t num_map = 0; num_map < mapCoins.numMaps(); num_map++)
     {
-        for (CCoinsMap::iterator it = mapCoins.begin_partial(num_map); it != mapCoins.end_multi();)
+        for (CCoinsMap::iterator it = mapCoins.begin_partial(num_map); it != mapCoins.end_partial(num_map);)
         {
             if (it->second.flags & CCoinsCacheEntry::DIRTY)
             { // Ignore non-dirty entries (optimization).
@@ -278,7 +279,7 @@ bool CCoinsViewCache::BatchWrite(CCoinsMap &mapCoins,
                 nChildCachedCoinsUsage -= it->second.coin.DynamicMemoryUsage();
 
                 CCoinsMap::iterator itUs = cacheCoins.find(it->first);
-                if (itUs == cacheCoins.end_multi())
+                if (itUs == cacheCoins.end_partial(it->first))
                 {
                     // The parent cache does not have an entry, while the child does
                     // We can ignore it if it's both FRESH and pruned in the child
@@ -335,7 +336,7 @@ bool CCoinsViewCache::BatchWrite(CCoinsMap &mapCoins,
             }
         }
     }
-    hashBlock = hashBlockIn;
+    SetBestBlock(hashBlockIn);
     if (nBestCoinHeightIn > nBestCoinHeight)
         nBestCoinHeight = nBestCoinHeightIn;
 
@@ -344,14 +345,14 @@ bool CCoinsViewCache::BatchWrite(CCoinsMap &mapCoins,
 
 bool CCoinsViewCache::Flush()
 {
-    WRITELOCK(cs_utxo);
+    RECURSIVEWRITELOCK(cs_all_cacheCoins_maps);
     bool fOk = base->BatchWrite(cacheCoins, hashBlock, nBestCoinHeight, cachedCoinsUsage);
     return fOk;
 }
 
 void CCoinsViewCache::Trim(size_t nTrimSize) const
 {
-    WRITELOCK(cs_utxo);
+    RECURSIVEWRITELOCK(cs_all_cacheCoins_maps);
 
     uint64_t nTrimmed = 0;
     uint64_t nTrimmedByHeight = 0;
@@ -371,11 +372,11 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
 
         for (uint8_t num_map = 0; num_map < cacheCoins.numMaps(); num_map++)
         {
-            for (CCoinsMap::iterator iter = cacheCoins.begin_partial(num_map); iter != cacheCoins.end_multi();)
+            for (CCoinsMap::iterator iter = cacheCoins.begin_partial(num_map); iter != cacheCoins.end_partial(num_map);)
             {
                 while (_DynamicMemoryUsage() > nTrimSize)
                 {
-                    if (iter == cacheCoins.end_multi())
+                    if (iter == cacheCoins.end_partial(num_map))
                     {
                         if (num_map == cacheCoins.numMaps() - 1)
                         {
@@ -430,11 +431,15 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
     // coin height. While this is not ideal we still have to trim to keep the cache from growing unbounded.
     for (uint8_t num_map = 0; num_map < cacheCoins.numMaps(); num_map++)
     {
-        for (CCoinsMap::iterator it = cacheCoins.begin_partial(num_map); it != cacheCoins.end_multi();)
+        for (CCoinsMap::iterator it = cacheCoins.begin_partial(num_map); it != cacheCoins.end_partial(num_map);)
         {
+            if (_DynamicMemoryUsage() <= nTrimSize)
+            {
+                break;
+            }
             while (_DynamicMemoryUsage() > nTrimSize)
             {
-                if (it == cacheCoins.end_multi())
+                if (it == cacheCoins.end_partial(num_map))
                 {
                     break;
                 }
@@ -474,11 +479,12 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
 
 void CCoinsViewCache::Uncache(const COutPoint &hash)
 {
-    WRITELOCK(cs_utxo);
+    RECURSIVEREADLOCK(cs_all_cacheCoins_maps);
+    WRITELOCK(cacheCoins.getLockForOutpoint(hash));
     CCoinsMap::iterator it = cacheCoins.find(hash);
 
     // only uncache coins that are not dirty.
-    if (it != cacheCoins.end_multi() && it->second.flags == 0)
+    if (it != cacheCoins.end_partial(hash) && it->second.flags == 0)
     {
         cachedCoinsUsage -= it->second.coin.DynamicMemoryUsage();
         cacheCoins.erase(it);
@@ -493,13 +499,13 @@ void CCoinsViewCache::UncacheTx(const CTransaction &tx)
 
 unsigned int CCoinsViewCache::GetCacheSize() const
 {
-    READLOCK(cs_utxo);
+    RECURSIVEREADLOCK(cs_all_cacheCoins_maps);
     return cacheCoins.size();
 }
 
 CAmount CCoinsViewCache::GetValueIn(const CTransaction &tx) const
 {
-    READLOCK(cs_utxo);
+    RECURSIVEREADLOCK(cs_all_cacheCoins_maps);
     if (tx.IsCoinBase())
         return 0;
 
@@ -527,7 +533,7 @@ bool CCoinsViewCache::HaveInputs(const CTransaction &tx) const
 
 double CCoinsViewCache::GetPriority(const CTransaction &tx, int nHeight, CAmount &inChainInputValue) const
 {
-    READLOCK(cs_utxo);
+    RECURSIVEREADLOCK(cs_all_cacheCoins_maps);
     inChainInputValue = 0;
     if (tx.IsCoinBase())
         return 0.0;
@@ -551,11 +557,13 @@ CCoinsViewCursor::~CCoinsViewCursor() {}
 static const size_t nMaxOutputsPerBlock =
     DEFAULT_LARGEST_TRANSACTION / ::GetSerializeSize(CTxOut(), SER_NETWORK, PROTOCOL_VERSION);
 
-CoinAccessor::CoinAccessor(const CCoinsViewCache &view, const uint256 &txid) : cache(&view), lock(cache->csCacheInsert)
+CoinAccessor::CoinAccessor(const CCoinsViewCache &view, const uint256 &txid)
+    : cache(&view), lock(cache->cs_all_cacheCoins_maps)
 {
-    EnterCritical("CCoinsViewCache.cs_utxo", __FILE__, __LINE__, (void *)(&cache->cs_utxo), LockType::SHARED_MUTEX,
+    EnterCritical("CCoinsViewCache.cs_all_maps", __FILE__, __LINE__, (void *)(&lock), LockType::RECURSIVE_SHARED_MUTEX,
         OwnershipType::SHARED);
-    cache->cs_utxo.lock_shared();
+    lock.lock_shared();
+    lock2 = nullptr;
     COutPoint iter(txid, 0);
     coin = &emptyCoin;
     while (iter.n < nMaxOutputsPerBlock)
@@ -571,13 +579,19 @@ CoinAccessor::CoinAccessor(const CCoinsViewCache &view, const uint256 &txid) : c
 }
 
 CoinAccessor::CoinAccessor(const CCoinsViewCache &cacheObj, const COutPoint &output)
-    : cache(&cacheObj), lock(cache->csCacheInsert)
+    : cache(&cacheObj), lock(cache->cs_all_cacheCoins_maps)
 {
-    EnterCritical("CCoinsViewCache.cs_utxo", __FILE__, __LINE__, (void *)(&cache->cs_utxo), LockType::SHARED_MUTEX,
+    EnterCritical("CCoinsViewCache.cs_all_maps", __FILE__, __LINE__, (void *)(&lock), LockType::RECURSIVE_SHARED_MUTEX,
         OwnershipType::SHARED);
-    cache->cs_utxo.lock_shared();
-    it = cache->FetchCoin(output, &lock);
-    if (it != cache->cacheCoins.end_multi())
+    lock.lock_shared();
+
+    lock2 = new CDeferredSharedLocker(cache->cacheCoins_lockforoutpoint(output));
+    EnterCritical("CCoinsViewCache.cs_some_map", __FILE__, __LINE__, (void *)(&lock2->get()), LockType::SHARED_MUTEX,
+        OwnershipType::SHARED);
+    lock2->lock_shared();
+
+    it = cache->FetchCoin(output, lock2);
+    if (it != cache->cacheCoins.end_partial(output))
         coin = &it->second.coin;
     else
         coin = &emptyCoin;
@@ -586,18 +600,25 @@ CoinAccessor::CoinAccessor(const CCoinsViewCache &cacheObj, const COutPoint &out
 CoinAccessor::~CoinAccessor()
 {
     coin = nullptr;
-    cache->cs_utxo.unlock_shared();
-    LeaveCritical(&cache->cs_utxo);
+    if (lock2)
+    {
+        lock2->unlock();
+        LeaveCritical(&lock2->get());
+    }
+    delete lock2;
+    lock.unlock_shared();
+    LeaveCritical(&lock);
 }
 
-
+// it is probably possible to modify CoinModifier to only lock for the map it needs
+// but it is only used by bitcoin-tx when signing so this is not very important to do
 CoinModifier::CoinModifier(const CCoinsViewCache &cacheObj, const COutPoint &output) : cache(&cacheObj)
 {
-    EnterCritical("CCoinsViewCache.cs_utxo", __FILE__, __LINE__, (void *)(&cache->cs_utxo), LockType::SHARED_MUTEX,
-        OwnershipType::EXCLUSIVE);
-    cache->cs_utxo.lock();
+    EnterCritical("CCoinsViewCache.cs_all_cacheCoins_maps", __FILE__, __LINE__,
+        (void *)(&cache->cs_all_cacheCoins_maps), LockType::RECURSIVE_SHARED_MUTEX, OwnershipType::EXCLUSIVE);
+    cache->cs_all_cacheCoins_maps.lock();
     it = cache->FetchCoin(output, nullptr);
-    if (it != cache->cacheCoins.end_multi())
+    if (it != cache->cacheCoins.end_partial(output))
         coin = &it->second.coin;
     else
         coin = &emptyCoin;
@@ -606,8 +627,8 @@ CoinModifier::CoinModifier(const CCoinsViewCache &cacheObj, const COutPoint &out
 CoinModifier::~CoinModifier()
 {
     coin = nullptr;
-    cache->cs_utxo.unlock();
-    LeaveCritical(&cache->cs_utxo);
+    cache->cs_all_cacheCoins_maps.unlock();
+    LeaveCritical(&cache->cs_all_cacheCoins_maps);
 }
 
 void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight)

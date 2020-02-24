@@ -69,25 +69,19 @@ CCoinsViewDB::CCoinsViewDB(size_t nCacheSize,
 
 bool CCoinsViewDB::GetCoin(const COutPoint &outpoint, Coin &coin) const
 {
-    READLOCK(cs_utxo);
+    RECURSIVEREADLOCK(cs_utxo);
     return db.Read(CoinEntry(&outpoint), coin);
 }
 
 bool CCoinsViewDB::HaveCoin(const COutPoint &outpoint) const
 {
-    READLOCK(cs_utxo);
+    RECURSIVEREADLOCK(cs_utxo);
     return db.Exists(CoinEntry(&outpoint));
 }
 
 uint256 CCoinsViewDB::GetBestBlock() const
 {
-    READLOCK(cs_utxo);
-    return _GetBestBlock();
-}
-
-uint256 CCoinsViewDB::_GetBestBlock() const
-{
-    AssertLockHeld(cs_utxo);
+    RECURSIVEREADLOCK(cs_utxo);
     uint256 hashBestChain;
     std::string strmode = std::to_string(static_cast<int32_t>(BLOCK_DB_MODE));
     if (pblockdb)
@@ -106,13 +100,7 @@ uint256 CCoinsViewDB::_GetBestBlock() const
 
 uint256 CCoinsViewDB::GetBestBlock(BlockDBMode mode) const
 {
-    READLOCK(cs_utxo);
-    return _GetBestBlock(mode);
-}
-
-uint256 CCoinsViewDB::_GetBestBlock(BlockDBMode mode) const
-{
-    AssertLockHeld(cs_utxo);
+    RECURSIVEREADLOCK(cs_utxo);
     uint256 hashBestChain;
     // if override isnt end, override the fetch to get the best block of a specific mode
     if (mode != END_STORAGE_OPTIONS)
@@ -134,13 +122,7 @@ uint256 CCoinsViewDB::_GetBestBlock(BlockDBMode mode) const
 
 void CCoinsViewDB::WriteBestBlock(const uint256 &hashBlock)
 {
-    WRITELOCK(cs_utxo);
-    _WriteBestBlock(hashBlock);
-}
-
-void CCoinsViewDB::_WriteBestBlock(const uint256 &hashBlock)
-{
-    AssertWriteLockHeld(cs_utxo);
+    RECURSIVEWRITELOCK(cs_utxo);
     std::string strmode = std::to_string(static_cast<int32_t>(BLOCK_DB_MODE));
     if (!hashBlock.IsNull())
     {
@@ -158,13 +140,7 @@ void CCoinsViewDB::_WriteBestBlock(const uint256 &hashBlock)
 
 void CCoinsViewDB::WriteBestBlock(const uint256 &hashBlock, BlockDBMode mode)
 {
-    WRITELOCK(cs_utxo);
-    _WriteBestBlock(hashBlock);
-}
-
-void CCoinsViewDB::_WriteBestBlock(const uint256 &hashBlock, BlockDBMode mode)
-{
-    AssertWriteLockHeld(cs_utxo);
+    RECURSIVEWRITELOCK(cs_utxo);
     if (mode != END_STORAGE_OPTIONS)
     {
         std::string strmode = std::to_string(static_cast<int32_t>(mode));
@@ -184,7 +160,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
     const uint64_t nBestCoinHeight,
     size_t &nChildCachedCoinsUsage)
 {
-    WRITELOCK(cs_utxo);
+    RECURSIVEWRITELOCK(cs_utxo);
     CDBBatch batch(db);
     size_t count = 0;
     size_t changed = 0;
@@ -193,7 +169,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
 
     for (uint8_t num_map = 0; num_map < mapCoins.numMaps(); num_map++)
     {
-        for (CCoinsMap::iterator it = mapCoins.begin_partial(num_map); it != mapCoins.end_multi();)
+        for (CCoinsMap::iterator it = mapCoins.begin_partial(num_map); it != mapCoins.end_partial(num_map);)
         {
             if (it->second.flags & CCoinsCacheEntry::DIRTY)
             {
@@ -247,7 +223,9 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
         }
     }
     if (!hashBlock.IsNull())
-        _WriteBestBlock(hashBlock);
+    {
+        WriteBestBlock(hashBlock);
+    }
 
     bool ret = db.WriteBatch(batch);
     LOG(COINDB, "Committing %u changed transactions (out of %u) to coin database with %u batch writes...\n",
@@ -258,13 +236,13 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
 
 size_t CCoinsViewDB::EstimateSize() const
 {
-    READLOCK(cs_utxo);
+    RECURSIVEREADLOCK(cs_utxo);
     return db.EstimateSize(DB_COIN, (char)(DB_COIN + 1));
 }
 
 size_t CCoinsViewDB::TotalWriteBufferSize() const
 {
-    READLOCK(cs_utxo);
+    RECURSIVEREADLOCK(cs_utxo);
     return db.TotalWriteBufferSize();
 }
 

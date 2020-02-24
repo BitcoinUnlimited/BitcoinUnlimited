@@ -138,12 +138,7 @@ struct CCoinsCacheEntry
 
     CCoinsCacheEntry() : flags(0) {}
     explicit CCoinsCacheEntry(Coin &&coin_) : coin(std::move(coin_)), flags(0) {}
-
-    friend bool operator==(CCoinsCacheEntry a, CCoinsCacheEntry b)
-    {
-        return (a.coin == b.coin);
-    }
-
+    friend bool operator==(CCoinsCacheEntry a, CCoinsCacheEntry b) { return (a.coin == b.coin); }
 };
 
 typedef std::unordered_map<COutPoint, CCoinsCacheEntry, SaltedOutpointHasher> _coin_map;
@@ -168,6 +163,7 @@ private:
 
     mutable CSharedCriticalSection cs_c_f;
     mutable _coin_map map_c_f;
+
 protected:
     uint8_t getMapForNibble(uint8_t &nibble)
     {
@@ -188,8 +184,9 @@ protected:
             return 3;
         }
     }
-    _coin_map* vMaps[4];
-    CSharedCriticalSection* vCs[4];
+    _coin_map *vMaps[4];
+    CSharedCriticalSection *vCs[4];
+
 public:
     typedef _coin_map::iterator iterator;
     typedef _coin_map::const_iterator const_iterator;
@@ -201,10 +198,10 @@ public:
         vMaps[1] = &(this->map_4_7);
         vMaps[2] = &(this->map_8_b);
         vMaps[3] = &(this->map_c_f);
-        vCs[0]= &(this->cs_0_3);
-        vCs[1]= &(this->cs_4_7);
-        vCs[2]= &(this->cs_8_b);
-        vCs[3]= &(this->cs_c_f);
+        vCs[0] = &(this->cs_0_3);
+        vCs[1] = &(this->cs_4_7);
+        vCs[2] = &(this->cs_8_b);
+        vCs[3] = &(this->cs_c_f);
     }
 
     void clear()
@@ -215,9 +212,12 @@ public:
         map_c_f.clear();
     }
 
-    uint8_t numMaps()
+    uint8_t numMaps() { return 4; }
+    CSharedCriticalSection &getLockForOutpoint(const COutPoint &outpoint)
     {
-        return 4;
+        uint8_t nibble = outpoint.hash.GetFirstNibble();
+        uint8_t map_num = getMapForNibble(nibble);
+        return (*vCs[map_num]);
     }
 
     iterator begin_partial(uint8_t map_num)
@@ -229,18 +229,27 @@ public:
         return vMaps[map_num]->begin();
     }
 
-    // the end() of all maps point to the same invalid memory so we can Compare
-    // the end of any of the _coin_map to the end of map_c_f without issue
-    iterator end_multi()
+    iterator end_partial(uint8_t map_num)
     {
-        return map_c_f.end();
+        if (map_num > numMaps() - 1)
+        {
+            map_num = numMaps() - 1;
+        }
+        return vMaps[map_num]->end();
     }
 
-    CCoinsCacheEntry& operator[] (const COutPoint& outpoint)
+    iterator end_partial(const COutPoint &outpoint)
     {
         uint8_t nibble = outpoint.hash.GetFirstNibble();
         uint8_t map_num = getMapForNibble(nibble);
-        _coin_map* selectedMap = vMaps[map_num];
+        return vMaps[map_num]->end();
+    }
+
+    CCoinsCacheEntry &operator[](const COutPoint &outpoint)
+    {
+        uint8_t nibble = outpoint.hash.GetFirstNibble();
+        uint8_t map_num = getMapForNibble(nibble);
+        _coin_map *selectedMap = vMaps[map_num];
         return (*selectedMap)[outpoint];
     }
 
@@ -248,9 +257,9 @@ public:
     {
         uint8_t nibble = it->first.hash.GetFirstNibble();
         uint8_t map_num = getMapForNibble(nibble);
-        auto new_it =  vMaps[map_num]->erase(it);
+        auto new_it = vMaps[map_num]->erase(it);
         // we dont want to get the begin of the next map if we are on the last map
-        if (new_it == end_multi() && map_num < (numMaps() - 1))
+        if (new_it == vMaps[map_num]->end() && map_num < (numMaps() - 1))
         {
             new_it = vMaps[map_num + 1]->begin();
         }
@@ -264,35 +273,33 @@ public:
         return vMaps[map_num]->find(outpoint);
     }
 
-    std::pair<iterator, bool> emplace(const COutPoint& outpoint)
+    std::pair<iterator, bool> emplace(const COutPoint &outpoint)
     {
         uint8_t nibble = outpoint.hash.GetFirstNibble();
         uint8_t map_num = getMapForNibble(nibble);
         return vMaps[map_num]->emplace(std::piecewise_construct, std::forward_as_tuple(outpoint), std::tuple<>());
     }
 
-    std::pair<iterator, bool> emplace(const COutPoint& outpoint, const CCoinsCacheEntry& entry)
+    std::pair<iterator, bool> emplace(const COutPoint &outpoint, const CCoinsCacheEntry &entry)
     {
         uint8_t nibble = outpoint.hash.GetFirstNibble();
         uint8_t map_num = getMapForNibble(nibble);
         return vMaps[map_num]->emplace(outpoint, std::move(entry));
     }
 
-    std::pair<iterator, bool> emplace(const COutPoint& outpoint, Coin& coin)
+    std::pair<iterator, bool> emplace(const COutPoint &outpoint, Coin &coin)
     {
         uint8_t nibble = outpoint.hash.GetFirstNibble();
         uint8_t map_num = getMapForNibble(nibble);
-        return vMaps[map_num]->emplace(std::piecewise_construct, std::forward_as_tuple(outpoint), std::forward_as_tuple(std::move(coin)));
+        return vMaps[map_num]->emplace(
+            std::piecewise_construct, std::forward_as_tuple(outpoint), std::forward_as_tuple(std::move(coin)));
     }
 
-    size_t size()
-    {
-        return (map_0_3.size() + map_4_7.size() + map_8_b.size() + map_c_f.size());
-    }
-
+    size_t size() { return (map_0_3.size() + map_4_7.size() + map_8_b.size() + map_c_f.size()); }
     size_t DynamicUsage()
     {
-        return (memusage::DynamicUsage(map_0_3) + memusage::DynamicUsage(map_4_7) + memusage::DynamicUsage(map_8_b) + memusage::DynamicUsage(map_c_f));
+        return (memusage::DynamicUsage(map_0_3) + memusage::DynamicUsage(map_4_7) + memusage::DynamicUsage(map_8_b) +
+                memusage::DynamicUsage(map_c_f));
     }
 };
 
@@ -321,7 +328,7 @@ private:
 class CCoinsView
 {
 public:
-    mutable CSharedCriticalSection cs_utxo;
+    mutable CRecursiveSharedCriticalSection cs_utxo;
 
     //! Retrieve the Coin (unspent transaction output) for a given outpoint.
     virtual bool GetCoin(const COutPoint &outpoint, Coin &coin) const;
@@ -331,12 +338,7 @@ public:
     virtual bool HaveCoin(const COutPoint &outpoint) const;
 
     //! Retrieve the block hash whose state this CCoinsView currently represents
-    virtual uint256 _GetBestBlock() const;
-    uint256 GetBestBlock() const
-    {
-        READLOCK(cs_utxo);
-        return _GetBestBlock();
-    }
+    virtual uint256 GetBestBlock() const;
 
     //! Do a bulk modification (multiple Coin changes + BestBlock change).
     //! The passed mapCoins can be modified.
@@ -363,9 +365,9 @@ protected:
 
 public:
     CCoinsViewBacked(CCoinsView *viewIn);
+    uint256 GetBestBlock() const override;
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
-    uint256 _GetBestBlock() const override;
     void SetBackend(CCoinsView &viewIn);
     bool BatchWrite(CCoinsMap &mapCoins,
         const uint256 &hashBlock,
@@ -409,7 +411,8 @@ protected:
     const CCoinsViewCache *cache;
     CCoinsMap::const_iterator it;
     const Coin *coin;
-    CDeferredSharedLocker lock;
+    CRecursiveSharedCriticalSection &lock;
+    CDeferredSharedLocker *lock2;
 
 public:
     operator bool() const { return coin != nullptr; }
@@ -428,6 +431,9 @@ class CCoinsViewCache : public CCoinsViewBacked
     friend class CoinAccessor;
     friend class CoinModifier;
 
+public:
+    mutable CRecursiveSharedCriticalSection cs_all_cacheCoins_maps;
+
 protected:
     /**
      * Make mutable so that we can "fill the cache" even from Get-methods
@@ -436,19 +442,21 @@ protected:
     mutable uint256 hashBlock;
     mutable uint64_t nBestCoinHeight;
     mutable CCoinsMap cacheCoins;
-    mutable CSharedCriticalSection csCacheInsert;
     /* Cached dynamic memory usage for the inner Coin objects. */
     mutable size_t cachedCoinsUsage;
 
-
 public:
     CCoinsViewCache(CCoinsView *baseIn);
+
+    CSharedCriticalSection &cacheCoins_lockforoutpoint(const COutPoint &outpoint) const
+    {
+        return cacheCoins.getLockForOutpoint(outpoint);
+    }
 
     // Standard CCoinsView methods
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const;
     bool HaveCoin(const COutPoint &outpoint) const;
     uint256 GetBestBlock() const;
-    uint256 _GetBestBlock() const;
     void SetBestBlock(const uint256 &hashBlock);
     bool BatchWrite(CCoinsMap &mapCoins,
         const uint256 &hashBlock,
@@ -504,7 +512,7 @@ public:
      */
     void Clear()
     {
-        WRITELOCK(cs_utxo);
+        RECURSIVEWRITELOCK(cs_all_cacheCoins_maps);
         cacheCoins.clear();
     }
 

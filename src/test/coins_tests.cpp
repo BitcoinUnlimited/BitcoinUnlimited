@@ -20,7 +20,6 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, CTxUndo &txund
 
 namespace
 {
-
 class CCoinsViewTest : public CCoinsView
 {
     uint256 hashBestBlock_;
@@ -57,7 +56,7 @@ public:
     {
         for (uint8_t num_map = 0; num_map < mapCoins.numMaps(); num_map++)
         {
-            for (CCoinsMap::iterator it = mapCoins.begin_partial(num_map); it != mapCoins.end_multi();)
+            for (CCoinsMap::iterator it = mapCoins.begin_partial(num_map); it != mapCoins.end_partial(num_map);)
             {
                 if (it->second.flags & CCoinsCacheEntry::DIRTY)
                 {
@@ -96,9 +95,10 @@ public:
         // Manually recompute the dynamic usage of the whole data, and compare it.
         size_t ret = cacheCoins.DynamicUsage();
         size_t count = 0;
+        CCoinsMap::iterator it;
         for (uint8_t num_map = 0; num_map < cacheCoins.numMaps(); num_map++)
         {
-            for (CCoinsMap::iterator it = cacheCoins.begin_partial(num_map); it != cacheCoins.end_multi(); it++)
+            for (it = cacheCoins.begin_partial(num_map); it != cacheCoins.end_partial(num_map); it++)
             {
                 ret += it->second.coin.DynamicMemoryUsage();
                 ++count;
@@ -168,8 +168,8 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
             }
             else
             {
-                WRITELOCK(stack.back()->cs_utxo);
-                const Coin &entry = stack.back()->_AccessCoin(COutPoint(txid, 0));
+                Coin entry;
+                stack.back()->GetCoin(COutPoint(txid, 0), entry);
                 BOOST_CHECK(coin == entry);
             }
 
@@ -227,7 +227,8 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
                 bool have = stack.back()->HaveCoin(it->first);
                 bool isspent = true;
                 {
-                    WRITELOCK(stack.back()->cs_utxo);
+
+                    RECURSIVEREADLOCK(stack.back()->cs_all_cacheCoins_maps);
                     const Coin &coin = stack.back()->_AccessCoin(it->first);
                     isspent = coin.IsSpent();
                     BOOST_CHECK(have == !isspent);
@@ -449,7 +450,7 @@ size_t InsertCoinsMapEntry(CCoinsMap &map, CAmount value, char flags)
 void GetCoinsMapEntry(CCoinsMap &map, CAmount &value, char &flags)
 {
     auto it = map.find(OUTPOINT);
-    if (it == map.end_multi())
+    if (it == map.end_partial(OUTPOINT))
     {
         value = ABSENT;
         flags = NO_ENTRY;
@@ -503,7 +504,7 @@ void CheckAccessCoin(CAmount base_value,
     SingleEntryCacheTest test(base_value, cache_value, cache_flags);
 
     {
-        WRITELOCK(test.cache.cs_utxo);
+        RECURSIVEREADLOCK(test.cache.cs_all_cacheCoins_maps);
         test.cache._AccessCoin(OUTPOINT);
     }
     test.cache.SelfTest();
