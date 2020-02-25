@@ -1,5 +1,5 @@
 ---
-name: "BUcash-linux-1.7"
+name: "BUcash-arm"
 enable_cache: true
 suites:
 - "bionic"
