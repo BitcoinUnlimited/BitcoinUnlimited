@@ -538,6 +538,19 @@ void CRequestManager::RequestCorruptedBlock(const uint256 &blockHash)
     AskForDuringIBD(vGetBlocks, nullptr);
 }
 
+static bool IsGrapheneVersionSupported(CNode *pfrom)
+{
+    try
+    {
+        NegotiateGrapheneVersion(pfrom);
+        return true;
+    }
+    catch (const std::runtime_error &error)
+    {
+        return false;
+    }
+}
+
 bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
 {
     CInv inv2(obj);
@@ -548,7 +561,7 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
     {
         // Ask for Graphene blocks
         // Must download a graphene block from a graphene enabled peer.
-        if (IsGrapheneBlockEnabled() && pfrom->GrapheneCapable())
+        if (IsGrapheneBlockEnabled() && pfrom->GrapheneCapable() && IsGrapheneVersionSupported(pfrom))
         {
             if (thinrelay.AddBlockInFlight(pfrom, inv2.hash, NetMsgType::GRAPHENEBLOCK))
             {
