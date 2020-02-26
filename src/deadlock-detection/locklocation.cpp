@@ -26,7 +26,8 @@ CLockLocation::CLockLocation(const char *pszName,
 std::string CLockLocation::ToString() const
 {
     return mutexName + "  " + sourceFile + ":" + std::to_string(sourceLine) + (fTry ? " (TRY)" : "") +
-           (eOwnership == OwnershipType::EXCLUSIVE ? " (EXCLUSIVE)" : "") + (fWaiting ? " (WAITING)" : "");
+           (eOwnership == OwnershipType::EXCLUSIVE ? " (EXCLUSIVE)" : "(SHARED)") +
+           (fWaiting ? " (WAITING)" : "(HELD)");
 }
 
 bool CLockLocation::GetTry() const { return fTry; }
