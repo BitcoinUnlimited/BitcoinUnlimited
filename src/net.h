@@ -514,22 +514,24 @@ public:
     bool fShouldBan;
     BanReason nBanType = (BanReason)-1;
 
+    // General thintype critical section to ensure that no
+    // two thintype blocks from the "same" peer can be processed at
+    // the same time.
+    CCriticalSection cs_thintype;
+
     // Xtreme Thinblocks
-    CCriticalSection cs_xthinblock;
     /** Max xthin bloom filter size (in bytes) that our peer will accept */
     std::atomic<uint32_t> nXthinBloomfilterSize;
 
     // Graphene blocks
-    CCriticalSection cs_graphene;
     /** Stores the grapheneblock salt to be used for this peer */
-    uint64_t gr_shorttxidk0 GUARDED_BY(cs_graphene);
-    uint64_t gr_shorttxidk1 GUARDED_BY(cs_graphene);
+    uint64_t gr_shorttxidk0 GUARDED_BY(cs_thintype);
+    uint64_t gr_shorttxidk1 GUARDED_BY(cs_thintype);
 
     // Compact Blocks
-    CCriticalSection cs_compactblock;
     /** Stores the compactblock salt to be used for this peer */
-    uint64_t shorttxidk0 GUARDED_BY(cs_compactblock);
-    uint64_t shorttxidk1 GUARDED_BY(cs_compactblock);
+    uint64_t shorttxidk0 GUARDED_BY(cs_thintype);
+    uint64_t shorttxidk1 GUARDED_BY(cs_thintype);
     /** Does this peer support CompactBlocks */
     std::atomic<bool> fSupportsCompactBlocks;
 

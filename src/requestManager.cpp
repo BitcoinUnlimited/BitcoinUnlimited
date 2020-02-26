@@ -538,6 +538,19 @@ void CRequestManager::RequestCorruptedBlock(const uint256 &blockHash)
     AskForDuringIBD(vGetBlocks, nullptr);
 }
 
+static bool IsGrapheneVersionSupported(CNode *pfrom)
+{
+    try
+    {
+        NegotiateGrapheneVersion(pfrom);
+        return true;
+    }
+    catch (const std::runtime_error &error)
+    {
+        return false;
+    }
+}
+
 bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
 {
     CInv inv2(obj);
@@ -548,9 +561,8 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
     {
         // Ask for Graphene blocks
         // Must download a graphene block from a graphene enabled peer.
-        if (IsGrapheneBlockEnabled() && pfrom->GrapheneCapable())
+        if (IsGrapheneBlockEnabled() && pfrom->GrapheneCapable() && IsGrapheneVersionSupported(pfrom))
         {
-            // We can only request one thin type block per peer at a time.
             if (thinrelay.AddBlockInFlight(pfrom, inv2.hash, NetMsgType::GRAPHENEBLOCK))
             {
                 MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
@@ -575,7 +587,6 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         // Must download an xthinblock from a xthin peer.
         if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable())
         {
-            // We can only request one thin type block per peer at a time.
             if (thinrelay.AddBlockInFlight(pfrom, inv2.hash, NetMsgType::XTHINBLOCK))
             {
                 MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
@@ -602,7 +613,6 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         // Must download an xthinblock from a xthin peer.
         if (IsCompactBlocksEnabled() && pfrom->CompactBlockCapable())
         {
-            // We can only request one thin type block per peer at a time.
             if (thinrelay.AddBlockInFlight(pfrom, inv2.hash, NetMsgType::CMPCTBLOCK))
             {
                 MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
@@ -1087,10 +1097,35 @@ void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
         }
         if (!vGetBlocks.empty())
         {
+            std::vector<CInv> vToFetchNew;
+            {
+                LOCK(cs_objDownloader);
+                for (CInv &inv : vGetBlocks)
+                {
+                    // If this block is already in flight then don't ask for it again during the IBD process.
+                    //
+                    // If it's an additional source for a new peer then it would have been added already in
+                    // FindNextBlocksToDownload().
+                    std::map<uint256, std::map<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
+                        mapBlocksInFlight.find(inv.hash);
+                    if (itInFlight != mapBlocksInFlight.end())
+                    {
+                        continue;
+                    }
+
+                    vToFetchNew.push_back(inv);
+                }
+            }
+            vGetBlocks.swap(vToFetchNew);
+
             if (!IsInitialBlockDownload())
+            {
                 AskFor(vGetBlocks, pto);
+            }
             else
+            {
                 AskForDuringIBD(vGetBlocks, pto);
+            }
         }
     }
 }
@@ -1164,8 +1199,17 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
             uint256 blockHash = pindex->GetBlockHash();
             if (AlreadyAskedForBlock(blockHash))
             {
-                AskFor(CInv(MSG_BLOCK, blockHash), node); // Add another source
-                continue;
+                // Only add a new source if there is a block in flight from a different peer. This prevents
+                // us from re-adding a source for the same peer and possibly downloading two duplicate blocks.
+                // This edge condition can typically happen when we were only connected to only one peer and we
+                // exceed the download timeout causing us to re-request the same block from the same peer.
+                std::map<uint256, std::map<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
+                    mapBlocksInFlight.find(blockHash);
+                if (itInFlight != mapBlocksInFlight.end() && !itInFlight->second.count(nodeid))
+                {
+                    AskFor(CInv(MSG_BLOCK, blockHash), node); // Add another source
+                    continue;
+                }
             }
 
             if (!pindex->IsValid(BLOCK_VALID_TREE))
