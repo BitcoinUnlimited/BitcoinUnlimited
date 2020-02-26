@@ -1141,7 +1141,10 @@ bool AppInit2(Config &config, thread_group &threadGroup)
                     cacheConfig.nBlockTreeDBCache, cacheConfig.nBlockDBCache, cacheConfig.nBlockUndoDBCache);
 
                 uiInterface.InitMessage(_("Opening UTXO database..."));
-                pcoinsdbview = new CCoinsViewDB(cacheConfig.nCoinDBCache, false, fReindex);
+                COverrideOptions overridecache;
+                overridecache.block_size = 128;
+                pcoinsdbview = new CCoinsViewDB(cacheConfig.nCoinDBCache, false, fReindex, true, &overridecache);
+
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
                 uiInterface.InitMessage(_("Opening Coins Cache database..."));
                 pcoinsTip = new CCoinsViewCache(pcoinscatcher);
