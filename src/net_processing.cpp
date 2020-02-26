@@ -1623,7 +1623,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // ignore the expedited message unless we are at the chain tip...
         if (!fImporting && !fReindex && !IsInitialBlockDownload())
         {
-            LOCK(pfrom->cs_xthinblock);
+            LOCK(pfrom->cs_thintype);
             if (!HandleExpeditedBlock(vRecv, pfrom))
                 return false;
         }
@@ -1632,7 +1632,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::XTHINBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsThinBlocksEnabled())
     {
-        LOCK(pfrom->cs_xthinblock);
+        LOCK(pfrom->cs_thintype);
         return CXThinBlock::HandleMessage(vRecv, pfrom, strCommand, 0);
     }
 
@@ -1640,7 +1640,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::THINBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsThinBlocksEnabled())
     {
-        LOCK(pfrom->cs_xthinblock);
+        LOCK(pfrom->cs_thintype);
         return CThinBlock::HandleMessage(vRecv, pfrom);
     }
 
@@ -1651,7 +1651,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
-        LOCK(pfrom->cs_xthinblock);
+        LOCK(pfrom->cs_thintype);
         return CXRequestThinBlockTx::HandleMessage(vRecv, pfrom);
     }
 
@@ -1659,7 +1659,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::XBLOCKTX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsThinBlocksEnabled())
     {
-        LOCK(pfrom->cs_xthinblock);
+        LOCK(pfrom->cs_thintype);
         return CXThinBlockTx::HandleMessage(vRecv, pfrom);
     }
 
@@ -1670,14 +1670,14 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
-        LOCK(pfrom->cs_graphene);
+        LOCK(pfrom->cs_thintype);
         return HandleGrapheneBlockRequest(vRecv, pfrom, chainparams);
     }
 
     else if (strCommand == NetMsgType::GRAPHENEBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsGrapheneBlockEnabled() && grapheneVersionCompatible)
     {
-        LOCK(pfrom->cs_graphene);
+        LOCK(pfrom->cs_thintype);
         return CGrapheneBlock::HandleMessage(vRecv, pfrom, strCommand, 0);
     }
 
@@ -1688,7 +1688,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
-        LOCK(pfrom->cs_graphene);
+        LOCK(pfrom->cs_thintype);
         return CRequestGrapheneBlockTx::HandleMessage(vRecv, pfrom);
     }
 
@@ -1696,7 +1696,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::GRAPHENETX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsGrapheneBlockEnabled() && grapheneVersionCompatible)
     {
-        LOCK(pfrom->cs_graphene);
+        LOCK(pfrom->cs_thintype);
         return CGrapheneBlockTx::HandleMessage(vRecv, pfrom);
     }
 
@@ -1705,7 +1705,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
-        LOCK(pfrom->cs_graphene);
+        LOCK(pfrom->cs_thintype);
         return HandleGrapheneBlockRecoveryRequest(vRecv, pfrom, chainparams);
     }
 
@@ -1714,7 +1714,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
-        LOCK(pfrom->cs_graphene);
+        LOCK(pfrom->cs_thintype);
         return HandleGrapheneBlockRecoveryResponse(vRecv, pfrom, chainparams);
     }
 
@@ -1722,7 +1722,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::CMPCTBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsCompactBlocksEnabled())
     {
-        LOCK(pfrom->cs_compactblock);
+        LOCK(pfrom->cs_thintype);
         return CompactBlock::HandleMessage(vRecv, pfrom);
     }
     else if (strCommand == NetMsgType::GETBLOCKTXN && !fImporting && !fReindex && !IsInitialBlockDownload() &&
@@ -1731,13 +1731,13 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
-        LOCK(pfrom->cs_compactblock);
+        LOCK(pfrom->cs_thintype);
         return CompactReRequest::HandleMessage(vRecv, pfrom);
     }
     else if (strCommand == NetMsgType::BLOCKTXN && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsCompactBlocksEnabled())
     {
-        LOCK(pfrom->cs_compactblock);
+        LOCK(pfrom->cs_thintype);
         return CompactReReqResponse::HandleMessage(vRecv, pfrom);
     }
 
