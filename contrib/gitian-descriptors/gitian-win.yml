@@ -1,5 +1,5 @@
 ---
-name: "BUcash-win-1.7"
+name: "BUcash-win"
 enable_cache: true
 suites:
 - "bionic"

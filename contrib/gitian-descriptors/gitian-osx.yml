@@ -1,5 +1,5 @@
 ---
-name: "BUcash-osx-1.7"
+name: "BUcash-osx"
 enable_cache: true
 suites:
 - "bionic"
