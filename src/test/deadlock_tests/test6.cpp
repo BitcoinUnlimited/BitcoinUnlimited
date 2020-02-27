@@ -62,7 +62,6 @@ void Thread2()
 
 BOOST_AUTO_TEST_CASE(TEST_6)
 {
-    /*
     std::thread thread1(Thread1);
     std::thread thread2(Thread2);
     while(!lock_exceptions) ;
@@ -71,7 +70,6 @@ BOOST_AUTO_TEST_CASE(TEST_6)
     thread2.join();
     BOOST_CHECK(lock_exceptions == 1);
     lockdata.ordertracker.clear();
-    */
 }
 
 #else
