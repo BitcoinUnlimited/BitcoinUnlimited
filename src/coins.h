@@ -273,21 +273,21 @@ public:
         return vMaps[map_num]->find(outpoint);
     }
 
-    std::pair<iterator, bool> emplace(const COutPoint &outpoint)
+    inline std::pair<iterator, bool> emplace(const COutPoint &outpoint)
     {
         uint8_t nibble = outpoint.hash.GetFirstNibble();
         uint8_t map_num = getMapForNibble(nibble);
         return vMaps[map_num]->emplace(std::piecewise_construct, std::forward_as_tuple(outpoint), std::tuple<>());
     }
 
-    std::pair<iterator, bool> emplace(const COutPoint &outpoint, const CCoinsCacheEntry &entry)
+    inline std::pair<iterator, bool> emplace(const COutPoint &outpoint, const CCoinsCacheEntry &entry)
     {
         uint8_t nibble = outpoint.hash.GetFirstNibble();
         uint8_t map_num = getMapForNibble(nibble);
         return vMaps[map_num]->emplace(outpoint, std::move(entry));
     }
 
-    std::pair<iterator, bool> emplace(const COutPoint &outpoint, Coin &coin)
+    inline std::pair<iterator, bool> emplace(const COutPoint &outpoint, Coin &coin)
     {
         uint8_t nibble = outpoint.hash.GetFirstNibble();
         uint8_t map_num = getMapForNibble(nibble);
