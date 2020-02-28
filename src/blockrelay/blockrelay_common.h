@@ -8,6 +8,7 @@
 #include "net.h"
 #include "utiltime.h"
 
+#include <set>
 #include <stdint.h>
 
 class CNode;
@@ -20,7 +21,17 @@ struct CThinTypeBlockInFlight
     int64_t nRequestTime;
     bool fReceived;
     const std::string thinType;
+    bool operator==(const CThinTypeBlockInFlight &b) { return ((hash == b.hash) && (thinType == b.thinType)); }
+    friend bool operator<(const CThinTypeBlockInFlight &a, const CThinTypeBlockInFlight &b)
+    {
+        if (a.hash == b.hash)
+        {
+            return (a.thinType < b.thinType);
+        }
+        return (a.hash < b.hash);
+    }
 };
+
 
 class ThinTypeRelay
 {
@@ -35,10 +46,10 @@ private:
     std::map<uint256, std::pair<uint64_t, bool> > mapBlockRelayTimer GUARDED_BY(cs_blockrelaytimer);
 
     // thin type blocks in flight and the time they were requested.
-    std::multimap<const NodeId, CThinTypeBlockInFlight> mapThinTypeBlocksInFlight GUARDED_BY(cs_inflight);
+    std::map<const NodeId, std::set<CThinTypeBlockInFlight> > mapThinTypeBlocksInFlight GUARDED_BY(cs_inflight);
 
     // blocks that are currently being reconstructed.
-    std::multimap<NodeId, std::pair<uint256, std::shared_ptr<CBlockThinRelay> > > mapBlocksReconstruct GUARDED_BY(
+    std::map<NodeId, std::map<uint256, std::shared_ptr<CBlockThinRelay> > > mapBlocksReconstruct GUARDED_BY(
         cs_reconstruct);
 
     // put a cap on the total number of thin type blocks we can have in flight. This lowers any possible
@@ -70,7 +81,6 @@ public:
     void ClearBlockRelayTimer(const uint256 &hash);
     bool AreTooManyBlocksInFlight();
     bool IsBlockInFlight(CNode *pfrom, const std::string thinType, const uint256 &hash);
-    unsigned int TotalBlocksInFlight();
     void BlockWasReceived(CNode *pfrom, const uint256 &hash);
     bool AddBlockInFlight(CNode *pfrom, const uint256 &hash, const std::string thinType);
     void ClearBlockInFlight(NodeId id, const uint256 &hash);
