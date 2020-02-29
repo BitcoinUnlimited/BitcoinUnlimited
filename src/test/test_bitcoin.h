@@ -15,6 +15,14 @@
 
 #include <thread>
 
+extern FastRandomContext insecure_rand_ctx;
+
+static inline void SeedInsecureRand(bool deterministic = false)
+{
+    insecure_rand_ctx = FastRandomContext(deterministic);
+}
+
+static inline uint32_t InsecureRand32() { return insecure_rand_ctx.rand32(); }
 /** Basic testing setup.
  * This just configures logging and chain parameters.
  */
