@@ -92,7 +92,6 @@ static ScriptErrorDesc script_errors[] = {
     {SCRIPT_ERR_MINIMALDATA, "MINIMALDATA"},
     {SCRIPT_ERR_SIG_PUSHONLY, "SIG_PUSHONLY"},
     {SCRIPT_ERR_SIG_HIGH_S, "SIG_HIGH_S"},
-    {SCRIPT_ERR_SIG_NULLDUMMY, "SIG_NULLDUMMY"},
     {SCRIPT_ERR_PUBKEYTYPE, "PUBKEYTYPE"},
     {SCRIPT_ERR_CLEANSTACK, "CLEANSTACK"},
     {SCRIPT_ERR_SIG_NULLFAIL, "NULLFAIL"},
@@ -1120,37 +1119,19 @@ BOOST_AUTO_TEST_CASE(script_build_1)
 
     tests.push_back(TestBuilder(CScript() << OP_3 << ToByteVector(keys.pubkey0C) << ToByteVector(keys.pubkey1C)
                                           << ToByteVector(keys.pubkey2C) << OP_3 << OP_CHECKMULTISIG,
-                        "3-of-3 with nonzero dummy but no NULLDUMMY", 0)
+                        "3-of-3 with nonzero dummy", 0)
                         .Num(1)
                         .PushSigECDSA(keys.key0)
                         .PushSigECDSA(keys.key1)
                         .PushSigECDSA(keys.key2));
     tests.push_back(TestBuilder(CScript() << OP_3 << ToByteVector(keys.pubkey0C) << ToByteVector(keys.pubkey1C)
-                                          << ToByteVector(keys.pubkey2C) << OP_3 << OP_CHECKMULTISIG,
-                        "3-of-3 with nonzero dummy", SCRIPT_VERIFY_NULLDUMMY)
-                        .Num(1)
-                        .PushSigECDSA(keys.key0)
-                        .PushSigECDSA(keys.key1)
-                        .PushSigECDSA(keys.key2)
-                        .SetScriptError(SCRIPT_ERR_SIG_NULLDUMMY));
-    tests.push_back(TestBuilder(CScript() << OP_3 << ToByteVector(keys.pubkey0C) << ToByteVector(keys.pubkey1C)
                                           << ToByteVector(keys.pubkey2C) << OP_3 << OP_CHECKMULTISIG << OP_NOT,
-                        "3-of-3 NOT with invalid sig and nonzero dummy but no NULLDUMMY", 0)
+                        "3-of-3 NOT with invalid sig and nonzero dummy", 0)
                         .Num(1)
                         .PushSigECDSA(keys.key0)
                         .PushSigECDSA(keys.key1)
                         .PushSigECDSA(keys.key2)
                         .DamagePush(10));
-    tests.push_back(TestBuilder(CScript() << OP_3 << ToByteVector(keys.pubkey0C) << ToByteVector(keys.pubkey1C)
-                                          << ToByteVector(keys.pubkey2C) << OP_3 << OP_CHECKMULTISIG << OP_NOT,
-                        "3-of-3 NOT with invalid sig with nonzero dummy", SCRIPT_VERIFY_NULLDUMMY)
-                        .Num(1)
-                        .PushSigECDSA(keys.key0)
-                        .PushSigECDSA(keys.key1)
-                        .PushSigECDSA(keys.key2)
-                        .DamagePush(10)
-                        .SetScriptError(SCRIPT_ERR_SIG_NULLDUMMY));
-
     tests.push_back(TestBuilder(CScript() << OP_2 << ToByteVector(keys.pubkey1C) << ToByteVector(keys.pubkey1C) << OP_2
                                           << OP_CHECKMULTISIG,
                         "2-of-2 with two identical keys and sigs pushed using OP_DUP but no SIGPUSHONLY", 0)
@@ -1899,11 +1880,6 @@ BOOST_AUTO_TEST_CASE(script_build_2)
                         "dummy need not be null",
                         newmultisigflags)
                         .Push("00"));
-    tests.push_back(
-        TestBuilder(CScript() << OP_1 << ToByteVector(keys.pubkey0) << OP_1 << OP_CHECKMULTISIG,
-            "SCHNORR_MULTISIG implies that NULLDUMMY flag has no effect", newmultisigflags | SCRIPT_VERIFY_NULLDUMMY)
-            .Num(0b1)
-            .PushSigSchnorr(keys.key0));
     tests.push_back(
         TestBuilder(CScript() << OP_1 << ToByteVector(keys.pubkey0) << OP_1 << OP_CHECKMULTISIGVERIFY << OP_1,
             "OP_CHECKMULTISIGVERIFY Schnorr", newmultisigflags)

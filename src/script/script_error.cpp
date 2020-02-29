@@ -83,8 +83,6 @@ const char *ScriptErrorString(const ScriptError serror)
         return "Only non-push operators allowed in signatures";
     case SCRIPT_ERR_SIG_HIGH_S:
         return "Non-canonical signature: S value is unnecessarily high";
-    case SCRIPT_ERR_SIG_NULLDUMMY:
-        return "Dummy CHECKMULTISIG argument must be zero";
     case SCRIPT_ERR_SIG_NULLFAIL:
         return "Signature must be zero for failed CHECK(MULTI)SIG operation";
     case SCRIPT_ERR_SIG_BADLENGTH:
