@@ -282,8 +282,8 @@ void DoTest(const CScript &scriptPubKey,
         uint32_t extra_flags = InsecureRand32();
         // Some flags are not purely-restrictive and thus we can't assume
         // anything about what happens when they are flipped. Keep them as-is.
-        extra_flags &=
-            ~(SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_ENABLE_REPLAY_PROTECTION | SCRIPT_ENABLE_SCHNORR_MULTISIG);
+        extra_flags &= ~(SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_ENABLE_REPLAY_PROTECTION |
+                         SCRIPT_ENABLE_SCHNORR_MULTISIG | SCRIPT_ENABLE_OP_REVERSEBYTES);
         uint32_t combined_flags = expect ? (flags & ~extra_flags) : (flags | extra_flags);
         // Weed out invalid flag combinations.
         if (combined_flags & SCRIPT_VERIFY_CLEANSTACK)
