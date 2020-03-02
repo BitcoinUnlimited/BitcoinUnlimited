@@ -85,11 +85,30 @@ void CLockOrderTracker::AddNewLockInfo(const std::string &lockname, const std::v
     // we have not seen the lock we are trying to lock before, add data for it
     for (auto &heldLock : heldLocks)
     {
-        auto heldLockIter = seenLockOrders.find(heldLock.GetMutexName());
-        if (heldLockIter != seenLockOrders.end())
+        std::string heldLockName = heldLock.GetMutexName();
+        auto heldLockIter = seenLockOrders.find(heldLockName);
+        if (heldLockIter == seenLockOrders.end())
         {
-            // add information about this lock
-            heldLockIter->second.emplace(lockname);
+            continue;
+        }
+        // add information about this lock
+        heldLockIter->second.emplace(lockname);
+        for (auto &otherLock : seenLockOrders)
+        {
+            if (otherLock.first != lockname)
+            {
+                if (otherLock.second.count(heldLockName) != 0)
+                {
+                    otherLock.second.emplace(lockname);
+                }
+            }
+            else if (otherLock.first == lockname)
+            {
+                for (auto &other_element : otherLock.second)
+                {
+                    heldLockIter->second.emplace(other_element);
+                }
+            }
         }
     }
     // add a new key to track locks locked after this one
