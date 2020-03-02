@@ -2,8 +2,8 @@
 // Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#ifndef _BITCOIN_PREVECTOR_H_
-#define _BITCOIN_PREVECTOR_H_
+#ifndef BITCOIN_PREVECTOR_H
+#define BITCOIN_PREVECTOR_H
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -606,4 +606,4 @@ public:
 };
 #pragma pack(pop)
 
-#endif
+#endif // BITCOIN_PREVECTOR_H
