@@ -21,6 +21,8 @@ if [ "$RUN_TESTS" = "true" ]; then
     BEGIN_FOLD unit-tests
     echo "Unit tests"
     if [ $HOST != "x86_64-w64-mingw32" ]; then
+        # use travis_wait work around fork problem (https://github.com/travis-ci/travis-ci/issues/6934)
+        travis_wait 30 sleep infinity &
         DOCKER_EXEC LD_LIBRARY_PATH=$TRAVIS_BUILD_DIR/depends/$HOST/lib make $MAKEJOBS check VERBOSE=1;
     fi
     END_FOLD
