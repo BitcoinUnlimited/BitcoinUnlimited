@@ -358,7 +358,7 @@ public:
 
     prevector() : _size(0), _union{{}} {}
     explicit prevector(size_type n) : _size(0) { resize(n); }
-    explicit prevector(size_type n, const T &val = T()) : _size(0)
+    explicit prevector(size_type n, const T &val) : _size(0)
     {
         change_capacity(n);
         _size += n;
