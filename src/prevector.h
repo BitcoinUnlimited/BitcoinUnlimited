@@ -253,11 +253,13 @@ private:
         };
     };
 #pragma pack(pop)
-    alignas(char*) direct_or_indirect _union = {};
+    alignas(char *) direct_or_indirect _union = {};
     size_type _size = 0;
 
-    static_assert(alignof(char*) % alignof(size_type) == 0 && sizeof(char*) % alignof(size_type) == 0, "size_type cannot have more restrictive alignment requirement than pointer");
-    static_assert(alignof(char*) % alignof(T) == 0, "value_type T cannot have more restrictive alignment requirement than pointer");
+    static_assert(alignof(char *) % alignof(size_type) == 0 && sizeof(char *) % alignof(size_type) == 0,
+        "size_type cannot have more restrictive alignment requirement than pointer");
+    static_assert(alignof(char *) % alignof(T) == 0,
+        "value_type T cannot have more restrictive alignment requirement than pointer");
 
     T *direct_ptr(difference_type pos) { return reinterpret_cast<T *>(_union.direct) + pos; }
     const T *direct_ptr(difference_type pos) const { return reinterpret_cast<const T *>(_union.direct) + pos; }
@@ -305,15 +307,13 @@ private:
 
     T *item_ptr(difference_type pos) { return is_direct() ? direct_ptr(pos) : indirect_ptr(pos); }
     const T *item_ptr(difference_type pos) const { return is_direct() ? direct_ptr(pos) : indirect_ptr(pos); }
-
-    void fill(T* dst, ptrdiff_t count, const T& value = T{}) {
-        std::fill_n(dst, count, value);
-    }
-
-    template<typename InputIterator>
-    void fill(T* dst, InputIterator first, InputIterator last) {
-        while (first != last) {
-            new(static_cast<void*>(dst)) T(*first);
+    void fill(T *dst, ptrdiff_t count, const T &value = T{}) { std::fill_n(dst, count, value); }
+    template <typename InputIterator>
+    void fill(T *dst, InputIterator first, InputIterator last)
+    {
+        while (first != last)
+        {
+            new (static_cast<void *>(dst)) T(*first);
             ++dst;
             ++first;
         }
@@ -368,7 +368,7 @@ public:
         size_type n = other.size();
         change_capacity(n);
         _size += n;
-        fill(item_ptr(0), other.begin(),  other.end());
+        fill(item_ptr(0), other.begin(), other.end());
     }
 
     prevector(prevector<N, T, Size, Diff> &&other) { swap(other); }
@@ -415,7 +415,8 @@ public:
     void resize(size_type new_size)
     {
         size_type cur_size = size();
-        if (cur_size == new_size) {
+        if (cur_size == new_size)
+        {
             return;
         }
         if (cur_size > new_size)
@@ -450,10 +451,10 @@ public:
         {
             change_capacity(new_size + (new_size >> 1));
         }
-        T* ptr = item_ptr(p);
+        T *ptr = item_ptr(p);
         memmove(ptr + 1, ptr, (size() - p) * sizeof(T));
         _size++;
-        new(static_cast<void*>(ptr)) T(value);
+        new (static_cast<void *>(ptr)) T(value);
         return iterator(ptr);
     }
 
@@ -465,23 +466,28 @@ public:
         {
             change_capacity(new_size + (new_size >> 1));
         }
-        T* ptr = item_ptr(p);
+        T *ptr = item_ptr(p);
         memmove(ptr + count, ptr, (size() - p) * sizeof(T));
         _size += count;
         fill(item_ptr(p), count, value);
     }
 
-    inline void resize_uninitialized(size_type new_size) {
+    inline void resize_uninitialized(size_type new_size)
+    {
         // resize_uninitialized changes the size of the prevector but does not initialize it.
         // If size < new_size, the added elements must be initialized explicitly.
-        if (capacity() < new_size) {
+        if (capacity() < new_size)
+        {
             change_capacity(new_size);
             _size += new_size - size();
             return;
         }
-        if (new_size < size()) {
+        if (new_size < size())
+        {
             erase(item_ptr(new_size), end());
-        } else {
+        }
+        else
+        {
             _size += new_size - size();
         }
     }
@@ -496,7 +502,7 @@ public:
         {
             change_capacity(new_size + (new_size >> 1));
         }
-        T* ptr = item_ptr(p);
+        T *ptr = item_ptr(p);
         memmove(ptr + count, ptr, (size() - p) * sizeof(T));
         _size += count;
         fill(ptr, first, last);
@@ -513,13 +519,17 @@ public:
         // representation (with capacity N and size <= N).
         iterator p = first;
         char *endp = (char *)&(*end());
-        if (!std::is_trivially_destructible<T>::value) {
-            while (p != last) {
+        if (!std::is_trivially_destructible<T>::value)
+        {
+            while (p != last)
+            {
                 (*p).~T();
                 _size--;
                 ++p;
             }
-        } else {
+        }
+        else
+        {
             _size -= last - p;
         }
         memmove(&(*first), &(*last), endp - ((char *)(&(*last))));
@@ -550,7 +560,8 @@ public:
 
     ~prevector()
     {
-        if (!std::is_trivially_destructible<T>::value) {
+        if (!std::is_trivially_destructible<T>::value)
+        {
             clear();
         }
         if (!is_direct())
