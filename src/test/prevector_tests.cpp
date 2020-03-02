@@ -200,26 +200,29 @@ public:
         pre_vector = pre_vector_alt;
     }
 
-    void resize_uninitialized(realtype values) {
+    void resize_uninitialized(realtype values)
+    {
         size_t r = values.size();
         size_t s = real_vector.size() / 2;
-        if (real_vector.capacity() < s + r) {
+        if (real_vector.capacity() < s + r)
+        {
             real_vector.reserve(s + r);
         }
         real_vector.resize(s);
         pre_vector.resize_uninitialized(s);
-        for (auto v : values) {
+        for (auto v : values)
+        {
             real_vector.push_back(v);
         }
         auto p = pre_vector.size();
         pre_vector.resize_uninitialized(p + r);
-        for (auto v : values) {
+        for (auto v : values)
+        {
             pre_vector[p] = v;
             ++p;
         }
         test();
     }
-
 };
 
 BOOST_AUTO_TEST_CASE(PrevectorTestInt)
@@ -314,7 +317,8 @@ BOOST_AUTO_TEST_CASE(PrevectorTestInt)
             {
                 unsigned int num = 1 + ((r >> 15) % 32);
                 std::vector<int> values(num);
-                for (auto &v : values) {
+                for (auto &v : values)
+                {
                     v = insecure_rand();
                 }
                 test.resize_uninitialized(values);
