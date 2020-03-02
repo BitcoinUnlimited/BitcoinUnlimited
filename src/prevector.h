@@ -356,7 +356,7 @@ public:
         fill(item_ptr(0), first, last);
     }
 
-    prevector() : _size(0) {}
+    prevector() : _size(0), _union{{}} {}
     explicit prevector(size_type n) : _size(0) { resize(n); }
     explicit prevector(size_type n, const T &val = T()) : _size(0)
     {
