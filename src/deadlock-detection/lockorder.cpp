@@ -8,6 +8,8 @@
 
 #ifdef DEBUG_LOCKORDER // this ifdef covers the rest of the file
 
+extern std::atomic<bool> lockdataDestructed;
+
 void CLockOrderTracker::potential_lock_order_issue_detected(const CLockLocation &thisLock,
     const CLockLocation &otherLock,
     const uint64_t &tid)
