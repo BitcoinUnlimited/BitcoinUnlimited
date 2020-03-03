@@ -49,7 +49,7 @@ import logging
 
 # ECDSA checkmultisig with non-null dummy are invalid since the new mode
 # refuses ECDSA.
-ECDSA_NULLDUMMY_ERROR = 'upgrade-conditional-script-failure (Only Schnorr signatures allowed in this operation)'
+ECDSA_NULLDUMMY_ERROR = 'mandatory-script-verify-flag-failed (Only Schnorr signatures allowed in this operation)'
 
 # A mandatory (bannable) error occurs when people pass Schnorr signatures into
 # legacy OP_CHECKMULTISIG.
@@ -217,7 +217,7 @@ class SchnorrMultisigTest(BitcoinTestFramework):
         logging.info(
             "If we try to submit it by mempool or RPC, it is rejected and we are banned")
         assert_raises_rpc_error(-26, ECDSA_NULLDUMMY_ERROR, node.sendrawtransaction, ToHex(ecdsa1tx))
-        self.check_for_ban_on_rejected_tx(ecdsa1tx, ECDSA_NULLDUMMY_ERROR, False)
+        self.check_for_ban_on_rejected_tx(ecdsa1tx, ECDSA_NULLDUMMY_ERROR)
 
         logging.info(
             "Submitting a Schnorr-multisig via net, and mining it in a block")
