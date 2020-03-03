@@ -47,7 +47,8 @@ static const uint32_t MANDATORY_SCRIPT_VERIFY_FLAGS = SCRIPT_VERIFY_P2SH |
                                                       SCRIPT_ENABLE_SIGHASH_FORKID |
                                                       SCRIPT_VERIFY_LOW_S |
                                                       SCRIPT_VERIFY_NULLFAIL |
-                                                      SCRIPT_VERIFY_MINIMALDATA ;
+                                                      SCRIPT_VERIFY_MINIMALDATA |
+                                                      SCRIPT_ENABLE_SCHNORR_MULTISIG;
 /* clang-format on */
 
 enum txnouttype

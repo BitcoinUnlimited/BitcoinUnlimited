@@ -114,12 +114,12 @@ class SchnorrMultisigTest(BitcoinTestFramework):
         self.block_heights[block.sha256] = block_height
         return block
 
-    def check_for_ban_on_rejected_tx(self, tx, reject_reason=None, ban=True):
+    def check_for_ban_on_rejected_tx(self, tx, reject_reason=None):
         """Check we are banned when sending a txn that the node rejects.
 
         (Can't actually get banned, since bitcoind won't ban local peers.)"""
         self.p2p.send_txs_and_test(
-            [tx], self.nodes[0], success=False, expect_ban=ban, reject_reason=reject_reason)
+            [tx], self.nodes[0], success=False, expect_ban=True, reject_reason=reject_reason)
 
     def check_for_ban_on_rejected_block(self, block, reject_reason=None):
         """Check we are banned when sending a block that the node rejects.
