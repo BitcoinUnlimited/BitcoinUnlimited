@@ -1395,14 +1395,7 @@ void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
 void RequestThinBlock(CNode *pfrom, const uint256 &hash)
 {
     CInv inv(MSG_THINBLOCK, hash);
-    if (pfrom->xVersion.as_u64c(XVer::BU_XTHIN_VERSION) >= 2)
-    {
-        pfrom->PushMessage(NetMsgType::GET_THIN, inv);
-    }
-    else
-    {
-        pfrom->PushMessage(NetMsgType::GETDATA, inv);
-    }
+    pfrom->PushMessage(NetMsgType::GET_THIN, inv);
 }
 
 bool IsThinBlockValid(CNode *pfrom,
