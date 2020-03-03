@@ -102,7 +102,7 @@ class MinimaldataTest(BitcoinTestFramework):
         return block
 
     def check_for_ban_on_rejected_tx(self, tx, reject_reason=None):
-        """Check we don't trigger a ban when sending a txn that the node rejects."""
+        """Check we trigger a ban when sending a txn that the node rejects."""
         self.p2p.send_txs_and_test(
             [tx], self.nodes[0], success=False, expect_ban=True, reject_reason=reject_reason)
 
