@@ -31,7 +31,7 @@
 #include <boost/assign/list_of.hpp>
 
 #ifdef DEBUG_LOCKORDER
-std::atomic<bool> lockdataDestructed {false};
+std::atomic<bool> lockdataDestructed{false};
 LockData lockdata;
 #endif
 
