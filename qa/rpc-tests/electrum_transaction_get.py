@@ -10,7 +10,6 @@ from test_framework.electrumutil import *
 from test_framework.nodemessages import COIN, ToHex
 from test_framework.blocktools import create_coinbase, create_block, \
     create_transaction
-from test_framework.txtools import pad_tx
 from test_framework.mininode import (
     P2PDataStore,
     NodeConn,
