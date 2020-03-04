@@ -260,3 +260,19 @@ def pad_raw_tx(rawtx_hex, min_size=MIN_TX_SIZE):
     FromHex(tx, rawtx_hex)
     pad_tx(tx, min_size)
     return ToHex(tx)
+
+def create_tx_with_script(prevtx, n, script_sig=b"",
+                          amount=1, script_pub_key=CScript()):
+    """Return one-input, one-output transaction object
+       spending the prevtx's n-th output with the given amount.
+
+       Can optionally pass scriptPubKey and scriptSig, default is anyone-can-spend output.
+    """
+    tx = CTransaction()
+    assert(n < len(prevtx.vout))
+    tx.vin.append(CTxIn(COutPoint(prevtx.sha256, n), script_sig, 0xffffffff))
+    tx.vout.append(CTxOut(amount, script_pub_key))
+    pad_tx(tx)
+    tx.calc_sha256()
+    return tx
+
