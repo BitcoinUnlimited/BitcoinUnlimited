@@ -644,7 +644,7 @@ class CompactBlocksTest(BitcoinTestFramework):
 
         # Test logic begins here
         self.test_node.wait_for_verack()
-        self.test_node.send_message(msg_xversion({131075:2}), True) #BU_XTHIN_VERSION = 2
+        self.test_node.send_message(msg_xversion(), True)
         self.test_node.wait_for_xverack()
 
         # We will need UTXOs to construct transactions in later tests.
