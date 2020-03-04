@@ -17,6 +17,16 @@ constexpr int64_t SYNC_LOCATOR_WRITE_INTERVAL = 30; // seconds
 
 std::unique_ptr<TxIndex> g_txindex;
 
+bool IsTxIndexReady()
+{
+    bool fReady = false;
+    if (g_txindex)
+    {
+        fReady = g_txindex->IsSynced();
+    }
+    return fReady;
+}
+
 template <typename... Args>
 static void FatalError(const char *fmt, const Args &... args)
 {
@@ -55,7 +65,6 @@ bool TxIndex::Init()
             return false;
     }
 
-    fSynced = pbestindex.load() == chainActive.Tip();
     return true;
 }
 
@@ -99,8 +108,14 @@ static const CBlockIndex *NextSyncBlock(const CBlockIndex *pindex_prev)
 
 void TxIndex::ThreadSync()
 {
-    if (fReindex)
-        return;
+    while (fReindex || fImporting || IsInitialBlockDownload())
+    {
+        MilliSleep(1000);
+        if (shutdown_threads.load() == true)
+        {
+            return;
+        }
+    }
 
     CBlockIndex *pindex = pbestindex.load();
     if (!fSynced.load())
@@ -191,10 +206,8 @@ bool TxIndex::WriteBestBlock(CBlockIndex *block_index)
 
 void TxIndex::BlockConnected(const CBlock &block, CBlockIndex *pindex)
 {
-    if (!fSynced.load() && !fReindex)
-    {
+    if (!fSynced.load())
         return;
-    }
 
     // If we're reindexing we need to write the transaction from the genesis block here
     if (fReindex && pindex->nHeight == 1)
@@ -216,18 +229,7 @@ void TxIndex::BlockConnected(const CBlock &block, CBlockIndex *pindex)
     }
 }
 
-bool TxIndex::IsSynced()
-{
-    AssertLockNotHeld(cs_main);
-
-    if (!fSynced.load())
-    {
-        LOGA("%s: txindex is catching up on block notifications\n", __func__);
-        return false;
-    }
-    return true;
-}
-
+bool TxIndex::IsSynced() { return fSynced.load(); }
 bool TxIndex::FindTx(const uint256 &txhash, uint256 &blockhash, CTransactionRef &ptx) const
 {
     CDiskTxPos postx;

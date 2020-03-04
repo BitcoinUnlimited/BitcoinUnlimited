@@ -633,7 +633,9 @@ bool InitBlockIndex(const CChainParams &chainparams)
     LOGA("Initializing databases...\n");
 
     // Only add the genesis block if not reindexing (in which case we reuse the one already on disk)
-    if (!fReindex)
+    bool fReindexing = false;
+    pblocktree->ReadReindexing(fReindexing);
+    if (!fReindexing)
     {
         try
         {
@@ -2726,7 +2728,7 @@ bool ConnectBlock(const CBlock &block,
     }
 
     // Write transaction data to the txindex
-    if (fTxIndex)
+    if (IsTxIndexReady())
     {
         g_txindex->BlockConnected(block, pindex);
     }

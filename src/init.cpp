@@ -1053,7 +1053,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     // ********************************************************* Step 6: load block chain
 
     fReindex = GetBoolArg("-reindex", DEFAULT_REINDEX);
-    fTxIndex = GetBoolArg("-txindex", DEFAULT_TXINDEX);
     int64_t requested_block_mode = GetArg("-useblockdb", DEFAULT_BLOCK_DB_MODE);
     if (requested_block_mode >= 0 && requested_block_mode < END_STORAGE_OPTIONS)
     {
@@ -1111,12 +1110,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 
     bool fLoaded = false;
     StartTxAdmission(threadGroup);
-
-    if (fTxIndex)
-    {
-        auto txindex_db = new TxIndexDB(cacheConfig.nTxIndexCache, false, fReindex);
-        g_txindex = std::make_unique<TxIndex>(txindex_db);
-    }
 
     while (!fLoaded)
     {
@@ -1319,10 +1312,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 #endif // !ENABLE_WALLET
 
     // ********************************************************* Step 8: data directory maintenance
-    if (g_txindex)
-    {
-        g_txindex->Start();
-    }
 
     // if pruning, unset the service bit and perform the initial blockstore prune
     // after any wallet rescanning has taken place.
@@ -1576,6 +1565,25 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
         StartTorControl(threadGroup);
 
+    // Startup txindex just before StartNode. If we start it earlier and before ActivateBestChain
+    // we can end up grinding slowly through ActivateBestChain when txindex still has unfinished
+    // compaction to do from a prior run.
+    fTxIndex = GetBoolArg("-txindex", DEFAULT_TXINDEX);
+    if (fTxIndex)
+    {
+        uiInterface.InitMessage(_("Starting txindex"));
+
+        // When reindexing we want to wipe the previous txindex database however we don't want to
+        // rely on the fReindex flag since it's possible that by the time we get to this point in the
+        // node startup that the reindex is already completed (in the case of a very small reindex) and
+        // therefore fReindex would already be false and the txindex would not get rebuilt.
+        bool fWipeDatabase = GetBoolArg("-reindex", DEFAULT_REINDEX);
+        auto txindex_db = new TxIndexDB(cacheConfig.nTxIndexCache, false, fWipeDatabase);
+
+        g_txindex = std::make_unique<TxIndex>(txindex_db);
+        g_txindex->Start();
+    }
+
     StartNode(threadGroup);
 
 // Monitor the chain, and alert if we get blocks much quicker or slower than expected
@@ -1609,6 +1617,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 #endif
 
     uiInterface.InitMessage(_("Done loading"));
+
 
     // This should be done last in init. If not, then RPC's could be allowed before the wallet
     // is ready.

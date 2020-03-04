@@ -12,6 +12,8 @@
 
 class CBlockIndex;
 
+bool IsTxIndexReady();
+
 /**
  * TxIndex is used to look up transactions included in the blockchain by hash.
  * The index is written to a LevelDB database and records the filesystem

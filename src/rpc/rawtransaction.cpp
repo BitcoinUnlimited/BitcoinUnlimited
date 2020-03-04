@@ -128,16 +128,6 @@ void TxToJSON(const CTransaction &tx, const uint256 hashBlock, UniValue &entry)
     entry.pushKV("hex", EncodeHexTx(tx));
 }
 
-static bool IsTxIndexReady()
-{
-    bool fReady = false;
-    if (g_txindex)
-    {
-        fReady = g_txindex->IsSynced();
-    }
-    return fReady;
-}
-
 UniValue getrawtransaction(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 3)

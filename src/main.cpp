@@ -295,7 +295,7 @@ bool GetTransaction(const uint256 &hash,
         return true;
     }
 
-    if (fTxIndex)
+    if (g_txindex)
     {
         if (g_txindex->FindTx(hash, hashBlock, txOut))
         {

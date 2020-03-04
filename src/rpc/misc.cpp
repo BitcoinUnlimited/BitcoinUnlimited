@@ -6,6 +6,7 @@
 
 #include "blockrelay/blockrelay_common.h"
 #include "dstencode.h"
+#include "index/txindex.h"
 #include "init.h"
 #include "main.h"
 #include "net.h"
@@ -128,6 +129,7 @@ UniValue getinfo(const UniValue &params, bool fHelp)
 #endif
     obj.pushKV("relayfee", ValueFromAmount(::minRelayTxFee.GetFeePerK()));
     obj.pushKV("status", statusStrings.GetPrintable());
+    obj.pushKV("txindex", IsTxIndexReady() ? "synced" : "not ready");
     obj.pushKV("errors", GetWarnings("statusbar"));
     obj.pushKV("fork", "Bitcoin Cash");
 
