@@ -701,8 +701,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     uint32_t featureFlags = 0;
     if (IsMay2020Enabled(chainparams.GetConsensus(), chainActive.Tip()))
     {
-        // Put your next network upgrade features HERE
-        // featureFlags |= SCRIPT_ENABLE_CHECKDATASIG;
+        featureFlags |= SCRIPT_ENABLE_OP_REVERSEBYTES;
     }
 
     uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;

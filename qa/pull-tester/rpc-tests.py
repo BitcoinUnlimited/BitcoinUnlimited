@@ -263,7 +263,8 @@ testScripts = [ RpcTest(t) for t in [
     'rpc_getblockstats',
     'minimaldata',
     'schnorrmultisig',
-    'uptime'
+    'uptime',
+    'op-reversebytes-activation'
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
