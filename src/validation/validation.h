@@ -29,9 +29,6 @@ enum DisconnectResult
 /** Context-independent validity checks */
 bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state, bool fCheckPOW = true);
 
-/** Check Bobtail header **/
-bool CheckBlockHeader(const CDeltaBlock &block, CValidationState &state, bool fCheckPOW = true);
-
 /** Context-dependent validity header checks */
 bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex *pindexPrev);
 

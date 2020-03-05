@@ -121,86 +121,69 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
     while (numblocks < nGenerate)
     {
         std::unique_ptr<CBlockTemplate> pblocktemplate;
+        CDeltaBlockRef pblock;
         {
             TxAdmissionPause lock; // flush any tx waiting to enter the mempool
             pblocktemplate = BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript);
         }
         if (!pblocktemplate.get())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
-        CBlockRef pblock;
-        // FIXME: some overlap codewise with what is in unlimited.cpp ..
-        if (pblocktemplate->delta_block != nullptr)
-        {
-            LOG(WB, "Using delta block for RPC generate.\n");
-            pblock = pblocktemplate->delta_block;
-        }
-        else
-        {
-            LOG(WB, "Using non delta-block for RPC generate.\n");
-            pblock = pblocktemplate->block;
-        }
+		LOG(WB, "Using delta block for RPC generate.\n");
+		pblock = pblocktemplate->delta_block;
+
         {
             // LOCK(cs_main);
             IncrementExtraNonce(pblock.get(), nExtraNonce);
         }
-        bool weak = false;
 
-        while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount)
-        {
-            if (CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus()))
-            {
-                // strong block
-                if (!(weak_mode & 1))
-                {
-                    pblock->nNonce = nInnerLoopCount; // ignore as only interested in weak blocks
-                }
-                break;
-            }
-            else if ((weak_mode & 2) &&
-                     CheckProofOfWork(pblock->GetHash(), weakPOWfromPOW(pblock->nBits), Params().GetConsensus(), true))
-            {
-                // weak block
-                weak = true;
-                break;
-            }
-            ++pblock->nNonce;
-            --nMaxTries;
-        }
-        if (nMaxTries == 0)
-        {
-            break;
-        }
-        if (pblock->nNonce == nInnerLoopCount)
-        {
-            continue;
-        }
+		// Generally look for weak PoW
+		while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount && CheckProofOfWork(pblock->GetHash(), weakPOWfromPOW(pblock->nBits), Params().GetConsensus()))
+		{
+			++pblock->nNonce;
+			--nMaxTries;
+		}
+		if (nMaxTries == 0)
+		{
+			break;
+		}
+		if (pblock->nNonce == nInnerLoopCount)
+		{
+			continue;
+		}
 
-        if (pblocktemplate->delta_block != nullptr)
-        {
-            CNetDeltaBlock::processNew(pblocktemplate->delta_block, nullptr);
-        }
+		LOG(WB, "PROCESS NEW WEAK\n");
+		CNetDeltaBlock::processNew(pblock, nullptr);
+		CDeltaBlock::tryRegister(pblock);
 
-        if (!weak)
-        {
-            // In we are mining our own block or not running in parallel for any reason
-            // we must terminate any block validation threads that are currently running,
-            // Unless they have more work than our own block or are processing a chain
-            // that has more work than our block.
-            PV->StopAllValidationThreads(pblock->GetBlockHeader().nBits);
+		// Now check if Bobtail PoW is also satisfied
+		int k = 3; //FIXME
+		if (CheckBobtailPoW(*pblock, pblock->allAncestorHashes(), Params().GetConsensus(), k))
+		{
+			LOG(WB, "PROCESS NEW STRONG %s\n", pblock->GetHash().ToString());
+			for (int i=0;i < pblock->allAncestorHashes().size();i++)
+			{
+				LOG(WB, "\t%s\n", pblock->allAncestorHashes()[i].ToString());
+			}
+			// In we are mining our own block or not running in parallel for any reason
+			// we must terminate any block validation threads that are currently running,
+			// Unless they have more work than our own block or are processing a chain
+			// that has more work than our block.
+			PV->StopAllValidationThreads(pblock->GetBlockHeader().nBits);
 
-            CValidationState state;
-            if (!ProcessNewBlock(state, Params(), nullptr, pblock.get(), true, nullptr, false))
-                throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
-        }
+			CValidationState state;
+			if (!ProcessNewBlock(state, Params(), nullptr, pblock.get(), true, nullptr, false))
+				throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
+
+			// mark script as important because it was used at least for one coinbase output if the script came from the
+			// wallet
+			if (keepScript)
+			{
+				coinbaseScript->KeepScript();
+			}
+            numblocks++;
+			LOG(WB, "DONE PROCESS NEW STRONG\n");
+		}
         blockHashes.push_back(pblock->GetHash().GetHex());
-
-        // mark script as important because it was used at least for one coinbase output if the script came from the
-        // wallet
-        if (keepScript)
-        {
-            coinbaseScript->KeepScript();
-        }
-        numblocks++;
     }
 
     CValidationState state;
@@ -228,7 +211,7 @@ UniValue generate(const UniValue &params, bool fHelp)
                             HelpExampleCli("generate", "11"));
 
     int nGenerate = params[0].get_int();
-    uint64_t nMaxTries = 1000000;
+    uint64_t nMaxTries = 100000000;
     if (params.size() > 1)
     {
         nMaxTries = params[1].get_int();
@@ -268,7 +251,7 @@ UniValue generatetoaddress(const UniValue &params, bool fHelp)
                             HelpExampleCli("generatetoaddress", "11 \"myaddress\""));
 
     int nGenerate = params[0].get_int();
-    uint64_t nMaxTries = 1000000;
+    uint64_t nMaxTries = 100000000;
     if (params.size() > 2)
     {
         nMaxTries = params[2].get_int();

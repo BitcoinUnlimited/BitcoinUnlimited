@@ -321,15 +321,15 @@ BOOST_AUTO_TEST_CASE(check_bobtail_pow)
     CMutableTransaction childCb;
     CDeltaBlock::addAncestorOPRETURNs(childCb, ancestorHashes);
 
-    CDeltaBlockRef childDelta(new CDeltaBlock(childHeader, MakeTransactionRef(childCb)));
+    CDeltaBlock childDelta = CDeltaBlock(childHeader, MakeTransactionRef(childCb));
 
-    std::vector<uint256> ah = childDelta->ancestorHashes();
+    std::vector<uint256> ah = childDelta.ancestorHashes();
     BOOST_CHECK_EQUAL(ah.size(), 3);
     BOOST_CHECK_EQUAL(ah[0], ancestorHashes[0]);
     BOOST_CHECK_EQUAL(ah[1], ancestorHashes[1]);
     BOOST_CHECK_EQUAL(ah[2], ancestorHashes[2]);
 
-    CheckBobtailPoW(childDelta, consensusParams, 2);
+    CheckBobtailPoW(childDelta, childDelta.ancestorHashes(), consensusParams, 2);
 }
 
 BOOST_AUTO_TEST_CASE(check_bobtail_statistic)

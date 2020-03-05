@@ -76,6 +76,9 @@
  * Global state
  */
 
+/*! Known, complete delta blocks. */
+std::map<uint256, ConstCDeltaBlockRef> known_dbs;
+
 std::atomic<bool> fImporting{false};
 std::atomic<bool> fReindex{false};
 bool fBlocksOnly = false;

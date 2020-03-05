@@ -37,6 +37,7 @@ can be complete - which means including all transactions and the same
 for all ancestors.
 */
 class CDeltaBlock : public CBlock {
+    friend class CNetDeltaBlock;
 public:
     //! Create incomplete deltablock from header and coinbase
     CDeltaBlock(const CBlockHeader &header,
@@ -136,21 +137,22 @@ public:
 
     //! Test outpoint for whether it is spent in the delta block already
     bool spendsOutput(const COutPoint &out) const;
+
+    //! Recursively return all ancestors
+    std::set<ConstCDeltaBlockRef> allAncestors() const;
+    std::vector<uint256> allAncestorHashes() const;
 private:
     static void mergeDeltablocks(
         const std::vector<ConstCDeltaBlockRef> &ancestors,
         CPersistentTransactionMap &all_tx,
         CSpentMap &all_spent);
 
-    //! Recursively return all ancestors
-    std::set<ConstCDeltaBlockRef> allAncestors() const;
     void parseCBhashes();
 
     std::vector<uint256> delta_parent_hashes;
 
     std::vector<CTransactionRef> delta_set;
 
-    mutable bool is_strong;
     mutable bool weakpow_cached; // true only if final weak pow is known
     mutable int cached_weakpow;
 
@@ -163,7 +165,7 @@ private:
     friend int weakPOW_internal(const std::vector<ConstCDeltaBlockRef>& merge_set, const uint256& hashPrevBlock);
 };
 
-bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, const Consensus::Params &params, uint8_t k);
+bool CheckBobtailPoW(CBlockHeader deltaBlock, std::vector<uint256> ancestors, const Consensus::Params &params, uint8_t k);
 bool CheckBobtailPoWFromOrderedProofs(std::vector<arith_uint256> proofs, arith_uint256 target, uint8_t k);
 
 #endif

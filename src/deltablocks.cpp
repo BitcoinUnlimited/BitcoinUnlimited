@@ -16,7 +16,7 @@ CCriticalSection cs_db;
 const size_t TRACK_N_STRONG = 4;
 
 /*! Known, complete delta blocks. */
-static std::map<uint256, ConstCDeltaBlockRef> known_dbs;
+extern std::map<uint256, ConstCDeltaBlockRef> known_dbs;
 // delta blocks in receive order, by strong block parent hash
 static std::map<uint256, std::vector<ConstCDeltaBlockRef> > incoming_dbs;
 // strong blocks in receive order, limited to TRACK_N_STRONG
@@ -42,7 +42,6 @@ bool CDeltaBlock::isEnabled(const CChainParams& params, const CBlockIndex *pinde
 
 CDeltaBlock::CDeltaBlock(const CBlockHeader &header,
                          const CTransactionRef &coinbase) :
-    is_strong(CheckProofOfWork(header.GetHash(), header.nBits, Params().GetConsensus())),
     weakpow_cached(false), cached_weakpow(-1), fAllTransactionsKnown(false) {
     *(CBlockHeader*)this = header;
     setCoinbase(coinbase);
@@ -230,6 +229,18 @@ std::set<ConstCDeltaBlockRef> CDeltaBlock::allAncestors() const {
     return result;
 }
 
+std::vector<uint256> CDeltaBlock::allAncestorHashes() const
+{
+    std::vector<uint256> hashes;
+
+    for (auto &anc : allAncestors())
+    {
+        hashes.push_back(anc->GetHash());
+    }
+
+    return hashes;
+}
+
 std::vector<CTransactionRef> CDeltaBlock::deltaSet() const {
     LOCK(cs_db);
     return delta_set;
@@ -374,10 +385,10 @@ CDeltaBlockRef CDeltaBlock::bestTemplate(const uint256& strongparenthash,
     header.hashPrevBlock = strongparenthash;
 
     //! Set parent hashes
-    std::vector<uint256> delta_parent_hashes;
+    std::vector<uint256> dph;
 
     for (ConstCDeltaBlockRef cdbr : merge_set) {
-        delta_parent_hashes.emplace_back(cdbr->GetHash());
+        dph.emplace_back(cdbr->GetHash());
     }
 
     /*! The coinbase that is returned by this function is very
@@ -392,7 +403,7 @@ CDeltaBlockRef CDeltaBlock::bestTemplate(const uint256& strongparenthash,
     coinbase_template.vin.resize(1);
     coinbase_template.vin[0].prevout.SetNull();
 
-    addAncestorOPRETURNs(coinbase_template, delta_parent_hashes);
+    addAncestorOPRETURNs(coinbase_template, dph);
 
     CPersistentTransactionMap all_tx;
     CSpentMap all_spent;
@@ -405,7 +416,6 @@ CDeltaBlockRef CDeltaBlock::bestTemplate(const uint256& strongparenthash,
         new CDeltaBlock(header, cb));
     cdr->mtx = all_tx.insert(CTransactionSlot(cb, 0), cb);
     cdr->spent = all_spent;
-    cdr->delta_parent_hashes = delta_parent_hashes;
     return cdr;
 }
 
@@ -429,7 +439,7 @@ void CDeltaBlock::tryRegister(const CDeltaBlockRef& ref) {
         LOG(WB, "Ignoring, already known.\n");
         return;
     }
-    LOG(WB, "Delta block is strong: %s\n", ref->is_strong);
+    LOG(WB, "Delta block %s is strong: %s\n", ref->GetHash().ToString(), ref->isStrong());
     known_dbs[ref->GetHash()] = ref;
     incoming_dbs[ref->hashPrevBlock].emplace_back(ref);
 
@@ -529,7 +539,8 @@ std::map<uint256, std::vector<ConstCDeltaBlockRef> >  CDeltaBlock::knownInReceiv
 void CDeltaBlock::setAllTransactionsKnown() { fAllTransactionsKnown = true; }
 bool CDeltaBlock::allTransactionsKnown() const { return fAllTransactionsKnown; }
 
-bool CDeltaBlock::isStrong() const { return is_strong; }
+//bool CDeltaBlock::isStrong() const { return is_strong; }
+bool CDeltaBlock::isStrong() const { int k=3; /*FIXME*/ return CheckBobtailPoW(*((CBlockHeader *)this), delta_parent_hashes, Params().GetConsensus(), k); }
 
 void CDeltaBlock::resetAll() {
     LOCK(cs_db);
@@ -542,17 +553,17 @@ bool CDeltaBlock::spendsOutput(const COutPoint &out) const {
     return spent.contains(out);
 }
 
-bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, const Consensus::Params &params, uint8_t k)
+bool CheckBobtailPoW(CBlockHeader deltaHeader, std::vector<uint256> ancestors, const Consensus::Params &params, uint8_t k)
 {
     bool fNegative;
     bool fOverflow;
     arith_uint256 bnTarget;
 
-    bnTarget.SetCompact(deltaBlock->nBits, &fNegative, &fOverflow);
+    bnTarget.SetCompact(deltaHeader.nBits, &fNegative, &fOverflow);
 
     if (fNegative || fOverflow)
     {
-        LOG(WB, "Illegal value encountered when decoding target bits=%d\n", deltaBlock->nBits);
+        LOG(WB, "Illegal value encountered when decoding target bits=%d\n", deltaHeader.nBits);
         return false;
     }
 
@@ -561,8 +572,6 @@ bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, const Consensus::Params &params,
         LOG(WB, "Illegal target value bnTarget=%d for pow limit\n", bnTarget.getdouble());
         return false;
     }
-
-    std::vector<uint256> ancestors = deltaBlock->ancestorHashes();
 
     if (ancestors.size() < (uint8_t)(k-1))
         return false;
@@ -574,7 +583,7 @@ bool CheckBobtailPoW(CDeltaBlockRef deltaBlock, const Consensus::Params &params,
         lowestK.push_back(UintToArith256(ancestors[i]));
     }
 
-    arith_uint256 childTarget = UintToArith256(deltaBlock->GetHash());
+    arith_uint256 childTarget = UintToArith256(deltaHeader.GetHash());
     if (ancestors.size() == (uint8_t)(k-1))
         lowestK.push_back(childTarget);
     else
