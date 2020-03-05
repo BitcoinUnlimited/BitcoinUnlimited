@@ -986,7 +986,7 @@ QString formatServicesStr(quint64 mask, const QStringList &additionalServices)
             case NODE_GRAPHENE:
                 strList.append("GRAPH");
                 break;
-            case NODE_WEAKBLOCKS:
+            case NODE_DELTABLOCKS:
                 strList.append("WB");
                 break;
             case NODE_CF:
