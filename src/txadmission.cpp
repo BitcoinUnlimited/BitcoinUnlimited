@@ -2,7 +2,6 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-//#include "chainparams.h"
 #include "txadmission.h"
 #include "blockstorage/blockstorage.h"
 #include "connmgr.h"
@@ -14,6 +13,7 @@
 #include "main.h"
 #include "net.h"
 #include "parallel.h"
+#include "policy/mempool.h"
 #include "requestManager.h"
 #include "respend/respenddetector.h"
 #include "timedata.h"

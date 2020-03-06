@@ -188,6 +188,7 @@ BITCOIN_CORE_H = \
   parallel.h \
   policy/fees.h \
   policy/policy.h \
+  policy/mempool.h \
   pow.h \
   protocol.h \
   random.h \

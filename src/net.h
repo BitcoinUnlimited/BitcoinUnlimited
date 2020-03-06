@@ -7,6 +7,7 @@
 #ifndef BITCOIN_NET_H
 #define BITCOIN_NET_H
 
+#include "banentry.h"
 #include "blockrelay/compactblock.h"
 #include "bloom.h"
 #include "chainparams.h"
@@ -17,14 +18,18 @@
 #include "iblt.h"
 #include "limitedmap.h"
 #include "netbase.h"
+#include "policy/mempool.h"
 #include "primitives/block.h"
 #include "protocol.h"
 #include "random.h"
+#include "stat.h"
 #include "streams.h"
 #include "sync.h"
 #include "threadgroup.h"
 #include "uint256.h"
+#include "unlimited.h"
 #include "util.h" // FIXME: reduce scope
+#include "xversionmessage.h"
 
 #include <atomic>
 #include <deque>
@@ -36,10 +41,6 @@
 
 #include <boost/signals2/signal.hpp>
 
-#include "banentry.h"
-#include "stat.h"
-#include "unlimited.h"
-#include "xversionmessage.h"
 
 extern CTweak<uint32_t> netMagic;
 static CMessageHeader::MessageStartChars netOverride;

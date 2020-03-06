@@ -35,6 +35,7 @@
 #include "net.h"
 #include "parallel.h"
 #include "policy/fees.h"
+#include "policy/mempool.h"
 #include "policy/policy.h"
 #include "requestManager.h"
 #include "rpc/register.h"
