@@ -82,6 +82,8 @@ CCriticalSection cs_rpcWarmup;
 
 CSharedCriticalSection cs_mapBlockIndex;
 BlockMap mapBlockIndex GUARDED_BY(cs_mapBlockIndex);
+CSharedCriticalSection cs_mapBobtailProofs;
+std::map<uint256, std::vector<uint256> > mapBobtailProofs GUARDED_BY(cs_mapBobtailProofs);
 
 std::atomic<CBlockIndex *> pindexBestHeader{nullptr};
 std::atomic<CBlockIndex *> pindexBestInvalid{nullptr};
