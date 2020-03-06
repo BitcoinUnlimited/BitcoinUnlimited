@@ -1152,7 +1152,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // If restrict inputs is enabled and we are extending a long unconfirmed chain past the network
         // default limit, then make sure to check that the txn only has one input. This prevents the reverse
         // double spend attack.
-        if (setAncestors.size() >= BCH_DEFAULT_ANCESTOR_LIMIT && restrictInputs.Value() == true)
+        if (setAncestors.size() >= GetBCHDefaultAncestorLimit(chainparams.GetConsensus(), chainActive.Tip()) &&
+            restrictInputs.Value() == true)
         {
             if (tx->vin.size() > 1)
                 return state.DoS(0, false, REJECT_NONSTANDARD, "bad-txn-too-many-inputs");
