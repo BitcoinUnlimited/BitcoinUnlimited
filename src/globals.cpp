@@ -303,7 +303,7 @@ CTweakRef<unsigned int> maxDataCarrierTweak("mining.dataCarrierSize",
     &nMaxDatacarrierBytes,
     &MaxDataCarrierValidator);
 
-CTweakRef<uint64_t> miningForkTime("consensus.forkNov2019Time",
+CTweakRef<uint64_t> miningForkTime("consensus.forkMay2020Time",
     "Time in seconds since the epoch to initiate the Bitcoin Cash protocol upgraded scheduled on 15th May 2020.  A "
     "setting of "
     "1 "
