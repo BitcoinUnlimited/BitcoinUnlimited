@@ -55,10 +55,14 @@ LIBUNIVALUE=univalue/libunivalue.la
 if ENABLE_ZMQ
 LIBBITCOIN_ZMQ=libbitcoin_zmq.a
 endif
+
 if BUILD_BITCOIN_LIBS
 LIBBITCOINCONSENSUS=libbitcoinconsensus.la
+if TARGET_LINUX
 LIBBITCOINCASH=libbitcoincash.la
 endif
+endif
+
 if ENABLE_WALLET
 LIBBITCOIN_WALLET=libbitcoin_wallet.a
 endif
@@ -358,6 +362,7 @@ libbitcoin_wallet_a_SOURCES = \
   wallet/walletdb.cpp \
   $(BITCOIN_CORE_H)
 
+if TARGET_LINUX
 libbitcoincash_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoincash_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 
@@ -414,6 +419,7 @@ libbitcoincash_a_SOURCES = \
   bloom.cpp \
   bloom.h \
   streams.h
+endif
 
 
 # crypto primitives library
@@ -644,17 +650,18 @@ bitcoin_miner_LDADD += $(BOOST_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(EVENT_LIBS)
 
 # bitcoincash library #
 if BUILD_BITCOIN_LIBS
+if TARGET_LINUX
 libbitcoincash_la_SOURCES = $(libbitcoincash_a_SOURCES) $(crypto_libbitcoin_crypto_a_SOURCES)
 
 if GLIBC_BACK_COMPAT
-  libbitcoincash_la_SOURCES += compat/glibc_compat.cpp
+libbitcoincash_la_SOURCES += compat/glibc_compat.cpp
 endif
 
 libbitcoincash_la_LDFLAGS = $(AM_LDFLAGS) $(SSL_LIBS) $(CRYPTO_LIBS) $(BOOST_LIBS) -no-undefined $(RELDFLAGS)
 libbitcoincash_la_LIBADD = $(LIBSECP256K1)
 libbitcoincash_la_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) -I$(BOOST_CPPFLAGS) -I$(builddir)/obj -I$(srcdir)/secp256k1/include $(JNI_CXXFLAGS) -DBUILD_BITCOIN_INTERNAL
 libbitcoincash_la_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-
+endif
 endif
 #
 
@@ -671,7 +678,6 @@ libbitcoinconsensus_la_LDFLAGS = $(AM_LDFLAGS) $(BOOST_LIBS) -no-undefined $(REL
 libbitcoinconsensus_la_LIBADD = $(LIBSECP256K1)
 libbitcoinconsensus_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(BOOST_CPPFLAGS) -I$(builddir)/obj -I$(srcdir)/secp256k1/include -DBUILD_BITCOIN_INTERNAL
 libbitcoinconsensus_la_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-
 endif
 #
 CLEANFILES = $(EXTRA_LIBRARIES)
