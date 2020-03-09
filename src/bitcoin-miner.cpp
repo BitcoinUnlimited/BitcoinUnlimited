@@ -38,6 +38,7 @@
 #include <random>
 
 #ifdef DEBUG_LOCKORDER
+std::atomic<bool> lockdataDestructed{false};
 LockData lockdata;
 #endif
 

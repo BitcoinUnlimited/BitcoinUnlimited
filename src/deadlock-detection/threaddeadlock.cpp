@@ -8,8 +8,6 @@
 
 #ifdef DEBUG_LOCKORDER // this ifdef covers the rest of the file
 
-bool lockdataDestructed = false;
-
 // removes 1 lock for a critical section
 void _remove_lock_critical_exit(void *cs)
 {
@@ -69,70 +67,6 @@ void _remove_lock_critical_exit(void *cs)
     }
 }
 
-void deadlock_detected(LockStackEntry now, LockStack &deadlocks, std::set<uint64_t> &threads)
-{
-    LOGA("DEADLOCK DETECTED\n");
-    LOGA("This occurred while trying to lock: %s ", now.second.ToString().c_str());
-    LOGA("Which has:\n");
-
-    auto rlw = lockdata.readlockswaiting.find(now.first);
-    if (rlw != lockdata.readlockswaiting.end())
-    {
-        for (auto &entry : rlw->second)
-        {
-            LOGA("Read Lock Waiting for thread with id %" PRIu64 "\n", entry);
-        }
-    }
-
-    auto wlw = lockdata.writelockswaiting.find(now.first);
-    if (wlw != lockdata.writelockswaiting.end())
-    {
-        for (auto &entry : wlw->second)
-        {
-            LOGA("Write Lock Waiting for thread with id %" PRIu64 "\n", entry);
-        }
-    }
-
-    auto rlh = lockdata.readlocksheld.find(now.first);
-    if (rlh != lockdata.readlocksheld.end())
-    {
-        for (auto &entry : rlh->second)
-        {
-            LOGA("Read Lock Held for thread with id %" PRIu64 "\n", entry);
-        }
-    }
-
-    auto wlh = lockdata.writelocksheld.find(now.first);
-    if (wlh != lockdata.writelocksheld.end())
-    {
-        for (auto &entry : wlh->second)
-        {
-            LOGA("Write Lock Held for thread with id %" PRIu64 "\n", entry);
-        }
-    }
-
-    LOGA("\nThe locks involved are:\n");
-    for (auto &lock : deadlocks)
-    {
-        LOGA(" %s\n", lock.second.ToString().c_str());
-    }
-    for (auto &thread : threads)
-    {
-        LOGA("\nThread with tid %" PRIu64 " was involved. It held locks:\n", thread);
-        auto iterheld = lockdata.locksheldbythread.find(thread);
-        if (iterheld != lockdata.locksheldbythread.end())
-        {
-            for (auto &lockentry : iterheld->second)
-            {
-                LOGA(" %s\n", lockentry.second.ToString().c_str());
-            }
-        }
-    }
-    // clean up the lock before throwing
-    _remove_lock_critical_exit(now.first);
-    throw std::logic_error("potential deadlock detected");
-}
-
 bool HasAnyOwners(void *c)
 {
     auto iter = lockdata.writelocksheld.find(c);
@@ -152,97 +86,6 @@ bool HasAnyOwners(void *c)
         }
     }
 
-    return false;
-}
-
-static bool RecursiveCheck(const uint64_t &tid,
-    const void *c,
-    uint64_t lastTid,
-    void *lastLock,
-    bool firstRun,
-    LockStack &deadlocks,
-    std::set<uint64_t> &threads)
-{
-    if (!firstRun && c == lastLock && tid == lastTid)
-    {
-        // we are back where we started, infinite loop means there is a deadlock
-        return true;
-    }
-    // first check if we currently have any other ownerships
-    auto self_iter = lockdata.locksheldbythread.find(lastTid);
-    if (self_iter != lockdata.locksheldbythread.end())
-    {
-        if (self_iter->second.size() == 0)
-        {
-            // we cant deadlock if we dont own any other mutexs
-            return false;
-        }
-    }
-    // at this point we have at least 1 lock for a mutex somewhere
-
-    // check if a thread has an ownership of c
-    auto writeiter = lockdata.writelocksheld.find(lastLock);
-    auto readiter = lockdata.readlocksheld.find(lastLock);
-
-    // NOTE: be careful when adjusting these booleans, the order of the checks is important
-    bool isReadLocked = !((readiter == lockdata.readlocksheld.end()) || readiter->second.empty());
-    bool isWriteLocked = !((writeiter == lockdata.writelocksheld.end()) || writeiter->second.empty());
-    if (!isWriteLocked && !isReadLocked)
-    {
-        // no owners, no deadlock possible
-        return false;
-    }
-    // we have other locks, so check if we have any in common with the holder(s) of the other lock
-    std::set<uint64_t> otherLocks;
-    if (isWriteLocked)
-    {
-        otherLocks.insert(writeiter->second.begin(), writeiter->second.end());
-    }
-    if (isReadLocked)
-    {
-        otherLocks.insert(readiter->second.begin(), readiter->second.end());
-    }
-    for (auto &threadId : otherLocks)
-    {
-        if (threadId == lastTid)
-        {
-            // this continue fixes an infinite looping problem
-            continue;
-        }
-        auto other_iter = lockdata.locksheldbythread.find(threadId);
-        // we dont need to check empty here, other thread has at least 1 lock otherwise we wouldnt be checking it
-        if (other_iter->second.size() == 1)
-        {
-            // it does not have any locks aside from known exclusive, no deadlock possible
-            // we can just wait until that exclusive lock is released
-            return false;
-        }
-        // if the other thread has 1+ other locks aside from the known exclusive, check them for matches with our own
-        // locks
-        for (auto &lock : other_iter->second)
-        {
-            // if they have a lock that is on a lock that someone has a lock on
-            if (HasAnyOwners(lock.first))
-            {
-                // and their lock is waiting...
-                if (lock.second.GetWaiting() == true)
-                {
-                    deadlocks.push_back(lock);
-                    threads.emplace(other_iter->first);
-                    if (other_iter->first == tid && lock.first == c)
-                    {
-                        // we are back where we started and there is a deadlock
-                        return true;
-                    }
-                    if (RecursiveCheck(tid, c, other_iter->first, lock.first, false, deadlocks, threads))
-                    {
-                        return true;
-                    }
-                }
-                // no deadlock, other lock is not waiting, we simply have to wait until they release that lock
-            }
-        }
-    }
     return false;
 }
 
@@ -518,18 +361,16 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
             {
                 heldLocks.push_back(entry.second);
             }
+            // we havent seen this lock before, add generic data for it
+            lockdata.ordertracker.AddNewLockInfo(lockname, heldLocks);
+            // track this locks exactly locking order info
+            lockdata.ordertracker.TrackLockOrderHistory(locklocation, heldLocks, tid);
+
             if (lockdata.ordertracker.CanCheckForConflicts(lockname))
             {
                 // we have seen the lock we are trying to lock before, check ordering
                 lockdata.ordertracker.CheckForConflict(locklocation, heldLocks, tid);
             }
-            else
-            {
-                // we havent seen this lock before, add generic data for it
-                lockdata.ordertracker.AddNewLockInfo(lockname, heldLocks);
-            }
-            // track this locks exactly locking order info
-            lockdata.ordertracker.TrackLockOrderHistory(locklocation, heldLocks, tid);
         }
         else
         {
@@ -547,20 +388,12 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
         return;
     }
     AddNewWaitingLock(c, tid, ownership);
-    /*
-    std::vector<LockStackEntry> deadlocks;
-    std::set<uint64_t> threads;
-    if (RecursiveCheck(tid, c, tid, c, true, deadlocks, threads))
-    {
-        deadlock_detected(now, deadlocks, threads);
-    }
-    */
 }
 
 // removes all instances of the critical section
 void DeleteCritical(void *cs)
 {
-    if (lockdataDestructed)
+    if (lockdataDestructed.load())
         return;
     // remove all instances of the critical section from lockdata
     std::lock_guard<std::mutex> lock(lockdata.dd_mutex);

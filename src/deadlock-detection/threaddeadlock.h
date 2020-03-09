@@ -39,7 +39,7 @@ inline uint64_t getTid(void)
 // In your app, declare lockdata and all global lock variables in a single module so destruction order is controlled.
 // But for unit tests, these might be declared in separate files.  In this case we use a global boolean to indicate
 // whether lockdata has been destructed.
-extern bool lockdataDestructed;
+extern std::atomic<bool> lockdataDestructed;
 
 struct LockData
 {
@@ -69,7 +69,7 @@ struct LockData
     /// a mutex that protects all other data members of this struct
     std::mutex dd_mutex;
 
-    ~LockData() { lockdataDestructed = true; }
+    ~LockData() { lockdataDestructed.store(true); }
 };
 extern LockData lockdata;
 
