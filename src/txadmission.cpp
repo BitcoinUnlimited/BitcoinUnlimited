@@ -699,14 +699,10 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     }
 
     uint32_t featureFlags = 0;
-    if (IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip()))
+    if (IsMay2020Enabled(chainparams.GetConsensus(), chainActive.Tip()))
     {
-        featureFlags |= SCRIPT_ENABLE_CHECKDATASIG;
-    }
-    if (IsNov2019Activated(chainparams.GetConsensus(), chainActive.Tip()))
-    {
-        featureFlags |= SCRIPT_ENABLE_SCHNORR_MULTISIG;
-        featureFlags |= SCRIPT_VERIFY_MINIMALDATA;
+        // Put your next network upgrade features HERE
+        // featureFlags |= SCRIPT_ENABLE_CHECKDATASIG;
     }
 
     uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;

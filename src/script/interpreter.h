@@ -43,24 +43,23 @@ enum
     // (softfork safe, but not used or intended as a consensus rule).
     SCRIPT_VERIFY_STRICTENC = (1U << 1),
 
-    // Passing a non-strict-DER signature to a checksig operation causes script failure (softfork safe, BIP62 rule 1)
+    // Passing a non-strict-DER signature to a checksig operation causes script failure
+    // (BIP62 rule 1)
     SCRIPT_VERIFY_DERSIG = (1U << 2),
 
-    // Passing a non-strict-DER signature or one with S > order/2 to a checksig operation causes script failure
-    // (softfork safe, BIP62 rule 5).
+    // Passing a non-strict-DER signature or one with S > order/2 to a checksig operation
+    // causes script failure
+    // (BIP62 rule 5)
     SCRIPT_VERIFY_LOW_S = (1U << 3),
 
-    // verify dummy stack item consumed by CHECKMULTISIG is of zero-length (softfork safe, BIP62 rule 7).
-    SCRIPT_VERIFY_NULLDUMMY = (1U << 4),
-
-    // Using a non-push operator in the scriptSig causes script failure (softfork safe, BIP62 rule 2).
+    // Using a non-push operator in the scriptSig causes script failure
+    // (BIP62 rule 2).
     SCRIPT_VERIFY_SIGPUSHONLY = (1U << 5),
 
     // Require minimal encodings for all push operations (OP_0... OP_16, OP_1NEGATE where possible, direct
     // pushes up to 75 bytes, OP_PUSHDATA up to 255 bytes, OP_PUSHDATA2 for anything larger). Evaluating
     // any other push causes the script to fail (BIP62 rule 3).
     // In addition, whenever a stack element is interpreted as a number, it must be of minimal length (BIP62 rule 4).
-    // (softfork safe)
     SCRIPT_VERIFY_MINIMALDATA = (1U << 6),
 
     // Discourage use of NOPs reserved for upgrades (NOP1-10)

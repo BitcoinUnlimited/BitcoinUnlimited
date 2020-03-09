@@ -39,7 +39,7 @@ from test_framework.util import assert_raises_rpc_error, p2p_port, waitFor
 import logging
 
 # this is the errror you get when minimal push errors are detected during mempool admission
-MINIMALPUSH_ERROR = 'non-mandatory-script-verify-flag (Data push larger than necessary)'
+MINIMALPUSH_ERROR = 'mandatory-script-verify-flag-failed (Data push larger than necessary)'
 
 # Blocks with invalid scripts give this error:
 BADSIGNATURE_ERROR = 'bad-blk-signatures'
@@ -62,6 +62,7 @@ class MinimaldataTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.block_heights = {}
+        self.extra_args = [["-debug=mempool"]]
 
     def bootstrap_p2p(self):
         """Add a P2P connection to the node.
@@ -100,10 +101,10 @@ class MinimaldataTest(BitcoinTestFramework):
         self.block_heights[block.sha256] = block_height
         return block
 
-    def check_for_no_ban_on_rejected_tx(self, tx, reject_reason):
-        """Check we don't trigger a ban when sending a txn that the node rejects."""
+    def check_for_ban_on_rejected_tx(self, tx, reject_reason=None):
+        """Check we trigger a ban when sending a txn that the node rejects."""
         self.p2p.send_txs_and_test(
-            [tx], self.nodes[0], success=False, expect_ban=False, reject_reason=reject_reason)
+            [tx], self.nodes[0], success=False, expect_ban=True, reject_reason=reject_reason)
 
     def check_for_ban_on_rejected_block(self, block, reject_reason=None):
         """Check we trigger a ban when sending a block that the node rejects.
@@ -172,12 +173,9 @@ class MinimaldataTest(BitcoinTestFramework):
         logging.info("Trying to mine a minimaldata violation")
         self.check_for_ban_on_rejected_block(
             self.build_block(tip, [nonminimaltx]), BADSIGNATURE_ERROR)
-        return
         logging.info("If we try to submit it by mempool or RPC we are banned")
-        assert_raises_rpc_error(-26, rpc_error(MINIMALPUSH_ERROR),
-                                node.sendrawtransaction, ToHex(nonminimaltx_3))
-        self.check_for_no_ban_on_rejected_tx(
-            nonminimaltx, MINIMALPUSH_ERROR)
+        assert_raises_rpc_error(-26, MINIMALPUSH_ERROR, node.sendrawtransaction, ToHex(nonminimaltx))
+        self.check_for_ban_on_rejected_tx(nonminimaltx, MINIMALPUSH_ERROR)
 
         logging.info("Mine a normal block")
         tip = self.build_block(tip)

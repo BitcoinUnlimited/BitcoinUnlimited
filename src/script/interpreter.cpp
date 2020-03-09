@@ -709,11 +709,6 @@ bool ScriptMachine::Step()
                 {
                     if (!(flags & SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY))
                     {
-                        // not enabled; treat as a NOP2
-                        if (flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)
-                        {
-                            return set_error(serror, SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS);
-                        }
                         break;
                     }
 
@@ -753,11 +748,6 @@ bool ScriptMachine::Step()
                 {
                     if (!(flags & SCRIPT_VERIFY_CHECKSEQUENCEVERIFY))
                     {
-                        // not enabled; treat as a NOP3
-                        if (flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)
-                        {
-                            return set_error(serror, SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS);
-                        }
                         break;
                     }
 
@@ -1519,15 +1509,6 @@ bool ScriptMachine::Step()
                     else
                     {
                         // LEGACY MULTISIG (ECDSA / NULL)
-                        // A bug causes CHECKMULTISIG to consume one extra argument whose contents were not checked in
-                        // any way.
-                        //
-                        // Unfortunately this is a potential source of mutability, so optionally verify it is exactly
-                        // equal to zero.
-                        if ((flags & SCRIPT_VERIFY_NULLDUMMY) && stacktop(-idxDummy).size())
-                        {
-                            return set_error(serror, SCRIPT_ERR_SIG_NULLDUMMY);
-                        }
 
                         // Remove signature for pre-fork scripts
                         for (int k = 0; k < nSigsCount; k++)

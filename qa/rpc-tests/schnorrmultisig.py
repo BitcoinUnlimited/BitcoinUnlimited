@@ -49,7 +49,7 @@ import logging
 
 # ECDSA checkmultisig with non-null dummy are invalid since the new mode
 # refuses ECDSA.
-ECDSA_NULLDUMMY_ERROR = 'upgrade-conditional-script-failure (Only Schnorr signatures allowed in this operation)'
+ECDSA_NULLDUMMY_ERROR = 'mandatory-script-verify-flag-failed (Only Schnorr signatures allowed in this operation)'
 
 # A mandatory (bannable) error occurs when people pass Schnorr signatures into
 # legacy OP_CHECKMULTISIG.
@@ -114,12 +114,12 @@ class SchnorrMultisigTest(BitcoinTestFramework):
         self.block_heights[block.sha256] = block_height
         return block
 
-    def check_for_ban_on_rejected_tx(self, tx, reject_reason=None, ban=True):
+    def check_for_ban_on_rejected_tx(self, tx, reject_reason=None):
         """Check we are banned when sending a txn that the node rejects.
 
         (Can't actually get banned, since bitcoind won't ban local peers.)"""
         self.p2p.send_txs_and_test(
-            [tx], self.nodes[0], success=False, expect_ban=ban, reject_reason=reject_reason)
+            [tx], self.nodes[0], success=False, expect_ban=True, reject_reason=reject_reason)
 
     def check_for_ban_on_rejected_block(self, block, reject_reason=None):
         """Check we are banned when sending a block that the node rejects.
@@ -217,7 +217,7 @@ class SchnorrMultisigTest(BitcoinTestFramework):
         logging.info(
             "If we try to submit it by mempool or RPC, it is rejected and we are banned")
         assert_raises_rpc_error(-26, ECDSA_NULLDUMMY_ERROR, node.sendrawtransaction, ToHex(ecdsa1tx))
-        self.check_for_ban_on_rejected_tx(ecdsa1tx, ECDSA_NULLDUMMY_ERROR, False)
+        self.check_for_ban_on_rejected_tx(ecdsa1tx, ECDSA_NULLDUMMY_ERROR)
 
         logging.info(
             "Submitting a Schnorr-multisig via net, and mining it in a block")
