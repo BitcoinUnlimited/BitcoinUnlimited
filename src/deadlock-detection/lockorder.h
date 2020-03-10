@@ -29,8 +29,9 @@ protected:
     /// mutex that is required to be locked before any method accesses any of this classes data members
     std::mutex lot_mutex;
     /// @var std::map<void*, std::pair<std::string, boolean> >
-    /// map for attempting to track the name of the mutex based on its reference. might not always be accurate, boolean will denote this
-    std::map<void*, std::pair<std::string, bool> > mapMutexToName;
+    /// map for attempting to track the name of the mutex based on its reference. might not always be accurate, boolean
+    /// will denote this
+    std::map<void *, std::pair<std::string, bool> > mapMutexToName;
     /// @var std::map<std::string, std::set<std::string> > seenLockOrders
     /// key is mutex, value is set of mutexes that have ever been locked while key was locked
     std::map<void *, std::set<void *> > seenLockOrders;
@@ -63,9 +64,7 @@ public:
      * @param a std::vector of LockStackEntry that are the held locks held by a thread
      * @param a uitn64_t that is the thread id of the calling thread
      */
-    void CheckForConflict(LockStackEntry& this_lock,
-        std::vector<LockStackEntry> &heldLocks,
-        const uint64_t &tid);
+    void CheckForConflict(LockStackEntry &this_lock, std::vector<LockStackEntry> &heldLocks, const uint64_t &tid);
 
     /**
      * Adds information to seenLockOrders about an ordering seen by a given thread
@@ -73,7 +72,7 @@ public:
      * @param LockStackEntry that is the name of the lock being added
      * @param a std::vector of LockStackEntry that are the held locks held by this thread
      */
-    void AddNewLockInfo(const LockStackEntry& this_lock, const std::vector<LockStackEntry> &heldLocks);
+    void AddNewLockInfo(const LockStackEntry &this_lock, const std::vector<LockStackEntry> &heldLocks);
 
     /**
      * Adds information to seenLockLocations about an ordering seen by a given thread

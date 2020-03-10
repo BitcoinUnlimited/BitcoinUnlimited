@@ -143,7 +143,7 @@ void CLockOrderTracker::AddNewLockInfo(const LockStackEntry &this_lock, const st
     // add a new key to track locks locked after this one
     if (seenLockOrders.find(this_lock.first) == seenLockOrders.end())
     {
-        seenLockOrders.emplace(this_lock.first, std::set<void*>());
+        seenLockOrders.emplace(this_lock.first, std::set<void *>());
     }
 }
 
