@@ -303,8 +303,8 @@ public:
         bool fTry = false) EXCLUSIVE_LOCK_FUNCTION(mutexIn)
         : lock(mutexIn, boost::defer_lock)
     {
-        // we no longer allow naming critical sections cs, please name it something more meaningful
         assert(pszName != nullptr);
+        // we no longer allow naming critical sections cs, please name it something more meaningful
         assert(std::string(pszName) != "cs");
         if (fTry)
             TryEnter(pszName, pszFile, nLine, type);
@@ -322,8 +322,8 @@ public:
         if (!pmutexIn)
             return;
 
-        // we no longer allow naming critical sections cs, please name it something more meaningful
         assert(pszName != nullptr);
+        // we no longer allow naming critical sections cs, please name it something more meaningful
         assert(std::string(pszName) != "cs");
         lock = boost::unique_lock<Mutex>(*pmutexIn, boost::defer_lock);
         if (fTry)
@@ -424,8 +424,8 @@ public:
         bool fTry = false) SHARED_LOCK_FUNCTION(mutexIn)
         : lock(mutexIn, boost::defer_lock)
     {
-        // we no longer allow naming critical sections cs, please name it something more meaningful
         assert(pszName != nullptr);
+        // we no longer allow naming critical sections cs, please name it something more meaningful
         assert(std::string(pszName) != "cs");
         if (fTry)
             TryEnter(pszName, pszFile, nLine, type);
@@ -443,8 +443,8 @@ public:
         if (!pmutexIn)
             return;
 
-        // we no longer allow naming critical sections cs, please name it something more meaningful
         assert(pszName != nullptr);
+        // we no longer allow naming critical sections cs, please name it something more meaningful
         assert(std::string(pszName) != "cs");
         lock = boost::shared_lock<Mutex>(*pmutexIn, boost::defer_lock);
         if (fTry)

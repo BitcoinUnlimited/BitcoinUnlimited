@@ -339,7 +339,6 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
             {
                 heldLocks.push_back(entry.second);
             }
-            // we havent seen this lock before, add generic data for it
             lockdata.ordertracker.AddNewLockInfo(lockname, heldLocks);
             // track this locks exactly locking order info
             lockdata.ordertracker.TrackLockOrderHistory(locklocation, heldLocks, tid);
@@ -352,7 +351,6 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
         }
         else
         {
-            // we havent seen this lock before, add generic data for it
             lockdata.ordertracker.AddNewLockInfo(lockname, heldLocks);
             // track this locks exactly locking order info
             lockdata.ordertracker.TrackLockOrderHistory(locklocation, heldLocks, tid);
