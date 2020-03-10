@@ -259,7 +259,6 @@ private:
             PrintLockContention(pszName, pszFile, nLine);
 #endif
             lock.lock();
-            SetWaitingToHeld((void *)(lock.mutex()), OwnershipType::EXCLUSIVE);
 #ifdef DEBUG_LOCKCONTENTION
         }
 #endif
@@ -381,7 +380,6 @@ private:
             PrintLockContention(pszName, pszFile, nLine);
 #endif
             lock.lock();
-            SetWaitingToHeld((void *)(lock.mutex()), OwnershipType::SHARED);
 #ifdef DEBUG_LOCKCONTENTION
         }
 #endif
