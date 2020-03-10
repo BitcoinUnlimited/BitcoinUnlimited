@@ -205,8 +205,8 @@ AC_ARG_ENABLE([glibc-back-compat],
   [use_glibc_compat=no])
 
 AC_ARG_ENABLE([asm],
-  [AS_HELP_STRING([--enable-asm],
-  [Enable assembly routines (default is yes)])],
+  [AS_HELP_STRING([--disable-asm],
+  [disable assembly routines (default is yes)])],
   [use_asm=$enableval],
   [use_asm=yes])
 
@@ -300,6 +300,12 @@ if test "x$CXXFLAGS_overridden" = "xno"; then
   AX_CHECK_COMPILE_FLAG([-Wthread-safety-analysis],[CXXFLAGS="$CXXFLAGS -Wthread-safety-analysis"],,[[$CXXFLAG_WERROR]])
 fi
 
+enable_hwcrc32=no
+enable_sse41=no
+enable_avx2=no
+
+if test "x$use_asm" = "xyes"; then
+
 # Check for optional instruction set support. Enabling these does _not_ imply that all code will
 # be compiled with them, rather that specific objects/libs may use them after checking for runtime
 # compatibility.
@@ -368,6 +374,8 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 CXXFLAGS="$TEMP_CXXFLAGS"
 
 CPPFLAGS="$CPPFLAGS -DHAVE_BUILD_INFO -D__STDC_FORMAT_MACROS"
+
+fi
 
 AC_ARG_WITH([utils],
   [AS_HELP_STRING([--with-utils],
