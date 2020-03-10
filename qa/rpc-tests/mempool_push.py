@@ -42,10 +42,8 @@ class MyTest (BitcoinTestFramework):
             ["-blockprioritysize=2000000", "-limitdescendantcount=1000", "-limitancestorcount=1000",
              "-limitancestorsize=1000", "-limitdescendantsize=1000", "-net.unconfChainResendAction=2",
              "-net.restrictInputs=0"],
-            ["-blockprioritysize=2000000", "-limitdescendantcount=25", "-limitancestorcount=25",
-             "-limitancestorsize=150","-limitdescendantsize=101", "-net.unconfChainResendAction=2"]
             ]
-        self.nodes = start_nodes(4, self.options.tmpdir, mempoolConf)
+        self.nodes = start_nodes(3, self.options.tmpdir, mempoolConf)
         connect_nodes_full(self.nodes)
         self.is_network_split=False
         self.sync_blocks()
@@ -88,7 +86,7 @@ class MyTest (BitcoinTestFramework):
         waitFor(DELAY_TIME, lambda: len(self.nodes[0].getblocktemplate()["transactions"])>=BCH_UNCONF_DEPTH)
         blk3 = self.nodes[0].generate(1)[0]
         blk3data = self.nodes[0].getblock(blk3)
-        # this would be ideal, but a particular block is not guaranteed to contain all tx in the mempool 
+        # this would be ideal, but a particular block is not guaranteed to contain all tx in the mempool
         # assert_equal(len(blk3data["tx"]), BCH_UNCONF_DEPTH + 1)  # chain of BCH_UNCONF_DEPTH unconfirmed + coinbase
         committedTxCount = len(blk3data["tx"])-1  # -1 to remove coinbase
         waitFor(DELAY_TIME, lambda: self.nodes[1].getbestblockhash() == blk3)
@@ -119,7 +117,7 @@ class MyTest (BitcoinTestFramework):
         # Wait for sync before issuing the tx chain so that no txes are rejected as nonfinal
         self.sync_blocks()
         logging.info("Block heights: %s" % str([x.getblockcount() for x in self.nodes]))
-        
+
         # Create an unconfirmed chain that exceeds what node 0 allows
         cumulativeTxSize = 0
         while cumulativeTxSize < BCH_UNCONF_SIZE:
