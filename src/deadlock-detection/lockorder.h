@@ -13,6 +13,7 @@
 #include <set>
 #include <string>
 #include <tuple>
+#include <utility>
 
 #include "locklocation.h"
 
@@ -27,9 +28,12 @@ protected:
     /// @var std::mutex lot_mutex
     /// mutex that is required to be locked before any method accesses any of this classes data members
     std::mutex lot_mutex;
+    /// @var std::map<void*, std::pair<std::string, boolean> >
+    /// map for attempting to track the name of the mutex based on its reference. might not always be accurate, boolean will denote this
+    std::map<void*, std::pair<std::string, bool> > mapMutexToName;
     /// @var std::map<std::string, std::set<std::string> > seenLockOrders
-    /// key is lockname, value is vector of locknames that have ever been locked while key was locked
-    std::map<std::string, std::set<std::string> > seenLockOrders;
+    /// key is mutex, value is set of mutexes that have ever been locked while key was locked
+    std::map<void *, std::set<void *> > seenLockOrders;
     /// @var std::map<std::pair<std::string, std::string>, std::set<std::tuple<std::string, std::string, uint64_t> > >
     /// seenLockLocations
     /// we track every time a lock ordering has taken place, key is the two locknames
@@ -38,36 +42,38 @@ protected:
         seenLockLocations;
 
 private:
-    void potential_lock_order_issue_detected(const CLockLocation &thisLock,
-        const CLockLocation &otherLock,
+    void potential_lock_order_issue_detected(LockStackEntry &this_lock,
+        LockStackEntry &other_lock,
         const uint64_t &tid);
 
 public:
-    /**
-     * Determines if we have enough information to check for a conflict with a given lock
-     *
-     * @param std::string that is the name of the lock we want to check for conflicts with
-     */
-    bool CanCheckForConflicts(const std::string &lockname);
-
+    size_t size()
+    {
+        uint64_t lockorderssize = 0;
+        for (auto &entry : seenLockOrders)
+        {
+            lockorderssize += entry.second.size() + 1;
+        }
+        return lockorderssize;
+    }
     /**
      * Checks for ordering conflicts between a given lock and a vector of other locks
      *
-     * @param a CLockLocation struct that is a new lock being locked
-     * @param a std::vector of CLockLocation structs that are the held locks held by a thread
+     * @param a LockStackEntry that is a new lock being locked
+     * @param a std::vector of LockStackEntry that are the held locks held by a thread
      * @param a uitn64_t that is the thread id of the calling thread
      */
-    void CheckForConflict(const CLockLocation &locklocation,
-        const std::vector<CLockLocation> &heldLocks,
+    void CheckForConflict(LockStackEntry& this_lock,
+        std::vector<LockStackEntry> &heldLocks,
         const uint64_t &tid);
 
     /**
      * Adds information to seenLockOrders about an ordering seen by a given thread
      *
-     * @param std::string that is the name of the lock being added
-     * @param a std::vector of CLockLocation structs that are the held locks held by this thread
+     * @param LockStackEntry that is the name of the lock being added
+     * @param a std::vector of LockStackEntry that are the held locks held by this thread
      */
-    void AddNewLockInfo(const std::string &lockname, const std::vector<CLockLocation> &heldLocks);
+    void AddNewLockInfo(const LockStackEntry& this_lock, const std::vector<LockStackEntry> &heldLocks);
 
     /**
      * Adds information to seenLockLocations about an ordering seen by a given thread
@@ -76,11 +82,11 @@ public:
      * not just the order
      *
      * @param a CLockLocation struct that is a new lock being locked
-     * @param a std::vector of CLockLocation structs that are the held locks held by this thread
+     * @param a std::vector of LockStackEntry that are the held locks held by this thread
      * @param a uitn64_t that is the thread id of the calling thread
      */
     void TrackLockOrderHistory(const CLockLocation &locklocation,
-        const std::vector<CLockLocation> &heldLocks,
+        const std::vector<LockStackEntry> &heldLocks,
         const uint64_t &tid);
 
     /**
@@ -90,6 +96,7 @@ public:
      */
     void clear()
     {
+        mapMutexToName.clear();
         seenLockOrders.clear();
         seenLockLocations.clear();
     }
