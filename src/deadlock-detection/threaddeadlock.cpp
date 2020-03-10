@@ -67,28 +67,6 @@ void _remove_lock_critical_exit(void *cs)
     }
 }
 
-bool HasAnyOwners(void *c)
-{
-    auto iter = lockdata.writelocksheld.find(c);
-    if (iter != lockdata.writelocksheld.end())
-    {
-        if (!iter->second.empty())
-        {
-            return true;
-        }
-    }
-    auto iter2 = lockdata.readlocksheld.find(c);
-    if (iter2 != lockdata.readlocksheld.end())
-    {
-        if (!iter2->second.empty())
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 // for recrusive locking issues with a non recrusive mutex
 static void self_deadlock_detected(LockStackEntry now, LockStackEntry previous)
 {
