@@ -398,7 +398,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 {
     int64_t receiptTime = GetTime();
     const CChainParams &chainparams = Params();
-    RandAddSeedPerfmon();
     unsigned int msgSize = vRecv.size(); // BU for statistics
     UpdateRecvStats(pfrom, strCommand, msgSize, nStopwatchTimeReceived);
     LOG(NET, "received: %s (%u bytes) peer=%s\n", SanitizeString(strCommand), msgSize, pfrom->GetLogName());

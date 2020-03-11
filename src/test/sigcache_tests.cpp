@@ -176,7 +176,7 @@ BOOST_AUTO_TEST_CASE(flag_invariants) {
         BOOST_CHECK(key1.SignECDSA(hashMsg, sig));
 
         // choose random background flagset to test
-        uint32_t base_flags = insecure_rand();
+        uint32_t base_flags = InsecureRand32();
 
         // shouldn't be in cache at start
         BOOST_CHECK(!testChecker.IsCached(sig, pubkey1, hashMsg, base_flags));

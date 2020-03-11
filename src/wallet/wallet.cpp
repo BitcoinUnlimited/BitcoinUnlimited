@@ -600,16 +600,14 @@ bool CWallet::EncryptWallet(const SecureString &strWalletPassphrase)
         return false;
 
     CKeyingMaterial _vMasterKey;
-    RandAddSeedPerfmon();
 
     _vMasterKey.resize(WALLET_CRYPTO_KEY_SIZE);
-    GetRandBytes(&_vMasterKey[0], WALLET_CRYPTO_KEY_SIZE);
+    GetStrongRandBytes(&_vMasterKey[0], WALLET_CRYPTO_KEY_SIZE);
 
     CMasterKey kMasterKey;
-    RandAddSeedPerfmon();
 
     kMasterKey.vchSalt.resize(WALLET_CRYPTO_SALT_SIZE);
-    GetRandBytes(&kMasterKey.vchSalt[0], WALLET_CRYPTO_SALT_SIZE);
+    GetStrongRandBytes(&kMasterKey.vchSalt[0], WALLET_CRYPTO_SALT_SIZE);
 
     CCrypter crypter;
     int64_t nStartTime = GetTimeMillis();
@@ -1965,7 +1963,7 @@ static void ApproximateBestSubset(vector<pair<CAmount, pair<const CWalletTx *, u
                 // that the rng is fast. We do not use a constant random sequence,
                 // because there may be some privacy improvement by making
                 // the selection random.
-                if (nPass == 0 ? insecure_rand.rand32() & 1 : !vfIncluded[i])
+                if (nPass == 0 ? insecure_rand.randbool() : !vfIncluded[i])
                 {
                     nTotal += vValue[i].first;
                     vfIncluded[i] = true;
@@ -2014,7 +2012,7 @@ bool CWallet::SelectCoinsMinConf(const CAmount &nTargetValue,
     vector<pair<CAmount, pair<const CWalletTx *, unsigned int> > > vValue;
     CAmount nTotalLower = 0;
 
-    random_shuffle(vCoins.begin(), vCoins.end(), GetRandInt);
+    Shuffle(vCoins.begin(), vCoins.end(), FastRandomContext());
 
     for (const COutput &output : vCoins)
     {
@@ -3611,7 +3609,6 @@ bool CWallet::InitLoadWallet()
     if (fFirstRun)
     {
         // Create new keyUser and set as default key
-        RandAddSeedPerfmon();
 
         if (GetBoolArg("-usehd", DEFAULT_USE_HD_WALLET) && !walletInstance->IsHDEnabled())
         {

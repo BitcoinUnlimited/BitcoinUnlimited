@@ -34,7 +34,7 @@
 #include <boost/test/unit_test.hpp>
 #include <thread>
 
-FastRandomContext insecure_rand_ctx(true);
+FastRandomContext insecure_rand_ctx;
 
 extern bool fPrintToConsole;
 extern void noui_connect();
@@ -46,6 +46,7 @@ BasicTestingSetup::BasicTestingSetup(const std::string &chainName)
     if (mapArgs.count("-datadir") == 0)
         mapArgs["-datadir"] = GetTempPath().string();
     SHA256AutoDetect();
+    RandomInit();
     ECC_Start();
     SetupEnvironment();
     SetupNetworking();
@@ -64,7 +65,8 @@ TestingSetup::TestingSetup(const std::string &chainName) : BasicTestingSetup(cha
     // instead of unit tests, but for now we need these here.
     RegisterAllCoreRPCCommands(tableRPC);
     ClearDatadirCache();
-    pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i", (unsigned long)GetTime(), (int)(GetRand(1 << 30)));
+    pathTemp =
+        GetTempPath() / strprintf("test_bitcoin_%lu_%i", (unsigned long)GetTime(), (int)(InsecureRandRange(1 << 30)));
     fs::create_directories(pathTemp);
     pblocktree = new CBlockTreeDB(1 << 20, "", true);
     pcoinsdbview = new CCoinsViewDB(1 << 23, true);

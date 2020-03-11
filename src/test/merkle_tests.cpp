@@ -5,7 +5,6 @@
 
 #include "consensus/merkle.h"
 #include "test/test_bitcoin.h"
-#include "test/test_random.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -101,13 +100,13 @@ BOOST_AUTO_TEST_CASE(merkle_test)
         // add a random leaf
         uint256 temp;
         for (uint32_t j = 0; j < 32; j++)
-            *(temp.begin() + j) = insecure_rand() & 255;
+            *(temp.begin() + j) = InsecureRand32() & 255;
         leafData.push_back(temp);
     }
 
     for (unsigned int i = 0; i < MAX_TRIES; i++)
     {
-        uint32_t size = insecure_rand() % MAX_LEAVES;
+        uint32_t size = InsecureRandRange(MAX_LEAVES);
         std::vector<uint256> leaves = leafData;
         leaves.resize(size);
 
@@ -125,7 +124,7 @@ BOOST_AUTO_TEST_CASE(merkle_test)
     for (int i = 0; i < 32; i++)
     {
         // Try 32 block sizes: all sizes from 0 to 16 inclusive, and then 15 random sizes.
-        int ntx = (i <= 16) ? i : 17 + (insecure_rand() % 4000);
+        int ntx = (i <= 16) ? i : 17 + (InsecureRandRange(4000));
         // Try up to 3 mutations.
         for (int mutate = 0; mutate <= 3; mutate++)
         {
@@ -190,7 +189,7 @@ BOOST_AUTO_TEST_CASE(merkle_test)
                     int mtx = loop;
                     if (ntx > 16)
                     {
-                        mtx = insecure_rand() % ntx;
+                        mtx = InsecureRandRange(ntx);
                     }
                     std::vector<uint256> newBranch = BlockMerkleBranch(block, mtx);
                     std::vector<uint256> oldBranch = BlockGetMerkleBranch(block, merkleTree, mtx);

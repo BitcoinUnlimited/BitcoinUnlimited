@@ -44,7 +44,6 @@ BITCOIN_TEST_SUITE = \
   test/scriptnum10.h \
   test/test_bitcoin.cpp \
   test/test_bitcoin.h \
-  test/test_random.h \
   test/testutil.cpp \
   test/testutil.h
 
@@ -117,6 +116,7 @@ BITCOIN_TESTS =\
   test/policyestimator_tests.cpp \
   test/pow_tests.cpp \
   test/prevector_tests.cpp \
+  test/random_tests.cpp \
   test/requestmanager_tests.cpp \
   test/reverselock_tests.cpp \
   test/rpc_tests.cpp \

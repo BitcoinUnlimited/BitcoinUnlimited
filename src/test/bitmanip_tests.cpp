@@ -3,7 +3,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <test/test_bitcoin.h>
-#include <test/test_random.h>
 #include <bitmanip.h>
 
 #include <boost/test/unit_test.hpp>
@@ -53,7 +52,7 @@ BOOST_AUTO_TEST_CASE(bit_count) {
 
     // Check random values against a naive implementation.
     for (size_t i = 0; i < COUNT; i++) {
-        uint32_t v = insecure_rand();
+        uint32_t v = InsecureRand32();
         CheckBitCount(v, countBitsNaive(v));
     }
 }
