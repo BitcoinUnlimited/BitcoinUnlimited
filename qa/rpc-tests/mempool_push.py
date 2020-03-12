@@ -29,7 +29,8 @@ class MyTest (BitcoinTestFramework):
 
     def setup_network(self, split=False):
         mempoolConf = [
-            ["-blockprioritysize=2000000"],
+            ["-blockprioritysize=2000000", "-limitdescendantcount=25", "-limitancestorcount=25",
+             "-limitancestorsize=101", "-limitdescendantsize=101"],
             ["-blockprioritysize=2000000",
              "-maxmempool=8080",
              "-limitancestorsize=%d" % (BCH_UNCONF_SIZE_KB*2),
@@ -41,7 +42,8 @@ class MyTest (BitcoinTestFramework):
             ["-blockprioritysize=2000000", "-limitdescendantcount=1000", "-limitancestorcount=1000",
              "-limitancestorsize=1000", "-limitdescendantsize=1000", "-net.unconfChainResendAction=2",
              "-net.restrictInputs=0"],
-            ["-blockprioritysize=2000000", "-limitancestorsize=150","-net.unconfChainResendAction=2"]
+            ["-blockprioritysize=2000000", "-limitdescendantcount=25", "-limitancestorcount=25",
+             "-limitancestorsize=150","-limitdescendantsize=101", "-net.unconfChainResendAction=2"]
             ]
         self.nodes = start_nodes(4, self.options.tmpdir, mempoolConf)
         connect_nodes_full(self.nodes)

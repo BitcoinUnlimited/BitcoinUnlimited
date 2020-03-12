@@ -32,13 +32,13 @@ static const CAmount HIGH_MAX_TX_FEE = 100 * HIGH_TX_FEE_PER_KB;
  */
 static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 1000000;
 /** BU's default for -limitancestorcount, max number of in-mempool ancestors */
-static const unsigned int BU_DEFAULT_ANCESTOR_LIMIT = 25;
+static const unsigned int BU_DEFAULT_ANCESTOR_LIMIT = 500;
 /** BU's default for -limitancestorsize, maximum kilobytes of tx + all in-mempool ancestors */
-static const unsigned int BU_DEFAULT_ANCESTOR_SIZE_LIMIT = 101;
+static const unsigned int BU_DEFAULT_ANCESTOR_SIZE_LIMIT = 2020;
 /** BU's default for -limitdescendantcount, max number of in-mempool descendants */
-static const unsigned int BU_DEFAULT_DESCENDANT_LIMIT = 25;
+static const unsigned int BU_DEFAULT_DESCENDANT_LIMIT = 500;
 /** BU's default for -limitdescendantsize, maximum kilobytes of in-mempool descendants */
-static const unsigned int BU_DEFAULT_DESCENDANT_SIZE_LIMIT = 101;
+static const unsigned int BU_DEFAULT_DESCENDANT_SIZE_LIMIT = 2020;
 
 /** Network default for the max number of in-mempool ancestors */
 static const unsigned int BCH_DEFAULT_ANCESTOR_LIMIT = 25;
