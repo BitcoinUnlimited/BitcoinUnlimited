@@ -644,7 +644,7 @@ public:
     void ReadConfigFromXVersion();
 
     // requires LOCK(cs_vRecvMsg)
-    unsigned int GetTotalRecvSize()
+    unsigned int GetTotalRecvSize() EXCLUSIVE_LOCKS_REQUIRED(cs_vRecvMsg)
     {
         AssertLockHeld(cs_vRecvMsg);
         unsigned int total = 0;
