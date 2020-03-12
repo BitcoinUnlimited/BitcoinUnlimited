@@ -132,6 +132,10 @@ class CDeferredSharedLocker
     LockState state;
 
 public:
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wthread-safety-analysis"
+#endif
     CDeferredSharedLocker(CSharedCriticalSection &scsp) : scs(scsp), state(LockState::UNLOCKED) {}
     void lock_shared()
     {
@@ -159,6 +163,9 @@ public:
         state = LockState::UNLOCKED;
     }
     ~CDeferredSharedLocker() { unlock(); }
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 };
 
 
