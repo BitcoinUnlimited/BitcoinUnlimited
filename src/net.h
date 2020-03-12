@@ -653,6 +653,12 @@ public:
         return total;
     }
 
+    unsigned int GetSendMsgSize()
+    {
+        LOCK(cs_vSend);
+        return vSendMsg.size();
+    }
+
     // requires LOCK(cs_vRecvMsg)
     bool ReceiveMsgBytes(const char *pch, unsigned int nBytes);
 
