@@ -11,7 +11,7 @@
 
 #include "fs.h"
 
-class CMutableTransaction;
+struct CMutableTransaction;
 
 fs::path GetTempPath();
 CMutableTransaction CreateRandomTx();
