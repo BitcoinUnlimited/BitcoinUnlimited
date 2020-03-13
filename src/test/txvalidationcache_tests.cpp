@@ -396,7 +396,10 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
 
     // cleanup
     mempool.clear();
-    orphanpool.mapOrphanTransactions.clear();
+    {
+        WRITELOCK(orphanpool.cs_orphanpool);
+        orphanpool.mapOrphanTransactions.clear();
+    }
     pcoinsTip->Flush();
     SetMockTime(0);
 }
