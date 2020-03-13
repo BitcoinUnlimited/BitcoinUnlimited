@@ -525,13 +525,13 @@ public:
 
     // Graphene blocks
     /** Stores the grapheneblock salt to be used for this peer */
-    uint64_t gr_shorttxidk0 GUARDED_BY(cs_thintype);
-    uint64_t gr_shorttxidk1 GUARDED_BY(cs_thintype);
+    std::atomic<uint64_t> gr_shorttxidk0;
+    std::atomic<uint64_t> gr_shorttxidk1;
 
     // Compact Blocks
     /** Stores the compactblock salt to be used for this peer */
-    uint64_t shorttxidk0 GUARDED_BY(cs_thintype);
-    uint64_t shorttxidk1 GUARDED_BY(cs_thintype);
+    std::atomic<uint64_t> shorttxidk0;
+    std::atomic<uint64_t> shorttxidk1;
     /** Does this peer support CompactBlocks */
     std::atomic<bool> fSupportsCompactBlocks;
 

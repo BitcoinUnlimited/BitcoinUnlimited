@@ -105,12 +105,12 @@ void CGrapheneBlock::AddNewTransactions(std::vector<CTransaction> vMissingTx, CN
     size_t idx = 0;
     for (const CTransaction &tx : vMissingTx)
     {
-        mapMissingTx[GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, tx.GetHash(),
+        mapMissingTx[GetShortID(pfrom->gr_shorttxidk0.load(), pfrom->gr_shorttxidk1.load(), tx.GetHash(),
             NegotiateGrapheneVersion(pfrom))] = MakeTransactionRef(tx);
 
         uint256 hash = tx.GetHash();
-        uint64_t cheapHash =
-            GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash, NegotiateGrapheneVersion(pfrom));
+        uint64_t cheapHash = GetShortID(
+            pfrom->gr_shorttxidk0.load(), pfrom->gr_shorttxidk1.load(), hash, NegotiateGrapheneVersion(pfrom));
 
         // Insert in arbitrary order if canonical ordering is enabled and xversion is recent enough
         if (fCanonicalTxsOrder && NegotiateGrapheneVersion(pfrom) >= 1)
@@ -144,8 +144,8 @@ void CGrapheneBlock::OrderTxHashes(CNode *pfrom)
         std::vector<uint256> orderedTxHashes256(nBlockTxs, nullhash);
         for (auto &hash : vTxHashes256)
         {
-            uint64_t cheapHash =
-                GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash, NegotiateGrapheneVersion(pfrom));
+            uint64_t cheapHash = GetShortID(
+                pfrom->gr_shorttxidk0.load(), pfrom->gr_shorttxidk1.load(), hash, NegotiateGrapheneVersion(pfrom));
             const auto &orderIdx = mapHashOrderIndex.find(cheapHash);
             if (orderIdx == mapHashOrderIndex.end())
                 throw std::runtime_error("Could not locate cheapHash in mapHashOrderIndex");
@@ -566,8 +566,8 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     pblock->nTime = header.nTime;
     pblock->hashMerkleRoot = header.hashMerkleRoot;
     pblock->hashPrevBlock = header.hashPrevBlock;
-    pfrom->gr_shorttxidk0 = shorttxidk0;
-    pfrom->gr_shorttxidk1 = shorttxidk1;
+    pfrom->gr_shorttxidk0.store(shorttxidk0);
+    pfrom->gr_shorttxidk1.store(shorttxidk1);
 
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
     int missingCount = 0;
@@ -788,8 +788,8 @@ static bool ReconstructBlock(CNode *pfrom,
             bool inOrphanCache = false;
             if (!ptx)
             {
-                uint64_t nShortId =
-                    GetShortID(pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, hash, NegotiateGrapheneVersion(pfrom));
+                uint64_t nShortId = GetShortID(
+                    pfrom->gr_shorttxidk0.load(), pfrom->gr_shorttxidk1.load(), hash, NegotiateGrapheneVersion(pfrom));
 
                 std::map<uint256, CTransactionRef>::iterator iter1 = mapAdditionalTxs.find(hash);
                 if (iter1 != mapAdditionalTxs.end())
@@ -1327,8 +1327,8 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
             LOG(GRAPHENE, "Block %s to peer %s using Graphene version %d\n", grapheneBlock.header.GetHash().ToString(),
                 pfrom->GetLogName(), grapheneBlock.version);
 
-            pfrom->gr_shorttxidk0 = grapheneBlock.shorttxidk0;
-            pfrom->gr_shorttxidk1 = grapheneBlock.shorttxidk1;
+            pfrom->gr_shorttxidk0.store(grapheneBlock.shorttxidk0);
+            pfrom->gr_shorttxidk1.store(grapheneBlock.shorttxidk1);
             uint64_t nSizeBlock = pblock->GetBlockSize();
             uint64_t nSizeGrapheneBlock = grapheneBlock.GetSize();
 
@@ -1717,8 +1717,8 @@ std::vector<CTransaction> TransactionsFromBlockByCheapHash(std::set<uint64_t> &v
         {
             for (auto &tx : block.vtx)
             {
-                uint64_t cheapHash = GetShortID(
-                    pfrom->gr_shorttxidk0, pfrom->gr_shorttxidk1, tx->GetHash(), NegotiateGrapheneVersion(pfrom));
+                uint64_t cheapHash = GetShortID(pfrom->gr_shorttxidk0.load(), pfrom->gr_shorttxidk1.load(),
+                    tx->GetHash(), NegotiateGrapheneVersion(pfrom));
 
                 if (vCheapHashes.count(cheapHash))
                     vTx.push_back(*tx);
