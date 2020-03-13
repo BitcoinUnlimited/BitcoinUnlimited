@@ -298,6 +298,7 @@ BOOST_AUTO_TEST_CASE(DoS_bantime_expiration)
 CTransaction RandomOrphan()
 {
     std::map<uint256, CTxOrphanPool::COrphanTx>::iterator it;
+    READLOCK(orphanpool.cs_orphanpool);
     it = orphanpool.mapOrphanTransactions.lower_bound(InsecureRand256());
     if (it == orphanpool.mapOrphanTransactions.end())
         it = orphanpool.mapOrphanTransactions.begin();
