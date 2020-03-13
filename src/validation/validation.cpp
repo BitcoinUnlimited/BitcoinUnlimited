@@ -2222,26 +2222,32 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                 // be in ConnectBlock because they require the UTXO set
                 prevheights.resize(tx.vin.size());
                 {
+                    bool abort = false;
                     for (size_t j = 0; j < tx.vin.size(); j++)
                     {
                         CoinAccessor coin(view, tx.vin[j].prevout);
                         // isSpend is true for empty coin object (coinEmpty)
                         if (coin->IsSpent())
                         {
-                            // If we were validating at the same time as another block and the other block wins the
-                            // validation race and updates the UTXO first, then we may end up here with missing inputs.
-                            // Therefore we check to see if the chainwork has advanced or if we recieved a quit and if
-                            // so return without DOSing the node.
-                            if (PV->ChainWorkHasChanged(nStartingChainWork) || PV->QuitReceived(this_id, fParallel))
-                            {
-                                return false;
-                            }
-                            return state.DoS(100, error("%s: block %s inputs missing/spent in tx %d %s", __func__,
-                                                      block.GetHash().ToString(), i, tx.GetHash().ToString()),
-                                REJECT_INVALID, "bad-txns-inputs-missingorspent");
+                            abort = true;
+                            break;
                         }
                         prevheights[j] = coin->nHeight;
                         nFees = nFees + coin->out.nValue;
+                    }
+                    if (abort)
+                    {
+                        // If we were validating at the same time as another block and the other block wins the
+                        // validation race and updates the UTXO first, then we may end up here with missing inputs.
+                        // Therefore we check to see if the chainwork has advanced or if we recieved a quit and if
+                        // so return without DOSing the node.
+                        if (PV->ChainWorkHasChanged(nStartingChainWork) || PV->QuitReceived(this_id, fParallel))
+                        {
+                            return false;
+                        }
+                        return state.DoS(100, error("%s: block %s inputs missing/spent in tx %d %s", __func__,
+                                                  block.GetHash().ToString(), i, tx.GetHash().ToString()),
+                            REJECT_INVALID, "bad-txns-inputs-missingorspent");
                     }
                 }
                 nFees = nFees - tx.GetValueOut();
@@ -2454,26 +2460,32 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                 // be in ConnectBlock because they require the UTXO set
                 prevheights.resize(tx.vin.size());
                 {
+                    bool abort = false;
                     for (size_t j = 0; j < tx.vin.size(); j++)
                     {
                         CoinAccessor coin(view, tx.vin[j].prevout);
                         // isSpend is true for empty coin object (coinEmpty)
                         if (coin->IsSpent())
                         {
-                            // If we were validating at the same time as another block and the other block wins the
-                            // validation race and updates the UTXO first, then we may end up here with missing inputs.
-                            // Therefore we check to see if the chainwork has advanced or if we recieved a quit and if
-                            // so return without DOSing the node.
-                            if (PV->ChainWorkHasChanged(nStartingChainWork) || PV->QuitReceived(this_id, fParallel))
-                            {
-                                return false;
-                            }
-                            return state.DoS(100, error("%s: block %s inputs missing/spent in tx %d %s", __func__,
-                                                      block.GetHash().ToString(), i, tx.GetHash().ToString()),
-                                REJECT_INVALID, "bad-txns-inputs-missingorspent");
+                            abort = true;
+                            break;
                         }
                         prevheights[j] = coin->nHeight;
                         nFees = nFees + coin->out.nValue;
+                    }
+                    if (abort)
+                    {
+                        // If we were validating at the same time as another block and the other block wins the
+                        // validation race and updates the UTXO first, then we may end up here with missing inputs.
+                        // Therefore we check to see if the chainwork has advanced or if we recieved a quit and if
+                        // so return without DOSing the node.
+                        if (PV->ChainWorkHasChanged(nStartingChainWork) || PV->QuitReceived(this_id, fParallel))
+                        {
+                            return false;
+                        }
+                        return state.DoS(100, error("%s: block %s inputs missing/spent in tx %d %s", __func__,
+                                                  block.GetHash().ToString(), i, tx.GetHash().ToString()),
+                            REJECT_INVALID, "bad-txns-inputs-missingorspent");
                     }
                 }
                 nFees = nFees - tx.GetValueOut();
