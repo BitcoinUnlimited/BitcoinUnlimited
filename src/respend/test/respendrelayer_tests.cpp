@@ -81,18 +81,24 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     // Create an interesting and valid respend to an SPV peer
     // add bloom filter using the respend hash.
     CBloomFilter *filter = new CBloomFilter(1, .00001, 5, BLOOM_UPDATE_ALL, 36000);
-    delete node.pfilter;
-    node.pfilter = filter;
-    node.pfilter->insert(respend.GetHash());
-    node.vInventoryToSend.clear();
+    {
+        LOCK(node.cs_filter);
+        delete node.pfilter;
+        node.pfilter = filter;
+        node.pfilter->insert(respend.GetHash());
+        node.vInventoryToSend.clear();
+    }
     r.SetValid(true);
     r.Trigger();
     BOOST_CHECK_EQUAL(size_t(0), node.vInventoryToSend.size());
-    node.pfilter->clear();
+    {
+        LOCK(node.cs_filter);
+        node.pfilter->clear();
+        // clean up node
+        delete node.pfilter;
+        node.pfilter = nullptr;
+    }
 
-    // clean up node
-    delete node.pfilter;
-    node.pfilter = nullptr;
     vNodes.erase(vNodes.end() - 1);
 }
 
