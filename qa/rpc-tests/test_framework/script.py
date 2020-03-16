@@ -236,6 +236,9 @@ OP_CHECKMULTISIGVERIFY = CScriptOp(0xaf)
 OP_CHECKDATASIG = CScriptOp(0xba)
 OP_CHECKDATASIGVERIFY = CScriptOp(0xbb)
 
+# additional byte string operations
+OP_REVERSEBYTES = CScriptOp(0xbc)
+
 # expansion
 OP_NOP1 = CScriptOp(0xb0)
 OP_CHECKLOCKTIMEVERIFY = CScriptOp(0xb1)

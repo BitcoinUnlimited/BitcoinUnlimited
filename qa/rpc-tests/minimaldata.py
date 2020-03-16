@@ -17,6 +17,7 @@ from test_framework.blocktools import (
     create_coinbase,
     create_transaction,
     make_conform_to_ctor,
+    pad_tx,
 )
 from test_framework.nodemessages import (
     CBlock,
@@ -34,7 +35,6 @@ from test_framework.script import (
     OP_TRUE,
 )
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.txtools import pad_tx
 from test_framework.util import assert_raises_rpc_error, p2p_port, waitFor
 import logging
 

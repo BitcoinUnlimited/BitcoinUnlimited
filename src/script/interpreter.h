@@ -125,6 +125,12 @@ enum
     // Whether to allow new OP_CHECKMULTISIG logic to trigger. (new multisig
     // logic verifies faster, and only allows Schnorr signatures)
     SCRIPT_ENABLE_SCHNORR_MULTISIG = (1U << 21),
+
+    // 1U << 22 is reserved for SCRIPT_VERIFY_INPUT_SIGCHECKS
+
+    // Whether the new OP_REVERSEBYTES opcode can be used.
+    SCRIPT_ENABLE_OP_REVERSEBYTES = (1U << 23),
+
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);

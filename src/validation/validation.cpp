@@ -1072,6 +1072,31 @@ bool CheckInputs(const CTransactionRef &tx,
                         scriptError = check2.GetScriptError();
                     }
 
+                    // Before banning, we need to check whether the transaction would
+                    // be valid on the other side of the upgrade, so as to avoid
+                    // splitting the network between upgraded and non-upgraded nodes.
+                    // Note that this will create strange error messages like
+                    // "upgrade-conditional-script-failure (Opcode missing or not
+                    // understood)".
+                    CScriptCheck check3(nullptr, scriptPubKey, amount, *tx, i,
+                        mandatoryFlags ^ SCRIPT_ENABLE_OP_REVERSEBYTES, maxOps, cacheStore);
+                    if (check3())
+                    {
+                        if (debugger)
+                        {
+                            debugger->AddInputCheckError(strprintf(
+                                "upgrade-conditional-script-failure (%s)", ScriptErrorString(check.GetScriptError())));
+                            inputVerified = false;
+                            allPassed = false;
+                        }
+                        else
+                        {
+                            return state.Invalid(
+                                false, REJECT_INVALID, strprintf("upgrade-conditional-script-failure (%s)",
+                                                           ScriptErrorString(check.GetScriptError())));
+                        }
+                    }
+
                     // Failures of other flags indicate a transaction that is
                     // invalid in new blocks, e.g. a invalid P2SH. We DoS ban
                     // such nodes as they are not following the protocol. That
@@ -1865,6 +1890,11 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
     {
         flags |= SCRIPT_ENABLE_SCHNORR_MULTISIG;
         flags |= SCRIPT_VERIFY_MINIMALDATA;
+    }
+
+    if (IsMay2020Enabled(consensusparams, pindex->pprev))
+    {
+        flags |= SCRIPT_ENABLE_OP_REVERSEBYTES;
     }
 
     return flags;
