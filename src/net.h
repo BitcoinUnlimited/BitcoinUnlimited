@@ -405,10 +405,10 @@ public:
     std::deque<CInv> vRecvGetData GUARDED_BY(csRecvGetData);
 
     CCriticalSection cs_vRecvMsg;
-    uint64_t nRecvBytes GUARDED_BY(vRecvMsg);
-    std::deque<CNetMessage> vRecvMsg GUARDED_BY(vRecvMsg);
+    uint64_t nRecvBytes GUARDED_BY(cs_vRecvMsg);
+    std::deque<CNetMessage> vRecvMsg GUARDED_BY(cs_vRecvMsg);
     // the next message we receive from the socket
-    CNetMessage msg GUARDED_BY(vRecvMsg);
+    CNetMessage msg GUARDED_BY(cs_vRecvMsg);
     CStatHistory<uint64_t> currentRecvMsgSize;
 
     uint64_t nServices;
@@ -644,13 +644,19 @@ public:
     void ReadConfigFromXVersion();
 
     // requires LOCK(cs_vRecvMsg)
-    unsigned int GetTotalRecvSize()
+    unsigned int GetTotalRecvSize() EXCLUSIVE_LOCKS_REQUIRED(cs_vRecvMsg)
     {
         AssertLockHeld(cs_vRecvMsg);
         unsigned int total = 0;
         for (const CNetMessage &message : vRecvMsg)
             total += message.vRecv.size() + 24;
         return total;
+    }
+
+    unsigned int GetSendMsgSize()
+    {
+        LOCK(cs_vSend);
+        return vSendMsg.size();
     }
 
     // requires LOCK(cs_vRecvMsg)
