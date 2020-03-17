@@ -1746,29 +1746,35 @@ uint64_t GetShortID(uint64_t shorttxidk0, uint64_t shorttxidk1, const uint256 &t
 
 bool NegotiateFastFilterSupport(CNode *pfrom)
 {
+    uint64_t peerFastFilterPref;
+    {
+        LOCK(pfrom->cs_xversion);
+        peerFastFilterPref = pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF);
+    }
+
     if (grapheneFastFilterCompatibility.Value() == EITHER)
     {
-        if (pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF) == EITHER)
+        if (peerFastFilterPref == EITHER)
             return true;
-        else if (pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF) == FAST)
+        else if (peerFastFilterPref == FAST)
             return true;
         else
             return false;
     }
     else if (grapheneFastFilterCompatibility.Value() == FAST)
     {
-        if (pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF) == EITHER)
+        if (peerFastFilterPref == EITHER)
             return true;
-        else if (pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF) == FAST)
+        else if (peerFastFilterPref == FAST)
             return true;
         else
             throw std::runtime_error("Sender and receiver have incompatible fast filter preferences");
     }
     else
     {
-        if (pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF) == EITHER)
+        if (peerFastFilterPref == EITHER)
             return false;
-        else if (pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF) == FAST)
+        else if (peerFastFilterPref == FAST)
             throw std::runtime_error("Sender and receiver have incompatible fast filter preferences");
         else
             return false;

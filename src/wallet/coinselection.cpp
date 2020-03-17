@@ -219,7 +219,6 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos &available,
         excessModifier += loopCost;
 
         // Calculate the size of this new input
-        large->second.i;
         const CScript &scriptPubKey = large->second.tx->vout[large->second.i].scriptPubKey;
         CScript scriptSigRes; // = txNew.vin[nIn].scriptSig;
         CWallet dummyWallet;

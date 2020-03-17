@@ -229,6 +229,7 @@ UniValue getpeerinfo(const UniValue &params, bool fHelp)
 
             if (snode)
             {
+                LOCK(snode->cs_xversion);
                 UniValue xmap_enc(UniValue::VOBJ);
                 for (auto kv : snode->xVersion.xmap)
                 {

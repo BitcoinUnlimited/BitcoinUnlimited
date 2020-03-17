@@ -47,7 +47,6 @@ bool bSpendZeroConfChange = DEFAULT_SPEND_ZEROCONF_CHANGE;
 bool fSendFreeTransactions = DEFAULT_SEND_FREE_TRANSACTIONS;
 
 const unsigned int P2PKH_LEN = 34;
-const unsigned int TX_HEADER_LEN = 4;
 const unsigned int MIN_BYTES_IN_TX = 192;
 
 const char *DEFAULT_WALLET_DAT = "wallet.dat";
