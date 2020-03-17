@@ -188,6 +188,7 @@ BITCOIN_CORE_H = \
   parallel.h \
   policy/fees.h \
   policy/policy.h \
+  policy/mempool.h \
   pow.h \
   protocol.h \
   random.h \
@@ -307,6 +308,7 @@ libbitcoin_server_a_SOURCES = \
   parallel.cpp \
   policy/fees.cpp \
   policy/policy.cpp \
+  policy/mempool.cpp \
   pow.cpp \
   rest.cpp \
   rpc/blockchain.cpp \

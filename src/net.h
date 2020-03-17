@@ -7,6 +7,7 @@
 #ifndef BITCOIN_NET_H
 #define BITCOIN_NET_H
 
+#include "banentry.h"
 #include "blockrelay/compactblock.h"
 #include "bloom.h"
 #include "chainparams.h"
@@ -17,14 +18,18 @@
 #include "iblt.h"
 #include "limitedmap.h"
 #include "netbase.h"
+#include "policy/mempool.h"
 #include "primitives/block.h"
 #include "protocol.h"
 #include "random.h"
+#include "stat.h"
 #include "streams.h"
 #include "sync.h"
 #include "threadgroup.h"
 #include "uint256.h"
+#include "unlimited.h"
 #include "util.h" // FIXME: reduce scope
+#include "xversionmessage.h"
 
 #include <atomic>
 #include <deque>
@@ -36,12 +41,9 @@
 
 #include <boost/signals2/signal.hpp>
 
-#include "banentry.h"
-#include "stat.h"
-#include "unlimited.h"
-#include "xversionmessage.h"
 
 extern CTweak<uint32_t> netMagic;
+extern CChain chainActive;
 static CMessageHeader::MessageStartChars netOverride;
 class CAddrMan;
 class CSubNet;
@@ -369,13 +371,13 @@ class CNode
 public:
     /** This node's max acceptable number ancestor transactions.  Used to decide whether this node will accept a
      * particular transaction. */
-    size_t nLimitAncestorCount = BCH_DEFAULT_ANCESTOR_LIMIT;
+    size_t nLimitAncestorCount = GetBCHDefaultAncestorLimit(Params().GetConsensus(), chainActive.Tip());
     /** This node's max acceptable sum of all ancestor transaction sizes.  Used to decide whether this node will accept
      * a particular transaction. */
     size_t nLimitAncestorSize = BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000;
     /** This node's max acceptable number of descendants.  Used to decide whether this node will accept a particular
      * transaction. */
-    size_t nLimitDescendantCount = BCH_DEFAULT_DESCENDANT_LIMIT;
+    size_t nLimitDescendantCount = GetBCHDefaultDescendantLimit(Params().GetConsensus(), chainActive.Tip());
     /** This node's max acceptable sum of all descendant transaction sizes.  Used to decide whether this node will
      * accept a particular transaction. */
     size_t nLimitDescendantSize = BCH_DEFAULT_DESCENDANT_SIZE_LIMIT * 1000;
@@ -385,6 +387,11 @@ public:
     uint64_t nMempoolSyncMinVersionSupported = 0;
     /** Maximum supported mempool synchronization version */
     uint64_t nMempoolSyncMaxVersionSupported = 0;
+    /** set to true if this node support xVersion */
+    bool xVersionEnabled;
+    /** set to true if this node is ok with no message checksum */
+    bool skipChecksum;
+
 
     // This is shared-locked whenever messages are processed.
     // Take it exclusive-locked to finish all ongoing processing
@@ -429,9 +436,6 @@ public:
 
     /** The address of the remote peer */
     CAddress addr;
-
-    /** set to true if this node is ok with no message checksum */
-    bool skipChecksum;
 
     /** The address the remote peer advertised in its version message */
     CAddress addrFrom_advertised;
@@ -633,7 +637,9 @@ public:
     {
         // Checking the descendants makes no sense -- the target node can't have descendants in its mempool if it
         // doesn't have this transaction!
-        if (props.countWithAncestors > nLimitAncestorCount)
+        if ((xVersionEnabled && props.countWithAncestors > nLimitAncestorCount) ||
+            (!xVersionEnabled &&
+                props.countWithAncestors > GetBCHDefaultDescendantLimit(Params().GetConsensus(), chainActive.Tip())))
             return false;
         if (props.sizeWithAncestors > nLimitAncestorSize)
             return false;
