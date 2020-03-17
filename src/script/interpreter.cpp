@@ -1529,7 +1529,10 @@ bool ScriptMachine::Step()
                             }
                         }
 
+<<<<<<< HEAD
+=======
 
+>>>>>>> 4c5c0dacd... Implement sigcheck counting at the script machine layer.
                         if (!allNull)
                             stats.consensusSigOpCount += nKeysCount; // 2020-05-15 sigchecks consensus rule
 
