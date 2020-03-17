@@ -547,7 +547,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->PushMessage(NetMsgType::VERACK);
 
         // Change version
-        pfrom->ssSend.SetVersion(std::min(pfrom->nVersion, PROTOCOL_VERSION));
+        {
+            LOCK(pfrom->cs_vSend);
+            pfrom->ssSend.SetVersion(std::min(pfrom->nVersion, PROTOCOL_VERSION));
+        }
 
         LOG(NET, "receive version message: %s: version %d, blocks=%d, us=%s, peer=%s\n", pfrom->cleanSubVer,
             pfrom->nVersion, pfrom->nStartingHeight, addrMe.ToString(), pfrom->GetLogName());
