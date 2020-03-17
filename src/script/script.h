@@ -26,6 +26,10 @@ static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520;
 // Maximum number of non-push operations per script
 static const int MAX_OPS_PER_SCRIPT = 201;
 
+// 2020-05-15 sigchecks consensus rule
+// Maximum number of signature check operations per transaction
+static const int MAX_SIGOPS_PER_TRANSACTION = 3000;
+
 // Maximum number of public keys per multisig
 static const int MAX_PUBKEYS_PER_MULTISIG = 20;
 

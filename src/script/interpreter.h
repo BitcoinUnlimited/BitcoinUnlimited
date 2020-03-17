@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+
 class CPubKey;
 class CScript;
 class CTransaction;
@@ -225,6 +226,39 @@ public:
 
 typedef std::vector<unsigned char> StackDataType;
 
+/**
+ * Class that keeps track of number of signature operations
+ * and bytes hashed to compute signature hashes.
+ */
+class ScriptMachineResourceTracker
+{
+public:
+    /** 2020-05-15 sigchecks consensus rule */
+    uint64_t consensusSigOpCount = 0;
+    /** the bitwise OR of all sighashtypes in executed signature checks */
+    unsigned char sighashtype = 0;
+    /** Number of instructions executed */
+    unsigned int nOpCount = 0;
+
+    ScriptMachineResourceTracker() {}
+    /** Combine the results of this tracker and another tracker */
+    void update(const ScriptMachineResourceTracker &stats)
+    {
+        consensusSigOpCount += stats.consensusSigOpCount;
+        nOpCount = stats.nOpCount;
+        sighashtype |= stats.sighashtype;
+    }
+
+    /** Set all tracked values to zero */
+    void clear(void)
+    {
+        consensusSigOpCount = 0;
+        sighashtype = 0;
+        nOpCount = 0;
+    }
+};
+
+
 class ScriptMachine
 {
 protected:
@@ -242,8 +276,13 @@ protected:
     CScript::const_iterator pend;
     CScript::const_iterator pbegincodehash;
 
-    unsigned int nOpCount;
+    /** Maximum number of instructions to be executed -- script will abort with error if this number is exceeded */
     unsigned int maxOps;
+    /** Maximum number of 2020-05-15 sigchecks allowed -- script will abort with error if this number is exceeded */
+    unsigned int maxConsensusSigOps;
+
+    /** Tracks current values of script execution metrics */
+    ScriptMachineResourceTracker stats;
 
     std::vector<bool> vfExec;
 
@@ -256,16 +295,18 @@ public:
         altstack = from.altstack;
         script = from.script;
         error = from.error;
-        sighashtype = from.sighashtype;
-        nOpCount = from.nOpCount;
         vfExec = from.vfExec;
         maxOps = from.maxOps;
-        nOpCount = 0;
+        maxConsensusSigOps = from.maxConsensusSigOps;
+        stats = from.stats;
     }
 
-    ScriptMachine(unsigned int _flags, const BaseSignatureChecker &_checker, unsigned int maxOpsIn)
+    ScriptMachine(unsigned int _flags,
+        const BaseSignatureChecker &_checker,
+        unsigned int _maxOps,
+        unsigned int _maxSigOps)
         : flags(_flags), script(nullptr), checker(_checker), pc(CScript().end()), pbegin(CScript().end()),
-          pend(CScript().end()), pbegincodehash(CScript().end()), nOpCount(0), maxOps(maxOpsIn)
+          pend(CScript().end()), pbegincodehash(CScript().end()), maxOps(_maxOps), maxConsensusSigOps(_maxSigOps)
     {
     }
 
@@ -292,17 +333,25 @@ public:
     void ClearAltStack() { altstack.clear(); }
     // Remove all items from the stack
     void ClearStack() { stack.clear(); }
-    // clear all state
+    /** remove a single item from the top of the stack.  If the stack is empty, std::runtime_error is thrown. */
+    void PopStack()
+    {
+        if (stack.empty())
+            throw std::runtime_error("ScriptMachine.PopStack: stack empty");
+        stack.pop_back();
+    }
+
+    // clear all state except for configuration like maximums
     void Reset()
     {
         altstack.clear();
         stack.clear();
         vfExec.clear();
-        nOpCount = 0;
+        stats.clear();
     }
 
     // Set the main stack to the passed data
-    void setStack(std::vector<StackDataType> &stk) { stack = stk; }
+    void setStack(const std::vector<StackDataType> &stk) { stack = stk; }
     // Overwrite a stack entry with the passed data.  0 is the stack top, -1 is a special number indicating to push
     // an item onto the stack top.
     void setStackItem(int idx, const StackDataType &item)
@@ -338,7 +387,9 @@ public:
     // Get the bitwise OR of all sighashtype bytes that occurred in the script
     unsigned char getSigHashType() { return sighashtype; }
     // Return the number of instructions executed since the last Reset()
-    unsigned int getOpCount() { return nOpCount; }
+    unsigned int getOpCount() { return stats.nOpCount; }
+    /** Return execution statistics */
+    const ScriptMachineResourceTracker &getStats() { return stats; }
 };
 
 bool EvalScript(std::vector<std::vector<unsigned char> > &stack,
@@ -354,7 +405,7 @@ bool VerifyScript(const CScript &scriptSig,
     unsigned int maxOps,
     const BaseSignatureChecker &checker,
     ScriptError *error = nullptr,
-    unsigned char *sighashtype = nullptr);
+    ScriptMachineResourceTracker *tracker = nullptr);
 
 // string prefixed to data when validating signed messages via RPC call.  This ensures
 // that the signature was intended for use on this blockchain.

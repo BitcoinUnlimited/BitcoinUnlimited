@@ -48,10 +48,14 @@ bool CScriptCheck::operator()()
 {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
     CachingTransactionSignatureChecker checker(ptxTo, nIn, amount, nFlags, cacheStore);
-    if (!VerifyScript(scriptSig, scriptPubKey, nFlags, maxOps, checker, &error, &sighashType))
+    ScriptMachineResourceTracker smRes;
+    if (!VerifyScript(scriptSig, scriptPubKey, nFlags, maxOps, checker, &error, &smRes))
         return false;
     if (resourceTracker)
+    {
         resourceTracker->Update(ptxTo->GetHash(), checker.GetNumSigops(), checker.GetBytesHashed());
+        resourceTracker->UpdateConsensusSigOps(smRes.consensusSigOpCount);
+    }
     return true;
 }
 

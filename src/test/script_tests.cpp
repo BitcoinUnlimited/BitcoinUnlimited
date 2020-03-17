@@ -392,7 +392,7 @@ struct KeyData
 
 class TestBuilder
 {
-private:
+public:
     //! Actually executed script
     CScript script;
     //! The P2SH redeemscript
@@ -1404,7 +1404,7 @@ BOOST_AUTO_TEST_CASE(script_build_2)
                         .PushSigSchnorr(keys.key1)
                         .SetScriptError(SCRIPT_ERR_CHECKSIGVERIFY));
 
-    // CHECKDATASIG & Schnor
+    // CHECKDATASIG & Schnorr
     tests.push_back(
         TestBuilder(CScript() << OP_0 << ToByteVector(keys.pubkey0) << OP_CHECKDATASIG, "CHECKDATASIG Schnorr", 0)
             .PushDataSigSchnorr(keys.key0, {}));
@@ -2623,12 +2623,13 @@ BOOST_AUTO_TEST_CASE(IsWitnessProgram)
     }
 }
 
+
 BOOST_AUTO_TEST_CASE(script_debugger)
 {
     CScript testScript = CScript() << 0 << 1;
     CScript testRedeemScript = CScript() << OP_IF << OP_IF << 1 << OP_ELSE << 2 << OP_ENDIF << OP_ELSE << 3 << OP_ENDIF;
     BaseSignatureChecker sigChecker;
-    ScriptMachine sm(0, sigChecker, 0xffffffff);
+    ScriptMachine sm(0, sigChecker, 0xffffffff, 0xffffffff);
 
     bool result = sm.Eval(testScript);
     BOOST_CHECK(result);
