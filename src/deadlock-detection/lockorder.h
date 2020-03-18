@@ -32,8 +32,8 @@ protected:
     /// map for attempting to track the name of the mutex based on its reference. might not always be accurate, boolean
     /// will denote this
     std::map<void *, std::pair<std::string, bool> > mapMutexToName;
-    /// @var std::map<std::string, std::set<std::string> > seenLockOrders
-    /// key is mutex, value is set of mutexes that have ever been locked while key was locked
+    /// @var std::map<void*, std::set<void*> > seenLockOrders
+    /// key is mutex, value is set of mutex that have ever been locked while key was locked
     std::map<void *, std::set<void *> > seenLockOrders;
     /// @var std::map<std::pair<std::string, std::string>, std::set<std::tuple<std::string, std::string, uint64_t> > >
     /// seenLockLocations
