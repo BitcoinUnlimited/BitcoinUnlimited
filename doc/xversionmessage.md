@@ -1,7 +1,7 @@
 # XVersionMessage: BCH node extended version and configuration fields
 
 DRAFT specification
-Version: 0.0.3
+Version: 0.1.0
 
 ## Overview
 
@@ -20,9 +20,9 @@ clients on the current BCH network that will consider an oversized
 `version` message illegal (e.g. Bitcoin XT).
 
 For this reason, an additional message type named `xversion` is
-specified here in, plus an acknowledgement named `xverack`. The
-`xversion` message transports a generic key-value map that is meant to
-hold the configuration and version parameters.
+specified here in. The `xversion` message transports a generic
+key-value map that is meant to hold the configuration and version
+parameters.
 
 As a general reminder, it should be noted that the values given in
 this extended `xversion` version and configuration map are, except for
@@ -32,7 +32,7 @@ implementation depending for its configuration on the values in the
 xmap will properly account for this fact and ban or otherwise penalize
 nodes that do not conform with their advertised behavior.
 
-## Encoding of the `xversion` and `xverack` message types
+## Encoding of the `xversion` message type
 
 The `xversion` message contains a single compound field which is a
 serialized key-value map henceforth named `xmap` that maps 64-bit
@@ -72,9 +72,6 @@ any order of the key-value pairs. When receiving an `xmap`, entries
 with duplicate keys that are later in the message should override
 values that are that are closer to the start of the message.
 
-The `xverack` message, meant as an acknowledgement of proper
-`xversion` receipt is empty.
-
 ### Size limit
 
 The *serialized* size of the `xversion` payload has to be of size
@@ -84,22 +81,18 @@ than this are illegal.
 ### Later extensions
 
 Implementations should allow extra bytes following the defined fields
-in the `xversion` message as well as any bytes in in the `xverack`
-message, to allow for further extensibility.
+in the `xversion` message to allow for further extensibility.
 
 
 ## Handling and sequencing of `xversion` messages
 
 A node should expect an `xversion` message to arrive after the
-acknowledgement ('verack') of the `version` message.  Only a single
-`xversion` message should arrive during the lifetime of a connection
-and receival of multiple such messages should be considered
-misbehavior of the remote peer.
+`version` message.  Only a single `xversion` message should arrive
+during the lifetime of a connection and receival of multiple such
+messages should be considered misbehavior of the remote peer.
 
 After receival of an `xversion` message, a node must answer with an
-empty `xverack` message to confirm recept. Receival of an `xverack`
-without having ever send an `xversion` message should be handled as a
-protocol violation.
+empty `verack` message to confirm recept.
 
 An empty `xmap` for a peer has a defined reading (see below).
 However, to simplify node implementations, it is deemed acceptable to
@@ -159,7 +152,7 @@ the corresponding value should be assumed.
 
 A directory that lists the currently defined key values comes along
 with this specification and can be found in the file named
-`xversionkeys.dat`.
+`xversionkeys.h`.
 
 At the moment, and for more compact wire encoding, keys are assumed to
 be just 32-bit in size and the current specification format reflects
@@ -176,70 +169,23 @@ detailed interpretation of the fields in the `xmap` will obviously
 rely on external specifications that cannot ever be the scope of this
 document.
 
-The `xmap` directory is meant to be machine readable. For this reason,
-a simple `python` tool in the Bitcoin Unlimited implementation
-produces a C++ header file from this directory (see below).
-
-The rationale to not directly implement it as a simple C++ header is
-that this will make it easier for non-C++ implementations to extract
-the desired values from this table as well as ensuring that table
-stays simple.
-
-## `xmap` directory format
-The file is assumed to be ASCII-encoded and read
-line-by-line. Anything that follows a `#` is deemed a comment and
-ignored. Lines that are empty or consisting only of whitespace are
-ignored as well.
-
-Each line is interpreted as a string tuple. The entries in the tuple
-are separated by any positive amount of whitespace in the directory file.
-
-String tuples that have `KEY` as their first entry specify the key type, naming,
-prefix, suffix and data type of an entry in the `xmap`, in this order. For example:
-
-`KEY i BU_LISTEN_PORT                            0x0000                   0x0000         u64c`
-
-
-The name of a key should be an all-upper-case, underscore-separated string
-that is a valid C++ `enum` identifier, like in the above example.
-
-The keys in the table should be marked with either `INITIAL` or
-CHANGEABLE, expressed as `i` or `c`. Currently, only the meaning of
-INITIAL (`i`) is defined.
-
-The idea is that an initial value is marking values that are valid for
-the lifetime of the connection to the peer, whereas values marked as
-`c` could be updated with a to-be-defined update mechanism. This
-functionality, however, has not been implemented yet. And implementer
-that desires the functionality of a `CHANGEABLE` key is expected to
-update this very specification accordingly.
-
-Valid values for the data type specification are currently `vector` for an
-unspecified vector of bytes and `u64c` for a value that is assumed to
-be a compact-size encoded 64-bit unsigned integer like described
-above.
-
-Other tuples that do not start with `KEY` or have the above format are
-currently undefined and should be expected to produce an error in any
-`xmap` directory parsers that might be implemented (or potentially in
-any of the later processing and compilation stages).
-
 ## Implementation prefixes
 
 The implementations listed here should use the following prefixes:
 
-`bitcore           0x0005`
-`bcash             0x0001`
-`Parity Cash       0x0007`
-`bitprim           0x0006`
-`bchd              0x0004`
-`XT                0x0003`
-`BU                0x0002`
 `ABC               0x0000`
+`bcash             0x0001`
+`BU                0x0002`
+`XT                0x0003`
+`bchd              0x0004`
+`bitcore           0x0005`
+`bitprim           0x0006`
+`Parity Cash       0x0007`
+
 
 An implementation not listed here, but wanting to extend the `xversion`
 map can pick an unused prefix but is strongly suggested to communicate
-the choice with the rest of the teams as early as possible. 
+the choice with the rest of the teams as early as possible.
 
 Experimental or temporary features should use the `0x1000` prefix.
 
@@ -255,7 +201,3 @@ cause a slow-down of key lookup in the `xmap` tables, the table is
 internally using a salted siphash to map the keys.  The implementation
 can be found in the files `src/xversionmessage.h` and
 `src/xversionmessage.cpp` relative to the source root directory.
-
-The `xmap` directory resides in the file `src/xversionkeys.dat`. Using
-the script `contrib/devtools/xversionkeys.py`, this file is processed
-into the header file `xversionkeys.h`.
