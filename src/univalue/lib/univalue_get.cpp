@@ -11,6 +11,7 @@
 #include <vector>
 #include <limits>
 #include <string>
+#include <sstream>        // .get_int64()
 
 #include "univalue.h"
 

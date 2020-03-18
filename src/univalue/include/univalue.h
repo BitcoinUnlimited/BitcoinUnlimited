@@ -9,12 +9,10 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <cassert>
+#include <map>
 #include <string>
 #include <vector>
-#include <map>
-#include <cassert>
-
-#include <sstream>        // .get_int64()
 
 class UniValue {
 public:
@@ -164,8 +162,14 @@ private:
     std::vector<UniValue> values;
 
     bool findKey(const std::string& key, size_t& retIdx) const;
-    void writeArray(unsigned int prettyIndent, unsigned int indentLevel, std::string& s) const;
-    void writeObject(unsigned int prettyIndent, unsigned int indentLevel, std::string& s) const;
+
+    struct Stream;
+
+    void writeStream(Stream & stream, unsigned int prettyIndent = 0, unsigned int indentLevel = 0) const;
+    void writeArray(Stream & stream, unsigned int prettyIndent, unsigned int indentLevel) const;
+    void writeObject(Stream & stream, unsigned int prettyIndent, unsigned int indentLevel) const;
+    static void jsonEscape(Stream & stream, const std::string & inString);
+    static void indentStr(Stream & stream, unsigned int prettyIndent, unsigned int indentLevel);
 
 public:
     // Strict type-specific getters, these throw std::runtime_error if the
