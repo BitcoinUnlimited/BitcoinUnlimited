@@ -2803,9 +2803,15 @@ void NetCleanup()
         {
             // Since we are quitting, disconnect abruptly from the node rather than finishing up our conversation
             // with it.
-            pnode->vRecvMsg.clear();
-            pnode->ssSend.clear();
-            pnode->nSendSize = 0;
+            {
+                LOCK(pnode->cs_vRecvMsg);
+                pnode->vRecvMsg.clear();
+            }
+            {
+                LOCK(pnode->cs_vSend);
+                pnode->ssSend.clear();
+            }
+            pnode->nSendSize.store(0);
             // Now close communications with the other node
             pnode->CloseSocketDisconnect();
         }
