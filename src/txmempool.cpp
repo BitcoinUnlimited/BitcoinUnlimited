@@ -1842,7 +1842,6 @@ void CTxMemPool::GetTransactionRateStatistics(double &smoothedTps, double &insta
 }
 
 void CTxMemPool::UpdateTransactionsPerSecondImpl(bool fAddTxn, const std::lock_guard<std::mutex> &lock)
-    EXCLUSIVE_LOCKS_REQUIRED(cs_txPerSec)
 {
     static uint64_t nCount = 0;
     static int64_t nLastTime = GetTime();
