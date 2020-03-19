@@ -136,7 +136,6 @@ unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string &strError, bool fWhitelisted = false);
 void StartNode(thread_group &threadGroup);
 bool StopNode();
-int SocketSendData(CNode *pnode, bool fSendTwo = false);
 
 struct CombinerAll
 {
@@ -666,7 +665,7 @@ public:
     }
 
     // requires LOCK(cs_vRecvMsg)
-    bool ReceiveMsgBytes(const char *pch, unsigned int nBytes);
+    bool ReceiveMsgBytes(const char *pch, unsigned int nBytes) EXCLUSIVE_LOCKS_REQUIRED(cs_vRecvMsg);
 
     void SetRecvVersion(int nVersionIn)
     {
