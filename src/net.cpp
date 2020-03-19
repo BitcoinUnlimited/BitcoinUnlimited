@@ -3012,6 +3012,7 @@ uint64_t CNode::GetTotalBytesRecv() { return nTotalBytesRecv; }
 uint64_t CNode::GetTotalBytesSent() { return nTotalBytesSent; }
 void CNode::Fuzz(int nChance)
 {
+    AssertLockHeld(cs_vSend);
     if (!successfullyConnected())
         return; // Don't fuzz initial handshake
     if (GetRand(nChance) != 0)
