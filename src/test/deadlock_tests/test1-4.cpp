@@ -20,6 +20,10 @@ BOOST_FIXTURE_TEST_SUITE(self_deadlock_tests, EmptySuite)
 
 #ifdef DEBUG_LOCKORDER // this ifdef covers the rest of the file
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wthread-safety-analysis"
+#endif
 // shared lock a shared mutex
 // then try to exclusive lock the same shared mutex while holding shared lock,
 // should self deadlock
@@ -70,6 +74,9 @@ BOOST_AUTO_TEST_CASE(TEST_4)
     BOOST_CHECK_THROW(WRITELOCK(shared_mutex), std::logic_error);
     lockdata.ordertracker.clear();
 }
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif // end clang ifdef
 
 #else
 
