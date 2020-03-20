@@ -10,6 +10,7 @@
 #include "random.h"
 #include "streams.h"
 
+
 /**
 * Default constructor initializes CBanDB file path based on user specified
 * data directory.
