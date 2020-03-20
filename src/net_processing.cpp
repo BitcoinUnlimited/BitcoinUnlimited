@@ -2626,20 +2626,18 @@ bool SendMessages(CNode *pto)
                 for (const CInv &inv : pto->vInventoryToSend)
                 {
                     nToErase++;
-
                     if (inv.type == MSG_TX)
                     {
                         if (fChokeTxInv)
+                            continue;
+                        if ((rnd.rand32() % 100) < randomlyDontInv.Value())
                             continue;
                         // skip if we already know about this one
                         if (pto->filterInventoryKnown.contains(inv.hash))
                             continue;
                     }
-                    if ((rnd.rand32() % 100) < (100 - randomlyDontInv.Value()))
-                    {
-                        vInvSend.push_back(inv);
-                        pto->filterInventoryKnown.insert(inv.hash);
-                    }
+                    vInvSend.push_back(inv);
+                    pto->filterInventoryKnown.insert(inv.hash);
 
                     if (vInvSend.size() >= MAX_INV_TO_SEND)
                         break;
