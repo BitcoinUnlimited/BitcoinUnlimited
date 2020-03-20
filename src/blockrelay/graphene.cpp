@@ -1783,10 +1783,14 @@ bool NegotiateFastFilterSupport(CNode *pfrom)
 
 uint64_t NegotiateGrapheneVersion(CNode *pfrom)
 {
-    uint64_t peerMin = pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED);
-    uint64_t selfMin = grapheneMinVersionSupported.Value();
-    uint64_t peerMax = pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED);
     uint64_t selfMax = grapheneMaxVersionSupported.Value();
+    uint64_t selfMin = grapheneMinVersionSupported.Value();
+    uint64_t peerMin, peerMax;
+    {
+        LOCK(pfrom->cs_xversion);
+        peerMin = pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED);
+        peerMax = pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED);
+    }
 
     uint64_t upper = (uint64_t)std::min(peerMax, selfMax);
     uint64_t lower = (uint64_t)std::max(peerMin, selfMin);

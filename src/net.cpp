@@ -3427,6 +3427,7 @@ void CNode::DisconnectIfBanned()
 void CNode::ReadConfigFromXVersion()
 {
     xVersionEnabled = true;
+    LOCK(cs_xversion);
     skipChecksum = (xVersion.as_u64c(XVer::BU_MSG_IGNORE_CHECKSUM) == 1);
     if (addrFromPort == 0)
     {
