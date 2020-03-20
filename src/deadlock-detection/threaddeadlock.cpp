@@ -172,7 +172,7 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
             }
             lockdata.ordertracker.AddNewLockInfo(now, heldLocks);
             // track this locks exactly locking order info
-            lockdata.ordertracker.TrackLockOrderHistory(locklocation, heldLocks, tid);
+            lockdata.ordertracker.TrackLockOrderHistory(locklocation, heldLocks);
             // we have seen the lock we are trying to lock before, check ordering
             lockdata.ordertracker.CheckForConflict(now, heldLocks, tid);
         }
@@ -180,7 +180,7 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
         {
             lockdata.ordertracker.AddNewLockInfo(now, heldLocks);
             // track this locks exactly locking order info
-            lockdata.ordertracker.TrackLockOrderHistory(locklocation, heldLocks, tid);
+            lockdata.ordertracker.TrackLockOrderHistory(locklocation, heldLocks);
         }
     }
     AddNewLock(now, tid);
