@@ -35,12 +35,10 @@ protected:
     /// @var std::map<void*, std::set<void*> > seenLockOrders
     /// key is mutex, value is set of mutex that have ever been locked while key was locked
     std::map<void *, std::set<void *> > seenLockOrders;
-    /// @var std::map<std::pair<std::string, std::string>, std::set<std::tuple<std::string, std::string, uint64_t> > >
-    /// seenLockLocations
-    /// we track every time a lock ordering has taken place, key is the two locknames
-    /// value is the lock file+lines respectivly and the id of the thread that locked them
-    std::map<std::pair<std::string, std::string>, std::set<std::tuple<std::string, std::string, uint64_t> > >
-        seenLockLocations;
+    /// @var std::map<std::string, std::set<std::string> > seenLockLocations
+    /// we track every time a lock ordering has taken place, key is the lockname+file+line
+    /// value is the set of locks we locked after this one with the entry lockname+file+line
+    std::map<std::string, std::set<std::string> > seenLockLocations;
 
 private:
     void potential_lock_order_issue_detected(LockStackEntry &this_lock,
@@ -84,9 +82,7 @@ public:
      * @param a std::vector of LockStackEntry that are the held locks held by this thread
      * @param a uitn64_t that is the thread id of the calling thread
      */
-    void TrackLockOrderHistory(const CLockLocation &locklocation,
-        const std::vector<LockStackEntry> &heldLocks,
-        const uint64_t &tid);
+    void TrackLockOrderHistory(const CLockLocation &locklocation, const std::vector<LockStackEntry> &heldLocks);
 
     /**
      * clears all historical lock ordering data from this

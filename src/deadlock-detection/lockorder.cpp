@@ -43,35 +43,17 @@ void CLockOrderTracker::potential_lock_order_issue_detected(LockStackEntry &this
         tid, thisLock.GetMutexName().c_str(), thisLock.GetLineNumber(), thisLock.GetFileName().c_str(),
         otherLock.GetMutexName().c_str(), otherLock.GetLineNumber(), otherLock.GetFileName().c_str());
     LOGA("We have previously locked these locks in the reverse order\n");
-    LOGA("\n\nOur historical lock orderings containing these two locks by thread %" PRIu64 " include: \n", tid);
-
-    std::pair<std::string, std::string> key = std::make_pair(otherLock.GetMutexName(), thisLock.GetMutexName());
-    auto iter = seenLockLocations.find(key);
-    if (iter != seenLockLocations.end())
+    LOGA("full lock order dump: \n");
+    for (auto &set : seenLockLocations)
     {
-        for (auto &entry : iter->second)
+        for (auto &entry : set.second)
         {
-            if (std::get<2>(entry) == tid)
-            {
-                LOGA("This thread previously locked %s on %s after locking %s on %s\n", key.first.c_str(),
-                    std::get<0>(entry).c_str(), key.second.c_str(), std::get<1>(entry).c_str());
-            }
+            LOGA("locked %s then locked %s\n", set.first.c_str(), entry.c_str());
         }
-        LOGA("\n\n");
-        LOGA("Our historical lock orderings containing these two locks by other threads include: \n");
-        for (auto &entry : iter->second)
-        {
-            const uint64_t storedTid = std::get<2>(entry);
-            if (storedTid != tid)
-            {
-                LOGA("Thread with id %" PRIu64 " previously locked %s on %s after locking %s on %s\n", storedTid,
-                    key.first.c_str(), std::get<0>(entry).c_str(), key.second.c_str(), std::get<1>(entry).c_str());
-            }
-        }
-        LOGA("\n\n");
     }
     throw std::logic_error("potential lock order issue detected");
 }
+
 
 // this function assumes you already checked if lockname exists
 void CLockOrderTracker::CheckForConflict(LockStackEntry &this_lock,
@@ -148,25 +130,30 @@ void CLockOrderTracker::AddNewLockInfo(const LockStackEntry &this_lock, const st
 }
 
 void CLockOrderTracker::TrackLockOrderHistory(const CLockLocation &locklocation,
-    const std::vector<LockStackEntry> &heldLocks,
-    const uint64_t &tid)
+    const std::vector<LockStackEntry> &heldLocks)
 {
     std::lock_guard<std::mutex> lock(lot_mutex);
-    std::string key1 = locklocation.GetMutexName();
-    std::string value1 = locklocation.GetFileName() + ":" + std::to_string(locklocation.GetLineNumber());
+    // build the new key
+    std::string new_key = locklocation.GetMutexName() + " on " + locklocation.GetFileName() + ":" +
+                          std::to_string(locklocation.GetLineNumber());
+    // add newest key to map if it does not exist
+    if (seenLockLocations.count(new_key) == 0)
+    {
+        seenLockLocations.emplace(new_key, std::set<std::string>());
+    }
+    // add held locks
     for (auto &heldLock : heldLocks)
     {
-        std::string key2 = heldLock.second.GetMutexName();
-        std::string value2 = heldLock.second.GetFileName() + ":" + std::to_string(heldLock.second.GetLineNumber());
-        auto iter = seenLockLocations.find(std::make_pair(key1, key2));
-        if (iter == seenLockLocations.end())
+        std::string held_key = heldLock.second.GetMutexName() + " on " + heldLock.second.GetFileName() + ":" +
+                               std::to_string(heldLock.second.GetLineNumber());
+        auto held_iter = seenLockLocations.find(held_key);
+        if (held_iter == seenLockLocations.end())
         {
-            seenLockLocations.emplace(std::make_pair(key1, key2),
-                std::set<std::tuple<std::string, std::string, uint64_t> >{std::make_tuple(value1, value2, tid)});
+            // this happens on recursive locks
         }
         else
         {
-            iter->second.emplace(std::make_tuple(value1, value2, tid));
+            held_iter->second.emplace(new_key);
         }
     }
 }
