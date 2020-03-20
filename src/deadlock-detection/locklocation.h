@@ -75,18 +75,6 @@ struct CLockLocation
     OwnershipType GetExclusive() const;
 
     /**
-     * Returns a boolean that describes if this lock is held or is waiting
-     *
-     * @return boolean
-     */
-    bool GetWaiting() const;
-
-    /**
-     * Changes the status of the lock from waiting to held
-     */
-    void ChangeWaitingToHeld();
-
-    /**
      * Returns the tpye of lock being locked
      *
      * @return LockType
