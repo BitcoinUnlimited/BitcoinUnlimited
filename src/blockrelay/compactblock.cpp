@@ -195,8 +195,8 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock
     pblock->hashPrevBlock = header.hashPrevBlock;
 
     // Store the salt used by this peer.
-    pfrom->shorttxidk0 = shorttxidk0;
-    pfrom->shorttxidk1 = shorttxidk1;
+    pfrom->shorttxidk0.store(shorttxidk0);
+    pfrom->shorttxidk1.store(shorttxidk1);
 
     DbgAssert(pblock->cmpctblock != nullptr, return false);
     DbgAssert(pblock->cmpctblock.get() == this, return false);
@@ -487,7 +487,7 @@ bool CompactReReqResponse::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     // Create the mapMissingTx from all the supplied tx's in the compactblock
     for (const CTransaction &tx : compactReReqResponse.txn)
-        cmpctBlock->mapMissingTx[GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, tx.GetHash())] =
+        cmpctBlock->mapMissingTx[GetShortID(pfrom->shorttxidk0.load(), pfrom->shorttxidk1.load(), tx.GetHash())] =
             MakeTransactionRef(tx);
 
     // Get the full hashes from the compactReReqResponse and add them to the compactBlockHashes vector.  These should
@@ -622,7 +622,7 @@ static bool ReconstructBlock(CNode *pfrom,
             bool inOrphanCache = false;
             if (!ptx)
             {
-                uint64_t nShortId = GetShortID(pfrom->shorttxidk0, pfrom->shorttxidk1, hash);
+                uint64_t nShortId = GetShortID(pfrom->shorttxidk0.load(), pfrom->shorttxidk1.load(), hash);
                 std::map<uint64_t, CTransactionRef>::iterator iter1 = pblock->cmpctblock->mapMissingTx.find(nShortId);
                 if (iter1 != pblock->cmpctblock->mapMissingTx.end())
                 {
