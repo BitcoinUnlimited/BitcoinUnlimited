@@ -8,6 +8,8 @@ Derived from both abc-schnorrmultisig-activation.py (see https://reviews.bitcoin
 abc-schnorrmultisig.py
 """
 
+import time
+
 from test_framework.blocktools import (
     create_block,
     create_coinbase,
@@ -269,6 +271,8 @@ class OpReversebytesActivationTest(BitcoinTestFramework):
         logging.info(
             "Invalidating the post-upgrade blocks returns OP_REVERSEBYTES transaction to mempool")
         node.invalidateblock(post_upgrade_block.hash)
+        waitFor(5, lambda: node.getbestblockhash() == upgrade_block.hash)
+        waitFor(5, lambda: len(node.getrawmempool()) > 0)
         assert_equal(set(node.getrawmempool()), {
                      tx_reversebytes_spend.hash})
 

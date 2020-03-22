@@ -264,7 +264,7 @@ testScripts = [ RpcTest(t) for t in [
     'minimaldata',
     'schnorrmultisig',
     'uptime',
-    'op-reversebytes-activation'
+    'op_reversebytes_activation'
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
