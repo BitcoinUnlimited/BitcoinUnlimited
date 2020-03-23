@@ -232,7 +232,7 @@ void CParallelValidation::QuitCompetingThreads(const uint256 &prevBlockHash)
     }
 }
 
-bool CParallelValidation::IsAlreadyValidating(const NodeId nodeid)
+bool CParallelValidation::IsAlreadyValidating(const NodeId nodeid, const uint256 blockhash)
 {
     // Don't allow a second thinblock to validate if this node is already in the process of validating a block.
     LOCK(cs_blockvalidationthread);
@@ -240,7 +240,7 @@ bool CParallelValidation::IsAlreadyValidating(const NodeId nodeid)
         mapBlockValidationThreads.begin();
     while (iter != mapBlockValidationThreads.end())
     {
-        if ((*iter).second.nodeid == nodeid)
+        if ((*iter).second.nodeid == nodeid && (*iter).second.hash == blockhash)
         {
             return true;
         }

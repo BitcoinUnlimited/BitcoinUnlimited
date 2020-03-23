@@ -590,8 +590,12 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<
     // In PV we must prevent two thinblocks from simulaneously processing from that were recieved from the
     // same peer. This would only happen as in the example of an expedited block coming in
     // after an xthin request, because we would never explicitly request two xthins from the same peer.
-    if (PV->IsAlreadyValidating(pfrom->id))
+    if (PV->IsAlreadyValidating(pfrom->id, pblock->GetHash()))
+    {
+        LOGA("Not processing this xthin because %s is already validating in another thread\n",
+            pblock->GetHash().ToString().c_str());
         return false;
+    }
 
     pblock->nVersion = header.nVersion;
     pblock->nBits = header.nBits;
