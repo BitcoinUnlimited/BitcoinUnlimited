@@ -171,7 +171,7 @@ public:
     void QuitCompetingThreads(const uint256 &prevBlockHash);
 
     /** Is this block already running a validation thread? */
-    bool IsAlreadyValidating(const NodeId id);
+    bool IsAlreadyValidating(const NodeId id, const uint256 blockhash);
 
     /** Terminate all currently running Block Validation threads, except the passed thread */
     void StopAllValidationThreads(const boost::thread::id this_id = boost::thread::id());

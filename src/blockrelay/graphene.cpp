@@ -553,8 +553,12 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     // In PV we must prevent two graphene blocks from simulaneously processing from that were recieved from the
     // same peer. This would only happen as in the example of an expedited block coming in
     // after an graphene request, because we would never explicitly request two graphene blocks from the same peer.
-    if (PV->IsAlreadyValidating(pfrom->id))
+    if (PV->IsAlreadyValidating(pfrom->id, pblock->GetHash()))
+    {
+        LOGA("Not processing this graphenblock because %s is already validating in another thread\n",
+            pblock->GetHash().ToString().c_str());
         return false;
+    }
 
     DbgAssert(pblock->grapheneblock != nullptr, return false);
     DbgAssert(pblock->grapheneblock.get() == this, return false);
