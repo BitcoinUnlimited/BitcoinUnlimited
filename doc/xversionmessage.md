@@ -94,6 +94,12 @@ messages should be considered misbehavior of the remote peer.
 After receival of an `xversion` message, a node must answer with an
 empty `verack` message to confirm recept.
 
+A node signals that it is using xversion via service bit 11.
+
+When `xversion` is enabled the version handshake should be
+`version` `xversion` `verack`. When `xversion` is not enabled the
+handshake should be `version` `verack`.
+
 An empty `xmap` for a peer has a defined reading (see below).
 However, to simplify node implementations, it is deemed acceptable to
 enable certain protocol features only after proper receipt of a
