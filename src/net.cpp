@@ -593,8 +593,14 @@ void CNode::copyStats(CNodeStats &stats)
     X(cleanSubVer);
     X(fInbound);
     X(nStartingHeight);
-    X(nSendBytes);
-    X(nRecvBytes);
+    {
+        LOCK(cs_vSend);
+        X(nSendBytes);
+    }
+    {
+        LOCK(cs_vRecvMsg);
+        X(nRecvBytes);
+    }
     X(fWhitelisted);
     X(fSupportsCompactBlocks);
 
@@ -796,8 +802,9 @@ int CNetMessage::readData(const char *pch, unsigned int nBytes)
 
 
 // requires LOCK(cs_vSend), BU: returns > 0 if any data was sent, 0 if nothing accomplished.
-int SocketSendData(CNode *pnode, bool fSendTwo)
+int SocketSendData(CNode *pnode, bool fSendTwo = false) EXCLUSIVE_LOCKS_REQUIRED(pnode->cs_vSend)
 {
+    AssertLockHeld(pnode->cs_vSend);
     // BU This variable is incremented if something happens.  If it is zero at the bottom of the loop, we delay.  This
     // solves spin loop issues where the select does not block but no bytes can be transferred (traffic shaping limited,
     // for example).
@@ -2796,9 +2803,15 @@ void NetCleanup()
         {
             // Since we are quitting, disconnect abruptly from the node rather than finishing up our conversation
             // with it.
-            pnode->vRecvMsg.clear();
-            pnode->ssSend.clear();
-            pnode->nSendSize = 0;
+            {
+                LOCK(pnode->cs_vRecvMsg);
+                pnode->vRecvMsg.clear();
+            }
+            {
+                LOCK(pnode->cs_vSend);
+                pnode->ssSend.clear();
+            }
+            pnode->nSendSize.store(0);
             // Now close communications with the other node
             pnode->CloseSocketDisconnect();
         }
@@ -2999,6 +3012,7 @@ uint64_t CNode::GetTotalBytesRecv() { return nTotalBytesRecv; }
 uint64_t CNode::GetTotalBytesSent() { return nTotalBytesSent; }
 void CNode::Fuzz(int nChance)
 {
+    AssertLockHeld(cs_vSend);
     if (!successfullyConnected())
         return; // Don't fuzz initial handshake
     if (GetRand(nChance) != 0)
