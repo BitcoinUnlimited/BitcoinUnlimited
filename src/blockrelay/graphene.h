@@ -202,8 +202,8 @@ public:
     void FillTxMapFromPools(std::map<uint64_t, uint256> &mapTxFromPools);
     void SituateCoinbase(std::vector<uint64_t> blockCheapHashes, CTransactionRef coinbase, uint64_t grapheneVersion);
     void SituateCoinbase(CTransactionRef coinbase);
-    std::set<uint64_t> UpdateResolvedTxsAndIdentifyMissing(std::map<uint64_t, uint256> mapPartialTxHash,
-        std::vector<uint64_t> blockCheapHashes,
+    std::set<uint64_t> UpdateResolvedTxsAndIdentifyMissing(const std::map<uint64_t, uint256> &mapPartialTxHash,
+        const std::vector<uint64_t> &blockCheapHashes,
         uint64_t grapheneVersion);
     bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state);
 };

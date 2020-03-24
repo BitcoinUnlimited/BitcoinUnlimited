@@ -170,7 +170,7 @@ def Test():
     t = TxnCloneTest()
     t.drop_to_pdb = True
     bitcoinConf = {
-        "debug": ["blk", "mempool", "net", "req"],
+        "debug": ["graphene", "blk", "mempool", "net", "req"],
         "logtimemicros": 1
     }
 
