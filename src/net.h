@@ -275,6 +275,7 @@ public:
         nHdrPos = 0;
         nDataPos = 0;
         nTime = 0;
+        nStopwatch = 0;
     }
 
     CNetMessage(const CMessageHeader::MessageStartChars &pchMessageStartIn, int nTypeIn, int nVersionIn)
@@ -285,6 +286,7 @@ public:
         nHdrPos = 0;
         nDataPos = 0;
         nTime = 0;
+        nStopwatch = 0;
     }
 
     // Returns true if this message has been completely received.  This is determined by checking the message size

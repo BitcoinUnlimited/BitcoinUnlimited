@@ -50,7 +50,6 @@ CMempoolSync::CMempoolSync(std::vector<uint256> mempoolTxHashes,
 {
     uint64_t grapheneSetVersion = CMempoolSync::GetGrapheneSetVersion(version);
     version = _version;
-    nSenderMempoolTxs = 0;
     nSenderMempoolTxs = mempoolTxHashes.size();
 
     pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock,

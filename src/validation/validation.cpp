@@ -3276,6 +3276,9 @@ bool ActivateBestChainStep(CValidationState &state,
     const CBlock *pblock,
     bool fParallel)
 {
+    if (!pindexMostWork)
+        return false;
+
     AssertLockHeld(cs_main);
     bool fInvalidFound = false;
     const CBlockIndex *pindexOldTip = chainActive.Tip();
@@ -3351,7 +3354,7 @@ bool ActivateBestChainStep(CValidationState &state,
             // Check if the best chain has changed while we were disconnecting or processing blocks.
             // If so then we need to return and continue processing the newer chain.
             pindexNewMostWork = FindMostWorkChain();
-            if (!pindexMostWork)
+            if (!pindexMostWork || !pindexNewMostWork)
                 return false;
 
             if (pindexNewMostWork->nChainWork > pindexMostWork->nChainWork)
