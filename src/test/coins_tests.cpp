@@ -62,7 +62,7 @@ public:
                 {
                     // Same optimization used in CCoinsViewDB is to only write dirty entries.
                     map_[it->first] = it->second.coin;
-                    if (it->second.coin.IsSpent() && insecure_rand() % 3 == 0)
+                    if (it->second.coin.IsSpent() && InsecureRandRange(3) == 0)
                     {
                         // Randomly delete empty entries on write.
                         map_.erase(it->first);
@@ -227,7 +227,6 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
                 bool have = stack.back()->HaveCoin(it->first);
                 bool isspent = true;
                 {
-
                     RECURSIVEREADLOCK(stack.back()->cs_all_cacheCoins_maps);
                     const Coin &coin = stack.back()->_AccessCoin(it->first);
                     isspent = coin.IsSpent();
