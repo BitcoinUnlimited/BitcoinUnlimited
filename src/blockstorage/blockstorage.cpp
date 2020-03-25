@@ -149,6 +149,12 @@ void SyncStorage(const CChainParams &chainparams)
     AssertLockHeld(cs_main);
     if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
+        if (pblockdbsync == nullptr)
+        {
+            LOGA("ERROR: could not open blockdbsync\n");
+            abort();
+        }
+
         std::vector<std::pair<int, CDiskBlockIndex> > hashesByHeight;
         pblocktreeother->GetSortedHashIndex(hashesByHeight);
         CValidationState state;
@@ -207,10 +213,6 @@ void SyncStorage(const CChainParams &chainparams)
             if (index->nStatus & BLOCK_HAVE_DATA && item.second.nDataPos != 0)
             {
                 CBlock block_lev;
-                if (pblockdbsync == nullptr)
-                {
-                    LOGA("blockdbsync is a nullptr \n");
-                }
                 if (pblockdbsync->ReadBlock(index, block_lev))
                 {
                     unsigned int nBlockSize = ::GetSerializeSize(block_lev, SER_DISK, CLIENT_VERSION);
