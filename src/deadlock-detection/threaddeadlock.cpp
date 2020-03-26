@@ -246,13 +246,12 @@ void AssertLockHeldInternal(const char *pszName, const char *pszFile, unsigned i
     std::lock_guard<std::mutex> lock(lockdata.dd_mutex);
     uint64_t tid = getTid();
     auto self_iter = lockdata.locksheldbythread.find(tid);
-    if (self_iter == lockdata.locksheldbythread.end())
+    if (self_iter == lockdata.locksheldbythread.end() || self_iter->second.empty() == true)
     {
-        return;
-    }
-    if (self_iter->second.empty())
-    {
-        return;
+        // this thread is not holding any locks
+        fprintf(stderr, "Assertion failed: lock %s not held in %s:%i; locks held:\n%s", pszName, pszFile, nLine,
+            _LocksHeld().c_str());
+        throw std::logic_error("AssertLockHeld failure");
     }
     for (auto &entry : self_iter->second)
     {
@@ -262,9 +261,10 @@ void AssertLockHeldInternal(const char *pszName, const char *pszFile, unsigned i
             return;
         }
     }
+    // this thread is holding locks but none are the one we are checking for
     fprintf(stderr, "Assertion failed: lock %s not held in %s:%i; locks held:\n%s", pszName, pszFile, nLine,
         _LocksHeld().c_str());
-    abort();
+    throw std::logic_error("AssertLockHeld failure");
 }
 
 void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs)
@@ -278,9 +278,10 @@ void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, unsigne
         {
             if (entry.first == cs)
             {
+                // this thread is holding the lock when it should not be
                 fprintf(stderr, "Assertion failed: lock %s held in %s:%i; locks held:\n%s", pszName, pszFile, nLine,
                     _LocksHeld().c_str());
-                abort();
+                throw std::logic_error("AssertLockNotHeld failure");
             }
         }
     }
