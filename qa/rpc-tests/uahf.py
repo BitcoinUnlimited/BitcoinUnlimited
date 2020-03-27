@@ -147,13 +147,13 @@ class BUIP055Test (BitcoinTestFramework):
             try: # Accept BU cash nodes if running BTC node
                 buCashNode.cnxns[0].wait_for_buverack()
             except DisconnectedError:
-                assert(not "should not have disconnected a bitcoin cash node")
+                assert(not "should not have disconnected a bch-unlimited node")
         else:
             try: # do not accept BU cash nodes if running BTC node
                 buCashNode.cnxns[0].wait_for_buverack()
                 assert(not "should have disconnected a bitcoin cash node")
             except DisconnectedError:
-                logging.info("properly disconnected bucash node")
+                logging.info("properly disconnected bch-unlimited node")
 
     def run_test(self):
         # this test is mean to test fork scenarios starting from mainchain nodes.
