@@ -558,7 +558,6 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
 
     DbgAssert(pblock->grapheneblock != nullptr, return false);
     DbgAssert(pblock->grapheneblock.get() == this, return false);
-    std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
 
     pblock->nVersion = header.nVersion;
     pblock->nBits = header.nBits;
@@ -619,15 +618,15 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
             }
 
             std::vector<uint64_t> blockCheapHashes = pGrapheneSet->Reconcile(setSenderFilterPositiveCheapHashes);
-            setHashesToRequest = grapheneBlock->UpdateResolvedTxsAndIdentifyMissing(
+            setHashesToRequest = this->UpdateResolvedTxsAndIdentifyMissing(
                 mapPartialTxHash, blockCheapHashes, NegotiateGrapheneVersion(pfrom));
-            grapheneBlock->SituateCoinbase(coinbase);
+            this->SituateCoinbase(coinbase);
 
             // Sort order transactions if canonical order is enabled and graphene version is late enough
             if (fCanonicalTxsOrder && NegotiateGrapheneVersion(pfrom) >= 1)
             {
                 // coinbase is always first
-                std::sort(grapheneBlock->vTxHashes256.begin() + 1, grapheneBlock->vTxHashes256.end());
+                std::sort(this->vTxHashes256.begin() + 1, this->vTxHashes256.end());
                 LOG(GRAPHENE, "Using canonical order for block from peer=%s\n", pfrom->GetLogName());
             }
         }
@@ -651,7 +650,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
         if (setHashesToRequest.empty() && !fRequestFailureRecovery)
         {
             bool mutated;
-            uint256 merkleroot = ComputeMerkleRoot(grapheneBlock->vTxHashes256, &mutated);
+            uint256 merkleroot = ComputeMerkleRoot(this->vTxHashes256, &mutated);
             if (header.hashMerkleRoot != merkleroot || mutated)
                 fMerkleRootCorrect = false;
             else
@@ -667,7 +666,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     // This must be checked outside of the above section or deadlock may occur.
     if (fRequestFailureRecovery)
     {
-        RequestFailureRecovery(pfrom, grapheneBlock, vSenderFilterPositiveHahses);
+        RequestFailureRecovery(pfrom, *this, vSenderFilterPositiveHahses);
         return true;
     }
 
@@ -684,18 +683,18 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
 
     this->nWaitingFor = missingCount;
     LOG(GRAPHENE, "Graphene block waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n",
-        this->nWaitingFor, unnecessaryCount, pblock->vtx.size(), grapheneBlock->mapMissingTx.size());
+        this->nWaitingFor, unnecessaryCount, pblock->vtx.size(), this->mapMissingTx.size());
 
     // If there are any missing hashes or transactions then we request them here.
     // This must be done outside of the mempool.cs lock or may deadlock.
     if (setHashesToRequest.size() > 0)
     {
-        grapheneBlock->nWaitingFor = setHashesToRequest.size();
+        this->nWaitingFor = setHashesToRequest.size();
         CRequestGrapheneBlockTx grapheneBlockTx(header.GetHash(), setHashesToRequest);
         pfrom->PushMessage(NetMsgType::GET_GRAPHENETX, grapheneBlockTx);
 
         // Update run-time statistics of graphene block bandwidth savings
-        graphenedata.UpdateInBoundReRequestedTx(grapheneBlock->nWaitingFor);
+        graphenedata.UpdateInBoundReRequestedTx(this->nWaitingFor);
 
         return true;
     }
@@ -704,22 +703,22 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     // and re-request failover block (This should never happen because we just checked the various pools).
     if (missingCount > 0)
     {
-        RequestFailureRecovery(pfrom, grapheneBlock, vSenderFilterPositiveHahses);
+        RequestFailureRecovery(pfrom, *this, vSenderFilterPositiveHahses);
         return error("Still missing transactions for graphene block: re-requesting failover block");
     }
 
     // We now have all the transactions that are in this block
-    grapheneBlock->nWaitingFor = 0;
+    this->nWaitingFor = 0;
     int blockSize = pblock->GetBlockSize();
     float nCompressionRatio = 0.0;
-    if (grapheneBlock->GetSize() > 0)
-        nCompressionRatio = (float)blockSize / (float)grapheneBlock->GetSize();
+    if (this->GetSize() > 0)
+        nCompressionRatio = (float)blockSize / (float)this->GetSize();
     LOG(GRAPHENE,
         "Reassembled graphene block for %s (%d bytes). Message was %d bytes, compression ratio %3.2f, peer=%s\n",
-        pblock->GetHash().ToString(), blockSize, grapheneBlock->GetSize(), nCompressionRatio, pfrom->GetLogName());
+        pblock->GetHash().ToString(), blockSize, this->GetSize(), nCompressionRatio, pfrom->GetLogName());
 
     // Update run-time statistics of graphene block bandwidth savings
-    graphenedata.UpdateInBound(grapheneBlock->GetSize(), blockSize);
+    graphenedata.UpdateInBound(this->GetSize(), blockSize);
     LOG(GRAPHENE, "Graphene block stats: %s\n", graphenedata.ToString().c_str());
 
     // Process the full block
@@ -1626,11 +1625,11 @@ CMemPoolInfo GetGrapheneMempoolInfo()
 }
 
 void RequestFailureRecovery(CNode *pfrom,
-    std::shared_ptr<CGrapheneBlock> grapheneBlock,
+    CGrapheneBlock &grapheneBlock,
     std::vector<uint256> vSenderFilterPositiveHahses)
 {
     CRequestGrapheneReceiverRecover recoveryRequest = CRequestGrapheneReceiverRecover(
-        vSenderFilterPositiveHahses, *grapheneBlock, vSenderFilterPositiveHahses.size());
+        vSenderFilterPositiveHahses, grapheneBlock, vSenderFilterPositiveHahses.size());
 
     pfrom->PushMessage(NetMsgType::GET_GRAPHENE_RECOVERY, recoveryRequest);
 }

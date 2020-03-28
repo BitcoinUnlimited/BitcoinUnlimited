@@ -498,7 +498,7 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
 bool HandleGrapheneBlockRecoveryRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams);
 CMemPoolInfo GetGrapheneMempoolInfo();
 void RequestFailureRecovery(CNode *pfrom,
-    std::shared_ptr<CGrapheneBlock> pblock,
+    CGrapheneBlock &grapheneBlock,
     std::vector<uint256> vSenderFilterPositiveHahses);
 void RequestFailoverBlock(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock);
 // Load subset of transactions from block according to cheap hashes
