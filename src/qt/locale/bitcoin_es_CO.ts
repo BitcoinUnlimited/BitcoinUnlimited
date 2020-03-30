@@ -165,8 +165,8 @@ Estas son las direcciones de Bitcoin para enviar pagos . Siempre verifique la ca
         <translation>Estas seguro de que deseas encriptar tu billetera?</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
-        <translation>Bitcoin Unlimited se cerrará ahora para finalizar el proceso de encriptación. Recuerda que encriptando tu billetera no protegera por completo tus bitcoins desde robos por malware que infectan tu computadora.</translation>
+        <source>BCH Unlimited will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
+        <translation>BCH Unlimited se cerrará ahora para finalizar el proceso de encriptación. Recuerda que encriptando tu billetera no protegera por completo tus bitcoins desde robos por malware que infectan tu computadora.</translation>
     </message>
     <message>
         <source>IMPORTANT: Any previous backups you have made of your wallet file should be replaced with the newly generated, encrypted wallet file. For security reasons, previous backups of the unencrypted wallet file will become useless as soon as you start using the new, encrypted wallet.</source>
@@ -279,8 +279,8 @@ Estas son las direcciones de Bitcoin para enviar pagos . Siempre verifique la ca
         <translation>Abrir &amp;URL...</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited client</source>
-        <translation>Bitcoin Unlimited cliente</translation>
+        <source>BCH Unlimited client</source>
+        <translation>BCH Unlimited cliente</translation>
     </message>
     <message>
         <source>Importing blocks from disk...</source>
@@ -323,8 +323,8 @@ Estas son las direcciones de Bitcoin para enviar pagos . Siempre verifique la ca
         <translation>&amp;Recibir</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Unlimited</source>
-        <translation>Mostrar información sobre Bitcoin Unlimited</translation>
+        <source>Show information about BCH Unlimited</source>
+        <translation>Mostrar información sobre BCH Unlimited</translation>
     </message>
     <message>
         <source>&amp;Show / Hide</source>
@@ -347,8 +347,8 @@ Estas son las direcciones de Bitcoin para enviar pagos . Siempre verifique la ca
         <translation>&amp;Ayuda</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>BCH Unlimited</source>
+        <translation>BCH Unlimited</translation>
     </message>
     <message>
         <source>Error</source>
@@ -374,15 +374,15 @@ Estas son las direcciones de Bitcoin para enviar pagos . Siempre verifique la ca
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>BCH Unlimited</source>
+        <translation>BCH Unlimited</translation>
     </message>
     </context>
 <context>
     <name>Intro</name>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>BCH Unlimited</source>
+        <translation>BCH Unlimited</translation>
     </message>
     <message>
         <source>Error</source>
@@ -457,8 +457,8 @@ Estas son las direcciones de Bitcoin para enviar pagos . Siempre verifique la ca
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>BCH Unlimited</source>
+        <translation>BCH Unlimited</translation>
     </message>
     </context>
 <context>

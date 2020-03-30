@@ -168,8 +168,8 @@
         <translation>Er du sikker på at du vil kryptere lommeboken?</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
-        <translation>Bitcoin Unlimited vil nå avslutte for å fullføre krypteringsprosessen. Husk at kryptering av lommeboken ikke kan beskytte fullstendig mot tyveri av dine bitcoins hvis datamaskinen din er infisert av skadevare.</translation>
+        <source>BCH Unlimited will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
+        <translation>BCH Unlimited vil nå avslutte for å fullføre krypteringsprosessen. Husk at kryptering av lommeboken ikke kan beskytte fullstendig mot tyveri av dine bitcoins hvis datamaskinen din er infisert av skadevare.</translation>
     </message>
     <message>
         <source>IMPORTANT: Any previous backups you have made of your wallet file should be replaced with the newly generated, encrypted wallet file. For security reasons, previous backups of the unencrypted wallet file will become useless as soon as you start using the new, encrypted wallet.</source>
@@ -306,8 +306,8 @@
         <translation>Åpne &amp;URI...</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited client</source>
-        <translation>Bitcoin Unlimited-klient</translation>
+        <source>BCH Unlimited client</source>
+        <translation>BCH Unlimited-klient</translation>
     </message>
     <message>
         <source>Importing blocks from disk...</source>
@@ -358,8 +358,8 @@
         <translation>&amp;Motta</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Unlimited</source>
-        <translation>Vis informasjon om Bitcoin Unlimited</translation>
+        <source>Show information about BCH Unlimited</source>
+        <translation>Vis informasjon om BCH Unlimited</translation>
     </message>
     <message>
         <source>&amp;Show / Hide</source>
@@ -398,20 +398,20 @@
         <translation>Verktøylinje for faner</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>BCH Unlimited</source>
+        <translation>BCH Unlimited</translation>
     </message>
     <message>
         <source>Request payments (generates QR codes and %1 URIs)</source>
         <translation>Forespør betalinger (genererer QR-koder og %1 URIer)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Unlimited</source>
-        <translation>&amp;Om Bitcoin Unlimited</translation>
+        <source>&amp;About BCH Unlimited</source>
+        <translation>&amp;Om BCH Unlimited</translation>
     </message>
     <message>
-        <source>Modify configuration options for Bitcoin Unlimited</source>
-        <translation>Endre konfigurasjonsvalg for Bitcoin Unlimited</translation>
+        <source>Modify configuration options for BCH Unlimited</source>
+        <translation>Endre konfigurasjonsvalg for BCH Unlimited</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -430,8 +430,8 @@
         <translation>&amp;Kommandolinjevalg</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Unlimited help message to get a list with possible Bitcoin command-line options</source>
-        <translation>Vis Bitcoin Unlimited hjelpemeldingen for å få en liste med mulige kommandolinjevalg</translation>
+        <source>Show the BCH Unlimited help message to get a list with possible Bitcoin command-line options</source>
+        <translation>Vis BCH Unlimited hjelpemeldingen for å få en liste med mulige kommandolinjevalg</translation>
     </message>
     <message numerus="yes">
         <source>%n active connection(s) to Bitcoin network</source>
@@ -855,8 +855,8 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>BCH Unlimited</source>
+        <translation>BCH Unlimited</translation>
     </message>
     <message>
         <source>version</source>
@@ -867,8 +867,8 @@
         <translation> (%1-bit)</translation>
     </message>
     <message>
-        <source>About Bitcoin Unlimited</source>
-        <translation>Om Bitcoin Unlimited</translation>
+        <source>About BCH Unlimited</source>
+        <translation>Om BCH Unlimited</translation>
     </message>
     <message>
         <source>Command-line options</source>
@@ -918,16 +918,16 @@
         <translation>Velkommen</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Unlimited.</source>
-        <translation>Velkommen til Bitcoin Unlimited.</translation>
+        <source>Welcome to BCH Unlimited.</source>
+        <translation>Velkommen til BCH Unlimited.</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Unlimited will store its data.</source>
-        <translation>Siden dette er første gang programmet starter, kan du nå velge hvor Bitcoin Unlimited skal lagre sine data.</translation>
+        <source>As this is the first time the program is launched, you can choose where BCH Unlimited will store its data.</source>
+        <translation>Siden dette er første gang programmet starter, kan du nå velge hvor BCH Unlimited skal lagre sine data.</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
-        <translation>Bitcoin Unlimited vil laste ned og lagre en kopi av Bitcoin sin blokkjede. Minst %1GB av data vil bli lagret i denne mappen, og det vil vokse over tid. Lommeboken vil også bli lagret i denne mappen.</translation>
+        <source>BCH Unlimited will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <translation>BCH Unlimited vil laste ned og lagre en kopi av Bitcoin sin blokkjede. Minst %1GB av data vil bli lagret i denne mappen, og det vil vokse over tid. Lommeboken vil også bli lagret i denne mappen.</translation>
     </message>
     <message>
         <source>Use the default data directory</source>
@@ -938,8 +938,8 @@
         <translation>Bruk en egendefinert datamappe:</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>BCH Unlimited</source>
+        <translation>BCH Unlimited</translation>
     </message>
     <message>
         <source>Error: Specified data directory "%1" cannot be created.</source>
@@ -1020,8 +1020,8 @@
         <translation>Minimer i stedet for å avslutte applikasjonen når vinduet lukkes. Når dette er valgt, vil applikasjonen avsluttes kun etter at Avslutte er valgt i menyen.</translation>
     </message>
     <message>
-        <source>The user interface language can be set here. This setting will take effect after restarting Bitcoin Unlimited.</source>
-        <translation>Språk for brukergrensesnittet kan velges her. Denne innstillingen trer i kraft etter omstart av Bitcoin Unlimited.</translation>
+        <source>The user interface language can be set here. This setting will take effect after restarting BCH Unlimited.</source>
+        <translation>Språk for brukergrensesnittet kan velges her. Denne innstillingen trer i kraft etter omstart av BCH Unlimited.</translation>
     </message>
     <message>
         <source>Third party URLs (e.g. a block explorer) that appear in the transactions tab as context menu items. %s in the URL is replaced by transaction hash. Multiple URLs are separated by vertical bar |.</source>
@@ -1048,12 +1048,12 @@
         <translation>&amp;Nettverk</translation>
     </message>
     <message>
-        <source>Automatically start Bitcoin Unlimited after logging in to the system.</source>
-        <translation>Start Bitcoin Unlimited automatisk ved oppstart av datamaskinen.</translation>
+        <source>Automatically start BCH Unlimited after logging in to the system.</source>
+        <translation>Start BCH Unlimited automatisk ved oppstart av datamaskinen.</translation>
     </message>
     <message>
-        <source>&amp;Start Bitcoin Unlimited on system login</source>
-        <translation>&amp;Start Bitcoin Unlimited ved oppstart av datamaskinen</translation>
+        <source>&amp;Start BCH Unlimited on system login</source>
+        <translation>&amp;Start BCH Unlimited ved oppstart av datamaskinen</translation>
     </message>
     <message>
         <source>(0 = auto, &lt;0 = leave that many cores free)</source>
@@ -1518,8 +1518,8 @@
         <translation>Minnebruk</translation>
     </message>
     <message>
-        <source>Open the Bitcoin Unlimited debug log file from the current data directory. This can take a few seconds for large log files.</source>
-        <translation>Åpne Bitcoin Unlimited sin loggfil for feilsøk fra gjeldende datamappe. Dette kan ta noen sekunder for store loggfiler.</translation>
+        <source>Open the BCH Unlimited debug log file from the current data directory. This can take a few seconds for large log files.</source>
+        <translation>Åpne BCH Unlimited sin loggfil for feilsøk fra gjeldende datamappe. Dette kan ta noen sekunder for store loggfiler.</translation>
     </message>
     <message>
         <source>Received</source>
@@ -1678,8 +1678,8 @@
         <translation>Fjern &amp;Utestengning av Node</translation>
     </message>
     <message>
-        <source>Welcome to the Bitcoin Unlimited RPC console.</source>
-        <translation>Velkommen til Bitcoin Unlimited sin RPC-konsoll.</translation>
+        <source>Welcome to the BCH Unlimited RPC console.</source>
+        <translation>Velkommen til BCH Unlimited sin RPC-konsoll.</translation>
     </message>
     <message>
         <source>Use up and down arrows to navigate history, and &lt;b&gt;Ctrl-L&lt;/b&gt; to clear screen.</source>
@@ -2264,8 +2264,8 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Unlimited is shutting down...</source>
-        <translation>Bitcoin Unlimited lukker...</translation>
+        <source>BCH Unlimited is shutting down...</source>
+        <translation>BCH Unlimited lukker...</translation>
     </message>
     <message>
         <source>Do not shut down the computer until this window disappears.</source>
@@ -2414,12 +2414,12 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>BCH Unlimited</source>
+        <translation>BCH Unlimited</translation>
     </message>
     <message>
-        <source>The Bitcoin Unlimited developers</source>
-        <translation>Bitcoin Unlimited utviklerne</translation>
+        <source>The BCH Unlimited developers</source>
+        <translation>BCH Unlimited utviklerne</translation>
     </message>
     <message>
         <source>[testnet]</source>
@@ -2940,8 +2940,8 @@
         <translation>Maksimalt samlede gebyrer (i %s) til å bruke i en enkelt lommeboktransaksjon; settes dette for lavt kan store transaksjoner kanskje avbrytes (standardverdi: %s)</translation>
     </message>
     <message>
-        <source>Please check that your computer's date and time are correct! If your clock is wrong Bitcoin Unlimited will not work properly.</source>
-        <translation>Vennligst undersøk at din datamaskin har riktig dato og klokkeslett! Hvis klokken er stilt feil vil ikke Bitcoin Unlimited fungere riktig.</translation>
+        <source>Please check that your computer's date and time are correct! If your clock is wrong BCH Unlimited will not work properly.</source>
+        <translation>Vennligst undersøk at din datamaskin har riktig dato og klokkeslett! Hvis klokken er stilt feil vil ikke BCH Unlimited fungere riktig.</translation>
     </message>
     <message>
         <source>Prune configured below the minimum of %d MiB.  Please use a higher number.</source>
@@ -3012,8 +3012,8 @@
         <translation>Dette er en forhåndssluppet testversjon - bruk på egen risiko - ikke for bruk til blokkutvinning eller bedriftsapplikasjoner</translation>
     </message>
     <message>
-        <source>Unable to bind to %s on this computer. Bitcoin Unlimited is probably already running.</source>
-        <translation>Ute av stand til å binde til %s på denne datamaskinen. Bitcoin Unlimited kjører sannsynligvis allerede.</translation>
+        <source>Unable to bind to %s on this computer. BCH Unlimited is probably already running.</source>
+        <translation>Ute av stand til å binde til %s på denne datamaskinen. BCH Unlimited kjører sannsynligvis allerede.</translation>
     </message>
     <message>
         <source>Use UPnP to map the listening port (default: 1 when listening and no -proxy)</source>
@@ -3220,8 +3220,8 @@
         <translation>Bind til gitt adresse for å lytte for JSON-RPC-tilkoblinger. Bruk [host]:port notasjon for IPv6. Dette alternativet kan angis flere ganger (standardverdi: bind til alle grensesnitt)</translation>
     </message>
     <message>
-        <source>Cannot obtain a lock on data directory %s. Bitcoin Unlimited is probably already running.</source>
-        <translation>Ute av stand til å låse datamappen %s. Bitcoin Unlimited kjører sannsynligvis allerede.</translation>
+        <source>Cannot obtain a lock on data directory %s. BCH Unlimited is probably already running.</source>
+        <translation>Ute av stand til å låse datamappen %s. BCH Unlimited kjører sannsynligvis allerede.</translation>
     </message>
     <message>
         <source>Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)</source>
@@ -3320,12 +3320,12 @@
         <translation>Koble til via SOCKS5-proxy</translation>
     </message>
     <message>
-        <source>Copyright (C) 2009-%i The Bitcoin Unlimited Developers</source>
-        <translation>Copyright (C) 2009-%i utviklerne av Bitcoin Unlimited</translation>
+        <source>Copyright (C) 2009-%i The BCH Unlimited Developers</source>
+        <translation>Copyright (C) 2009-%i utviklerne av BCH Unlimited</translation>
     </message>
     <message>
-        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin Unlimited</source>
-        <translation>Feil ved lasting av wallet.dat: Lommeboken krever en nyere versjon av Bitcoin Unlimited</translation>
+        <source>Error loading wallet.dat: Wallet requires newer version of BCH Unlimited</source>
+        <translation>Feil ved lasting av wallet.dat: Lommeboken krever en nyere versjon av BCH Unlimited</translation>
     </message>
     <message>
         <source>Error reading from database, shutting down.</source>
@@ -3340,8 +3340,8 @@
         <translation>Informasjon</translation>
     </message>
     <message>
-        <source>Initialization sanity check failed. Bitcoin Unlimited is shutting down.</source>
-        <translation>Sunnhetssjekk ved oppstart feilet. Bitcoin Unlimited stenges ned.</translation>
+        <source>Initialization sanity check failed. BCH Unlimited is shutting down.</source>
+        <translation>Sunnhetssjekk ved oppstart feilet. BCH Unlimited stenges ned.</translation>
     </message>
     <message>
         <source>Invalid amount for -maxtxfee=&lt;amount&gt;: '%s'</source>
@@ -3460,8 +3460,8 @@
         <translation>Brukernavn for JSON-RPC forbindelser</translation>
     </message>
     <message>
-        <source>Wallet needed to be rewritten: restart Bitcoin Unlimited to complete</source>
-        <translation>Lommeboken måtte skrives på nytt: start Bitcoin Unlimited på nytt for å fullføre</translation>
+        <source>Wallet needed to be rewritten: restart BCH Unlimited to complete</source>
+        <translation>Lommeboken måtte skrives på nytt: start BCH Unlimited på nytt for å fullføre</translation>
     </message>
     <message>
         <source>Warning</source>

@@ -168,7 +168,7 @@
         <translation>Наистина ли желаете да шифрирате портфейла си?</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
+        <source>BCH Unlimited will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
         <translation>Биткоин сега ще се затоври за да завърши процеса на криптиране. Запомнете, че криптирането на вашия портефейл не може напълно да предпази вашите монети от кражба чрез зловреден софтуер, инфектирал вашия компютър</translation>
     </message>
     <message>
@@ -294,8 +294,8 @@
         <translation>Отвори &amp;URI...</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited client</source>
-        <translation>Bitcoin Unlimited клиент</translation>
+        <source>BCH Unlimited client</source>
+        <translation>BCH Unlimited клиент</translation>
     </message>
     <message>
         <source>Send coins to a Bitcoin address</source>
@@ -338,7 +338,7 @@
         <translation>&amp;Получаване</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Unlimited</source>
+        <source>Show information about BCH Unlimited</source>
         <translation>Покажете информация за Биткойн ядрото</translation>
     </message>
     <message>
@@ -378,7 +378,7 @@
         <translation>Раздели</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>Биткойн ядро</translation>
     </message>
     <message>
@@ -386,8 +386,8 @@
         <translation>Изискване на плащания(генерира QR кодове и %1 URIs)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Unlimited</source>
-        <translation>&amp;Относно Bitcoin Unlimited</translation>
+        <source>&amp;About BCH Unlimited</source>
+        <translation>&amp;Относно BCH Unlimited</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -406,7 +406,7 @@
         <translation>&amp;Налични команди</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Unlimited help message to get a list with possible Bitcoin command-line options</source>
+        <source>Show the BCH Unlimited help message to get a list with possible Bitcoin command-line options</source>
         <translation>Покажи помощните съобщения на Биткойн за да видиш наличните и валидни команди</translation>
     </message>
     <message>
@@ -783,7 +783,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>Биткойн ядро</translation>
     </message>
     <message>
@@ -795,8 +795,8 @@
         <translation>(%1-битов)</translation>
     </message>
     <message>
-        <source>About Bitcoin Unlimited</source>
-        <translation>Относно Bitcoin Unlimited</translation>
+        <source>About BCH Unlimited</source>
+        <translation>Относно BCH Unlimited</translation>
     </message>
     <message>
         <source>Command-line options</source>
@@ -818,11 +818,11 @@
         <translation>Добре дошли</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Unlimited.</source>
+        <source>Welcome to BCH Unlimited.</source>
         <translation>Добре дошли в Биткойн ядрото.</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Unlimited will store its data.</source>
+        <source>As this is the first time the program is launched, you can choose where BCH Unlimited will store its data.</source>
         <translation>Тъй като това е първото стартиране на програмата можете да изберете къде Биткон ядрото да запази данните си.</translation>
     </message>
     <message>
@@ -834,7 +834,7 @@
         <translation>Използване на директория ръчно</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>Биткойн ядро</translation>
     </message>
     <message>
@@ -900,8 +900,8 @@
         <translation>&amp;Мрежа</translation>
     </message>
     <message>
-        <source>Automatically start Bitcoin Unlimited after logging in to the system.</source>
-        <translation>Автоматично стартиране на Bitcoin Unlimited след влизане в системата.</translation>
+        <source>Automatically start BCH Unlimited after logging in to the system.</source>
+        <translation>Автоматично стартиране на BCH Unlimited след влизане в системата.</translation>
     </message>
     <message>
         <source>W&amp;allet</source>
@@ -1812,7 +1812,7 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Unlimited is shutting down...</source>
+        <source>BCH Unlimited is shutting down...</source>
         <translation>Биткойн ядрото се изключва...</translation>
     </message>
     <message>
@@ -1938,12 +1938,12 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>Биткойн ядро</translation>
     </message>
     <message>
-        <source>The Bitcoin Unlimited developers</source>
-        <translation>Разработчици на Bitcoin Unlimited</translation>
+        <source>The BCH Unlimited developers</source>
+        <translation>Разработчици на BCH Unlimited</translation>
     </message>
     <message>
         <source>[testnet]</source>
@@ -2464,7 +2464,7 @@
         <translation>Свързване чрез SOCKS5  прокси</translation>
     </message>
     <message>
-        <source>Copyright (C) 2009-%i The Bitcoin Unlimited Developers</source>
+        <source>Copyright (C) 2009-%i The BCH Unlimited Developers</source>
         <translation>Всички права запазени (C) 2009-%i Доставчиците на Биткойн</translation>
     </message>
     <message>

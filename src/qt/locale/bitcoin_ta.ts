@@ -146,7 +146,7 @@
         <translation>&amp;உதவி</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>Bitcoin மையம்</translation>
     </message>
     <message numerus="yes">
@@ -289,11 +289,11 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>Bitcoin மையம்</translation>
     </message>
     <message>
-        <source>About Bitcoin Unlimited</source>
+        <source>About BCH Unlimited</source>
         <translation>Bitcoin மையம் பற்றி</translation>
     </message>
     </context>
@@ -304,7 +304,7 @@
         <translation>நல்வரவு</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>Bitcoin மையம்</translation>
     </message>
     <message>
@@ -812,7 +812,7 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>Bitcoin மையம்</translation>
     </message>
     </context>
