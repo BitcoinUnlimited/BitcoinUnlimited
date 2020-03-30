@@ -42,7 +42,13 @@ static const unsigned int MIN_EXCESSIVE_BLOCK_SIZE = 32000000;
 static const unsigned int MIN_EXCESSIVE_BLOCK_SIZE_REGTEST = 1000;
 static const unsigned int DEFAULT_EXCESSIVE_BLOCK_SIZE = MIN_EXCESSIVE_BLOCK_SIZE;
 
-static const unsigned int MAY2020_MAX_BLOCK_SIGCHECK_COUNT = MIN_EXCESSIVE_BLOCK_SIZE / 141;
+/**
+ * The ratio between the maximum allowable block size and the maximum allowable
+ * SigChecks (executed signature check operations) in the block. (network rule).
+ */
+static const int BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO = 141;
+
+static const unsigned int MAY2020_MAX_BLOCK_SIGCHECK_COUNT = MIN_EXCESSIVE_BLOCK_SIZE / BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO;
 static_assert(MAY2020_MAX_BLOCK_SIGCHECK_COUNT == 226950, "Max block sigcheck value differs from specification");
 
 /** Allowed messages lengths will be this * the excessive block size */
@@ -64,5 +70,16 @@ enum
     /* Use GetMedianTimePast() instead of nTime for end point timestamp. */
     LOCKTIME_MEDIAN_TIME_PAST = (1 << 1),
 };
+
+/**
+ * Compute the maximum number of sigchecks that can be contained in a block
+ * given the MAXIMUM block size as parameter. The maximum sigchecks scale
+ * linearly with the maximum block size and do not depend on the actual
+ * block size. The returned value is rounded down (there are no fractional
+ * sigchecks so the fractional part is meaningless).
+ */
+inline uint64_t GetMaxBlockSigChecksCount(uint64_t maxBlockSize) {
+    return maxBlockSize / BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO;
+}
 
 #endif // BITCOIN_CONSENSUS_CONSENSUS_H
