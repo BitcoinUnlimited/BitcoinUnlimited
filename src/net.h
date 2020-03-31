@@ -514,7 +514,7 @@ public:
     NodeId id;
 
     //! Accumulated misbehaviour score for this peer.
-    std::atomic<int> nMisbehavior;
+    std::atomic<double> nMisbehavior;
     //! Whether this peer should be disconnected and banned (unless whitelisted).
     bool fShouldBan;
     BanReason nBanType = (BanReason)-1;

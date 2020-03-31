@@ -273,8 +273,8 @@ void CDoSManager::Misbehaving(CNode *pNode, int howmuch, BanReason reason)
     if (howmuch == 0 || !pNode)
         return;
 
-    int prior(pNode->nMisbehavior.fetch_add(howmuch));
-
+    int prior = pNode->nMisbehavior.load();
+    pNode->nMisbehavior.store(prior + howmuch);
     if (prior + howmuch >= nBanThreshold && prior < nBanThreshold)
     {
         LOGA("%s: %s (%d -> %d) BAN THRESHOLD EXCEEDED\n", __func__, pNode->GetLogName(), prior, prior + howmuch);
