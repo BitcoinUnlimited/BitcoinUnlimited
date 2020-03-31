@@ -16,7 +16,7 @@
  * for both bitcoind and bitcoin-core, to make it harder for attackers to
  * target servers or GUI users specifically.
  */
-const std::string CLIENT_NAME("BUCash");
+const std::string CLIENT_NAME("BCH Unlimited");
 
 // BU added
 /**
