@@ -628,7 +628,7 @@ class RPCTestHandler:
                     # This is a list of expected messages on stderr. If they appear, they do not
                     # necessarily indicate final failure of a test.
                     stderr_filtered = stderr.replace("Error: Unable to start HTTP server. See debug log for details.", "")
-                    stderr_filtered = re.sub(r"Error: Unable to bind to 0.0.0.0:[0-9]+ on this computer\. Bitcoin Unlimited Cash Edition is probably already running\.",
+                    stderr_filtered = re.sub(r"Error: Unable to bind to 0.0.0.0:[0-9]+ on this computer\. BCH Unlimited is probably already running\.",
                                              "", stderr_filtered)
                     invalid_index = re.compile(r'.*?\n.*?EXCEPTION.*?\n.*?invalid index for tx.*?\n.*?ProcessMessages.*?\n', re.MULTILINE)
                     stderr_filtered = invalid_index.sub("", stderr_filtered)
