@@ -3229,10 +3229,6 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nAvgBlkResponseTime = -1.0;
     nMaxBlocksInTransit = 16;
 
-    // for misbehavior
-    nMisbehavior = 0;
-    fShouldBan = false;
-
     // For statistics only, BU doesn't support CB protocol
     fSupportsCompactBlocks = false;
 

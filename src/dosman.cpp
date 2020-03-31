@@ -273,9 +273,30 @@ void CDoSManager::Misbehaving(CNode *pNode, int howmuch, BanReason reason)
     if (howmuch == 0 || !pNode)
         return;
 
-    int prior = pNode->nMisbehavior.load();
-    pNode->nMisbehavior.store(prior + howmuch);
-    if (prior + howmuch >= nBanThreshold && prior < nBanThreshold)
+    if (pNode->nLastMisbehaviorTime.load() == 0)
+        pNode->nLastMisbehaviorTime = GetTime();
+
+    // Decay the previous misbehavior over a four hour window
+    int64_t nNow = GetTime();
+    while (true)
+    {
+        double nOldMisBehavior = pNode->nMisbehavior.load();
+        double nNewMisBehavior =
+            nOldMisBehavior * pow(1.0 - 1.0 / 14400, (double)(nNow - pNode->nLastMisbehaviorTime.load()));
+        if (pNode->nMisbehavior.compare_exchange_weak(nOldMisBehavior, nNewMisBehavior))
+            break;
+    }
+    pNode->nLastMisbehaviorTime.store(nNow);
+
+    // Add the new misbehavior and check whether to ban
+    double prior = pNode->nMisbehavior.load();
+    while (true)
+    {
+        if (pNode->nMisbehavior.compare_exchange_weak(prior, prior + howmuch))
+            break;
+        prior = pNode->nMisbehavior.load();
+    }
+    if (pNode->nMisbehavior.load() >= nBanThreshold && prior < nBanThreshold)
     {
         LOGA("%s: %s (%d -> %d) BAN THRESHOLD EXCEEDED\n", __func__, pNode->GetLogName(), prior, prior + howmuch);
         pNode->fShouldBan = true;

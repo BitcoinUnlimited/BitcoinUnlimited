@@ -513,10 +513,12 @@ public:
     std::atomic<int> nRefCount;
     NodeId id;
 
-    //! Accumulated misbehaviour score for this peer.
-    std::atomic<double> nMisbehavior;
+    //! Accumulated misbehavior score for this peer.
+    std::atomic<double> nMisbehavior{0};
+    std::atomic<int64_t> nLastMisbehaviorTime{0};
+
     //! Whether this peer should be disconnected and banned (unless whitelisted).
-    bool fShouldBan;
+    bool fShouldBan = false;
     BanReason nBanType = (BanReason)-1;
 
     // General thintype critical section to ensure that no
