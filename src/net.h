@@ -518,7 +518,7 @@ public:
     std::atomic<int64_t> nLastMisbehaviorTime{0};
 
     //! Whether this peer should be disconnected and banned (unless whitelisted).
-    bool fShouldBan = false;
+    std::atomic<bool> fShouldBan{false};
     BanReason nBanType = (BanReason)-1;
 
     // General thintype critical section to ensure that no
