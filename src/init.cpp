@@ -651,7 +651,7 @@ void InitLogging()
     Logging::LogInit();
 
     LOGA("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
-    LOGA("Bitcoin version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
+    LOGA("BCH Unlimited version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
 }
 
 /** Initialize bitcoin.
