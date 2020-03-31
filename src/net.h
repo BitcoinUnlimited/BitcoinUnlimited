@@ -519,7 +519,7 @@ public:
 
     //! Whether this peer should be disconnected and banned (unless whitelisted).
     std::atomic<bool> fShouldBan{false};
-    BanReason nBanType = (BanReason)-1;
+    std::atomic<int> nBanType{-1};
 
     // General thintype critical section to ensure that no
     // two thintype blocks from the "same" peer can be processed at
