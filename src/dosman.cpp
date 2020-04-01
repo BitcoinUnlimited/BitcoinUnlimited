@@ -270,7 +270,7 @@ bool CDoSManager::BannedSetIsDirty()
  */
 void CDoSManager::Misbehaving(CNode *pNode, int howmuch, BanReason reason)
 {
-    if (howmuch == 0 || !pNode)
+    if (!pNode)
         return;
 
     if (pNode->nLastMisbehaviorTime.load() == 0)

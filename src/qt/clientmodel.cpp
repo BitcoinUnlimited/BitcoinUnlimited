@@ -12,6 +12,7 @@
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "clientversion.h"
+#include "dosman.h"
 #include "net.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
@@ -117,6 +118,15 @@ void ClientModel::updateTimer2()
 
     graphenedata.FillGrapheneQuickStats(grapheneStats);
     Q_EMIT grapheneBlockPropagationStatsChanged(grapheneStats);
+
+    // Update all misbehaviors
+    {
+        LOCK(cs_vNodes);
+        for (auto pnode : vNodes)
+        {
+            dosMan.Misbehaving(pnode, 0);
+        }
+    }
 
     uiInterface.BannedListChanged();
 }
