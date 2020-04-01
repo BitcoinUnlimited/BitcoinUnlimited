@@ -979,7 +979,7 @@ extern UniValue getminercomment(const UniValue &params, bool fHelp)
     if (fHelp || params.size() != 0)
         throw runtime_error("getminercomment\n"
                             "\nReturn the comment that will be put into each mined block's coinbase\n transaction "
-                            "after the Bitcoin Unlimited parameters."
+                            "after the BCH Unlimited parameters."
                             "\nResult\n"
                             "  minerComment (string) miner comment\n"
                             "\nExamples:\n" +
@@ -993,7 +993,7 @@ extern UniValue setminercomment(const UniValue &params, bool fHelp)
     if (fHelp || params.size() != 1)
         throw runtime_error("setminercomment\n"
                             "\nSet the comment that will be put into each mined block's coinbase\n transaction after "
-                            "the Bitcoin Unlimited parameters.\n Comments that are too long will be truncated."
+                            "the BCH Unlimited parameters.\n Comments that are too long will be truncated."
                             "\nExamples:\n" +
                             HelpExampleCli("setminercomment", "\"bitcoin is fundamentally emergent consensus\"") +
                             HelpExampleRpc("setminercomment", "\"bitcoin is fundamentally emergent consensus\""));

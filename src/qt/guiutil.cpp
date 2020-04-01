@@ -129,8 +129,8 @@ void setupAddressWidget(QValidatedLineEdit *widget, QWidget *parent)
     const CChainParams &params = Params();
     // We don't want translators to use own addresses in translations
     // and this is the only place, where this address is supplied.
-    widget->setPlaceholderText(QObject::tr("Enter a Bitcoin address (e.g. %1)")
-                                   .arg(QString::fromStdString(DummyAddress(params, GetConfig()))));
+    widget->setPlaceholderText(
+        QObject::tr("Enter a BCH address (e.g. %1)").arg(QString::fromStdString(DummyAddress(params, GetConfig()))));
     widget->setValidator(new BitcoinAddressEntryValidator(params.CashAddrPrefix(), parent));
     widget->setCheckValidator(new BitcoinAddressCheckValidator(parent));
 }
