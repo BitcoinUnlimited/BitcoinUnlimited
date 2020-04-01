@@ -270,23 +270,11 @@ bool CDoSManager::BannedSetIsDirty()
  */
 void CDoSManager::Misbehaving(CNode *pNode, int howmuch, BanReason reason)
 {
-    if (!pNode)
+    if (howmuch == 0 || !pNode)
         return;
 
-    if (pNode->nLastMisbehaviorTime.load() == 0)
-        pNode->nLastMisbehaviorTime = GetTime();
-
-    // Decay the previous misbehavior over a four hour window
-    int64_t nNow = GetTime();
-    while (true)
-    {
-        double nOldMisBehavior = pNode->nMisbehavior.load();
-        double nNewMisBehavior =
-            nOldMisBehavior * pow(1.0 - 1.0 / 14400, (double)(nNow - pNode->nLastMisbehaviorTime.load()));
-        if (pNode->nMisbehavior.compare_exchange_weak(nOldMisBehavior, nNewMisBehavior))
-            break;
-    }
-    pNode->nLastMisbehaviorTime.store(nNow);
+    // Update the old misbehavior
+    UpdateMisbehavior(pNode);
 
     // Add the new misbehavior and check whether to ban
     double prior = pNode->nMisbehavior.load();
@@ -304,6 +292,28 @@ void CDoSManager::Misbehaving(CNode *pNode, int howmuch, BanReason reason)
     }
     else
         LOGA("%s: %s (%d -> %d)\n", __func__, pNode->GetLogName(), prior, prior + howmuch);
+}
+
+/** Update the current values of misbehavior by decaying them over a set time period. */
+void CDoSManager::UpdateMisbehavior(CNode *pNode)
+{
+    if (!pNode)
+        return;
+
+    if (pNode->nLastMisbehaviorTime.load() == 0)
+        pNode->nLastMisbehaviorTime = GetTime();
+
+    // Decay the previous misbehavior over a four hour window
+    int64_t nNow = GetTime();
+    while (true)
+    {
+        double nOldMisBehavior = pNode->nMisbehavior.load();
+        double nNewMisBehavior =
+            nOldMisBehavior * pow(1.0 - 1.0 / 14400, (double)(nNow - pNode->nLastMisbehaviorTime.load()));
+        if (pNode->nMisbehavior.compare_exchange_weak(nOldMisBehavior, nNewMisBehavior))
+            break;
+    }
+    pNode->nLastMisbehaviorTime.store(nNow);
 }
 
 /**

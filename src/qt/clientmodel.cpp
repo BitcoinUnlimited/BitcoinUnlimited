@@ -124,7 +124,7 @@ void ClientModel::updateTimer2()
         LOCK(cs_vNodes);
         for (auto pnode : vNodes)
         {
-            dosMan.Misbehaving(pnode, 0);
+            dosMan.UpdateMisbehavior(pnode);
         }
     }
 
