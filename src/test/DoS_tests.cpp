@@ -240,6 +240,9 @@ BOOST_AUTO_TEST_CASE(DoS_misbehaving_ban_tests)
 
 BOOST_AUTO_TEST_CASE(DoS_non_default_banscore)
 {
+    int64_t nStartTime = GetTime();
+    SetMockTime(nStartTime); // Overrides future calls to GetTime()
+
     dosMan.ClearBanned();
     mapArgs["-banscore"] = "111"; // because 11 is my favorite number
     CAddress addr1(ip(0xa0b0c001));
@@ -257,6 +260,36 @@ BOOST_AUTO_TEST_CASE(DoS_non_default_banscore)
     BOOST_CHECK(dosMan.IsBanned(addr1));
     mapArgs.erase("-banscore");
     dosMan.HandleCommandLine();
+
+
+    // Move the clock forward to make sure than misbehavior is decaying over time
+    SetMockTime(nStartTime + 60 * 60 * 4);
+    dosMan.UpdateMisbehavior(&dummyNode1);
+    BOOST_CHECK(std::floor(dummyNode1.nMisbehavior.load()) == 40);
+    SetMockTime(nStartTime + 60 * 60 * 8);
+    dosMan.UpdateMisbehavior(&dummyNode1);
+    BOOST_CHECK(std::floor(dummyNode1.nMisbehavior.load()) == 15);
+    SetMockTime(nStartTime + 60 * 60 * 12);
+    dosMan.UpdateMisbehavior(&dummyNode1);
+    BOOST_CHECK(std::floor(dummyNode1.nMisbehavior.load()) == 5);
+    SetMockTime(nStartTime + 60 * 60 * 16);
+    dosMan.UpdateMisbehavior(&dummyNode1);
+    BOOST_CHECK(std::floor(dummyNode1.nMisbehavior.load()) == 2);
+    SetMockTime(nStartTime + 60 * 60 * 20);
+    dosMan.UpdateMisbehavior(&dummyNode1);
+    BOOST_CHECK(std::floor(dummyNode1.nMisbehavior.load()) == 0);
+    SetMockTime(nStartTime + 60 * 60 * 24);
+    dosMan.UpdateMisbehavior(&dummyNode1);
+    BOOST_CHECK(std::floor(dummyNode1.nMisbehavior.load()) == 0);
+
+    // Add some more misbehavior and then let it decay
+    dosMan.Misbehaving(&dummyNode1, 50);
+    BOOST_CHECK(std::floor(dummyNode1.nMisbehavior.load()) == 50);
+    SetMockTime(nStartTime + 60 * 60 * 28);
+    dosMan.UpdateMisbehavior(&dummyNode1);
+    BOOST_CHECK(std::floor(dummyNode1.nMisbehavior.load()) == 18);
+
+    SetMockTime(0);
 }
 
 BOOST_AUTO_TEST_CASE(DoS_bantime_expiration)
