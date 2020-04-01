@@ -199,10 +199,10 @@ public:
 
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
     bool process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> pblock);
-    void FillTxMapFromPools(std::map<uint64_t, uint256> &mapTxFromPools);
+    void FillTxMapFromPools(std::map<uint64_t, CTransactionRef> &mapTxFromPools);
     void SituateCoinbase(std::vector<uint64_t> blockCheapHashes, CTransactionRef coinbase, uint64_t grapheneVersion);
     void SituateCoinbase(CTransactionRef coinbase);
-    std::set<uint64_t> UpdateResolvedTxsAndIdentifyMissing(const std::map<uint64_t, uint256> &mapPartialTxHash,
+    std::set<uint64_t> UpdateResolvedTxsAndIdentifyMissing(const std::map<uint64_t, CTransactionRef> &mapPartialTxHash,
         const std::vector<uint64_t> &blockCheapHashes,
         uint64_t grapheneVersion);
     bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state);

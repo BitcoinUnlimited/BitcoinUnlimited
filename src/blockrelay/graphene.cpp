@@ -477,26 +477,33 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
     return result;
 }
 
-void CGrapheneBlock::FillTxMapFromPools(std::map<uint64_t, uint256> &mapTxFromPools)
+void CGrapheneBlock::FillTxMapFromPools(std::map<uint64_t, CTransactionRef> &mapTxFromPools)
 {
+    {
+        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        for (auto &kv : *txCommitQ)
+        {
+            uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, kv.first, version);
+            mapTxFromPools.insert(std::make_pair(cheapHash, kv.second.entry.GetSharedTx()));
+        }
+    }
+
     {
         READLOCK(orphanpool.cs_orphanpool);
         for (auto &kv : orphanpool.mapOrphanTransactions)
         {
             uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, kv.first, version);
-            mapTxFromPools.insert(std::make_pair(cheapHash, kv.first));
+            mapTxFromPools.insert(std::make_pair(cheapHash, kv.second.ptx));
         }
     }
 
-    // We don't have to keep the lock on mempool.cs here to do mempool.queryHashes
-    // but we take the lock anyway so we don't have to re-lock again later.
     std::vector<uint256> memPoolHashes;
     mempool.queryHashes(memPoolHashes);
 
     for (const uint256 &hash : memPoolHashes)
     {
         uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, hash, version);
-        mapTxFromPools.insert(std::make_pair(cheapHash, hash));
+        mapTxFromPools.insert(std::make_pair(cheapHash, mempool.get(hash)));
     }
 }
 
@@ -531,7 +538,7 @@ void CGrapheneBlock::SituateCoinbase(CTransactionRef coinbase)
 }
 
 std::set<uint64_t> CGrapheneBlock::UpdateResolvedTxsAndIdentifyMissing(
-    const std::map<uint64_t, uint256> &mapPartialTxHash,
+    const std::map<uint64_t, CTransactionRef> &mapPartialTxHash,
     const std::vector<uint64_t> &blockCheapHashes,
     uint64_t grapheneVersion)
 {
@@ -551,9 +558,9 @@ std::set<uint64_t> CGrapheneBlock::UpdateResolvedTxsAndIdentifyMissing(
         const auto &elem = mapPartialTxHash.find(cheapHash);
         if (elem != mapPartialTxHash.end())
         {
-            const auto repeat = std::find(vTxHashes256.begin(), vTxHashes256.end(), elem->second);
+            const auto repeat = std::find(vTxHashes256.begin(), vTxHashes256.end(), elem->second->GetHash());
             if (repeat == vTxHashes256.end())
-                vTxHashes256.push_back(elem->second);
+                vTxHashes256.push_back(elem->second->GetHash());
         }
         else
         {
@@ -595,7 +602,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     int unnecessaryCount = 0;
     bool fRequestFailureRecovery = false;
     std::set<uint256> passingTxHashes;
-    std::map<uint64_t, uint256> mapPartialTxHash;
+    std::map<uint64_t, CTransactionRef> mapPartialTxHash;
     std::set<uint64_t> setHashesToRequest;
     std::vector<uint256> vSenderFilterPositiveHahses;
 
@@ -609,7 +616,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
         {
             const uint256 &hash = tx->GetHash();
             uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, hash, version);
-            mapPartialTxHash.insert(std::make_pair(cheapHash, hash));
+            mapPartialTxHash.insert(std::make_pair(cheapHash, tx));
 
             if (tx->IsCoinBase())
                 coinbase = tx;
@@ -631,11 +638,11 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
             bool grSetComputeOpt = pGrapheneSet->GetComputeOptimized();
             for (const auto &entry : mapPartialTxHash)
             {
-                if ((grSetComputeOpt && pGrapheneSet->GetFastFilter()->contains(entry.second)) ||
-                    (!grSetComputeOpt && pGrapheneSet->GetRegularFilter()->contains(entry.second)))
+                if ((grSetComputeOpt && pGrapheneSet->GetFastFilter()->contains(entry.second->GetHash())) ||
+                    (!grSetComputeOpt && pGrapheneSet->GetRegularFilter()->contains(entry.second->GetHash())))
                 {
                     setSenderFilterPositiveCheapHashes.insert(entry.first);
-                    vSenderFilterPositiveHahses.push_back(entry.second);
+                    vSenderFilterPositiveHahses.push_back(entry.second->GetHash());
                 }
             }
 
@@ -1493,7 +1500,7 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
     localIblt.reset();
 
     // Initialize map with txs from various pools
-    std::map<uint64_t, uint256> mapTxFromPools;
+    std::map<uint64_t, CTransactionRef> mapTxFromPools;
     pblock->grapheneblock->FillTxMapFromPools(mapTxFromPools);
 
     // Insert additional txs and identify coinbase
@@ -1503,7 +1510,7 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
         const uint256 &hash = tx->GetHash();
         uint64_t cheapHash = pblock->grapheneblock->pGrapheneSet->GetShortID(hash);
 
-        mapTxFromPools.insert(std::make_pair(cheapHash, hash));
+        mapTxFromPools.insert(std::make_pair(cheapHash, tx));
 
         if (tx->IsCoinBase())
             coinbase = tx;
@@ -1521,8 +1528,9 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
         const uint256 &hash = tx.GetHash();
         uint64_t cheapHash = pblock->grapheneblock->pGrapheneSet->GetShortID(hash);
 
-        mapTxFromPools[cheapHash] = hash;
-        pblock->grapheneblock->mapMissingTx[cheapHash] = MakeTransactionRef(tx);
+        CTransactionRef txRef = MakeTransactionRef(tx);
+        mapTxFromPools[cheapHash] = txRef;
+        pblock->grapheneblock->mapMissingTx[cheapHash] = txRef;
     }
 
     // Determine which txs pass filter and populate IBLT
@@ -1530,9 +1538,9 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
     for (auto &pair : mapTxFromPools)
     {
         if ((pblock->grapheneblock->pGrapheneSet->GetComputeOptimized() &&
-                pblock->grapheneblock->pGrapheneSet->GetFastFilter()->contains(pair.second)) ||
+                pblock->grapheneblock->pGrapheneSet->GetFastFilter()->contains(pair.second->GetHash())) ||
             (!pblock->grapheneblock->pGrapheneSet->GetComputeOptimized() &&
-                pblock->grapheneblock->pGrapheneSet->GetRegularFilter()->contains(pair.second)))
+                pblock->grapheneblock->pGrapheneSet->GetRegularFilter()->contains(pair.second->GetHash())))
         {
             localIblt.insert(pair.first, IBLT_NULL_VALUE);
             setSenderFilterPositiveCheapHashes.insert(pair.first);
