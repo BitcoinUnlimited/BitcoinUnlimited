@@ -24,10 +24,7 @@
 #include "xversionkeys.h"
 
 #include <iomanip>
-static bool ReconstructBlock(CNode *pfrom,
-    int &missingCount,
-    int &unnecessaryCount,
-    std::shared_ptr<CBlockThinRelay> pblock);
+static bool ReconstructBlock(CNode *pfrom, int &missingCount, std::shared_ptr<CBlockThinRelay> pblock);
 extern CTweak<uint64_t> grapheneMinVersionSupported;
 extern CTweak<uint64_t> grapheneMaxVersionSupported;
 extern CTweak<uint64_t> grapheneFastFilterCompatibility;
@@ -158,7 +155,6 @@ void CGrapheneBlock::OrderTxHashes(CNode *pfrom)
 }
 
 bool CGrapheneBlock::ValidateAndRecontructBlock(int &missingCount,
-    int &unnecessaryCount,
     uint256 blockhash,
     std::shared_ptr<CBlockThinRelay> pblock,
     std::string command,
@@ -183,7 +179,7 @@ bool CGrapheneBlock::ValidateAndRecontructBlock(int &missingCount,
     // Look for each transaction in our various pools and buffers.
     // With grapheneBlocks recovered txs contains only the first 8 bytes of the tx hash.
     {
-        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
+        if (!ReconstructBlock(pfrom, missingCount, pblock))
             return false;
     }
 
@@ -298,9 +294,8 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
     LOG(GRAPHENE, "Got %d Re-requested txs from peer=%s\n", grapheneBlockTx.vMissingTx.size(), pfrom->GetLogName());
 
     int missingCount = 0;
-    int unnecessaryCount = 0;
     grapheneBlock->ValidateAndRecontructBlock(
-        missingCount, unnecessaryCount, grapheneBlockTx.blockhash, pblock, strCommand, pfrom, vRecv);
+        missingCount, grapheneBlockTx.blockhash, pblock, strCommand, pfrom, vRecv);
 
     // If we're still missing transactions then bail out and request the failover block. This should never
     // happen unless we're under some kind of attack or somehow we lost transactions out of our memory pool
@@ -599,7 +594,6 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
 
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
     int missingCount = 0;
-    int unnecessaryCount = 0;
     bool fRequestFailureRecovery = false;
     std::set<uint256> passingTxHashes;
     std::map<uint64_t, CTransactionRef> mapPartialTxHash;
@@ -684,7 +678,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
                 fMerkleRootCorrect = false;
             else
             {
-                if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
+                if (!ReconstructBlock(pfrom, missingCount, pblock))
                     return false;
             }
         }
@@ -711,8 +705,8 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     }
 
     this->nWaitingFor = missingCount;
-    LOG(GRAPHENE, "Graphene block waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n",
-        this->nWaitingFor, unnecessaryCount, pblock->vtx.size(), grapheneBlock->mapMissingTx.size());
+    LOG(GRAPHENE, "Graphene block waiting for: %d, total txns: %d received txns: %d\n", this->nWaitingFor,
+        pblock->vtx.size(), grapheneBlock->mapMissingTx.size());
 
     // If there are any missing hashes or transactions then we request them here.
     // This must be done outside of the mempool.cs lock or may deadlock.
@@ -756,10 +750,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     return true;
 }
 
-static bool ReconstructBlock(CNode *pfrom,
-    int &missingCount,
-    int &unnecessaryCount,
-    std::shared_ptr<CBlockThinRelay> pblock)
+static bool ReconstructBlock(CNode *pfrom, int &missingCount, std::shared_ptr<CBlockThinRelay> pblock)
 {
     std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
 
@@ -856,9 +847,6 @@ static bool ReconstructBlock(CNode *pfrom,
                 if (ptx)
                     pblock->setUnVerifiedTxns.insert(hash);
             }
-            if (((inMemPool || inCommitQ) && inMissingTx) || (inOrphanCache && inMissingTx) ||
-                (inAdditionalTxs && inMissingTx))
-                unnecessaryCount++;
         }
         if (!ptx)
             missingCount++;
@@ -1584,9 +1572,8 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
     }
 
     int missingCount = 0;
-    int unnecessaryCount = 0;
-    pblock->grapheneblock->ValidateAndRecontructBlock(missingCount, unnecessaryCount, recoveryResponse.blockhash,
-        pblock, NetMsgType::GRAPHENE_RECOVERY, pfrom, vRecv);
+    pblock->grapheneblock->ValidateAndRecontructBlock(
+        missingCount, recoveryResponse.blockhash, pblock, NetMsgType::GRAPHENE_RECOVERY, pfrom, vRecv);
 
     if (missingCount > 0)
     {
