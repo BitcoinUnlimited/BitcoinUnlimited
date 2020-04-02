@@ -34,7 +34,7 @@ static const unsigned int nScriptCheckQueues = 4;
 std::unique_ptr<CParallelValidation> PV;
 
 bool ShutdownRequested();
-static void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef pblock, const CInv inv);
+static void HandleBlockMessageThread(CNodeRef noderef, const string strCommand, CBlockRef pblock, const CInv inv);
 
 static void AddScriptCheckThreads(int i, CCheckQueue<CScriptCheck> *pqueue)
 {
@@ -546,28 +546,27 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
 
     // Add a reference here because we are detaching a thread which may run for a long time and
     // we do not want CNode to be deleted if the node should disconnect while we are processing this block.
-    // We will clean up this reference when the thread finishes.
-    {
-        // We do not have to take a vNodes lock here as would usually be the case because at this point there
-        // will be at least one ref already and we therefore don't have to worry about getting disconnected.
-        pfrom->AddRef();
-    }
+    //
+    // We do not have to take a vNodes lock here as would usually be the case because at this point there
+    // will be at least one ref already and we therefore don't have to worry about getting disconnected.
+    CNodeRef noderef(pfrom);
 
     // only launch block validation in a separate thread if PV is enabled.
     if (PV->Enabled() && !ShutdownRequested())
     {
-        boost::thread thread(boost::bind(&HandleBlockMessageThread, pfrom, strCommand, pblock, inv));
+        boost::thread thread(boost::bind(&HandleBlockMessageThread, noderef, strCommand, pblock, inv));
         thread.detach();
     }
     else
     {
-        HandleBlockMessageThread(pfrom, strCommand, pblock, inv);
+        HandleBlockMessageThread(noderef, strCommand, pblock, inv);
     }
 }
 
-void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef pblock, const CInv inv)
+void HandleBlockMessageThread(CNodeRef noderef, const string strCommand, CBlockRef pblock, const CInv inv)
 {
     boost::thread::id this_id(boost::this_thread::get_id());
+    CNode *pfrom = noderef.get();
 
     try
     {
@@ -653,9 +652,6 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
     {
         // release the semaphore.
         PV->Post();
-
-        // Remove the CNode reference we aquired just before we launched this thread.
-        pfrom->Release();
 
         // Clear thread data - this must be done before the thread completes or else some other new
         // thread may grab the same thread id and we would end up deleting the entry for the new thread instead.
