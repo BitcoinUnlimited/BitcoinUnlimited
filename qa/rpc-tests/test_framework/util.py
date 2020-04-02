@@ -279,15 +279,16 @@ def is_connected(gdict, vertices_encountered = None, start_vertex=None):
             return True
         return False
 
-def sync_blocks(rpc_connections, wait=1,verbose=1):
+def sync_blocks(rpc_connections, *, wait=1, verbose=1, timeout=60):
     """
     Wait until everybody has the same block count
     """
     iter=-1
-    while True:
+    stop_time = time.time() + timeout
+    while time.time() <= stop_time:
         counts = [ x.getblockcount() for x in rpc_connections ]
         if counts == [ counts[0] ]*len(counts):
-            break
+            return
         if verbose and iter>2:
             logging.info("sync blocks (" + str(iter) +"): " + str(counts))
         time.sleep(wait)
@@ -310,21 +311,24 @@ def sync_blocks(rpc_connections, wait=1,verbose=1):
                 graph[nodeIdx] = connectedTo
             if not is_connected(graph):
                 raise Exception('sync_blocks: bitcoind nodes cannot sync because they are not all connected.  Node connection graph: %s' % str(graph))
+    raise Exception('sync_blocks: blocks did not sync through various nodes before the timeout of %d seconds kicked in' % timeout)
 
-def sync_blocks_to(height, rpc_connections, wait=1,verbose=1):
+def sync_blocks_to(height, rpc_connections, *, wait=1, verbose=1, timeout=60):
     """
     Wait until all passed nodes have the passed "height" block count
     """
     heights = [ height ]*len(rpc_connections)
     iter = 0
-    while True:
+    stop_time = time.time() + timeout
+    while time.time() <= stop_time:
         counts = [ x.getblockcount() for x in rpc_connections ]
         if counts == heights:
-            break
+            return
         if verbose and iter>2:
             logging.info("sync blocks (" + str(iter) + ") to %d: %s" % (height, str(counts)))
         iter+=1
         time.sleep(wait)
+    raise Exception('sync_blocks_to: blocks did not sync through various nodes before the timeout of %d seconds kicked in' % timeout)
 
 def hub_is_running(node_num):
     """
