@@ -311,6 +311,7 @@ def sync_blocks(rpc_connections, *, wait=1, verbose=1, timeout=60):
                 graph[nodeIdx] = connectedTo
             if not is_connected(graph):
                 raise Exception('sync_blocks: bitcoind nodes cannot sync because they are not all connected.  Node connection graph: %s' % str(graph))
+    raise Exception('sync_blocks: blocks did not sync through various nodes before the timeout of %d seconds kicked in' % timeout)
 
 def sync_blocks_to(height, rpc_connections, wait=1,verbose=1):
     """
