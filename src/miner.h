@@ -28,6 +28,7 @@ extern CCriticalSection cs_coinbaseFlags;
 extern std::atomic<int64_t> nTotalPackage;
 extern std::atomic<int64_t> nTotalScore;
 extern CTweak<bool> miningCPFP;
+extern CTweak<uint64_t> miningSigChecks;
 
 namespace Consensus
 {
@@ -93,6 +94,9 @@ private:
     // Variables used for addScoreTxs and addPriorityTxs
     int lastFewTxs;
     bool blockFinished;
+
+    bool may2020Enabled = false;
+    uint64_t maxSigOpsAllowed = 0;
 
 public:
     BlockAssembler(const CChainParams &chainparams);

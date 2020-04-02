@@ -290,6 +290,7 @@ CTweak<uint64_t> coinbaseReserve("mining.coinbaseReserve",
     "How much space to reserve for the coinbase transaction, in bytes",
     DEFAULT_COINBASE_RESERVE_SIZE);
 CTweakRef<std::string> miningCommentTweak("mining.comment", "Include text in a block's coinbase.", &minerComment);
+
 CTweakRef<uint64_t> miningBlockSize("mining.blockSize",
     "Maximum block size in bytes.  The maximum block size returned from 'getblocktemplate' will be this value minus "
     "mining.coinbaseReserve.",
@@ -312,6 +313,9 @@ CTweak<uint64_t> maxScriptOps("consensus.maxScriptOps",
     "Maximum number of script operations allowed.  Stack pushes are excepted.",
     MAX_OPS_PER_SCRIPT);
 
+CTweak<uint64_t> maxSigChecks("consensus.maxBlockSigChecks",
+    "Consensus parameter specifying the maximum sigchecks in a block.  Use for testing only!",
+    MAY2020_MAX_BLOCK_SIGCHECK_COUNT);
 
 CTweak<bool> unsafeGetBlockTemplate("mining.unsafeGetBlockTemplate",
     "Allow getblocktemplate to succeed even if the chain tip is old or this node is not connected to other nodes",

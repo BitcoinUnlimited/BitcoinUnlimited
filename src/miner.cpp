@@ -231,6 +231,14 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     CBlockIndex *pindexPrev = chainActive.Tip();
     assert(pindexPrev); // can't make a new block if we don't even have the genesis block
 
+    may2020Enabled = IsMay2020Enabled(Params().GetConsensus(), pindexPrev);
+
+    if (may2020Enabled)
+    {
+        maxSigOpsAllowed = maxSigChecks.Value();
+    }
+
+
     {
         READLOCK(mempool.cs_txmempool);
         nHeight = pindexPrev->nHeight + 1;
@@ -351,8 +359,12 @@ bool BlockAssembler::isStillDependent(CTxMemPool::txiter iter)
 
 bool BlockAssembler::TestPackageSigOps(uint64_t packageSize, unsigned int packageSigOps)
 {
-    uint64_t nMaxSigOpsAllowed = GetMaxBlockSigOpsCount(nBlockSize + packageSize);
-    if (nBlockSigOps + packageSigOps >= nMaxSigOpsAllowed)
+    if (!may2020Enabled) // if may2020 is enabled, its a constant
+    {
+        maxSigOpsAllowed = GetMaxBlockSigOpsCount(nBlockSize + packageSize);
+    }
+
+    if (nBlockSigOps + packageSigOps >= maxSigOpsAllowed)
         return false;
     return true;
 }
@@ -579,6 +591,7 @@ void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, b
 
         uint64_t packageSize = iter->GetSizeWithAncestors();
         CAmount packageFees = iter->GetModFeesWithAncestors();
+        // mempool uses same field for sigops and sigchecks
         unsigned int packageSigOps = iter->GetSigOpCountWithAncestors();
 
         // Get any unconfirmed ancestors of this txn

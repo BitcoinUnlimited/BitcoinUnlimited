@@ -2623,10 +2623,6 @@ BOOST_AUTO_TEST_CASE(IsWitnessProgram)
     }
 }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 4c5c0dacd... Implement sigcheck counting at the script machine layer.
 BOOST_AUTO_TEST_CASE(script_debugger)
 {
     CScript testScript = CScript() << 0 << 1;

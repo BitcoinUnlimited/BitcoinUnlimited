@@ -36,6 +36,14 @@ public:
     unsigned char sighashtype = 0;
 
     ValidationResourceTracker() {}
+    ValidationResourceTracker(const ValidationResourceTracker &c)
+    {
+        LOCK(cs_resource_tracker);
+        nSigops = c.nSigops;
+        nSighashBytes = c.nSighashBytes;
+        consensusSigops = c.consensusSigops;
+        sighashtype = c.sighashtype;
+    }
     void Update(const uint256 &txid, uint64_t nSigopsIn, uint64_t nSighashBytesIn)
     {
         LOCK(cs_resource_tracker);

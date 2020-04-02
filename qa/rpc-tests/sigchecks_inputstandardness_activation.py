@@ -65,8 +65,7 @@ def create_transaction(spendfrom, custom_script, amount=None):
 
     ctx = CTransaction()
     ctx.vin.append(CTxIn(COutPoint(spendfrom.sha256, 0), bytes([OP_TRUE])))
-    ctx.vout.append(
-        CTxOut(0, bytes([OP_TRUE])))
+    ctx.vout.append(CTxOut(0, bytes([OP_TRUE])))
     ctx.vout.append(customout)
     pad_tx(ctx)
 

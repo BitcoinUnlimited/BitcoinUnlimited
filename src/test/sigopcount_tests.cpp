@@ -251,7 +251,7 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx)
 
     {
         CValidationState state;
-        BOOST_CHECK(!CheckTransaction(MakeTransactionRef(CTransaction(tx)), state));
+        BOOST_CHECK(!ContextualCheckTransaction(MakeTransactionRef(CTransaction(tx)), state, nullptr, Params()));
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txns-too-many-sigops");
     }
 }

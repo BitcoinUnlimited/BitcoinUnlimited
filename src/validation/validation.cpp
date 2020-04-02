@@ -1524,7 +1524,6 @@ bool ContextualCheckBlock(const CBlock &block,
 {
     const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
     const Consensus::Params &consensusParams = Params().GetConsensus();
-    bool may2020Enabled = IsMay2020Enabled(consensusParams, pindexPrev);
 
     // Start enforcing BIP113 (Median Time Past)
     int nLockTimeFlags = 0;
@@ -2374,6 +2373,8 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     CBlockUndo &blockundo,
     std::vector<std::pair<uint256, CDiskTxPos> > &vPos)
 {
+    // Enabled returns true if the fork is enabled on the NEXT block, so we pass this block's parent
+    bool may2020Active = (pindex) ? IsMay2020Enabled(chainparams.GetConsensus(), pindex->pprev) : false;
     nFees = 0;
     int64_t nTime2 = GetStopwatchMicros();
     LOG(BLK, "Canonical ordering for %s MTP: %d\n", block.GetHash().ToString(), pindex->GetMedianTimePast());
@@ -2388,7 +2389,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     // Get the script flags for this block
     uint32_t flags = GetBlockScriptFlags(pindex, chainparams.GetConsensus());
 
-    ValidationResourceTracker resourceTracker;
+    std::vector<ValidationResourceTracker> txResourceTracker;
     std::vector<int> prevheights;
     int nInputs = 0;
     unsigned int nSigOps = 0;
@@ -2427,6 +2428,8 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             ConnectBlockScopeExit(fParallel, control, pScriptQueue);
         }
         BOOST_SCOPE_EXIT_END
+
+        txResourceTracker.resize(block.vtx.size());
 
         // Outputs then Inputs algorithm: add outputs to the coin cache
         // and validate lexical ordering
@@ -2475,10 +2478,13 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
 
             nInputs += tx.vin.size();
 
-            // Get total sigop count for both legacy and p2sh sigops
-            nSigOps += GetTransactionSigOpCount(txref, view, flags);
-            if (nSigOps > GetMaxBlockSigOpsCount(block.GetBlockSize()))
-                return state.DoS(100, error("ConnectBlock(): too many sigops"), REJECT_INVALID, "bad-blk-sigops");
+            if (!may2020Active)
+            {
+                // Get total sigop count for both legacy and p2sh sigops
+                nSigOps += GetTransactionSigOpCount(txref, view, flags);
+                if (nSigOps > GetMaxBlockSigOpsCount(block.GetBlockSize()))
+                    return state.DoS(100, error("ConnectBlock(): too many sigops"), REJECT_INVALID, "bad-blk-sigops");
+            }
 
             if (!tx.IsCoinBase())
             {
@@ -2538,7 +2544,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                         bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks
                                                             (still consult the cache, though) */
                         if (!CheckInputs(txref, state, view, fScriptChecks, flags, maxScriptOps.Value(), fCacheResults,
-                                &resourceTracker, PV->ThreadCount() ? &vChecks : nullptr))
+                                &txResourceTracker[i], PV->ThreadCount() ? &vChecks : nullptr))
                         {
                             return error("%s: block %s CheckInputs on %s failed with %s", __func__,
                                 block.GetHash().ToString(), tx.GetHash().ToString(), FormatStateMessage(state));
@@ -2570,7 +2576,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             if (GetArg("-pvtest", false))
                 MilliSleep(1000);
         }
-        LOG(THIN, "Number of CheckInputs() performed: %d  Unverified count: %d\n", nChecked, nUnVerifiedChecked);
+        LOG(BENCH, "Number of CheckInputs() performed: %d  Unverified count: %d\n", nChecked, nUnVerifiedChecked);
 
 
         // Wait for all sig check threads to finish before updating utxo
@@ -2579,6 +2585,33 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
         {
             // if we end up here then the signature verification failed and we must re-lock cs_main before returning.
             return state.DoS(100, false, REJECT_INVALID, "bad-blk-signatures", false, "parallel script check failed");
+        }
+
+        if (may2020Active)
+        {
+            uint64_t blockSigChecks = 0;
+            for (const auto &t : txResourceTracker) // its ok to add the coinbase sigchecks because they must be 0
+            {
+                auto txSigChecks = t.GetConsensusSigOps();
+                blockSigChecks += txSigChecks;
+                LOG(BENCH, "Tx SigChecks performed: %d\n", txSigChecks);
+                // May2020 transaction consensus rule
+                if (txSigChecks > MAY2020_MAX_TX_SIGCHECK_COUNT)
+                {
+                    return state.DoS(100, false, REJECT_INVALID, "bad-tx-sigchecks", false,
+                        "per transaction sigcheck limit exceeded");
+                }
+            }
+
+            LOG(BENCH, "Number of SigChecks performed: %d\n", blockSigChecks);
+
+            // May 2020 block consensus rule
+            uint64_t maxSigChecksAllowed = maxSigChecks.Value();
+            if (blockSigChecks > maxSigChecksAllowed)
+            {
+                return state.DoS(
+                    100, false, REJECT_INVALID, "bad-blk-sigchecks", false, "block sigcheck limit exceeded");
+            }
         }
 
         if (PV->QuitReceived(this_id, fParallel))
@@ -3021,6 +3054,7 @@ static void ResubmitTransactions(CBlock *block = nullptr)
     // We must hold the mempool lock throughout otherwise it would be possible for some txns to slip back into
     // the mempool from the csCommitQFinal.
     WRITELOCK(mempool.cs_txmempool);
+    LOG(MEMPOOL, "Clearing mempool and resubmitting transactions");
     {
         if (block)
         {

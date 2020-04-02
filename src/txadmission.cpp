@@ -889,12 +889,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
         }
 
-        if (!may2020Enabled) // Old sigop counting -- the new sigchecks must wait for script evaluation
-        {
-            nSigOps = GetLegacySigOpCount(tx, STANDARD_SCRIPT_VERIFY_FLAGS);
-            nSigOps += GetP2SHSigOpCount(tx, view, STANDARD_SCRIPT_VERIFY_FLAGS);
-        }
-
         CAmount nValueOut = tx->GetValueOut();
         CAmount nFees = nValueIn - nValueOut;
         // nModifiedFees includes any fee deltas from PrioritiseTransaction
@@ -918,16 +912,52 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
         }
 
-        // Create a commit data entry
-        CTxMemPoolEntry entry(tx, nFees, GetTime(), dPriority, chainActive.Height(), pool.HasNoInputsOf(*tx),
-            inChainInputValue, fSpendsCoinbase, nSigOps, lp);
-
-        nSize = entry.GetTxSize();
+        // Check that input script constraints are satisfied
+        unsigned char sighashType = 0;
+        if (!CheckInputs(tx, state, view, true, flags, maxScriptOps.Value(), true, &resourceTracker, nullptr,
+                &sighashType, debugger))
+        {
+            if (debugger && debugger->InputsCheck1IsValid())
+            {
+                debugger->AddInvalidReason("input-script-failed");
+                debugger->mineable = false;
+                debugger->futureMineable = false;
+            }
+            else
+            {
+                LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", hash.ToString());
+                if (state.GetDebugMessage() == "")
+                    state.SetDebugMessage("CheckInputs failed");
+                return false;
+            }
+        }
 
         // Check that the transaction doesn't have an excessive number of sigops, making it impossible to mine.
-
-        if (!may2020Enabled)
+        if (may2020Enabled) // Enforce May 2020 consensus sigchecks rule
         {
+            nSigOps = resourceTracker.GetConsensusSigOps();
+            if (nSigOps > MAY2020_MAX_TX_SIGCHECK_COUNT)
+            {
+                if (debugger)
+                {
+                    debugger->AddInvalidReason("bad-txns-too-many-sigchecks");
+                    debugger->mineable = false;
+                }
+                else
+                {
+                    return state.DoS(
+                        0, false, REJECT_INVALID, "bad-txns-too-many-sigchecks", false, strprintf("%d", nSigOps));
+                }
+            }
+            // Place sigchecks into the mempool sigops field, since these are not cotemporaneous
+            LOG(MEMPOOL, "Mempool is tracking sigchecks.  Tx %s has %d\n", hash.ToString(), nSigOps);
+        }
+        else // Old sigop counting
+        {
+            nSigOps = GetLegacySigOpCount(tx, STANDARD_SCRIPT_VERIFY_FLAGS);
+            nSigOps += GetP2SHSigOpCount(tx, view, STANDARD_SCRIPT_VERIFY_FLAGS);
+            LOG(MEMPOOL, "Mempool is tracking sigops.  Tx %s has %d\n", hash.ToString(), nSigOps);
+
             if (nSigOps > MAX_TX_SIGOPS_COUNT)
             {
                 if (debugger)
@@ -942,6 +972,14 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 }
             }
         }
+
+        // Create a commit data entry
+        CTxMemPoolEntry entry(tx, nFees, GetTime(), dPriority, chainActive.Height(), pool.HasNoInputsOf(*tx),
+            inChainInputValue, fSpendsCoinbase, nSigOps, lp);
+        // Record the actual number of sigops executed for statistical purposes only
+        entry.UpdateRuntimeSigOps(resourceTracker.GetSigOps(), resourceTracker.GetSighashBytes());
+
+        nSize = entry.GetTxSize();
 
         CAmount mempoolRejectFee =
             pool.GetMinFee(GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000).GetFee(nSize);
@@ -1172,37 +1210,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             // How can something we are just adding have any descendants?  It can't so these values are just this tx
             txProps->countWithDescendants = 1;
             txProps->sizeWithDescendants = tx->GetTxSize();
-        }
-
-        // Check against previous transactions
-        // This is done last to help prevent CPU exhaustion denial-of-service attacks.
-        unsigned char sighashType = 0;
-        if (!CheckInputs(tx, state, view, true, flags, maxScriptOps.Value(), true, &resourceTracker, nullptr,
-                &sighashType, debugger))
-        {
-            if (debugger && debugger->InputsCheck1IsValid())
-            {
-                debugger->AddInvalidReason("input-script-failed");
-                debugger->mineable = false;
-                debugger->futureMineable = false;
-            }
-            else
-            {
-                LOG(MEMPOOL, "CheckInputs failed for tx: %s\n", hash.ToString());
-                if (state.GetDebugMessage() == "")
-                    state.SetDebugMessage("CheckInputs failed");
-                return false;
-            }
-        }
-        entry.UpdateRuntimeSigOps(resourceTracker.GetSigOps(), resourceTracker.GetSighashBytes());
-
-        if (may2020Enabled) // Enforce May 2020 consensus sigops rule
-        {
-            auto cSigOps = resourceTracker.GetConsensusSigOps();
-            if (cSigOps > MAY2020_MAX_TX_SIGCHECK_COUNT)
-            {
-                return state.DoS(0, false, REJECT_INVALID, "bad-txns-too-many-sigops", false, strprintf("%d", cSigOps));
-            }
         }
 
         // Check again against just the consensus-critical mandatory script

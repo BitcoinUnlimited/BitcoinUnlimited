@@ -48,7 +48,8 @@ static const unsigned int DEFAULT_EXCESSIVE_BLOCK_SIZE = MIN_EXCESSIVE_BLOCK_SIZ
  */
 static const int BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO = 141;
 
-static const unsigned int MAY2020_MAX_BLOCK_SIGCHECK_COUNT = MIN_EXCESSIVE_BLOCK_SIZE / BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO;
+static const unsigned int MAY2020_MAX_BLOCK_SIGCHECK_COUNT =
+    MIN_EXCESSIVE_BLOCK_SIZE / BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO;
 static_assert(MAY2020_MAX_BLOCK_SIGCHECK_COUNT == 226950, "Max block sigcheck value differs from specification");
 
 /** Allowed messages lengths will be this * the excessive block size */
@@ -78,7 +79,8 @@ enum
  * block size. The returned value is rounded down (there are no fractional
  * sigchecks so the fractional part is meaningless).
  */
-inline uint64_t GetMaxBlockSigChecksCount(uint64_t maxBlockSize) {
+inline uint64_t GetMaxBlockSigChecksCount(uint64_t maxBlockSize)
+{
     return maxBlockSize / BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO;
 }
 
