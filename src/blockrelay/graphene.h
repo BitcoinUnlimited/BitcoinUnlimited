@@ -76,6 +76,7 @@ public:
     std::vector<uint256> vTxHashes256; // List of all 256 bit transaction hashes in the block
     std::map<uint64_t, CTransactionRef> mapMissingTx; // Map of transactions that were re-requested
     std::vector<CTransactionRef> vAdditionalTxs; // vector of transactions receiver probably does not have
+    std::set<CTransactionRef> vRecoveredTxs; // set of transactions collected during failure recovery
     std::map<uint64_t, uint32_t> mapHashOrderIndex;
 
 public:
@@ -126,6 +127,7 @@ public:
     bool ValidateAndRecontructBlock(int &missingCount,
         uint256 blockhash,
         std::shared_ptr<CBlockThinRelay> pblock,
+        std::map<uint64_t, CTransactionRef> mapMissingTx,
         std::string command,
         CNode *pfrom,
         CDataStream &vRecv);
