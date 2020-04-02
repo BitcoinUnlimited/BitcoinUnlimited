@@ -124,8 +124,7 @@ public:
 
     // Validates header and, if possible, determines if there are any missing or unnecessary transactions
     // in the block
-    bool ValidateAndRecontructBlock(int &missingCount,
-        uint256 blockhash,
+    bool ValidateAndRecontructBlock(uint256 blockhash,
         std::shared_ptr<CBlockThinRelay> pblock,
         std::map<uint64_t, CTransactionRef> mapMissingTx,
         std::string command,

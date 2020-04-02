@@ -25,7 +25,6 @@
 
 #include <iomanip>
 static bool ReconstructBlock(CNode *pfrom,
-    int &missingCount,
     std::shared_ptr<CBlockThinRelay> pblock,
     std::map<uint64_t, CTransactionRef> mapTxFromPools);
 extern CTweak<uint64_t> grapheneMinVersionSupported;
@@ -157,8 +156,7 @@ void CGrapheneBlock::OrderTxHashes(CNode *pfrom)
     }
 }
 
-bool CGrapheneBlock::ValidateAndRecontructBlock(int &missingCount,
-    uint256 blockhash,
+bool CGrapheneBlock::ValidateAndRecontructBlock(uint256 blockhash,
     std::shared_ptr<CBlockThinRelay> pblock,
     std::map<uint64_t, CTransactionRef> mapCheapHashTx,
     std::string command,
@@ -183,34 +181,31 @@ bool CGrapheneBlock::ValidateAndRecontructBlock(int &missingCount,
     // Look for each transaction in our various pools and buffers.
     // With grapheneBlocks recovered txs contains only the first 8 bytes of the tx hash.
     {
-        if (!ReconstructBlock(pfrom, missingCount, pblock, mapCheapHashTx))
+        if (!ReconstructBlock(pfrom, pblock, mapCheapHashTx))
             return false;
     }
 
-    if (missingCount <= 0)
-    {
-        // We have all the transactions now that are in this block: try to reassemble and process.
-        CInv inv2(MSG_BLOCK, blockhash);
+    // We have all the transactions now that are in this block: try to reassemble and process.
+    CInv inv2(MSG_BLOCK, blockhash);
 
-        // for compression statistics, we have to add up the size of grapheneblock and the re-requested grapheneBlockTx.
-        uint64_t nSizeGrapheneBlockTx = msgSize;
-        uint64_t blockSize = pblock->GetBlockSize();
-        float nCompressionRatio = 0.0;
-        if (GetSize() + nSizeGrapheneBlockTx > 0)
-            nCompressionRatio = (float)blockSize / ((float)GetSize() + (float)nSizeGrapheneBlockTx);
-        LOG(GRAPHENE, "Reassembled grblktx for %s (%d bytes). Message was %d bytes (graphene block) and %d bytes "
-                      "(re-requested tx), compression ratio %3.2f, peer=%s\n",
-            pblock->GetHash().ToString(), blockSize, GetSize(), nSizeGrapheneBlockTx, nCompressionRatio,
-            pfrom->GetLogName());
+    // for compression statistics, we have to add up the size of grapheneblock and the re-requested grapheneBlockTx.
+    uint64_t nSizeGrapheneBlockTx = msgSize;
+    uint64_t blockSize = pblock->GetBlockSize();
+    float nCompressionRatio = 0.0;
+    if (GetSize() + nSizeGrapheneBlockTx > 0)
+        nCompressionRatio = (float)blockSize / ((float)GetSize() + (float)nSizeGrapheneBlockTx);
+    LOG(GRAPHENE, "Reassembled grblktx for %s (%d bytes). Message was %d bytes (graphene block) and %d bytes "
+                  "(re-requested tx), compression ratio %3.2f, peer=%s\n",
+        pblock->GetHash().ToString(), blockSize, GetSize(), nSizeGrapheneBlockTx, nCompressionRatio,
+        pfrom->GetLogName());
 
-        // Update run-time statistics of graphene block bandwidth savings.
-        // We add the original graphene block size with the size of transactions that were re-requested.
-        // This is NOT double counting since we never accounted for the original graphene block due to the re-request.
-        graphenedata.UpdateInBound(nSizeGrapheneBlockTx + GetSize(), blockSize);
-        LOG(GRAPHENE, "Graphene block stats: %s\n", graphenedata.ToString());
+    // Update run-time statistics of graphene block bandwidth savings.
+    // We add the original graphene block size with the size of transactions that were re-requested.
+    // This is NOT double counting since we never accounted for the original graphene block due to the re-request.
+    graphenedata.UpdateInBound(nSizeGrapheneBlockTx + GetSize(), blockSize);
+    LOG(GRAPHENE, "Graphene block stats: %s\n", graphenedata.ToString());
 
-        PV->HandleBlockMessage(pfrom, command, pblock, inv2);
-    }
+    PV->HandleBlockMessage(pfrom, command, pblock, inv2);
 
     return true;
 }
@@ -325,19 +320,8 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         mapPartialTxHash.insert(std::make_pair(cheapHash, txRef));
     }
 
-    int missingCount = 0;
     grapheneBlock->ValidateAndRecontructBlock(
-        missingCount, grapheneBlockTx.blockhash, pblock, mapPartialTxHash, strCommand, pfrom, vRecv);
-
-    // If we're still missing transactions then bail out and request the failover block. This should never
-    // happen unless we're under some kind of attack or somehow we lost transactions out of our memory pool
-    // while we were retreiving missing transactions.
-    if (missingCount > 0)
-    {
-        RequestFailoverBlock(pfrom, backup);
-        return error("Still missing transactions after reconstructing block, peer=%s: re-requesting failover block",
-            pfrom->GetLogName());
-    }
+        grapheneBlockTx.blockhash, pblock, mapPartialTxHash, strCommand, pfrom, vRecv);
 
     return true;
 }
@@ -625,7 +609,6 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     pfrom->gr_shorttxidk1.store(shorttxidk1);
 
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
-    int missingCount = 0;
     bool fRequestFailureRecovery = false;
     std::set<uint256> passingTxHashes;
     std::map<uint64_t, CTransactionRef> mapPartialTxHash;
@@ -710,7 +693,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
                 fMerkleRootCorrect = false;
             else
             {
-                if (!ReconstructBlock(pfrom, missingCount, pblock, mapPartialTxHash))
+                if (!ReconstructBlock(pfrom, pblock, mapPartialTxHash))
                     return false;
             }
         }
@@ -736,7 +719,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
             "Mismatched merkle root on grapheneblock: requesting failover block, peer=%s", pfrom->GetLogName());
     }
 
-    this->nWaitingFor = missingCount;
+    this->nWaitingFor = setHashesToRequest.size();
     LOG(GRAPHENE, "Graphene block waiting for: %d, total txns: %d received txns: %d\n", this->nWaitingFor,
         pblock->vtx.size(), grapheneBlock->mapMissingTx.size());
 
@@ -752,14 +735,6 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
         graphenedata.UpdateInBoundReRequestedTx(grapheneBlock->nWaitingFor);
 
         return true;
-    }
-
-    // If there are still any missing transactions then we must clear out the graphene block data
-    // and re-request failover block (This should never happen because we just checked the various pools).
-    if (missingCount > 0)
-    {
-        RequestFailureRecovery(pfrom, grapheneBlock, vSenderFilterPositiveHahses);
-        return error("Still missing transactions for graphene block: re-requesting failover block");
     }
 
     // We now have all the transactions that are in this block
@@ -783,7 +758,6 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
 }
 
 static bool ReconstructBlock(CNode *pfrom,
-    int &missingCount,
     std::shared_ptr<CBlockThinRelay> pblock,
     std::map<uint64_t, CTransactionRef> mapTxFromPools)
 {
@@ -1571,18 +1545,8 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
         return true;
     }
 
-    int missingCount = 0;
     pblock->grapheneblock->ValidateAndRecontructBlock(
-        missingCount, recoveryResponse.blockhash, pblock, mapTxFromPools, NetMsgType::GRAPHENE_RECOVERY, pfrom, vRecv);
-
-    if (missingCount > 0)
-    {
-        // This should never happen except in the event of attack or lost transactions from memory pool.
-        RequestFailoverBlock(pfrom, pblock);
-        return error("Failure recovery still missing transactions after reconstructing block from peer=%s: requesting "
-                     "failover block",
-            pfrom->GetLogName());
-    }
+        recoveryResponse.blockhash, pblock, mapTxFromPools, NetMsgType::GRAPHENE_RECOVERY, pfrom, vRecv);
 
     return true;
 }
