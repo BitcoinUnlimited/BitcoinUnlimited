@@ -80,7 +80,7 @@ static void InitMessage(const std::string &message) { LOGA("init message: %s\n",
  */
 static std::string Translate(const char *psz)
 {
-    return QCoreApplication::translate("bitcoin-unlimited", psz).toStdString();
+    return QCoreApplication::translate("bch-unlimited", psz).toStdString();
 }
 
 static QString GetLangTerritory()

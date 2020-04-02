@@ -262,7 +262,7 @@
         <translation>Abrir y url...</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited client</source>
+        <source>BCH Unlimited client</source>
         <translation>cliente bitcoin core</translation>
     </message>
     <message>
@@ -310,8 +310,8 @@
         <translation>y recibir</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Unlimited</source>
-        <translation>Mostrar informacion sobre Bitcoin Unlimited</translation>
+        <source>Show information about BCH Unlimited</source>
+        <translation>Mostrar informacion sobre BCH Unlimited</translation>
     </message>
     <message>
         <source>&amp;Show / Hide</source>
@@ -338,7 +338,7 @@
         <translation>Barra de pestañas</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>bitcoin core</translation>
     </message>
     <message>
@@ -346,11 +346,11 @@
         <translation>Pide pagos (genera codigos QR and %1 URls)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Unlimited</source>
-        <translation>&amp;Sobre Bitcoin Unlimited</translation>
+        <source>&amp;About BCH Unlimited</source>
+        <translation>&amp;Sobre BCH Unlimited</translation>
     </message>
     <message>
-        <source>Modify configuration options for Bitcoin Unlimited</source>
+        <source>Modify configuration options for BCH Unlimited</source>
         <translation>Modifica las opciones para BitCoin Core</translation>
     </message>
     <message>
@@ -538,7 +538,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>bitcoin core</translation>
     </message>
     <message>
@@ -561,7 +561,7 @@
         <translation>bienvenido</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>bitcoin core</translation>
     </message>
     <message>
@@ -1072,7 +1072,7 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>bitcoin core</translation>
     </message>
     <message>

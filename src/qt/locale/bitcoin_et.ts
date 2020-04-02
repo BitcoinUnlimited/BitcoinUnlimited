@@ -326,11 +326,11 @@
         <translation>Vahelehe tööriistariba</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>Bitcoini tuumik</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Unlimited</source>
+        <source>&amp;About BCH Unlimited</source>
         <translation>Kirjeldus Bitcoini Tuumast</translation>
     </message>
     <message>
@@ -599,7 +599,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>Bitcoini tuumik</translation>
     </message>
     <message>
@@ -607,7 +607,7 @@
         <translation>versioon</translation>
     </message>
     <message>
-        <source>About Bitcoin Unlimited</source>
+        <source>About BCH Unlimited</source>
         <translation>Kirjeldus Bitcoini Tuumast</translation>
     </message>
     <message>
@@ -630,7 +630,7 @@
         <translation>Teretulemast</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>Bitcoini tuumik</translation>
     </message>
     <message>
@@ -1298,11 +1298,11 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>Bitcoini tuumik</translation>
     </message>
     <message>
-        <source>The Bitcoin Unlimited developers</source>
+        <source>The BCH Unlimited developers</source>
         <translation>Bitcoini Tuuma arendajad</translation>
     </message>
     <message>

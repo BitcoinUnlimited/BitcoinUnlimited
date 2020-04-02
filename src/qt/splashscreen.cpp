@@ -42,7 +42,7 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
 #endif
 
     // define text to place
-    QString titleText = tr("Bitcoin Unlimited Bitcoin Cash");
+    QString titleText = tr("BCH Unlimited");
     // create a bitmap according to device pixelratio
     QPixmap splash(":/images/splash");
     QSize splashPixSize = splash.size();

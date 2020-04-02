@@ -290,7 +290,7 @@
         <translation>Malfermi &amp;URI-on...</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited client</source>
+        <source>BCH Unlimited client</source>
         <translation>kliento de bitmon-kerno</translation>
     </message>
     <message>
@@ -342,7 +342,7 @@
         <translation>&amp;Ricevi</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Unlimited</source>
+        <source>Show information about BCH Unlimited</source>
         <translation>Vidigi informon pri Bitmona Kerno</translation>
     </message>
     <message>
@@ -382,7 +382,7 @@
         <translation>Langeto-breto</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>Kerno de Bitmono</translation>
     </message>
     <message>
@@ -390,7 +390,7 @@
         <translation>Peti pagon (kreas QR-kodojn kaj URI-ojn kun prefikso %1)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Unlimited</source>
+        <source>&amp;About BCH Unlimited</source>
         <translation>&amp;Pri la Bitmona Kerno</translation>
     </message>
     <message>
@@ -803,7 +803,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>Kerno de Bitmono</translation>
     </message>
     <message>
@@ -811,7 +811,7 @@
         <translation>versio</translation>
     </message>
     <message>
-        <source>About Bitcoin Unlimited</source>
+        <source>About BCH Unlimited</source>
         <translation>Pri la Bitmona Kerno</translation>
     </message>
     <message>
@@ -838,16 +838,16 @@
         <translation>Bonvenon</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Unlimited.</source>
-        <translation>Bonvenon al la bitmona kerno, Bitcoin Unlimited.</translation>
+        <source>Welcome to BCH Unlimited.</source>
+        <translation>Bonvenon al la bitmona kerno, BCH Unlimited.</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Unlimited will store its data.</source>
-        <translation>Dum tiu ĉi unua uzo de la programo, vi povas elekti lokon, kie Bitcoin Unlimited stokos siajn datumojn.</translation>
+        <source>As this is the first time the program is launched, you can choose where BCH Unlimited will store its data.</source>
+        <translation>Dum tiu ĉi unua uzo de la programo, vi povas elekti lokon, kie BCH Unlimited stokos siajn datumojn.</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
-        <translation>Bitcoin Unlimited elŝutos kaj konservos kopion de la bitmona blokĉeno. Almenaŭ %1GB da datumoj konserviĝos en tiu loko, kaj tio poiome kreskos. Ankaŭ via monujo konserviĝos en tiu dosierujo.</translation>
+        <source>BCH Unlimited will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <translation>BCH Unlimited elŝutos kaj konservos kopion de la bitmona blokĉeno. Almenaŭ %1GB da datumoj konserviĝos en tiu loko, kaj tio poiome kreskos. Ankaŭ via monujo konserviĝos en tiu dosierujo.</translation>
     </message>
     <message>
         <source>Use the default data directory</source>
@@ -858,7 +858,7 @@
         <translation>Uzi alian dosierujon por datumoj:</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>Kerno de Bitmono</translation>
     </message>
     <message>
@@ -1806,11 +1806,11 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>Kerno de Bitmono</translation>
     </message>
     <message>
-        <source>The Bitcoin Unlimited developers</source>
+        <source>The BCH Unlimited developers</source>
         <translation>La programistoj de Bitmona Kerno</translation>
     </message>
     <message>
