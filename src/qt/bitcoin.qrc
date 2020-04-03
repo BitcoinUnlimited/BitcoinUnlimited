@@ -1,6 +1,6 @@
 <!DOCTYPE RCC><RCC version="1.0">
     <qresource prefix="/images">
-        <file alias="splash">res/images/splashscreen.png</file>    
+        <file alias="splash">res/images/splashscreen.png</file>
     </qresource>
     <qresource prefix="/icons">
         <file alias="bitcoin">res/icons/bitcoin.png</file>
