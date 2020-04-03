@@ -627,12 +627,15 @@ class RPCTestHandler:
 
                     # This is a list of expected messages on stderr. If they appear, they do not
                     # necessarily indicate final failure of a test.
+
+                    # These 2 are due to accidental port conflicts caused by running multiple tests simultaneously.
                     stderr_filtered = stderr.replace("Error: Unable to start HTTP server. See debug log for details.", "")
+                    stderr_filtered = stderr.replace("Error: Unable to start RPC services. See debug log for details.", "")
+
                     stderr_filtered = re.sub(r"Error: Unable to bind to 0.0.0.0:[0-9]+ on this computer\. BCH Unlimited is probably already running\.",
                                              "", stderr_filtered)
                     invalid_index = re.compile(r'.*?\n.*?EXCEPTION.*?\n.*?invalid index for tx.*?\n.*?ProcessMessages.*?\n', re.MULTILINE)
                     stderr_filtered = invalid_index.sub("", stderr_filtered)
-
                     stderr_filtered = stderr_filtered.replace("Error: Failed to listen on any port. Use -listen=0 if you want this.", "")
                     stderr_filtered = stderr_filtered.replace("Error: Failed to listen on all P2P ports. Failing as requested by -bindallorfail.", "")
                     stderr_filtered = stderr_filtered.replace(" ", "")
