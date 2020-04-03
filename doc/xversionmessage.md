@@ -179,19 +179,19 @@ document.
 
 The implementations listed here should use the following prefixes:
 
-`ABC               0x0000`
-`bcash             0x0001`
-`BU                0x0002`
-`XT                0x0003`
-`bchd              0x0004`
-`bitcore           0x0005`
-`bitprim           0x0006`
-`Parity Cash       0x0007`
+`ABC                0x0000`
+`BCHN               0x0001`
+`BU                 0x0002`
+`bchd               0x0003`
+`Bitcoin Verde      0x0004`
+`k-nuth             0x0005`
 
 
 An implementation not listed here, but wanting to extend the `xversion`
 map can pick an unused prefix but is strongly suggested to communicate
-the choice with the rest of the teams as early as possible.
+the choice with the rest of the teams as early as possible. It is also
+strongly suggested to communicate with the rest of the teams before
+removing an implementation from this list.
 
 Experimental or temporary features should use the `0x1000` prefix.
 
