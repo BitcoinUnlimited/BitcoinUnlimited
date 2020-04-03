@@ -999,7 +999,7 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
             if (node->nPingNonceSent > 0 && node->nPingUsecTime == 0 &&
                 ((GetStopwatchMicros() - node->nStopwatchConnected) > 60 * 1000000))
             {
-                LOG(NET, "node %s evicted, slow ping\n", node->GetLogName());
+                LOG(EVICT, "node %s evicted, slow ping\n", node->GetLogName());
                 node->fDisconnect = true;
                 return true;
             }
