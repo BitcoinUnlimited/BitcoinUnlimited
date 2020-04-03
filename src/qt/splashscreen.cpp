@@ -29,9 +29,9 @@
 
 SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) : QWidget(0, f), curAlignment(0)
 {
-    int TEXTX = 260;
-    int VERY = 150;
-    // int COPYRIGHTY = 180;
+    // x=0, y=0 is the upper left corner
+    int TEXTX = 65;
+    int VERY = 230;
     int NETY = 250;
 
     // set reference point, paddings
