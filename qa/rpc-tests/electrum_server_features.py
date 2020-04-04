@@ -6,6 +6,12 @@ from test_framework.loginit import logging
 from test_framework.electrumutil import bitcoind_electrum_args, \
     create_electrum_connection
 
+def versiontuple(v):
+    v = tuple(map(int, (v.split("."))))
+    if len(v) == 2:
+        v = v + (0,)
+    return v
+
 class ElectrumBasicTests(BitcoinTestFramework):
 
     def __init__(self):
@@ -26,8 +32,8 @@ class ElectrumBasicTests(BitcoinTestFramework):
         # Keys that the server MUST support
         assert_equal(n.getblockhash(0), res['genesis_hash'])
         assert_equal("sha256", res['hash_function'])
-        assert(float(res['protocol_min']) > 1)
-        assert(float(res['protocol_max']) >= 1.4)
+        assert(versiontuple(res['protocol_min']) >= versiontuple("1.4"))
+        assert(versiontuple(res['protocol_max']) >= versiontuple("1.4"))
         assert(len(res['server_version']))
 
 if __name__ == '__main__':
