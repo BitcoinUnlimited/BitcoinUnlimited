@@ -803,7 +803,7 @@ static bool ReconstructBlock(CNode *pfrom,
         toVerify.insert(kv.second->GetHash());
     }
 
-    // Locate each transaction in prepoulated mapTxFromPools.
+    // Locate each transaction in pre-populated mapTxFromPools.
     int idx = -1;
     CTransactionRef ptx = nullptr;
     for (const uint256 &hash : grapheneBlock->vTxHashes256)
