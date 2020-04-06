@@ -29,9 +29,9 @@
 
 SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) : QWidget(0, f), curAlignment(0)
 {
-    int TEXTX = 260;
-    int VERY = 150;
-    // int COPYRIGHTY = 180;
+    // x=0, y=0 is the upper left corner
+    int TEXTX = 65;
+    int VERY = 230;
     int NETY = 250;
 
     // set reference point, paddings
@@ -71,8 +71,6 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
     pixPaint.drawPixmap(QRect(QPoint(0, 0), splashSize), splash);
 
     pixPaint.setFont(QFont(font, 16 * fontFactor));
-    // QFontMetrics fm = pixPaint.fontMetrics();
-    // int versionTextWidth = fm.width(versionText);
     pixPaint.drawText(TEXTX * devicePixelRatio, VERY * devicePixelRatio, versionText);
 
     // draw additional text if special network
@@ -80,25 +78,8 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
     {
         pixPaint.setFont(QFont(font, 40 * fontFactor));
         pixPaint.setPen(QColor(200, 0, 0));
-        // fm = pixPaint.fontMetrics();
-        // versionTextWidth = fm.width(versionText);
         pixPaint.drawText(TEXTX * devicePixelRatio, NETY * devicePixelRatio, titleAddText);
     }
-
-#if 0 // I don't think we need copyright on the splash screen but leaving this here for later
-    QString copyrightText =
-        QString::fromUtf8(CopyrightHolders(strprintf("\xc2\xA9 %u-%u ", 2009, COPYRIGHT_YEAR)).c_str());
-
-    // draw copyright stuff
-    {
-        pixPaint.setFont(QFont(font, 10 * fontFactor));
-        pixPaint.setPen(QColor(100, 100, 100));
-        const int x = TEXTX;
-        const int y = COPYRIGHTY;
-        QRect copyrightRect(x, y, pixmap.width() - x - paddingRight, pixmap.height() - y);
-        pixPaint.drawText(copyrightRect, Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap, copyrightText);
-    }
-#endif
 
     pixPaint.end();
 
@@ -126,7 +107,7 @@ static void InitMessage(SplashScreen *splash, const std::string &message)
 {
     QMetaObject::invokeMethod(splash, "showMessage", Qt::QueuedConnection,
         Q_ARG(QString, QString::fromStdString(message)), Q_ARG(int, Qt::AlignBottom | Qt::AlignHCenter),
-        Q_ARG(QColor, QColor(55, 55, 55)));
+        Q_ARG(QColor, QColor(255, 255, 255)));
 }
 
 static void ShowProgress(SplashScreen *splash, const std::string &title, int nProgress)
