@@ -126,7 +126,7 @@ public:
     // in the block
     bool ValidateAndRecontructBlock(uint256 blockhash,
         std::shared_ptr<CBlockThinRelay> pblock,
-        const std::map<uint64_t, CTransactionRef> mapMissingTx,
+        const std::map<uint64_t, CTransactionRef> &mapMissingTx,
         std::string command,
         CNode *pfrom,
         CDataStream &vRecv);
