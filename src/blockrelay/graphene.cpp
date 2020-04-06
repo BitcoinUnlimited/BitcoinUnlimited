@@ -26,7 +26,7 @@
 #include <iomanip>
 static bool ReconstructBlock(CNode *pfrom,
     std::shared_ptr<CBlockThinRelay> pblock,
-    std::map<uint64_t, CTransactionRef> mapTxFromPools);
+    const std::map<uint64_t, CTransactionRef> mapTxFromPools);
 extern CTweak<uint64_t> grapheneMinVersionSupported;
 extern CTweak<uint64_t> grapheneMaxVersionSupported;
 extern CTweak<uint64_t> grapheneFastFilterCompatibility;
@@ -158,7 +158,7 @@ void CGrapheneBlock::OrderTxHashes(CNode *pfrom)
 
 bool CGrapheneBlock::ValidateAndRecontructBlock(uint256 blockhash,
     std::shared_ptr<CBlockThinRelay> pblock,
-    std::map<uint64_t, CTransactionRef> mapCheapHashTx,
+    const std::map<uint64_t, CTransactionRef> mapCheapHashTx,
     std::string command,
     CNode *pfrom,
     CDataStream &vRecv)
@@ -759,7 +759,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
 
 static bool ReconstructBlock(CNode *pfrom,
     std::shared_ptr<CBlockThinRelay> pblock,
-    std::map<uint64_t, CTransactionRef> mapTxFromPools)
+    const std::map<uint64_t, CTransactionRef> mapTxFromPools)
 {
     std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
 
@@ -811,10 +811,11 @@ static bool ReconstructBlock(CNode *pfrom,
         idx++;
         uint64_t nShortId = GetShortID(
             pfrom->gr_shorttxidk0.load(), pfrom->gr_shorttxidk1.load(), hash, NegotiateGrapheneVersion(pfrom));
-        ptx = mapTxFromPools[nShortId];
+        const auto iter = mapTxFromPools.find(nShortId);
 
-        if (ptx != nullptr)
+        if (iter != mapTxFromPools.end())
         {
+            ptx = iter->second;
             pblock->vtx[idx] = ptx;
         }
         else
