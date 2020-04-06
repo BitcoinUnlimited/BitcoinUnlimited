@@ -40,6 +40,10 @@ public:
     CCriticalSection cs_reconstruct;
     CCriticalSection cs_graphene_sender;
 
+    // put a cap on the total number of thin type blocks we can have in flight. This lowers any possible
+    // attack surface.
+    size_t MAX_THINTYPE_BLOCKS_IN_FLIGHT = 6;
+
 private:
     // block relay timer
     CCriticalSection cs_blockrelaytimer;
@@ -51,10 +55,6 @@ private:
     // blocks that are currently being reconstructed.
     std::map<NodeId, std::map<uint256, std::shared_ptr<CBlockThinRelay> > > mapBlocksReconstruct GUARDED_BY(
         cs_reconstruct);
-
-    // put a cap on the total number of thin type blocks we can have in flight. This lowers any possible
-    // attack surface.
-    size_t MAX_THINTYPE_BLOCKS_IN_FLIGHT = 6;
 
     // Counters for how many of each peer are currently connected.  We use the set to store the
     // nodeid so that we can then get a unique count of peers with with to update the atomic counters.
