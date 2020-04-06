@@ -308,6 +308,8 @@ void CDoSManager::UpdateMisbehavior(CNode *pNode)
     while (true)
     {
         double nOldMisBehavior = pNode->nMisbehavior.load();
+        if (nOldMisBehavior == 0.0)
+            break;
         double nNewMisBehavior =
             nOldMisBehavior * pow(1.0 - 1.0 / 14400, (double)(nNow - pNode->nLastMisbehaviorTime.load()));
         if (pNode->nMisbehavior.compare_exchange_weak(nOldMisBehavior, nNewMisBehavior))
