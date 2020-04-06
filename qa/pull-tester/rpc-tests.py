@@ -510,8 +510,8 @@ class RPCTestHandler:
         self.num_running = 0
         # In case there is a graveyard of zombie bitcoinds, we can apply a
         # pseudorandom offset to hopefully jump over them.
-        # (625 is PORT_RANGE/MAX_NODES)
-        self.portseed_offset = int(time.time() * 1000) % 625
+        # 3750 is PORT_RANGE/MAX_NODES defined in util, but awkward to import into rpc-test.py
+        self.portseed_offset = int(time.time() * 1000) % 3750
         self.jobs = []
 
     def get_next(self):
