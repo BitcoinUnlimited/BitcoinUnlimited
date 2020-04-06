@@ -76,6 +76,7 @@ public:
     std::vector<uint256> vTxHashes256; // List of all 256 bit transaction hashes in the block
     std::map<uint64_t, CTransactionRef> mapMissingTx; // Map of transactions that were re-requested
     std::vector<CTransactionRef> vAdditionalTxs; // vector of transactions receiver probably does not have
+    std::set<CTransactionRef> vRecoveredTxs; // set of transactions collected during failure recovery
     std::map<uint64_t, uint32_t> mapHashOrderIndex;
 
 public:
@@ -123,10 +124,9 @@ public:
 
     // Validates header and, if possible, determines if there are any missing or unnecessary transactions
     // in the block
-    bool ValidateAndRecontructBlock(int &missingCount,
-        int &unnecessaryCount,
-        uint256 blockhash,
+    bool ValidateAndRecontructBlock(uint256 blockhash,
         std::shared_ptr<CBlockThinRelay> pblock,
+        const std::map<uint64_t, CTransactionRef> &mapMissingTx,
         std::string command,
         CNode *pfrom,
         CDataStream &vRecv);
@@ -199,10 +199,10 @@ public:
 
     CInv GetInv() { return CInv(MSG_BLOCK, header.GetHash()); }
     bool process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> pblock);
-    void FillTxMapFromPools(std::map<uint64_t, uint256> &mapTxFromPools);
+    void FillTxMapFromPools(std::map<uint64_t, CTransactionRef> &mapTxFromPools);
     void SituateCoinbase(std::vector<uint64_t> blockCheapHashes, CTransactionRef coinbase, uint64_t grapheneVersion);
     void SituateCoinbase(CTransactionRef coinbase);
-    std::set<uint64_t> UpdateResolvedTxsAndIdentifyMissing(const std::map<uint64_t, uint256> &mapPartialTxHash,
+    std::set<uint64_t> UpdateResolvedTxsAndIdentifyMissing(const std::map<uint64_t, CTransactionRef> &mapPartialTxHash,
         const std::vector<uint64_t> &blockCheapHashes,
         uint64_t grapheneVersion);
     bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state);

@@ -25,9 +25,8 @@
 
 #include <iomanip>
 static bool ReconstructBlock(CNode *pfrom,
-    int &missingCount,
-    int &unnecessaryCount,
-    std::shared_ptr<CBlockThinRelay> pblock);
+    std::shared_ptr<CBlockThinRelay> pblock,
+    const std::map<uint64_t, CTransactionRef> &mapTxFromPools);
 extern CTweak<uint64_t> grapheneMinVersionSupported;
 extern CTweak<uint64_t> grapheneMaxVersionSupported;
 extern CTweak<uint64_t> grapheneFastFilterCompatibility;
@@ -157,10 +156,9 @@ void CGrapheneBlock::OrderTxHashes(CNode *pfrom)
     }
 }
 
-bool CGrapheneBlock::ValidateAndRecontructBlock(int &missingCount,
-    int &unnecessaryCount,
-    uint256 blockhash,
+bool CGrapheneBlock::ValidateAndRecontructBlock(uint256 blockhash,
     std::shared_ptr<CBlockThinRelay> pblock,
+    const std::map<uint64_t, CTransactionRef> &mapCheapHashTx,
     std::string command,
     CNode *pfrom,
     CDataStream &vRecv)
@@ -183,34 +181,31 @@ bool CGrapheneBlock::ValidateAndRecontructBlock(int &missingCount,
     // Look for each transaction in our various pools and buffers.
     // With grapheneBlocks recovered txs contains only the first 8 bytes of the tx hash.
     {
-        if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
+        if (!ReconstructBlock(pfrom, pblock, mapCheapHashTx))
             return false;
     }
 
-    if (missingCount <= 0)
-    {
-        // We have all the transactions now that are in this block: try to reassemble and process.
-        CInv inv2(MSG_BLOCK, blockhash);
+    // We have all the transactions now that are in this block: try to reassemble and process.
+    CInv inv2(MSG_BLOCK, blockhash);
 
-        // for compression statistics, we have to add up the size of grapheneblock and the re-requested grapheneBlockTx.
-        uint64_t nSizeGrapheneBlockTx = msgSize;
-        uint64_t blockSize = pblock->GetBlockSize();
-        float nCompressionRatio = 0.0;
-        if (GetSize() + nSizeGrapheneBlockTx > 0)
-            nCompressionRatio = (float)blockSize / ((float)GetSize() + (float)nSizeGrapheneBlockTx);
-        LOG(GRAPHENE, "Reassembled grblktx for %s (%d bytes). Message was %d bytes (graphene block) and %d bytes "
-                      "(re-requested tx), compression ratio %3.2f, peer=%s\n",
-            pblock->GetHash().ToString(), blockSize, GetSize(), nSizeGrapheneBlockTx, nCompressionRatio,
-            pfrom->GetLogName());
+    // for compression statistics, we have to add up the size of grapheneblock and the re-requested grapheneBlockTx.
+    uint64_t nSizeGrapheneBlockTx = msgSize;
+    uint64_t blockSize = pblock->GetBlockSize();
+    float nCompressionRatio = 0.0;
+    if (GetSize() + nSizeGrapheneBlockTx > 0)
+        nCompressionRatio = (float)blockSize / ((float)GetSize() + (float)nSizeGrapheneBlockTx);
+    LOG(GRAPHENE, "Reassembled grblktx for %s (%d bytes). Message was %d bytes (graphene block) and %d bytes "
+                  "(re-requested tx), compression ratio %3.2f, peer=%s\n",
+        pblock->GetHash().ToString(), blockSize, GetSize(), nSizeGrapheneBlockTx, nCompressionRatio,
+        pfrom->GetLogName());
 
-        // Update run-time statistics of graphene block bandwidth savings.
-        // We add the original graphene block size with the size of transactions that were re-requested.
-        // This is NOT double counting since we never accounted for the original graphene block due to the re-request.
-        graphenedata.UpdateInBound(nSizeGrapheneBlockTx + GetSize(), blockSize);
-        LOG(GRAPHENE, "Graphene block stats: %s\n", graphenedata.ToString());
+    // Update run-time statistics of graphene block bandwidth savings.
+    // We add the original graphene block size with the size of transactions that were re-requested.
+    // This is NOT double counting since we never accounted for the original graphene block due to the re-request.
+    graphenedata.UpdateInBound(nSizeGrapheneBlockTx + GetSize(), blockSize);
+    LOG(GRAPHENE, "Graphene block stats: %s\n", graphenedata.ToString());
 
-        PV->HandleBlockMessage(pfrom, command, pblock, inv2);
-    }
+    PV->HandleBlockMessage(pfrom, command, pblock, inv2);
 
     return true;
 }
@@ -297,20 +292,36 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     LOG(GRAPHENE, "Got %d Re-requested txs from peer=%s\n", grapheneBlockTx.vMissingTx.size(), pfrom->GetLogName());
 
-    int missingCount = 0;
-    int unnecessaryCount = 0;
-    grapheneBlock->ValidateAndRecontructBlock(
-        missingCount, unnecessaryCount, grapheneBlockTx.blockhash, pblock, strCommand, pfrom, vRecv);
+    std::map<uint64_t, CTransactionRef> mapPartialTxHash;
+    grapheneBlock->FillTxMapFromPools(mapPartialTxHash);
 
-    // If we're still missing transactions then bail out and request the failover block. This should never
-    // happen unless we're under some kind of attack or somehow we lost transactions out of our memory pool
-    // while we were retreiving missing transactions.
-    if (missingCount > 0)
+    // Add full transactions included in the block
+    for (auto &tx : grapheneBlock->vAdditionalTxs)
     {
-        RequestFailoverBlock(pfrom, backup);
-        return error("Still missing transactions after reconstructing block, peer=%s: re-requesting failover block",
-            pfrom->GetLogName());
+        const uint256 &hash = tx->GetHash();
+        uint64_t cheapHash = grapheneBlock->pGrapheneSet->GetShortID(hash);
+        mapPartialTxHash.insert(std::make_pair(cheapHash, tx));
     }
+
+    // Add full transactions collected during failure recovery
+    for (auto &tx : grapheneBlock->vRecoveredTxs)
+    {
+        const uint256 &hash = tx->GetHash();
+        uint64_t cheapHash = grapheneBlock->pGrapheneSet->GetShortID(hash);
+        mapPartialTxHash.insert(std::make_pair(cheapHash, tx));
+    }
+
+    // Add full transactions from grapheneBlockTx.vMissingTx
+    for (auto &tx : grapheneBlockTx.vMissingTx)
+    {
+        CTransactionRef txRef = MakeTransactionRef(tx);
+        const uint256 &hash = tx.GetHash();
+        uint64_t cheapHash = grapheneBlock->pGrapheneSet->GetShortID(hash);
+        mapPartialTxHash.insert(std::make_pair(cheapHash, txRef));
+    }
+
+    grapheneBlock->ValidateAndRecontructBlock(
+        grapheneBlockTx.blockhash, pblock, mapPartialTxHash, strCommand, pfrom, vRecv);
 
     return true;
 }
@@ -477,26 +488,33 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
     return result;
 }
 
-void CGrapheneBlock::FillTxMapFromPools(std::map<uint64_t, uint256> &mapTxFromPools)
+void CGrapheneBlock::FillTxMapFromPools(std::map<uint64_t, CTransactionRef> &mapTxFromPools)
 {
+    {
+        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        for (auto &kv : *txCommitQ)
+        {
+            uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, kv.first, version);
+            mapTxFromPools.insert(std::make_pair(cheapHash, kv.second.entry.GetSharedTx()));
+        }
+    }
+
     {
         READLOCK(orphanpool.cs_orphanpool);
         for (auto &kv : orphanpool.mapOrphanTransactions)
         {
             uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, kv.first, version);
-            mapTxFromPools.insert(std::make_pair(cheapHash, kv.first));
+            mapTxFromPools.insert(std::make_pair(cheapHash, kv.second.ptx));
         }
     }
 
-    // We don't have to keep the lock on mempool.cs here to do mempool.queryHashes
-    // but we take the lock anyway so we don't have to re-lock again later.
     std::vector<uint256> memPoolHashes;
     mempool.queryHashes(memPoolHashes);
 
     for (const uint256 &hash : memPoolHashes)
     {
         uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, hash, version);
-        mapTxFromPools.insert(std::make_pair(cheapHash, hash));
+        mapTxFromPools.insert(std::make_pair(cheapHash, mempool.get(hash)));
     }
 }
 
@@ -531,7 +549,7 @@ void CGrapheneBlock::SituateCoinbase(CTransactionRef coinbase)
 }
 
 std::set<uint64_t> CGrapheneBlock::UpdateResolvedTxsAndIdentifyMissing(
-    const std::map<uint64_t, uint256> &mapPartialTxHash,
+    const std::map<uint64_t, CTransactionRef> &mapPartialTxHash,
     const std::vector<uint64_t> &blockCheapHashes,
     uint64_t grapheneVersion)
 {
@@ -551,9 +569,9 @@ std::set<uint64_t> CGrapheneBlock::UpdateResolvedTxsAndIdentifyMissing(
         const auto &elem = mapPartialTxHash.find(cheapHash);
         if (elem != mapPartialTxHash.end())
         {
-            const auto repeat = std::find(vTxHashes256.begin(), vTxHashes256.end(), elem->second);
+            const auto repeat = std::find(vTxHashes256.begin(), vTxHashes256.end(), elem->second->GetHash());
             if (repeat == vTxHashes256.end())
-                vTxHashes256.push_back(elem->second);
+                vTxHashes256.push_back(elem->second->GetHash());
         }
         else
         {
@@ -591,11 +609,9 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
     pfrom->gr_shorttxidk1.store(shorttxidk1);
 
     // Create a map of all 8 bytes tx hashes pointing to their full tx hash counterpart
-    int missingCount = 0;
-    int unnecessaryCount = 0;
     bool fRequestFailureRecovery = false;
     std::set<uint256> passingTxHashes;
-    std::map<uint64_t, uint256> mapPartialTxHash;
+    std::map<uint64_t, CTransactionRef> mapPartialTxHash;
     std::set<uint64_t> setHashesToRequest;
     std::vector<uint256> vSenderFilterPositiveHahses;
 
@@ -609,7 +625,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
         {
             const uint256 &hash = tx->GetHash();
             uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, hash, version);
-            mapPartialTxHash.insert(std::make_pair(cheapHash, hash));
+            mapPartialTxHash.insert(std::make_pair(cheapHash, tx));
 
             if (tx->IsCoinBase())
                 coinbase = tx;
@@ -631,11 +647,11 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
             bool grSetComputeOpt = pGrapheneSet->GetComputeOptimized();
             for (const auto &entry : mapPartialTxHash)
             {
-                if ((grSetComputeOpt && pGrapheneSet->GetFastFilter()->contains(entry.second)) ||
-                    (!grSetComputeOpt && pGrapheneSet->GetRegularFilter()->contains(entry.second)))
+                if ((grSetComputeOpt && pGrapheneSet->GetFastFilter()->contains(entry.second->GetHash())) ||
+                    (!grSetComputeOpt && pGrapheneSet->GetRegularFilter()->contains(entry.second->GetHash())))
                 {
                     setSenderFilterPositiveCheapHashes.insert(entry.first);
-                    vSenderFilterPositiveHahses.push_back(entry.second);
+                    vSenderFilterPositiveHahses.push_back(entry.second->GetHash());
                 }
             }
 
@@ -677,7 +693,7 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
                 fMerkleRootCorrect = false;
             else
             {
-                if (!ReconstructBlock(pfrom, missingCount, unnecessaryCount, pblock))
+                if (!ReconstructBlock(pfrom, pblock, mapPartialTxHash))
                     return false;
             }
         }
@@ -703,9 +719,9 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
             "Mismatched merkle root on grapheneblock: requesting failover block, peer=%s", pfrom->GetLogName());
     }
 
-    this->nWaitingFor = missingCount;
-    LOG(GRAPHENE, "Graphene block waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n",
-        this->nWaitingFor, unnecessaryCount, pblock->vtx.size(), grapheneBlock->mapMissingTx.size());
+    this->nWaitingFor = setHashesToRequest.size();
+    LOG(GRAPHENE, "Graphene block waiting for: %d, total txns: %d received txns: %d\n", this->nWaitingFor,
+        pblock->vtx.size(), grapheneBlock->mapMissingTx.size());
 
     // If there are any missing hashes or transactions then we request them here.
     // This must be done outside of the mempool.cs lock or may deadlock.
@@ -719,14 +735,6 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
         graphenedata.UpdateInBoundReRequestedTx(grapheneBlock->nWaitingFor);
 
         return true;
-    }
-
-    // If there are still any missing transactions then we must clear out the graphene block data
-    // and re-request failover block (This should never happen because we just checked the various pools).
-    if (missingCount > 0)
-    {
-        RequestFailureRecovery(pfrom, grapheneBlock, vSenderFilterPositiveHahses);
-        return error("Still missing transactions for graphene block: re-requesting failover block");
     }
 
     // We now have all the transactions that are in this block
@@ -750,9 +758,8 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
 }
 
 static bool ReconstructBlock(CNode *pfrom,
-    int &missingCount,
-    int &unnecessaryCount,
-    std::shared_ptr<CBlockThinRelay> pblock)
+    std::shared_ptr<CBlockThinRelay> pblock,
+    const std::map<uint64_t, CTransactionRef> &mapTxFromPools)
 {
     std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
 
@@ -767,99 +774,64 @@ static bool ReconstructBlock(CNode *pfrom,
         }
     }
 
-    std::map<uint256, CTransactionRef> mapAdditionalTxs;
-    {
-        for (auto tx : grapheneBlock->vAdditionalTxs)
-            mapAdditionalTxs[tx->GetHash()] = tx;
-    }
-
     // Add the header size to the current size being tracked
     thinrelay.AddBlockBytes(::GetSerializeSize(pblock->GetBlockHeader(), SER_NETWORK, PROTOCOL_VERSION), pblock);
 
     // If we have incomplete infomation about this block, resize the block transaction count to accomodate new data
     if (pblock->vtx.size() < grapheneBlock->vTxHashes256.size())
         pblock->vtx.resize(grapheneBlock->vTxHashes256.size());
-    // Look for each transaction in our various pools and buffers.
-    // With grapheneBlocks recovered txs contains only the first 8 bytes of the tx hash.
+
+    // Collect hashes of txs that will need to be verified
+    std::set<uint256> toVerify;
+    {
+        READLOCK(orphanpool.cs_orphanpool);
+        for (auto &kv : orphanpool.mapOrphanTransactions)
+        {
+            toVerify.insert(kv.first);
+        }
+    }
+    for (auto &tx : grapheneBlock->vAdditionalTxs)
+    {
+        toVerify.insert(tx->GetHash());
+    }
+    for (auto &tx : grapheneBlock->vRecoveredTxs)
+    {
+        toVerify.insert(tx->GetHash());
+    }
+    for (auto &kv : grapheneBlock->mapMissingTx)
+    {
+        toVerify.insert(kv.second->GetHash());
+    }
+
+    // Locate each transaction in pre-populated mapTxFromPools.
     int idx = -1;
+    CTransactionRef ptx = nullptr;
     for (const uint256 &hash : grapheneBlock->vTxHashes256)
     {
         idx++;
-        // Replace the truncated hash with the full hash value if it exists
-        CTransactionRef ptx = nullptr;
-        if (!hash.IsNull())
+        uint64_t nShortId = GetShortID(
+            pfrom->gr_shorttxidk0.load(), pfrom->gr_shorttxidk1.load(), hash, NegotiateGrapheneVersion(pfrom));
+        const auto iter = mapTxFromPools.find(nShortId);
+
+        if (iter != mapTxFromPools.end())
         {
-            // Check the commit queue first. If we check the mempool first and it's not in there then when we release
-            // the lock on the mempool it may get transfered from the commitQ to the mempool before we have time to
-            // grab the lock on the commitQ and we'll think we don't have the transaction.
-            // the mempool.
-            bool inMemPool = false;
-            bool inCommitQ = false;
-            ptx = CommitQGet(hash);
-            if (ptx)
-            {
-                inCommitQ = true;
-            }
-            else
-            {
-                // if it's not in the mempool then check the commitQ
-                ptx = mempool.get(hash);
-                if (ptx)
-                    inMemPool = true;
-            }
-
-            // Continue checking if we still don't have the txn
-            bool inMissingTx = false;
-            bool inAdditionalTxs = false;
-            bool inOrphanCache = false;
-            if (!ptx)
-            {
-                uint64_t nShortId = GetShortID(
-                    pfrom->gr_shorttxidk0.load(), pfrom->gr_shorttxidk1.load(), hash, NegotiateGrapheneVersion(pfrom));
-
-                std::map<uint256, CTransactionRef>::iterator iter1 = mapAdditionalTxs.find(hash);
-                if (iter1 != mapAdditionalTxs.end())
-                {
-                    inAdditionalTxs = true;
-                    ptx = iter1->second;
-                }
-                else
-                {
-                    std::map<uint64_t, CTransactionRef>::iterator iter2 = grapheneBlock->mapMissingTx.find(nShortId);
-                    if (iter2 != grapheneBlock->mapMissingTx.end())
-                    {
-                        inMissingTx = true;
-                        ptx = iter2->second;
-                    }
-                    else
-                    {
-                        READLOCK(orphanpool.cs_orphanpool);
-                        std::map<uint256, CTxOrphanPool::COrphanTx>::iterator iter3 =
-                            orphanpool.mapOrphanTransactions.find(hash);
-                        if (iter3 != orphanpool.mapOrphanTransactions.end())
-                        {
-                            inOrphanCache = true;
-                            ptx = iter3->second.ptx;
-                        }
-                    }
-                }
-
-                // XVal: these transactions still need to be verified since they were not in the mempool
-                // or CommitQ.
-                if (ptx)
-                    pblock->setUnVerifiedTxns.insert(hash);
-            }
-            if (((inMemPool || inCommitQ) && inMissingTx) || (inOrphanCache && inMissingTx) ||
-                (inAdditionalTxs && inMissingTx))
-                unnecessaryCount++;
+            ptx = iter->second;
+            pblock->vtx[idx] = ptx;
         }
-        if (!ptx)
-            missingCount++;
+        else
+        {
+            thinrelay.ClearAllBlockData(pfrom, grapheneBlock->header.GetHash());
+            return error("Malformed mapTxFromPools, null transaction reference found, peer=%s", pfrom->GetLogName());
+        }
+
+        // XVal: these transactions still need to be verified since they were not in the mempool
+        // or CommitQ.
+        if (toVerify.count(hash) > 0)
+            pblock->setUnVerifiedTxns.insert(hash);
 
         // In order to prevent a memory exhaustion attack we track transaction bytes used to recreate the block
         // in order to see if we've exceeded any limits and if so clear out data and return.
-        if (ptx)
-            thinrelay.AddBlockBytes(ptx->GetTxSize(), pblock);
+        thinrelay.AddBlockBytes(ptx->GetTxSize(), pblock);
         if (pblock->nCurrentBlockSize > thinrelay.GetMaxAllowedBlockSize())
         {
             uint64_t nBlockBytes = pblock->nCurrentBlockSize;
@@ -869,13 +841,9 @@ static bool ReconstructBlock(CNode *pfrom,
                 "Reconstructed block %s (size:%llu) has caused max memory limit %llu bytes to be exceeded, peer=%s",
                 pblock->GetHash().ToString(), nBlockBytes, thinrelay.GetMaxAllowedBlockSize(), pfrom->GetLogName());
         }
-
-        if (ptx != nullptr)
-        {
-            pblock->vtx[idx] = ptx;
-        }
     }
-    // Now that we've rebuild the block successfully we can set the XVal flag which is used in
+
+    // Now that we've rebuilt the block successfully we can set the XVal flag which is used in
     // ConnectBlock() to determine which if any inputs we can skip the checking of inputs.
     pblock->fXVal = true;
 
@@ -1493,7 +1461,7 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
     localIblt.reset();
 
     // Initialize map with txs from various pools
-    std::map<uint64_t, uint256> mapTxFromPools;
+    std::map<uint64_t, CTransactionRef> mapTxFromPools;
     pblock->grapheneblock->FillTxMapFromPools(mapTxFromPools);
 
     // Insert additional txs and identify coinbase
@@ -1503,7 +1471,7 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
         const uint256 &hash = tx->GetHash();
         uint64_t cheapHash = pblock->grapheneblock->pGrapheneSet->GetShortID(hash);
 
-        mapTxFromPools.insert(std::make_pair(cheapHash, hash));
+        mapTxFromPools.insert(std::make_pair(cheapHash, tx));
 
         if (tx->IsCoinBase())
             coinbase = tx;
@@ -1521,8 +1489,11 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
         const uint256 &hash = tx.GetHash();
         uint64_t cheapHash = pblock->grapheneblock->pGrapheneSet->GetShortID(hash);
 
-        mapTxFromPools[cheapHash] = hash;
-        pblock->grapheneblock->mapMissingTx[cheapHash] = MakeTransactionRef(tx);
+        CTransactionRef txRef = MakeTransactionRef(tx);
+        mapTxFromPools.insert(std::make_pair(cheapHash, txRef));
+        pblock->grapheneblock->mapMissingTx[cheapHash] = txRef;
+        // Used during reconstruction if other txs need to be rerequested
+        pblock->grapheneblock->vRecoveredTxs.insert(txRef);
     }
 
     // Determine which txs pass filter and populate IBLT
@@ -1530,9 +1501,9 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
     for (auto &pair : mapTxFromPools)
     {
         if ((pblock->grapheneblock->pGrapheneSet->GetComputeOptimized() &&
-                pblock->grapheneblock->pGrapheneSet->GetFastFilter()->contains(pair.second)) ||
+                pblock->grapheneblock->pGrapheneSet->GetFastFilter()->contains(pair.second->GetHash())) ||
             (!pblock->grapheneblock->pGrapheneSet->GetComputeOptimized() &&
-                pblock->grapheneblock->pGrapheneSet->GetRegularFilter()->contains(pair.second)))
+                pblock->grapheneblock->pGrapheneSet->GetRegularFilter()->contains(pair.second->GetHash())))
         {
             localIblt.insert(pair.first, IBLT_NULL_VALUE);
             setSenderFilterPositiveCheapHashes.insert(pair.first);
@@ -1575,19 +1546,8 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
         return true;
     }
 
-    int missingCount = 0;
-    int unnecessaryCount = 0;
-    pblock->grapheneblock->ValidateAndRecontructBlock(missingCount, unnecessaryCount, recoveryResponse.blockhash,
-        pblock, NetMsgType::GRAPHENE_RECOVERY, pfrom, vRecv);
-
-    if (missingCount > 0)
-    {
-        // This should never happen except in the event of attack or lost transactions from memory pool.
-        RequestFailoverBlock(pfrom, pblock);
-        return error("Failure recovery still missing transactions after reconstructing block from peer=%s: requesting "
-                     "failover block",
-            pfrom->GetLogName());
-    }
+    pblock->grapheneblock->ValidateAndRecontructBlock(
+        recoveryResponse.blockhash, pblock, mapTxFromPools, NetMsgType::GRAPHENE_RECOVERY, pfrom, vRecv);
 
     return true;
 }
