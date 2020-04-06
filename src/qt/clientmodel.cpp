@@ -119,15 +119,6 @@ void ClientModel::updateTimer2()
     graphenedata.FillGrapheneQuickStats(grapheneStats);
     Q_EMIT grapheneBlockPropagationStatsChanged(grapheneStats);
 
-    // Update all misbehaviors
-    {
-        LOCK(cs_vNodes);
-        for (auto pnode : vNodes)
-        {
-            dosMan.UpdateMisbehavior(pnode);
-        }
-    }
-
     uiInterface.BannedListChanged();
 }
 
