@@ -130,13 +130,25 @@ class NodeHandlingTest (BitcoinTestFramework):
         waitFor(10, lambda: self.nodes[1].getinfo()["connections"] == 1)
         waitFor(10, lambda: self.nodes[3].getinfo()["connections"] == 2)
 
-        # Connect one more that the max which causes the first peer to be evicted
+        # Connecting one more than the max which causes the a peer to be evicted
         connect_nodes(self.nodes[2], 3)
-        waitFor(10, lambda: self.nodes[0].getinfo()["connections"] == 0)
-        waitFor(10, lambda: self.nodes[1].getinfo()["connections"] == 1)
+        # one of these 2 nodes should be evicted.  Which one depends on ping times and activity levels
+        waitFor(10, lambda: self.nodes[0].getinfo()["connections"] + self.nodes[1].getinfo()["connections"] == 1)
         waitFor(10, lambda: self.nodes[2].getinfo()["connections"] == 1)
         waitFor(10, lambda: self.nodes[3].getinfo()["connections"] == 2)
 
 
 if __name__ == '__main__':
     NodeHandlingTest ().main ()
+
+
+# Create a convenient function for an interactive python debugging session
+def Test():
+    t = NodeHandlingTest()
+    t.drop_to_pdb = True
+    bitcoinConf = {
+        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
+        "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
+    }
+    flags = standardFlags()
+    t.main(flags, bitcoinConf, None)
