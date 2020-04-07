@@ -254,13 +254,9 @@ class TestManager(object):
             time.sleep(.1)
             waitLoop+=1
             if waitLoop > 50:
-                raise AssertionError("Test malfunction -- connection 0 is has no best block for comparision")
+                raise AssertionError("Test malfunction -- connection 0 has no best block for comparision")
         with mininode_lock:
             if blockhash is None:
-                print("Blockhash is None in check_results")
-                raise AssertionError("Test failed -- passed check_results None as blockhash, was expecting %s" % str(outcome))
-            if cxn0bbh is None:
-                print("connection 0 bestblockhash is None in check_results")
                 raise AssertionError("Test failed -- passed check_results None as blockhash, was expecting %s" % str(outcome))
 
             for c in self.connections:
