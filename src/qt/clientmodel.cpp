@@ -12,6 +12,7 @@
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "clientversion.h"
+#include "dosman.h"
 #include "net.h"
 #include "txmempool.h"
 #include "txorphanpool.h"

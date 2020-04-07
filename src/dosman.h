@@ -66,6 +66,11 @@ public:
      */
     void Misbehaving(NodeId nodeid, int howmuch);
 
+    /** Update the current values of misbehavior by decaying them over a set time period.
+     * @param[in] pNode    The node which is being updated.  No effect if nullptr.
+     */
+    void UpdateMisbehavior(CNode *pNode);
+
     bool IsWhitelistedRange(const CNetAddr &ip);
     void AddWhitelistedRange(const CSubNet &subnet);
 

@@ -58,6 +58,9 @@ extern CTweak<bool> ignoreNetTimeouts;
 // Dump addresses to peers.dat and banlist.dat every 15 minutes (900s)
 #define DUMP_ADDRESSES_INTERVAL 900
 
+// Dump addresses to peers.dat and banlist.dat every 10 seconds
+#define UPDATE_MISBEHAVIOR_INTERVAL 10
+
 // We add a random period time (0 to 1 seconds) to feeler connections to prevent synchronization.
 #define FEELER_SLEEP_WINDOW 1
 
@@ -1947,6 +1950,35 @@ void DumpData(int64_t seconds_between_runs)
     }
 }
 
+void UpdateMisbehaviorPoints(int64_t seconds_between_runs)
+{
+    // Update all misbehaviors
+    while (shutdown_threads.load() == false)
+    {
+        // this has the potential to be a long sleep. so do it in chunks incase of node shutdown
+        int64_t nStart = GetTime();
+        int64_t nEnd = nStart + seconds_between_runs;
+        while (nStart < nEnd)
+        {
+            if (shutdown_threads.load() == true)
+            {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            nStart = GetTime();
+        }
+
+        // Update each peers misbehavior
+        {
+            LOCK(cs_vNodes);
+            for (auto pnode : vNodes)
+            {
+                dosMan.UpdateMisbehavior(pnode);
+            }
+        }
+    }
+}
+
 void static ProcessOneShot()
 {
     string strDest;
@@ -2773,6 +2805,9 @@ void StartNode(thread_group &threadGroup)
 
     // Dump network addresses
     threadGroup.create_thread(&DumpData, DUMP_ADDRESSES_INTERVAL);
+
+    // Update peer misbehavior points
+    threadGroup.create_thread(&UpdateMisbehaviorPoints, UPDATE_MISBEHAVIOR_INTERVAL);
 }
 
 bool StopNode()
@@ -3229,10 +3264,6 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     nAvgBlkResponseTime = -1.0;
     nMaxBlocksInTransit = 16;
 
-    // for misbehavior
-    nMisbehavior = 0;
-    fShouldBan = false;
-
     // For statistics only, BU doesn't support CB protocol
     fSupportsCompactBlocks = false;
 
@@ -3427,13 +3458,13 @@ void CNode::DisconnectIfBanned()
         else if (addr.IsLocal())
         {
             nMisbehavior.store(0);
-            nBanType = (BanReason)-1;
+            nBanType.store(-1);
             LOGA("Warning: not banning local peer %s!\n", GetLogName());
         }
         else
         {
             fDisconnect = true;
-            dosMan.Ban(addr, cleanSubVer, nBanType);
+            dosMan.Ban(addr, cleanSubVer, (BanReason)nBanType.load());
         }
     }
 }

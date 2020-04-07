@@ -182,7 +182,7 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats)
     CNodeStateAccessor state(nodestate, nodeid);
     DbgAssert(state != nullptr, return false);
 
-    stats.nMisbehavior = node->nMisbehavior;
+    stats.nMisbehavior = node->nMisbehavior.load();
     stats.nSyncHeight = state->pindexBestKnownBlock ? state->pindexBestKnownBlock->nHeight : -1;
     stats.nCommonHeight = state->pindexLastCommonBlock ? state->pindexLastCommonBlock->nHeight : -1;
 
