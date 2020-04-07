@@ -568,7 +568,7 @@ public:
 
     // inventory based relay
     CRollingFastFilter<4 * 1024 * 1024> filterInventoryKnown;
-    std::vector<CInv> vInventoryToSend;
+    std::vector<CInv> vInventoryToSend GUARDED_BY(cs_inventory);
     CCriticalSection cs_inventory;
     int64_t nNextInvSend;
     // Used for headers announcements - unfiltered blocks to relay

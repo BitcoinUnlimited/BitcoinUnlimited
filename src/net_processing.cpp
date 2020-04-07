@@ -2604,64 +2604,75 @@ bool SendMessages(CNode *pto)
         //
         // We must send all INV's before returning otherwise, under very heavy transaction rates, we could end up
         // falling behind in sending INV's and vInventoryToSend could possibly get quite large.
-        std::vector<CInv> vInvSend;
-        while (!pto->vInventoryToSend.empty())
+        bool haveInv2Send = false;
         {
-            // Send message INV up to the MAX_INV_TO_SEND. Once we reach the max then send the INV message
-            // and if there is any remaining it will be sent on the next iteration until vInventoryToSend is empty.
-            int nToErase = 0;
+            LOCK(pto->cs_inventory);
+            haveInv2Send = !pto->vInventoryToSend.empty();
+        }
+        std::vector<CInv> vInvSend;
+        FastRandomContext rnd;
+        if (haveInv2Send)
+        {
+            while (1)
             {
-                // BU - here we only want to forward message inventory if our peer has actually been requesting
-                // useful data or giving us useful data.  We give them 2 minutes to be useful but then choke off
-                // their inventory.  This prevents fake peers from connecting and listening to our inventory
-                // while providing no value to the network.
-                // However we will still send them block inventory in the case they are a pruned node or wallet
-                // waiting for block announcements, therefore we have to check each inv in pto->vInventoryToSend.
-                bool fChokeTxInv =
-                    (pto->nActivityBytes == 0 && (GetStopwatchMicros() - pto->nStopwatchConnected) > 120 * 1000000);
-
-                // Find INV's which should be sent, save them to vInvSend, and then erase from vInventoryToSend.
-                int invsz = std::min((int)pto->vInventoryToSend.size(), MAX_INV_TO_SEND);
-                vInvSend.reserve(invsz);
-
-                LOCK(pto->cs_inventory);
-                FastRandomContext rnd;
-                for (const CInv &inv : pto->vInventoryToSend)
+                // Send message INV up to the MAX_INV_TO_SEND. Once we reach the max then send the INV message
+                // and if there is any remaining it will be sent on the next iteration until vInventoryToSend is empty.
+                int nToErase = 0;
                 {
-                    nToErase++;
-                    if (inv.type == MSG_TX)
-                    {
-                        if (fChokeTxInv)
-                            continue;
-                        if ((rnd.rand32() % 100) < randomlyDontInv.Value())
-                            continue;
-                        // skip if we already know about this one
-                        if (pto->filterInventoryKnown.contains(inv.hash))
-                            continue;
-                    }
-                    vInvSend.push_back(inv);
-                    pto->filterInventoryKnown.insert(inv.hash);
+                    // BU - here we only want to forward message inventory if our peer has actually been requesting
+                    // useful data or giving us useful data.  We give them 2 minutes to be useful but then choke off
+                    // their inventory.  This prevents fake peers from connecting and listening to our inventory
+                    // while providing no value to the network.
+                    // However we will still send them block inventory in the case they are a pruned node or wallet
+                    // waiting for block announcements, therefore we have to check each inv in pto->vInventoryToSend.
+                    bool fChokeTxInv =
+                        (pto->nActivityBytes == 0 && (GetStopwatchMicros() - pto->nStopwatchConnected) > 120 * 1000000);
+                    LOCK(pto->cs_inventory);
+                    // Find INV's which should be sent, save them to vInvSend, and then erase from vInventoryToSend.
+                    int invsz = std::min((int)pto->vInventoryToSend.size(), MAX_INV_TO_SEND);
+                    vInvSend.reserve(invsz);
 
-                    if (vInvSend.size() >= MAX_INV_TO_SEND)
+                    for (const CInv &inv : pto->vInventoryToSend)
+                    {
+                        nToErase++;
+                        if (inv.type == MSG_TX)
+                        {
+                            if (fChokeTxInv)
+                                continue;
+                            if ((rnd.rand32() % 100) < randomlyDontInv.Value())
+                                continue;
+                            // skip if we already know about this one
+                            if (pto->filterInventoryKnown.contains(inv.hash))
+                                continue;
+                        }
+                        vInvSend.push_back(inv);
+                        pto->filterInventoryKnown.insert(inv.hash);
+
+                        if (vInvSend.size() >= MAX_INV_TO_SEND)
+                            break;
+                    }
+
+                    if (nToErase > 0)
+                    {
+                        pto->vInventoryToSend.erase(
+                            pto->vInventoryToSend.begin(), pto->vInventoryToSend.begin() + nToErase);
+                    }
+                    else // exit out of the while loop if nothing was done
+                    {
                         break;
+                    }
                 }
 
+                // To maintain proper locking order we have to push the message when we do not hold cs_inventory which
+                // was held in the section above.
                 if (nToErase > 0)
                 {
-                    pto->vInventoryToSend.erase(
-                        pto->vInventoryToSend.begin(), pto->vInventoryToSend.begin() + nToErase);
-                }
-            }
-
-            // To maintain proper locking order we have to push the message when we do not hold cs_inventory which
-            // was held in the section above.
-            if (nToErase > 0)
-            {
-                LOCK(pto->cs_vSend);
-                if (!vInvSend.empty())
-                {
-                    pto->PushMessage(NetMsgType::INV, vInvSend);
-                    vInvSend.clear();
+                    LOCK(pto->cs_vSend);
+                    if (!vInvSend.empty())
+                    {
+                        pto->PushMessage(NetMsgType::INV, vInvSend);
+                        vInvSend.clear();
+                    }
                 }
             }
         }
