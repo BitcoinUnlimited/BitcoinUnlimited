@@ -247,15 +247,26 @@ class TestManager(object):
     # Verify that the tip of each connection all agree with each other, and
     # with the expected outcome (if given)
     def check_results(self, blockhash, outcome):
+        waitLoop = 0
+        while 1:  # sometimes connection 0 hasn't figured itself out yet (but the network thread will handle this async)
+            cxn0bbh = self.connections[0].cb.bestblockhash
+            if cxn0bbh != None: break
+            time.sleep(.1)
+            waitLoop+=1
+            if waitLoop > 50:
+                raise AssertionError("Test malfunction -- connection 0 has no best block for comparision")
         with mininode_lock:
+            if blockhash is None:
+                raise AssertionError("Test failed -- passed check_results None as blockhash, was expecting %s" % str(outcome))
 
             for c in self.connections:
+                cxn_bbh = c.cb.bestblockhash
                 if outcome is None:
-                    if c.cb.bestblockhash != self.connections[0].cb.bestblockhash:
-                        print("Node ", c.addr, " has best block ", hex(c.cb.bestblockhash), ". Expecting ", hex(self.connections[0].cb.bestblockhash))
+                    if cxn_bbh != cxn0bbh:
+                        print("Node ", c.addr, " has best block ", hex(cxn_bbh), ". Expecting ", hex(cnx0bbh))
                         return False
                 elif isinstance(outcome, RejectResult): # Check that block was rejected w/ code
-                    if c.cb.bestblockhash == blockhash:
+                    if cxn_bbh == blockhash:
                         return False
                     if blockhash not in c.cb.block_reject_map:
                         print('Block not in reject map: %064x' % (blockhash))
@@ -263,8 +274,8 @@ class TestManager(object):
                     if not outcome.match(c.cb.block_reject_map[blockhash]):
                         print('Block rejected with %s instead of expected %s: %064x' % (c.cb.block_reject_map[blockhash], outcome, blockhash))
                         return False
-                elif ((c.cb.bestblockhash == blockhash) != outcome):
-                    print("Node ", c.addr, " has best block ", hex(c.cb.bestblockhash), ". Expecting ", hex(blockhash), outcome)
+                elif (cxn_bbh == blockhash) != outcome:
+                    print("Node ", c.addr, " has best block ", hex(cxn_bbh), ". Expecting ", hex(blockhash), outcome)
                     hsh = c.rpc.getbestblockhash()
                     print("Quick   RPC returns", hsh)
                     t = 0
@@ -337,7 +348,7 @@ class TestManager(object):
                 if isinstance(b_or_t, CBlock):  # Block test runner
                     block = b_or_t
                     block_outcome = outcome
-                    tip = block.sha256
+                    tip = block.gethash()
                     # each test_obj can have an optional third argument
                     # to specify the tip we should compare with
                     # (default is to use the block being tested)
