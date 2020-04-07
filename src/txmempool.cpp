@@ -855,19 +855,6 @@ void CTxMemPool::ResubmitCommitQ()
         }
         txCommitQ->clear();
     }
-
-    // Clear txCommitQFinal
-    {
-        LOCK(csCommitQFinal);
-        for (auto &kv : *txCommitQFinal)
-        {
-            CTxInputData txd;
-            txd.tx = kv.second.entry.GetSharedTx();
-            txd.nodeName = "rollback";
-            EnqueueTxForAdmission(txd);
-        }
-        txCommitQFinal->clear();
-    }
 }
 
 void CTxMemPool::_removeRecursive(const CTransaction &origTx, std::list<CTransactionRef> &removed)

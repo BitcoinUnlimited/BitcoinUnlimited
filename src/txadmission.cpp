@@ -270,51 +270,45 @@ void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age)
 
 void CommitTxToMempool()
 {
+    // Committing the tx to the mempool takes time.  We can continue to validate non-conflicting tx during this time.
+    // To do so, before the transactions are finally commited to the mempool the txCommitQ pointer is copied
+    // to txCommitQFinal so that the lock on txCommitQ can be released and processing can continue.
+    // However, the incomingConflicts detector is not reset until all the transactions are committed to the mempool.
+    std::map<uint256, CTxCommitData> *txCommitQFinal = nullptr;
+
     std::vector<uint256> vWhatChanged;
     {
-        boost::unique_lock<boost::mutex> lock(csCommitQ);
-        avgCommitBatchSize = (avgCommitBatchSize * 24 + txCommitQ->size()) / 25;
-        LOG(MEMPOOL, "txadmission committing %d tx\n", txCommitQ->size());
-
-        LOCK(csCommitQFinal);
-        txCommitQFinal = txCommitQ;
-        txCommitQ = new std::map<uint256, CTxCommitData>();
-    }
-
-    // These transactions have already been validated so store them directly into the mempool.
-    //
-    // We must hold the mempool lock for the duration because we want to be sure that we don't end up
-    // doing this loop in the middle of a reorg where we might be clearing the mempool.
-    std::map<uint256, CTxCommitData> *q;
-    {
+        // We must hold the mempool lock for the duration because we want to be sure that we don't end up
+        // doing this loop in the middle of a reorg where we might be clearing the mempool.
         WRITELOCK(mempool.cs_txmempool);
-        LOCK(csCommitQFinal);
+
+        {
+            boost::unique_lock<boost::mutex> lock(csCommitQ);
+            avgCommitBatchSize = (avgCommitBatchSize * 24 + txCommitQ->size()) / 25;
+            txCommitQFinal = txCommitQ;
+            txCommitQ = new std::map<uint256, CTxCommitData>();
+        }
+
+        // These transactions have already been validated so store them directly into the mempool.
         for (auto &it : *txCommitQFinal)
         {
             CTxCommitData &data = it.second;
             mempool._addUnchecked(it.first, data.entry, !IsInitialBlockDownload());
             vWhatChanged.push_back(data.hash);
 
-            // Indicate that this tx was fully processed/accepted and can now be removed from the
-            // request manager.
-            CInv inv(MSG_TX, data.hash);
-            requester.Received(inv, nullptr);
+            // Indicate that this tx was fully processed/accepted and can now be removed from the req mgr.
+            requester.Received(CInv(MSG_TX, data.hash), nullptr);
         }
-
-        // Copy the queue pointer. This is so we avoid a deadlock below when/if we SyncWithWallets()
-        q = txCommitQFinal;
-        txCommitQFinal = new std::map<uint256, CTxCommitData>;
     }
-
 #ifdef ENABLE_WALLET
-    for (auto &it : *q)
+    for (auto &it : *txCommitQFinal)
     {
         CTxCommitData &data = it.second;
         SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
     }
 #endif
-    q->clear();
-    delete q;
+    txCommitQFinal->clear();
+    delete txCommitQFinal;
 
     std::map<uint256, CTxInputData> mapWasDeferred;
     {

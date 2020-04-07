@@ -175,9 +175,9 @@ def Test():
     t = ListTransactionsTest()
     t.drop_to_pdb = True
     bitcoinConf = {
-        "debug": ["all"],
+        "debug": ["all","-libevent"],
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
-    # "--tmppfx=/ramdisk/test", "--nocleanup", "--noshutdown"
     flags = standardFlags()
+    # flags.append("--tmpdir=/tmp/test")
     t.main(flags, bitcoinConf, None)
