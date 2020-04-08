@@ -137,6 +137,43 @@ class NodeHandlingTest (BitcoinTestFramework):
         waitFor(10, lambda: self.nodes[2].getinfo()["connections"] == 1)
         waitFor(10, lambda: self.nodes[3].getinfo()["connections"] == 2)
 
+        #############################
+        # Test startup after invalidating part of the chain on one peer and extending the chain on another
+        # : This simulates what can happen after a hardfork and a node operator failed to upgrade
+        #   before the fork.
+        #############################
+
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+
+        self.node_args = [['-debug=net'],
+                          ['-debug=net'],
+                          ['-debug=net'],
+                          ['-debug=net']]
+        self.nodes = start_nodes(4, self.options.tmpdir, self.node_args)
+        for node in self.nodes:
+            node.clearbanned();
+   
+        # Before reconnecting the peers, extend the chain on one peer while
+        # at the same time invalidating a few blocks on another
+        self.nodes[0].generate(5);
+        height = self.nodes[1].getblockcount()
+        self.nodes[1].invalidateblock(self.nodes[1].getblockhash(height))
+        self.nodes[1].invalidateblock(self.nodes[1].getblockhash(height-1))
+        self.nodes[1].invalidateblock(self.nodes[1].getblockhash(height-2))
+
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+
+        self.node_args = [['-debug=net'],
+                          ['-debug=net'],
+                          ['-debug=net'],
+                          ['-debug=net']]
+        self.nodes = start_nodes(4, self.options.tmpdir, self.node_args)
+
+        interconnect_nodes(self.nodes);
+        sync_blocks(self.nodes);
+
 
 if __name__ == '__main__':
     NodeHandlingTest ().main ()

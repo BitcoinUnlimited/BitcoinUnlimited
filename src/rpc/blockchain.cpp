@@ -7,7 +7,6 @@
 #include "rpc/blockchain.h"
 #include "amount.h"
 #include "blockstorage/blockstorage.h"
-#include "chain.h"
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "coins.h"
@@ -1182,22 +1181,7 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
     return obj;
 }
 
-/** Comparison function for sorting the getchaintips heads.  */
-struct CompareBlocksByHeight
-{
-    bool operator()(const CBlockIndex *a, const CBlockIndex *b) const
-    {
-        /* Make sure that unequal blocks with the same height do not compare
-           equal. Use the pointers themselves to make a distinction. */
-
-        if (a->nHeight != b->nHeight)
-            return (a->nHeight > b->nHeight);
-
-        return a < b;
-    }
-};
-
-static std::set<CBlockIndex *, CompareBlocksByHeight> GetChainTips()
+std::set<CBlockIndex *, CompareBlocksByHeight> GetChainTips()
 {
     /*
      * Idea:  the set of chain tips is chainActive.tip, plus orphan blocks which do not have another orphan building off

@@ -38,6 +38,7 @@
 #include "policy/mempool.h"
 #include "policy/policy.h"
 #include "requestManager.h"
+#include "rpc/blockchain.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
 #include "script/sigcache.h"
@@ -1342,9 +1343,8 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     if (mapArgs.count("-blocknotify"))
         uiInterface.NotifyBlockTip.connect(BlockNotifyCallback);
 
-    uiInterface.InitMessage(_("Activating best chain..."));
     // scan for better chains in the block chain database, that are not yet connected in the active best chain
-
+    uiInterface.InitMessage(_("Activating best chain..."));
     CValidationState state;
     if (!ActivateBestChain(state, chainparams))
     {
@@ -1353,7 +1353,35 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         else
             strErrors << "Failed to connect best block";
     }
-    IsChainNearlySyncdInit(); // BUIP010 XTHIN: initialize fIsChainNearlySyncd
+
+    // Reconsider the most work chain if we're not already synced. This is necessary
+    // when switching from an ABC/BCHN client or when a operator failed to upgrade their BU
+    // node before a hardfork.
+    if (!fReindex)
+    {
+        LOCK(cs_main);
+
+        // Get the set of chaintips
+        std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
+        setTips = GetChainTips();
+
+        // Find out if we're already synced to one of the chaintips. If so then we
+        // can and must skip reconsidermostworkchain().
+        bool fReconsider = false;
+        CBlockIndex *pMostWork = chainActive.Tip();
+        for (CBlockIndex *pTip : setTips)
+        {
+            if (pMostWork->nChainWork < pTip->nChainWork)
+                fReconsider = true;
+        }
+        if (fReconsider)
+        {
+            UniValue obj(UniValue::VARR);
+            reconsidermostworkchain(obj, false);
+        }
+    }
+
+    IsChainNearlySyncdInit();
     IsInitialBlockDownloadInit();
 
     std::vector<fs::path> vImportFiles;
