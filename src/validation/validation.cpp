@@ -2592,7 +2592,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             uint64_t blockSigChecks = 0;
             for (const auto &t : txResourceTracker) // its ok to add the coinbase sigchecks because they must be 0
             {
-                auto txSigChecks = t.GetConsensusSigOps();
+                auto txSigChecks = t.GetConsensusSigChecks();
                 blockSigChecks += txSigChecks;
                 LOG(BENCH, "Tx SigChecks performed: %d\n", txSigChecks);
                 // May2020 transaction consensus rule

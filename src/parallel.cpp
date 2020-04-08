@@ -57,18 +57,18 @@ bool CScriptCheck::operator()()
     if (resourceTracker)
     {
         resourceTracker->Update(ptxTo->GetHash(), checker.GetNumSigops(), checker.GetBytesHashed());
-        resourceTracker->UpdateConsensusSigOps(smRes.consensusSigOpCount);
+        resourceTracker->UpdateConsensusSigChecks(smRes.consensusSigCheckCount);
     }
     if (nFlags & SCRIPT_VERIFY_INPUT_SIGCHECKS)
     {
         auto lenScriptSig = scriptSig.size();
         // May 2020 transaction input standardness rule
         // if < 2 scriptsig len is allowed to be 0 (len formula goes negative)
-        if ((smRes.consensusSigOpCount > 1) && ((smRes.consensusSigOpCount * 43) - 60 > lenScriptSig))
+        if ((smRes.consensusSigCheckCount > 1) && ((smRes.consensusSigCheckCount * 43) - 60 > lenScriptSig))
         {
             error = SIGCHECKS_LIMIT_EXCEEDED;
             LOGA("Sigchecks limit exceeded, with %d sigchecks: min script length (%d) > satisfier script len (%d)",
-                smRes.consensusSigOpCount, (smRes.consensusSigOpCount * 43) - 60, lenScriptSig);
+                smRes.consensusSigCheckCount, (smRes.consensusSigCheckCount * 43) - 60, lenScriptSig);
             return false;
         }
     }

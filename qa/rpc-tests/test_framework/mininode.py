@@ -599,10 +599,8 @@ class P2PDataStore(SingleNodeConnCB):
                 assert ok, "node failed to sync to block {}".format(blocks[-1].gethash('hex'))
             else:
                 ct = waitForBlockInChainTips(node, blockHash, timeout)
-                assert ct != None  # Block should have been handled
                 assert ct["status"] == 'invalid'  # Was expecting failure but block is not invalid
                 gbbh = node.getbestblockhash()
-                print("blocks not equal", gbbh, blocks[-1].hash)
                 assert gbbh != blocks[-1].hash
 
     def send_txs_and_test(self, txs, node, *, success=True, expect_ban=False, reject_reason=None):

@@ -1220,7 +1220,7 @@ def waitForBlockInChainTips(node, blockHash, timeout=30):
             if t["hash"] == blockHash:
                 return t
         time.sleep(1)
-    return None
+    raise AssertionError("block %s never appeared in chain tips" % str(blockHash))
 
 def standardFlags():
     flags = [] # ["--nocleanup", "--noshutdown"]

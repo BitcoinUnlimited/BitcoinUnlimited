@@ -30,7 +30,7 @@ private:
     uint64_t nSighashBytes = 0;
 
     /** 2020-05-15 sigchecks consensus rule -- counts the number of sigops/potential sigops */
-    uint64_t consensusSigops = 0;
+    uint64_t consensusSigChecks = 0;
 
 public:
     unsigned char sighashtype = 0;
@@ -41,7 +41,7 @@ public:
         LOCK(cs_resource_tracker);
         nSigops = c.nSigops;
         nSighashBytes = c.nSighashBytes;
-        consensusSigops = c.consensusSigops;
+        consensusSigChecks = c.consensusSigChecks;
         sighashtype = c.sighashtype;
     }
     void Update(const uint256 &txid, uint64_t nSigopsIn, uint64_t nSighashBytesIn)
@@ -55,18 +55,18 @@ public:
     /** Update 2020-05-15 sigchecks consensus rule sigop count
         @param ops added to the current count
      */
-    void UpdateConsensusSigOps(uint64_t ops)
+    void UpdateConsensusSigChecks(uint64_t ops)
     {
         LOCK(cs_resource_tracker);
-        consensusSigops += ops;
+        consensusSigChecks += ops;
     }
 
     /** Get 2020-05-15 sigchecks consensus rule sigop count
         @returns current number of sigops */
-    uint64_t GetConsensusSigOps() const
+    uint64_t GetConsensusSigChecks() const
     {
         LOCK(cs_resource_tracker);
-        return consensusSigops;
+        return consensusSigChecks;
     }
 
     uint64_t GetSigOps() const

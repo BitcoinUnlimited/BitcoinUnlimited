@@ -235,7 +235,7 @@ class ScriptMachineResourceTracker
 {
 public:
     /** 2020-05-15 sigchecks consensus rule */
-    uint64_t consensusSigOpCount = 0;
+    uint64_t consensusSigCheckCount = 0;
     /** the bitwise OR of all sighashtypes in executed signature checks */
     unsigned char sighashtype = 0;
     /** Number of instructions executed */
@@ -245,7 +245,7 @@ public:
     /** Combine the results of this tracker and another tracker */
     void update(const ScriptMachineResourceTracker &stats)
     {
-        consensusSigOpCount += stats.consensusSigOpCount;
+        consensusSigCheckCount += stats.consensusSigCheckCount;
         nOpCount = stats.nOpCount;
         sighashtype |= stats.sighashtype;
     }
@@ -253,7 +253,7 @@ public:
     /** Set all tracked values to zero */
     void clear(void)
     {
-        consensusSigOpCount = 0;
+        consensusSigCheckCount = 0;
         sighashtype = 0;
         nOpCount = 0;
     }

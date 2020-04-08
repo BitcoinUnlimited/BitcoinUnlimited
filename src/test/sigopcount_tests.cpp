@@ -306,7 +306,7 @@ unsigned int evalForSigChecks(const CScript &scriptSig,
     }
     BOOST_CHECK(worked == true); // All the sigops counting checks should be passed valid scripts
 
-    return tracker.consensusSigOpCount;
+    return tracker.consensusSigCheckCount;
 }
 
 CMutableTransaction BuildCreditingTransaction(const CScript &scriptPubKey, CAmount nValue)

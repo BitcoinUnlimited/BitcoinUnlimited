@@ -935,7 +935,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // Check that the transaction doesn't have an excessive number of sigops, making it impossible to mine.
         if (may2020Enabled) // Enforce May 2020 consensus sigchecks rule
         {
-            nSigOps = resourceTracker.GetConsensusSigOps();
+            nSigOps = resourceTracker.GetConsensusSigChecks();
             if (nSigOps > MAY2020_MAX_TX_SIGCHECK_COUNT)
             {
                 if (debugger)

@@ -1361,7 +1361,7 @@ bool ScriptMachine::Step()
                     scriptCode.FindAndDelete(CScript(vchSig));
 
                     if (vchSig.size() != 0)
-                        stats.consensusSigOpCount += 1; // 2020-05-15 sigchecks consensus rule
+                        stats.consensusSigCheckCount += 1; // 2020-05-15 sigchecks consensus rule
 
                     if (!CheckSignatureEncoding(vchSig, flags, serror) ||
                         !CheckPubKeyEncoding(vchPubKey, flags, serror))
@@ -1434,7 +1434,7 @@ bool ScriptMachine::Step()
 
                     if ((flags & SCRIPT_ENABLE_SCHNORR_MULTISIG) && stacktop(-idxDummy).size() != 0)
                     {
-                        stats.consensusSigOpCount += nSigsCount; // 2020-05-15 sigchecks consensus rule
+                        stats.consensusSigCheckCount += nSigsCount; // 2020-05-15 sigchecks consensus rule
                         // SCHNORR MULTISIG
                         static_assert(MAX_PUBKEYS_PER_MULTISIG < 32,
                             "Multisig dummy element decoded as bitfield can't represent more than 32 keys");
@@ -1530,7 +1530,7 @@ bool ScriptMachine::Step()
                         }
 
                         if (!allNull)
-                            stats.consensusSigOpCount += nKeysCount; // 2020-05-15 sigchecks consensus rule
+                            stats.consensusSigCheckCount += nKeysCount; // 2020-05-15 sigchecks consensus rule
 
                         // Remove signature for pre-fork scripts
                         for (int k = 0; k < nSigsCount; k++)
@@ -1628,7 +1628,7 @@ bool ScriptMachine::Step()
                         uint256 messagehash(vchHash);
                         CPubKey pubkey(vchPubKey);
                         fSuccess = checker.VerifySignature(vchSig, pubkey, messagehash);
-                        stats.consensusSigOpCount += 1; // 2020-05-15 sigchecks consensus rule
+                        stats.consensusSigCheckCount += 1; // 2020-05-15 sigchecks consensus rule
                     }
 
                     if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) && vchSig.size())

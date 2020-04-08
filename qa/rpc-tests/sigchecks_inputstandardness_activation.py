@@ -46,10 +46,6 @@ from collections import deque
 # The upgrade activation time, which we artificially set far into the future.
 MAY2020_START_TIME = 2000000000
 
-# If we don't do this, autoreplay protection will activate before graviton and
-# all our sigs will mysteriously fail.
-# REPLAY_PROTECTION_START_TIME = SIGCHECKS_ACTIVATION_TIME * 2
-
 TX_INPUT_SIGCHECKS_ERROR = "non-mandatory-script-verify-flag (Validation resources exceeded (SigChecks))"
 
 
