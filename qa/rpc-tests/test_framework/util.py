@@ -750,7 +750,10 @@ def disconnect_all(node):
     """Disconnect all peers from the passed node"""
     peers = node.getpeerinfo()
     for p in peers:
-        node.disconnectnode(p["addr"])
+        try:
+            node.disconnectnode(p["addr"])
+        except JSONRPCException as e:  # exception thrown if node is already disconnected so ignore since the intention is to disconnect
+            pass
     while len(node.getpeerinfo())!=0:
         time.sleep(0.1)
 
