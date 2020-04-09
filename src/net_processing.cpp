@@ -2627,11 +2627,11 @@ bool SendMessages(CNode *pto)
                     // waiting for block announcements, therefore we have to check each inv in pto->vInventoryToSend.
                     bool fChokeTxInv =
                         (pto->nActivityBytes == 0 && (GetStopwatchMicros() - pto->nStopwatchConnected) > 120 * 1000000);
-                    LOCK(pto->cs_inventory);
+
                     // Find INV's which should be sent, save them to vInvSend, and then erase from vInventoryToSend.
+                    LOCK(pto->cs_inventory);
                     int invsz = std::min((int)pto->vInventoryToSend.size(), MAX_INV_TO_SEND);
                     vInvSend.reserve(invsz);
-
                     for (const CInv &inv : pto->vInventoryToSend)
                     {
                         nToErase++;

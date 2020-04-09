@@ -14,11 +14,16 @@
 class CBlockIndex;
 class CCoinsViewCache;
 class CValidationState;
-
+class CChainParams;
 /** Transaction validation functions */
 
 /** Context-independent validity checks */
 bool CheckTransaction(const CTransactionRef tx, CValidationState &state);
+/** Context-dependent transaction structure validity checks.  Does not include input checking or script execution. */
+bool ContextualCheckTransaction(const CTransactionRef tx,
+    CValidationState &state,
+    CBlockIndex *const pindexPrev,
+    const CChainParams &params);
 
 namespace Consensus
 {

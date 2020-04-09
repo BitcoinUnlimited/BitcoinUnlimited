@@ -349,17 +349,17 @@ protected:
             flags |= SCRIPT_VERIFY_P2SH;
 
         ScriptError error;
-        unsigned char sighashtype;
+        ScriptMachineResourceTracker stats;
         CScript script_sig(scriptsig_raw.begin(), scriptsig_raw.end());
         CScript script_pubkey(scriptpubkey_raw.begin(), scriptpubkey_raw.end());
-        const bool result = VerifyScript(
-            script_sig, script_pubkey, flags, MAX_OPS_PER_SCRIPT, BaseSignatureChecker(), &error, &sighashtype);
+        const bool result =
+            VerifyScript(script_sig, script_pubkey, flags, MAX_OPS_PER_SCRIPT, BaseSignatureChecker(), &error, &stats);
 
         if (produce_output)
         {
             CDataStream out(output, SER_NETWORK, INIT_PROTO_VERSION);
             out << result;
-            out << sighashtype;
+            out << stats.sighashtype;
             out << scriptsig_raw;
             out << scriptpubkey_raw;
             output.insert(output.begin(), out.begin(), out.end());

@@ -408,6 +408,11 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
 {
     CScript scriptPubKey = CScript() << ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG;
 
+    // Get 1 more spendable coinbase tx
+    std::vector<CMutableTransaction> noTxns;
+    CBlock b = CreateAndProcessBlock(noTxns, scriptPubKey);
+    coinbaseTxns.push_back(*b.vtx[0]);
+
     unsigned int sighashType = SIGHASH_ALL;
     if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight))
         sighashType |= SIGHASH_FORKID;
@@ -497,10 +502,10 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
     {
         CMutableTransaction tx;
         tx.vin.resize(2);
-        tx.vin[1].prevout.hash = prevout;
-        tx.vin[1].prevout.n = 0;
-        tx.vin[0].prevout.hash = coinbaseTxns[0].GetHash();
+        tx.vin[0].prevout.hash = prevout;
         tx.vin[0].prevout.n = 0;
+        tx.vin[1].prevout.hash = coinbaseTxns[1].GetHash();
+        tx.vin[1].prevout.n = 0;
         tx.vout.resize(1);
         tx.vout[0].nValue = 11 * CENT;
         tx.vout[0].scriptPubKey = scriptPubKey;
@@ -512,6 +517,15 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
         BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
         vchSig.push_back((unsigned char)sighashType);
         tx.vin[0].scriptSig << vchSig;
+
+        std::vector<unsigned char> vchSig1;
+        hash = SignatureHash(scriptPubKey, tx, 1, sighashType, coinbaseTxns[1].vout[0].nValue, 0);
+        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
+        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig1));
+        vchSig1.push_back((unsigned char)sighashType);
+        tx.vin[1].scriptSig << vchSig1;
+
+        ToMemPool(tx, "bad-txn-too-many-inputs");
         BOOST_CHECK(!ToMemPool(tx, "bad-txn-too-many-inputs"));
     }
 

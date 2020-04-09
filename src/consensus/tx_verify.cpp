@@ -157,6 +157,37 @@ unsigned int GetP2SHSigOpCount(const CTransactionRef tx, const CCoinsViewCache &
     return nSigOps;
 }
 
+bool ContextualCheckTransaction(const CTransactionRef tx,
+    CValidationState &state,
+    CBlockIndex *const pindexPrev,
+    const CChainParams &params)
+{
+    const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
+    auto consensusParams = params.GetConsensus();
+    bool may2020Enabled = IsMay2020Enabled(consensusParams, pindexPrev);
+
+    if (!may2020Enabled)
+    {
+        // Check that the transaction doesn't have an excessive number of sigops
+        unsigned int nSigOps = GetLegacySigOpCount(tx, STANDARD_SCRIPT_VERIFY_FLAGS);
+        if (nSigOps > MAX_TX_SIGOPS_COUNT)
+            return state.DoS(10, false, REJECT_INVALID, "bad-txns-too-many-sigops");
+    }
+
+    // Make sure tx size is equal or higher to 100 bytes if we are on the BCH chain and Nov 15th 2018 activated
+    if (IsNov2018Activated(consensusParams, nHeight))
+    {
+        if (tx->GetTxSize() < MIN_TX_SIZE)
+        {
+            return state.DoS(
+                10, error("%s: contains transactions that are too small", __func__), REJECT_INVALID, "txn-undersize");
+        }
+    }
+
+
+    return true;
+}
+
 bool CheckTransaction(const CTransactionRef tx, CValidationState &state)
 {
     // Basic checks that don't depend on any context
@@ -164,10 +195,8 @@ bool CheckTransaction(const CTransactionRef tx, CValidationState &state)
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vin-empty");
     if (tx->vout.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vout-empty");
-    // Check that the transaction doesn't have an excessive number of sigops
-    unsigned int nSigOps = GetLegacySigOpCount(tx, STANDARD_SCRIPT_VERIFY_FLAGS);
-    if (nSigOps > MAX_TX_SIGOPS_COUNT)
-        return state.DoS(10, false, REJECT_INVALID, "bad-txns-too-many-sigops");
+
+    // Sigops moved to ContextualCheckTransaction because the consensus rule goes away after may2020 fork
 
     // Size limits
     // BU: size limits removed

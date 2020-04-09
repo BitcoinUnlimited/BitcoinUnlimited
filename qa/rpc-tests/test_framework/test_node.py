@@ -30,7 +30,7 @@ class TestNode():
         finally:
             # Travis test framework is so erratic that to make this reliable but generally quick we need to try a bunch of time looking for the appropriate log
             missingExpected = []
-            for loopCount in range(0,5):
+            for loopCount in range(0,90):
                 self.rpc.logline('flush log')
                 with open(debug_log, encoding='utf-8') as dl:
                     dl.seek(prev_size)

@@ -55,8 +55,9 @@ debug_port_assignments = False
 class TimeoutException(Exception):
     pass
 
-def SetupPythonLogConfig():
+def SetupPythonLogConfig(levelStr=None):
     logOn = os.getenv("PYTHON_DEBUG")
+    if logOn==None: logOn=levelStr
     level = logging.ERROR
     if logOn=="ERROR":
         level = logging.ERROR
@@ -1209,6 +1210,17 @@ def findBitcoind():
     else:
         objpath = os.path.dirname(env)
     return objpath
+
+def waitForBlockInChainTips(node, blockHash, timeout=30):
+    """Waits for a block to appear in the chaintip list.  Returns None if timeout or that block's chaintip data"""
+    start = time.time()
+    while time.time < start+timeout:
+        gct = node.getchaintips()
+        for t in gct:
+            if t["hash"] == blockHash:
+                return t
+        time.sleep(1)
+    raise AssertionError("block %s never appeared in chain tips" % str(blockHash))
 
 def standardFlags():
     flags = [] # ["--nocleanup", "--noshutdown"]

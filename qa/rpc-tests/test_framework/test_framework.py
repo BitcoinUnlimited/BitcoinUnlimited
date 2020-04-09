@@ -47,7 +47,15 @@ class BitcoinTestFramework(object):
     setup_clean_chain = False
     num_nodes = 4
     extra_args = None
+
+    def __init__(self):
+        super().__init__()
+        self.set_test_params()
+
     # These may be over-ridden by subclasses:
+    def set_test_params(self):
+        pass
+
     def run_test(self):
         for node in self.nodes:
             assert_equal(node.getblockcount(), 200)

@@ -103,6 +103,8 @@ const char *ScriptErrorString(const ScriptError serror)
         return "Script number overflow";
     case SCRIPT_ERR_NUMBER_BAD_ENCODING:
         return "Non-minimally encoded script number";
+    case SIGCHECKS_LIMIT_EXCEEDED:
+        return "Validation resources exceeded (SigChecks)";
     case SCRIPT_ERR_UNKNOWN_ERROR:
     case SCRIPT_ERR_ERROR_COUNT:
     default:

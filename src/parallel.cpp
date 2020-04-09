@@ -48,10 +48,30 @@ bool CScriptCheck::operator()()
 {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
     CachingTransactionSignatureChecker checker(ptxTo, nIn, amount, nFlags, cacheStore);
-    if (!VerifyScript(scriptSig, scriptPubKey, nFlags, maxOps, checker, &error, &sighashType))
+    ScriptMachineResourceTracker smRes;
+    if (!VerifyScript(scriptSig, scriptPubKey, nFlags, maxOps, checker, &error, &smRes))
+    {
+        LOGA("Script Error: %s\n", ScriptErrorString(error));
         return false;
+    }
     if (resourceTracker)
+    {
         resourceTracker->Update(ptxTo->GetHash(), checker.GetNumSigops(), checker.GetBytesHashed());
+        resourceTracker->UpdateConsensusSigChecks(smRes.consensusSigCheckCount);
+    }
+    if (nFlags & SCRIPT_VERIFY_INPUT_SIGCHECKS)
+    {
+        auto lenScriptSig = scriptSig.size();
+        // May 2020 transaction input standardness rule
+        // if < 2 scriptsig len is allowed to be 0 (len formula goes negative)
+        if ((smRes.consensusSigCheckCount > 1) && ((smRes.consensusSigCheckCount * 43) - 60 > lenScriptSig))
+        {
+            error = SIGCHECKS_LIMIT_EXCEEDED;
+            LOGA("Sigchecks limit exceeded, with %d sigchecks: min script length (%d) > satisfier script len (%d)",
+                smRes.consensusSigCheckCount, (smRes.consensusSigCheckCount * 43) - 60, lenScriptSig);
+            return false;
+        }
+    }
     return true;
 }
 

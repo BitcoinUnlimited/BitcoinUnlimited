@@ -38,7 +38,7 @@ import logging
 import copy
 import traceback
 
-from test_framework.util import waitFor
+from test_framework.util import waitFor, waitForBlockInChainTips
 from .nodemessages import *
 from .bumessages import *
 
@@ -551,7 +551,7 @@ class P2PDataStore(SingleNodeConnCB):
         if response is not None:
             self.send_message(response)
 
-    def send_blocks_and_test(self, blocks, node, *, success=True, request_block=True, reject_reason=None, expect_ban=False, timeout=60):
+    def send_blocks_and_test(self, blocks, node, *, success=True, request_block=True, reject_reason=None, expect_ban=False, expect_disconnect=False, timeout=60):
         """Send blocks to test node and test whether the tip advances.
 
          - add all blocks to our block_store
@@ -588,16 +588,22 @@ class P2PDataStore(SingleNodeConnCB):
                     lambda: blocks[-1].sha256 in self.getdata_requests, timeout=timeout)
                 assert ok, "did not receive getdata for {}".format(blocks[-1].sha256)
 
-            self.sync_with_ping()
+            if expect_disconnect:
+                self.wait_for_disconnect()
+            else:
+                self.sync_with_ping()
 
             if success:
                 ok = wait_until(lambda: node.getbestblockhash() ==
                            blocks[-1].hash, timeout=timeout)
                 assert ok, "node failed to sync to block {}".format(blocks[-1].gethash('hex'))
             else:
-                assert node.getbestblockhash() != blocks[-1].hash
+                ct = waitForBlockInChainTips(node, blockHash, timeout)
+                assert ct["status"] == 'invalid'  # Was expecting failure but block is not invalid
+                gbbh = node.getbestblockhash()
+                assert gbbh != blocks[-1].hash
 
-    def send_txs_and_test(self, txs, node, *, success=True, expect_ban=False, reject_reason=None):
+    def send_txs_and_test(self, txs, node, *, success=True, expect_ban=False, reject_reason=None, timeout=60):
         """Send txs to test node and test whether they're accepted to the mempool.
 
          - add all txs to our tx_store
@@ -631,10 +637,8 @@ class P2PDataStore(SingleNodeConnCB):
             if success:
                 # Check that all txs are now in the mempool
                 for tx in txs:
-                    waitFor(10, lambda: tx.hash in node.getrawmempool(), onError="{} tx not found in mempool".format(
-                        tx.hash))
+                    waitFor(timeout, lambda: tx.hash in node.getrawmempool(), onError="{} tx not found in mempool".format(tx.hash))
             else:
                 # Check that none of the txs are now in the mempool
                 for tx in txs:
-                    waitFor(10, lambda: tx.hash not in node.getrawmempool(), onError="{} tx not found in mempool".format(
-                        tx.hash))
+                    waitFor(timeout, lambda: tx.hash not in node.getrawmempool(), onError="{} tx not found in mempool".format(tx.hash))

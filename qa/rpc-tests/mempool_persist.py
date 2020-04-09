@@ -44,7 +44,7 @@ import logging
 
 class MempoolPersistTest(BitcoinTestFramework):
     def set_test_params(self):
-        self.num_nodes = 3
+        self.num_nodes = 4
 
     def run_test(self):
         chain_height = self.nodes[0].getblockcount()

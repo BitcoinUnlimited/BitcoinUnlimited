@@ -106,6 +106,9 @@ extern CTweak<uint32_t> netMagic;
 // The maximum number of allowed script operations (consensus param)
 extern CTweak<uint64_t> maxScriptOps;
 
+// The maximum number of allowed sigcheck operations (consensus param)
+extern CTweak<uint64_t> maxSigChecks;
+
 // print out a configuration warning during initialization
 // bool InitWarning(const std::string &str);
 
