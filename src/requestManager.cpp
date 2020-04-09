@@ -488,7 +488,7 @@ CNodeRequestData::CNodeRequestData(CNode *n)
     }
 
     // The bigger the latency (in microseconds), the less we want to request from this node
-    int latency = node->txReqLatency.GetTotal().get_int();
+    int latency = node->txReqLatency.GetTotalTyped();
     // data has never been requested from this node.  Should we encourage investigation into whether this node is fast,
     // or stick with nodes that we do have data on?
     if (latency == 0)

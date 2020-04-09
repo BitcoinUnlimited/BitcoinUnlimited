@@ -339,6 +339,15 @@ public:
         return UniValue(total);
     }
 
+    /** As GetTotal, but returns the fundamental type rather than a UniValue */
+    RecordType GetTotalTyped()
+    {
+        std::lock_guard<std::mutex> lock(cs_statHistory);
+        if ((op & STAT_OP_AVE) && (timerCount != 0))
+            return total / timerCount; // If the metric is an average, calculate the average before returning it
+        return total;
+    }
+
     virtual UniValue GetSeries(const std::string &_name, int count)
     {
         std::lock_guard<std::mutex> lock(cs_statHistory);
