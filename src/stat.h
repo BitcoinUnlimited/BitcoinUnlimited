@@ -344,7 +344,7 @@ public:
     {
         std::lock_guard<std::mutex> lock(cs_statHistory);
         if ((op & STAT_OP_AVE) && (timerCount != 0))
-            return total / timerCount ; // If the metric is an average, calculate the average before returning it
+            return total / timerCount; // If the metric is an average, calculate the average before returning it
         return total;
     }
 
