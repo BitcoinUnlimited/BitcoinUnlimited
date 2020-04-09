@@ -153,10 +153,6 @@ class SchnorrSigTest (BitcoinTestFramework):
                 txhex = hexlify(tx.serialize()).decode("utf-8")
                 txid = self.nodes[0].enqueuerawtransaction(txhex)
 
-                if doubleSpend == 0:
-                    resultWallet.append([destPrivKey, destPubKey, amt, PlaceHolder(txid), 0, output])
-                    alltx.append(txhex)
-
         # because enqueuerawtransaction and propagation is asynchronous we need to wait for it
         waitFor(30, lambda: self.nodes[1].getmempoolinfo()['size'] == txcount+1)
         mp = [i.getmempoolinfo() for i in self.nodes]
@@ -167,6 +163,16 @@ class SchnorrSigTest (BitcoinTestFramework):
 
         assert self.nodes[0].getmempoolinfo()['size'] == 0
         waitFor(30, lambda: self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
+
+        # Since we doublespent the above txs, we can't be sure which succeeded (we'd have to check the blocks)
+        # Instead just grab new ones from a node's wallet
+        wallets = self.nodes[0].listunspent()
+        resultWallet = []
+        for i in wallets:
+            privb58 = self.nodes[0].dumpprivkey(i["address"])
+            privKey = decodeBase58(privb58)[1:-5]
+            pubKey = cashlib.pubkey(privKey)
+            resultWallet.append([privKey, pubKey, i["satoshi"], PlaceHolder(i['txid']), i['vout'], CScript(i["scriptPubKey"])])
 
         FEEINSAT = 5000
         # now spend all the new utxos again
@@ -195,7 +201,11 @@ class SchnorrSigTest (BitcoinTestFramework):
                 sighashtype = 0x41
                 n = 0
                 sig = cashlib.signTxInputSchnorr(tx, n, w[2], w[5], w[0], sighashtype)
-                tx.vin[n].scriptSig = cashlib.spendscript(sig, w[1])  # P2PKH
+                # In this test we only have P2PK or P2PKH type constraint scripts so the length can be used to distinguish them
+                if len(w[5]) == 35:
+                    tx.vin[n].scriptSig = cashlib.spendscript(sig)  # P2PK
+                else:
+                    tx.vin[n].scriptSig = cashlib.spendscript(sig, w[1])  # P2PKH
 
                 txhex = hexlify(tx.serialize()).decode("utf-8")
                 txid = self.nodes[1].enqueuerawtransaction(txhex)
