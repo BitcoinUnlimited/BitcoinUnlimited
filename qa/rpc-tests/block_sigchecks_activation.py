@@ -313,7 +313,7 @@ class BlockSigChecksActivationTest(BitcoinTestFramework):
         node.invalidateblock(pre_activation_sigcheck_block.hash)
 
         # after block is invalidated these tx are put back into the mempool.  Test uses them later so evict.
-        waitFor(10, lambda: node.getmempoolinfo()["size"]==2)
+        waitFor(TIMEOUT, lambda: node.getmempoolinfo()["size"]==2)
         node.evicttransaction(good_tx.hash)
         node.evicttransaction(bad_tx.hash)
 
@@ -349,7 +349,7 @@ class BlockSigChecksActivationTest(BitcoinTestFramework):
         self.pynode.send_blocks_and_test([goodblock], node, timeout=TIMEOUT)
         node.invalidateblock(goodblock.hash)
         # All transactions should be back in mempool: validation is very slow in debug build
-        waitFor(60,lambda: set(node.getrawmempool()) == {t.hash for t in submittxes_1})
+        waitFor(TIMEOUT,lambda: set(node.getrawmempool()) == {t.hash for t in submittxes_1})
 
         logging.info("Mine the activation block itself")
         tip = self.build_block(tip)
@@ -359,7 +359,7 @@ class BlockSigChecksActivationTest(BitcoinTestFramework):
         assert_equal(node.getblockchaininfo()['mediantime'], SIGCHECKS_ACTIVATION_TIME)
 
         # All transactions get re-evaluated to count sigchecks, so wait for them
-        waitFor(60,lambda: set(node.getrawmempool()) == {t.hash for t in submittxes_1})
+        waitFor(TIMEOUT,lambda: set(node.getrawmempool()) == {t.hash for t in submittxes_1})
 
         logging.info("Try a block with a transaction going over the limit (limit: {})".format(MAX_TX_SIGCHECK))
         bad_tx_block = self.build_block(tip, [bad_tx])
@@ -374,7 +374,7 @@ class BlockSigChecksActivationTest(BitcoinTestFramework):
         # ~ upgrade_block = tip
 
         # Transactions still in pool:
-        waitFor(60, lambda: set(node.getrawmempool()) == {t.hash for t in submittxes_1})
+        waitFor(TIMEOUT, lambda: set(node.getrawmempool()) == {t.hash for t in submittxes_1})
 
         logging.info("Try sending 10000-sigcheck blocks after activation (limit: {})".format(MAXBLOCKSIZE // BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO))
         # Send block with same txes we just tried before activation

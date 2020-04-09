@@ -275,7 +275,7 @@ class NodeConn(asyncore.dispatcher):
         "regtest": b"\xda\xb5\xbf\xfa",
     }
 
-    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=1, bitcoinCash=True, send_initial_version = True):
+    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=1, bitcoinCash=True, send_initial_version = True, timeout=60):
         self.bitcoinCash = bitcoinCash
         if self.bitcoinCash:
             self.MAGIC_BYTES = self.CASH_MAGIC_BYTES
@@ -286,6 +286,7 @@ class NodeConn(asyncore.dispatcher):
         self.dstaddr = dstaddr
         self.dstport = dstport
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.settimeout(timeout)
         self.sendbuf = b""
         self.recvbuf = b""
         self.ver_send = 209
@@ -308,11 +309,12 @@ class NodeConn(asyncore.dispatcher):
             vt.addrFrom.ip = "0.0.0.0"
             vt.addrFrom.port = 0
             self.send_message(vt, True)
-        print('MiniNode: Connecting to Bitcoin Node IP # ' + dstaddr + ':'
-              + str(dstport))
+        print(str(time.time()) + ': MiniNode: Connecting to Bitcoin Node IP # ' + dstaddr + ':' + str(dstport))
         try:
             self.connect((dstaddr, dstport))
-        except:
+            print(str(time.time()) + ": Connected")
+        except Exception as e:
+            print(str(time.time()) + ": Connection failure (" + str(e) + ")")
             self.handle_close()
         self.rpc = rpc
         self.exceptions = []
