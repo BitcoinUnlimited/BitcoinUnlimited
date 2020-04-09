@@ -71,6 +71,8 @@ BLOCK_SIGCHECKS_BAD_BLOCK_SIGCHECKS = "Invalid block due to bad-blk-sigchecks"
 # Consensus parameter: maximum sigchecks in a transaction
 MAX_TX_SIGCHECK = 3000
 
+# time to wait for certain events to occur.  Set high due to travis irregularities
+TIMEOUT=60
 
 def create_transaction(spendfrom, custom_script, satisfier=bytes([OP_TRUE]), amount=None):
     # Fund and sign a transaction to a given output.
@@ -99,7 +101,7 @@ def check_for_ban_on_rejected_tx(pynode, node, tx, reject_reason=None):
     """Check we are disconnected when sending a txn that the node rejects, then reconnect after.
 
     (Can't actually get banned, since bitcoind won't ban local peers.)"""
-    pynode.send_txs_and_test([tx], node, success=False, expect_disconnect=True, reject_reason=reject_reason, timeout=10)
+    pynode.send_txs_and_test([tx], node, success=False, expect_disconnect=True, reject_reason=reject_reason, timeout=TIMEOUT)
     #disconnect_all(node)
     #node.add_p2p_connection(P2PDataStore())
 
@@ -109,14 +111,14 @@ def check_for_ban_on_rejected_block(pynode, node, block, reject_reason=None, exp
     then reconnect after.
 
     (Can't actually get banned, since bitcoind won't ban local peers.)"""
-    pynode.send_blocks_and_test([block], node, success=False, reject_reason=reject_reason, expect_ban=expect_ban, expect_disconnect=True, timeout=30)
+    pynode.send_blocks_and_test([block], node, success=False, reject_reason=reject_reason, expect_ban=expect_ban, expect_disconnect=True, timeout=TIMEOUT)
     # disconnect_all(node)
     # node.add_p2p_connection(P2PDataStore())
 
 
 def check_for_no_ban_on_rejected_tx(pynode, node, tx, reject_reason=None):
     """Check we are not disconnected when sending a txn that the node rejects."""
-    pynode.send_txs_and_test([tx], node, success=False, reject_reason=reject_reason, timeout=10)
+    pynode.send_txs_and_test([tx], node, success=False, reject_reason=reject_reason, timeout=TIMEOUT)
 
 
 class BlockSigChecksActivationTest(BitcoinTestFramework):
@@ -327,14 +329,14 @@ class BlockSigChecksActivationTest(BitcoinTestFramework):
         for i in range(-1, 5):
             tip = self.build_block(tip, nTime=SIGCHECKS_ACTIVATION_TIME + i)
             blocks.append(tip)
-        self.pynode.send_blocks_and_test(blocks, node)
+        self.pynode.send_blocks_and_test(blocks, node, timeout=TIMEOUT)
         assert_equal(node.getblockchaininfo()['mediantime'], SIGCHECKS_ACTIVATION_TIME - 1)
 
         logging.info("The next block will activate, but the activation block itself must follow old rules")
         # Send the 50 txes and get the node to mine as many as possible (it should do all)
         # The node is happy mining and validating a 10000 sigcheck block before
         # activation.
-        self.pynode.send_txs_and_test(submittxes_1, node)
+        self.pynode.send_txs_and_test(submittxes_1, node, timeout=TIMEOUT)
         [blockhash] = node.generate(1)
         assert_equal(set(node.getblock(blockhash, 1)["tx"][1:]), { t.hash for t in submittxes_1})
 
@@ -344,14 +346,14 @@ class BlockSigChecksActivationTest(BitcoinTestFramework):
 
         # Try again manually and invalidate that too
         goodblock = self.build_block(tip, submittxes_1)
-        self.pynode.send_blocks_and_test([goodblock], node)
+        self.pynode.send_blocks_and_test([goodblock], node, timeout=TIMEOUT)
         node.invalidateblock(goodblock.hash)
         # All transactions should be back in mempool: validation is very slow in debug build
         waitFor(60,lambda: set(node.getrawmempool()) == {t.hash for t in submittxes_1})
 
         logging.info("Mine the activation block itself")
         tip = self.build_block(tip)
-        self.pynode.send_blocks_and_test([tip], node)
+        self.pynode.send_blocks_and_test([tip], node, timeout=TIMEOUT)
 
         logging.info("We have activated!")
         assert_equal(node.getblockchaininfo()['mediantime'], SIGCHECKS_ACTIVATION_TIME)
@@ -365,7 +367,7 @@ class BlockSigChecksActivationTest(BitcoinTestFramework):
 
         logging.info("Try a block with a transaction just under the limit (limit: {})".format(MAX_TX_SIGCHECK))
         good_tx_block = self.build_block(tip, [good_tx])
-        self.pynode.send_blocks_and_test([good_tx_block], node)
+        self.pynode.send_blocks_and_test([good_tx_block], node, timeout=TIMEOUT)
         node.invalidateblock(good_tx_block.hash)
 
         # save this tip for later
@@ -400,7 +402,7 @@ class BlockSigChecksActivationTest(BitcoinTestFramework):
         check_for_ban_on_rejected_block(self.pynode, node, badblock, reject_reason=BLOCK_SIGCHECKS_BAD_BLOCK_SIGCHECKS)
 
         # Put all the txes in mempool, in order to get them cached:
-        self.pynode.send_txs_and_test(submittxes_2, node)
+        self.pynode.send_txs_and_test(submittxes_2, node, timeout=TIMEOUT)
         # Send them again, the node still doesn't like it. But the log
         # error message has now changed because the txes failed from cache.
         badblock = self.build_block(tip, submittxes_2, nTime=SIGCHECKS_ACTIVATION_TIME + 7)
@@ -416,7 +418,7 @@ class BlockSigChecksActivationTest(BitcoinTestFramework):
         node.set("consensus.maxBlockSigChecks=%d" % (MAX_BLOCK_SIGCHECKS+1))
         tip = self.build_block(tip, submittxes_2[:40], nTime=SIGCHECKS_ACTIVATION_TIME + 6)
         # It should succeed now since limit should be 8000.
-        self.pynode.send_blocks_and_test([tip], node)
+        self.pynode.send_blocks_and_test([tip], node, timeout=TIMEOUT)
 
 
 if __name__ == '__main__':

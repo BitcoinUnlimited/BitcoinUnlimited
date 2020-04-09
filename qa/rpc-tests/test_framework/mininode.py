@@ -603,7 +603,7 @@ class P2PDataStore(SingleNodeConnCB):
                 gbbh = node.getbestblockhash()
                 assert gbbh != blocks[-1].hash
 
-    def send_txs_and_test(self, txs, node, *, success=True, expect_ban=False, reject_reason=None):
+    def send_txs_and_test(self, txs, node, *, success=True, expect_ban=False, reject_reason=None, timeout=60):
         """Send txs to test node and test whether they're accepted to the mempool.
 
          - add all txs to our tx_store
@@ -637,10 +637,8 @@ class P2PDataStore(SingleNodeConnCB):
             if success:
                 # Check that all txs are now in the mempool
                 for tx in txs:
-                    waitFor(10, lambda: tx.hash in node.getrawmempool(), onError="{} tx not found in mempool".format(
-                        tx.hash))
+                    waitFor(timeout, lambda: tx.hash in node.getrawmempool(), onError="{} tx not found in mempool".format(tx.hash))
             else:
                 # Check that none of the txs are now in the mempool
                 for tx in txs:
-                    waitFor(10, lambda: tx.hash not in node.getrawmempool(), onError="{} tx not found in mempool".format(
-                        tx.hash))
+                    waitFor(timeout, lambda: tx.hash not in node.getrawmempool(), onError="{} tx not found in mempool".format(tx.hash))
