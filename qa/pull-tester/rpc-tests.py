@@ -573,6 +573,10 @@ class RPCTestHandler:
                     got_outputs[0] = True
                 except subprocess.TimeoutExpired:
                     pass
+                except ValueError:
+                    # There is a bug in communicate that causes this exception if the child process has closed any pipes but is still running
+                    # see: https://bugs.python.org/issue35182
+                    pass
 
                 retval = proc.poll()
                 if not retval is None:
