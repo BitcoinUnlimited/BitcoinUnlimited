@@ -708,6 +708,8 @@ class CScript(bytes):
     def __new__(cls, value=b''):
         if isinstance(value, bytes) or isinstance(value, bytearray):
             return super(CScript, cls).__new__(cls, value)
+        elif isinstance(value, str):
+            return super(CScript, cls).__new__(cls, bytearray.fromhex(value))
         else:
             def coerce_iterable(iterable):
                 for instance in iterable:
