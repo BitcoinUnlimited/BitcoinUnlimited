@@ -1617,6 +1617,9 @@ UniValue getstat(const UniValue &params, bool fHelp)
 
         ret.push_back(ustat);
     }
+    if (ret.empty())
+        throw std::invalid_argument("No stat available for that selection");
+
     return ret;
 }
 

@@ -80,6 +80,9 @@ UniValue gettweak(const UniValue &params, bool fHelp)
             }
         }
     }
+    if (ret.empty())
+        throw std::invalid_argument("No tweak available for that selection");
+
     return ret;
 }
 // RPC Set a particular tweak
@@ -149,8 +152,9 @@ UniValue settweak(const UniValue &params, bool fHelp)
                 ret.push_back(tmp);
             }
         }
+        else
+            throw std::invalid_argument("No tweak available for that selection");
     }
-
     if (!ret.empty())
     {
         return ret;
