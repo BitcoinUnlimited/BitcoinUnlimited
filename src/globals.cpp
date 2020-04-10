@@ -359,7 +359,7 @@ CTweak<unsigned int> unconfPushAction("net.unconfChainResendAction",
     "Action to take when this node thinks that a peer will now accept a previously unacceptable unconfirmed "
     "transaction (default: 2) "
     "0: do not resend, 1: send an INV, 2: send the TX",
-    0);
+    2);
 CTweak<bool> restrictInputs("net.restrictInputs",
     "Do we want to restrict max inputs to 1 for unconfirmed transaction chains that are longer than 25 (default: true)",
     true);

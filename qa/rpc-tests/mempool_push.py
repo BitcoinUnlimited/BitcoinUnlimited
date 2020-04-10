@@ -37,11 +37,9 @@ class MyTest (BitcoinTestFramework):
              "-limitdescendantsize=%d" % (BCH_UNCONF_SIZE_KB*2),
              "-limitancestorcount=%d" % (BCH_UNCONF_DEPTH*2),
              "-limitdescendantcount=%d" % (BCH_UNCONF_DEPTH*2),
-             "-net.unconfChainResendAction=2",
              "-net.restrictInputs=0"],
             ["-blockprioritysize=2000000", "-limitdescendantcount=1000", "-limitancestorcount=1000",
-             "-limitancestorsize=1000", "-limitdescendantsize=1000", "-net.unconfChainResendAction=2",
-             "-net.restrictInputs=0"],
+             "-limitancestorsize=1000", "-limitdescendantsize=1000", "-net.restrictInputs=0"],
             ]
         self.nodes = start_nodes(3, self.options.tmpdir, mempoolConf)
         connect_nodes_full(self.nodes)
