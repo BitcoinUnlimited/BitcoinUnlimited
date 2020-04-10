@@ -211,6 +211,7 @@ void DeleteCritical(void *cs)
         }
         std::swap(iter.second, newStack);
     }
+    lockdata.ordertracker.DeleteCritical(cs);
 }
 
 // removes 1 lock for a critical section

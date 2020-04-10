@@ -158,4 +158,19 @@ void CLockOrderTracker::TrackLockOrderHistory(const CLockLocation &locklocation,
     }
 }
 
+void CLockOrderTracker::DeleteCritical(void *cs)
+{
+    std::map<void *, std::set<void *> >::iterator iter;
+    iter = seenLockOrders.find(cs);
+    if (iter != seenLockOrders.end())
+    {
+        iter->second.clear();
+        seenLockOrders.erase(iter);
+    }
+    for (auto &entry : seenLockOrders)
+    {
+        entry.second.erase(cs);
+    }
+}
+
 #endif // end DEBUG_LOCKORDER
