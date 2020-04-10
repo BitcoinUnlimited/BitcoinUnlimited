@@ -768,7 +768,7 @@ public:
         vInventoryToSend.push_back(inv);
     }
 
-    /** Get size onf INVs inventory n a thread safe way*/
+    /** Get size of INVs to be sent in a thread safe way*/
     unsigned int GetInventoryToSendSize()
     {
         LOCK(cs_inventory);
