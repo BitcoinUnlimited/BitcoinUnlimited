@@ -132,6 +132,7 @@ UniValue settweak(const UniValue &params, bool fHelp)
 
     // Now assign
     UniValue ret(UniValue::VARR);
+    UniValue names(UniValue::VARR);
     for (unsigned int i = 0; i < params.size(); i++)
     {
         string s = params[i].get_str();
@@ -151,6 +152,8 @@ UniValue settweak(const UniValue &params, bool fHelp)
             {
                 ret.push_back(tmp);
             }
+
+            names.push_back(name);
         }
         else
             throw std::invalid_argument("No tweak available for that selection");
@@ -159,5 +162,5 @@ UniValue settweak(const UniValue &params, bool fHelp)
     {
         return ret;
     }
-    return NullUniValue;
+    return gettweak(names, false);
 }
