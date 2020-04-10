@@ -76,11 +76,12 @@ Increasing unilaterally such parameter is not something a single implementation,
 An example of this undesirable is increasing the chance of success of double spend attacks. This is due to the fact that if BU accept, let's say, chain as long as 50 transactions whereas all the rest of the network set the limit to 25. To mitigate this side effect we implemented [Intelligent unconfirmed transaction forwarding](https://github.com/BitcoinUnlimited/BitcoinUnlimited/pull/1937), i.e. when a block comes in that confirms enough parent transactions to make the transaction valid in non-BU mempools, a double-spender is essentially racing the entire BU network to push his double-spend into the miner nodes that now accept the transaction.
 
 Intelligent unconfirmed transaction forwarding is delivered as an "experimental" (off by default) feature.  To enable this feature, an operator would add configuration into bitcoin.conf.  Set both new unconfirmed limits (these config fields have existed for a long time) and turn on the new intelligent unconfirmed transaction forwarding:
-limitancestorsize=<KB of RAM>
-limitdescendantsize=<KB of RAM>
-limitancestorcount=<number of allowed ancestors>
-limitdescendantcount=<number of allowed ancestors>
-net.unconfChainResendAction=2
+
+- limitancestorsize = "KB of RAM"
+- limitdescendantsize = "KB of RAM"
+- limitancestorcount = "number of allowed ancestors"
+- limitdescendantcount = "number of allowed ancestors"
+- net.unconfChainResendAction = 2
 
 ### Mempool synchronization via Graphene
 
