@@ -320,8 +320,12 @@ bool CGrapheneBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         mapPartialTxHash.insert(std::make_pair(cheapHash, txRef));
     }
 
-    grapheneBlock->ValidateAndRecontructBlock(
-        grapheneBlockTx.blockhash, pblock, mapPartialTxHash, strCommand, pfrom, vRecv);
+    if (!grapheneBlock->ValidateAndRecontructBlock(
+            grapheneBlockTx.blockhash, pblock, mapPartialTxHash, strCommand, pfrom, vRecv))
+    {
+        RequestFailoverBlock(pfrom, backup);
+        return error("Graphene ValidateAndRecontructBlock failed");
+    }
 
     return true;
 }
@@ -1546,8 +1550,12 @@ bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const
         return true;
     }
 
-    pblock->grapheneblock->ValidateAndRecontructBlock(
-        recoveryResponse.blockhash, pblock, mapTxFromPools, NetMsgType::GRAPHENE_RECOVERY, pfrom, vRecv);
+    if (!pblock->grapheneblock->ValidateAndRecontructBlock(
+            recoveryResponse.blockhash, pblock, mapTxFromPools, NetMsgType::GRAPHENE_RECOVERY, pfrom, vRecv))
+    {
+        RequestFailoverBlock(pfrom, pblock);
+        return error("Graphene ValidateAndRecontructBlock failed");
+    }
 
     return true;
 }
