@@ -156,7 +156,10 @@ UniValue settweak(const UniValue &params, bool fHelp)
             names.push_back(name);
         }
         else
-            throw std::invalid_argument("No tweak available for that selection");
+        {
+            std::string error = "No tweak available for " + name;
+            throw std::invalid_argument(error.c_str());
+        }
     }
     if (!ret.empty())
     {

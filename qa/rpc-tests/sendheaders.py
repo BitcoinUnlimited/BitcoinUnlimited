@@ -316,11 +316,6 @@ class SendHeadersTest(BitcoinTestFramework):
 
     def run_test(self):
 
-        # Set the forktime to be far into the future.  Running the sript after forktime will cause a failure since
-        # we will be expecting a > 1MB block to begin with.
-        self.nodes[0].set("mining.forkTime=1901590000")
-        self.nodes[1].set("mining.forkTime=1901590000")
-
         # Setup the p2p connections and start up the network thread.
         inv_node = InvNode()
         test_node = TestNode()
