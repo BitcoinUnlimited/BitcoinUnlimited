@@ -343,7 +343,7 @@ BOOST_AUTO_TEST_CASE(univalue_object)
     BOOST_CHECK_EQUAL(obj.setObject(), true);
     UniValue uv;
     uv.setInt(42);
-    obj.__pushKV("age", uv);
+    obj.pushKV("age", uv);
     BOOST_CHECK_EQUAL(obj.size(), 1);
     BOOST_CHECK_EQUAL(obj["age"].getValStr(), "42");
 

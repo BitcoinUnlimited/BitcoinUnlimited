@@ -228,31 +228,30 @@ UniValue validateaddress(const UniValue &params, bool fHelp)
     bool isValid = IsValidDestination(dest);
 
     UniValue ret(UniValue::VOBJ);
-    ret.pushKV("isvalid", isValid);
+    ret.pushKV("isvalid", isValid, false);
     if (isValid)
     {
-        std::string currentAddress = EncodeDestination(dest);
-        ret.pushKV("address", currentAddress);
+        ret.pushKV("address", EncodeDestination(dest), false);
 
         CScript scriptPubKey = GetScriptForDestination(dest);
-        ret.pushKV("scriptPubKey", HexStr(scriptPubKey.begin(), scriptPubKey.end()));
+        ret.pushKV("scriptPubKey", HexStr(scriptPubKey.begin(), scriptPubKey.end()), false);
 
 #ifdef ENABLE_WALLET
         isminetype mine = pwalletMain ? IsMine(*pwalletMain, dest, chainActive.Tip()) : ISMINE_NO;
-        ret.pushKV("ismine", (mine & ISMINE_SPENDABLE) ? true : false);
-        ret.pushKV("iswatchonly", (mine & ISMINE_WATCH_ONLY) ? true : false);
+        ret.pushKV("ismine", (mine & ISMINE_SPENDABLE) ? true : false, false);
+        ret.pushKV("iswatchonly", (mine & ISMINE_WATCH_ONLY) ? true : false, false);
         UniValue detail = boost::apply_visitor(DescribeAddressVisitor(), dest);
         ret.pushKVs(detail);
         if (pwalletMain && pwalletMain->mapAddressBook.count(dest))
-            ret.pushKV("account", pwalletMain->mapAddressBook[dest].name);
+            ret.pushKV("account", pwalletMain->mapAddressBook[dest].name, false);
         const CKeyID *keyID = boost::get<CKeyID>(&dest);
         if (keyID)
         {
             if (pwalletMain && pwalletMain->mapKeyMetadata.count(*keyID) &&
                 !pwalletMain->mapKeyMetadata[*keyID].hdKeypath.empty())
             {
-                ret.pushKV("hdkeypath", pwalletMain->mapKeyMetadata[*keyID].hdKeypath);
-                ret.pushKV("hdmasterkeyid", pwalletMain->mapKeyMetadata[*keyID].hdMasterKeyID.GetHex());
+                ret.pushKV("hdkeypath", pwalletMain->mapKeyMetadata[*keyID].hdKeypath, false);
+                ret.pushKV("hdmasterkeyid", pwalletMain->mapKeyMetadata[*keyID].hdMasterKeyID.GetHex(), false);
             }
         }
 #endif

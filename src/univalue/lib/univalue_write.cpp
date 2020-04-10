@@ -63,7 +63,7 @@ void UniValue::writeStream(Stream & ss, unsigned int prettyIndent, unsigned int 
         ss << val;
         break;
     case VBOOL:
-        if (val == "1")
+        if (val == boolTrueVal)
             ss.write("true", 4);
         else
             ss.write("false", 5);

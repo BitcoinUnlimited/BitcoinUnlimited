@@ -12,156 +12,105 @@
 #include <cassert>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 class UniValue {
 public:
     enum VType { VNULL, VOBJ, VARR, VSTR, VNUM, VBOOL, };
 
-    UniValue() { typ = VNULL; }
-    UniValue(UniValue::VType initialType, const std::string& initialStr = "") {
-        typ = initialType;
-        val = initialStr;
-    }
-    UniValue(unsigned int val_) {
-       setInt((uint64_t)val_);
-    }
-    UniValue(unsigned long val_) {
-       setInt((uint64_t)val_);
-    }
-    UniValue(unsigned long long val_) {
-        setInt((uint64_t)val_);
-    }
-    UniValue(int64_t val_) {
-        setInt(val_);
-    }
-    UniValue(bool val_) {
-        setBool(val_);
-    }
-    UniValue(int val_) {
-        setInt(val_);
-    }
-    UniValue(double val_) {
-        setFloat(val_);
-    }
-    UniValue(const std::string& val_) {
-        setStr(val_);
-    }
-    UniValue(const char *val_) {
-        std::string s(val_);
-        setStr(s);
-    }
+    UniValue(UniValue::VType initialType = VNULL) noexcept : typ(initialType) {}
+    UniValue(UniValue::VType initialType, const std::string& initialStr)
+        : typ(initialType), val(initialStr) {}
+    UniValue(UniValue::VType initialType, std::string&& initialStr) noexcept
+        : typ(initialType), val(std::move(initialStr)) {}
+    UniValue(uint64_t val_) { setInt(val_); }
+    UniValue(int64_t val_) { setInt(val_); }
+    UniValue(bool val_) { setBool(val_); }
+    UniValue(int val_) { setInt(val_); }
+    UniValue(unsigned int val_) { setInt(val_); }
+    UniValue(double val_) { setFloat(val_); }
+    UniValue(const std::string& val_) : typ(VSTR), val(val_) {}
+    UniValue(std::string&& val_) noexcept : typ(VSTR), val(std::move(val_)) {}
+    UniValue(const char *val_) : typ(VSTR), val(val_) {}
 
-    void clear();
+    void clear() noexcept;
 
-    bool setNull();
+    bool setNull() noexcept;
     bool setBool(bool val);
     bool setNumStr(const std::string& val);
+    bool setNumStr(std::string&& val) noexcept;
     bool setInt(uint64_t val);
     bool setInt(int64_t val);
-    bool setInt(int val_) { return setInt((int64_t)val_); }
+    bool setInt(unsigned int val);
+    inline bool setInt(int val_) { return setInt(int64_t(val_)); }
     bool setFloat(double val);
     bool setStr(const std::string& val);
-    bool setArray();
-    bool setObject();
+    bool setStr(std::string&& val) noexcept;
+    bool setArray() noexcept;
+    bool setObject() noexcept;
 
-    enum VType getType() const { return typ; }
-    const std::string& getValStr() const { return val; }
-    bool empty() const { return (values.size() == 0); }
+    constexpr enum VType getType() const noexcept { return typ; }
+    constexpr const std::string& getValStr() const noexcept { return val; }
 
-    size_t size() const { return values.size(); }
+    inline bool empty() const noexcept { return values.empty(); }
+    inline size_t size() const noexcept { return values.size(); }
+    bool reserve(size_t n);
 
-    bool getBool() const { return isTrue(); }
+    constexpr bool getBool() const noexcept { return isTrue(); }
     void getObjMap(std::map<std::string,UniValue>& kv) const;
-    bool checkObject(const std::map<std::string,UniValue::VType>& memberTypes) const;
-    const UniValue& operator[](const std::string& key) const;
-    const UniValue& operator[](size_t index) const;
-    bool exists(const std::string& key) const { size_t i; return findKey(key, i); }
+    bool checkObject(const std::map<std::string,UniValue::VType>& memberTypes) const noexcept;
+    const UniValue& operator[](const std::string& key) const noexcept;
+    const UniValue& operator[](size_t index) const noexcept;
+    bool exists(const std::string& key) const noexcept { size_t i; return findKey(key, i); }
 
-    bool isNull() const { return (typ == VNULL); }
-    bool isTrue() const { return (typ == VBOOL) && (val == "1"); }
-    bool isFalse() const { return (typ == VBOOL) && (val != "1"); }
-    bool isBool() const { return (typ == VBOOL); }
-    bool isStr() const { return (typ == VSTR); }
-    bool isNum() const { return (typ == VNUM); }
-    bool isArray() const { return (typ == VARR); }
-    bool isObject() const { return (typ == VOBJ); }
+    constexpr bool isNull() const noexcept { return typ == VNULL; }
+    constexpr bool isTrue() const noexcept { return typ == VBOOL && val == boolTrueVal; }
+    constexpr bool isFalse() const noexcept { return typ == VBOOL && val != boolTrueVal; }
+    constexpr bool isBool() const noexcept { return typ == VBOOL; }
+    constexpr bool isStr() const noexcept { return typ == VSTR; }
+    constexpr bool isNum() const noexcept { return typ == VNUM; }
+    constexpr bool isArray() const noexcept { return typ == VARR; }
+    constexpr bool isObject() const noexcept { return typ == VOBJ; }
 
+    bool push_back(UniValue&& val);
     bool push_back(const UniValue& val);
-    bool push_back(const std::string& val_) {
-        UniValue tmpVal(VSTR, val_);
-        return push_back(tmpVal);
-    }
-    bool push_back(const char *val_) {
-        std::string s(val_);
-        return push_back(s);
-    }
-    bool push_back(uint64_t val_) {
-        UniValue tmpVal(val_);
-        return push_back(tmpVal);
-    }
-    bool push_back(int64_t val_) {
-        UniValue tmpVal(val_);
-        return push_back(tmpVal);
-    }
-    bool push_back(int val_) {
-        UniValue tmpVal(val_);
-        return push_back(tmpVal);
-    }
-    bool push_back(double val_) {
-        UniValue tmpVal(val_);
-        return push_back(tmpVal);
-    }
     bool push_backV(const std::vector<UniValue>& vec);
+    bool push_backV(std::vector<UniValue>&& vec);
 
-    void __pushKV(const std::string& key, const UniValue& val);
-    bool pushKV(const std::string& key, const UniValue& val);
-    bool pushKV(const std::string& key, const std::string& val_) {
-        UniValue tmpVal(VSTR, val_);
-        return pushKV(key, tmpVal);
-    }
-    bool pushKV(const std::string& key, const char *val_) {
-        std::string _val(val_);
-        return pushKV(key, _val);
-    }
-    bool pushKV(const std::string& key, int64_t val_) {
-        UniValue tmpVal(val_);
-        return pushKV(key, tmpVal);
-    }
-    bool pushKV(const std::string& key, uint64_t val_) {
-        UniValue tmpVal(val_);
-        return pushKV(key, tmpVal);
-    }
-    bool pushKV(const std::string& key, bool val_) {
-        UniValue tmpVal((bool)val_);
-        return pushKV(key, tmpVal);
-    }
-    bool pushKV(const std::string& key, int val_) {
-        UniValue tmpVal((int64_t)val_);
-        return pushKV(key, tmpVal);
-    }
-    bool pushKV(const std::string& key, double val_) {
-        UniValue tmpVal(val_);
-        return pushKV(key, tmpVal);
-    }
+    // checkForDupes=true is slower, but does a linear search through the keys to overwrite existing keys.
+    // checkForDupes=false is faster, and will always append the new entry at the end (even if `key` exists).
+    bool pushKV(const std::string& key, const UniValue& val, bool checkForDupes = true);
+    bool pushKV(const std::string& key, UniValue&& val, bool checkForDupes = true);
+    bool pushKV(std::string&& key, const UniValue& val, bool checkForDupes = true);
+    bool pushKV(std::string&& key, UniValue&& val, bool checkForDupes = true);
+    // Inserts all key/value pairs from `obj` into `this`.
+    // Caveat: For performance, `this` is not checked for duplicate keys coming in from `obj`.
+    // As a result, `this` may end up with duplicate keys if `obj` contains keys already
+    // present in `this`.
     bool pushKVs(const UniValue& obj);
+    bool pushKVs(UniValue&& obj);
 
     std::string write(unsigned int prettyIndent = 0,
                       unsigned int indentLevel = 0) const;
 
     bool read(const char *raw, size_t len);
-    bool read(const char *raw) { return read(raw, strlen(raw)); }
-    bool read(const std::string& rawStr) {
-        return read(rawStr.data(), rawStr.size());
-    }
+    inline bool read(const char *raw) { return read(raw, strlen(raw)); }
+    inline bool read(const std::string& rawStr) { return read(rawStr.data(), rawStr.size()); }
 
 private:
     UniValue::VType typ;
     std::string val;                       // numbers are stored as C++ strings
     std::vector<std::string> keys;
     std::vector<UniValue> values;
+    static const std::string boolTrueVal; // = "1"
 
-    bool findKey(const std::string& key, size_t& retIdx) const;
+    bool findKey(const std::string& key, size_t& retIdx) const noexcept;
+    // __pushKV does not check for duplicate keys and simply appends at the end
+    void __pushKV(const std::string& key, const UniValue& val);
+    void __pushKV(const std::string& key, UniValue&& val);
+    void __pushKV(std::string&& key, UniValue&& val);
+    void __pushKV(std::string&& key, const UniValue& val);
 
     struct Stream;
 
@@ -188,8 +137,8 @@ public:
     const UniValue& get_obj() const;
     const UniValue& get_array() const;
 
-    enum VType type() const { return getType(); }
-    friend const UniValue& find_value( const UniValue& obj, const std::string& name);
+    constexpr enum VType type() const noexcept { return getType(); }
+    friend const UniValue& find_value( const UniValue& obj, const std::string& name) noexcept;
 };
 
 enum jtokentype {
@@ -210,9 +159,9 @@ enum jtokentype {
 
 extern enum jtokentype getJsonToken(std::string& tokenVal,
                                     unsigned int& consumed, const char *raw, const char *end);
-extern const char *uvTypeName(UniValue::VType t);
+extern const char *uvTypeName(UniValue::VType t) noexcept;
 
-static inline bool jsonTokenIsValue(enum jtokentype jtt)
+static constexpr bool jsonTokenIsValue(enum jtokentype jtt) noexcept
 {
     switch (jtt) {
     case JTOK_KW_NULL:
@@ -229,7 +178,7 @@ static inline bool jsonTokenIsValue(enum jtokentype jtt)
     // not reached
 }
 
-static inline bool json_isspace(int ch)
+static constexpr bool json_isspace(int ch) noexcept
 {
     switch (ch) {
     case 0x20:
@@ -247,6 +196,6 @@ static inline bool json_isspace(int ch)
 
 extern const UniValue NullUniValue;
 
-const UniValue& find_value( const UniValue& obj, const std::string& name);
+const UniValue& find_value( const UniValue& obj, const std::string& name) noexcept;
 
 #endif // __UNIVALUE_H__

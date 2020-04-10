@@ -71,7 +71,7 @@ public:
     }
     // Check that we're in a state where the string can be ended
     // No open sequences, no open surrogate pairs, etc
-    bool finalize()
+    bool finalize() noexcept
     {
         if (state || surpair)
             is_valid = false;

@@ -1748,7 +1748,7 @@ UniValue listtransactions(const UniValue &params, bool fHelp)
 
     ret.clear();
     ret.setArray();
-    ret.push_backV(arrTmp);
+    ret.push_backV(std::move(arrTmp));
 
     return ret;
 }

@@ -437,6 +437,7 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
     aCaps.push_back("proposal");
 
     UniValue transactions(UniValue::VARR);
+    transactions.reserve(pblock->vtx.size());
     map<uint256, int64_t> setTxIndex;
     int i = 0;
     int sigcheckTotal = 0;
@@ -451,9 +452,9 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
 
         UniValue entry(UniValue::VOBJ);
 
-        entry.pushKV("data", EncodeHexTx(tx));
+        entry.pushKV("data", EncodeHexTx(tx), false);
 
-        entry.pushKV("hash", txHash.GetHex());
+        entry.pushKV("hash", txHash.GetHex(), false);
 
         UniValue deps(UniValue::VARR);
         for (const CTxIn &in : tx.vin)
@@ -466,16 +467,16 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
         int index_in_template = i - 1;
         entry.pushKV("fee", pblocktemplate->vTxFees[index_in_template]);
         if (!may2020Enabled)
-            entry.pushKV("sigops", pblocktemplate->vTxSigOps[index_in_template]);
+            entry.pushKV("sigops", pblocktemplate->vTxSigOps[index_in_template], false);
         else
         {
             // sigops is deprecated and not part of this block's consensus so report 0
-            entry.pushKV("sigops", 0);
-            entry.pushKV("sigchecks", pblocktemplate->vTxSigOps[index_in_template]);
+            entry.pushKV("sigops", 0, false);
+            entry.pushKV("sigchecks", pblocktemplate->vTxSigOps[index_in_template], false);
             sigcheckTotal += pblocktemplate->vTxSigOps[index_in_template];
         }
 
-        transactions.push_back(entry);
+        transactions.push_back(std::move(entry));
     }
 
     UniValue aRules(UniValue::VARR);
@@ -498,11 +499,11 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
     aMutable.push_back("prevblock");
 
     UniValue result(UniValue::VOBJ);
-    result.pushKV("capabilities", aCaps);
-    result.pushKV("version", pblock->nVersion);
-    result.pushKV("rules", aRules);
-    result.pushKV("vbavailable", vbavailable);
-    result.pushKV("vbrequired", int(0));
+    result.pushKV("capabilities", aCaps, false);
+    result.pushKV("version", pblock->nVersion, false);
+    result.pushKV("rules", aRules, false);
+    result.pushKV("vbavailable", vbavailable, false);
+    result.pushKV("vbrequired", int(0), false);
 
     if (nMaxVersionPreVB >= 2)
     {
@@ -516,29 +517,29 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
         aMutable.push_back("version/force");
     }
 
-    result.pushKV("previousblockhash", pblock->hashPrevBlock.GetHex());
-    result.pushKV("transactions", transactions);
-    result.pushKV("coinbaseaux", aux);
-    result.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue);
-    result.pushKV("longpollid", chainActive.Tip()->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast));
-    result.pushKV("target", hashTarget.GetHex());
-    result.pushKV("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1);
-    result.pushKV("mutable", aMutable);
-    result.pushKV("noncerange", "00000000ffffffff");
+    result.pushKV("previousblockhash", pblock->hashPrevBlock.GetHex(), false);
+    result.pushKV("transactions", transactions, false);
+    result.pushKV("coinbaseaux", aux, false);
+    result.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue, false);
+    result.pushKV("longpollid", chainActive.Tip()->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast), false);
+    result.pushKV("target", hashTarget.GetHex(), false);
+    result.pushKV("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1, false);
+    result.pushKV("mutable", aMutable, false);
+    result.pushKV("noncerange", "00000000ffffffff", false);
 
     // Deprecated after may 2020 but leave it in in case miners are using it in their code.
-    result.pushKV("sigoplimit", (int64_t)MAX_BLOCK_SIGOPS_PER_MB);
+    result.pushKV("sigoplimit", (int64_t)MAX_BLOCK_SIGOPS_PER_MB, false);
     if (may2020Enabled)
     {
-        result.pushKV("sigchecklimit", maxSigChecks.Value());
-        result.pushKV("sigchecktotal", sigcheckTotal);
+        result.pushKV("sigchecklimit", maxSigChecks.Value(), false);
+        result.pushKV("sigchecktotal", sigcheckTotal, false);
     }
 
-    result.pushKV("sizelimit", (int64_t)maxGeneratedBlock);
-    result.pushKV("curtime", pblock->GetBlockTime());
-    result.pushKV("bits", strprintf("%08x", pblock->nBits));
+    result.pushKV("sizelimit", (int64_t)maxGeneratedBlock, false);
+    result.pushKV("curtime", pblock->GetBlockTime(), false);
+    result.pushKV("bits", strprintf("%08x", pblock->nBits), false);
     // BU get the height directly from the block because pindexPrev could change if another block has come in.
-    result.pushKV("height", (int64_t)(pblock->GetHeight()));
+    result.pushKV("height", (int64_t)(pblock->GetHeight()), false);
 
     return result;
 }

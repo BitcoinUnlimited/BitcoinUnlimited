@@ -5,25 +5,27 @@
 #include <string.h>
 #include <vector>
 #include <stdio.h>
+#include <utility>
 #include "univalue.h"
 #include "univalue_utffilter.h"
 
+namespace {
 /*
  * According to stackexchange, the original json test suite wanted
  * to limit depth to 22.  Widely-deployed PHP bails at depth 512,
  * so we will follow PHP's lead, which should be more than sufficient
  * (further stackexchange comments indicate depth > 32 rarely occurs).
  */
-static const size_t MAX_JSON_DEPTH = 512;
+constexpr size_t MAX_JSON_DEPTH = 512;
 
-static bool json_isdigit(int ch)
+constexpr bool json_isdigit(int ch) noexcept
 {
     return ((ch >= '0') && (ch <= '9'));
 }
 
 // convert hexadecimal string to unsigned integer
-static const char *hatoui(const char *first, const char *last,
-                          unsigned int& out)
+const char *hatoui(const char *first, const char *last,
+                   unsigned int& out) noexcept
 {
     unsigned int result = 0;
     for (; first != last; ++first)
@@ -47,9 +49,10 @@ static const char *hatoui(const char *first, const char *last,
 
     return first;
 }
+} // end anonymous namespace
 
 enum jtokentype getJsonToken(std::string& tokenVal, unsigned int& consumed,
-                            const char *raw, const char *end)
+                             const char *raw, const char *end)
 {
     tokenVal.clear();
     consumed = 0;
@@ -323,9 +326,8 @@ bool UniValue::read(const char *raw, size_t size)
                     setArray();
                 stack.push_back(this);
             } else {
-                UniValue tmpVal(utyp);
                 UniValue *top = stack.back();
-                top->values.push_back(tmpVal);
+                top->values.emplace_back(utyp);
 
                 UniValue *newTop = &(top->values.back());
                 stack.push_back(newTop);
@@ -400,26 +402,26 @@ bool UniValue::read(const char *raw, size_t size)
             }
 
             if (!stack.size()) {
-                *this = tmpVal;
+                *this = std::move(tmpVal);
                 break;
             }
 
             UniValue *top = stack.back();
-            top->values.push_back(tmpVal);
+            top->values.emplace_back(std::move(tmpVal));
 
             setExpect(NOT_VALUE);
             break;
             }
 
         case JTOK_NUMBER: {
-            UniValue tmpVal(VNUM, tokenVal);
+            UniValue tmpVal(VNUM, std::move(tokenVal));
             if (!stack.size()) {
-                *this = tmpVal;
+                *this = std::move(tmpVal);
                 break;
             }
 
             UniValue *top = stack.back();
-            top->values.push_back(tmpVal);
+            top->values.emplace_back(std::move(tmpVal));
 
             setExpect(NOT_VALUE);
             break;
@@ -432,13 +434,13 @@ bool UniValue::read(const char *raw, size_t size)
                 clearExpect(OBJ_NAME);
                 setExpect(COLON);
             } else {
-                UniValue tmpVal(VSTR, tokenVal);
+                UniValue tmpVal(VSTR, std::move(tokenVal));
                 if (!stack.size()) {
-                    *this = tmpVal;
+                    *this = std::move(tmpVal);
                     break;
                 }
                 UniValue *top = stack.back();
-                top->values.push_back(tmpVal);
+                top->values.emplace_back(std::move(tmpVal));
             }
 
             setExpect(NOT_VALUE);
@@ -457,4 +459,3 @@ bool UniValue::read(const char *raw, size_t size)
 
     return true;
 }
-

@@ -1085,12 +1085,12 @@ UniValue decodescript(const UniValue &params, bool fHelp)
 static void TxInErrorToJSON(const CTxIn &txin, UniValue &vErrorsRet, const std::string &strMessage)
 {
     UniValue entry(UniValue::VOBJ);
-    entry.pushKV("txid", txin.prevout.hash.ToString());
-    entry.pushKV("vout", (uint64_t)txin.prevout.n);
-    entry.pushKV("scriptSig", HexStr(txin.scriptSig.begin(), txin.scriptSig.end()));
-    entry.pushKV("sequence", (uint64_t)txin.nSequence);
-    entry.pushKV("error", strMessage);
-    vErrorsRet.push_back(entry);
+    entry.pushKV("txid", txin.prevout.hash.ToString(), false);
+    entry.pushKV("vout", (uint64_t)txin.prevout.n, false);
+    entry.pushKV("scriptSig", HexStr(txin.scriptSig.begin(), txin.scriptSig.end()), false);
+    entry.pushKV("sequence", (uint64_t)txin.nSequence, false);
+    entry.pushKV("error", strMessage, false);
+    vErrorsRet.push_back(std::move(entry));
 }
 
 UniValue signrawtransaction(const UniValue &params, bool fHelp)
@@ -1397,11 +1397,11 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     bool fComplete = vErrors.empty();
 
     UniValue result(UniValue::VOBJ);
-    result.pushKV("hex", EncodeHexTx(mergedTx));
-    result.pushKV("complete", fComplete);
+    result.pushKV("hex", EncodeHexTx(mergedTx), false);
+    result.pushKV("complete", fComplete, false);
     if (!vErrors.empty())
     {
-        result.pushKV("errors", vErrors);
+        result.pushKV("errors", std::move(vErrors), false);
     }
 
     return result;
