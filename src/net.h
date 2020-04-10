@@ -754,6 +754,12 @@ public:
         filterInventoryKnown.insert(inv.hash);
     }
 
+    /**
+     * Add a reference of a new INV message to the inventory
+     *
+     * @param[in] inv reference to new INV object
+     * @param[in] force whether or not force the push in case the INV was already added
+     */
     void PushInventory(const CInv &inv, bool force = false)
     {
         LOCK(cs_inventory);
@@ -762,12 +768,18 @@ public:
         vInventoryToSend.push_back(inv);
     }
 
+    /** Get size onf INVs inventory n a thread safe way*/
     unsigned int GetInventoryToSendSize()
     {
         LOCK(cs_inventory);
         return vInventoryToSend.size();
     }
 
+    /**
+     * Add a reference of a new hash block to the list of blocks need to be announced
+     *
+     * @param[in] hash reference to the hash of the new block to announce
+     */
     void PushBlockHash(const uint256 &hash)
     {
         LOCK(cs_inventory);
