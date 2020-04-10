@@ -762,6 +762,12 @@ public:
         vInventoryToSend.push_back(inv);
     }
 
+    unsigned int GetInventoryToSendSize()
+    {
+        LOCK(cs_inventory);
+        return vInventoryToSend.size();
+    }
+
     void PushBlockHash(const uint256 &hash)
     {
         LOCK(cs_inventory);

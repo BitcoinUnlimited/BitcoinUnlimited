@@ -61,22 +61,25 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     RespendRelayer r;
     r.AddOutpointConflict(COutPoint{}, dummy, MakeTransactionRef(respend), true, false);
     r.Trigger();
-    BOOST_CHECK_EQUAL(size_t(0), node.vInventoryToSend.size());
+    BOOST_CHECK_EQUAL(size_t(0), node.GetInventoryToSendSize());
     r.SetValid(true);
     r.Trigger();
-    BOOST_CHECK_EQUAL(size_t(0), node.vInventoryToSend.size());
+    BOOST_CHECK_EQUAL(size_t(0), node.GetInventoryToSendSize());
 
     // Create an interesting, but invalid respend
     r.AddOutpointConflict(COutPoint{}, dummy, MakeTransactionRef(respend), false, false);
     BOOST_CHECK(r.IsInteresting());
     r.SetValid(false);
     r.Trigger();
-    BOOST_CHECK_EQUAL(size_t(0), node.vInventoryToSend.size());
+    BOOST_CHECK_EQUAL(size_t(0), node.GetInventoryToSendSize());
     // make valid
     r.SetValid(true);
     r.Trigger();
-    BOOST_CHECK_EQUAL(size_t(1), node.vInventoryToSend.size());
-    BOOST_CHECK(respend.GetHash() == node.vInventoryToSend.at(0).hash);
+    BOOST_CHECK_EQUAL(size_t(1), node.GetInventoryToSendSize());
+    {
+        LOCK(node.cs_inventory);
+        BOOST_CHECK(respend.GetHash() == node.vInventoryToSend.at(0).hash);
+    }
 
     // Create an interesting and valid respend to an SPV peer
     // add bloom filter using the respend hash.
@@ -86,11 +89,14 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
         delete node.pfilter;
         node.pfilter = filter;
         node.pfilter->insert(respend.GetHash());
+    }
+    {
+        LOCK(node.cs_inventory);
         node.vInventoryToSend.clear();
     }
     r.SetValid(true);
     r.Trigger();
-    BOOST_CHECK_EQUAL(size_t(0), node.vInventoryToSend.size());
+    BOOST_CHECK_EQUAL(size_t(0), node.GetInventoryToSendSize());
     {
         LOCK(node.cs_filter);
         node.pfilter->clear();
