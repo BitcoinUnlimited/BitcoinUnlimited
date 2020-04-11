@@ -85,6 +85,13 @@ public:
     void TrackLockOrderHistory(const CLockLocation &locklocation, const std::vector<LockStackEntry> &heldLocks);
 
     /**
+     * Removes lock order information for a mutex that has been deleted
+     *
+     * @param a void pointer to the mutex that is being deleted
+     */
+    void DeleteCritical(void *cs);
+
+    /**
      * clears all historical lock ordering data from this
      *
      * should only be called in the test suite
