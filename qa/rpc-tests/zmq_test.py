@@ -25,6 +25,7 @@ class ZMQTest (BitcoinTestFramework):
         self.zmqSubSocket = self.zmqContext.socket(zmq.SUB)
         self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"hashblock")
         self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"hashtx")
+        self.zmqSubSocket.RCVTIMEO = 30000
         self.zmqSubSocket.linger = 500
         self.zmqSubSocket.connect("tcp://127.0.0.1:%i" % self.port)
         return start_nodes(4, self.options.tmpdir, extra_args=[
@@ -93,5 +94,7 @@ if __name__ == '__main__':
 
 def Test():
     flags = standardFlags()
-    ZMQTest ().main (flags)
+    t = ZMQTest()
+    t.drop_to_pdb = True
+    t.main(flags)
  
