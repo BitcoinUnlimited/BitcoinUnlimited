@@ -364,6 +364,7 @@ bool BlockAssembler::TestPackageSigOps(uint64_t packageSize, unsigned int packag
         maxSigOpsAllowed = GetMaxBlockSigOpsCount(nBlockSize + packageSize);
     }
 
+    // Note that the may2020 rule should be > so this assembles a block with 1 less sigcheck than possible
     if (nBlockSigOps + packageSigOps >= maxSigOpsAllowed)
         return false;
     return true;
@@ -404,24 +405,38 @@ bool BlockAssembler::IsIncrementallyGood(uint64_t nExtraSize, unsigned int nExtr
         return false;
     }
 
-    // Enforce the "old" sigops for <= 1MB blocks
-    if (nBlockSize + nExtraSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
+    if (!may2020Enabled)
     {
-        // BU: be conservative about what is generated
-        if (nBlockSigOps + nExtraSigOps >= MAX_BLOCK_SIGOPS_PER_MB)
+        // Enforce the "old" sigops for <= 1MB blocks
+        if (nBlockSize + nExtraSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
         {
-            // BU: so a block that is near the sigops limit might be shorter than it could be if
-            // the high sigops tx was backed out and other tx added.
-            if (nBlockSigOps > MAX_BLOCK_SIGOPS_PER_MB - 2)
-                blockFinished = true;
-            return false;
+            // BU: be conservative about what is generated
+            if (nBlockSigOps + nExtraSigOps >= MAX_BLOCK_SIGOPS_PER_MB)
+            {
+                // BU: so a block that is near the sigops limit might be shorter than it could be if
+                // the high sigops tx was backed out and other tx added.
+                if (nBlockSigOps > MAX_BLOCK_SIGOPS_PER_MB - 2)
+                    blockFinished = true;
+                return false;
+            }
+        }
+        else
+        {
+            if (nBlockSigOps + nExtraSigOps > GetMaxBlockSigOpsCount(nBlockSize))
+            {
+                if (nBlockSigOps > GetMaxBlockSigOpsCount(nBlockSize) - 2)
+                    // very close to the limit, so the block is finished.  So a block that is near the sigops limit
+                    // might be shorter than it could be if the high sigops tx was backed out and other tx added.
+                    blockFinished = true;
+                return false;
+            }
         }
     }
-    else
+    else // may2020
     {
-        if (nBlockSigOps + nExtraSigOps > GetMaxBlockSigOpsCount(nBlockSize))
+        if (nBlockSigOps + nExtraSigOps > maxSigOpsAllowed)
         {
-            if (nBlockSigOps > GetMaxBlockSigOpsCount(nBlockSize) - 2)
+            if (nBlockSigOps > maxSigOpsAllowed - 2)
                 // very close to the limit, so the block is finished.  So a block that is near the sigops limit
                 // might be shorter than it could be if the high sigops tx was backed out and other tx added.
                 blockFinished = true;
