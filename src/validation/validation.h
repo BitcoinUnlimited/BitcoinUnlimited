@@ -83,7 +83,8 @@ bool TestBlockValidity(CValidationState &state,
     const CBlock &block,
     CBlockIndex *pindexPrev,
     bool fCheckPOW = true,
-    bool fCheckMerkleRoot = true);
+    bool fCheckMerkleRoot = true,
+    bool fConservative = false);
 
 // used during mining
 extern bool TestConservativeBlockValidity(CValidationState &state,

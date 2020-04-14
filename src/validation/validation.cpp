@@ -1194,7 +1194,8 @@ bool TestBlockValidity(CValidationState &state,
     const CBlock &block,
     CBlockIndex *pindexPrev,
     bool fCheckPOW,
-    bool fCheckMerkleRoot)
+    bool fCheckMerkleRoot,
+    bool fConservative)
 {
     AssertLockHeld(cs_main);
     assert(pindexPrev && pindexPrev == chainActive.Tip());
