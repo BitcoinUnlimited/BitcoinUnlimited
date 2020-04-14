@@ -87,7 +87,7 @@ bool TestBlockValidity(CValidationState &state,
     bool fConservative = false);
 
 // used during mining
-extern bool TestConservativeBlockValidity(CValidationState &state,
+bool TestConservativeBlockValidity(CValidationState &state,
     const CChainParams &chainparams,
     const CBlock &block,
     CBlockIndex *pindexPrev,
