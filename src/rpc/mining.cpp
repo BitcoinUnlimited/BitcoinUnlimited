@@ -469,6 +469,8 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
             entry.pushKV("sigops", pblocktemplate->vTxSigOps[index_in_template]);
         else
         {
+            // sigops is deprecated and not part of this block's consensus so report 0
+            entry.pushKV("sigops", 0);
             entry.pushKV("sigchecks", pblocktemplate->vTxSigOps[index_in_template]);
             sigcheckTotal += pblocktemplate->vTxSigOps[index_in_template];
         }
@@ -523,11 +525,10 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
     result.pushKV("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1);
     result.pushKV("mutable", aMutable);
     result.pushKV("noncerange", "00000000ffffffff");
-    if (!may2020Enabled)
-    {
-        result.pushKV("sigoplimit", (int64_t)MAX_BLOCK_SIGOPS_PER_MB);
-    }
-    else
+
+    // Deprecated after may 2020 but leave it in in case miners are using it in their code.
+    result.pushKV("sigoplimit", (int64_t)MAX_BLOCK_SIGOPS_PER_MB);
+    if (may2020Enabled)
     {
         result.pushKV("sigchecklimit", maxSigChecks.Value());
         result.pushKV("sigchecktotal", sigcheckTotal);
