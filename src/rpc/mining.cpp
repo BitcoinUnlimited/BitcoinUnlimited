@@ -431,6 +431,7 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
     const int nMaxVersionPreVB,
     const unsigned int nTransactionsUpdatedLast)
 {
+    bool may2020Enabled = IsMay2020Enabled(Params().GetConsensus(), pindexPrev);
     CBlock *pblock = &pblocktemplate->block; // pointer for convenience
     UniValue aCaps(UniValue::VARR);
     aCaps.push_back("proposal");
@@ -438,6 +439,7 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
     UniValue transactions(UniValue::VARR);
     map<uint256, int64_t> setTxIndex;
     int i = 0;
+    int sigcheckTotal = 0;
     for (const auto &it : pblock->vtx)
     {
         const CTransaction &tx = *it;
@@ -463,7 +465,15 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
 
         int index_in_template = i - 1;
         entry.pushKV("fee", pblocktemplate->vTxFees[index_in_template]);
-        entry.pushKV("sigops", pblocktemplate->vTxSigOps[index_in_template]);
+        if (!may2020Enabled)
+            entry.pushKV("sigops", pblocktemplate->vTxSigOps[index_in_template]);
+        else
+        {
+            // sigops is deprecated and not part of this block's consensus so report 0
+            entry.pushKV("sigops", 0);
+            entry.pushKV("sigchecks", pblocktemplate->vTxSigOps[index_in_template]);
+            sigcheckTotal += pblocktemplate->vTxSigOps[index_in_template];
+        }
 
         transactions.push_back(entry);
     }
@@ -515,7 +525,15 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
     result.pushKV("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1);
     result.pushKV("mutable", aMutable);
     result.pushKV("noncerange", "00000000ffffffff");
+
+    // Deprecated after may 2020 but leave it in in case miners are using it in their code.
     result.pushKV("sigoplimit", (int64_t)MAX_BLOCK_SIGOPS_PER_MB);
+    if (may2020Enabled)
+    {
+        result.pushKV("sigchecklimit", maxSigChecks.Value());
+        result.pushKV("sigchecktotal", sigcheckTotal);
+    }
+
     result.pushKV("sizelimit", (int64_t)maxGeneratedBlock);
     result.pushKV("curtime", pblock->GetBlockTime());
     result.pushKV("bits", strprintf("%08x", pblock->nBits));
