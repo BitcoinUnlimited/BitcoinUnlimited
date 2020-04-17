@@ -8,6 +8,8 @@
 #include <vector>
 #include <map>
 
+class CXVersionMessage;
+
 /// Electrs specific code goes in here. Separating generic electrum code allows
 /// us to support multiple, or swap electrum implementation in the future.
 
@@ -17,6 +19,8 @@ std::string electrs_path();
 std::vector<std::string> electrs_args(int rpcport, const std::string& network);
 
 std::map<std::string, int64_t> fetch_electrs_info();
+
+void set_xversion_flags(CXVersionMessage&, const std::string& network);
 
 } // ns electrum
 

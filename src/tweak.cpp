@@ -59,6 +59,7 @@ UniValue gettweak(const UniValue &params, bool fHelp)
 
     for (unsigned int i = 0; i < psize; i++)
     {
+        bool fMatch = false;
         string name = params[i].get_str();
         if (name == "help")
         {
@@ -77,9 +78,19 @@ UniValue gettweak(const UniValue &params, bool fHelp)
                     ret.pushKV(item->second->GetName(), item->second->GetHelp());
                 else
                     ret.pushKV(item->second->GetName(), item->second->Get());
+
+                fMatch = true;
             }
         }
+        if (!fMatch)
+        {
+            std::string error = "No tweak available for " + name;
+            throw std::invalid_argument(error.c_str());
+        }
     }
+    if (ret.empty())
+        throw std::invalid_argument("No tweak available for that selection");
+
     return ret;
 }
 // RPC Set a particular tweak
@@ -129,6 +140,7 @@ UniValue settweak(const UniValue &params, bool fHelp)
 
     // Now assign
     UniValue ret(UniValue::VARR);
+    UniValue names(UniValue::VARR);
     for (unsigned int i = 0; i < params.size(); i++)
     {
         string s = params[i].get_str();
@@ -148,12 +160,18 @@ UniValue settweak(const UniValue &params, bool fHelp)
             {
                 ret.push_back(tmp);
             }
+
+            names.push_back(name);
+        }
+        else
+        {
+            std::string error = "No tweak available for " + name;
+            throw std::invalid_argument(error.c_str());
         }
     }
-
     if (!ret.empty())
     {
         return ret;
     }
-    return NullUniValue;
+    return gettweak(names, false);
 }

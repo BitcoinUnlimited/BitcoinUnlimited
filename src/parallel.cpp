@@ -33,7 +33,8 @@ static const unsigned int nScriptCheckQueues = 4;
 
 std::unique_ptr<CParallelValidation> PV;
 
-static void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef pblock, const CInv inv);
+bool ShutdownRequested();
+static void HandleBlockMessageThread(CNodeRef noderef, const string strCommand, CBlockRef pblock, const CInv inv);
 
 static void AddScriptCheckThreads(int i, CCheckQueue<CScriptCheck> *pqueue)
 {
@@ -47,10 +48,30 @@ bool CScriptCheck::operator()()
 {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
     CachingTransactionSignatureChecker checker(ptxTo, nIn, amount, nFlags, cacheStore);
-    if (!VerifyScript(scriptSig, scriptPubKey, nFlags, maxOps, checker, &error, &sighashType))
+    ScriptMachineResourceTracker smRes;
+    if (!VerifyScript(scriptSig, scriptPubKey, nFlags, maxOps, checker, &error, &smRes))
+    {
+        LOGA("Script Error: %s\n", ScriptErrorString(error));
         return false;
+    }
     if (resourceTracker)
+    {
         resourceTracker->Update(ptxTo->GetHash(), checker.GetNumSigops(), checker.GetBytesHashed());
+        resourceTracker->UpdateConsensusSigChecks(smRes.consensusSigCheckCount);
+    }
+    if (nFlags & SCRIPT_VERIFY_INPUT_SIGCHECKS)
+    {
+        auto lenScriptSig = scriptSig.size();
+        // May 2020 transaction input standardness rule
+        // if < 2 scriptsig len is allowed to be 0 (len formula goes negative)
+        if ((smRes.consensusSigCheckCount > 1) && ((smRes.consensusSigCheckCount * 43) - 60 > lenScriptSig))
+        {
+            error = SIGCHECKS_LIMIT_EXCEEDED;
+            LOGA("Sigchecks limit exceeded, with %d sigchecks: min script length (%d) > satisfier script len (%d)",
+                smRes.consensusSigCheckCount, (smRes.consensusSigCheckCount * 43) - 60, lenScriptSig);
+            return false;
+        }
+    }
     return true;
 }
 
@@ -148,9 +169,11 @@ bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlo
 
         // Assign the nSequenceId for the block being validated in this thread. cs_main must be locked for lookup on
         // pindex.
-        if (pindex->nSequenceId > 0)
-            pValidationThread->nSequenceId = pindex->nSequenceId;
-
+        {
+            READLOCK(cs_mapBlockIndex);
+            if (pindex->nSequenceId > 0)
+                pValidationThread->nSequenceId = pindex->nSequenceId;
+        }
         pValidationThread->fIsValidating = true;
     }
 
@@ -229,7 +252,7 @@ void CParallelValidation::QuitCompetingThreads(const uint256 &prevBlockHash)
     }
 }
 
-bool CParallelValidation::IsAlreadyValidating(const NodeId nodeid)
+bool CParallelValidation::IsAlreadyValidating(const NodeId nodeid, const uint256 blockhash)
 {
     // Don't allow a second thinblock to validate if this node is already in the process of validating a block.
     LOCK(cs_blockvalidationthread);
@@ -237,7 +260,7 @@ bool CParallelValidation::IsAlreadyValidating(const NodeId nodeid)
         mapBlockValidationThreads.begin();
     while (iter != mapBlockValidationThreads.end())
     {
-        if ((*iter).second.nodeid == nodeid)
+        if ((*iter).second.nodeid == nodeid && (*iter).second.hash == blockhash)
         {
             return true;
         }
@@ -376,7 +399,7 @@ void CParallelValidation::SetLocks(const bool fParallel)
     }
 }
 
-void CParallelValidation::IsReorgInProgress(const boost::thread::id this_id, const bool fReorg, const bool fParallel)
+void CParallelValidation::MarkReorgInProgress(const boost::thread::id this_id, const bool fReorg, const bool fParallel)
 {
     if (fParallel)
     {
@@ -543,28 +566,27 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
 
     // Add a reference here because we are detaching a thread which may run for a long time and
     // we do not want CNode to be deleted if the node should disconnect while we are processing this block.
-    // We will clean up this reference when the thread finishes.
-    {
-        // We do not have to take a vNodes lock here as would usually be the case because at this point there
-        // will be at least one ref already and we therefore don't have to worry about getting disconnected.
-        pfrom->AddRef();
-    }
+    //
+    // We do not have to take a vNodes lock here as would usually be the case because at this point there
+    // will be at least one ref already and we therefore don't have to worry about getting disconnected.
+    CNodeRef noderef(pfrom);
 
     // only launch block validation in a separate thread if PV is enabled.
-    if (PV->Enabled())
+    if (PV->Enabled() && !ShutdownRequested())
     {
-        boost::thread thread(boost::bind(&HandleBlockMessageThread, pfrom, strCommand, pblock, inv));
+        boost::thread thread(boost::bind(&HandleBlockMessageThread, noderef, strCommand, pblock, inv));
         thread.detach();
     }
     else
     {
-        HandleBlockMessageThread(pfrom, strCommand, pblock, inv);
+        HandleBlockMessageThread(noderef, strCommand, pblock, inv);
     }
 }
 
-void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef pblock, const CInv inv)
+void HandleBlockMessageThread(CNodeRef noderef, const string strCommand, CBlockRef pblock, const CInv inv)
 {
     boost::thread::id this_id(boost::this_thread::get_id());
+    CNode *pfrom = noderef.get();
 
     try
     {
@@ -623,9 +645,9 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
         }
 
         // When we request a thin type block we may get back a regular block if it is smaller than
-        // either of the former.  Therefore we have to remove the thintype block in flight if it
-        // exists and we also need to check that the block didn't arrive from some other peer.
-        thinrelay.ClearBlockInFlight(pfrom, inv.hash);
+        // either of the former.  Therefore we have to remove the thintype block in flight and any
+        // associated data.
+        thinrelay.ClearAllBlockData(pfrom, inv.hash);
 
         // Increment block counter
         pfrom->firstBlock += 1;
@@ -648,17 +670,15 @@ void HandleBlockMessageThread(CNode *pfrom, const string strCommand, CBlockRef p
     // able to clean up the semaphore, tracking map and node reference.
     try
     {
-        // Clear thread data - this must be done before the thread completes or else some other new
-        // thread may grab the same thread id and we would end up deleting the entry for the new thread instead.
-        PV->Erase(this_id);
-
-        // release semaphores depending on whether this was IBD or not.  We can not use IsChainNearlySyncd()
-        // because the return value will switch over when IBD is nearly finished and we may end up not releasing
-        // the correct semaphore.
+        // release the semaphore.
         PV->Post();
 
-        // Remove the CNode reference we aquired just before we launched this thread.
-        pfrom->Release();
+        // Clear thread data - this must be done before the thread completes or else some other new
+        // thread may grab the same thread id and we would end up deleting the entry for the new thread instead.
+        //
+        // Furthermore this step must also be done as the last step of this thread.
+        // otherwise, shutdown could proceed before the validation thread has entirely completed.
+        PV->Erase(this_id);
     }
     catch (const std::exception &e)
     {

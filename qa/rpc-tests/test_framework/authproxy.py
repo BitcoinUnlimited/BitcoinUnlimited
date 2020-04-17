@@ -49,7 +49,7 @@ except ImportError:
 
 USER_AGENT = "AuthServiceProxy/0.1"
 
-HTTP_TIMEOUT = 60
+HTTP_TIMEOUT = 120
 
 log = logging.getLogger("BitcoinRPC")
 
@@ -137,7 +137,7 @@ class AuthServiceProxy(object):
             self.__conn.request(method, path, postdata, headers)
             return self._get_response()
           except httplib.CannotSendRequest as e:
-            print("Cannot send request:", str(e))
+            log.error("%s:%s Cannot send request: %s" % (self.__service_url, self.__url.port ,str(e)))
             self.reconnect()
           except httplib.BadStatusLine as e:
             if e.line == "''": # if connection was closed, try again

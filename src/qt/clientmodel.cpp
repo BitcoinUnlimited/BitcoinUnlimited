@@ -12,6 +12,7 @@
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "clientversion.h"
+#include "dosman.h"
 #include "net.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
@@ -164,7 +165,8 @@ QString ClientModel::clientName() const { return QString::fromStdString(CLIENT_N
 QString ClientModel::formatClientStartupTime() const
 {
     QString time_format = "MMM d yyyy, HH:mm:ss";
-    return QDateTime::fromTime_t(nClientStartupTime).toString(time_format);
+    // return QDateTime::fromTime_t(GetStartupTime()).toString(time_format);
+    return QDateTime::fromTime_t(GetStartupTime()).toString();
 }
 
 QString ClientModel::dataDir() const { return QString::fromStdString(GetDataDir().string()); }

@@ -35,10 +35,20 @@ CNodeState::CNodeState(CAddress addrIn, std::string addrNameIn) : address(addrIn
 */
 CNodeState *CState::_GetNodeState(const NodeId id)
 {
+// no need to lock explictly here cause CNodeStateAccessor
+// hence we are using clang pragma to silence it when it will be used
+// from CNodeStateAccessor
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wthread-safety-analysis"
+#endif
     std::map<NodeId, CNodeState>::iterator it = mapNodeState.find(id);
     if (it == mapNodeState.end())
         return nullptr;
     return &it->second;
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 }
 
 /**

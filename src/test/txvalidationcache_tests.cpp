@@ -26,11 +26,16 @@ extern void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age);
 
 BOOST_AUTO_TEST_SUITE(txvalidationcache_tests) // BU harmonize suite name with filename
 
-static bool ToMemPool(CMutableTransaction &tx)
+static bool ToMemPool(CMutableTransaction &tx, std::string rejectReason = "")
 {
     CValidationState state;
     bool fMissingInputs = false;
-    return AcceptToMemoryPool(mempool, state, MakeTransactionRef(tx), false, &fMissingInputs, true, false);
+    bool ret = false;
+    ret = AcceptToMemoryPool(mempool, state, MakeTransactionRef(tx), false, &fMissingInputs, true, false);
+
+    if (rejectReason != "")
+        BOOST_CHECK_EQUAL(rejectReason, state.GetRejectReason());
+    return ret;
 }
 
 BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup)
@@ -105,8 +110,8 @@ BOOST_FIXTURE_TEST_CASE(cache_configuration, TestChain100Setup)
     BOOST_CHECK(cacheConfig1.nBlockUndoDBCache == 0);
     BOOST_CHECK(cacheConfig1.nBlockTreeDBCache == 2097152);
     BOOST_CHECK(cacheConfig1.nTxIndexCache == 0);
-    BOOST_CHECK(cacheConfig1.nCoinDBCache == 138936320);
-    BOOST_CHECK(nCoinCacheMaxSize == 383254528);
+    BOOST_CHECK(cacheConfig1.nCoinDBCache == 73662464);
+    BOOST_CHECK(nCoinCacheMaxSize == 448528384);
 
     // Check non-default values are returned
     CacheConfig cacheConfig2 = DiscoverCacheConfiguration();
@@ -114,39 +119,39 @@ BOOST_FIXTURE_TEST_CASE(cache_configuration, TestChain100Setup)
     BOOST_CHECK(cacheConfig2.nBlockUndoDBCache == 0);
     BOOST_CHECK(cacheConfig2.nBlockTreeDBCache == 655360);
     BOOST_CHECK(cacheConfig2.nTxIndexCache == 0);
-    BOOST_CHECK(cacheConfig2.nCoinDBCache == 2293760);
-    BOOST_CHECK(nCoinCacheMaxSize == 2293760);
+    BOOST_CHECK(cacheConfig2.nCoinDBCache == 1146880);
+    BOOST_CHECK(nCoinCacheMaxSize == 3440640);
 
 
     // check default values are honored if blockdb storage is on
     BLOCK_DB_MODE = LEVELDB_BLOCK_STORAGE;
     cacheConfig1 = DiscoverCacheConfiguration(true);
-    BOOST_CHECK(cacheConfig1.nBlockDBCache == 26109542);
-    BOOST_CHECK(cacheConfig1.nBlockUndoDBCache == 5221908);
+    BOOST_CHECK(cacheConfig1.nBlockDBCache == 52219084);
+    BOOST_CHECK(cacheConfig1.nBlockUndoDBCache == 10443816);
     BOOST_CHECK(cacheConfig1.nBlockTreeDBCache == 2097152);
     BOOST_CHECK(cacheConfig1.nTxIndexCache == 0);
-    BOOST_CHECK(cacheConfig1.nCoinDBCache == 131103457);
-    BOOST_CHECK(nCoinCacheMaxSize == 359755941);
+    BOOST_CHECK(cacheConfig1.nCoinDBCache == 65829601);
+    BOOST_CHECK(nCoinCacheMaxSize == 393698347);
 
     // check settings when txindex is on
     bool nTemp = GetBoolArg("-txindex", 0);
     SetBoolArg("-txindex", true);
     cacheConfig1 = DiscoverCacheConfiguration(true);
-    BOOST_CHECK(cacheConfig1.nBlockDBCache == 26109542);
-    BOOST_CHECK(cacheConfig1.nBlockUndoDBCache == 5221908);
+    BOOST_CHECK(cacheConfig1.nBlockDBCache == 52219084);
+    BOOST_CHECK(cacheConfig1.nBlockUndoDBCache == 10443816);
     BOOST_CHECK(cacheConfig1.nBlockTreeDBCache == 2097152);
-    BOOST_CHECK(cacheConfig1.nTxIndexCache == 65551728);
-    BOOST_CHECK(cacheConfig1.nCoinDBCache == 65551728);
-    BOOST_CHECK(nCoinCacheMaxSize == 359755942);
+    BOOST_CHECK(cacheConfig1.nTxIndexCache == 32914800);
+    BOOST_CHECK(cacheConfig1.nCoinDBCache == 32914800);
+    BOOST_CHECK(nCoinCacheMaxSize == 393698348);
 
     // Check non-default values are returned
     cacheConfig2 = DiscoverCacheConfiguration();
     BOOST_CHECK(cacheConfig2.nBlockDBCache == 655360);
     BOOST_CHECK(cacheConfig2.nBlockUndoDBCache == 655360);
     BOOST_CHECK(cacheConfig2.nBlockTreeDBCache == 655360);
-    BOOST_CHECK(cacheConfig2.nTxIndexCache == 819200);
-    BOOST_CHECK(cacheConfig2.nCoinDBCache == 819200);
-    BOOST_CHECK(nCoinCacheMaxSize == 1638400);
+    BOOST_CHECK(cacheConfig2.nTxIndexCache == 409600);
+    BOOST_CHECK(cacheConfig2.nCoinDBCache == 409600);
+    BOOST_CHECK(nCoinCacheMaxSize == 2457600);
 
     // Cleanup
     SetBoolArg("-txindex", nTemp);
@@ -196,7 +201,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     BOOST_CHECK(fSpent == false);
 
     // Try to add the same tx to the memory pool. The coins should still be present.
-    BOOST_CHECK(!ToMemPool(spends[0]));
+    BOOST_CHECK(!ToMemPool(spends[0], "txn-already-in-mempool"));
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[0].vin[0].prevout, fSpent));
     BOOST_CHECK(fSpent == false);
 
@@ -218,7 +223,7 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     vchSig2.push_back((unsigned char)sighashType);
     spends[1].vin[0].scriptSig << vchSig2;
 
-    BOOST_CHECK(!ToMemPool(spends[1]));
+    BOOST_CHECK(!ToMemPool(spends[1], "bad-txns-premature-spend-of-coinbase"));
     // not uncached because from a previous txn
     BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[0].vin[0].prevout, fSpent));
     BOOST_CHECK(fSpent == false);
@@ -227,9 +232,9 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     // Add an orphan to the orphan cache.  The valid inputs should be present in the coins cache.
     spends.resize(3);
     spends[2].vin.resize(3);
-    spends[2].vin[2].prevout.hash = GetRandHash();
+    spends[2].vin[2].prevout.hash = InsecureRand256();
     spends[2].vin[2].prevout.n = 0;
-    spends[2].vin[1].prevout.hash = GetRandHash();
+    spends[2].vin[1].prevout.hash = InsecureRand256();
     spends[2].vin[1].prevout.n = 0;
     spends[2].vin[0].prevout.hash = coinbaseTxns[2].GetHash();
     spends[2].vin[0].prevout.n = 0;
@@ -350,9 +355,9 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
     // Add an orphan to the orphan cache.  The valid inputs should be present in the coins cache.
     spends.resize(5);
     spends[4].vin.resize(3);
-    spends[4].vin[2].prevout.hash = GetRandHash();
+    spends[4].vin[2].prevout.hash = InsecureRand256();
     spends[4].vin[2].prevout.n = 0;
-    spends[4].vin[1].prevout.hash = GetRandHash();
+    spends[4].vin[1].prevout.hash = InsecureRand256();
     spends[4].vin[1].prevout.n = 0;
     spends[4].vin[0].prevout.hash = coinbaseTxns[5].GetHash();
     spends[4].vin[0].prevout.n = 0;
@@ -391,9 +396,180 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
 
     // cleanup
     mempool.clear();
-    orphanpool.mapOrphanTransactions.clear();
+    {
+        WRITELOCK(orphanpool.cs_orphanpool);
+        orphanpool.mapOrphanTransactions.clear();
+    }
     pcoinsTip->Flush();
     SetMockTime(0);
 }
 
+BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
+{
+    CScript scriptPubKey = CScript() << ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG;
+
+    // Get 1 more spendable coinbase tx
+    std::vector<CMutableTransaction> noTxns;
+    CBlock b = CreateAndProcessBlock(noTxns, scriptPubKey);
+    coinbaseTxns.push_back(*b.vtx[0]);
+
+    unsigned int sighashType = SIGHASH_ALL;
+    if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight))
+        sighashType |= SIGHASH_FORKID;
+
+    uint256 prevout = coinbaseTxns[0].GetHash();
+    uint256 hash;
+
+    // Create a chain of 25 unconfirmed transactions
+    SetArg("-limitancestorcount", std::to_string(25));
+    SetArg("-limitdescendantcount", std::to_string(25));
+    for (int i = 1; i <= 25; i++)
+    {
+        CMutableTransaction tx;
+        tx.vin.resize(1);
+        tx.vin[0].prevout.hash = prevout;
+        tx.vin[0].prevout.n = 0;
+        tx.vout.resize(1);
+        tx.vout[0].nValue = 11 * CENT;
+        tx.vout[0].scriptPubKey = scriptPubKey;
+
+        // Sign:
+        std::vector<unsigned char> vchSig;
+        if (i == 1)
+        {
+            hash = SignatureHash(scriptPubKey, tx, 0, sighashType, coinbaseTxns[0].vout[0].nValue, 0);
+        }
+        else
+        {
+            hash = SignatureHash(scriptPubKey, tx, 0, sighashType, 11 * CENT, 0);
+        }
+        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
+        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
+        vchSig.push_back((unsigned char)sighashType);
+        tx.vin[0].scriptSig << vchSig;
+        BOOST_CHECK(ToMemPool(tx));
+
+        prevout = tx.GetHash();
+    }
+
+
+    // Add one more which should fail because it's over the 25 limit.
+    {
+        CMutableTransaction tx;
+        tx.vin.resize(1);
+        tx.vin[0].prevout.hash = prevout;
+        tx.vin[0].prevout.n = 0;
+        tx.vout.resize(1);
+        tx.vout[0].nValue = 11 * CENT;
+        tx.vout[0].scriptPubKey = scriptPubKey;
+
+        // Sign:
+        std::vector<unsigned char> vchSig;
+        hash = SignatureHash(scriptPubKey, tx, 0, sighashType, 11 * CENT, 0);
+        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
+        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
+        vchSig.push_back((unsigned char)sighashType);
+        tx.vin[0].scriptSig << vchSig;
+        BOOST_CHECK(!ToMemPool(tx, "too-long-mempool-chain"));
+    }
+
+    SetArg("-limitancestorcount", std::to_string(27));
+    SetArg("-limitdescendantcount", std::to_string(27));
+
+    // Add one more which should should work because the limit is now 27
+    {
+        CMutableTransaction tx;
+        tx.vin.resize(1);
+        tx.vin[0].prevout.hash = prevout;
+        tx.vin[0].prevout.n = 0;
+        tx.vout.resize(1);
+        tx.vout[0].nValue = 11 * CENT;
+        tx.vout[0].scriptPubKey = scriptPubKey;
+
+        // Sign:
+        std::vector<unsigned char> vchSig;
+        hash = SignatureHash(scriptPubKey, tx, 0, sighashType, 11 * CENT, 0);
+        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
+        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
+        vchSig.push_back((unsigned char)sighashType);
+        tx.vin[0].scriptSig << vchSig;
+        BOOST_CHECK(ToMemPool(tx));
+
+        prevout = tx.GetHash();
+    }
+
+    // Now try to add a tx with multiple inputs.  It should fail
+    {
+        CMutableTransaction tx;
+        tx.vin.resize(2);
+        tx.vin[0].prevout.hash = prevout;
+        tx.vin[0].prevout.n = 0;
+        tx.vin[1].prevout.hash = coinbaseTxns[1].GetHash();
+        tx.vin[1].prevout.n = 0;
+        tx.vout.resize(1);
+        tx.vout[0].nValue = 11 * CENT;
+        tx.vout[0].scriptPubKey = scriptPubKey;
+
+        // Sign:
+        std::vector<unsigned char> vchSig;
+        hash = SignatureHash(scriptPubKey, tx, 0, sighashType, 11 * CENT, 0);
+        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
+        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
+        vchSig.push_back((unsigned char)sighashType);
+        tx.vin[0].scriptSig << vchSig;
+
+        std::vector<unsigned char> vchSig1;
+        hash = SignatureHash(scriptPubKey, tx, 1, sighashType, coinbaseTxns[1].vout[0].nValue, 0);
+        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
+        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig1));
+        vchSig1.push_back((unsigned char)sighashType);
+        tx.vin[1].scriptSig << vchSig1;
+
+        ToMemPool(tx, "bad-txn-too-many-inputs");
+        BOOST_CHECK(!ToMemPool(tx, "bad-txn-too-many-inputs"));
+    }
+
+    // Now try to add a tx with only one input. It should succeed.
+    {
+        CMutableTransaction tx;
+        tx.vin.resize(1);
+        tx.vin[0].prevout.hash = prevout;
+        tx.vin[0].prevout.n = 0;
+        tx.vout.resize(1);
+        tx.vout[0].nValue = 11 * CENT;
+        tx.vout[0].scriptPubKey = scriptPubKey;
+
+        // Sign:
+        std::vector<unsigned char> vchSig;
+        hash = SignatureHash(scriptPubKey, tx, 0, sighashType, 11 * CENT, 0);
+        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
+        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
+        vchSig.push_back((unsigned char)sighashType);
+        tx.vin[0].scriptSig << vchSig;
+        BOOST_CHECK(ToMemPool(tx));
+
+        prevout = tx.GetHash();
+    }
+
+    // Now try to add one more tx with only one input. It should fail because
+    // we are over the limit of 27.
+    {
+        CMutableTransaction tx;
+        tx.vin.resize(1);
+        tx.vin[0].prevout.hash = prevout;
+        tx.vin[0].prevout.n = 0;
+        tx.vout.resize(1);
+        tx.vout[0].nValue = 11 * CENT;
+        tx.vout[0].scriptPubKey = scriptPubKey;
+
+        // Sign:
+        std::vector<unsigned char> vchSig;
+        hash = SignatureHash(scriptPubKey, tx, 0, sighashType, 11 * CENT, 0);
+        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
+        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
+        vchSig.push_back((unsigned char)sighashType);
+        tx.vin[0].scriptSig << vchSig;
+        BOOST_CHECK(!ToMemPool(tx, "too-long-mempool-chain"));
+    }
+}
 BOOST_AUTO_TEST_SUITE_END()

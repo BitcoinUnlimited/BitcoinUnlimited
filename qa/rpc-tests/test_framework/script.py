@@ -236,6 +236,9 @@ OP_CHECKMULTISIGVERIFY = CScriptOp(0xaf)
 OP_CHECKDATASIG = CScriptOp(0xba)
 OP_CHECKDATASIGVERIFY = CScriptOp(0xbb)
 
+# additional byte string operations
+OP_REVERSEBYTES = CScriptOp(0xbc)
+
 # expansion
 OP_NOP1 = CScriptOp(0xb0)
 OP_CHECKLOCKTIMEVERIFY = CScriptOp(0xb1)
@@ -705,6 +708,8 @@ class CScript(bytes):
     def __new__(cls, value=b''):
         if isinstance(value, bytes) or isinstance(value, bytearray):
             return super(CScript, cls).__new__(cls, value)
+        elif isinstance(value, str):
+            return super(CScript, cls).__new__(cls, bytearray.fromhex(value))
         else:
             def coerce_iterable(iterable):
                 for instance in iterable:

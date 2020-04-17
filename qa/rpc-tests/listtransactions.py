@@ -105,7 +105,7 @@ class ListTransactionsTest(BitcoinTestFramework):
                             {"category": "receive", "account": "", "amount": Decimal("0.1"), "confirmations": 0})
         # mine a block, confirmations should change:
         self.nodes[0].generate(1)
-        self.sync_all()
+        self.sync_blocks()
         assert_array_result(self.nodes[0].listtransactions(),
                             {"txid": txid},
                             {"category": "send", "account": "", "amount": Decimal("-0.1"), "confirmations": 1})
@@ -158,7 +158,7 @@ class ListTransactionsTest(BitcoinTestFramework):
         self.nodes[0].importaddress(multisig["redeemScript"], "watchonly", False, True)
         txid = self.nodes[1].sendtoaddress(multisig["address"], 0.1)
         self.nodes[1].generate(1)
-        self.sync_all()
+        self.sync_blocks()
         assert(len(self.nodes[0].listtransactions("watchonly", 100, 0, False)) == 0)
         assert_array_result(self.nodes[0].listtransactions("watchonly", 100, 0, True),
                             {"category": "receive", "amount": Decimal("0.1")},
@@ -166,14 +166,18 @@ class ListTransactionsTest(BitcoinTestFramework):
 
 
 if __name__ == '__main__':
-    ListTransactionsTest().main()
+    ListTransactionsTest().main(None, {
+        "debug": ["all"],
+    })
 
 
 def Test():
     t = ListTransactionsTest()
+    t.drop_to_pdb = True
     bitcoinConf = {
-        "debug": ["all"],
+        "debug": ["all","-libevent"],
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
-    # "--tmppfx=/ramdisk/test", "--nocleanup", "--noshutdown"
-    t.main([], bitcoinConf, None)
+    flags = standardFlags()
+    # flags.append("--tmpdir=/tmp/test")
+    t.main(flags, bitcoinConf, None)

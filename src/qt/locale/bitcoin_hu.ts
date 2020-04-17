@@ -294,8 +294,8 @@
         <translation>&amp;URI azonosító megnyitása...</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited client</source>
-        <translation>Bitcoin Unlimited kliens</translation>
+        <source>BCH Unlimited client</source>
+        <translation>BCH Unlimited kliens</translation>
     </message>
     <message>
         <source>Importing blocks from disk...</source>
@@ -346,8 +346,8 @@
         <translation>&amp;Fogadás</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited információ megjelenítése</translation>
+        <source>Show information about BCH Unlimited</source>
+        <translation>BCH Unlimited információ megjelenítése</translation>
     </message>
     <message>
         <source>&amp;Show / Hide</source>
@@ -386,20 +386,20 @@
         <translation>Fül eszköztár</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>BCH Unlimited</source>
+        <translation>BCH Unlimited</translation>
     </message>
     <message>
         <source>Request payments (generates QR codes and %1 URIs)</source>
         <translation>Fizetési kérelem (QR-kódot és "%1" URI azonosítót hoz létre)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Unlimited</source>
-        <translation>&amp;A Bitcoin Unlimited-ról</translation>
+        <source>&amp;About BCH Unlimited</source>
+        <translation>&amp;A BCH Unlimited-ról</translation>
     </message>
     <message>
-        <source>Modify configuration options for Bitcoin Unlimited</source>
-        <translation>Konfigurációs opciók módosítása a Bitcoin Unlimited-hoz</translation>
+        <source>Modify configuration options for BCH Unlimited</source>
+        <translation>Konfigurációs opciók módosítása a BCH Unlimited-hoz</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -418,8 +418,8 @@
         <translation>Paran&amp;cssor kapcsolók</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Unlimited help message to get a list with possible Bitcoin command-line options</source>
-        <translation>A Bitcoin Unlimited súgóüzenet megjelenítése a Bitcoin lehetséges parancssori kapcsolóival.</translation>
+        <source>Show the BCH Unlimited help message to get a list with possible Bitcoin command-line options</source>
+        <translation>A BCH Unlimited súgóüzenet megjelenítése a Bitcoin lehetséges parancssori kapcsolóival.</translation>
     </message>
     <message numerus="yes">
         <source>%n active connection(s) to Bitcoin network</source>
@@ -839,8 +839,8 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>BCH Unlimited</source>
+        <translation>BCH Unlimited</translation>
     </message>
     <message>
         <source>version</source>
@@ -851,8 +851,8 @@
         <translation>(%1-bit)</translation>
     </message>
     <message>
-        <source>About Bitcoin Unlimited</source>
-        <translation>A Bitcoin Unlimited-ról</translation>
+        <source>About BCH Unlimited</source>
+        <translation>A BCH Unlimited-ról</translation>
     </message>
     <message>
         <source>Command-line options</source>
@@ -874,12 +874,12 @@
         <translation>Üdvözlünk</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Unlimited.</source>
-        <translation>Üdvözlünk a Bitcoin Unlimited-ban.</translation>
+        <source>Welcome to BCH Unlimited.</source>
+        <translation>Üdvözlünk a BCH Unlimited-ban.</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
-        <translation>A Bitcoin Unlimited le fogja tölteni és tárolni fogja a Bitcoin blokklánc egy másolatát. Legalább %1GB adat lesz tárolva ebben a mappában, és ez folyamatosan nőni fog. A tárca szintén itt lesz tárolva.</translation>
+        <source>BCH Unlimited will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <translation>A BCH Unlimited le fogja tölteni és tárolni fogja a Bitcoin blokklánc egy másolatát. Legalább %1GB adat lesz tárolva ebben a mappában, és ez folyamatosan nőni fog. A tárca szintén itt lesz tárolva.</translation>
     </message>
     <message>
         <source>Use the default data directory</source>
@@ -890,8 +890,8 @@
         <translation>Saját adatkönyvtár használata:</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>BCH Unlimited</source>
+        <translation>BCH Unlimited</translation>
     </message>
     <message>
         <source>Error: Specified data directory "%1" cannot be created.</source>
@@ -960,7 +960,7 @@
         <translation>A proxy IP címe (pl.: IPv4: 127.0.0.1 / IPv6: ::1)</translation>
     </message>
     <message>
-        <source>The user interface language can be set here. This setting will take effect after restarting Bitcoin Unlimited.</source>
+        <source>The user interface language can be set here. This setting will take effect after restarting BCH Unlimited.</source>
         <translation>Itt beállíthatod a kezelőfelület nyelvét. A beállítás a Bitcoin újraindítása után lép érvénybe.</translation>
     </message>
     <message>
@@ -980,7 +980,7 @@
         <translation>&amp;Hálózat</translation>
     </message>
     <message>
-        <source>&amp;Start Bitcoin Unlimited on system login</source>
+        <source>&amp;Start BCH Unlimited on system login</source>
         <translation>A Bitcoin elindítása bejelentkezéskor</translation>
     </message>
     <message>
@@ -1829,8 +1829,8 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Unlimited is shutting down...</source>
-        <translation>A Bitcoin Unlimited leáll...</translation>
+        <source>BCH Unlimited is shutting down...</source>
+        <translation>A BCH Unlimited leáll...</translation>
     </message>
     <message>
         <source>Do not shut down the computer until this window disappears.</source>
@@ -1935,12 +1935,12 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Unlimited</source>
-        <translation>Bitcoin Unlimited</translation>
+        <source>BCH Unlimited</source>
+        <translation>BCH Unlimited</translation>
     </message>
     <message>
-        <source>The Bitcoin Unlimited developers</source>
-        <translation>A Bitcoin Unlimited fejlesztői</translation>
+        <source>The BCH Unlimited developers</source>
+        <translation>A BCH Unlimited fejlesztői</translation>
     </message>
     <message>
         <source>[testnet]</source>
@@ -2433,8 +2433,8 @@
         <translation>Külső cím (-whitebind address) feloldása nem sikerült: '%s'</translation>
     </message>
     <message>
-        <source>Copyright (C) 2009-%i The Bitcoin Unlimited Developers</source>
-        <translation>Copyright (C) 2009-%i A Bitcoin Unlimited Fejlesztői</translation>
+        <source>Copyright (C) 2009-%i The BCH Unlimited Developers</source>
+        <translation>Copyright (C) 2009-%i A BCH Unlimited Fejlesztői</translation>
     </message>
     <message>
         <source>Error reading from database, shutting down.</source>

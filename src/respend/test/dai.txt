@@ -1,0 +1,8 @@
+    sed -i 's/\<InsecureRandBits(/InsecureRandBits(/g' *
+    sed -i 's/\<InsecureRandBool(/InsecureRandBool(/g' *
+    sed -i 's/\<InsecureRandRange(/InsecureRandRange(/g' *
+    sed -i 's/\<InsecureRandBytes(/InsecureRandBytes(/g' *
+    sed -i 's/\<InsecureRand256(/InsecureRand256(/g' *
+    sed -i 's/\<InsecureRand32(/InsecureRand32(/g' *
+    sed -i 's/\<SeedInsecureRand(/SeedInsecureRand(/g' *
+

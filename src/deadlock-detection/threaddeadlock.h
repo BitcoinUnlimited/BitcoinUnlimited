@@ -39,24 +39,10 @@ inline uint64_t getTid(void)
 // In your app, declare lockdata and all global lock variables in a single module so destruction order is controlled.
 // But for unit tests, these might be declared in separate files.  In this case we use a global boolean to indicate
 // whether lockdata has been destructed.
-extern bool lockdataDestructed;
+extern std::atomic<bool> lockdataDestructed;
 
 struct LockData
 {
-    /// @var ReadLocksWaiting readlockswaiting
-    /// holds information about threads waiting on shared ownership of mutexes
-    ReadLocksWaiting readlockswaiting;
-    /// @var WriteLocksWaiting writelockswaiting
-    /// holds information about threads waiting on exclusive ownership of mutexes
-    WriteLocksWaiting writelockswaiting;
-
-    /// @var ReadLocksHeld readlocksheld
-    /// holds information about threads holding shared ownership of mutexes
-    ReadLocksHeld readlocksheld;
-    /// @var WriteLocksHeld writelocksheld
-    /// holds information about threads holding exclusive ownership of mutexes
-    WriteLocksHeld writelocksheld;
-
     /// @var LocksHeldByThread locksheldbythread
     /// holds information about which locks are held by which threads
     LocksHeldByThread locksheldbythread;
@@ -69,7 +55,7 @@ struct LockData
     /// a mutex that protects all other data members of this struct
     std::mutex dd_mutex;
 
-    ~LockData() { lockdataDestructed = true; }
+    ~LockData() { lockdataDestructed.store(true); }
 };
 extern LockData lockdata;
 
@@ -111,18 +97,6 @@ void remove_lock_critical_exit(void *cs);
  * @return std::string of all locks held by the calling thread
  */
 std::string LocksHeld();
-
-/**
- * Moves a lock that is currently in one of the waiting maps to the corresponding held map
- *
- * @param void pointer to the critical section that is to be moved from waiting to held
- * @param OwnershipType enum value that is the OwnershipType for the critical section
- */
-void SetWaitingToHeld(void *c, OwnershipType ownership);
-
-#else // NOT DEBUG_LOCKORDER
-
-static inline void SetWaitingToHeld(void *c, OwnershipType ownership) {}
 
 #endif // END DEBUG_LOCKORDER
 

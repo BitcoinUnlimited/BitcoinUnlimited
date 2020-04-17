@@ -27,9 +27,9 @@ BOOST_AUTO_TEST_CASE(isNov2019Enabled) {
     const CChainParams config = Params(CBaseChainParams::REGTEST);
     CBlockIndex prev;
 
-    const auto activation = config.GetConsensus().nov2019ActivationTime;
+    const auto activation = config.GetConsensus().may2020ActivationTime;
 
-    BOOST_CHECK(!IsNov2019Next(config.GetConsensus(), nullptr));
+    BOOST_CHECK(!IsMay2020Next(config.GetConsensus(), nullptr));
 
     std::array<CBlockIndex, 12> blocks;
     for (size_t i = 1; i < blocks.size(); ++i) {
@@ -37,13 +37,13 @@ BOOST_AUTO_TEST_CASE(isNov2019Enabled) {
     }
 
     SetMTP(blocks, activation - 1);
-    BOOST_CHECK(!IsNov2019Enabled(config.GetConsensus(), &blocks.back()));
+    BOOST_CHECK(!IsMay2020Enabled(config.GetConsensus(), &blocks.back()));
 
     SetMTP(blocks, activation);
-    BOOST_CHECK(IsNov2019Enabled(config.GetConsensus(), &blocks.back()));
+    BOOST_CHECK(IsMay2020Enabled(config.GetConsensus(), &blocks.back()));
 
     SetMTP(blocks, activation + 1);
-    BOOST_CHECK(IsNov2019Enabled(config.GetConsensus(), &blocks.back()));
+    BOOST_CHECK(IsMay2020Enabled(config.GetConsensus(), &blocks.back()));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

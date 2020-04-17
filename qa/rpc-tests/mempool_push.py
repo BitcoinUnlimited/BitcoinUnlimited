@@ -24,29 +24,24 @@ DELAY_TIME = 45
 class MyTest (BitcoinTestFramework):
 
     def setup_chain(self,bitcoinConfDict=None, wallets=None):
-        print("Initializing test directory "+self.options.tmpdir)
-        # pick this one to start from the cached 4 node 100 blocks mined configuration
-
+        logging.info("Initializing test directory " + self.options.tmpdir)
         initialize_chain(self.options.tmpdir, bitcoinConfDict, wallets)
-        # pick this one to start at 0 mined blocks
-        # initialize_chain_clean(self.options.tmpdir, 4, bitcoinConfDict, wallets)
-        # Number of nodes to initialize ----------> ^
 
     def setup_network(self, split=False):
         mempoolConf = [
-            ["-blockprioritysize=2000000"],
+            ["-blockprioritysize=2000000", "-limitdescendantcount=25", "-limitancestorcount=25",
+             "-limitancestorsize=101", "-limitdescendantsize=101"],
             ["-blockprioritysize=2000000",
              "-maxmempool=8080",
              "-limitancestorsize=%d" % (BCH_UNCONF_SIZE_KB*2),
              "-limitdescendantsize=%d" % (BCH_UNCONF_SIZE_KB*2),
              "-limitancestorcount=%d" % (BCH_UNCONF_DEPTH*2),
              "-limitdescendantcount=%d" % (BCH_UNCONF_DEPTH*2),
-             "-net.unconfChainResendAction=2"],
+             "-net.restrictInputs=0"],
             ["-blockprioritysize=2000000", "-limitdescendantcount=1000", "-limitancestorcount=1000",
-             "-limitancestorsize=1000", "-limitdescendantsize=1000", "-net.unconfChainResendAction=2"],
-            ["-blockprioritysize=2000000", "-limitancestorsize=150","-net.unconfChainResendAction=2"]
+             "-limitancestorsize=1000", "-limitdescendantsize=1000", "-net.restrictInputs=0"],
             ]
-        self.nodes = start_nodes(4, self.options.tmpdir, mempoolConf)
+        self.nodes = start_nodes(3, self.options.tmpdir, mempoolConf)
         connect_nodes_full(self.nodes)
         self.is_network_split=False
         self.sync_blocks()
@@ -63,7 +58,8 @@ class MyTest (BitcoinTestFramework):
         txhex = []
         for i in range(0,BCH_UNCONF_DEPTH*2):
           try:
-            txhex.append(self.nodes[1].sendtoaddress(addr, bal-1))  # enough so that it uses all UTXO, but has fee left over
+              txhex.append(self.nodes[1].sendtoaddress(addr, bal-1))  # enough so that it uses all UTXO, but has fee left over
+              logging.info("tx depth %d" % i) # Keep travis from timing out
           except JSONRPCException as e: # an exception you don't catch is a testing error
               print(str(e))
               raise
@@ -88,7 +84,7 @@ class MyTest (BitcoinTestFramework):
         waitFor(DELAY_TIME, lambda: len(self.nodes[0].getblocktemplate()["transactions"])>=BCH_UNCONF_DEPTH)
         blk3 = self.nodes[0].generate(1)[0]
         blk3data = self.nodes[0].getblock(blk3)
-        # this would be ideal, but a particular block is not guaranteed to contain all tx in the mempool 
+        # this would be ideal, but a particular block is not guaranteed to contain all tx in the mempool
         # assert_equal(len(blk3data["tx"]), BCH_UNCONF_DEPTH + 1)  # chain of BCH_UNCONF_DEPTH unconfirmed + coinbase
         committedTxCount = len(blk3data["tx"])-1  # -1 to remove coinbase
         waitFor(DELAY_TIME, lambda: self.nodes[1].getbestblockhash() == blk3)
@@ -100,8 +96,15 @@ class MyTest (BitcoinTestFramework):
         self.nodes[1].generate(1)
 
         logging.info("ancestor size test")
-        # Now test ancestor size
-        addrlist = [self.nodes[3].getnewaddress() for i in range(0,200)]
+
+        # Grab existing addresses on all the nodes to create destinations for sendmany
+        # Grabbing existing addrs is a lot faster than creating new ones
+        addrlist = []
+        for node in self.nodes:
+            tmpaddrs = node.listaddressgroupings()
+            for axx in tmpaddrs:
+                addrlist.append(axx[0][0])
+
         amounts = {}
         for a in addrlist:
             amounts[a] = "0.00001"
@@ -109,12 +112,19 @@ class MyTest (BitcoinTestFramework):
         bal = self.nodes[1].getbalance()
         amounts[addr] = bal - Decimal("5.0")
 
+        # Wait for sync before issuing the tx chain so that no txes are rejected as nonfinal
+        self.sync_blocks()
+        logging.info("Block heights: %s" % str([x.getblockcount() for x in self.nodes]))
+
         # Create an unconfirmed chain that exceeds what node 0 allows
         cumulativeTxSize = 0
         while cumulativeTxSize < BCH_UNCONF_SIZE:
             txhash = self.nodes[1].sendmany("",amounts,0)
             tx = self.nodes[1].getrawtransaction(txhash)
+            txinfo = self.nodes[1].gettransaction(txhash)
+            logging.info("fee: %s fee sat/byte: %s" % (str(txinfo["fee"]), str(txinfo["fee"]*100000000/Decimal(len(tx)/2)) ))
             cumulativeTxSize += len(tx)/2  # /2 because tx is a hex representation of the tx
+            logging.info("total size: %d" % cumulativeTxSize)
 
         txCommitted = self.nodes[1].getmempoolinfo()["size"]
         waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == txCommitted-1)  # nodes[0] will eliminate 1 tx because ancestor size too big
@@ -122,6 +132,9 @@ class MyTest (BitcoinTestFramework):
         self.nodes[0].generate(1)
         waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == 1)  # node 1 should push the tx that's now acceptable to node 0
         self.nodes[0].generate(1)  # clean up
+
+        self.sync_blocks() # Wait for sync before issuing the tx chain so that no txes are rejected as nonfinal
+        logging.info("Block heights: %s" % str([x.getblockcount() for x in self.nodes]))
 
         # Now let's run a more realistic test with 2 mining nodes of varying mempool depth, and one application node with a huge depth
         logging.info("deep unconfirmed chain test")
@@ -137,9 +150,10 @@ class MyTest (BitcoinTestFramework):
         addr = self.nodes[2].getnewaddress()
 
         txhex = []
-        for i in range(0,100):
+        for i in range(0,51):
           try:
             txhex.append(self.nodes[2].sendtoaddress(addr, bal-1))  # enough so that it uses all UTXO, but has fee left over
+            logging.info("send depth %d" % i) # Keep travis from timing out
           except JSONRPCException as e: # an exception you don't catch is a testing error
               print(str(e))
               raise
@@ -156,14 +170,15 @@ class MyTest (BitcoinTestFramework):
             count+=1
 
 if __name__ == '__main__':
-    MyTest ().main ()
+    t = MyTest()
+    t.main (None, { "blockprioritysize": 2000000, "keypool":5 })
 
 # Create a convenient function for an interactive python debugging session
 def Test():
     t = MyTest()
     t.drop_to_pdb = True
     bitcoinConf = {
-        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
+        "debug": [ "net", "blk", "thin", "mempool", "req", "bench", "evict"],
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
     flags = standardFlags()

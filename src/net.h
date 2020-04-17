@@ -7,6 +7,7 @@
 #ifndef BITCOIN_NET_H
 #define BITCOIN_NET_H
 
+#include "banentry.h"
 #include "blockrelay/compactblock.h"
 #include "bloom.h"
 #include "chainparams.h"
@@ -17,14 +18,18 @@
 #include "iblt.h"
 #include "limitedmap.h"
 #include "netbase.h"
+#include "policy/mempool.h"
 #include "primitives/block.h"
 #include "protocol.h"
 #include "random.h"
+#include "stat.h"
 #include "streams.h"
 #include "sync.h"
 #include "threadgroup.h"
 #include "uint256.h"
+#include "unlimited.h"
 #include "util.h" // FIXME: reduce scope
+#include "xversionmessage.h"
 
 #include <atomic>
 #include <deque>
@@ -36,24 +41,28 @@
 
 #include <boost/signals2/signal.hpp>
 
-#include "banentry.h"
-#include "stat.h"
-#include "unlimited.h"
-#include "xversionmessage.h"
 
 extern CTweak<uint32_t> netMagic;
+extern CChain chainActive;
 static CMessageHeader::MessageStartChars netOverride;
 class CAddrMan;
 class CSubNet;
 class CNode;
 class CNodeRef;
+class CNetMessage;
 
 namespace boost
 {
 class thread_group;
 } // namespace boost
 
+extern CCriticalSection cs_priorityRecvQ;
+extern CCriticalSection cs_prioritySendQ;
 extern CTweak<unsigned int> numMsgHandlerThreads;
+extern std::deque<std::pair<CNodeRef, CNetMessage> > vPriorityRecvQ;
+extern std::deque<CNodeRef> vPrioritySendQ;
+extern std::atomic<bool> fPriorityRecvMsg;
+extern std::atomic<bool> fPrioritySendMsg;
 
 /** Time between pings automatically sent out for latency probing and keepalive (in seconds). */
 static const int PING_INTERVAL = 2 * 60;
@@ -113,6 +122,8 @@ void AddOneShot(const std::string &strDest);
 CNodeRef FindNodeRef(const std::string &addrName);
 // Find a node by id.  Returns a null ref if no node found
 CNodeRef FindNodeRef(const NodeId id);
+// Find a node by ip.  Returns a null ref if no node found
+CNodeRef FindNodeRef(const CNetAddr &ip);
 int DisconnectSubNetNodes(const CSubNet &subNet);
 bool OpenNetworkConnection(const CAddress &addrConnect,
     bool fCountFailure,
@@ -125,7 +136,6 @@ unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string &strError, bool fWhitelisted = false);
 void StartNode(thread_group &threadGroup);
 bool StopNode();
-int SocketSendData(CNode *pnode);
 
 struct CombinerAll
 {
@@ -265,6 +275,7 @@ public:
         nHdrPos = 0;
         nDataPos = 0;
         nTime = 0;
+        nStopwatch = 0;
     }
 
     CNetMessage(const CMessageHeader::MessageStartChars &pchMessageStartIn, int nTypeIn, int nVersionIn)
@@ -275,6 +286,7 @@ public:
         nHdrPos = 0;
         nDataPos = 0;
         nTime = 0;
+        nStopwatch = 0;
     }
 
     // Returns true if this message has been completely received.  This is determined by checking the message size
@@ -360,58 +372,71 @@ class CNode
 public:
     /** This node's max acceptable number ancestor transactions.  Used to decide whether this node will accept a
      * particular transaction. */
-    size_t nLimitAncestorCount = BCH_DEFAULT_ANCESTOR_LIMIT;
+    size_t nLimitAncestorCount = GetBCHDefaultAncestorLimit(Params().GetConsensus(), chainActive.Tip());
     /** This node's max acceptable sum of all ancestor transaction sizes.  Used to decide whether this node will accept
      * a particular transaction. */
     size_t nLimitAncestorSize = BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000;
     /** This node's max acceptable number of descendants.  Used to decide whether this node will accept a particular
      * transaction. */
-    size_t nLimitDescendantCount = BCH_DEFAULT_DESCENDANT_LIMIT;
+    size_t nLimitDescendantCount = GetBCHDefaultDescendantLimit(Params().GetConsensus(), chainActive.Tip());
     /** This node's max acceptable sum of all descendant transaction sizes.  Used to decide whether this node will
      * accept a particular transaction. */
     size_t nLimitDescendantSize = BCH_DEFAULT_DESCENDANT_SIZE_LIMIT * 1000;
-    // Does this node support mempool synchronization?
+    /** Does this node support mempool synchronization? */
     bool canSyncMempoolWithPeers = false;
-    // Minimum supported mempool synchronization version
+    /** Minimum supported mempool synchronization version */
     uint64_t nMempoolSyncMinVersionSupported = 0;
-    // Maximum supported mempool synchronization version
+    /** Maximum supported mempool synchronization version */
     uint64_t nMempoolSyncMaxVersionSupported = 0;
+    /** set to true if this node support xVersion */
+    bool xVersionEnabled;
+    /** set to true if this node is ok with no message checksum */
+    bool skipChecksum;
+
 
     // This is shared-locked whenever messages are processed.
     // Take it exclusive-locked to finish all ongoing processing
     CSharedCriticalSection csMsgSerializer;
+
     // socket
-    uint64_t nServices;
     SOCKET hSocket;
-    CDataStream ssSend;
-    std::atomic<uint64_t> nSendSize; // total size in bytes of all vSendMsg entries
-    size_t nSendOffset; // offset inside the first vSendMsg already sent
-    uint64_t nSendBytes;
-    std::deque<CSerializeData> vSendMsg;
+
     CCriticalSection cs_vSend;
+    CDataStream ssSend GUARDED_BY(cs_vSend);
+    size_t nSendOffset GUARDED_BY(cs_vSend); // offset inside the first vSendMsg already sent
+    uint64_t nSendBytes GUARDED_BY(cs_vSend);
+    std::deque<CSerializeData> vSendMsg GUARDED_BY(cs_vSend);
+    std::deque<CSerializeData> vLowPrioritySendMsg GUARDED_BY(cs_vSend);
+    std::atomic<uint64_t> nSendSize; // total size in bytes of all vSendMsg entries
 
     CCriticalSection csRecvGetData;
-    std::deque<CInv> vRecvGetData;
-    std::deque<CNetMessage> vRecvMsg;
-    CStatHistory<uint64_t> currentRecvMsgSize;
+    std::deque<CInv> vRecvGetData GUARDED_BY(csRecvGetData);
+
     CCriticalSection cs_vRecvMsg;
-    uint64_t nRecvBytes;
+    uint64_t nRecvBytes GUARDED_BY(cs_vRecvMsg);
+    std::deque<CNetMessage> vRecvMsg GUARDED_BY(cs_vRecvMsg);
+    // the next message we receive from the socket
+    CNetMessage msg GUARDED_BY(cs_vRecvMsg);
+    CStatHistory<uint64_t> currentRecvMsgSize;
+
+    uint64_t nServices;
     int nRecvVersion;
 
-    // BU connection de-prioritization
-    //* Total bytes sent and received
-    uint64_t nActivityBytes;
+    /** Connection de-prioritization - Total useful bytes sent and received */
+    std::atomic<uint64_t> nActivityBytes{0};
+    /** The last time bytes were sent to the remote peer */
+    std::atomic<int64_t> nLastSend{0};
+    /** The last time bytes were received from the remote peer */
+    std::atomic<int64_t> nLastRecv{0};
+    /** Calendar time this node was connected */
+    std::atomic<int64_t> nTimeConnected;
+    /** Stopwatch time this node was connected */
+    std::atomic<uint64_t> nStopwatchConnected;
 
-    int64_t nLastSend;
-    int64_t nLastRecv;
-    int64_t nTimeConnected; /** Calendar time this node was connected */
-    uint64_t nStopwatchConnected; /** Stopwatch time this node was connected */
     int64_t nTimeOffset;
+
     /** The address of the remote peer */
     CAddress addr;
-
-    /** set to true if this node is ok with no message checksum */
-    bool skipChecksum;
 
     /** The address the remote peer advertised in its version message */
     CAddress addrFrom_advertised;
@@ -433,7 +458,7 @@ public:
 
     /** the intial xversion message sent in the handshake */
     CCriticalSection cs_xversion;
-    CXVersionMessage xVersion;
+    CXVersionMessage xVersion GUARDED_BY(cs_xversion);
 
     /** strSubVer is whatever byte array we read from the wire. However, this field is intended
         to be printed out, displayed to humans in various forms and so on. So we sanitize it and
@@ -478,46 +503,47 @@ public:
     bool fRelayTxes;
     bool fSentAddr;
     CSemaphoreGrant grantOutbound;
+
     CCriticalSection cs_filter;
-    CBloomFilter *pfilter;
-    // BU - Xtreme Thinblocks: a bloom filter which is separate from the one used by SPV wallets
-    CBloomFilter *pThinBlockFilter;
+    /** A bloom filter which is used by SPV wallets */
+    CBloomFilter *pfilter GUARDED_BY(cs_filter);
+    /** Xtreme Thinblocks bloom filter which is send with a get_xthin request */
+    CBloomFilter *pThinBlockFilter GUARDED_BY(cs_filter);
+
     std::atomic<int> nRefCount;
     NodeId id;
 
-    //! Accumulated misbehaviour score for this peer.
-    std::atomic<int> nMisbehavior;
+    //! Accumulated misbehavior score for this peer.
+    std::atomic<double> nMisbehavior{0};
+    std::atomic<int64_t> nLastMisbehaviorTime{0};
+
     //! Whether this peer should be disconnected and banned (unless whitelisted).
-    bool fShouldBan;
+    std::atomic<bool> fShouldBan{false};
+    std::atomic<int> nBanType{-1};
 
-    // BUIP010 Xtreme Thinblocks: begin section
-    std::atomic<uint32_t> nXthinBloomfilterSize; // Max xthin bloom filter size (in bytes) that our peer will accept.
+    // General thintype critical section to ensure that no
+    // two thintype blocks from the "same" peer can be processed at
+    // the same time.
+    CCriticalSection cs_thintype;
 
-    CCriticalSection cs_xthinblock;
-    // BUIP010 Xtreme Thinblocks: end section
+    // Xtreme Thinblocks
+    /** Max xthin bloom filter size (in bytes) that our peer will accept */
+    std::atomic<uint32_t> nXthinBloomfilterSize;
 
-    // Graphene blocks: begin section
-    CCriticalSection cs_graphene;
+    // Graphene blocks
+    /** Stores the grapheneblock salt to be used for this peer */
+    std::atomic<uint64_t> gr_shorttxidk0;
+    std::atomic<uint64_t> gr_shorttxidk1;
 
-    // Store the grapheneblock salt to be used for this peer
-    uint64_t gr_shorttxidk0;
-    uint64_t gr_shorttxidk1;
-    // Graphene blocks: end section
-
-    // Compact Blocks : begin
-    CCriticalSection cs_compactblock;
-
-    // Store the compactblock salt to be used for this peer
-    uint64_t shorttxidk0;
-    uint64_t shorttxidk1;
-
-    // Whether this peer supports CompactBlocks
+    // Compact Blocks
+    /** Stores the compactblock salt to be used for this peer */
+    std::atomic<uint64_t> shorttxidk0;
+    std::atomic<uint64_t> shorttxidk1;
+    /** Does this peer support CompactBlocks */
     std::atomic<bool> fSupportsCompactBlocks;
 
-    // Compact Blocks : end
-
     CCriticalSection cs_nAvgBlkResponseTime;
-    double nAvgBlkResponseTime;
+    double nAvgBlkResponseTime GUARDED_BY(cs_nAvgBlkResponseTime);
     std::atomic<int64_t> nMaxBlocksInTransit;
 
     unsigned short addrFromPort;
@@ -542,8 +568,8 @@ public:
 
     // inventory based relay
     CRollingFastFilter<4 * 1024 * 1024> filterInventoryKnown;
-    std::vector<CInv> vInventoryToSend;
     CCriticalSection cs_inventory;
+    std::vector<CInv> vInventoryToSend GUARDED_BY(cs_inventory);
     int64_t nNextInvSend;
     // Used for headers announcements - unfiltered blocks to relay
     // Also protected by cs_inventory
@@ -614,7 +640,9 @@ public:
     {
         // Checking the descendants makes no sense -- the target node can't have descendants in its mempool if it
         // doesn't have this transaction!
-        if (props.countWithAncestors > nLimitAncestorCount)
+        if ((xVersionEnabled && props.countWithAncestors > nLimitAncestorCount) ||
+            (!xVersionEnabled &&
+                props.countWithAncestors > GetBCHDefaultDescendantLimit(Params().GetConsensus(), chainActive.Tip())))
             return false;
         if (props.sizeWithAncestors > nLimitAncestorSize)
             return false;
@@ -625,24 +653,30 @@ public:
     void ReadConfigFromXVersion();
 
     // requires LOCK(cs_vRecvMsg)
-    unsigned int GetTotalRecvSize()
+    unsigned int GetTotalRecvSize() EXCLUSIVE_LOCKS_REQUIRED(cs_vRecvMsg)
     {
         AssertLockHeld(cs_vRecvMsg);
         unsigned int total = 0;
-        for (const CNetMessage &msg : vRecvMsg)
-            total += msg.vRecv.size() + 24;
+        for (const CNetMessage &message : vRecvMsg)
+            total += message.vRecv.size() + 24;
         return total;
     }
 
+    unsigned int GetSendMsgSize()
+    {
+        LOCK(cs_vSend);
+        return vSendMsg.size();
+    }
+
     // requires LOCK(cs_vRecvMsg)
-    bool ReceiveMsgBytes(const char *pch, unsigned int nBytes);
+    bool ReceiveMsgBytes(const char *pch, unsigned int nBytes) EXCLUSIVE_LOCKS_REQUIRED(cs_vRecvMsg);
 
     void SetRecvVersion(int nVersionIn)
     {
         LOCK(cs_vRecvMsg);
         nRecvVersion = nVersionIn;
-        for (CNetMessage &msg : vRecvMsg)
-            msg.SetVersion(nVersionIn);
+        for (CNetMessage &message : vRecvMsg)
+            message.SetVersion(nVersionIn);
     }
 
     const CMessageHeader::MessageStartChars &GetMagic(const CChainParams &params) const
@@ -704,7 +738,7 @@ public:
         {
             if (vAddrToSend.size() >= MAX_ADDR_TO_SEND)
             {
-                vAddrToSend[insecure_rand.rand32() % vAddrToSend.size()] = _addr;
+                vAddrToSend[insecure_rand.randrange(vAddrToSend.size())] = _addr;
             }
             else
             {
@@ -720,6 +754,12 @@ public:
         filterInventoryKnown.insert(inv.hash);
     }
 
+    /**
+     * Add a reference of a new INV message to the inventory
+     *
+     * @param[in] inv reference to new INV object
+     * @param[in] force whether or not force the push in case the INV was already added
+     */
     void PushInventory(const CInv &inv, bool force = false)
     {
         LOCK(cs_inventory);
@@ -728,6 +768,18 @@ public:
         vInventoryToSend.push_back(inv);
     }
 
+    /** Get size of INVs to be sent in a thread safe way*/
+    unsigned int GetInventoryToSendSize()
+    {
+        LOCK(cs_inventory);
+        return vInventoryToSend.size();
+    }
+
+    /**
+     * Add a reference of a new hash block to the list of blocks need to be announced
+     *
+     * @param[in] hash reference to the hash of the new block to announce
+     */
     void PushBlockHash(const uint256 &hash)
     {
         LOCK(cs_inventory);
@@ -1053,7 +1105,7 @@ private:
 typedef std::vector<CNodeRef> VNodeRefs;
 
 class CTransaction;
-void RelayTransaction(const CTransactionRef &ptx,
+void RelayTransaction(const CTransactionRef ptx,
     const bool fRespend = false,
     const CTxProperties *txproperties = nullptr);
 

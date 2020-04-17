@@ -168,7 +168,7 @@
         <translation>您确定需要为钱包加密吗？</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
+        <source>BCH Unlimited will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
         <translation>比特币无限现在将关闭以完成加密过程。请记住，在您的计算机被恶意软件感染的情况下，加密不能完全保护您的比特币免于被盗。</translation>
     </message>
     <message>
@@ -306,7 +306,7 @@
         <translation>打开 &amp;URI...</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited client</source>
+        <source>BCH Unlimited client</source>
         <translation>比特币无限钱包客户端</translation>
     </message>
     <message>
@@ -358,7 +358,7 @@
         <translation>接收(&amp;R)</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Unlimited</source>
+        <source>Show information about BCH Unlimited</source>
         <translation>显示有关比特币无限钱包信息</translation>
     </message>
     <message>
@@ -398,7 +398,7 @@
         <translation>分页工具栏</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>比特币无限</translation>
     </message>
     <message>
@@ -406,11 +406,11 @@
         <translation>请求支付 (生成二维码和 %1 URI)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Unlimited</source>
+        <source>&amp;About BCH Unlimited</source>
         <translation>关于比特币无限(&amp;A)</translation>
     </message>
     <message>
-        <source>Modify configuration options for Bitcoin Unlimited</source>
+        <source>Modify configuration options for BCH Unlimited</source>
         <translation>修改比特币无限的配置选项</translation>
     </message>
     <message>
@@ -430,7 +430,7 @@
         <translation>命令行选项(&amp;C)</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Unlimited help message to get a list with possible Bitcoin command-line options</source>
+        <source>Show the BCH Unlimited help message to get a list with possible Bitcoin command-line options</source>
         <translation>显示比特币无限 程序帮助信息，获取可用的命令行选项 </translation>
     </message>
     <message numerus="yes">
@@ -855,7 +855,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>比特币无限</translation>
     </message>
     <message>
@@ -867,7 +867,7 @@
         <translation>(%1 位)</translation>
     </message>
     <message>
-        <source>About Bitcoin Unlimited</source>
+        <source>About BCH Unlimited</source>
         <translation>关于比特币无限</translation>
     </message>
     <message>
@@ -918,15 +918,15 @@
         <translation>欢迎</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Unlimited.</source>
+        <source>Welcome to BCH Unlimited.</source>
         <translation>欢迎使用 比特币无限 程序。</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Unlimited will store its data.</source>
+        <source>As this is the first time the program is launched, you can choose where BCH Unlimited will store its data.</source>
         <translation>由于这是第一次运行 比特币无限 程序，您可以选择数据存储目录。</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <source>BCH Unlimited will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
         <translation>比特币无限 程序会下载储存一份数据块链(blockchain)。至少需要 %1 GB的存储空间，随着时间推移会需要更多的存储空间。钱包文件也储存在该目录。</translation>
     </message>
     <message>
@@ -938,7 +938,7 @@
         <translation>使用自定义的数据目录：</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>比特币无限</translation>
     </message>
     <message>
@@ -1020,7 +1020,7 @@
         <translation>窗口被关闭时最小化而不是退出应用程序。当此选项启用时，应用程序只会在菜单中选择退出时退出。</translation>
     </message>
     <message>
-        <source>The user interface language can be set here. This setting will take effect after restarting Bitcoin Unlimited.</source>
+        <source>The user interface language can be set here. This setting will take effect after restarting BCH Unlimited.</source>
         <translation>可以在这里设置用户界面语言。此设置将在重新启动比特币无限后生效。</translation>
     </message>
     <message>
@@ -1048,11 +1048,11 @@
         <translation>网络(&amp;N)</translation>
     </message>
     <message>
-        <source>Automatically start Bitcoin Unlimited after logging in to the system.</source>
+        <source>Automatically start BCH Unlimited after logging in to the system.</source>
         <translation>登录到系统后自动启动比特币无限。</translation>
     </message>
     <message>
-        <source>&amp;Start Bitcoin Unlimited on system login</source>
+        <source>&amp;Start BCH Unlimited on system login</source>
         <translation>系统登录时启动比特币无限(&amp;S)</translation>
     </message>
     <message>
@@ -1522,7 +1522,7 @@
         <translation>内存使用</translation>
     </message>
     <message>
-        <source>Open the Bitcoin Unlimited debug log file from the current data directory. This can take a few seconds for large log files.</source>
+        <source>Open the BCH Unlimited debug log file from the current data directory. This can take a few seconds for large log files.</source>
         <translation>从当前的数据目录打开比特币无限调试日志文件。对于较大的日志文件，这可能需要几秒钟。</translation>
     </message>
     <message>
@@ -1678,7 +1678,7 @@
         <translation>(&amp;U)允许节点连接</translation>
     </message>
     <message>
-        <source>Welcome to the Bitcoin Unlimited RPC console.</source>
+        <source>Welcome to the BCH Unlimited RPC console.</source>
         <translation>欢迎使用 比特币无限 RPC 控制台。</translation>
     </message>
     <message>
@@ -2264,7 +2264,7 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Unlimited is shutting down...</source>
+        <source>BCH Unlimited is shutting down...</source>
         <translation>比特币无限正在关机...</translation>
     </message>
     <message>
@@ -2414,12 +2414,12 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>比特币无限</translation>
     </message>
     <message>
-        <source>The Bitcoin Unlimited developers</source>
-        <translation>Bitcoin Unlimited 的开发者</translation>
+        <source>The BCH Unlimited developers</source>
+        <translation>BCH Unlimited 的开发者</translation>
     </message>
     <message>
         <source>[testnet]</source>
@@ -2939,7 +2939,7 @@
         <translation>最大单次转账费用（%s），设置太低可能导致大宗交易失败（默认：%s）</translation>
     </message>
     <message>
-        <source>Please check that your computer's date and time are correct! If your clock is wrong Bitcoin Unlimited will not work properly.</source>
+        <source>Please check that your computer's date and time are correct! If your clock is wrong BCH Unlimited will not work properly.</source>
         <translation>警请检查电脑的日期时间设置是否正确！时间错误可能会导致比特币客户端运行异常。</translation>
     </message>
     <message>
@@ -3005,7 +3005,7 @@
         <translation>这是测试用的预发布版本 - 请谨慎使用 - 不要用来挖矿，或者在正式商用环境下使用</translation>
     </message>
     <message>
-        <source>Unable to bind to %s on this computer. Bitcoin Unlimited is probably already running.</source>
+        <source>Unable to bind to %s on this computer. BCH Unlimited is probably already running.</source>
         <translation>无法 %s的绑定到电脑上，比特币无限钱包可能已经在运行。</translation>
     </message>
     <message>
@@ -3209,7 +3209,7 @@
         <translation>绑定到指定地址监听 JSON-RPC连接。 IPv6使用[主机]:端口 格式。该选项可多次指定 (默认: 绑定到所有接口) </translation>
     </message>
     <message>
-        <source>Cannot obtain a lock on data directory %s. Bitcoin Unlimited is probably already running.</source>
+        <source>Cannot obtain a lock on data directory %s. BCH Unlimited is probably already running.</source>
         <translation>无法获取数据目录的 %s. 比特币无限钱包可能已经在运行.</translation>
     </message>
     <message>
@@ -3293,11 +3293,11 @@
         <translation>通过 SOCKS5 代理连接</translation>
     </message>
     <message>
-        <source>Copyright (C) 2009-%i The Bitcoin Unlimited Developers</source>
-        <translation>版权所有 (C) 2009-%i Bitcoin Unlimited 开发者</translation>
+        <source>Copyright (C) 2009-%i The BCH Unlimited Developers</source>
+        <translation>版权所有 (C) 2009-%i BCH Unlimited 开发者</translation>
     </message>
     <message>
-        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin Unlimited</source>
+        <source>Error loading wallet.dat: Wallet requires newer version of BCH Unlimited</source>
         <translation>加载wallet.dat错误：需要新版的比特币无限钱包</translation>
     </message>
     <message>
@@ -3309,8 +3309,8 @@
         <translation>信息</translation>
     </message>
     <message>
-        <source>Initialization sanity check failed. Bitcoin Unlimited is shutting down.</source>
-        <translation>初始化完整性检查失败。Bitcoin Unlimited 即将关闭。</translation>
+        <source>Initialization sanity check failed. BCH Unlimited is shutting down.</source>
+        <translation>初始化完整性检查失败。BCH Unlimited 即将关闭。</translation>
     </message>
     <message>
         <source>Invalid amount for -maxtxfee=&lt;amount&gt;: '%s'</source>
@@ -3417,7 +3417,7 @@
         <translation>JSON-RPC 连接用户名</translation>
     </message>
     <message>
-        <source>Wallet needed to be rewritten: restart Bitcoin Unlimited to complete</source>
+        <source>Wallet needed to be rewritten: restart BCH Unlimited to complete</source>
         <translation>钱包需要被改写：重新启动比特币无限钱包来完成</translation>
     </message>
     <message>

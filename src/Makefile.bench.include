@@ -14,9 +14,11 @@ bench_bench_bitcoin_SOURCES = \
   bench/Examples.cpp \
   bench/verify_script.cpp \
   bench/crypto_hash.cpp \
+  bench/merkle_root.cpp \
   bench/murmur_hash.cpp \
   bench/rollingbloom.cpp \
-  bench/bloom.cpp
+  bench/bloom.cpp \
+  bench/prevector.cpp
 
 bench_bench_bitcoin_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(EVENT_CLFAGS) $(EVENT_PTHREADS_CFLAGS) -I$(builddir)/bench/
 bench_bench_bitcoin_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
@@ -27,6 +29,8 @@ bench_bench_bitcoin_LDADD = \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CONSENSUS) \
   $(LIBBITCOIN_CRYPTO) \
+  $(LIBBITCOIN_CRYPTO_SSE41) \
+  $(LIBBITCOIN_CRYPTO_AVX2) \
   $(LIBLEVELDB) \
   $(LIBLEVELDB_SSE42) \
   $(LIBMEMENV) \

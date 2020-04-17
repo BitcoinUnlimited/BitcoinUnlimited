@@ -10,5 +10,24 @@
 #endif
 
 #include "fs.h"
+#include "key.h"
+#include "primitives/transaction.h"
+#include "script/standard.h"
+#include "test/test_bitcoin.h"
 
 fs::path GetTempPath() { return fs::temp_directory_path(); }
+CMutableTransaction CreateRandomTx()
+{
+    CKey key;
+    key.MakeNewKey(true);
+
+    CMutableTransaction tx;
+    tx.vin.resize(1);
+    tx.vin[0].prevout.n = 0;
+    tx.vin[0].prevout.hash = InsecureRand256();
+    tx.vin[0].scriptSig << OP_1;
+    tx.vout.resize(1);
+    tx.vout[0].nValue = 1 * CENT;
+    tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
+    return tx;
+}

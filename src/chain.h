@@ -443,6 +443,8 @@ private:
     std::atomic<CBlockIndex *> tip;
 
 public:
+    mutable CSharedCriticalSection cs_chainLock;
+
     CChain() : tip(nullptr) {}
     /** Returns the index entry for the genesis block of this chain, or nullptr if none. */
     CBlockIndex *Genesis() const { return vChain.size() > 0 ? vChain[0] : nullptr; }
@@ -451,14 +453,27 @@ public:
     /** Returns the index entry at a particular height in this chain, or nullptr if no such height exists. */
     CBlockIndex *operator[](int nHeight) const
     {
+        READLOCK(cs_chainLock);
         if (nHeight < 0 || nHeight >= (int)vChain.size())
             return nullptr;
+        // We can return this outside of the lock because CBlockIndex objects are never deleted
+        return vChain[nHeight];
+    }
+
+    /** Returns the index entry at a particular height in this chain, or nullptr if no such height exists. Lock free */
+    CBlockIndex *_idx(int nHeight) const
+    {
+        if (nHeight < 0 || nHeight >= (int)vChain.size())
+            return nullptr;
+        // We can return this outside of the lock because CBlockIndex objects are never deleted
         return vChain[nHeight];
     }
 
     /** Compare two chains efficiently. */
     friend bool operator==(const CChain &a, const CChain &b)
     {
+        READLOCK(a.cs_chainLock);
+        READLOCK(b.cs_chainLock);
         return a.vChain.size() == b.vChain.size() && a.vChain[a.vChain.size() - 1] == b.vChain[b.vChain.size() - 1];
     }
 
@@ -467,14 +482,24 @@ public:
     {
         /* null pointer isn't in this chain but caller should not send in the first place */
         DbgAssert(pindex, return false);
+        // lock not needed because operator [] locks
         return (*this)[pindex->nHeight] == pindex;
+    }
+
+    /** Efficiently check whether a block is present in this chain.  Lock free */
+    bool _Contains(const CBlockIndex *pindex) const
+    {
+        /* null pointer isn't in this chain but caller should not send in the first place */
+        DbgAssert(pindex, return false);
+        return _idx(pindex->nHeight) == pindex;
     }
 
     /** Find the successor of a block in this chain, or nullptr if the given index is not found or is the tip. */
     CBlockIndex *Next(const CBlockIndex *pindex) const
     {
-        if (Contains(pindex))
-            return (*this)[pindex->nHeight + 1];
+        READLOCK(cs_chainLock);
+        if (_Contains(pindex))
+            return _idx(pindex->nHeight + 1);
         else
             return nullptr;
     }

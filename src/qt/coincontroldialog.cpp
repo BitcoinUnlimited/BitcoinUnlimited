@@ -423,12 +423,9 @@ void CoinControlDialog::viewItemChanged(QTreeWidgetItem *item, int column)
 }
 
 // return human readable label for priority number
-QString CoinControlDialog::getPriorityLabel(double dPriority, double mempoolEstimatePriority)
+QString CoinControlDialog::getPriorityLabel(double dPriority)
 {
-    double dPriorityMedium = mempoolEstimatePriority;
-
-    if (dPriorityMedium <= 0)
-        dPriorityMedium = AllowFreeThreshold(); // not enough data, back to hard-coded
+    double dPriorityMedium = AllowFreeThreshold(); // not enough data, back to hard-coded
 
     if (dPriority / 1000000 > dPriorityMedium)
         return tr("highest");
@@ -553,11 +550,10 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog *dialog)
                  ((CoinControlDialog::payAmounts.size() > 0 ? CoinControlDialog::payAmounts.size() + 1 : 2) * 34) + 10;
 
         // Priority
-        double mempoolEstimatePriority = mempool.estimateSmartPriority(nTxConfirmTarget);
         // 29 = 180 - 151 (uncompressed public keys are over the limit. max 151 bytes of the input are ignored for
         // priority)
         dPriority = dPriorityInputs / (nBytes - nBytesInputs + (nQuantityUncompressed * 29));
-        sPriorityLabel = CoinControlDialog::getPriorityLabel(dPriority, mempoolEstimatePriority);
+        sPriorityLabel = CoinControlDialog::getPriorityLabel(dPriority);
 
         // in the subtract fee from amount case, we can tell if zero change already and subtract the bytes, so that fee
         // calculation afterwards is accurate
@@ -572,7 +568,7 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog *dialog)
 
 
         // Allow free? (require at least hard-coded threshold and default to that if no estimate)
-        double dPriorityNeeded = std::max(mempoolEstimatePriority, AllowFreeThreshold());
+        double dPriorityNeeded = AllowFreeThreshold();
         fAllowFree = (dPriority >= dPriorityNeeded);
 
         if (fSendFreeTransactions)
@@ -676,8 +672,7 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog *dialog)
     else
     {
         dFeeVary =
-            (double)std::max(CWallet::GetRequiredFee(1000), mempool.estimateSmartFee(nTxConfirmTarget).GetFeePerK()) /
-            1000;
+            (double)std::max(CWallet::GetRequiredFee(1000), mempool.estimateFee(nTxConfirmTarget).GetFeePerK()) / 1000;
     }
     QString toolTip4 = tr("Can vary +/- %1 satoshi(s) per input.").arg(dFeeVary);
 
@@ -716,7 +711,6 @@ void CoinControlDialog::updateView()
         Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsTristate;
 
     int nDisplayUnit = model->getOptionsModel()->getDisplayUnit();
-    double mempoolEstimatePriority = mempool.estimateSmartPriority(nTxConfirmTarget);
 
     std::map<QString, std::vector<COutput> > mapCoins;
     model->listCoins(mapCoins);
@@ -811,8 +805,9 @@ void CoinControlDialog::updateView()
             // priority
             // 78 = 2 * 34 + 10
             double dPriority = ((double)out.tx->vout[out.i].nValue / (nInputSize + 78)) * (out.nDepth + 1);
-            itemOutput->setText(
-                COLUMN_PRIORITY, CoinControlDialog::getPriorityLabel(dPriority, mempoolEstimatePriority));
+
+            itemOutput->setText(COLUMN_PRIORITY, CoinControlDialog::getPriorityLabel(dPriority));
+
             itemOutput->setText(COLUMN_PRIORITY_INT64, strPad(QString::number((int64_t)dPriority), 20, " "));
             dPrioritySum += (double)out.tx->vout[out.i].nValue * (out.nDepth + 1);
             nInputSum += nInputSize;
@@ -845,8 +840,6 @@ void CoinControlDialog::updateView()
             itemWalletAddress->setText(COLUMN_CHECKBOX, "(" + QString::number(nChildren) + ")");
             itemWalletAddress->setText(COLUMN_AMOUNT, BitcoinUnits::format(nDisplayUnit, nSum));
             itemWalletAddress->setText(COLUMN_AMOUNT_INT64, strPad(QString::number(nSum), 15, " "));
-            itemWalletAddress->setText(
-                COLUMN_PRIORITY, CoinControlDialog::getPriorityLabel(dPrioritySum, mempoolEstimatePriority));
             itemWalletAddress->setText(COLUMN_PRIORITY_INT64, strPad(QString::number((int64_t)dPrioritySum), 20, " "));
         }
     }

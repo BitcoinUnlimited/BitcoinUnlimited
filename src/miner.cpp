@@ -231,6 +231,14 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     CBlockIndex *pindexPrev = chainActive.Tip();
     assert(pindexPrev); // can't make a new block if we don't even have the genesis block
 
+    may2020Enabled = IsMay2020Enabled(Params().GetConsensus(), pindexPrev);
+
+    if (may2020Enabled)
+    {
+        maxSigOpsAllowed = maxSigChecks.Value();
+    }
+
+
     {
         READLOCK(mempool.cs_txmempool);
         nHeight = pindexPrev->nHeight + 1;
@@ -282,8 +290,8 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
 
         nLastBlockTx = nBlockTx;
         nLastBlockSize = nBlockSize;
-        LOGA("CreateNewBlock(): total size %llu txs: %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx, nFees,
-            nBlockSigOps);
+        LOGA("CreateNewBlock: total size %llu txs: %llu of %llu fees: %lld sigops %u\n", nBlockSize, nBlockTx,
+            mempool._size(), nFees, nBlockSigOps);
 
 
         // sort tx if there are any and the feature is enabled
@@ -309,7 +317,10 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
         pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
         pblock->nNonce = 0;
-        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0], STANDARD_SCRIPT_VERIFY_FLAGS);
+        if (!may2020Enabled)
+            pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0], STANDARD_SCRIPT_VERIFY_FLAGS);
+        else // coinbase May2020 Sigchecks is always 0 since no scripts executed in coinbase tx.
+            pblocktemplate->vTxSigOps[0] = 0;
     }
 
     CValidationState state;
@@ -351,9 +362,13 @@ bool BlockAssembler::isStillDependent(CTxMemPool::txiter iter)
 
 bool BlockAssembler::TestPackageSigOps(uint64_t packageSize, unsigned int packageSigOps)
 {
-    uint64_t blockMbSize = 1 + (nBlockSize + packageSize - 1) / 1000000;
-    uint64_t nMaxSigOpsAllowed = blockMiningSigopsPerMb.Value() * blockMbSize;
-    if (nBlockSigOps + packageSigOps >= nMaxSigOpsAllowed)
+    if (!may2020Enabled) // if may2020 is enabled, its a constant
+    {
+        maxSigOpsAllowed = GetMaxBlockSigOpsCount(nBlockSize + packageSize);
+    }
+
+    // Note that the may2020 rule should be > so this assembles a block with 1 less sigcheck than possible
+    if (nBlockSigOps + packageSigOps >= maxSigOpsAllowed)
         return false;
     return true;
 }
@@ -393,25 +408,38 @@ bool BlockAssembler::IsIncrementallyGood(uint64_t nExtraSize, unsigned int nExtr
         return false;
     }
 
-    // Enforce the "old" sigops for <= 1MB blocks
-    if (nBlockSize + nExtraSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
+    if (!may2020Enabled)
     {
-        // BU: be conservative about what is generated
-        if (nBlockSigOps + nExtraSigOps >= BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS)
+        // Enforce the "old" sigops for <= 1MB blocks
+        if (nBlockSize + nExtraSize <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
         {
-            // BU: so a block that is near the sigops limit might be shorter than it could be if
-            // the high sigops tx was backed out and other tx added.
-            if (nBlockSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS - 2)
-                blockFinished = true;
-            return false;
+            // BU: be conservative about what is generated
+            if (nBlockSigOps + nExtraSigOps >= MAX_BLOCK_SIGOPS_PER_MB)
+            {
+                // BU: so a block that is near the sigops limit might be shorter than it could be if
+                // the high sigops tx was backed out and other tx added.
+                if (nBlockSigOps > MAX_BLOCK_SIGOPS_PER_MB - 2)
+                    blockFinished = true;
+                return false;
+            }
+        }
+        else
+        {
+            if (nBlockSigOps + nExtraSigOps > GetMaxBlockSigOpsCount(nBlockSize))
+            {
+                if (nBlockSigOps > GetMaxBlockSigOpsCount(nBlockSize) - 2)
+                    // very close to the limit, so the block is finished.  So a block that is near the sigops limit
+                    // might be shorter than it could be if the high sigops tx was backed out and other tx added.
+                    blockFinished = true;
+                return false;
+            }
         }
     }
-    else
+    else // may2020
     {
-        uint64_t blockMbSize = 1 + (nBlockSize + nExtraSize - 1) / 1000000;
-        if (nBlockSigOps + nExtraSigOps > blockMiningSigopsPerMb.Value() * blockMbSize)
+        if (nBlockSigOps + nExtraSigOps > maxSigOpsAllowed)
         {
-            if (nBlockSigOps > blockMiningSigopsPerMb.Value() * blockMbSize - 2)
+            if (nBlockSigOps > maxSigOpsAllowed - 2)
                 // very close to the limit, so the block is finished.  So a block that is near the sigops limit
                 // might be shorter than it could be if the high sigops tx was backed out and other tx added.
                 blockFinished = true;
@@ -551,6 +579,18 @@ void BlockAssembler::SortForBlock(const CTxMemPool::setEntries &package, std::ve
 // having transactions with all the same fees and Two, the typical child pays for parent scenario has only
 // two transactions with the child having the higher fee. And neither of these two types of packages could
 // cause any loss of fees with this mining algorithm, when the block is nearly full.
+//
+// The mining algorithm is surprisingly simple and centers around parsing though the mempools ancestor_score
+// index and adding the AGT's into the new block. There is however a pathological case which has to be
+// accounted for where a child transaction has less fees per KB than its parent which causes child transactions
+// to show up later as we parse though the ancestor index. In this case we then have to recalculate the
+// ancestor sigops and package size which can be time consuming given we have to parse through the ancestor
+// tree each time. However we get around that by shortcutting the process by parsing through only the portion
+// of the tree that is currently not in the block. This shortcutting happens in _CalculateMempoolAncestors()
+// where we pass in the inBlock vector of already added transactions. Even so, if we didn't do this shortcutting
+// the current algo is still much better than the older method which needed to update calculations for the
+// entire descendant tree after each package was added to the block.
+
 void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, bool fCanonical)
 {
     AssertLockHeld(mempool.cs_txmempool);
@@ -561,15 +601,16 @@ void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, b
     {
         iter = mempool.mapTx.project<0>(mi);
 
-        uint64_t packageSize = iter->GetSizeWithAncestors();
-        CAmount packageFees = iter->GetModFeesWithAncestors();
-        unsigned int packageSigOps = iter->GetSigOpCountWithAncestors();
-
         // Skip txns we know are in the block
         if (inBlock.count(iter))
         {
             continue;
         }
+
+        uint64_t packageSize = iter->GetSizeWithAncestors();
+        CAmount packageFees = iter->GetModFeesWithAncestors();
+        // mempool uses same field for sigops and sigchecks
+        unsigned int packageSigOps = iter->GetSigOpCountWithAncestors();
 
         // Get any unconfirmed ancestors of this txn
         CTxMemPool::setEntries ancestors;

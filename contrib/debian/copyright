@@ -6,7 +6,7 @@ Source: https://github.com/BitcoinUnlimited/BitcoinUnlimited
 Files: *
 Copyright: 2009, Satoshi Nakamoto
            2009-2016, Bitcoin Core Developers
-           2015-2019, The Bitcoin Unlimited developers           
+           2015-2020, The Bitcoin Unlimited developers           
 License: Expat
 Comment: The Bitcoin Developers encompasses the current developers listed on bitcoin.org, 
          on www.bitcoinunlimited.info and numerous other contributors to the project.

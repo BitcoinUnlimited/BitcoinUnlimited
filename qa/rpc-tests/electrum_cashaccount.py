@@ -51,8 +51,8 @@ class ElectrumCashaccountTests(BitcoinTestFramework):
         self.sync_electrs(n)
 
         res = self.electrum.call("cashaccount.query.name", "satoshi", n.getblockcount())
-        assert_equal(1, len(res['result']))
-        account = res['result'][0]
+        assert_equal(1, len(res))
+        account = res[0]
         assert_equal(tx, account['tx'])
         assert_equal(n.getblockcount(), account['height'])
         assert_equal(n.getbestblockhash(), account['blockhash'])
@@ -73,13 +73,13 @@ class ElectrumCashaccountTests(BitcoinTestFramework):
                 "nakamoto",
                 n.getblockcount())
 
-        txs = list(map(lambda r: r['tx'], res['result']))
+        txs = list(map(lambda r: r['tx'], res))
         assert_equal(3, len(txs))
         assert(tx1 in txs)
         assert(tx2 in txs)
         assert(tx3 in txs)
 
-        for account in res['result']:
+        for account in res:
             assert_equal(n.getblockcount(), account['height'])
             assert_equal(n.getbestblockhash(), account['blockhash'])
 

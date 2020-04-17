@@ -34,8 +34,11 @@
 #include "miner.h"
 #include "net.h"
 #include "parallel.h"
+#include "policy/fees.h"
+#include "policy/mempool.h"
 #include "policy/policy.h"
 #include "requestManager.h"
+#include "rpc/blockchain.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
 #include "script/sigcache.h"
@@ -509,8 +512,15 @@ bool InitSanityCheck(void)
         InitError("Elliptic curve cryptography sanity check failure. Aborting.");
         return false;
     }
+
     if (!glibc_sanity_test() || !glibcxx_sanity_test())
         return false;
+
+    if (!Random_SanityCheck())
+    {
+        InitError("OS cryptographic RNG sanity check failure. Aborting.");
+        return false;
+    }
 
     return true;
 }
@@ -642,7 +652,7 @@ void InitLogging()
     Logging::LogInit();
 
     LOGA("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
-    LOGA("Bitcoin version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
+    LOGA("BCH Unlimited version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
 }
 
 /** Initialize bitcoin.
@@ -896,6 +906,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 
     // Initialize elliptic curve code
     std::string sha256_algo = SHA256AutoDetect();
+    RandomInit();
     LOGA("Using the '%s' SHA256 implementation\n", sha256_algo);
     ECC_Start();
     globalVerifyHandle.reset(new ECCVerifyHandle());
@@ -1052,7 +1063,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     // ********************************************************* Step 6: load block chain
 
     fReindex = GetBoolArg("-reindex", DEFAULT_REINDEX);
-    fTxIndex = GetBoolArg("-txindex", DEFAULT_TXINDEX);
     int64_t requested_block_mode = GetArg("-useblockdb", DEFAULT_BLOCK_DB_MODE);
     if (requested_block_mode >= 0 && requested_block_mode < END_STORAGE_OPTIONS)
     {
@@ -1111,12 +1121,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     bool fLoaded = false;
     StartTxAdmission(threadGroup);
 
-    if (fTxIndex)
-    {
-        auto txindex_db = new TxIndexDB(cacheConfig.nTxIndexCache, false, fReindex);
-        g_txindex = std::make_unique<TxIndex>(txindex_db);
-    }
-
     while (!fLoaded)
     {
         bool fReset = fReindex;
@@ -1140,7 +1144,10 @@ bool AppInit2(Config &config, thread_group &threadGroup)
                     cacheConfig.nBlockTreeDBCache, cacheConfig.nBlockDBCache, cacheConfig.nBlockUndoDBCache);
 
                 uiInterface.InitMessage(_("Opening UTXO database..."));
-                pcoinsdbview = new CCoinsViewDB(cacheConfig.nCoinDBCache, false, fReindex);
+                COverrideOptions overridecache;
+                overridecache.block_size = 128;
+                pcoinsdbview = new CCoinsViewDB(cacheConfig.nCoinDBCache, false, fReindex, true, &overridecache);
+
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
                 uiInterface.InitMessage(_("Opening Coins Cache database..."));
                 pcoinsTip = new CCoinsViewCache(pcoinscatcher);
@@ -1315,10 +1322,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 #endif // !ENABLE_WALLET
 
     // ********************************************************* Step 8: data directory maintenance
-    if (g_txindex)
-    {
-        g_txindex->Start();
-    }
 
     // if pruning, unset the service bit and perform the initial blockstore prune
     // after any wallet rescanning has taken place.
@@ -1340,9 +1343,8 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     if (mapArgs.count("-blocknotify"))
         uiInterface.NotifyBlockTip.connect(BlockNotifyCallback);
 
-    uiInterface.InitMessage(_("Activating best chain..."));
     // scan for better chains in the block chain database, that are not yet connected in the active best chain
-
+    uiInterface.InitMessage(_("Activating best chain..."));
     CValidationState state;
     if (!ActivateBestChain(state, chainparams))
     {
@@ -1351,7 +1353,35 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         else
             strErrors << "Failed to connect best block";
     }
-    IsChainNearlySyncdInit(); // BUIP010 XTHIN: initialize fIsChainNearlySyncd
+
+    // Reconsider the most work chain if we're not already synced. This is necessary
+    // when switching from an ABC/BCHN client or when a operator failed to upgrade their BU
+    // node before a hardfork.
+    if (!fReindex)
+    {
+        LOCK(cs_main);
+
+        // Get the set of chaintips
+        std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
+        setTips = GetChainTips();
+
+        // Find out if we're already synced to one of the chaintips. If so then we
+        // can and must skip reconsidermostworkchain().
+        bool fReconsider = false;
+        CBlockIndex *pMostWork = chainActive.Tip();
+        for (CBlockIndex *pTip : setTips)
+        {
+            if (pMostWork->nChainWork < pTip->nChainWork)
+                fReconsider = true;
+        }
+        if (fReconsider)
+        {
+            UniValue obj(UniValue::VARR);
+            reconsidermostworkchain(obj, false);
+        }
+    }
+
+    IsChainNearlySyncdInit();
     IsInitialBlockDownloadInit();
 
     std::vector<fs::path> vImportFiles;
@@ -1554,8 +1584,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     if (!strErrors.str().empty())
         return InitError(strErrors.str());
 
-    RandAddSeedPerfmon();
-
     //// debug print
     {
         READLOCK(cs_mapBlockIndex);
@@ -1571,6 +1599,25 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
         StartTorControl(threadGroup);
+
+    // Startup txindex just before StartNode. If we start it earlier and before ActivateBestChain
+    // we can end up grinding slowly through ActivateBestChain when txindex still has unfinished
+    // compaction to do from a prior run.
+    fTxIndex = GetBoolArg("-txindex", DEFAULT_TXINDEX);
+    if (fTxIndex)
+    {
+        uiInterface.InitMessage(_("Starting txindex"));
+
+        // When reindexing we want to wipe the previous txindex database however we don't want to
+        // rely on the fReindex flag since it's possible that by the time we get to this point in the
+        // node startup that the reindex is already completed (in the case of a very small reindex) and
+        // therefore fReindex would already be false and the txindex would not get rebuilt.
+        bool fWipeDatabase = GetBoolArg("-reindex", DEFAULT_REINDEX);
+        auto txindex_db = new TxIndexDB(cacheConfig.nTxIndexCache, false, fWipeDatabase);
+
+        g_txindex = std::make_unique<TxIndex>(txindex_db);
+        g_txindex->Start();
+    }
 
     StartNode(threadGroup);
 
@@ -1605,6 +1652,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 #endif
 
     uiInterface.InitMessage(_("Done loading"));
+
 
     // This should be done last in init. If not, then RPC's could be allowed before the wallet
     // is ready.

@@ -222,7 +222,7 @@
         <translation>Трака са картицама</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Unlimited</source>
+        <source>&amp;About BCH Unlimited</source>
         <translation>O Bitcoin Coru</translation>
     </message>
     <message>
@@ -321,7 +321,7 @@
         <translation>верзија</translation>
     </message>
     <message>
-        <source>About Bitcoin Unlimited</source>
+        <source>About BCH Unlimited</source>
         <translation>O Bitcoin Coru</translation>
     </message>
     <message>

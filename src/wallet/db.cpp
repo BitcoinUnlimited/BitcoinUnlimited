@@ -294,6 +294,7 @@ void CDB::Flush()
     if (fReadOnly)
         nMinutes = 1;
 
+    LOCK(bitdb.cs_db);
     bitdb.dbenv->txn_checkpoint(nMinutes ? GetArg("-dblogsize", DEFAULT_WALLET_DBLOGSIZE) * 1024 : 0, nMinutes, 0);
 }
 

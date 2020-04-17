@@ -14,6 +14,7 @@ using namespace std;
  */
 void CChain::SetTip(CBlockIndex *pindex)
 {
+    WRITELOCK(cs_chainLock);
     if (pindex == nullptr)
     {
         vChain.clear();
@@ -35,6 +36,7 @@ CBlockLocator CChain::GetLocator(const CBlockIndex *pindex) const
     std::vector<uint256> vHave;
     vHave.reserve(32);
 
+    READLOCK(cs_chainLock);
     if (!pindex)
         pindex = Tip();
     while (pindex)
@@ -45,10 +47,10 @@ CBlockLocator CChain::GetLocator(const CBlockIndex *pindex) const
             break;
         // Exponentially larger steps back, plus the genesis block.
         int nHeight = std::max(pindex->nHeight - nStep, 0);
-        if (Contains(pindex))
+        if (_Contains(pindex))
         {
             // Use O(1) CChain index if possible.
-            pindex = (*this)[nHeight];
+            pindex = _idx(nHeight);
         }
         else
         {
@@ -64,13 +66,14 @@ CBlockLocator CChain::GetLocator(const CBlockIndex *pindex) const
 
 const CBlockIndex *CChain::FindFork(const CBlockIndex *pindex) const
 {
+    READLOCK(cs_chainLock);
     if (pindex == nullptr)
     {
         return nullptr;
     }
     if (pindex->nHeight > Height())
         pindex = pindex->GetAncestor(Height());
-    while (pindex && !Contains(pindex))
+    while (pindex && !_Contains(pindex))
         pindex = pindex->pprev;
     return pindex;
 }

@@ -15,6 +15,7 @@
 #include "bloom.h"
 #include "cashaddrenc.h"
 #include "chainparams.h"
+#include "merkleblock.h"
 #include "random.h"
 #include "script/sign.h"
 #include "streams.h"
@@ -57,6 +58,28 @@ struct ForkDeploymentInfo
     bool myVote;
 };
 struct ForkDeploymentInfo VersionBitsDeploymentInfo[Consensus::MAX_VERSION_BITS_DEPLOYMENTS];
+
+// Must match the equivalent object in calling language code
+typedef enum {
+    AddrBlockchainBCH = 1,
+    AddrBlockchainBCHtestnet = 2,
+    AddrBlockchainBCHregtest = 3,
+    AddrBlockchainNol = 4,
+} ChainSelector;
+
+CChainParams *GetChainParams(ChainSelector chainSelector)
+{
+    if (chainSelector == AddrBlockchainBCH)
+        return &Params(CBaseChainParams::MAIN);
+    else if (chainSelector == AddrBlockchainBCHtestnet)
+        return &Params(CBaseChainParams::TESTNET);
+    else if (chainSelector == AddrBlockchainBCHregtest)
+        return &Params(CBaseChainParams::REGTEST);
+    else if (chainSelector == AddrBlockchainNol)
+        return &Params(CBaseChainParams::UNL);
+    else
+        return nullptr;
+}
 
 
 // helper functions
@@ -348,7 +371,7 @@ SLAPI void *CreateNoContextScriptMachine(unsigned int flags)
 {
     ScriptMachineData *smd = new ScriptMachineData();
     smd->checker = std::make_shared<BaseSignatureChecker>();
-    smd->sm = new ScriptMachine(flags, *smd->checker, 0xffffffff);
+    smd->sm = new ScriptMachine(flags, *smd->checker, 0xffffffff, 0xffffffff);
     return (void *)smd;
 }
 
@@ -384,7 +407,9 @@ SLAPI void *CreateScriptMachine(unsigned int flags,
 
     // Its ok to get the bare tx pointer: the life of the CTransaction is the same as TransactionSignatureChecker
     smd->checker = std::make_shared<TransactionSignatureChecker>(smd->tx.get(), inputIdx, inputAmount, flags);
-    smd->sm = new ScriptMachine(flags, *smd->checker, 0xffffffff);
+    // max ops and max sigchecks are set to the maximum value with the intention that the caller will check these if
+    // needed because many uses of the script machine are for debugging and experimental scripts.
+    smd->sm = new ScriptMachine(flags, *smd->checker, 0xffffffff, 0xffffffff);
     return (void *)smd;
 }
 
@@ -565,7 +590,7 @@ public:
     ByteArrayAccessor(JNIEnv *e, jbyteArray &arg) : env(e), obj(arg)
     {
         size = env->GetArrayLength(obj);
-        data = (uint8_t *)env->GetByteArrayElements(obj, NULL);
+        data = (uint8_t *)env->GetByteArrayElements(obj, nullptr);
     }
 
     ~ByteArrayAccessor()
@@ -587,7 +612,7 @@ std::string toString(JNIEnv *env, jstring jStr)
     const jbyteArray stringJbytes = (jbyteArray)env->CallObjectMethod(jStr, getBytes, env->NewStringUTF("UTF-8"));
 
     size_t length = (size_t)env->GetArrayLength(stringJbytes);
-    jbyte *pBytes = env->GetByteArrayElements(stringJbytes, NULL);
+    jbyte *pBytes = env->GetByteArrayElements(stringJbytes, nullptr);
 
     std::string ret = std::string((char *)pBytes, length);
     env->ReleaseByteArrayElements(stringJbytes, pBytes, JNI_ABORT);
@@ -597,7 +622,7 @@ std::string toString(JNIEnv *env, jstring jStr)
     return ret;
 }
 
-jint throwIllegalState(JNIEnv *env, const char *message)
+jint triggerJavaIllegalStateException(JNIEnv *env, const char *message)
 {
     jclass exc = env->FindClass("java/lang/IllegalStateException");
     if (nullptr == exc)
@@ -610,10 +635,10 @@ jbyteArray encodeUint256(JNIEnv *env, arith_uint256 value)
 {
     const size_t size = 256 / 8;
     jbyteArray result = env->NewByteArray(size);
-    if (result != NULL)
+    if (result != nullptr)
     {
-        jbyte *data = env->GetByteArrayElements(result, NULL);
-        if (data != NULL)
+        jbyte *data = env->GetByteArrayElements(result, nullptr);
+        if (data != nullptr)
         {
             int i;
             for (i = (int)(size - 1); i >= 0; i--)
@@ -694,11 +719,11 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Cod
     jstring jdata)
 {
     std::string data = toString(env, jdata);
-    bool valid = false;
-    auto dataBytes = DecodeBase64(data.c_str(), &valid);
-    if (!valid)
+    bool invalid = true;
+    auto dataBytes = DecodeBase64(data.c_str(), &invalid);
+    if (invalid)
     {
-        throwIllegalState(env, "bad encoding");
+        triggerJavaIllegalStateException(env, "bad encoding");
         return jbyteArray();
     }
     return makeJByteArray(env, dataBytes);
@@ -758,19 +783,22 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Wal
     jobject ths,
     jobjectArray arg,
     jdouble falsePosRate,
+    jint capacity,
     jint maxSize,
     jint flags,
     jint tweak)
 {
     size_t len = env->GetArrayLength(arg);
+    if (capacity < 10)
+        capacity = 10; // sanity check the capacity
 
     if (!((falsePosRate >= 0) && (falsePosRate <= 1.0)))
     {
-        throwIllegalState(env, "unknown chain selection");
+        triggerJavaIllegalStateException(env, "incorrect false positive rate");
         return nullptr;
     }
 
-    CBloomFilter bloom(std::max((size_t)5, len), falsePosRate, tweak, flags, maxSize);
+    CBloomFilter bloom(std::max((size_t)capacity, len), falsePosRate, tweak, flags, maxSize);
 
     for (size_t i = 0; i < len; i++)
     {
@@ -808,7 +836,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Pay
     jbyteArray arg)
 {
     size_t len = env->GetArrayLength(arg);
-    jbyte *data = env->GetByteArrayElements(arg, NULL);
+    jbyte *data = env->GetByteArrayElements(arg, nullptr);
 
     if (len != 32)
     {
@@ -829,13 +857,14 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Pay
 
 extern "C" JNIEXPORT jstring JNICALL Java_bitcoinunlimited_libbitcoincash_PayAddress_EncodeCashAddr(JNIEnv *env,
     jobject ths,
+    jbyte chainSelector,
     jbyte typ,
     jbyteArray arg)
 {
     size_t len = env->GetArrayLength(arg);
     if (len != 20)
     {
-        throwIllegalState(env, "bad address argument length");
+        triggerJavaIllegalStateException(env, "bad address argument length");
         return env->NewStringUTF("bad address argument length");
     }
     jbyte *data = env->GetByteArrayElements(arg, 0);
@@ -845,7 +874,13 @@ extern "C" JNIEXPORT jstring JNICALL Java_bitcoinunlimited_libbitcoincash_PayAdd
 
     env->ReleaseByteArrayElements(arg, data, 0);
 
-    std::string addrAsStr(EncodeCashAddr(dst, *cashlibParams));
+    const CChainParams *cp = GetChainParams((ChainSelector)chainSelector);
+    if (cp == nullptr)
+    {
+        triggerJavaIllegalStateException(env, "Unknown blockchain selection");
+        return nullptr;
+    }
+    std::string addrAsStr(EncodeCashAddr(dst, *cp));
     return env->NewStringUTF(addrAsStr.c_str());
 }
 
@@ -876,44 +911,53 @@ public:
 
 extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_PayAddress_DecodeCashAddr(JNIEnv *env,
     jobject ths,
+    jbyte chainSelector,
     jstring addrstr)
 {
-    CTxDestination dst = DecodeCashAddr(toString(env, addrstr), *cashlibParams);
+    const CChainParams *cp = GetChainParams((ChainSelector)chainSelector);
+    if (cp == nullptr)
+    {
+        triggerJavaIllegalStateException(env, "Unknown blockchain selection");
+        return nullptr;
+    }
+
+    CTxDestination dst = DecodeCashAddr(toString(env, addrstr), *cp);
 
     jbyteArray bArray = env->NewByteArray(21);
     jbyte *data = env->GetByteArrayElements(bArray, 0);
-    boost::apply_visitor(PubkeyExtractor(data, *cashlibParams), dst);
+    boost::apply_visitor(PubkeyExtractor(data, *cp), dst);
     env->ReleaseByteArrayElements(bArray, data, 0);
     return bArray;
 }
 
-extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Key_Hd44DeriveChildKey(JNIEnv *env,
+// many of the args are long so that the hardened selectors (i.e. 0x80000000) are not negative
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_AddressDerivationKey_Hd44DeriveChildKey(
+    JNIEnv *env,
     jobject ths,
     jbyteArray masterSecretBytes,
-    jint purpose,
-    jint coinType,
-    jint account,
+    jlong purpose,
+    jlong coinType,
+    jlong account,
     jint change,
     jint index)
 {
     size_t mslen = env->GetArrayLength(masterSecretBytes);
-    if (mslen != 32)
+    if ((mslen < 16) || (mslen > 64))
     {
-        throwIllegalState(env, "key derivation failure -- master secret is incorrect length");
+        triggerJavaIllegalStateException(env, "key derivation failure -- master secret is incorrect length");
         return nullptr;
     }
 
     jbyte *msdata = env->GetByteArrayElements(masterSecretBytes, 0);
-    CKey masterSecret = LoadKey((unsigned char *)msdata);
 
     CKey secret;
-    Hd44DeriveChildKey(masterSecret, purpose, coinType, account, change, index, secret, nullptr);
+    Hd44DeriveChildKey((unsigned char *)msdata, mslen, purpose, coinType, account, change, index, secret, nullptr);
 
     jbyteArray bArray = env->NewByteArray(32);
     jbyte *data = env->GetByteArrayElements(bArray, 0);
     if (secret.size() != 32)
     {
-        throwIllegalState(env, "key derivation failure -- derived secret is incorrect length");
+        triggerJavaIllegalStateException(env, "key derivation failure -- derived secret is incorrect length");
         return nullptr;
     }
     memcpy(data, secret.begin(), 32);
@@ -969,23 +1013,89 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Has
     return bArray;
 }
 
+class CDecodablePartialMerkleTree : public CPartialMerkleTree
+{
+public:
+    std::vector<uint256> &accessHashes() { return vHash; }
+    CDecodablePartialMerkleTree(unsigned int ntx, char *bitField, int bitFieldLen)
+    {
+        nTransactions = ntx;
+        vBits.resize(bitFieldLen * 8);
+        for (unsigned int p = 0; p < vBits.size(); p++)
+            vBits[p] = (bitField[p / 8] & (1 << (p % 8))) != 0;
+        fBad = false;
+    }
+};
+
+extern "C" JNIEXPORT jobjectArray JNICALL Java_bitcoinunlimited_libbitcoincash_MerkleBlock_Extract(JNIEnv *env,
+    jobject ths,
+    jint numTxes,
+    jbyteArray merkleProofPath,
+    jobjectArray hashArray)
+{
+    const unsigned int HASH_LEN = 32;
+    size_t hashArrayLen = env->GetArrayLength(hashArray);
+
+    jbyte *mppData = env->GetByteArrayElements(merkleProofPath, 0);
+    size_t mppLen = env->GetArrayLength(merkleProofPath);
+    CDecodablePartialMerkleTree tree(numTxes, (char *)mppData, mppLen);
+    env->ReleaseByteArrayElements(merkleProofPath, mppData, 0);
+
+    // Copy the hashes out of the java wrapper objects into the PartialMerkleTree
+    auto &hashes = tree.accessHashes();
+    hashes.resize(hashArrayLen);
+    for (size_t i = 0; i < hashArrayLen; i++)
+    {
+        jbyteArray elem = (jbyteArray)env->GetObjectArrayElement(hashArray, i);
+        jbyte *elemData = env->GetByteArrayElements(elem, 0);
+        size_t elemLen = env->GetArrayLength(elem);
+        if (elemLen != HASH_LEN)
+        {
+            triggerJavaIllegalStateException(env, "invalid hash: bad length");
+            return nullptr;
+        }
+        hashes[i] = uint256((unsigned char *)elemData);
+        env->ReleaseByteArrayElements(elem, elemData, 0);
+    }
+
+    std::vector<uint256> matches;
+    std::vector<unsigned int> matchIndexes;
+    uint256 merkleRoot = tree.ExtractMatches(matches, matchIndexes);
+
+    jclass elementClass = env->GetObjectClass(merkleProofPath); // get the class of a jbyteArray
+    jobjectArray ret = env->NewObjectArray(matches.size() + 1, elementClass, nullptr);
+
+    // Put the merkle root in the first slot
+    {
+        jbyteArray bArray = env->NewByteArray(HASH_LEN);
+        jbyte *dest = env->GetByteArrayElements(bArray, 0);
+        memcpy(dest, merkleRoot.begin(), HASH_LEN);
+        env->ReleaseByteArrayElements(bArray, dest, 0);
+        env->SetObjectArrayElement(ret, 0, bArray);
+    }
+
+    // Fill the rest with transactions hashes
+    for (size_t i = 0; i < matches.size(); i++)
+    {
+        jbyteArray bArray = env->NewByteArray(HASH_LEN);
+        jbyte *dest = env->GetByteArrayElements(bArray, 0);
+        memcpy(dest, matches[i].begin(), HASH_LEN);
+        env->ReleaseByteArrayElements(bArray, dest, 0);
+        env->SetObjectArrayElement(ret, i + 1, bArray);
+    }
+    return ret;
+}
+
 extern "C" JNIEXPORT jstring JNICALL Java_bitcoinunlimited_libbitcoincash_Initialize_LibBitcoinCash(JNIEnv *env,
     jobject ths,
     jbyte chainSelector)
 {
     javaEnv = env;
 
-    if (chainSelector == 1)
-        cashlibParams = &Params(CBaseChainParams::MAIN);
-    else if (chainSelector == 2)
-        cashlibParams = &Params(CBaseChainParams::TESTNET);
-    else if (chainSelector == 3)
-        cashlibParams = &Params(CBaseChainParams::REGTEST);
-    else if (chainSelector == 4)
-        cashlibParams = &Params(CBaseChainParams::UNL);
-    else
+    cashlibParams = GetChainParams((ChainSelector)chainSelector);
+    if (cashlibParams == nullptr)
     {
-        throwIllegalState(env, "unknown chain selection");
+        triggerJavaIllegalStateException(env, "unknown blockchain selection");
     }
 
 #ifdef ANDROID

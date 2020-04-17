@@ -1,5 +1,5 @@
 ---
-name: "BUcash-linux-1.7"
+name: "bch-unlimited-linux"
 enable_cache: true
 suites:
 - "bionic"
@@ -136,14 +136,13 @@ script: |
   ./autogen.sh
   CONFIG_SITE=${BASEPREFIX}/`echo "${HOSTS}" | awk '{print $1;}'`/share/config.site ./configure --prefix=/
   make dist
-  # cp bitcoinUnlimited-*.tar.gz BUcash-1.1.0.tar.gz
-  SOURCEDIST=`echo BUcash-*.tar.gz`
+  SOURCEDIST=`echo bch-unlimited-*.tar.gz`
   DISTNAME=`echo ${SOURCEDIST} | sed 's/.tar.*//'`
   # Correct tar file order
   mkdir -p temp
   pushd temp
   tar xf ../$SOURCEDIST
-  find BUcash* | sort | tar --no-recursion --mode='u+rw,go+r-w,a+X' --owner=0 --group=0 -c -T - | gzip -9n > ../$SOURCEDIST
+  find bch-unlimited* | sort | tar --no-recursion --mode='u+rw,go+r-w,a+X' --owner=0 --group=0 -c -T - | gzip -9n > ../$SOURCEDIST
   popd
 
   ORIGPATH="$PATH"
@@ -166,6 +165,8 @@ script: |
     make ${MAKEOPTS} -C src check-symbols
     make install DESTDIR=${INSTALLPATH}
     if [ -f src/electrscash ]; then
+        cp src/electrscash ${OUTDIR}/electrscash-${i}.debug
+        strip src/electrscash
         cp src/electrscash ${INSTALLPATH}/bin/electrscash
     fi
     # BU save the executables with debug symbols

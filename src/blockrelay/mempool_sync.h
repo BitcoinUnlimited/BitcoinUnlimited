@@ -12,7 +12,7 @@
 #include "utiltime.h"
 
 const uint64_t DEFAULT_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED = 0;
-const uint64_t DEFAULT_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED = 0;
+const uint64_t DEFAULT_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED = 1;
 // arbitrary entropy passed to CGrapheneSet an used for IBLT
 const uint32_t IBLT_ENTROPY = 13;
 // any value greater than 2 will use SipHash

@@ -83,8 +83,6 @@ const char *ScriptErrorString(const ScriptError serror)
         return "Only non-push operators allowed in signatures";
     case SCRIPT_ERR_SIG_HIGH_S:
         return "Non-canonical signature: S value is unnecessarily high";
-    case SCRIPT_ERR_SIG_NULLDUMMY:
-        return "Dummy CHECKMULTISIG argument must be zero";
     case SCRIPT_ERR_SIG_NULLFAIL:
         return "Signature must be zero for failed CHECK(MULTI)SIG operation";
     case SCRIPT_ERR_SIG_BADLENGTH:
@@ -105,6 +103,8 @@ const char *ScriptErrorString(const ScriptError serror)
         return "Script number overflow";
     case SCRIPT_ERR_NUMBER_BAD_ENCODING:
         return "Non-minimally encoded script number";
+    case SIGCHECKS_LIMIT_EXCEEDED:
+        return "Validation resources exceeded (SigChecks)";
     case SCRIPT_ERR_UNKNOWN_ERROR:
     case SCRIPT_ERR_ERROR_COUNT:
     default:

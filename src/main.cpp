@@ -44,6 +44,7 @@
 #include "tinyformat.h"
 #include "txadmission.h"
 #include "txdb.h"
+#include "txlookup.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
 #include "ui_interface.h"
@@ -151,6 +152,9 @@ void FinalizeNode(NodeId nodeid)
     thinrelay.ClearAllBlocksToReconstruct(nodeid);
     thinrelay.ClearAllBlocksInFlight(nodeid);
 
+    // Clear Graphene blocks held by sender for this receiver
+    thinrelay.ClearSentGrapheneBlocks(nodeid);
+
     // Update block sync counters
     {
         CNodeStateAccessor state(nodestate, nodeid);
@@ -178,7 +182,7 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats)
     CNodeStateAccessor state(nodestate, nodeid);
     DbgAssert(state != nullptr, return false);
 
-    stats.nMisbehavior = node->nMisbehavior;
+    stats.nMisbehavior = node->nMisbehavior.load();
     stats.nSyncHeight = state->pindexBestKnownBlock ? state->pindexBestKnownBlock->nHeight : -1;
     stats.nCommonHeight = state->pindexLastCommonBlock ? state->pindexLastCommonBlock->nHeight : -1;
 
@@ -221,7 +225,6 @@ void UnregisterNodeSignals(CNodeSignals &nodeSignals)
 CBlockIndex *FindForkInGlobalIndex(const CChain &chain, const CBlockLocator &locator)
 {
     // Find the first block the caller has in the main chain
-    AssertLockHeld(cs_main); // for chain
     READLOCK(cs_mapBlockIndex);
     for (const uint256 &hash : locator.vHave)
     {
@@ -285,21 +288,24 @@ bool GetTransaction(const uint256 &hash,
 {
     const CBlockIndex *pindexSlow = blockIndex;
 
-    if (blockIndex == nullptr)
+    CTransactionRef ptx = mempool.get(hash);
+    if (ptx)
     {
-        CTransactionRef ptx = mempool.get(hash);
-        if (ptx)
+        txOut = ptx;
+        return true;
+    }
+
+    if (g_txindex)
+    {
+        if (g_txindex->FindTx(hash, hashBlock, txOut))
         {
-            txOut = ptx;
             return true;
         }
+    }
 
-        if (fTxIndex)
-        {
-            return g_txindex->FindTx(hash, hashBlock, txOut);
-        }
-
-        // use coin database to locate block that contains transaction, and scan it
+    if (blockIndex == nullptr)
+    {
+        // attempt to use coin database to locate block that contains transaction, and scan it
         if (fAllowSlow)
         {
             CoinAccessor coin(*pcoinsTip, hash);
@@ -313,15 +319,14 @@ bool GetTransaction(const uint256 &hash,
         CBlock block;
         if (ReadBlockFromDisk(block, pindexSlow, consensusParams))
         {
-            for (const auto &tx : block.vtx)
+            bool ctor_enabled = pindexSlow->nHeight >= consensusParams.nov2018Height;
+            int64_t pos = FindTxPosition(block, hash, ctor_enabled);
+            if (pos == TX_NOT_FOUND)
             {
-                if (tx->GetHash() == hash)
-                {
-                    txOut = tx;
-                    hashBlock = pindexSlow->GetBlockHash();
-                    return true;
-                }
+                return false;
             }
+            txOut = block.vtx.at(pos);
+            return true;
         }
     }
 
@@ -464,8 +469,8 @@ bool CheckDiskSpace(uint64_t nAdditionalBytes)
 {
     uint64_t nFreeBytesAvailable = fs::space(GetDataDir()).available;
 
-    // Check for nMinDiskSpace bytes (currently 50MB)
-    if (nFreeBytesAvailable < nMinDiskSpace + nAdditionalBytes)
+    // Check for nMinDiskSpace bytes (currently 100MB)
+    if (Params().NetworkIDString() != "regtest" && nFreeBytesAvailable < nMinDiskSpace + nAdditionalBytes)
         return AbortNode("Disk space is low!", _("Error: Disk space is low!"));
 
     return true;

@@ -59,8 +59,10 @@ private Q_SLOTS:
     void validateBlockSize();
     // Pushes the traffic shaping slider changes into the traffic shaping edit boxes
     void shapingSliderChanged();
-    void shapingMaxEditFinished(void); // auto-corrects cases where max is lower then average
-    void shapingAveEditFinished(void); // auto-corrects cases where max is lower then average
+    // auto-corrects cases where max is lower then average and force the input for those
+    // fields to be greater than zero
+    bool shapingMaxEditFinished(void);
+    bool shapingAveEditFinished(void);
     // Pushes the traffic shaping slider changes into the traffic shaping edit boxes
     void shapingEnableChanged(bool val);
 

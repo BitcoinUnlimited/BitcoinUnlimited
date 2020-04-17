@@ -142,7 +142,7 @@ public:
             vch.insert(it, first, last);
     }
 
-    void insert(iterator it, const char *first, const char *last)
+    void insert(iterator it, std::string::iterator first, std::string::iterator last)
     {
         if (last == first)
             return;

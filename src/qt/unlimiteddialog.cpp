@@ -72,10 +72,10 @@ UnlimitedDialog::UnlimitedDialog(QWidget *parent, UnlimitedModel *mdl)
     connect(ui.recvBurstSlider, SIGNAL(sliderMoved(int)), this, SLOT(shapingSliderChanged()));
     connect(ui.recvAveSlider, SIGNAL(sliderMoved(int)), this, SLOT(shapingSliderChanged()));
 
-    connect(ui.recvAveEdit, SIGNAL(editingFinished()), this, SLOT(shapingAveEditFinished()));
-    connect(ui.sendAveEdit, SIGNAL(editingFinished()), this, SLOT(shapingAveEditFinished()));
-    connect(ui.recvBurstEdit, SIGNAL(editingFinished()), this, SLOT(shapingMaxEditFinished()));
-    connect(ui.sendBurstEdit, SIGNAL(editingFinished()), this, SLOT(shapingMaxEditFinished()));
+    connect(ui.recvAveEdit, SIGNAL(textChanged(const QString &)), this, SLOT(shapingAveEditFinished()));
+    connect(ui.sendAveEdit, SIGNAL(textChanged(const QString &)), this, SLOT(shapingAveEditFinished()));
+    connect(ui.recvBurstEdit, SIGNAL(textChanged(const QString &)), this, SLOT(shapingMaxEditFinished()));
+    connect(ui.sendBurstEdit, SIGNAL(textChanged(const QString &)), this, SLOT(shapingMaxEditFinished()));
 
     if (enabled)
     {
@@ -155,6 +155,18 @@ void UnlimitedDialog::on_resetButton_clicked()
 
 void UnlimitedDialog::on_okButton_clicked()
 {
+    if (ui.sendShapingEnable->isChecked() && !(shapingAveEditFinished() && shapingMaxEditFinished()))
+    {
+        reject();
+        return;
+    }
+
+    if (ui.recvShapingEnable->isChecked() && !(shapingAveEditFinished() && shapingMaxEditFinished()))
+    {
+        reject();
+        return;
+    }
+
     if (!mapper.submit())
     {
         assert(0);
@@ -190,62 +202,128 @@ void UnlimitedDialog::validateBlockSize()
     }
 }
 
-void UnlimitedDialog::shapingAveEditFinished(void)
+bool UnlimitedDialog::shapingAveEditFinished(void)
 {
     bool ok, ok2 = false;
 
     if (ui.sendShapingEnable->isChecked())
     {
+        // if the use left the  max and avg edit empty warn and block further processing.
+        if (ui.sendBurstEdit->text().isEmpty() || ui.sendAveEdit->text().isEmpty())
+        {
+            setOkButtonState(false);
+            ui.errorText->setStyleSheet("QLabel { color: red; }");
+            ui.errorText->setText(tr("Upstream traffic shaping parameters can't be blank"));
+            return false;
+        }
+
         // If the user adjusted the average to be higher than the max, then auto-bump the max up to = the average
         int maxVal = ui.sendBurstEdit->text().toInt(&ok);
         int aveVal = ui.sendAveEdit->text().toInt(&ok2);
 
+
         if (ok && ok2)
         {
-            ui.sendAveSlider->setValue(bwEdit2Slider(aveVal));
-            if (maxVal < aveVal)
+            if (maxVal == 0 || aveVal == 0)
             {
-                ui.sendBurstEdit->setText(ui.sendAveEdit->text());
-                ui.sendBurstSlider->setValue(bwEdit2Slider(aveVal));
+                setOkButtonState(false);
+                ui.errorText->setStyleSheet("QLabel { color: red; }");
+                ui.errorText->setText(tr("Traffic shaping parameters have to be greater than 0."));
+                return false;
+            }
+            else
+            {
+                setOkButtonState(true);
+                ui.errorText->clear();
+                ui.sendAveSlider->setValue(bwEdit2Slider(aveVal));
+                if (maxVal < aveVal)
+                {
+                    ui.sendBurstEdit->setText(ui.sendAveEdit->text());
+                    ui.sendBurstSlider->setValue(bwEdit2Slider(aveVal));
+                }
             }
         }
     }
 
     if (ui.recvShapingEnable->isChecked())
     {
+        // if the use left the  max and avg edit empty warn and block further processing.
+        if (ui.recvBurstEdit->text().isEmpty() || ui.recvAveEdit->text().isEmpty())
+        {
+            setOkButtonState(false);
+            ui.errorText->setStyleSheet("QLabel { color: red; }");
+            ui.errorText->setText(tr("Upstream traffic shaping parameters can't be blank"));
+            return false;
+        }
+
         int maxVal = ui.recvBurstEdit->text().toInt(&ok);
         int aveVal = ui.recvAveEdit->text().toInt(&ok2);
         if (ok && ok2)
         {
-            ui.recvAveSlider->setValue(bwEdit2Slider(aveVal));
-            if (maxVal < aveVal)
+            if (maxVal == 0 || aveVal == 0)
             {
-                ui.recvBurstEdit->setText(ui.recvAveEdit->text());
-                ui.recvBurstSlider->setValue(bwEdit2Slider(aveVal));
+                setOkButtonState(false);
+                ui.errorText->setStyleSheet("QLabel { color: red; }");
+                ui.errorText->setText(tr("Traffic shaping parameters have to be greater than 0."));
+                return false;
+            }
+            else
+            {
+                setOkButtonState(true);
+                ui.errorText->clear();
+                ui.recvAveSlider->setValue(bwEdit2Slider(aveVal));
+                if (maxVal < aveVal)
+                {
+                    ui.recvBurstEdit->setText(ui.recvAveEdit->text());
+                    ui.recvBurstSlider->setValue(bwEdit2Slider(aveVal));
+                }
             }
         }
     }
+    return true;
 }
 
-void UnlimitedDialog::shapingMaxEditFinished(void)
+bool UnlimitedDialog::shapingMaxEditFinished(void)
 {
     bool ok, ok2 = false;
 
     if (ui.sendShapingEnable->isChecked())
     {
+        // if the use left the  max and avg edit empty warn and block further processing.
+        if (ui.sendBurstEdit->text().isEmpty() || ui.sendAveEdit->text().isEmpty())
+        {
+            setOkButtonState(false);
+            ui.errorText->setStyleSheet("QLabel { color: red; }");
+            ui.errorText->setText(tr("Upstream traffic shaping parameters can't be blank"));
+            return false;
+        }
+
         // If the user adjusted the max to be lower than the average, then move the average down
         int maxVal = ui.sendBurstEdit->text().toInt(&ok);
         int aveVal = ui.sendAveEdit->text().toInt(&ok2);
         if (ok && ok2)
         {
-            ui.sendBurstSlider->setValue(bwEdit2Slider(maxVal)); // Move the slider based on the edit box change
-            // If the max was changed to be lower than the average, bump the average down to the maximum, because having
-            // an ave > the max makes no sense.
-            if (maxVal < aveVal)
+            if (maxVal == 0 || aveVal == 0)
             {
-                // I use the string text here just so I don't have to convert back from int to string
-                ui.sendAveEdit->setText(ui.sendBurstEdit->text());
-                ui.sendAveSlider->setValue(bwEdit2Slider(maxVal));
+                setOkButtonState(false);
+                ui.errorText->setStyleSheet("QLabel { color: red; }");
+                ui.errorText->setText(tr("Traffic shaping parameters have to be greater than 0."));
+                return false;
+            }
+            else
+            {
+                setOkButtonState(true);
+                ui.errorText->clear();
+                ui.sendBurstSlider->setValue(bwEdit2Slider(maxVal)); // Move the slider based on the edit box change
+                // If the max was changed to be lower than the average, bump the average down to the maximum, because
+                // having
+                // an ave > the max makes no sense.
+                if (maxVal < aveVal)
+                {
+                    // I use the string text here just so I don't have to convert back from int to string
+                    ui.sendAveEdit->setText(ui.sendBurstEdit->text());
+                    ui.sendAveSlider->setValue(bwEdit2Slider(maxVal));
+                }
             }
         }
     }
@@ -253,19 +331,41 @@ void UnlimitedDialog::shapingMaxEditFinished(void)
 
     if (ui.recvShapingEnable->isChecked())
     {
+        // if the use left the  max and avg edit empty warn and block further processing.
+        if (ui.recvBurstEdit->text().isEmpty() || ui.recvAveEdit->text().isEmpty())
+        {
+            setOkButtonState(false);
+            ui.errorText->setStyleSheet("QLabel { color: red; }");
+            ui.errorText->setText(tr("Upstream traffic shaping parameters can't be blank"));
+            return false;
+        }
+
         int maxVal = ui.recvBurstEdit->text().toInt(&ok);
         int aveVal = ui.recvAveEdit->text().toInt(&ok2);
         if (ok && ok2)
         {
-            ui.recvBurstSlider->setValue(bwEdit2Slider(maxVal)); // Move the slider based on the edit box change
-            if (maxVal < aveVal)
+            if (maxVal == 0 || aveVal == 0)
             {
-                // I use the string text here just so I don't have to convert back from int to string
-                ui.recvAveEdit->setText(ui.recvBurstEdit->text());
-                ui.recvAveSlider->setValue(bwEdit2Slider(maxVal));
+                setOkButtonState(false);
+                ui.errorText->setStyleSheet("QLabel { color: red; }");
+                ui.errorText->setText(tr("Traffic shaping parameters have to be greater than 0."));
+                return false;
+            }
+            else
+            {
+                setOkButtonState(true);
+                ui.errorText->clear();
+                ui.recvBurstSlider->setValue(bwEdit2Slider(maxVal)); // Move the slider based on the edit box change
+                if (maxVal < aveVal)
+                {
+                    // I use the string text here just so I don't have to convert back from int to string
+                    ui.recvAveEdit->setText(ui.recvBurstEdit->text());
+                    ui.recvAveSlider->setValue(bwEdit2Slider(maxVal));
+                }
             }
         }
     }
+    return true;
 }
 
 void UnlimitedDialog::shapingEnableChanged(bool val)
@@ -276,12 +376,32 @@ void UnlimitedDialog::shapingEnableChanged(bool val)
     ui.sendAveSlider->setEnabled(enabled);
     ui.sendBurstEdit->setEnabled(enabled);
     ui.sendAveEdit->setEnabled(enabled);
+    if (enabled)
+    {
+        ui.sendBurstEdit->setFocus();
+    }
+    else
+    {
+        ui.sendBurstEdit->setText("");
+        ui.sendAveEdit->setText("");
+        ui.okButton->setEnabled(true);
+    }
 
     enabled = ui.recvShapingEnable->isChecked();
     ui.recvBurstSlider->setEnabled(enabled);
     ui.recvAveSlider->setEnabled(enabled);
     ui.recvBurstEdit->setEnabled(enabled);
     ui.recvAveEdit->setEnabled(enabled);
+    if (enabled)
+    {
+        ui.recvBurstEdit->setFocus();
+    }
+    else
+    {
+        ui.recvBurstEdit->setText("");
+        ui.recvAveEdit->setText("");
+        ui.okButton->setEnabled(true);
+    }
 }
 
 void UnlimitedDialog::shapingSliderChanged(void)
@@ -368,16 +488,37 @@ QValidator::State LessThanValidator::validate(QString &input, int &pos) const
         if (other)
         {
             bool ok, ok2 = false;
+            // if the use left the  max and avg edit empty warn and block further processing.
+            if (input.isEmpty() || other->text().isEmpty())
+            {
+                clearError = false;
+                if (errorDisplay)
+                {
+                    errorDisplay->setStyleSheet("QLabel { color: red; }");
+                    errorDisplay->setText(tr("Upstream traffic shaping parameters can't be blank"));
+                }
+            }
             int otherVal = other->text().toInt(&ok); // try to convert to an int
             int myVal = input.toInt(&ok2);
             if (ok && ok2)
             {
+                if (myVal == 0 || otherVal == 0)
+                {
+                    clearError = false;
+                    if (errorDisplay)
+                    {
+                        errorDisplay->setStyleSheet("QLabel { color: red; }");
+                        errorDisplay->setText("Traffic shaping parameters have to be greater than zero");
+                    }
+                }
                 if (myVal > otherVal)
                 {
                     clearError = false;
                     if (errorDisplay)
-                        errorDisplay->setText(
-                            "<span style=\"color:#aa0000;\">Average must be less than or equal Maximum</span>");
+                    {
+                        errorDisplay->setStyleSheet("QLabel { color: red; }");
+                        errorDisplay->setText("Average must be less than or equal Maximum");
+                    }
                 }
             }
         }

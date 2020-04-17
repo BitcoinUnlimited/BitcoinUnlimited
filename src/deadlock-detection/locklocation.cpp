@@ -20,19 +20,16 @@ CLockLocation::CLockLocation(const char *pszName,
     fTry = fTryIn;
     eOwnership = eOwnershipIn;
     eLockType = eLockTypeIn;
-    fWaiting = true;
 }
 
 std::string CLockLocation::ToString() const
 {
     return mutexName + "  " + sourceFile + ":" + std::to_string(sourceLine) + (fTry ? " (TRY)" : "") +
-           (eOwnership == OwnershipType::EXCLUSIVE ? " (EXCLUSIVE)" : "") + (fWaiting ? " (WAITING)" : "");
+           (eOwnership == OwnershipType::EXCLUSIVE ? " (EXCLUSIVE)" : "(SHARED)") + "(HELD)";
 }
 
 bool CLockLocation::GetTry() const { return fTry; }
 OwnershipType CLockLocation::GetExclusive() const { return eOwnership; }
-bool CLockLocation::GetWaiting() const { return fWaiting; }
-void CLockLocation::ChangeWaitingToHeld() { fWaiting = false; }
 LockType CLockLocation::GetLockType() const { return eLockType; }
 std::string CLockLocation::GetFileName() const { return sourceFile; }
 int CLockLocation::GetLineNumber() const { return sourceLine; }

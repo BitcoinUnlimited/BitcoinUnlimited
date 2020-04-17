@@ -106,6 +106,9 @@ extern CTweak<uint32_t> netMagic;
 // The maximum number of allowed script operations (consensus param)
 extern CTweak<uint64_t> maxScriptOps;
 
+// The maximum number of allowed sigcheck operations (consensus param)
+extern CTweak<uint64_t> maxSigChecks;
+
 // print out a configuration warning during initialization
 // bool InitWarning(const std::string &str);
 
@@ -147,7 +150,7 @@ extern bool TestConservativeBlockValidity(CValidationState &state,
     bool fCheckMerkleRoot);
 
 // Check whether this block is bigger in some metric than we really want to accept
-extern bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, uint64_t nTx, uint64_t largestTx);
+extern bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nTx, uint64_t largestTx);
 
 // Check whether this chain qualifies as excessive.
 extern int isChainExcessive(const CBlockIndex *blk, unsigned int checkDepth = excessiveAcceptDepth);
@@ -257,6 +260,8 @@ struct ConnectionHistory
 
     double nEvictions; // number of times a connection was de-prioritized and disconnected in last 30 minutes
     int64_t nLastEvictionTime; // the time the last eviction occurred.
+
+    std::string userAgent;
 };
 extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
 extern CCriticalSection cs_mapInboundConnectionTracker;

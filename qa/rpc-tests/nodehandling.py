@@ -107,5 +107,85 @@ class NodeHandlingTest (BitcoinTestFramework):
         waitFor(10, lambda: self.nodes[2].getinfo()["peers_xthinblock"] == 2)
         waitFor(10, lambda: self.nodes[2].getinfo()["peers_cmpctblock"] == 2)
 
+        #############################
+        # Test peer eviction
+        #############################
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+        # Node 3 is the one we will use to evict a connection. It is set to maxconnection=3 however
+        # it will only allow 2 inbound connections because "1" outbound feeler connection is assumed
+        # making the total connections possible equal to three.
+        self.node_args = [['-debug=net', '-maxconnections=1', '-maxoutconnections=1'],
+                          ['-debug=net', '-maxconnections=1', '-maxoutconnections=1'],
+                          ['-debug=net', '-maxconnections=1', '-maxoutconnections=1'],
+                          ['-debug=net', '-maxconnections=3', '-maxoutconnections=0', '-debug=evict']]
+        self.nodes = start_nodes(4, self.options.tmpdir, self.node_args)
+        for node in self.nodes:
+            node.clearbanned();
+        connect_nodes(self.nodes[0], 3)
+        waitFor(10, lambda: self.nodes[0].getinfo()["connections"] == 1)
+        waitFor(10, lambda: self.nodes[3].getinfo()["connections"] == 1)
+        connect_nodes(self.nodes[1], 3)
+        waitFor(10, lambda: self.nodes[0].getinfo()["connections"] == 1)
+        waitFor(10, lambda: self.nodes[1].getinfo()["connections"] == 1)
+        waitFor(10, lambda: self.nodes[3].getinfo()["connections"] == 2)
+
+        # Connecting one more than the max which causes the a peer to be evicted
+        connect_nodes(self.nodes[2], 3)
+        # one of these 2 nodes should be evicted.  Which one depends on ping times and activity levels
+        waitFor(10, lambda: self.nodes[0].getinfo()["connections"] + self.nodes[1].getinfo()["connections"] == 1)
+        waitFor(10, lambda: self.nodes[2].getinfo()["connections"] == 1)
+        waitFor(10, lambda: self.nodes[3].getinfo()["connections"] == 2)
+
+        #############################
+        # Test startup after invalidating part of the chain on one peer and extending the chain on another
+        # : This simulates what can happen after a hardfork and a node operator failed to upgrade
+        #   before the fork.
+        #############################
+
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+
+        self.node_args = [['-debug=net'],
+                          ['-debug=net'],
+                          ['-debug=net'],
+                          ['-debug=net']]
+        self.nodes = start_nodes(4, self.options.tmpdir, self.node_args)
+        for node in self.nodes:
+            node.clearbanned();
+   
+        # Before reconnecting the peers, extend the chain on one peer while
+        # at the same time invalidating a few blocks on another
+        self.nodes[0].generate(5);
+        height = self.nodes[1].getblockcount()
+        self.nodes[1].invalidateblock(self.nodes[1].getblockhash(height))
+        self.nodes[1].invalidateblock(self.nodes[1].getblockhash(height-1))
+        self.nodes[1].invalidateblock(self.nodes[1].getblockhash(height-2))
+
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+
+        self.node_args = [['-debug=net'],
+                          ['-debug=net'],
+                          ['-debug=net'],
+                          ['-debug=net']]
+        self.nodes = start_nodes(4, self.options.tmpdir, self.node_args)
+
+        interconnect_nodes(self.nodes);
+        sync_blocks(self.nodes);
+
+
 if __name__ == '__main__':
     NodeHandlingTest ().main ()
+
+
+# Create a convenient function for an interactive python debugging session
+def Test():
+    t = NodeHandlingTest()
+    t.drop_to_pdb = True
+    bitcoinConf = {
+        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
+        "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
+    }
+    flags = standardFlags()
+    t.main(flags, bitcoinConf, None)

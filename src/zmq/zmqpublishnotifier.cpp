@@ -94,32 +94,34 @@ bool CZMQAbstractPublishNotifier::Initialize(void *pcontext)
 
 void CZMQAbstractPublishNotifier::Shutdown()
 {
-    assert(psocket);
-
-    int count = mapPublishNotifiers.count(address);
-
-    // remove this notifier from the list of publishers using this address
-    typedef std::multimap<std::string, CZMQAbstractPublishNotifier *>::iterator iterator;
-    std::pair<iterator, iterator> iterpair = mapPublishNotifiers.equal_range(address);
-
-    for (iterator it = iterpair.first; it != iterpair.second; ++it)
+    // If Initialize did not succeed, or was never called, then shutdown may be called with psocket == nullptr
+    if (psocket != nullptr)
     {
-        if (it->second == this)
+        int count = mapPublishNotifiers.count(address);
+
+        // remove this notifier from the list of publishers using this address
+        typedef std::multimap<std::string, CZMQAbstractPublishNotifier *>::iterator iterator;
+        std::pair<iterator, iterator> iterpair = mapPublishNotifiers.equal_range(address);
+
+        for (iterator it = iterpair.first; it != iterpair.second; ++it)
         {
-            mapPublishNotifiers.erase(it);
-            break;
+            if (it->second == this)
+            {
+                mapPublishNotifiers.erase(it);
+                break;
+            }
         }
-    }
 
-    if (count == 1)
-    {
-        LOG(ZMQ, "Close socket at address %s\n", address);
-        int linger = 0;
-        zmq_setsockopt(psocket, ZMQ_LINGER, &linger, sizeof(linger));
-        zmq_close(psocket);
-    }
+        if (count <= 1)
+        {
+            LOG(ZMQ, "Close socket at address %s\n", address);
+            int linger = 0;
+            zmq_setsockopt(psocket, ZMQ_LINGER, &linger, sizeof(linger));
+            zmq_close(psocket);
+        }
 
-    psocket = 0;
+        psocket = nullptr;
+    }
 }
 
 bool CZMQPublishHashBlockNotifier::NotifyBlock(const CBlockIndex *pindex)

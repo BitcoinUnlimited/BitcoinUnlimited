@@ -445,7 +445,7 @@ class WalletTest (BitcoinTestFramework):
             # wait for blockchain to catch up
             waitFor(60, lambda : [block_count] * 3 == [self.nodes[i].getblockcount() for i in range(3)])
             # wait for wallet to catch up to blockchain
-            waitFor(60, lambda : balance_nodes == [self.nodes[i].getbalance() for i in range(3)], lambda: print("balances: " + [self.nodes[i].getbalance() for i in range(3)] + " expecting: " + balance_nodes))
+            waitFor(60, lambda : balance_nodes == [self.nodes[i].getbalance() for i in range(3)], lambda: print("balances: " + str([self.nodes[i].getbalance() for i in range(3)]) + " expecting: " + str(balance_nodes)))
 
         # Exercise listsinceblock with the last two blocks
         coinbase_tx_1 = self.nodes[0].listsinceblock(blocks[0])
@@ -462,7 +462,7 @@ if __name__ == '__main__':
 def Test():
     t = WalletTest()
     bitcoinConf = {
-        "debug": ["rpc","net", "blk", "thin", "mempool", "req", "bench", "evict"],
+        "debug": ["selectcoins", "rpc","net", "blk", "thin", "mempool", "req", "bench", "evict"]
     }
 
     flags = standardFlags()

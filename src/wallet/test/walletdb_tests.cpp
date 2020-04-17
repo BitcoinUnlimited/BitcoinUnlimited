@@ -4,7 +4,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "test/test_bitcoin.h"
-#include "test/test_random.h"
 #include "fs.h"
 
 #include "wallet/wallet.h"
@@ -32,7 +31,7 @@ static std::unique_ptr<CWalletDB> TmpDB(const fs::path &pathTemp, const std::str
     fs::path dir = pathTemp / testname;
     BOOST_CHECK_MESSAGE(fs::create_directory(dir),
                         "Unable to create a directory for test " + testname);
-    fs::path path = dir / strprintf("testwallet%i", static_cast<int>(insecure_rand() % 1000000));
+    fs::path path = dir / strprintf("testwallet%i", static_cast<int>(InsecureRandRange(1000000)));
     return std::unique_ptr<CWalletDB>(new CWalletDB(path.string(), "cr+"));
 }
 

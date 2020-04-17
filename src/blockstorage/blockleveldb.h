@@ -118,6 +118,11 @@ public:
     bool ReadBlock(const CBlockIndex *pindex, CBlock &block);
     bool EraseBlock(CBlock &block);
     bool EraseBlock(const CBlockIndex *pindex);
+    void Flush()
+    {
+        pwrapperblock->Sync();
+        pwrapperundo->Sync();
+    }
 
     void CondenseBlockData(const std::string &key_begin, const std::string &key_end)
     {

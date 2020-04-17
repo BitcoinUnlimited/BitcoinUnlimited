@@ -431,6 +431,7 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
     const int nMaxVersionPreVB,
     const unsigned int nTransactionsUpdatedLast)
 {
+    bool may2020Enabled = IsMay2020Enabled(Params().GetConsensus(), pindexPrev);
     CBlock *pblock = &pblocktemplate->block; // pointer for convenience
     UniValue aCaps(UniValue::VARR);
     aCaps.push_back("proposal");
@@ -438,6 +439,7 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
     UniValue transactions(UniValue::VARR);
     map<uint256, int64_t> setTxIndex;
     int i = 0;
+    int sigcheckTotal = 0;
     for (const auto &it : pblock->vtx)
     {
         const CTransaction &tx = *it;
@@ -463,7 +465,15 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
 
         int index_in_template = i - 1;
         entry.pushKV("fee", pblocktemplate->vTxFees[index_in_template]);
-        entry.pushKV("sigops", pblocktemplate->vTxSigOps[index_in_template]);
+        if (!may2020Enabled)
+            entry.pushKV("sigops", pblocktemplate->vTxSigOps[index_in_template]);
+        else
+        {
+            // sigops is deprecated and not part of this block's consensus so report 0
+            entry.pushKV("sigops", 0);
+            entry.pushKV("sigchecks", pblocktemplate->vTxSigOps[index_in_template]);
+            sigcheckTotal += pblocktemplate->vTxSigOps[index_in_template];
+        }
 
         transactions.push_back(entry);
     }
@@ -515,7 +525,15 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
     result.pushKV("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1);
     result.pushKV("mutable", aMutable);
     result.pushKV("noncerange", "00000000ffffffff");
-    result.pushKV("sigoplimit", (int64_t)BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
+
+    // Deprecated after may 2020 but leave it in in case miners are using it in their code.
+    result.pushKV("sigoplimit", (int64_t)MAX_BLOCK_SIGOPS_PER_MB);
+    if (may2020Enabled)
+    {
+        result.pushKV("sigchecklimit", maxSigChecks.Value());
+        result.pushKV("sigchecktotal", sigcheckTotal);
+    }
+
     result.pushKV("sizelimit", (int64_t)maxGeneratedBlock);
     result.pushKV("curtime", pblock->GetBlockTime());
     result.pushKV("bits", strprintf("%08x", pblock->nBits));
@@ -988,21 +1006,27 @@ UniValue estimatefee(const UniValue &params, bool fHelp)
     return ValueFromAmount(feeRate.GetFeePerK());
 }
 
-UniValue estimatepriority(const UniValue &params, bool fHelp)
+UniValue estimatesmartfee(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
-        throw runtime_error("estimatepriority nblocks\n"
-                            "\nEstimates the approximate priority a zero-fee transaction needs to begin\n"
+        throw runtime_error("estimatesmartfee nblocks\n"
+                            "\nWARNING: This interface is unstable and may disappear or change!\n"
+                            "\nThis rpc call now does the same thing as estimatefee, It has not been removed for\n"
+                            "compatibility reasons\n"
+                            "\nEstimates the approximate fee per kilobyte needed for a transaction to begin\n"
                             "confirmation within nblocks blocks.\n"
                             "\nArguments:\n"
                             "1. nblocks     (numeric)\n"
                             "\nResult:\n"
-                            "n              (numeric) estimated priority\n"
+                            "{\n"
+                            "  \"feerate\" : x.x,     (numeric) estimate fee-per-kilobyte (in BCH)\n"
+                            "  \"blocks\" : 1         (numeric) hardcoded to 1 for backwards compatibility reasons\n"
+                            "}\n"
                             "\n"
                             "A negative value is returned if not enough transactions and blocks\n"
                             "have been observed to make an estimate.\n"
                             "\nExample:\n" +
-                            HelpExampleCli("estimatepriority", "6"));
+                            HelpExampleCli("estimatesmartfee", "6"));
 
     RPCTypeCheck(params, boost::assign::list_of(UniValue::VNUM));
 
@@ -1010,76 +1034,13 @@ UniValue estimatepriority(const UniValue &params, bool fHelp)
     if (nBlocks < 1)
         nBlocks = 1;
 
-    return mempool.estimatePriority(nBlocks);
-}
-
-UniValue estimatesmartfee(const UniValue &params, bool fHelp)
-{
-    if (fHelp || params.size() != 1)
-        throw runtime_error("estimatesmartfee nblocks\n"
-                            "\nWARNING: This interface is unstable and may disappear or change!\n"
-                            "\nEstimates the approximate fee per kilobyte needed for a transaction to begin\n"
-                            "confirmation within nblocks blocks if possible and return the number of blocks\n"
-                            "for which the estimate is valid.\n"
-                            "\nArguments:\n"
-                            "1. nblocks     (numeric)\n"
-                            "\nResult:\n"
-                            "{\n"
-                            "  \"feerate\" : x.x,     (numeric) estimate fee-per-kilobyte (in BCH)\n"
-                            "  \"blocks\" : n         (numeric) block number where estimate was found\n"
-                            "}\n"
-                            "\n"
-                            "A negative value is returned if not enough transactions and blocks\n"
-                            "have been observed to make an estimate for any number of blocks.\n"
-                            "However it will not return a value below the mempool reject fee.\n"
-                            "\nExample:\n" +
-                            HelpExampleCli("estimatesmartfee", "6"));
-
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VNUM));
-
-    int nBlocks = params[0].get_int();
-
     UniValue result(UniValue::VOBJ);
-    int answerFound;
-    CFeeRate feeRate = mempool.estimateSmartFee(nBlocks, &answerFound);
+    CFeeRate feeRate = mempool.estimateFee(nBlocks);
     result.pushKV("feerate", feeRate == CFeeRate(0) ? -1.0 : ValueFromAmount(feeRate.GetFeePerK()));
-    result.pushKV("blocks", answerFound);
+    result.pushKV("blocks", 1);
     return result;
 }
 
-UniValue estimatesmartpriority(const UniValue &params, bool fHelp)
-{
-    if (fHelp || params.size() != 1)
-        throw runtime_error("estimatesmartpriority nblocks\n"
-                            "\nWARNING: This interface is unstable and may disappear or change!\n"
-                            "\nEstimates the approximate priority a zero-fee transaction needs to begin\n"
-                            "confirmation within nblocks blocks if possible and return the number of blocks\n"
-                            "for which the estimate is valid.\n"
-                            "\nArguments:\n"
-                            "1. nblocks     (numeric)\n"
-                            "\nResult:\n"
-                            "{\n"
-                            "  \"priority\" : x.x,    (numeric) estimated priority\n"
-                            "  \"blocks\" : n         (numeric) block number where estimate was found\n"
-                            "}\n"
-                            "\n"
-                            "A negative value is returned if not enough transactions and blocks\n"
-                            "have been observed to make an estimate for any number of blocks.\n"
-                            "However if the mempool reject fee is set it will return 1e9 * MAX_MONEY.\n"
-                            "\nExample:\n" +
-                            HelpExampleCli("estimatesmartpriority", "6"));
-
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VNUM));
-
-    int nBlocks = params[0].get_int();
-
-    UniValue result(UniValue::VOBJ);
-    int answerFound;
-    double priority = mempool.estimateSmartPriority(nBlocks, &answerFound);
-    result.pushKV("priority", priority);
-    result.pushKV("blocks", answerFound);
-    return result;
-}
 
 static const CRPCCommand commands[] = {
     //  category              name                      actor (function)         okSafeMode
@@ -1090,9 +1051,7 @@ static const CRPCCommand commands[] = {
 
     {"generating", "generate", &generate, true}, {"generating", "generatetoaddress", &generatetoaddress, true},
 
-    {"util", "estimatefee", &estimatefee, true}, {"util", "estimatepriority", &estimatepriority, true},
-    {"util", "estimatesmartfee", &estimatesmartfee, true},
-    {"util", "estimatesmartpriority", &estimatesmartpriority, true},
+    {"util", "estimatefee", &estimatefee, true}, {"util", "estimatesmartfee", &estimatesmartfee, true},
 };
 
 void RegisterMiningRPCCommands(CRPCTable &table)

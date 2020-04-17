@@ -1127,7 +1127,7 @@ void RPCConsole::banSelectedNode(int bantime)
         int port = 0;
         SplitHostPort(nStr, port, addr);
 
-        dosMan.Ban(CNetAddr(addr), BanReasonManuallyAdded, bantime);
+        dosMan.Ban(CNetAddr(addr), bannedNode.get()->cleanSubVer, BanReasonManuallyAdded, bantime);
         bannedNode->fDisconnect = true;
 
         clearSelectedNode();

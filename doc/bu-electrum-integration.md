@@ -31,7 +31,7 @@ sudo apt install python3-git cargo clang
 The latest stable release used by the node software can be compiled from the Bitcoin Unlimited source tree by running
 
 ```sh
-make electrs
+make electrscash
 ```
 
 For more recent development versions, see the [usage document](https://github.com/BitcoinUnlimited/ElectrsCash/blob/master/doc/usage.md).

@@ -37,6 +37,7 @@ void CBanEntry::SetNull()
     nCreateTime = 0;
     nBanUntil = 0;
     banReason = BanReasonUnknown;
+    userAgent.clear();
 }
 
 /**
@@ -49,9 +50,19 @@ std::string CBanEntry::banReasonToString()
     switch (banReason)
     {
     case BanReasonNodeMisbehaving:
-        return "node misbehaving";
+        return "Node Misbehaving";
     case BanReasonManuallyAdded:
-        return "manually added";
+        return "Manually Banned";
+    case BanReasonTooManyEvictions:
+        return "Too Many Evictions";
+    case BanReasonTooManyConnectionAttempts:
+        return "Too Many Connection Attempts";
+    case BanReasonInvalidMessageStart:
+        return "Invalid Message Start";
+    case BanReasonInvalidInventory:
+        return "Invalid Inventory";
+    case BanReasonInvalidPeer:
+        return "Invalid Peer for this Network";
     default:
         return "unknown";
     }

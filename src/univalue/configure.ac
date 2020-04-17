@@ -52,8 +52,19 @@ AC_ARG_ENABLE([debug],
     [enable_debug=$enableval],
     [enable_debug=no])
 
+# Enable std library debug
+AC_ARG_ENABLE([std-debug],
+    [AS_HELP_STRING([--enable-std-debug],
+                    [use glib std debug library with range checking on containers, etc.  This requires boost to be built with "./b2 define=_GLIBCXX_DEBUG define=GLIB_CXX_DEBUG_PEDANTIC" options.])],
+    [enable_std_debug=$enableval],
+    [enable_std_debug=no])
+
 if test "x$enable_debug" = xyes; then
     CPPFLAGS="$CPPFLAGS -DDEBUG"
+fi
+
+if test "x$enable_std_debug" = xyes; then
+    CPPFLAGS="$CPPFLAGS -D_GLIBCXX_DEBUG -DGLIB_CXX_DEBUG_PEDANTIC"
 fi
 
 case $host in

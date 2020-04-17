@@ -62,7 +62,7 @@ bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType)
     return whichType != TX_NONSTANDARD;
 }
 
-bool IsStandardTx(const CTransactionRef &tx, std::string &reason)
+bool IsStandardTx(const CTransactionRef tx, std::string &reason)
 {
     if (tx->nVersion > CTransaction::MAX_STANDARD_VERSION || tx->nVersion < 1)
     {
@@ -135,7 +135,7 @@ bool IsStandardTx(const CTransactionRef &tx, std::string &reason)
     return true;
 }
 
-bool AreInputsStandard(const CTransactionRef &tx, const CCoinsViewCache &mapInputs)
+bool AreInputsStandard(const CTransactionRef tx, const CCoinsViewCache &mapInputs, bool may2020Enabled)
 {
     if (tx->IsCoinBase())
         return true; // Coinbases don't use vin normally
@@ -166,10 +166,13 @@ bool AreInputsStandard(const CTransactionRef &tx, const CCoinsViewCache &mapInpu
                 return false;
             if (stack.empty())
                 return false;
-            CScript subscript(stack.back().begin(), stack.back().end());
-            if (subscript.GetSigOpCount(STANDARD_SCRIPT_VERIFY_FLAGS, true) > MAX_P2SH_SIGOPS)
+            if (!may2020Enabled)
             {
-                return false;
+                CScript subscript(stack.back().begin(), stack.back().end());
+                if (subscript.GetSigOpCount(STANDARD_SCRIPT_VERIFY_FLAGS, true) > MAX_P2SH_SIGOPS)
+                {
+                    return false;
+                }
             }
         }
     }

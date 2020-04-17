@@ -15,6 +15,7 @@
 #include "blockstorage/blockstorage.h"
 #include "chain.h"
 #include "dosman.h"
+#include "electrum/electrs.h"
 #include "expedited.h"
 #include "main.h"
 #include "merkleblock.h"
@@ -40,6 +41,9 @@ extern CTweak<uint64_t> mempoolSyncMaxVersionSupported;
 extern CTweak<uint64_t> syncMempoolWithPeers;
 
 extern CTweak<uint32_t> randomlyDontInv;
+
+/** How many inbound connections will we track before pruning entries */
+const uint32_t MAX_INBOUND_CONNECTIONS_TRACKED = 10000;
 
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
@@ -117,7 +121,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                             // best equivalent proof of work) than the best header chain we know about.
                             {
                                 READLOCK(cs_mapBlockIndex);
-                                fSend = mi->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != NULL) &&
+                                fSend = mi->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != nullptr) &&
                                         (pindexBestHeader.load()->GetBlockTime() - mi->GetBlockTime() < nOneMonth) &&
                                         (GetBlockProofEquivalentTime(
                                              *pindexBestHeader, *mi, *pindexBestHeader, consensusParams) < nOneMonth);
@@ -394,7 +398,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 {
     int64_t receiptTime = GetTime();
     const CChainParams &chainparams = Params();
-    RandAddSeedPerfmon();
     unsigned int msgSize = vRecv.size(); // BU for statistics
     UpdateRecvStats(pfrom, strCommand, msgSize, nStopwatchTimeReceived);
     LOG(NET, "received: %s (%u bytes) peer=%s\n", SanitizeString(strCommand), msgSize, pfrom->GetLogName());
@@ -482,11 +485,27 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             vRecv >> LIMITED_STRING(pfrom->strSubVer, MAX_SUBVERSION_LENGTH);
             pfrom->cleanSubVer = SanitizeString(pfrom->strSubVer);
 
+            // Track the user agent string
+            {
+                LOCK(cs_mapInboundConnectionTracker);
+
+                // Remove a random entry if we've gotten too big.
+                if (mapInboundConnectionTracker.size() >= MAX_INBOUND_CONNECTIONS_TRACKED)
+                {
+                    size_t nIndex = GetRandInt(mapInboundConnectionTracker.size() - 1);
+                    auto rand_iter = std::next(mapInboundConnectionTracker.begin(), nIndex);
+                    mapInboundConnectionTracker.erase(rand_iter);
+                }
+
+                // Add the subver string.
+                mapInboundConnectionTracker[(CNetAddr)pfrom->addr].userAgent = pfrom->cleanSubVer;
+            }
+
             // ban SV peers
             if (pfrom->strSubVer.find("Bitcoin SV") != std::string::npos ||
                 pfrom->strSubVer.find("(SV;") != std::string::npos)
             {
-                dosMan.Misbehaving(pfrom, 100);
+                dosMan.Misbehaving(pfrom, 100, BanReasonInvalidPeer);
             }
         }
         if (!vRecv.empty())
@@ -528,7 +547,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->PushMessage(NetMsgType::VERACK);
 
         // Change version
-        pfrom->ssSend.SetVersion(std::min(pfrom->nVersion, PROTOCOL_VERSION));
+        {
+            LOCK(pfrom->cs_vSend);
+            pfrom->ssSend.SetVersion(std::min(pfrom->nVersion, PROTOCOL_VERSION));
+        }
 
         LOG(NET, "receive version message: %s: version %d, blocks=%d, us=%s, peer=%s\n", pfrom->cleanSubVer,
             pfrom->nVersion, pfrom->nStartingHeight, addrMe.ToString(), pfrom->GetLogName());
@@ -598,6 +620,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT, nLimitDescendants);
         xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT, nLimitDescendantSize);
 
+        electrum::set_xversion_flags(xver, chainparams.NetworkIDString());
+
         pfrom->PushMessage(NetMsgType::XVERSION, xver);
 
 
@@ -631,6 +655,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CNetAddr ipAddress = (CNetAddr)pfrom->addr;
         mapInboundConnectionTracker[ipAddress].nEvictions += 1;
         mapInboundConnectionTracker[ipAddress].nLastEvictionTime = GetTime();
+        mapInboundConnectionTracker[ipAddress].userAgent = pfrom->cleanSubVer;
 
         return true; // return true so we don't get any process message failures in the log.
     }
@@ -944,15 +969,18 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         for (unsigned int nInv = 0; nInv < vInv.size(); nInv++)
         {
             if (shutdown_threads.load() == true)
-            {
                 return false;
-            }
 
             const CInv &inv = vInv[nInv];
-            if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK)) || inv.hash.IsNull())
+            if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK)))
             {
-                dosMan.Misbehaving(pfrom, 20);
-                return error("message inv invalid type = %u or is null hash %s", inv.type, inv.hash.ToString());
+                LOG(NET, "message inv invalid type = %u hash %s", inv.type, inv.hash.ToString());
+                return false;
+            }
+            else if (inv.hash.IsNull())
+            {
+                LOG(NET, "message inv has null hash %s", inv.type, inv.hash.ToString());
+                return false;
             }
 
             if (inv.type == MSG_BLOCK)
@@ -1043,7 +1071,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK) || (inv.type == MSG_FILTERED_BLOCK) ||
                     (inv.type == MSG_CMPCT_BLOCK)))
             {
-                dosMan.Misbehaving(pfrom, 20);
+                dosMan.Misbehaving(pfrom, 20, BanReasonInvalidInventory);
                 return error("message inv invalid type = %u", inv.type);
             }
 
@@ -1597,7 +1625,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // ignore the expedited message unless we are at the chain tip...
         if (!fImporting && !fReindex && !IsInitialBlockDownload())
         {
-            LOCK(pfrom->cs_xthinblock);
+            LOCK(pfrom->cs_thintype);
             if (!HandleExpeditedBlock(vRecv, pfrom))
                 return false;
         }
@@ -1606,7 +1634,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::XTHINBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsThinBlocksEnabled())
     {
-        LOCK(pfrom->cs_xthinblock);
+        LOCK(pfrom->cs_thintype);
         return CXThinBlock::HandleMessage(vRecv, pfrom, strCommand, 0);
     }
 
@@ -1614,7 +1642,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::THINBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsThinBlocksEnabled())
     {
-        LOCK(pfrom->cs_xthinblock);
+        LOCK(pfrom->cs_thintype);
         return CThinBlock::HandleMessage(vRecv, pfrom);
     }
 
@@ -1625,7 +1653,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
-        LOCK(pfrom->cs_xthinblock);
+        LOCK(pfrom->cs_thintype);
         return CXRequestThinBlockTx::HandleMessage(vRecv, pfrom);
     }
 
@@ -1633,7 +1661,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::XBLOCKTX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsThinBlocksEnabled())
     {
-        LOCK(pfrom->cs_xthinblock);
+        LOCK(pfrom->cs_thintype);
         return CXThinBlockTx::HandleMessage(vRecv, pfrom);
     }
 
@@ -1644,14 +1672,14 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
-        LOCK(pfrom->cs_graphene);
+        LOCK(pfrom->cs_thintype);
         return HandleGrapheneBlockRequest(vRecv, pfrom, chainparams);
     }
 
     else if (strCommand == NetMsgType::GRAPHENEBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsGrapheneBlockEnabled() && grapheneVersionCompatible)
     {
-        LOCK(pfrom->cs_graphene);
+        LOCK(pfrom->cs_thintype);
         return CGrapheneBlock::HandleMessage(vRecv, pfrom, strCommand, 0);
     }
 
@@ -1662,7 +1690,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
-        LOCK(pfrom->cs_graphene);
+        LOCK(pfrom->cs_thintype);
         return CRequestGrapheneBlockTx::HandleMessage(vRecv, pfrom);
     }
 
@@ -1670,15 +1698,33 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     else if (strCommand == NetMsgType::GRAPHENETX && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsGrapheneBlockEnabled() && grapheneVersionCompatible)
     {
-        LOCK(pfrom->cs_graphene);
+        LOCK(pfrom->cs_thintype);
         return CGrapheneBlockTx::HandleMessage(vRecv, pfrom);
+    }
+
+    else if (strCommand == NetMsgType::GET_GRAPHENE_RECOVERY && IsGrapheneBlockEnabled() && grapheneVersionCompatible)
+    {
+        if (!requester.CheckForRequestDOS(pfrom, chainparams))
+            return false;
+
+        LOCK(pfrom->cs_thintype);
+        return HandleGrapheneBlockRecoveryRequest(vRecv, pfrom, chainparams);
+    }
+
+    else if (strCommand == NetMsgType::GRAPHENE_RECOVERY && IsGrapheneBlockEnabled() && grapheneVersionCompatible)
+    {
+        if (!requester.CheckForRequestDOS(pfrom, chainparams))
+            return false;
+
+        LOCK(pfrom->cs_thintype);
+        return HandleGrapheneBlockRecoveryResponse(vRecv, pfrom, chainparams);
     }
 
     // Handle Compact Blocks
     else if (strCommand == NetMsgType::CMPCTBLOCK && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsCompactBlocksEnabled())
     {
-        LOCK(pfrom->cs_compactblock);
+        LOCK(pfrom->cs_thintype);
         return CompactBlock::HandleMessage(vRecv, pfrom);
     }
     else if (strCommand == NetMsgType::GETBLOCKTXN && !fImporting && !fReindex && !IsInitialBlockDownload() &&
@@ -1687,13 +1733,13 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!requester.CheckForRequestDOS(pfrom, chainparams))
             return false;
 
-        LOCK(pfrom->cs_compactblock);
+        LOCK(pfrom->cs_thintype);
         return CompactReRequest::HandleMessage(vRecv, pfrom);
     }
     else if (strCommand == NetMsgType::BLOCKTXN && !fImporting && !fReindex && !IsInitialBlockDownload() &&
              IsCompactBlocksEnabled())
     {
-        LOCK(pfrom->cs_compactblock);
+        LOCK(pfrom->cs_thintype);
         return CompactReReqResponse::HandleMessage(vRecv, pfrom);
     }
 
@@ -2034,6 +2080,8 @@ bool ProcessMessages(CNode *pfrom)
     //
     bool fOk = true;
 
+    // Check getdata requests first if there are no priority messages waiting.
+    if (!fPriorityRecvMsg.load())
     {
         TRY_LOCK(pfrom->csRecvGetData, locked);
         if (locked && !pfrom->vRecvGetData.empty())
@@ -2044,28 +2092,70 @@ bool ProcessMessages(CNode *pfrom)
 
     int msgsProcessed = 0;
     // Don't bother if send buffer is too full to respond anyway
+    CNode *pfrom_original = pfrom;
     while ((!pfrom->fDisconnect) && (pfrom->nSendSize < SendBufferSize()) && (shutdown_threads.load() == false))
     {
+        CNodeRef noderef;
+        bool fIsPriority = false;
         READLOCK(pfrom->csMsgSerializer);
         CNetMessage msg;
+        bool fUseLowPriorityMsg = true;
         {
-            TRY_LOCK(pfrom->cs_vRecvMsg, lockRecv);
-            if (!lockRecv)
-                break;
-
-            if (pfrom->vRecvMsg.empty())
-                break;
-            CNetMessage &msgOnQ = pfrom->vRecvMsg.front();
-            if (!msgOnQ.complete()) // end if an incomplete message is on the top
+            // Get next message to process checking whether it is a priority messasge and if so then
+            // process it right away. It doesn't matter that the peer where the message came from is
+            // different than the one we are currently procesing as we will switch to the correct peer
+            // automatically. Furthermore by using and holding the CNodeRef we automatically maintain
+            // a node reference to the priority peer.
+            if (fPriorityRecvMsg.load())
             {
-                // LogPrintf("%s: partial message %d of size %d. Recvd bytes: %d\n", pfrom->GetLogName(),
-                // msgOnQ.nDataPos, msgOnQ.size(), pfrom->currentRecvMsgSize.value);
-                break;
+                TRY_LOCK(cs_priorityRecvQ, locked);
+                if (locked && !vPriorityRecvQ.empty())
+                {
+                    // Get the message out of queue.
+                    std::swap(noderef, vPriorityRecvQ.front().first);
+                    std::swap(msg, vPriorityRecvQ.front().second);
+                    vPriorityRecvQ.pop_front();
+
+                    if (vPriorityRecvQ.empty())
+                        fPriorityRecvMsg.store(false);
+
+                    // check if we should process the message.
+                    CNode *pnode = noderef.get();
+                    if (pnode->fDisconnect || pnode->nSendSize > SendBufferSize())
+                    {
+                        continue;
+                    }
+
+                    fIsPriority = true;
+                    fUseLowPriorityMsg = false;
+                }
+                else if (locked && vPriorityRecvQ.empty())
+                {
+                    fPriorityRecvMsg.store(false);
+                    fUseLowPriorityMsg = true;
+                }
             }
-            msg = msgOnQ;
-            // at this point, any failure means we can delete the current message
-            pfrom->vRecvMsg.pop_front();
-            pfrom->currentRecvMsgSize -= msg.size();
+
+            if (fUseLowPriorityMsg)
+            {
+                TRY_LOCK(pfrom->cs_vRecvMsg, lockRecv);
+                if (!lockRecv)
+                    break;
+                if (pfrom->vRecvMsg.empty())
+                    break;
+
+                // get the message from the queue
+                std::swap(msg, pfrom->vRecvMsg.front());
+                pfrom->vRecvMsg.pop_front();
+            }
+
+            // Check if this is a priority message and if so then modify pfrom to be the peer which
+            // this priority message came from.
+            if (fIsPriority)
+                pfrom = noderef.get();
+            else
+                pfrom->currentRecvMsgSize -= msg.size();
+
             msgsProcessed++;
         }
 
@@ -2077,11 +2167,19 @@ bool ProcessMessages(CNode *pfrom)
         // Scan for message start
         if (memcmp(msg.hdr.pchMessageStart, pfrom->GetMagic(chainparams), MESSAGE_START_SIZE) != 0)
         {
+            // Setting the cleanSubVer string allows us to present this peer in the bantable
+            // with a likely peer type if it uses the BitcoinCore network magic.
+            if (memcmp(msg.hdr.pchMessageStart, chainparams.MessageStart(), MESSAGE_START_SIZE) == 0)
+            {
+                pfrom->cleanSubVer = "BitcoinCore Network application";
+            }
+
             LOG(NET, "PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%s\n", SanitizeString(msg.hdr.GetCommand()),
                 pfrom->GetLogName());
             if (!pfrom->fWhitelisted)
             {
-                dosMan.Ban(pfrom->addr, BanReasonNodeMisbehaving, 4 * 60 * 60); // ban for 4 hours
+                // ban for 4 hours
+                dosMan.Ban(pfrom->addr, pfrom->cleanSubVer, BanReasonInvalidMessageStart, 4 * 60 * 60);
             }
             fOk = false;
             break;
@@ -2169,6 +2267,10 @@ bool ProcessMessages(CNode *pfrom)
 
         if (msgsProcessed > 2000)
             break; // let someone else do something periodically
+
+        // Swap back to the original peer if we just processed a priority message
+        if (fIsPriority)
+            pfrom = pfrom_original;
     }
 
     return fOk;
@@ -2387,7 +2489,7 @@ bool SendMessages(CNode *pto)
             }
 
             std::vector<CBlock> vHeaders;
-            bool fRevertToInv = (!state->fPreferHeaders || pto->vBlockHashesToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE);
+            bool fRevertToInv = (!state->fPreferHeaders || vBlocksToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE);
             CBlockIndex *pBestIndex = nullptr; // last header queued for delivery
 
             // Ensure pindexBestKnownBlock is up-to-date
@@ -2502,66 +2604,75 @@ bool SendMessages(CNode *pto)
         //
         // We must send all INV's before returning otherwise, under very heavy transaction rates, we could end up
         // falling behind in sending INV's and vInventoryToSend could possibly get quite large.
-        std::vector<CInv> vInvSend;
-        while (!pto->vInventoryToSend.empty())
+        bool haveInv2Send = false;
         {
-            // Send message INV up to the MAX_INV_TO_SEND. Once we reach the max then send the INV message
-            // and if there is any remaining it will be sent on the next iteration until vInventoryToSend is empty.
-            int nToErase = 0;
+            LOCK(pto->cs_inventory);
+            haveInv2Send = !pto->vInventoryToSend.empty();
+        }
+        std::vector<CInv> vInvSend;
+        FastRandomContext rnd;
+        if (haveInv2Send)
+        {
+            while (1)
             {
-                // BU - here we only want to forward message inventory if our peer has actually been requesting
-                // useful data or giving us useful data.  We give them 2 minutes to be useful but then choke off
-                // their inventory.  This prevents fake peers from connecting and listening to our inventory
-                // while providing no value to the network.
-                // However we will still send them block inventory in the case they are a pruned node or wallet
-                // waiting for block announcements, therefore we have to check each inv in pto->vInventoryToSend.
-                bool fChokeTxInv =
-                    (pto->nActivityBytes == 0 && (GetStopwatchMicros() - pto->nStopwatchConnected) > 120 * 1000000);
-
-                // Find INV's which should be sent, save them to vInvSend, and then erase from vInventoryToSend.
-                int invsz = std::min((int)pto->vInventoryToSend.size(), MAX_INV_TO_SEND);
-                vInvSend.reserve(invsz);
-
-                LOCK(pto->cs_inventory);
-                FastRandomContext rnd;
-                for (const CInv &inv : pto->vInventoryToSend)
+                // Send message INV up to the MAX_INV_TO_SEND. Once we reach the max then send the INV message
+                // and if there is any remaining it will be sent on the next iteration until vInventoryToSend is empty.
+                int nToErase = 0;
                 {
-                    nToErase++;
+                    // BU - here we only want to forward message inventory if our peer has actually been requesting
+                    // useful data or giving us useful data.  We give them 2 minutes to be useful but then choke off
+                    // their inventory.  This prevents fake peers from connecting and listening to our inventory
+                    // while providing no value to the network.
+                    // However we will still send them block inventory in the case they are a pruned node or wallet
+                    // waiting for block announcements, therefore we have to check each inv in pto->vInventoryToSend.
+                    bool fChokeTxInv =
+                        (pto->nActivityBytes == 0 && (GetStopwatchMicros() - pto->nStopwatchConnected) > 120 * 1000000);
 
-                    if (inv.type == MSG_TX)
+                    // Find INV's which should be sent, save them to vInvSend, and then erase from vInventoryToSend.
+                    LOCK(pto->cs_inventory);
+                    int invsz = std::min((int)pto->vInventoryToSend.size(), MAX_INV_TO_SEND);
+                    vInvSend.reserve(invsz);
+                    for (const CInv &inv : pto->vInventoryToSend)
                     {
-                        if (fChokeTxInv)
-                            continue;
-                        // skip if we already know about this one
-                        if (pto->filterInventoryKnown.contains(inv.hash))
-                            continue;
-                    }
-                    if ((rnd.rand32() % 100) < (100 - randomlyDontInv.Value()))
-                    {
+                        nToErase++;
+                        if (inv.type == MSG_TX)
+                        {
+                            if (fChokeTxInv)
+                                continue;
+                            if ((rnd.rand32() % 100) < randomlyDontInv.Value())
+                                continue;
+                            // skip if we already know about this one
+                            if (pto->filterInventoryKnown.contains(inv.hash))
+                                continue;
+                        }
                         vInvSend.push_back(inv);
                         pto->filterInventoryKnown.insert(inv.hash);
+
+                        if (vInvSend.size() >= MAX_INV_TO_SEND)
+                            break;
                     }
 
-                    if (vInvSend.size() >= MAX_INV_TO_SEND)
+                    if (nToErase > 0)
+                    {
+                        pto->vInventoryToSend.erase(
+                            pto->vInventoryToSend.begin(), pto->vInventoryToSend.begin() + nToErase);
+                    }
+                    else // exit out of the while loop if nothing was done
+                    {
                         break;
+                    }
                 }
 
+                // To maintain proper locking order we have to push the message when we do not hold cs_inventory which
+                // was held in the section above.
                 if (nToErase > 0)
                 {
-                    pto->vInventoryToSend.erase(
-                        pto->vInventoryToSend.begin(), pto->vInventoryToSend.begin() + nToErase);
-                }
-            }
-
-            // To maintain proper locking order we have to push the message when we do not hold cs_inventory which
-            // was held in the section above.
-            if (nToErase > 0)
-            {
-                LOCK(pto->cs_vSend);
-                if (!vInvSend.empty())
-                {
-                    pto->PushMessage(NetMsgType::INV, vInvSend);
-                    vInvSend.clear();
+                    LOCK(pto->cs_vSend);
+                    if (!vInvSend.empty())
+                    {
+                        pto->PushMessage(NetMsgType::INV, vInvSend);
+                        vInvSend.clear();
+                    }
                 }
             }
         }

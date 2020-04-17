@@ -16,6 +16,7 @@
 #include "streams.h"
 #include "timedata.h"
 #include "txadmission.h"
+#include "txorphanpool.h"
 #include "unlimited.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -35,7 +36,7 @@ CTxMemPoolEntry::CTxMemPoolEntry()
     sighashType = 0;
 }
 
-CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef &_tx,
+CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef _tx,
     const CAmount &_nFee,
     int64_t _nTime,
     double _entryPriority,
@@ -235,9 +236,10 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
 
     if (fSearchForParents)
     {
-        // Get parents of this transaction that are in the mempool
-        // GetMemPoolParents() is only valid for entries in the mempool, so we
-        // iterate mapTx to find parents.
+        // Get parents of this transaction that are in the mempool.
+        // Our current transaction ("entry") is not yet in the mempool so we can not look for its
+        // parents using GetMemPoolParents(). Therefore we need to instead lookup the parents
+        // by using the inputs of this transaction.
         for (unsigned int i = 0; i < tx.vin.size(); i++)
         {
             txiter piter = mapTx.find(tx.vin[i].prevout.hash);
@@ -265,6 +267,7 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
 
     while (!parentHashes.empty())
     {
+        auto parentElemIter = parentHashes.begin();
         txiter stageit = *parentHashes.begin();
 
         // If inBlock then we only return a set of ancestors that have not yet been added to a block.
@@ -274,7 +277,14 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
         if (inBlock)
         {
             if (!inBlock->count(stageit))
+            {
                 setAncestors.insert(stageit);
+            }
+            else
+            {
+                parentHashes.erase(stageit);
+                continue;
+            }
         }
         else
         {
@@ -308,15 +318,7 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
             // If this is a new ancestor, add it.
             if (setAncestors.count(phash) == 0)
             {
-                if (inBlock)
-                {
-                    if (!inBlock->count(phash))
-                        parentHashes.insert(phash);
-                }
-                else
-                {
-                    parentHashes.insert(phash);
-                }
+                parentHashes.insert(phash);
             }
 
             // removed +1 from test below as per BU: Fix use after free bug
@@ -328,7 +330,7 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
             }
         }
 
-        parentHashes.erase(stageit); // BU: Fix use after free bug by removing this last
+        parentHashes.erase(parentElemIter); // BU: Fix use after free bug by removing this last
     }
 
     return true;
@@ -418,9 +420,9 @@ bool CTxMemPool::ValidateMemPoolAncestors(const std::vector<CTxIn> &txIn,
 void CTxMemPool::_UpdateAncestorsOf(bool add, txiter it, setEntries &setAncestors)
 {
     AssertWriteLockHeld(cs_txmempool);
-    setEntries parentIters = GetMemPoolParents(it);
+    setEntries setParents = GetMemPoolParents(it);
     // add or remove this tx as a child of each parent
-    for (txiter piter : parentIters)
+    for (txiter piter : setParents)
     {
         _UpdateChild(piter, it, add);
     }
@@ -440,11 +442,23 @@ void CTxMemPool::_UpdateEntryForAncestors(txiter it, const setEntries &setAncest
     int64_t updateSize = 0;
     CAmount updateFee = 0;
     int updateSigOps = 0;
-    for (txiter ancestorIt : setAncestors)
+
+    setEntries setParents = GetMemPoolParents(it);
+    if (setParents.size() > 1)
     {
-        updateSize += ancestorIt->GetTxSize();
-        updateFee += ancestorIt->GetModifiedFee();
-        updateSigOps += ancestorIt->GetSigOpCount();
+        for (txiter ancestorIt : setAncestors)
+        {
+            updateSize += ancestorIt->GetTxSize();
+            updateFee += ancestorIt->GetModifiedFee();
+            updateSigOps += ancestorIt->GetSigOpCount();
+        }
+    }
+    else if (setParents.size() == 1)
+    {
+        txiter parent = *setParents.begin();
+        updateSize += parent->GetSizeWithAncestors();
+        updateFee += parent->GetModFeesWithAncestors();
+        updateSigOps += parent->GetSigOpCountWithAncestors();
     }
     mapTx.modify(it, update_ancestor_state(updateSize, updateFee, updateCount, updateSigOps));
 }
@@ -456,6 +470,82 @@ void CTxMemPool::UpdateChildrenForRemoval(txiter it)
     for (txiter updateIt : setMemPoolChildren)
     {
         _UpdateParent(updateIt, it, false);
+    }
+}
+
+void CTxMemPool::UpdateTxnChainState(mapEntryHistory &mapTxnChainTips)
+{
+    AssertWriteLockHeld(cs_txmempool);
+
+    // As a starting point, re-calculate all chaintip ancestor states. Although at least one chaintip
+    // parent will have been mined there could still be other chaintip parents that were not mined.
+    //
+    /*
+       Chain prior to being mined:
+
+       tx1        tx2      tx3
+         \        |       /
+          \______ tx4____/
+
+
+       Chain after being mined:
+       Only tx1 and tx2 are mined leaving tx4 as the chaintip, and tx3 becomes an unmined
+       chaintip parent and is not considered a chaintip in the program logic even though clearly
+       it is in fact the new chaintip.
+
+                         tx3 (unmined chain so it has no entry in mapTxnChainTips)
+                          /
+                  tx4____/   (tx4 becomes the chaintip in mapTxnChainTips)
+
+    */
+
+    for (auto iter_tip : mapTxnChainTips)
+    {
+        uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
+        std::string dummy;
+        int64_t nAncestorCount = 0;
+        int64_t nAncestorSize = 0;
+        int nAncestorSigOps = 0;
+        CAmount nAncestorModifiedFee(0);
+
+        setEntries setAncestors;
+        setAncestors.insert(iter_tip.first);
+        _CalculateMemPoolAncestors(*(iter_tip.first), setAncestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy);
+        for (auto it : setAncestors)
+        {
+            nAncestorCount += 1;
+            nAncestorSize += it->GetTxSize();
+            nAncestorSigOps += it->GetSigOpCount();
+            nAncestorModifiedFee += it->GetModifiedFee();
+        }
+        mapTx.modify(iter_tip.first,
+            replace_ancestor_state(nAncestorSize, nAncestorModifiedFee, nAncestorCount, nAncestorSigOps));
+    }
+
+    // For each txnChainTip find the difference between the old chain tip ancestor state
+    // values and the new ancestor state values and apply them to all of the descendants.
+    for (auto iter_tip : mapTxnChainTips)
+    {
+        // Find difference
+        int64_t nAncestorCountDiff = iter_tip.first->GetCountWithAncestors() - iter_tip.second.modifyCount;
+        int64_t nAncestorSizeDiff = iter_tip.first->GetSizeWithAncestors() - iter_tip.second.modifySize;
+        int nAncestorSigOpsDiff = iter_tip.first->GetSigOpCountWithAncestors() - iter_tip.second.modifySigOps;
+        CAmount nAncestorModifiedFeeDiff = iter_tip.first->GetModFeesWithAncestors() - iter_tip.second.modifyFee;
+
+        // Get descendants but stop looking if/when we find another txnchaintip in the descendant tree.
+        setEntries setDescendants;
+        _CalculateDescendants(iter_tip.first, setDescendants, &mapTxnChainTips);
+
+        // Remove the txnChainTip since it has already been updated
+        setDescendants.erase(iter_tip.first);
+
+        // Apply the difference in sorted order
+        for (txiter it : setDescendants)
+        {
+            assert(!mapTxnChainTips.count(it));
+            mapTx.modify(it, update_ancestor_state(
+                                 nAncestorSizeDiff, nAncestorModifiedFeeDiff, nAncestorCountDiff, nAncestorSigOpsDiff));
+        }
     }
 }
 
@@ -558,12 +648,25 @@ void CTxMemPoolEntry::UpdateDescendantState(int64_t modifySize, CAmount modifyFe
 
 void CTxMemPoolEntry::UpdateAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps)
 {
+    // Ancestor state can be modified by subtraction so we use a DbgAssert here to make sure
+    // we don't accitdentally trigger these asserts on mainnet.
     nSizeWithAncestors += modifySize;
-    assert(int64_t(nSizeWithAncestors) > 0);
+    DbgAssert(int64_t(nSizeWithAncestors) > 0, );
     nModFeesWithAncestors += modifyFee;
     nCountWithAncestors += modifyCount;
-    assert(int64_t(nCountWithAncestors) > 0);
+    DbgAssert(int64_t(nCountWithAncestors) > 0, );
     nSigOpCountWithAncestors += modifySigOps;
+    DbgAssert(int(nSigOpCountWithAncestors) >= 0, );
+}
+
+void CTxMemPoolEntry::ReplaceAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps)
+{
+    nSizeWithAncestors = modifySize;
+    assert(int64_t(nSizeWithAncestors) > 0);
+    nModFeesWithAncestors = modifyFee;
+    nCountWithAncestors = modifyCount;
+    assert(int64_t(nCountWithAncestors) > 0);
+    nSigOpCountWithAncestors = modifySigOps;
     assert(int(nSigOpCountWithAncestors) >= 0);
 }
 
@@ -645,15 +748,15 @@ bool CTxMemPool::addUnchecked(const uint256 &hash,
     std::set<uint256> setParentTransactions;
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        mapNextTx[tx.vin[i].prevout] = CInPoint(&tx, i);
+        mapNextTx.emplace(tx.vin[i].prevout, CInPoint{&tx, i});
         setParentTransactions.insert(tx.vin[i].prevout.hash);
     }
+
     // Don't bother worrying about child transactions of this one.
     // Normal case of a new transaction arriving is that there can't be any
     // children, because such children would be orphans.
     // An exception to that is if a transaction enters that used to be in a block.
-    // In that case, our disconnect block logic will call UpdateTransactionsFromBlock
-    // to clean up the mess we're leaving here.
+    // In that case, our disconnect block logic will clean up the mess we're leaving here.
 
     // Update ancestors with information about this tx
     for (const uint256 &phash : setParentTransactions)
@@ -664,6 +767,7 @@ bool CTxMemPool::addUnchecked(const uint256 &hash,
             _UpdateParent(newit, pit, true);
         }
     }
+
     _UpdateAncestorsOf(true, newit, setAncestors);
     _UpdateEntryForAncestors(newit, setAncestors);
 
@@ -698,7 +802,7 @@ void CTxMemPool::removeUnchecked(txiter it)
 // Also assumes that if an entry is in setDescendants already, then all
 // in-mempool descendants of it are already in setDescendants as well, so that we
 // can save time by not iterating over those entries.
-void CTxMemPool::_CalculateDescendants(txiter entryit, setEntries &setDescendants)
+void CTxMemPool::_CalculateDescendants(txiter entryit, setEntries &setDescendants, mapEntryHistory *mapTxnChainTips)
 {
     AssertWriteLockHeld(cs_txmempool);
     setEntries stage;
@@ -720,6 +824,9 @@ void CTxMemPool::_CalculateDescendants(txiter entryit, setEntries &setDescendant
         {
             if (!setDescendants.count(childiter))
             {
+                if (mapTxnChainTips && mapTxnChainTips->count(childiter))
+                    continue;
+
                 stage.insert(childiter);
             }
         }
@@ -732,9 +839,28 @@ void CTxMemPool::removeRecursive(const CTransaction &origTx, std::list<CTransact
     _removeRecursive(origTx, removed);
 }
 
+void CTxMemPool::ResubmitCommitQ()
+{
+    AssertWriteLockHeld(cs_txmempool);
+
+    // Clear txCommitQ
+    {
+        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        for (auto &kv : *txCommitQ)
+        {
+            CTxInputData txd;
+            txd.tx = kv.second.entry.GetSharedTx();
+            txd.nodeName = "rollback";
+            EnqueueTxForAdmission(txd);
+        }
+        txCommitQ->clear();
+    }
+}
+
 void CTxMemPool::_removeRecursive(const CTransaction &origTx, std::list<CTransactionRef> &removed)
 {
     AssertWriteLockHeld(cs_txmempool);
+
     // Remove transaction from memory pool
     setEntries txToRemove;
     txiter origit = mapTx.find(origTx.GetHash());
@@ -768,6 +894,10 @@ void CTxMemPool::_removeRecursive(const CTransaction &origTx, std::list<CTransac
         removed.push_back(it->GetSharedTx());
     }
     _RemoveStaged(setAllRemoves, false);
+
+    // As a final step we must resubmit whatever is in the CommitQ and CommitQFinal in case
+    // there are any anscestors that were removed from the mempool above.
+    ResubmitCommitQ();
 }
 
 void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMemPoolHeight, int flags)
@@ -849,6 +979,143 @@ void CTxMemPool::_removeConflicts(const CTransaction &tx, std::list<CTransaction
 // Whenever a tx is removed from the mempool, any of its descendants are placed back onto the
 // queue of tx that are removable.
 void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
+    uint64_t nBlockHeight,
+    std::list<CTransactionRef> &conflicts,
+    bool fCurrentEstimate,
+    std::vector<CTxChange> *txChanges)
+{
+    WRITELOCK(cs_txmempool);
+
+    // Process the block for transasction removal and ancestor state updates.
+    // As a first step remove all the txns that are in the block from the mempool by
+    // first updating the children for removal of the parent, and also saving the entries
+    // for policy estimate updates.  Then in the final loop simply remove all the txns.
+    //
+    // While we're updating the child transactions prior to removal we can also gather the
+    // mapTxnChaiTips.
+    mapEntryHistory mapTxnChainTips;
+    setEntries setAncestorsFromBlock;
+    {
+        setEntries setTxnsInBlock;
+        for (const auto &tx : vtx)
+        {
+            uint256 hash = tx->GetHash();
+            txiter it = mapTx.find(hash);
+            if (it == mapTx.end())
+            {
+                continue;
+            }
+
+            // Get all ancestors from related to txns in the block. Stop looking if we've already looked up
+            // this set of ancestors before; we don't want to be traversing the same part of the ancestor
+            // tree more than once.
+            setEntries setAncestors;
+            uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
+            std::string dummy;
+            _CalculateMemPoolAncestors(
+                *it, setAncestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy, &setAncestorsFromBlock, false);
+
+            setAncestorsFromBlock.insert(setAncestors.begin(), setAncestors.end());
+            setTxnsInBlock.insert(it);
+
+            const setEntries &setMemPoolChildren = GetMemPoolChildren(it);
+            for (txiter updateIt : setMemPoolChildren)
+            {
+                // Get the current ancestor state values and save them for later comparison
+                ancestor_state ancestorState(updateIt->GetSizeWithAncestors(), updateIt->GetModFeesWithAncestors(),
+                    updateIt->GetCountWithAncestors(), updateIt->GetSigOpCountWithAncestors());
+                mapTxnChainTips.emplace(updateIt, ancestorState);
+
+                // Remove each block entry from the parent map in mapLinks
+                _UpdateParent(updateIt, it, false);
+            }
+        }
+
+        // Before the txs in the new block have been removed from the mempool, update policy estimates
+        minerPolicyEstimator->processBlock(nBlockHeight, setTxnsInBlock, fCurrentEstimate);
+        lastRollingFeeUpdate = GetTime();
+        blockSinceLastRollingFeeBump = true;
+
+        // Remove Transactions that were in the block from the mempool.
+        for (txiter it : setTxnsInBlock)
+        {
+            setAncestorsFromBlock.erase(it);
+            mapTxnChainTips.erase(it);
+            removeUnchecked(it);
+        }
+
+        // This is a safeguard in the case where ancestors of transactions in this block have re-entered
+        // the mempool, possibly from a re-org. This should never happen and would likely indicate a locking
+        // issue if it did.
+        if (!setAncestorsFromBlock.empty())
+        {
+            DbgAssert(!"Ancestors in the mempool when they should not be", );
+            for (txiter it : setAncestorsFromBlock)
+            {
+                removeUnchecked(it);
+            }
+        }
+    }
+
+    // For every chain tip walk through their decendants finding any transaction that have more than one parent.
+    // These will then need to be considered as chain tips.
+    CTxMemPool::TxMempoolOriginalStateMap changeSet;
+    mapEntryHistory mapAdditionalChainTips;
+    for (auto iter : mapTxnChainTips)
+    {
+        // Get descendants but stop looking if/when we find another txnchaintip in the descendant tree.
+        setEntries setDescendants;
+        _CalculateDescendants(iter.first, setDescendants, &mapTxnChainTips);
+        for (txiter dit : setDescendants)
+        {
+            // If long chain transaction forwarding is turned on, get the original descendant state
+            // and save it for later comparison.
+            if (txChanges && changeSet.count(dit) == 0)
+                changeSet.insert({dit, TxMempoolOriginalState(dit)});
+
+            // Add a new chaintip if there is more than 1 parent.
+            if (GetMemPoolParents(dit).size() > 1)
+            {
+                ancestor_state ancestorState(dit->GetSizeWithAncestors(), dit->GetModFeesWithAncestors(),
+                    dit->GetCountWithAncestors(), dit->GetSigOpCountWithAncestors());
+                mapAdditionalChainTips.emplace(dit, ancestorState);
+            }
+        }
+    }
+    mapTxnChainTips.insert(mapAdditionalChainTips.begin(), mapAdditionalChainTips.end());
+
+    // Update ancestor state for remaining chains
+    UpdateTxnChainState(mapTxnChainTips);
+
+    // After the updates are complete then process changeSet into a list of tx and mempool changes
+    // and sort into dependency order.
+    if (!changeSet.empty())
+    {
+        txChanges->reserve(changeSet.size());
+        for (auto &mc : changeSet)
+        {
+            txChanges->push_back(CTxChange(mc.second));
+        }
+        sort(txChanges->begin(), txChanges->end(), [](const CTxChange &a, const CTxChange &b) {
+            return a.now.countWithDescendants > b.now.countWithDescendants;
+        });
+    }
+
+    // Remove conflicting tx
+    for (const auto &tx : vtx)
+    {
+        _removeConflicts(*tx, conflicts);
+        _ClearPrioritisation(tx->GetHash());
+    }
+
+    // With the cs_txmepool lock on, resubmit the txCommitQ so we don't allow txns back into
+    // the mempool that may be ancestors of txns that were in the block we just processed.  If we allowed
+    // this then the txns would essentialy be orphans within the mempool.
+    ResubmitCommitQ();
+}
+
+// This is the old version of remove for block which is still kept for testing purposes.
+void CTxMemPool::removeForBlock_Legacy(const std::vector<CTransactionRef> &vtx,
     unsigned int nBlockHeight,
     std::list<CTransactionRef> &conflicts,
     bool fCurrentEstimate,
@@ -858,22 +1125,26 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
 
     WRITELOCK(cs_txmempool);
     std::vector<txiter> entriesToRemove;
-    std::vector<CTxMemPoolEntry> entries;
 
     DeferredMap deferred;
     std::queue<txiter> ready;
 
     CTxMemPool::TxMempoolOriginalStateMap changeSet;
 
+    setEntries setTxnsInBlock;
     for (const auto &tx : vtx)
     {
-        setEntries descendants;
         uint256 hash = tx->GetHash();
         txiter i = mapTx.find(hash);
         if (i == mapTx.end())
             continue; // not in the mempool
         ready.push(i);
+        setTxnsInBlock.insert(i);
     }
+    // Before the txs in the new block have been removed from the mempool, update policy estimates
+    minerPolicyEstimator->processBlock(nBlockHeight, setTxnsInBlock, fCurrentEstimate);
+    lastRollingFeeUpdate = GetTime();
+    blockSinceLastRollingFeeBump = true;
 
     while (!ready.empty())
     {
@@ -888,8 +1159,6 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
         }
         if (links->second.parents.empty()) // This tx has no ancestors, so its ready to be removed
         {
-            entries.push_back(*nextTx); // save tx for estimator adjustment at the bottom
-
             // place any tx that were deferred because this tx was required back onto the ready Q
             DeferredMap::iterator deferredSet = deferred.find(nextTx);
             if (deferredSet != deferred.end())
@@ -916,7 +1185,7 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
             }
             else // an empty txiter should never be part of the parents
             {
-                DbgAssert("tx parents is corrupt!", {
+                DbgAssert(!"tx parents is corrupt!", {
                     links->second.parents.clear();
                     ready.push(nextTx);
                 });
@@ -959,10 +1228,6 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
         _removeConflicts(*tx, conflicts);
         _ClearPrioritisation(tx->GetHash());
     }
-    // After the txs in the new block have been removed from the mempool, update policy estimates
-    minerPolicyEstimator->processBlock(nBlockHeight, entries, fCurrentEstimate);
-    lastRollingFeeUpdate = GetTime();
-    blockSinceLastRollingFeeBump = true;
 }
 
 void CTxMemPool::_clear()
@@ -1091,7 +1356,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
             // Use the largest maxOps since this code is not meant to validate that constraint
             assert(
                 CheckInputs(it->GetSharedTx(), state, mempoolDuplicate, false, 0, MAX_OPS_PER_SCRIPT, false, nullptr));
-            UpdateCoins(tx, state, mempoolDuplicate, 1000000);
+            UpdateCoins(tx, mempoolDuplicate, 1000000);
         }
     }
     unsigned int stepsSinceLastRemove = 0;
@@ -1111,7 +1376,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
             // Use the largest maxOps since this code is not meant to validate that constraint
             assert(CheckInputs(
                 entry->GetSharedTx(), state, mempoolDuplicate, false, 0, MAX_OPS_PER_SCRIPT, false, nullptr));
-            UpdateCoins(entry->GetTx(), state, mempoolDuplicate, 1000000);
+            UpdateCoins(entry->GetTx(), mempoolDuplicate, 1000000);
             stepsSinceLastRemove = 0;
         }
     }
@@ -1149,22 +1414,6 @@ CFeeRate CTxMemPool::estimateFee(int nBlocks) const
 {
     READLOCK(cs_txmempool);
     return minerPolicyEstimator->estimateFee(nBlocks);
-}
-CFeeRate CTxMemPool::estimateSmartFee(int nBlocks, int *answerFoundAtBlocks) const
-{
-    READLOCK(cs_txmempool);
-    return minerPolicyEstimator->estimateSmartFee(nBlocks, answerFoundAtBlocks, *this);
-}
-
-double CTxMemPool::estimatePriority(int nBlocks) const
-{
-    READLOCK(cs_txmempool);
-    return minerPolicyEstimator->estimatePriority(nBlocks);
-}
-double CTxMemPool::estimateSmartPriority(int nBlocks, int *answerFoundAtBlocks) const
-{
-    READLOCK(cs_txmempool);
-    return minerPolicyEstimator->estimateSmartPriority(nBlocks, answerFoundAtBlocks, *this);
 }
 
 bool CTxMemPool::WriteFeeEstimates(CAutoFile &fileout) const
@@ -1580,7 +1829,6 @@ void CTxMemPool::GetTransactionRateStatistics(double &smoothedTps, double &insta
 }
 
 void CTxMemPool::UpdateTransactionsPerSecondImpl(bool fAddTxn, const std::lock_guard<std::mutex> &lock)
-    EXCLUSIVE_LOCKS_REQUIRED(cs_txPerSec)
 {
     static uint64_t nCount = 0;
     static int64_t nLastTime = GetTime();

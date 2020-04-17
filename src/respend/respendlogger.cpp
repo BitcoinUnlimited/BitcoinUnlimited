@@ -11,7 +11,7 @@ namespace respend
 RespendLogger::RespendLogger() : equivalent(false), valid("indeterminate"), newConflict(false) {}
 bool RespendLogger::AddOutpointConflict(const COutPoint &,
     const CTxMemPool::txiter mempoolEntry,
-    const CTransactionRef &pRespendTx,
+    const CTransactionRef pRespendTx,
     bool seen,
     bool isEquivalent)
 {

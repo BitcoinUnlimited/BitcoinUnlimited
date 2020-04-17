@@ -76,7 +76,6 @@ class ExcessiveBlockTest (BitcoinTestFramework):
     def run_test(self):
         BitcoinTestFramework.run_test(self)
         self.testCli()
-        self.testExcessiveSigops()
 
         # clear out the mempool
         for n in self.nodes:
@@ -192,95 +191,6 @@ class ExcessiveBlockTest (BitcoinTestFramework):
         logging.info("%d tx %d length" % (count, size))
         decimal.getcontext().prec = decContext
         return (count, size)
-
-    def testExcessiveSigops(self):
-        """This test checks the behavior of the nodes in the presence of transactions that take a long time to validate.
-        """
-        NUM_ADDRS = 20
-        logging.info("testExcessiveSigops: Cleaning up node state")
-
-        # We are not testing excessively sized blocks so make these large
-        for i in range(0,4):
-            self.nodes[i].setminingmaxblock(5000000)
-            self.nodes[i].set("net.excessiveBlock=5000000")
-            # Stagger the accept depths so we can see the block accepted stepwise
-            self.nodes[i].set("net.excessiveAcceptDepth=%d"%(i))
-
-        self.nodes[0].generate(20)  # create a lot of BTC for spending
-
-        self.sync_blocks()
-
-        self.nodes[0].set("net.excessiveSigopsPerMb=19")  # Set low so txns will fail if its used
-
-        logging.info("Creating addresses...")
-        self.nodes[0].keypoolrefill(NUM_ADDRS)
-        addrs = [self.nodes[0].getnewaddress() for _ in range(NUM_ADDRS)]
-
-        # test that a < 1MB block ignores the sigops parameter
-        self.nodes[0].setminingmaxblock(1000000)
-        # if excessive Sigops was heeded, this txn would not make it into the block
-        self.createUtxos(self.nodes[0], addrs, NUM_ADDRS)
-        mpool = self.nodes[0].getmempoolinfo()
-        assert_equal(mpool["size"], 0)
-
-        # test that a < 1MB block ignores the sigops parameter, even if the max block size is less
-        self.nodes[0].setminingmaxblock(5000000)
-        # if excessive Sigops was heeded, this txn would not make it into the block
-        self.createUtxos(self.nodes[0], addrs, NUM_ADDRS)
-        mpool = self.nodes[0].getmempoolinfo()
-        assert_equal(mpool["size"], 0)
-
-        if self.extended:  # creating 1MB+ blocks is too slow for travis due to the signing cost
-            self.createUtxos(self.nodes[0], addrs, 10000)  # we need a lot to generate 1MB+ blocks
-
-            wallet = self.nodes[0].listunspent()
-            wallet.sort(key=lambda x: x["amount"], reverse=True)
-            self.nodes[0].set("net.excessiveSigopsPerMb=100000")  # Set this huge so all txns are accepted by this node
-            self.nodes[1].set("net.excessiveSigopsPerMb=10")
-            self.nodes[2].set("net.excessiveSigopsPerMb=10")
-            self.nodes[3].set("net.excessiveSigopsPerMb=10")
-
-            logging.info("Generate > 1MB block with excessive sigops")
-            self.generateTx(self.nodes[0], 1100000, addrs)
-
-            counts = [x.getblockcount() for x in self.nodes]
-            base = counts[0]
-
-            self.nodes[0].generate(1)
-            assert_equal(True, self.expectHeights([base + 1, base, base, base], 30))
-
-            logging.info("Test excessive block propagation to nodes with different AD")
-            self.nodes[0].generate(1)
-            # it takes a while to sync all the txns
-            assert_equal(True, self.expectHeights([base + 2, base + 2, base, base], 30))
-
-            self.nodes[0].generate(1)
-            assert_equal(True, self.expectHeights([base + 3, base + 3, base + 3, base], 30))
-
-            self.nodes[0].generate(1)
-            assert_equal(True, self.expectHeights([base + 4, base + 4, base + 4, base + 4], 30))
-
-            # Reset the excessive block logic by mining a day worth of blocks
-            for n in self.nodes:
-                n.generate(int(144/len(self.nodes) + 1))
-                self.sync_blocks()
-
-        logging.info("Excessive sigops test completed")
-
-        # set it all back to defaults
-        self.nodes[0].set("net.excessiveSigopsPerMb=20000")
-        self.nodes[1].set("net.excessiveSigopsPerMb=20000")
-        self.nodes[2].set("net.excessiveSigopsPerMb=20000")
-        self.nodes[3].set("net.excessiveSigopsPerMb=20000")
-
-        self.nodes[0].setminingmaxblock(1000000)
-        self.nodes[1].setminingmaxblock(1000000)
-        self.nodes[2].setminingmaxblock(1000000)
-        self.nodes[3].setminingmaxblock(1000000)
-        self.nodes[0].set("net.excessiveBlock=1000000")
-        self.nodes[1].set("net.excessiveBlock=1000000")
-        self.nodes[2].set("net.excessiveBlock=1000000")
-        self.nodes[3].set("net.excessiveBlock=1000000")
 
 
     def testExcessiveTx(self):

@@ -70,10 +70,10 @@ void SetKnownBanlistContents()
     dosMan.ClearBanned();
 
     // Add test ban of specific IP
-    dosMan.Ban(CNetAddr("192.168.1.1"), BanReasonNodeMisbehaving, DEFAULT_MISBEHAVING_BANTIME, false);
+    dosMan.Ban(CNetAddr("192.168.1.1"), "unknown", BanReasonNodeMisbehaving, DEFAULT_MISBEHAVING_BANTIME, false);
 
     // Add test ban of specific subnet
-    dosMan.Ban(CSubNet("10.168.1.0/28"), BanReasonManuallyAdded, DEFAULT_MISBEHAVING_BANTIME, false);
+    dosMan.Ban(CSubNet("10.168.1.0/28"), "unknown", BanReasonManuallyAdded, DEFAULT_MISBEHAVING_BANTIME, false);
 }
 
 BOOST_AUTO_TEST_CASE(DoS_persistence_tests)
@@ -147,11 +147,11 @@ BOOST_AUTO_TEST_CASE(DoS_basic_ban_tests)
     BOOST_CHECK(GetNumberBanEntries() == 0);
 
     // Add a CNetAddr entry to banlist
-    dosMan.Ban(CNetAddr("192.168.1.1"), BanReasonNodeMisbehaving, DEFAULT_MISBEHAVING_BANTIME, false);
+    dosMan.Ban(CNetAddr("192.168.1.1"), "unknown", BanReasonNodeMisbehaving, DEFAULT_MISBEHAVING_BANTIME, false);
     // Ensure we have exactly 1 entry in our banlist
     BOOST_CHECK(GetNumberBanEntries() == 1);
     // Add a CSubNet entry to banlist
-    dosMan.Ban(CSubNet("10.168.1.0/28"), BanReasonManuallyAdded, DEFAULT_MISBEHAVING_BANTIME, false);
+    dosMan.Ban(CSubNet("10.168.1.0/28"), "unknown", BanReasonManuallyAdded, DEFAULT_MISBEHAVING_BANTIME, false);
     // Ensure we have exactly 2 entries in our banlist
     BOOST_CHECK(GetNumberBanEntries() == 2);
 
@@ -240,6 +240,9 @@ BOOST_AUTO_TEST_CASE(DoS_misbehaving_ban_tests)
 
 BOOST_AUTO_TEST_CASE(DoS_non_default_banscore)
 {
+    int64_t nStartTime = GetTime();
+    SetMockTime(nStartTime); // Overrides future calls to GetTime()
+
     dosMan.ClearBanned();
     mapArgs["-banscore"] = "111"; // because 11 is my favorite number
     CAddress addr1(ip(0xa0b0c001));
@@ -257,6 +260,36 @@ BOOST_AUTO_TEST_CASE(DoS_non_default_banscore)
     BOOST_CHECK(dosMan.IsBanned(addr1));
     mapArgs.erase("-banscore");
     dosMan.HandleCommandLine();
+
+
+    // Move the clock forward to make sure than misbehavior is decaying over time
+    SetMockTime(nStartTime + 60 * 60 * 4);
+    dosMan.UpdateMisbehavior(&dummyNode1);
+    BOOST_CHECK(std::floor(dummyNode1.nMisbehavior.load()) == 40);
+    SetMockTime(nStartTime + 60 * 60 * 8);
+    dosMan.UpdateMisbehavior(&dummyNode1);
+    BOOST_CHECK(std::floor(dummyNode1.nMisbehavior.load()) == 15);
+    SetMockTime(nStartTime + 60 * 60 * 12);
+    dosMan.UpdateMisbehavior(&dummyNode1);
+    BOOST_CHECK(std::floor(dummyNode1.nMisbehavior.load()) == 5);
+    SetMockTime(nStartTime + 60 * 60 * 16);
+    dosMan.UpdateMisbehavior(&dummyNode1);
+    BOOST_CHECK(std::floor(dummyNode1.nMisbehavior.load()) == 2);
+    SetMockTime(nStartTime + 60 * 60 * 20);
+    dosMan.UpdateMisbehavior(&dummyNode1);
+    BOOST_CHECK(std::floor(dummyNode1.nMisbehavior.load()) == 0);
+    SetMockTime(nStartTime + 60 * 60 * 24);
+    dosMan.UpdateMisbehavior(&dummyNode1);
+    BOOST_CHECK(std::floor(dummyNode1.nMisbehavior.load()) == 0);
+
+    // Add some more misbehavior and then let it decay
+    dosMan.Misbehaving(&dummyNode1, 50);
+    BOOST_CHECK(std::floor(dummyNode1.nMisbehavior.load()) == 50);
+    SetMockTime(nStartTime + 60 * 60 * 28);
+    dosMan.UpdateMisbehavior(&dummyNode1);
+    BOOST_CHECK(std::floor(dummyNode1.nMisbehavior.load()) == 18);
+
+    SetMockTime(0);
 }
 
 BOOST_AUTO_TEST_CASE(DoS_bantime_expiration)
@@ -298,7 +331,8 @@ BOOST_AUTO_TEST_CASE(DoS_bantime_expiration)
 CTransaction RandomOrphan()
 {
     std::map<uint256, CTxOrphanPool::COrphanTx>::iterator it;
-    it = orphanpool.mapOrphanTransactions.lower_bound(GetRandHash());
+    READLOCK(orphanpool.cs_orphanpool);
+    it = orphanpool.mapOrphanTransactions.lower_bound(InsecureRand256());
     if (it == orphanpool.mapOrphanTransactions.end())
         it = orphanpool.mapOrphanTransactions.begin();
     return *it->second.ptx;
@@ -318,7 +352,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         CMutableTransaction tx;
         tx.vin.resize(1);
         tx.vin[0].prevout.n = 0;
-        tx.vin[0].prevout.hash = GetRandHash();
+        tx.vin[0].prevout.hash = InsecureRand256();
         tx.vin[0].scriptSig << OP_1;
         tx.vout.resize(1);
         tx.vout[0].nValue = 1 * CENT;
@@ -347,7 +381,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         CMutableTransaction tx;
         tx.vin.resize(1);
         tx.vin[0].prevout.n = 0;
-        tx.vin[0].prevout.hash = GetRandHash();
+        tx.vin[0].prevout.hash = InsecureRand256();
         tx.vin[0].scriptSig << OP_1;
         tx.vout.resize(1);
         tx.vout[0].nValue = 1 * CENT;
@@ -428,7 +462,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
             CMutableTransaction tx;
             tx.vin.resize(1);
             tx.vin[0].prevout.n = 0;
-            tx.vin[0].prevout.hash = GetRandHash();
+            tx.vin[0].prevout.hash = InsecureRand256();
             tx.vin[0].scriptSig << OP_1;
             tx.vout.resize(1);
             tx.vout[0].nValue = 1 * CENT;

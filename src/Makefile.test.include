@@ -44,7 +44,6 @@ BITCOIN_TEST_SUITE = \
   test/scriptnum10.h \
   test/test_bitcoin.cpp \
   test/test_bitcoin.h \
-  test/test_random.h \
   test/testutil.cpp \
   test/testutil.h
 
@@ -109,15 +108,18 @@ BITCOIN_TESTS =\
   test/mempool_tests.cpp \
   test/mempool_sync_tests.cpp \
   test/merkle_tests.cpp \
+  test/mempool_policy_tests.cpp \
   test/miner_tests.cpp \
   test/multisig_tests.cpp \
   test/net_tests.cpp \
   test/netbase_tests.cpp \
+  test/op_reversebytes_tests.cpp \
   test/opcodes_tests.cpp \
   test/pmt_tests.cpp \
   test/policyestimator_tests.cpp \
   test/pow_tests.cpp \
   test/prevector_tests.cpp \
+  test/random_tests.cpp \
   test/requestmanager_tests.cpp \
   test/reverselock_tests.cpp \
   test/rpc_tests.cpp \
@@ -125,6 +127,7 @@ BITCOIN_TESTS =\
   test/schnorr_tests.cpp \
   test/script_bitfield_tests.cpp \
   test/script_P2SH_tests.cpp \
+  test/script_standard_tests.cpp \
   test/script_tests.cpp \
   test/scriptnum_tests.cpp \
   test/serialize_tests.cpp \
@@ -139,6 +142,7 @@ BITCOIN_TESTS =\
   test/thinblock_util_tests.cpp \
   test/timedata_tests.cpp \
   test/transaction_tests.cpp \
+  test/txlookup_tests.cpp \
   test/txvalidationcache_tests.cpp \
   test/versionbits_tests.cpp \
   test/genversionbits_tests.cpp \
@@ -163,7 +167,7 @@ endif
 
 test_test_bitcoin_SOURCES = $(BITCOIN_TEST_SUITE) $(BITCOIN_TESTS) $(JSON_TEST_FILES) $(RAW_TEST_FILES)
 test_test_bitcoin_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) -I$(builddir)/test/ $(TESTDEFS)
-test_test_bitcoin_LDADD = $(LIBBITCOIN_SERVER) $(LIBBITCOIN_CLI) $(LIBBITCOIN_COMMON) $(LIBBITCOIN_UTIL) $(LIBBITCOIN_CONSENSUS) $(LIBBITCOIN_CRYPTO) $(LIBUNIVALUE) \
+test_test_bitcoin_LDADD = $(LIBBITCOIN_SERVER) $(LIBBITCOIN_CLI) $(LIBBITCOIN_COMMON) $(LIBBITCOIN_UTIL) $(LIBBITCOIN_CONSENSUS) $(LIBBITCOIN_CRYPTO) $(LIBBITCOIN_CRYPTO_SSE41) $(LIBBITCOIN_CRYPTO_AVX2) $(LIBUNIVALUE) \
   $(LIBLEVELDB) $(LIBLEVELDB_SSE42) $(LIBMEMENV) $(EVENT_LIBS) $(BOOST_LIBS) $(BOOST_UNIT_TEST_FRAMEWORK_LIB) $(LIBSECP256K1) $(LIBRSM)
 test_test_bitcoin_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS) -DTEST_DATA_DIR=$(srcdir)/test/data/
 
@@ -194,6 +198,8 @@ test_test_bitcoin_fuzzy_LDADD = \
   $(LIBBITCOIN_ZMQ) \
   $(LIBBITCOIN_CONSENSUS) \
   $(LIBBITCOIN_CRYPTO) \
+  $(LIBBITCOIN_CRYPTO_SSE41) \
+  $(LIBBITCOIN_CRYPTO_AVX2) \
   $(LIBLEVELDB) \
   $(LIBLEVELDB_SSE42) \
   $(LIBMEMENV) \

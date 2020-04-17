@@ -59,7 +59,9 @@ protected:
     friend class CNodeStateAccessor;
 
 public:
-    /** Return a node pointer for an node id (does not lock -- use CNodeStateAccessor) */
+    /** Return a node pointer for an node id (does not lock -- use CNodeStateAccessor)
+     * Do not use it directly, this is meant to be used through CNodeStateAccessor
+     **/
     CNodeState *_GetNodeState(const NodeId id);
 
     /** Add a nodestate from the map */

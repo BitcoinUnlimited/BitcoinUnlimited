@@ -25,6 +25,12 @@ The following is a list of the previuos network upgrades specifications:
 Upgrading
 ---------
 
+If you are running your client with `-txindex` (`txindex=1), the first session
+after upgrading to 1.7.0 the transactions index database will be migrated to a new
+format. This process could take quite a while especially if you are storing your blockchain
+data on a rotative hard disk (up to one hour). During the migration bitcoind won't respond
+to RPC calls.
+
 If you are running an older version, shut it down. Wait until it has completely
 shut down (which might take a few minutes for older versions), then run the
 installer (on Windows) or just copy over /Applications/Bitcoin-Qt (on Mac) or
@@ -45,7 +51,7 @@ This is list of the main changes that have been merged in this release:
 - Graphene ver 2.1 and IBLT specifications
 - New dead-lock detection mechanism
 - New getblockstats rpc call
-- ElectrsCash v1.0
+- ElectrsCash v1.0 ([release notes](https://github.com/BitcoinUnlimited/ElectrsCash/blob/master/RELEASE-NOTES.md#100-18-september-2019))
 - QA improvements
 - Schnorr multisignature (Nov 15th' 2019 upgrade)
 - Enforce minimal data push at the consensus layer (Nov 15th' 2019 upgrade).
@@ -70,11 +76,12 @@ Increasing unilaterally such parameter is not something a single implementation,
 An example of this undesirable is increasing the chance of success of double spend attacks. This is due to the fact that if BU accept, let's say, chain as long as 50 transactions whereas all the rest of the network set the limit to 25. To mitigate this side effect we implemented [Intelligent unconfirmed transaction forwarding](https://github.com/BitcoinUnlimited/BitcoinUnlimited/pull/1937), i.e. when a block comes in that confirms enough parent transactions to make the transaction valid in non-BU mempools, a double-spender is essentially racing the entire BU network to push his double-spend into the miner nodes that now accept the transaction.
 
 Intelligent unconfirmed transaction forwarding is delivered as an "experimental" (off by default) feature.  To enable this feature, an operator would add configuration into bitcoin.conf.  Set both new unconfirmed limits (these config fields have existed for a long time) and turn on the new intelligent unconfirmed transaction forwarding:
-limitancestorsize=<KB of RAM>
-limitdescendantsize=<KB of RAM>
-limitancestorcount=<number of allowed ancestors>
-limitdescendantcount=<number of allowed ancestors>
-net.unconfChainResendAction=2
+
+- limitancestorsize = "KB of RAM"
+- limitdescendantsize = "KB of RAM"
+- limitancestorcount = "number of allowed ancestors"
+- limitdescendantcount = "number of allowed ancestors"
+- net.unconfChainResendAction = 2
 
 ### Mempool synchronization via Graphene
 

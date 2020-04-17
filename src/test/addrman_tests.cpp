@@ -25,12 +25,6 @@ public:
         insecure_rand = FastRandomContext(true);
     }
 
-    int RandomInt(int nMax)
-    {
-        state = (CHashWriter(SER_GETHASH, 0) << state).GetHash().GetCheapHash();
-        return (unsigned int)(state % nMax);
-    }
-
     CAddrInfo *Find(const CNetAddr &addr, int *pnId = nullptr) { return CAddrMan::Find(addr, pnId); }
     CAddrInfo *Create(const CAddress &addr, const CNetAddr &addrSource, int *pnId = nullptr)
     {
@@ -180,10 +174,12 @@ BOOST_AUTO_TEST_CASE(addrman_select)
     BOOST_CHECK(addrman.size() == 7);
 
     // Test 12: Select pulls from new and tried regardless of port number.
-    BOOST_CHECK(addrman.Select().ToString() == "250.4.6.6:8333");
-    BOOST_CHECK(addrman.Select().ToString() == "250.3.2.2:9999");
-    BOOST_CHECK(addrman.Select().ToString() == "250.3.3.3:9999");
-    BOOST_CHECK(addrman.Select().ToString() == "250.4.4.4:8333");
+    std::set<uint16_t> ports;
+    for (int i = 0; i < 20; ++i)
+    {
+        ports.insert(addrman.Select().GetPort());
+    }
+    BOOST_CHECK_EQUAL(ports.size(), 3);
 }
 
 BOOST_AUTO_TEST_CASE(addrman_new_collisions)

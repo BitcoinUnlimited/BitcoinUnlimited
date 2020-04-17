@@ -168,7 +168,7 @@
         <translation>هل أنت متأكد من رغبتك في تشفير محفظتك ؟</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
+        <source>BCH Unlimited will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
         <translation>بتكوين سوف يغلق الآن لإنهاء عملية التشفير. تذكر أن التشفير لا يستطيع حماية محفظتك تمامًا من السرقة من خلال البرمجيات الخبيثة التي تصيب جهازك </translation>
     </message>
     <message>
@@ -298,7 +298,7 @@
         <translation>افتح &amp;URI...</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited client</source>
+        <source>BCH Unlimited client</source>
         <translation>عميل bitcion core</translation>
     </message>
     <message>
@@ -350,7 +350,7 @@
         <translation>&amp;استقبل</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Unlimited</source>
+        <source>Show information about BCH Unlimited</source>
         <translation>  اظهار معلومات حول bitcion core</translation>
     </message>
     <message>
@@ -390,7 +390,7 @@
         <translation>شريط أدوات علامات التبويب</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>جوهر البيت كوين</translation>
     </message>
     <message>
@@ -410,11 +410,11 @@
         <translation>فتح URI : Bitcoin أو طلب دفع</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Unlimited</source>
+        <source>&amp;About BCH Unlimited</source>
         <translation>حول bitcoin core</translation>
     </message>
     <message>
-        <source>Modify configuration options for Bitcoin Unlimited</source>
+        <source>Modify configuration options for BCH Unlimited</source>
         <translation>تغيير خيارات الإعداد لأساس Bitcoin</translation>
     </message>
     <message>
@@ -669,7 +669,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>جوهر البيت كوين</translation>
     </message>
     <message>
@@ -677,7 +677,7 @@
         <translation>النسخة</translation>
     </message>
     <message>
-        <source>About Bitcoin Unlimited</source>
+        <source>About BCH Unlimited</source>
         <translation>عن جوهر البيت كوين</translation>
     </message>
     <message>
@@ -700,7 +700,7 @@
         <translation>استخدام دليل بيانات مخصص:</translation>
     </message>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>جوهر البيت كوين</translation>
     </message>
     <message>
@@ -1388,11 +1388,11 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Unlimited</source>
+        <source>BCH Unlimited</source>
         <translation>جوهر البيت كوين</translation>
     </message>
     <message>
-        <source>The Bitcoin Unlimited developers</source>
+        <source>The BCH Unlimited developers</source>
         <translation>مطوري جوهر البيت كوين</translation>
     </message>
     <message>

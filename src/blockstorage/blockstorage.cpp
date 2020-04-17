@@ -149,6 +149,12 @@ void SyncStorage(const CChainParams &chainparams)
     AssertLockHeld(cs_main);
     if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
     {
+        if (pblockdbsync == nullptr)
+        {
+            LOGA("ERROR: could not open blockdbsync\n");
+            abort();
+        }
+
         std::vector<std::pair<int, CDiskBlockIndex> > hashesByHeight;
         pblocktreeother->GetSortedHashIndex(hashesByHeight);
         CValidationState state;
@@ -207,10 +213,6 @@ void SyncStorage(const CChainParams &chainparams)
             if (index->nStatus & BLOCK_HAVE_DATA && item.second.nDataPos != 0)
             {
                 CBlock block_lev;
-                if (pblockdbsync == nullptr)
-                {
-                    LOGA("blockdbsync is a nullptr \n");
-                }
                 if (pblockdbsync->ReadBlock(index, block_lev))
                 {
                     unsigned int nBlockSize = ::GetSerializeSize(block_lev, SER_DISK, CLIENT_VERSION);
@@ -600,7 +602,8 @@ bool FlushStateToDiskInternal(CValidationState &state,
     // It's been a while since we wrote the block index to disk. Do this frequently, so we don't need to redownload
     // after a crash.
     bool fPeriodicWrite =
-        mode == FLUSH_STATE_PERIODIC && nNow > nLastWrite + (int64_t)DATABASE_WRITE_INTERVAL * 1000000;
+        (mode == FLUSH_STATE_PERIODIC && nNow > nLastWrite + (int64_t)DATABASE_WRITE_INTERVAL * 1000000) ||
+        (IsInitialBlockDownload() && nNow > nLastWrite + (int64_t)IBD_DATABASE_WRITE_INTERVAL * 1000000);
     // It's been very long since we flushed the cache. Do this infrequently, to optimize cache usage.
     bool fPeriodicFlush =
         mode == FLUSH_STATE_PERIODIC && nNow > nLastFlush + (int64_t)DATABASE_FLUSH_INTERVAL * 1000000;
@@ -614,10 +617,17 @@ bool FlushStateToDiskInternal(CValidationState &state,
         {
             return state.Error("out of disk space");
         }
-        // First make sure all block and undo data is flushed to disk. This is not used for levelDB block storage
+        // First make sure all block and undo data is flushed to disk.
         if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES)
         {
             FlushBlockFile();
+        }
+        else
+        {
+            if (pblockdb)
+            {
+                pblockdb->Flush();
+            }
         }
         // Then update all block file information (which may refer to block and undo files).
         {

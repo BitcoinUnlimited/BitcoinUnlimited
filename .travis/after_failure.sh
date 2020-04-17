@@ -8,6 +8,7 @@ if [ $DIST != "RPM" ]; then
   export LC_ALL=C.UTF-8
 fi
 
+# TODO the following have to be made aware of DOCKER
 for i in `find /home/travis/ -name debug.log`; do echo $i; echo "-----"; tail -100 $i; done
 for i in `find /tmp/ -name debug.log`; do echo $i; echo "-----"; tail -100 $i; done
 for i in `find /home/travis/ -name bitcoin.conf`; do echo $i; echo "-----"; cat $i; done

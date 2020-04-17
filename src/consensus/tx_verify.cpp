@@ -20,7 +20,7 @@
 #include <boost/scope_exit.hpp>
 
 
-bool IsFinalTx(const CTransactionRef &tx, int nBlockHeight, int64_t nBlockTime)
+bool IsFinalTx(const CTransactionRef tx, int nBlockHeight, int64_t nBlockTime)
 {
     if (tx->nLockTime == 0)
         return true;
@@ -34,7 +34,7 @@ bool IsFinalTx(const CTransactionRef &tx, int nBlockHeight, int64_t nBlockTime)
     return true;
 }
 
-std::pair<int, int64_t> CalculateSequenceLocks(const CTransactionRef &tx,
+std::pair<int, int64_t> CalculateSequenceLocks(const CTransactionRef tx,
     int flags,
     std::vector<int> *prevHeights,
     const CBlockIndex &block)
@@ -116,7 +116,7 @@ bool EvaluateSequenceLocks(const CBlockIndex &block, std::pair<int, int64_t> loc
     return true;
 }
 
-bool SequenceLocks(const CTransactionRef &tx, int flags, std::vector<int> *prevHeights, const CBlockIndex &block)
+bool SequenceLocks(const CTransactionRef tx, int flags, std::vector<int> *prevHeights, const CBlockIndex &block)
 {
     return EvaluateSequenceLocks(block, CalculateSequenceLocks(tx, flags, prevHeights, block));
 }
@@ -126,7 +126,7 @@ bool SequenceLocks(const CTransactionRef &tx, int flags, std::vector<int> *prevH
 // previous outputs are the most relevant, but not actually checked.
 // The purpose of this is to limit the outputs of transactions so that other transactions' "prevout"
 // is reasonably sized.
-unsigned int GetLegacySigOpCount(const CTransactionRef &tx, const uint32_t flags)
+unsigned int GetLegacySigOpCount(const CTransactionRef tx, const uint32_t flags)
 {
     unsigned int nSigOps = 0;
     for (const auto &txin : tx->vin)
@@ -140,7 +140,7 @@ unsigned int GetLegacySigOpCount(const CTransactionRef &tx, const uint32_t flags
     return nSigOps;
 }
 
-unsigned int GetP2SHSigOpCount(const CTransactionRef &tx, const CCoinsViewCache &inputs, const uint32_t flags)
+unsigned int GetP2SHSigOpCount(const CTransactionRef tx, const CCoinsViewCache &inputs, const uint32_t flags)
 {
     if ((flags & SCRIPT_VERIFY_P2SH) == 0 || tx->IsCoinBase())
         return 0;
@@ -157,17 +157,46 @@ unsigned int GetP2SHSigOpCount(const CTransactionRef &tx, const CCoinsViewCache 
     return nSigOps;
 }
 
-bool CheckTransaction(const CTransactionRef &tx, CValidationState &state)
+bool ContextualCheckTransaction(const CTransactionRef tx,
+    CValidationState &state,
+    CBlockIndex *const pindexPrev,
+    const CChainParams &params)
+{
+    const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
+    auto consensusParams = params.GetConsensus();
+    bool may2020Enabled = IsMay2020Enabled(consensusParams, pindexPrev);
+
+    if (!may2020Enabled)
+    {
+        // Check that the transaction doesn't have an excessive number of sigops
+        unsigned int nSigOps = GetLegacySigOpCount(tx, STANDARD_SCRIPT_VERIFY_FLAGS);
+        if (nSigOps > MAX_TX_SIGOPS_COUNT)
+            return state.DoS(10, false, REJECT_INVALID, "bad-txns-too-many-sigops");
+    }
+
+    // Make sure tx size is equal or higher to 100 bytes if we are on the BCH chain and Nov 15th 2018 activated
+    if (IsNov2018Activated(consensusParams, nHeight))
+    {
+        if (tx->GetTxSize() < MIN_TX_SIZE)
+        {
+            return state.DoS(
+                10, error("%s: contains transactions that are too small", __func__), REJECT_INVALID, "txn-undersize");
+        }
+    }
+
+
+    return true;
+}
+
+bool CheckTransaction(const CTransactionRef tx, CValidationState &state)
 {
     // Basic checks that don't depend on any context
     if (tx->vin.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vin-empty");
     if (tx->vout.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vout-empty");
-    // Check that the transaction doesn't have an excessive number of sigops
-    unsigned int nSigOps = GetLegacySigOpCount(tx, STANDARD_SCRIPT_VERIFY_FLAGS);
-    if (nSigOps > MAX_TX_SIGOPS)
-        return state.DoS(10, false, REJECT_INVALID, "bad-txns-too-many-sigops");
+
+    // Sigops moved to ContextualCheckTransaction because the consensus rule goes away after may2020 fork
 
     // Size limits
     // BU: size limits removed
@@ -234,7 +263,7 @@ static int GetSpendHeight(const CCoinsViewCache &inputs)
     throw std::runtime_error("GetSpendHeight(): best block does not exist");
 }
 
-bool Consensus::CheckTxInputs(const CTransactionRef &tx, CValidationState &state, const CCoinsViewCache &inputs)
+bool Consensus::CheckTxInputs(const CTransactionRef tx, CValidationState &state, const CCoinsViewCache &inputs)
 {
     // This doesn't trigger the DoS code on purpose; if it did, it would make it easier
     // for an attacker to attempt to split the network.
@@ -300,7 +329,7 @@ bool Consensus::CheckTxInputs(const CTransactionRef &tx, CValidationState &state
     return true;
 }
 
-uint64_t GetTransactionSigOpCount(const CTransaction &tx, const CCoinsViewCache &coins, const uint32_t flags)
+uint64_t GetTransactionSigOpCount(const CTransactionRef ptx, const CCoinsViewCache &coins, const uint32_t flags)
 {
-    return GetLegacySigOpCount(MakeTransactionRef(tx), flags) + GetP2SHSigOpCount(MakeTransactionRef(tx), coins, flags);
+    return GetLegacySigOpCount(ptx, flags) + GetP2SHSigOpCount(ptx, coins, flags);
 }

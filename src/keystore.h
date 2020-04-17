@@ -19,10 +19,13 @@
 /** A virtual base class for key stores */
 class CKeyStore
 {
-protected:
+public:
+    /** This lock only needs to be explicitly taken by the caller if lock-free functions are called.  All lock-free
+        functions are preceded by an _.  In general, use the locking functions.  Only use the lock-free functions
+        for optimization of loops by factoring the lock out of the loop and calling the lock-free function in the loop.
+    */
     mutable CCriticalSection cs_KeyStore;
 
-public:
     virtual ~CKeyStore() {}
     //! Add a key to the store.
     virtual bool AddKeyPubKey(const CKey &key, const CPubKey &pubkey) = 0;
@@ -30,6 +33,9 @@ public:
 
     //! Check whether a key corresponding to a given address is present in the store.
     virtual bool HaveKey(const CKeyID &address) const = 0;
+    //! Check whether a key corresponding to a given address is present in the store, caller must hold cs_KeyStore
+    virtual bool _HaveKey(const CKeyID &address) const = 0;
+
     virtual bool GetKey(const CKeyID &address, CKey &keyOut) const = 0;
     virtual void GetKeys(std::set<CKeyID> &setAddress) const = 0;
     virtual bool GetPubKey(const CKeyID &address, CPubKey &vchPubKeyOut) const = 0;
@@ -72,6 +78,7 @@ public:
         }
         return result;
     }
+    bool _HaveKey(const CKeyID &address) const { return (mapKeys.count(address) > 0); }
     void GetKeys(std::set<CKeyID> &setAddress) const
     {
         setAddress.clear();

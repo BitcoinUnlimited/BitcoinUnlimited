@@ -180,6 +180,16 @@ extern const char *GET_GRAPHENETX;
  */
 extern const char *GET_GRAPHENE;
 /**
+ * The get_graphene_recovery message transmits a single serialized
+ * RequestGrapheneReceiverRecover object.
+ */
+extern const char *GET_GRAPHENE_RECOVERY;
+/**
+ * The graphene_recovery message transmits a single serialized
+ * CGrapheneReceiverRecover object.
+ */
+extern const char *GRAPHENE_RECOVERY;
+/**
  * The mempoolsync message transmits a single serialized get_memsync.
  */
 extern const char *MEMPOOLSYNC;

@@ -26,6 +26,10 @@ static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520;
 // Maximum number of non-push operations per script
 static const int MAX_OPS_PER_SCRIPT = 201;
 
+// 2020-05-15 sigchecks consensus rule
+// Maximum number of signature check operations per transaction
+static const int MAX_SIGOPS_PER_TRANSACTION = 3000;
+
 // Maximum number of public keys per multisig
 static const int MAX_PUBKEYS_PER_MULTISIG = 20;
 
@@ -186,16 +190,11 @@ enum opcodetype
     OP_CHECKDATASIG = 0xba,
     OP_CHECKDATASIGVERIFY = 0xbb,
 
+    // additional byte string operations
+    OP_REVERSEBYTES = 0xbc,
+
     // The first op_code value after all defined opcodes
     FIRST_UNDEFINED_OP_VALUE,
-
-    // template matching params
-    OP_BIGINTEGER = 0xf0,
-    OP_DATA = 0xf1,
-    OP_SMALLINTEGER = 0xfa,
-    OP_PUBKEYS = 0xfb,
-    OP_PUBKEYHASH = 0xfd,
-    OP_PUBKEY = 0xfe,
 
     OP_INVALIDOPCODE = 0xff,
 };
@@ -382,7 +381,6 @@ public:
     explicit LegacyCScriptNum(const int64_t &n) : CScriptNum(n) {}
 };
 
-
 /**
  * We use a prevector for the script to reduce the considerable memory overhead
  *  of vectors in cases where they normally contain a small number of small elements.
@@ -414,7 +412,6 @@ protected:
 
 public:
     CScript() {}
-    CScript(const CScript &b) : CScriptBase(b.begin(), b.end()) {}
     CScript(const_iterator pbegin, const_iterator pend) : CScriptBase(pbegin, pend) {}
     CScript(std::vector<unsigned char>::const_iterator pbegin, std::vector<unsigned char>::const_iterator pend)
         : CScriptBase(pbegin, pend)
@@ -454,10 +451,8 @@ public:
         return *this;
     }
 
-    CScript &operator<<(const LegacyCScriptNum &a)
+    void serializeVector(const std::vector<unsigned char> &b)
     {
-        auto b = a.getvch();
-
         if (b.size() < OP_PUSHDATA1)
         {
             insert(end(), (unsigned char)b.size());
@@ -482,6 +477,12 @@ public:
             insert(end(), data, data + sizeof(data));
         }
         insert(end(), b.begin(), b.end());
+    }
+
+    CScript &operator<<(const LegacyCScriptNum &a)
+    {
+        auto b = a.getvch();
+        serializeVector(b);
         return *this;
     }
 
@@ -502,30 +503,8 @@ public:
             insert(end(), OP_1NEGATE);
             return *this;
         }
-        else if (b.size() < OP_PUSHDATA1)
-        {
-            insert(end(), (unsigned char)b.size());
-        }
-        else if (b.size() <= 0xff)
-        {
-            insert(end(), OP_PUSHDATA1);
-            insert(end(), (unsigned char)b.size());
-        }
-        else if (b.size() <= 0xffff)
-        {
-            insert(end(), OP_PUSHDATA2);
-            uint8_t data[2];
-            WriteLE16(data, b.size());
-            insert(end(), data, data + sizeof(data));
-        }
-        else
-        {
-            insert(end(), OP_PUSHDATA4);
-            uint8_t data[4];
-            WriteLE32(data, b.size());
-            insert(end(), data, data + sizeof(data));
-        }
-        insert(end(), b.begin(), b.end());
+
+        serializeVector(b);
         return *this;
     }
 

@@ -13,7 +13,7 @@
 #include "primitives/transaction.h"
 #include "uint256.h"
 
-uint256 ComputeMerkleRoot(const std::vector<uint256> &leaves, bool *mutated = nullptr);
+uint256 ComputeMerkleRoot(std::vector<uint256> hashes, bool *mutated = nullptr);
 
 /*
 To compute a merkle path (AKA merkle proof), pass the index of the element being proved into position.

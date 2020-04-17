@@ -58,6 +58,9 @@ extern CTweak<bool> ignoreNetTimeouts;
 // Dump addresses to peers.dat and banlist.dat every 15 minutes (900s)
 #define DUMP_ADDRESSES_INTERVAL 900
 
+// Dump addresses to peers.dat and banlist.dat every 10 seconds
+#define UPDATE_MISBEHAVIOR_INTERVAL 10
+
 // We add a random period time (0 to 1 seconds) to feeler connections to prevent synchronization.
 #define FEELER_SLEEP_WINDOW 1
 
@@ -192,12 +195,13 @@ static std::vector<CAddress> convertSeed6(const std::vector<SeedSpec6> &vSeedsIn
     const int64_t nOneWeek = 7 * 24 * 60 * 60;
     std::vector<CAddress> vSeedsOut;
     vSeedsOut.reserve(vSeedsIn.size());
+    FastRandomContext rng;
     for (std::vector<SeedSpec6>::const_iterator i(vSeedsIn.begin()); i != vSeedsIn.end(); ++i)
     {
         struct in6_addr ip;
         memcpy(&ip, i->addr, sizeof(ip));
         CAddress addr(CService(ip, i->port));
-        addr.nTime = GetTime() - GetRand(nOneWeek) - nOneWeek;
+        addr.nTime = GetTime() - rng.randrange(nOneWeek) - nOneWeek;
         vSeedsOut.push_back(addr);
     }
     return vSeedsOut;
@@ -244,8 +248,9 @@ void AdvertiseLocal(CNode *pnode)
         // If discovery is enabled, sometimes give our peer the address it
         // tells us that it sees us as in case it has a better idea of our
         // address than we do.
+        FastRandomContext rng;
         if (IsPeerAddrLocalGood(pnode) &&
-            (!addrLocal.IsRoutable() || GetRand((GetnScore(addrLocal) > LOCAL_MANUAL) ? 8 : 2) == 0))
+            (!addrLocal.IsRoutable() || rng.randbits((GetnScore(addrLocal) > LOCAL_MANUAL) ? 8 : 2) == 0))
         {
             addrLocal.SetIP(pnode->addrLocal);
         }
@@ -253,7 +258,7 @@ void AdvertiseLocal(CNode *pnode)
         {
             // BU logs too often: LOGA("AdvertiseLocal: advertising address %s\n", addrLocal.ToString());
             FastRandomContext insecure_rand;
-            pnode->PushAddress(addrLocal, insecure_rand);
+            pnode->PushAddress(addrLocal, rng);
         }
     }
 }
@@ -425,6 +430,13 @@ CNodeRef FindNodeRef(const std::string &addrName)
     return CNodeRef(FindNode(addrName));
 }
 
+CNodeRef FindNodeRef(const CNetAddr &ip)
+{
+    LOCK(cs_vNodes);
+    return CNodeRef(FindNode(ip));
+}
+
+
 int DisconnectSubNetNodes(const CSubNet &subNet)
 {
     int nDisconnected = 0;
@@ -518,6 +530,20 @@ void CNode::CloseSocketDisconnect()
         CloseSocket(hSocket);
     }
 
+    // Purge any noderef's in the priority message queue relating to this peer. If we don't
+    // remove the node references here then we won't be able to complete the disconnection.
+    {
+        LOCK(cs_prioritySendQ);
+        auto it = vPrioritySendQ.begin();
+        while (it != vPrioritySendQ.end())
+        {
+            if (this == it->get())
+                it = vPrioritySendQ.erase(it);
+            else
+                it++;
+        }
+    }
+
     // in case this fails, we'll empty the recv buffer when the CNode is deleted
     TRY_LOCK(cs_vRecvMsg, lockRecv);
     if (lockRecv)
@@ -570,8 +596,14 @@ void CNode::copyStats(CNodeStats &stats)
     X(cleanSubVer);
     X(fInbound);
     X(nStartingHeight);
-    X(nSendBytes);
-    X(nRecvBytes);
+    {
+        LOCK(cs_vSend);
+        X(nSendBytes);
+    }
+    {
+        LOCK(cs_vRecvMsg);
+        X(nRecvBytes);
+    }
     X(fWhitelisted);
     X(fSupportsCompactBlocks);
 
@@ -609,17 +641,45 @@ static bool IsMessageOversized(CNetMessage &msg)
     return false;
 }
 
+static bool IsPriorityMsg(std::string strCommand)
+{
+    if (!IsChainNearlySyncd())
+        return false;
+
+    // Most traffic is INV, TX or GETDATA so check that first to prevent us from having to
+    // to evaluate, for every message, the long if statement that follows this one.
+    if (strCommand == NetMsgType::INV || strCommand == NetMsgType::TX || strCommand == NetMsgType::GETDATA)
+        return false;
+
+    // Various messages types that are considered priority.
+    // NOTE: The absence of BLOCK is not by accident. Full BLOCK messages are problematic for priority queuing.
+    //       as it is difficult to know the state of the peer in terms of whether they are sync'd to the chain.
+    //       We for instance don't want to be sending BLOCK's as priority messages if the peer is only in the process
+    //       of initial sync. Also, BLOCK's can be quite large and we don't want them to be dominating our priority
+    //       sending process. We prefer small objects that can be forwarded with one SockeSendData() attempt.
+    if (strCommand == NetMsgType::HEADERS || strCommand == NetMsgType::GRAPHENEBLOCK ||
+        strCommand == NetMsgType::GET_GRAPHENE || strCommand == NetMsgType::GRAPHENETX ||
+        strCommand == NetMsgType::GET_GRAPHENE_RECOVERY || strCommand == NetMsgType::GRAPHENE_RECOVERY ||
+        strCommand == NetMsgType::GET_GRAPHENETX || strCommand == NetMsgType::GET_XTHIN ||
+        strCommand == NetMsgType::GET_THIN || strCommand == NetMsgType::XTHINBLOCK ||
+        strCommand == NetMsgType::THINBLOCK || strCommand == NetMsgType::XBLOCKTX ||
+        strCommand == NetMsgType::GET_XBLOCKTX || strCommand == NetMsgType::XPEDITEDREQUEST ||
+        strCommand == NetMsgType::XPEDITEDBLK || strCommand == NetMsgType::XPEDITEDTXN ||
+        strCommand == NetMsgType::CMPCTBLOCK || strCommand == NetMsgType::GETBLOCKTXN ||
+        strCommand == NetMsgType::BLOCKTXN)
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
 bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 {
     AssertLockHeld(cs_vRecvMsg);
     while (nBytes > 0)
     {
-        // get current incomplete message, or create a new one
-        if (vRecvMsg.empty() || vRecvMsg.back().complete())
-            vRecvMsg.push_back(CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion));
-
-        CNetMessage &msg = vRecvMsg.back();
-
         // Absorb network data.
         int handled;
         if (!msg.in_data)
@@ -642,6 +702,11 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 
         if (msg.complete())
         {
+            bool fSendLowPriority = true;
+
+            msg.nStopwatch = GetStopwatchMicros();
+            msg.nTime = GetTimeMicros();
+
             // Connection slot attack mitigation.  We don't want to add useful bytes for outgoing INV, PING, ADDR,
             // VERSION or VERACK messages since attackers will often just connect and listen to INV messages.
             // We want to make sure that connected nodes are doing useful work in sending us data or requesting data.
@@ -649,32 +714,37 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
             if (strCommand != NetMsgType::PONG && strCommand != NetMsgType::PING && strCommand != NetMsgType::ADDR &&
                 strCommand != NetMsgType::VERSION && strCommand != NetMsgType::VERACK)
             {
-                nActivityBytes += msg.hdr.nMessageSize;
+                nActivityBytes.fetch_add(msg.hdr.nMessageSize);
 
-                // If the message is a priority message then move from the back to the front of the deque.
-                //
-                // NOTE: for GET_XTHIN we don't jump the queue on test environments because the GET_XTHIN can get ahead
-                // of a previous GET_XTHIN/HEADER requests and result in a DOS if the block returns out of order and
-                // with no headers in the block index or the setblockindexcandidates.
-                if ((strCommand == NetMsgType::GET_XTHIN && Params().NetworkIDString() == "main") ||
-                    strCommand == NetMsgType::GET_THIN || strCommand == NetMsgType::XTHINBLOCK ||
-                    strCommand == NetMsgType::THINBLOCK || strCommand == NetMsgType::XBLOCKTX ||
-                    strCommand == NetMsgType::GET_XBLOCKTX || strCommand == NetMsgType::GET_GRAPHENE ||
-                    strCommand == NetMsgType::GRAPHENEBLOCK || strCommand == NetMsgType::GRAPHENETX ||
-                    strCommand == NetMsgType::GET_GRAPHENETX)
+                // If the message is a priority message then move it into the priority queue.
+                if (IsPriorityMsg(strCommand))
                 {
-                    LOG(THIN | GRAPHENE, "ReceiveMsgBytes %s\n", strCommand);
+                    LOCK(cs_priorityRecvQ);
+                    // As a safeguard on some peer trying to dominate our networking
+                    // don't allow unlimited simultaneous priority messages. There should in general only be
+                    // one priority message at any one time with the exception of block HEADERS announcements
+                    // which can come relatively close together in time.
+                    if (vPriorityRecvQ.size() <= 5)
+                    {
+                        // Move the this message to the priority queue.
+                        vPriorityRecvQ.push_back(std::make_pair<CNodeRef, CNetMessage>(CNodeRef(this), std::move(msg)));
+                        msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
 
-                    // Move the this message to the front of the queue.
-                    std::rotate(vRecvMsg.begin(), vRecvMsg.end() - 1, vRecvMsg.end());
-
-                    std::string strFirstMsgCommand = vRecvMsg[0].hdr.GetCommand();
-                    DbgAssert(strFirstMsgCommand == strCommand, );
-                    LOG(THIN | GRAPHENE, "Receive Queue: pushed %s to the front of the queue\n", strFirstMsgCommand);
+                        LOG(THIN | GRAPHENE | CMPCT,
+                            "Receive Queue: pushed %s to the priority queue, %d bytes, peer(%d)\n", strCommand,
+                            vPriorityRecvQ.back().second.hdr.nMessageSize, this->GetId());
+                        // Indicate we have a priority message to process
+                        fPriorityRecvMsg.store(true);
+                        fSendLowPriority = false;
+                    }
                 }
             }
-            msg.nStopwatch = GetStopwatchMicros();
-            msg.nTime = GetTimeMicros();
+
+            if (fSendLowPriority)
+            {
+                vRecvMsg.push_back(std::move(msg));
+                msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
+            }
             messageHandlerCondition.notify_one();
         }
     }
@@ -735,30 +805,45 @@ int CNetMessage::readData(const char *pch, unsigned int nBytes)
 
 
 // requires LOCK(cs_vSend), BU: returns > 0 if any data was sent, 0 if nothing accomplished.
-int SocketSendData(CNode *pnode)
+int SocketSendData(CNode *pnode, bool fSendTwo = false) EXCLUSIVE_LOCKS_REQUIRED(pnode->cs_vSend)
 {
+    AssertLockHeld(pnode->cs_vSend);
     // BU This variable is incremented if something happens.  If it is zero at the bottom of the loop, we delay.  This
     // solves spin loop issues where the select does not block but no bytes can be transferred (traffic shaping limited,
     // for example).
     int progress = 0;
-
+    uint32_t nMsgSent = 0;
     // Make sure we haven't already been asked to disconnect
     if (pnode->fDisconnect)
         return progress;
 
-    std::deque<CSerializeData>::iterator it = pnode->vSendMsg.begin();
-    while (it != pnode->vSendMsg.end())
+    std::deque<CSerializeData>::iterator it;
+    while (!pnode->vSendMsg.empty() || !pnode->vLowPrioritySendMsg.empty())
     {
+        if (!pnode->vSendMsg.empty())
+        {
+            it = pnode->vSendMsg.begin();
+        }
+        else
+        {
+            // Move a message from the lower priority queue to the higher priority queue
+            // and then continue. This keeps all active message sending from the priority queue
+            // only and prevents us from putting the next priority message in front of any that
+            // has already been partially sent.
+            pnode->vSendMsg.push_back(std::move(*pnode->vLowPrioritySendMsg.begin()));
+            pnode->vLowPrioritySendMsg.pop_front();
+            continue;
+        }
+
         const CSerializeData &data = *it;
         if (data.size() <= 0)
         {
-            it++;
+            pnode->vSendMsg.pop_front();
             LOGA("ERROR:  Trying to send message but data size was %d nSendOffset was %d nSendSize was %d\n",
                 data.size(), pnode->nSendOffset, pnode->nSendSize);
             continue;
         }
-        // assert(data.size() > pnode->nSendOffset);
-
+        DbgAssert(data.size() > pnode->nSendOffset, );
         int amt2Send = min((int64_t)(data.size() - pnode->nSendOffset), sendShaper.available(SEND_SHAPER_MIN_FRAG));
         if (amt2Send == 0)
             break;
@@ -781,7 +866,12 @@ int SocketSendData(CNode *pnode)
             {
                 pnode->nSendOffset = 0;
                 pnode->nSendSize.fetch_sub(data.size());
-                it++;
+                pnode->vSendMsg.pop_front();
+
+                // If this is a priority send then just send two messages, then stop sending more.
+                nMsgSent++;
+                if (fSendTwo && nMsgSent >= 2)
+                    break;
             }
             else
             {
@@ -808,15 +898,15 @@ int SocketSendData(CNode *pnode)
         }
     }
 
-    if (it == pnode->vSendMsg.end())
+    if (pnode->vSendMsg.empty() && pnode->vLowPrioritySendMsg.empty())
     {
         if (pnode->nSendOffset != 0 || pnode->nSendSize != 0)
             LOGA("ERROR: One or more values were not Zero - nSendOffset was %d nSendSize was %d\n", pnode->nSendOffset,
                 pnode->nSendSize);
-        // assert(pnode->nSendOffset == 0);
-        // assert(pnode->nSendSize == 0);
+        DbgAssert(pnode->nSendOffset == 0, );
+        DbgAssert(pnode->nSendSize == 0, );
     }
-    pnode->vSendMsg.erase(pnode->vSendMsg.begin(), it);
+
     return progress;
 }
 
@@ -883,12 +973,18 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
         static int64_t nLastTime = GetTime();
         for (CNode *node : vNodes)
         {
-            // Decay the activity bytes for each node over a period of 2 hours.  This gradually de-prioritizes a
-            // connection
-            // that was once active but has gone stale for some reason and allows lower priority active nodes to climb
-            // the ladder.
+            // Decay the activity bytes for each node over a period of 2 hours.  This gradually de-prioritizes
+            // a connection that was once active but has gone stale for some reason and allows lower priority
+            // active nodes to climb the ladder.
             int64_t nNow = GetTime();
-            node->nActivityBytes *= pow(1.0 - 1.0 / 7200, (double)(nNow - nLastTime)); // exponential 2 hour decay
+
+            while (true)
+            {
+                uint64_t nOldActivityBytes = node->nActivityBytes;
+                uint64_t nNewActivityBytes = nOldActivityBytes * pow(1.0 - 1.0 / 7200, (double)(nNow - nLastTime));
+                if (node->nActivityBytes.compare_exchange_weak(nOldActivityBytes, nNewActivityBytes))
+                    break;
+            }
 
             if (node->fWhitelisted)
                 continue;
@@ -903,7 +999,7 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
             if (node->nPingNonceSent > 0 && node->nPingUsecTime == 0 &&
                 ((GetStopwatchMicros() - node->nStopwatchConnected) > 60 * 1000000))
             {
-                LOG(NET, "node %s evicted, slow ping\n", node->GetLogName());
+                LOG(EVICT, "node %s evicted, slow ping\n", node->GetLogName());
                 node->fDisconnect = true;
                 return true;
             }
@@ -947,7 +1043,8 @@ static bool AttemptToEvictConnection(bool fPreferNewConnection)
         if (nEvictions > 15)
         {
             int nHoursToBan = 4;
-            dosMan.Ban(ipAddress, BanReasonNodeMisbehaving, nHoursToBan * 60 * 60);
+            std::string userAgent = vEvictionCandidatesByActivity[0]->cleanSubVer;
+            dosMan.Ban(ipAddress, userAgent, BanReasonTooManyEvictions, nHoursToBan * 60 * 60);
             LOGA("Banning %s for %d hours: Too many evictions - connection dropped\n",
                 vEvictionCandidatesByActivity[0]->addr.ToString(), nHoursToBan);
         }
@@ -1094,7 +1191,8 @@ static void AcceptConnection(const ListenSocket &hListenSocket)
         if (nConnections > 4 && !whitelisted && !addr.IsLocal()) // local connections are auto-whitelisted
         {
             int nHoursToBan = 4;
-            dosMan.Ban((CNetAddr)addr, BanReasonNodeMisbehaving, nHoursToBan * 60 * 60);
+            std::string userAgent = mapInboundConnectionTracker[ipAddress].userAgent;
+            dosMan.Ban((CNetAddr)addr, userAgent, BanReasonTooManyConnectionAttempts, nHoursToBan * 60 * 60);
             LOGA("Banning %s for %d hours: Too many connection attempts - connection dropped\n", addr.ToString(),
                 nHoursToBan);
             CloseSocket(hSocket);
@@ -1262,7 +1360,7 @@ void ThreadSocketHandler()
                 // * We process a message in the buffer (message handler thread).
                 {
                     TRY_LOCK(pnode->cs_vSend, lockSend);
-                    if (lockSend && !pnode->vSendMsg.empty())
+                    if (lockSend && (!pnode->vSendMsg.empty() || !pnode->vLowPrioritySendMsg.empty()))
                     {
                         FD_SET(hSocket, &fdsetSend);
                         continue;
@@ -1270,9 +1368,10 @@ void ThreadSocketHandler()
                 }
                 {
                     TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                    if (lockRecv && (pnode->vRecvMsg.empty() || !pnode->vRecvMsg.front().complete() ||
-                                        pnode->GetTotalRecvSize() <= ReceiveFloodSize()))
+                    if (lockRecv && (pnode->vRecvMsg.empty() || pnode->GetTotalRecvSize() <= ReceiveFloodSize()))
+                    {
                         FD_SET(hSocket, &fdsetRecv);
+                    }
                 }
             }
         }
@@ -1398,6 +1497,75 @@ void ThreadSocketHandler()
                 continue;
             if (FD_ISSET(hSocket, &fdsetSend))
             {
+                // Send priority messages if there any regardless of which peer, taking care to maintain
+                // locking orders.
+                //
+                // Only send two messages, the first two in the send queue by setting the fSendTwo flag, since the
+                // priority message will be the first or second one in the queue. If there happen to be multiple
+                // priority messages stacked in the same queue then we will loop around sending one message each time.
+                // This way we don't end up draining each queue for a peer before being able to send another priority
+                // message from another peer which would happen in the case of block announcements.
+                //
+                // The following presents a more difficult issue in maintaining locking orders. cs_vSend must be
+                // taken before cs_prioritySendQ and hence the following blocks of code needed to preserve that order.
+                while (fPrioritySendMsg)
+                {
+                    // Check if anything is really in queue and pop the noderef. If we're empty then set the
+                    // priority flag to false. Do it here so we don't have to check at the end again and take a lock
+                    // twice.
+                    CNodeRef noderef;
+                    {
+                        LOCK(cs_prioritySendQ);
+                        if (!vPrioritySendQ.empty())
+                        {
+                            noderef = vPrioritySendQ.front();
+                            vPrioritySendQ.pop_front();
+                        }
+                        else
+                        {
+                            fPrioritySendMsg = false;
+                            break;
+                        }
+                    }
+
+                    // Send the first two messages in the send queue. We send two because
+                    // the first message may be a partial message and as a result may not be
+                    // a priority message; the priorty message may be the one behind this partial message.
+                    {
+                        bool fEmpty = false;
+                        CNode *pfrom = noderef.get();
+                        TRY_LOCK(pfrom->cs_vSend, lock_sendtwo);
+                        if (lock_sendtwo)
+                        {
+                            if (!pfrom->vSendMsg.empty())
+                            {
+                                bool fSendTwo = true;
+                                progress += SocketSendData(pfrom, fSendTwo);
+                            }
+                            else
+                                fEmpty = true;
+                        }
+
+                        if (!pfrom->fDisconnect && !lock_sendtwo)
+                        {
+                            // Only if we failed to lock, then push to the back of the queue an try later.
+                            //
+                            // NOTE: If priority messages failed to send or are not sent in their entirety then do "NOT"
+                            //       try again, just let the normal queuing take care of sending the rest. We don't want
+                            //       to start a possible infinite loop where a socket could be hung or network could
+                            //       be backed up. The remainder of the message is at the front of the queue so
+                            //       it will get sent (if it can) at some point.
+                            LOCK(cs_prioritySendQ);
+                            vPrioritySendQ.push_back(noderef);
+                            fPrioritySendMsg = true;
+                            break;
+                        }
+                        else if (fEmpty)
+                            break;
+                    }
+                }
+
+                // Send messages from this pnode's send queue
                 TRY_LOCK(pnode->cs_vSend, lockSend);
                 if (lockSend && sendShaper.try_leak(0))
                 {
@@ -1406,38 +1574,40 @@ void ThreadSocketHandler()
             }
 
             //
-            // Inactivity checking
+            // Inactivity checking every TIMEOUT_INTERVAL
             //
             int64_t stopwatchTime = GetStopwatchMicros();
-            if (stopwatchTime - pnode->nStopwatchConnected > 60 * 1000000)
+            if (stopwatchTime - pnode->nStopwatchConnected > TIMEOUT_INTERVAL * 1000000)
             {
-                int64_t nTime = GetTime();
-                if (pnode->nLastRecv == 0 || pnode->nLastSend == 0)
+                pnode->nStopwatchConnected = GetTimeMicros();
+                if (ignoreNetTimeouts.Value() == false)
                 {
-                    LOG(NET, "Node %s socket no message in first 60 seconds, %d %d from %d\n", pnode->GetLogName(),
-                        pnode->nLastRecv != 0, pnode->nLastSend != 0, pnode->id);
-                    if (ignoreNetTimeouts.Value() == false)
+                    int64_t nTime = GetTime();
+                    if (pnode->nLastRecv == 0 || pnode->nLastSend == 0)
+                    {
+                        LOG(NET, "Node %s: no message sent or received after startup, %d %d from %d\n",
+                            pnode->GetLogName(), pnode->nLastRecv != 0, pnode->nLastSend != 0, pnode->id);
                         pnode->fDisconnect = true;
-                }
-                else if (nTime - pnode->nLastSend > TIMEOUT_INTERVAL)
-                {
-                    LOG(NET, "Node %s socket sending timeout: %is\n", pnode->GetLogName(), nTime - pnode->nLastSend);
-                    if (ignoreNetTimeouts.Value() == false)
+                    }
+                    else if (nTime - pnode->nLastSend > TIMEOUT_INTERVAL)
+                    {
+                        LOG(NET, "Node %s: socket sending timeout: %is\n", pnode->GetLogName(),
+                            nTime - pnode->nLastSend);
                         pnode->fDisconnect = true;
-                }
-                else if (nTime - pnode->nLastRecv > TIMEOUT_INTERVAL)
-                {
-                    LOG(NET, "Node %s socket receive timeout: %is\n", pnode->GetLogName(), nTime - pnode->nLastRecv);
-                    if (ignoreNetTimeouts.Value() == false)
+                    }
+                    else if (nTime - pnode->nLastRecv > TIMEOUT_INTERVAL)
+                    {
+                        LOG(NET, "Node %s: socket receive timeout: %is\n", pnode->GetLogName(),
+                            nTime - pnode->nLastRecv);
                         pnode->fDisconnect = true;
-                }
-                else if (pnode->nPingNonceSent &&
-                         pnode->nPingUsecStart + (TIMEOUT_INTERVAL * 1000000) < (int64_t)GetStopwatchMicros())
-                {
-                    LOG(NET, "Node %s ping timeout: %fs\n", pnode->GetLogName(),
-                        0.000001 * (GetStopwatchMicros() - pnode->nPingUsecStart));
-                    if (ignoreNetTimeouts.Value() == false)
+                    }
+                    else if (pnode->nPingNonceSent &&
+                             pnode->nPingUsecStart + (TIMEOUT_INTERVAL * 1000000) < (int64_t)GetStopwatchMicros())
+                    {
+                        LOG(NET, "Node %s: ping timeout: %fs\n", pnode->GetLogName(),
+                            0.000001 * (GetStopwatchMicros() - pnode->nPingUsecStart));
                         pnode->fDisconnect = true;
+                    }
                 }
             }
         }
@@ -1460,9 +1630,9 @@ static bool fShutdownUPnP = false;
 void ThreadMapPort()
 {
     std::string port = strprintf("%u", GetListenPort());
-    const char *multicastif = 0;
-    const char *minissdpdpath = 0;
-    struct UPNPDev *devlist = 0;
+    const char *multicastif = nullptr;
+    const char *minissdpdpath = nullptr;
+    struct UPNPDev *devlist = nullptr;
     char lanaddr[64];
 
 #ifndef UPNPDISCOVER_SUCCESS
@@ -1777,6 +1947,35 @@ void DumpData(int64_t seconds_between_runs)
             nStart = GetTime();
         }
         _DumpData();
+    }
+}
+
+void UpdateMisbehaviorPoints(int64_t seconds_between_runs)
+{
+    // Update all misbehaviors
+    while (shutdown_threads.load() == false)
+    {
+        // this has the potential to be a long sleep. so do it in chunks incase of node shutdown
+        int64_t nStart = GetTime();
+        int64_t nEnd = nStart + seconds_between_runs;
+        while (nStart < nEnd)
+        {
+            if (shutdown_threads.load() == true)
+            {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            nStart = GetTime();
+        }
+
+        // Update each peers misbehavior
+        {
+            LOCK(cs_vNodes);
+            for (auto pnode : vNodes)
+            {
+                dosMan.UpdateMisbehavior(pnode);
+            }
+        }
     }
 }
 
@@ -2250,15 +2449,17 @@ static bool threadProcessMessages(CNode *pnode)
     // Discover if there's more work to be done
     if (pnode->nSendSize < SendBufferSize())
     {
-        { // If already locked some other thread is working on it, so no work for this thread
+        {
+            // If already locked some other thread is working on it, so no work for this thread
             TRY_LOCK(pnode->csRecvGetData, lockRecv);
             if (lockRecv && (!pnode->vRecvGetData.empty()))
                 fSleep = false;
         }
         if (fSleep)
-        { // If already locked some other thread is working on it, so no work for this thread
+        {
+            // If already locked some other thread is working on it, so no work for this thread
             TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-            if (lockRecv && (!pnode->vRecvMsg.empty() && pnode->vRecvMsg[0].complete()))
+            if (lockRecv && (!pnode->vRecvMsg.empty() || fPriorityRecvMsg.load()))
                 fSleep = false;
         }
     }
@@ -2604,6 +2805,9 @@ void StartNode(thread_group &threadGroup)
 
     // Dump network addresses
     threadGroup.create_thread(&DumpData, DUMP_ADDRESSES_INTERVAL);
+
+    // Update peer misbehavior points
+    threadGroup.create_thread(&UpdateMisbehaviorPoints, UPDATE_MISBEHAVIOR_INTERVAL);
 }
 
 bool StopNode()
@@ -2634,9 +2838,15 @@ void NetCleanup()
         {
             // Since we are quitting, disconnect abruptly from the node rather than finishing up our conversation
             // with it.
-            pnode->vRecvMsg.clear();
-            pnode->ssSend.clear();
-            pnode->nSendSize = 0;
+            {
+                LOCK(pnode->cs_vRecvMsg);
+                pnode->vRecvMsg.clear();
+            }
+            {
+                LOCK(pnode->cs_vSend);
+                pnode->ssSend.clear();
+            }
+            pnode->nSendSize.store(0);
             // Now close communications with the other node
             pnode->CloseSocketDisconnect();
         }
@@ -2695,7 +2905,7 @@ void NetCleanup()
 }
 
 
-void RelayTransaction(const CTransactionRef &ptx, const bool fRespend, const CTxProperties *txProperties)
+void RelayTransaction(const CTransactionRef ptx, const bool fRespend, const CTxProperties *txProperties)
 {
     if (ptx->GetTxSize() > maxTxSize.Value())
     {
@@ -2837,6 +3047,7 @@ uint64_t CNode::GetTotalBytesRecv() { return nTotalBytesRecv; }
 uint64_t CNode::GetTotalBytesSent() { return nTotalBytesSent; }
 void CNode::Fuzz(int nChance)
 {
+    AssertLockHeld(cs_vSend);
     if (!successfullyConnected())
         return; // Don't fuzz initial handshake
     if (GetRand(nChance) != 0)
@@ -2987,16 +3198,14 @@ bool CAddrDB::Read(CAddrMan &addr, CDataStream &ssPeers)
 unsigned int ReceiveFloodSize() { return 1000 * GetArg("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER); }
 unsigned int SendBufferSize() { return 1000 * GetArg("-maxsendbuffer", DEFAULT_MAXSENDBUFFER); }
 CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn, bool fInboundIn)
-    : ssSend(SER_NETWORK, INIT_PROTO_VERSION), skipChecksum(false), id(connmgr->NextNodeId()), addrKnown(5000, 0.001)
+    : xVersionEnabled(false), skipChecksum(false), ssSend(SER_NETWORK, INIT_PROTO_VERSION), id(connmgr->NextNodeId()),
+      addrKnown(5000, 0.001)
 {
     nServices = 0;
     hSocket = hSocketIn;
     nRecvVersion = INIT_PROTO_VERSION;
-    nLastSend = 0;
-    nLastRecv = 0;
     nSendBytes = 0;
     nRecvBytes = 0;
-    nActivityBytes = 0; // BU connection slot exhaustion mitigation
     nTimeConnected = GetTime();
     nStopwatchConnected = GetStopwatchMicros();
     nTimeOffset = 0;
@@ -3037,6 +3246,8 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     fPingQueued = false;
     nMinPingUsecTime = std::numeric_limits<int64_t>::max();
 
+    msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
+
     // xthinblocks
     nXthinBloomfilterSize = 0;
     addrFromPort = 0;
@@ -3052,10 +3263,6 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     // performance tracking
     nAvgBlkResponseTime = -1.0;
     nMaxBlocksInTransit = 16;
-
-    // for misbehavior
-    nMisbehavior = 0;
-    fShouldBan = false;
 
     // For statistics only, BU doesn't support CB protocol
     fSupportsCompactBlocks = false;
@@ -3195,31 +3402,38 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
         strcmp(strCommand, NetMsgType::ADDR) != 0 && strcmp(strCommand, NetMsgType::VERSION) != 0 &&
         strcmp(strCommand, NetMsgType::VERACK) != 0 && strcmp(strCommand, NetMsgType::INV) != 0)
     {
-        nActivityBytes += nSize;
+        nActivityBytes.fetch_add(nSize);
+    }
 
-        // If the message is a priority message then move to the front of the deque
-        if (strcmp(strCommand, NetMsgType::GET_XTHIN) == 0 || strcmp(strCommand, NetMsgType::XTHINBLOCK) == 0 ||
-            strcmp(strCommand, NetMsgType::GET_THIN) == 0 || strcmp(strCommand, NetMsgType::THINBLOCK) == 0 ||
-            strcmp(strCommand, NetMsgType::XBLOCKTX) == 0 || strcmp(strCommand, NetMsgType::GET_XBLOCKTX) == 0 ||
-            strcmp(strCommand, NetMsgType::GET_GRAPHENE) == 0 || strcmp(strCommand, NetMsgType::GRAPHENEBLOCK) == 0 ||
-            strcmp(strCommand, NetMsgType::GRAPHENETX) == 0 || strcmp(strCommand, NetMsgType::GET_GRAPHENETX) == 0)
-        {
-            it = vSendMsg.insert(vSendMsg.begin(), CSerializeData());
-            LOG(THIN, "Send Queue: pushed %s to the front of the queue\n", strCommand);
-        }
-        else
-            it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
+    // If the message is a priority message then move it to priority queue.
+    if (IsPriorityMsg(strCommand))
+    {
+        it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
+        ssSend.GetAndClear(*it);
+        nSendSize.fetch_add((*it).size());
+        LOG(THIN | GRAPHENE | CMPCT, "Send Queue: pushed %s to the priority queue, peer(%d)\n", strCommand,
+            this->GetId());
+
+        LOCK(cs_prioritySendQ);
+        vPrioritySendQ.push_back(CNodeRef(this));
+        fPrioritySendMsg = true;
     }
     else
-        it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
-    // BU: end
+    {
+        it = vLowPrioritySendMsg.insert(vLowPrioritySendMsg.end(), CSerializeData());
+        ssSend.GetAndClear(*it);
+        nSendSize.fetch_add((*it).size());
+    }
 
-    ssSend.GetAndClear(*it);
-    nSendSize.fetch_add((*it).size());
-
-    // If write queue empty, attempt "optimistic write"
-    if (it == vSendMsg.begin())
+    // if only 1 message is in queue then attempt and "optimistic" send
+    if (vSendMsg.size() == 1)
+    {
         SocketSendData(this);
+    }
+    else if (vSendMsg.empty() && (vLowPrioritySendMsg.size() == 1))
+    {
+        SocketSendData(this);
+    }
 
     LEAVE_CRITICAL_SECTION(cs_vSend);
 }
@@ -3244,18 +3458,21 @@ void CNode::DisconnectIfBanned()
         else if (addr.IsLocal())
         {
             nMisbehavior.store(0);
+            nBanType.store(-1);
             LOGA("Warning: not banning local peer %s!\n", GetLogName());
         }
         else
         {
             fDisconnect = true;
-            dosMan.Ban(addr, BanReasonNodeMisbehaving);
+            dosMan.Ban(addr, cleanSubVer, (BanReason)nBanType.load());
         }
     }
 }
 
 void CNode::ReadConfigFromXVersion()
 {
+    xVersionEnabled = true;
+    LOCK(cs_xversion);
     skipChecksum = (xVersion.as_u64c(XVer::BU_MSG_IGNORE_CHECKSUM) == 1);
     if (addrFromPort == 0)
     {

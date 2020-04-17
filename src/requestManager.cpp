@@ -488,7 +488,7 @@ CNodeRequestData::CNodeRequestData(CNode *n)
     }
 
     // The bigger the latency (in microseconds), the less we want to request from this node
-    int latency = node->txReqLatency.GetTotal().get_int();
+    int latency = node->txReqLatency.GetTotalTyped();
     // data has never been requested from this node.  Should we encourage investigation into whether this node is fast,
     // or stick with nodes that we do have data on?
     if (latency == 0)
@@ -538,6 +538,19 @@ void CRequestManager::RequestCorruptedBlock(const uint256 &blockHash)
     AskForDuringIBD(vGetBlocks, nullptr);
 }
 
+static bool IsGrapheneVersionSupported(CNode *pfrom)
+{
+    try
+    {
+        NegotiateGrapheneVersion(pfrom);
+        return true;
+    }
+    catch (const std::runtime_error &error)
+    {
+        return false;
+    }
+}
+
 bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
 {
     CInv inv2(obj);
@@ -548,9 +561,8 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
     {
         // Ask for Graphene blocks
         // Must download a graphene block from a graphene enabled peer.
-        if (IsGrapheneBlockEnabled() && pfrom->GrapheneCapable())
+        if (IsGrapheneBlockEnabled() && pfrom->GrapheneCapable() && IsGrapheneVersionSupported(pfrom))
         {
-            // We can only request one thin type block per peer at a time.
             if (thinrelay.AddBlockInFlight(pfrom, inv2.hash, NetMsgType::GRAPHENEBLOCK))
             {
                 MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
@@ -575,7 +587,6 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         // Must download an xthinblock from a xthin peer.
         if (IsThinBlocksEnabled() && pfrom->ThinBlockCapable())
         {
-            // We can only request one thin type block per peer at a time.
             if (thinrelay.AddBlockInFlight(pfrom, inv2.hash, NetMsgType::XTHINBLOCK))
             {
                 MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
@@ -602,7 +613,6 @@ bool CRequestManager::RequestBlock(CNode *pfrom, CInv obj)
         // Must download an xthinblock from a xthin peer.
         if (IsCompactBlocksEnabled() && pfrom->CompactBlockCapable())
         {
-            // We can only request one thin type block per peer at a time.
             if (thinrelay.AddBlockInFlight(pfrom, inv2.hash, NetMsgType::CMPCTBLOCK))
             {
                 MarkBlockAsInFlight(pfrom->GetId(), obj.hash);
@@ -659,12 +669,15 @@ void CRequestManager::SendRequests()
     // those blocks and txns can take much longer to download.
     unsigned int _blkReqRetryInterval = MIN_BLK_REQUEST_RETRY_INTERVAL;
     unsigned int _txReqRetryInterval = MIN_TX_REQUEST_RETRY_INTERVAL;
-    if ((!IsChainNearlySyncd() && Params().NetworkIDString() != "regtest") || IsTrafficShapingEnabled())
+    if (IsTrafficShapingEnabled())
     {
         _blkReqRetryInterval *= 6;
-        // we want to optimise block DL during IBD (and give lots of time for shaped nodes) so push the TX retry up to 2
-        // minutes (default val of MIN_TX is 5 sec)
         _txReqRetryInterval *= (12 * 2);
+    }
+    else if ((!IsChainNearlySyncd() && Params().NetworkIDString() != "regtest"))
+    {
+        _blkReqRetryInterval *= 2;
+        _txReqRetryInterval *= 8;
     }
 
     // When we are still doing an initial sync we want to batch request the blocks instead of just
@@ -1084,10 +1097,35 @@ void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
         }
         if (!vGetBlocks.empty())
         {
+            std::vector<CInv> vToFetchNew;
+            {
+                LOCK(cs_objDownloader);
+                for (CInv &inv : vGetBlocks)
+                {
+                    // If this block is already in flight then don't ask for it again during the IBD process.
+                    //
+                    // If it's an additional source for a new peer then it would have been added already in
+                    // FindNextBlocksToDownload().
+                    std::map<uint256, std::map<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
+                        mapBlocksInFlight.find(inv.hash);
+                    if (itInFlight != mapBlocksInFlight.end())
+                    {
+                        continue;
+                    }
+
+                    vToFetchNew.push_back(inv);
+                }
+            }
+            vGetBlocks.swap(vToFetchNew);
+
             if (!IsInitialBlockDownload())
+            {
                 AskFor(vGetBlocks, pto);
+            }
             else
+            {
                 AskForDuringIBD(vGetBlocks, pto);
+            }
         }
     }
 }
@@ -1161,8 +1199,17 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
             uint256 blockHash = pindex->GetBlockHash();
             if (AlreadyAskedForBlock(blockHash))
             {
-                AskFor(CInv(MSG_BLOCK, blockHash), node); // Add another source
-                continue;
+                // Only add a new source if there is a block in flight from a different peer. This prevents
+                // us from re-adding a source for the same peer and possibly downloading two duplicate blocks.
+                // This edge condition can typically happen when we were only connected to only one peer and we
+                // exceed the download timeout causing us to re-request the same block from the same peer.
+                std::map<uint256, std::map<NodeId, std::list<QueuedBlock>::iterator> >::iterator itInFlight =
+                    mapBlocksInFlight.find(blockHash);
+                if (itInFlight != mapBlocksInFlight.end() && !itInFlight->second.count(nodeid))
+                {
+                    AskFor(CInv(MSG_BLOCK, blockHash), node); // Add another source
+                    continue;
+                }
             }
 
             if (!pindex->IsValid(BLOCK_VALID_TREE))
@@ -1204,17 +1251,19 @@ void CRequestManager::RequestMempoolSync(CNode *pto)
         pto->canSyncMempoolWithPeers)
     {
         // Similar to Graphene, receiver must send CMempoolInfo
-        CInv inv;
-        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-
-        inv.type = MSG_MEMPOOLSYNC;
         CMempoolSyncInfo receiverMemPoolInfo = GetMempoolSyncInfo();
-        ss << inv;
-        ss << receiverMemPoolInfo;
-
         mempoolSyncRequested[nodeId] = CMempoolSyncState(
             GetStopwatchMicros(), receiverMemPoolInfo.shorttxidk0, receiverMemPoolInfo.shorttxidk1, false);
-        pto->PushMessage(NetMsgType::GET_MEMPOOLSYNC, ss);
+        if (NegotiateMempoolSyncVersion(pto) > 0)
+            pto->PushMessage(NetMsgType::GET_MEMPOOLSYNC, receiverMemPoolInfo);
+        else
+        {
+            CInv inv;
+            CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+            ss << inv;
+            ss << receiverMemPoolInfo;
+            pto->PushMessage(NetMsgType::GET_MEMPOOLSYNC, ss);
+        }
         LOG(MPOOLSYNC, "Requesting mempool synchronization from peer %s\n", pto->GetLogName());
 
         lastMempoolSync = GetStopwatchMicros();
@@ -1329,7 +1378,10 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                 // disconnecting.
                 //
                 // We disconnect a peer only if their average response time is more than 4 times the overall average.
-                if (nOutbound >= nMaxOutConnections - 1 && IsInitialBlockDownload() && nIterations > nOverallRange &&
+                static int nStartDisconnections GUARDED_BY(cs_overallaverage) = BEGIN_PRUNING_PEERS;
+                if (!pnode->fDisconnectRequest &&
+                    (nOutbound >= nMaxOutConnections - 1 || nOutbound >= nStartDisconnections) &&
+                    IsInitialBlockDownload() && nIterations > nOverallRange &&
                     pnode->nAvgBlkResponseTime > nOverallAverageResponseTime * 4)
                 {
                     LOG(IBD, "disconnecting %s because too slow , overall avg %d peer avg %d\n", pnode->GetLogName(),
@@ -1337,6 +1389,14 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                     pnode->InitiateGracefulDisconnect();
                     // We must not return here but continue in order
                     // to update the vBlocksInFlight stats.
+
+                    // Increment so we start disconnecting at a higher number of peers each time. This
+                    // helps to improve the very beginning of IBD such that we don't have to wait for all outbound
+                    // connections to be established before we start pruning the slow peers and yet we don't end
+                    // up suddenly overpruning.
+                    nStartDisconnections = nOutbound;
+                    if (nStartDisconnections < nMaxOutConnections)
+                        nStartDisconnections++;
                 }
             }
 
@@ -1388,17 +1448,17 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         if (IsChainNearlySyncd())
         {
             // Update Thinblock stats
-            if (thinrelay.IsBlockInFlight(pnode, NetMsgType::XTHINBLOCK))
+            if (thinrelay.IsBlockInFlight(pnode, NetMsgType::XTHINBLOCK, hash))
             {
                 thindata.UpdateResponseTime(nResponseTime);
             }
             // Update Graphene stats
-            if (thinrelay.IsBlockInFlight(pnode, NetMsgType::GRAPHENEBLOCK))
+            if (thinrelay.IsBlockInFlight(pnode, NetMsgType::GRAPHENEBLOCK, hash))
             {
                 graphenedata.UpdateResponseTime(nResponseTime);
             }
             // Update CompactBlock stats
-            if (thinrelay.IsBlockInFlight(pnode, NetMsgType::CMPCTBLOCK))
+            if (thinrelay.IsBlockInFlight(pnode, NetMsgType::CMPCTBLOCK, hash))
             {
                 compactdata.UpdateResponseTime(nResponseTime);
             }

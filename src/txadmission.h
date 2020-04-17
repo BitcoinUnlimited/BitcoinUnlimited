@@ -23,9 +23,11 @@ static const unsigned int MAX_BLOCK_SIZE_MULTIPLIER = 3;
 /** The maximum number of free transactions (in KB) that can enter the mempool per minute.
  *  For a 1MB block we allow 15KB of free transactions per 1 minute.
  */
-static const uint32_t DEFAULT_LIMITFREERELAY = DEFAULT_BLOCK_MAX_SIZE * 0.000015;
+// static const uint32_t DEFAULT_LIMITFREERELAY = DEFAULT_BLOCK_MAX_SIZE * 0.000015;
+static const uint32_t DEFAULT_LIMITFREERELAY = 0;
 /** The minimum value possible for -limitfreerelay when rate limiting */
-static const unsigned int DEFAULT_MIN_LIMITFREERELAY = 1;
+// static const unsigned int DEFAULT_MIN_LIMITFREERELAY = 1;
+static const unsigned int DEFAULT_MIN_LIMITFREERELAY = 0;
 
 /** Subject free transactions to priority checking when entering the mempool */
 static const bool DEFAULT_RELAYPRIORITY = false;
@@ -55,7 +57,7 @@ static const bool DEFAULT_RELAYPRIORITY = false;
 class Snapshot
 {
 public:
-    CCriticalSection cs_snapshot;
+    CSharedCriticalSection cs_snapshot;
     uint64_t tipHeight;
     uint64_t tipMedianTimePast;
     int64_t adjustedTime;
@@ -122,6 +124,9 @@ enum
 // maximum transaction mempool admission threads
 extern CTweak<unsigned int> numTxAdmissionThreads;
 
+// restrict transaction inputs to 1 for long unconfirmed chains
+extern CTweak<bool> restrictInputs;
+
 extern CRollingFastFilter<4 * 1024 * 1024> recentRejects;
 extern CRollingFastFilter<4 * 1024 * 1024> txRecentlyInBlock;
 
@@ -148,8 +153,6 @@ extern std::queue<CTxInputData> txWaitNextBlockQ;
 extern CWaitableCriticalSection csCommitQ;
 extern CConditionVariable cvCommitQ;
 extern std::map<uint256, CTxCommitData> *txCommitQ;
-extern CCriticalSection csCommitQFinal;
-extern std::map<uint256, CTxCommitData> *txCommitQFinal;
 
 // returns a transaction ref, if it exists in the commitQ
 CTransactionRef CommitQGet(uint256 hash);
@@ -206,7 +209,7 @@ void CommitTxToMempool();
  *
  * See consensus/consensus.h for flag definitions.
  */
-bool CheckFinalTx(const CTransactionRef &tx, int flags = -1, const Snapshot *ss = nullptr);
+bool CheckFinalTx(const CTransactionRef tx, int flags = -1, const Snapshot *ss = nullptr);
 
 /*
  * Check if transaction will be BIP 68 final in the next block to be created.
@@ -219,7 +222,7 @@ bool CheckFinalTx(const CTransactionRef &tx, int flags = -1, const Snapshot *ss 
  *
  * See consensus/consensus.h for flag definitions.
  */
-bool CheckSequenceLocks(const CTransactionRef &tx,
+bool CheckSequenceLocks(const CTransactionRef tx,
     int flags,
     LockPoints *lp = nullptr,
     bool useExistingLockPoints = false,

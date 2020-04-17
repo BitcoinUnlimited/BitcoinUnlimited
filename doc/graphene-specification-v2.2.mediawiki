@@ -1,0 +1,391 @@
+
+-------
+
+Draft version 2.2
+
+'''Comments welcome.'''
+-------
+
+<pre>
+  BUIP093: Graphene Relay
+  Proposers: George Bissias <gbiss@cs.umass.edu>, Brian Levine <levine@cs.umass.edu>
+  Created: 2019-12-20
+  Status: Accepted, implemented
+</pre>
+
+==Abstract==
+
+
+Graphene is a protocol for efficiently relaying blocks across the peer-to-peer network.
+
+==Motivation==
+
+Relaying blocks across the peer-to-peer (P2P) network using the least amount of bandwidth and latency has a number of advantages for the operation of any cryptocurrency. Blocks that can be relayed using less bandwidth propagate more quickly, which can increase synchronization among peers and  reduce forks in the chain. Using less bandwidth to relay a block also allows greater participation by peers who are behind limited-bandwidth links and routes.  Finally, an efficient mechanism for relaying blocks can allow maximum block size to increase, sustaining a larger number of transactions per second overall.  
+
+This specification is a stand-alone description of Graphene, but is based heavily on previous work by Ozisik, Andresen, Bissias, Houmansadr, Levine, Tapp, and Katkuri [[graphene-specification-v2.2.mediawiki#ref1|<nowiki>[1]</nowiki>]][[graphene-specification-v2.2.mediawiki#ref10|<nowiki>[10]</nowiki>]]. 
+
+====Intuition====
+
+The intuition behind Graphene's use of Bloom filters and IBLTs is as follows, presented as optional reading. 
+
+Let us consider several options for relaying a block containing ''n'' transactions. The first option is to simply list each 32-byte transaction ID.  If our block contains ''n=2000'' transactions, then the total cost is 64,000 bytes. Next, we realize that the chances of an accidental collision among 32-bytes IDs is almost nil, and so our second option is to limit each transaction ID to its first 8 bytes. If our block contains ''n=2000'' transactions, then the total cost is already down to 16,000 bytes. 
+
+Our third option is to use Bloom filters, which are an incredibly useful probabilistic data structure for determining whether ''items'' are members of a given ''set''. In this case, our set is all transactions in the sender's block (actually, the set of transaction IDs); and the items are the transactions IDs in the receiver's mempool (recall from above that the mempool is assumed to include transactions from the orphan pool as well). A Bloom filter has two special characteristics. First, it has no ''false negatives''. That is, if a Bloom filter tells us that a transaction ID ''is not'' in the set, then it ''definitely is not'' in the set.  Second, a Bloom filters does have ''false positives''. That is, if a Bloom filter tells us that a transaction ID ''is'' in the set, then it ''might not be'' in the set. We can set the Bloom filter's false positive rate (FPR) to whatever we like. There is an important trade-off though: if the FPR is low, and the Bloom filter is therefore accurate, then it will also be larger in terms of bytes. If we don't mind some wrong answers about what transaction IDs are in the block, then the Bloom filter will be smaller. 
+
+How much space is required to relay blocks using Bloom filters? For example, we could set the FPR of the Bloom Filter to ''f=1/m''. In that case, when the receiver checks each of the ''m'' transaction IDs in her mempoool, we can expect that the Bloom filter will wrongly state that ''f*m=(1/m)*m=1'' transaction is in the block on average. To make matters worse, we won't know which transaction is the wrong one; as a result of the extra transaction, the Merkle root won't validate. We can try to fix this problem by lowering the FPR of the filter. For example, if we set the FPR to ''f=1/(144m)'', then we can expect that the filter will permit a wrong answer only about once every 144 blocks relayed (i.e., only about once a day). But keep in mind, this accuracy will cost us in bytes. The size of a Bloom filter with ''n'' items inserted and a false positive rate of ''f=1/144m'' [https://en.wikipedia.org/wiki/Bloom_filter#Optimal_number_of_hash_functions is well known to be] 
+''-n*ln(f)/ln<sup>2</sup>(2) = n*ln(1/(144m))/(8ln<sup>2</sup>(2))'' bytes. For example, for a block with ''n=2000'' transactions and a mempool of ''m=6000'' transactions total, the Bloom filter will be about 7,113 bytes. That's an improvement over our first and second options, but we can do better. 
+
+A fourth option is presented by Invertible Bloom Lookup Tables (IBLTs) [[graphene-specification-v2.2.mediawiki#ref2|<nowiki>[2]</nowiki>]], another useful probabilistic data structure. They are designed to allow us to discover the [https://en.wikipedia.org/wiki/Symmetric_difference symmetric difference] between two sets of items. For example, we can create an IBLT of all transaction IDs that are in the sender's block, and then create another IBLT of the transactions in the receiver's mempool. A ''subtraction'' [[graphene-specification-v2.2.mediawiki#ref3|<nowiki>[3]</nowiki>]] of the first IBLT from the second will tell us exactly which transactions in the mempool are not in the block. Given this functionality, one can use IBLTs alone [[graphene-specification-v2.2.mediawiki#ref7|<nowiki>[7]</nowiki>]] to relay the block from sender to receiver, but unfortunately it is not an efficient approach. The size in bytes of an IBLT increases linearly with the size of the symmetric difference recovered from it. An IBLT uses about 17 bytes per transaction ID that is part of the symmetric difference, and the overhead of an IBLT (in bytes) is about 140% (this value can vary significantly for small symmetric differences, and can be set optimally using techniques described in the Recovery section below). So if the mempool is 2000 transactions larger than the block (i.e., the symmetric difference is 2000), then the sender's IBLT will be about ''(1.4*2000)*17=47,600'' bytes. Not our best option so far.
+
+Our fifth and best solution is a combination of both data structures. First, we pass all transactions in the receiver's mempool through a Bloom filter of the sender's block; however, we allow a good number of false positives, which results in a small Bloom filter. We clean up any mistakes made by the Bloom filter with an IBLT also sent by the sender. The symmetric difference is now quite small: it's equal to number of false positives that were produced by our Bloom filter. There is a trade-off: we can make the Bloom filter larger (more accurate), which results in a smaller IBLT; or we can make the IBLT larger (able to correct more mistakes), which results in a smaller Bloom filter. Graphene picks the parameters of both data structures together so that the summed size is optimally small (using techniques described in the Recovery section below). For example, for ''n=2000'' and ''m=6000'', a sender computes that an IBLT that can recover ''a=27'' items and a Bloom filter of ''n'' items with a FPR of ''f=0.00675'' is minimal. In our test implementation (again assuming the IBLT overhead of 140%) this results in a 3,244-byte total based on a 643-byte IBLT and a 2601-byte Bloom filter, which is about 1/5 the size of sending 8-bytes per transaction. If a canonical transaction order is not defined, an expression of the transaction ordering must also be sent, which increases the total by 2,750 bytes to 5,994 bytes (which is about 38% of the cost of sending 8-bytes per transaction). The IBLT will fail to decode about once every 240 blocks.
+
+Graphene maintains this size advantage as block size grows. For example, for a block of ''n=10,000'' transactions, listing 8-bytes of each transaction ID would be 80,000 bytes. With a mempool of ''m=30,000'' transactions, Graphene's cost is 14,482 bytes (or 31,091 bytes when including ordering information).
+
+==Specification for Version 2.2==
+
+The second version of Graphene is implemented in two phases: 2.1 and 2.2. Graphene 2.2 uses the same messages as 1.0 and 2.1, but some of the data structures have changed. This section provides a comprehensive description of the data structures used in Graphene 2.2. The description corresponds to BU client Graphene version 6.
+
+===Intended Protocol Flow===
+
+
+In the Bitcoin Cash Network, blocks are relayed from a peer possessing the block (the sender) to a peer requesting it (the receiver). The core idea behind Graphene is for the sender to avoid sending information that is already held by the receiver. Blocks are comprised of a header that is previously unknown to the receiver, and a collection of transactions that are likely to be already within the receiver's mempool. Therefore, to save bandwidth, Graphene attempts to avoid resending the actual transactions and transaction IDs. Instead, Graphene makes use of two ''set reconciliation'' data structures for expressing the list of transactions: [https://en.wikipedia.org/wiki/Bloom_filter Bloom filters] [[graphene-specification-v2.2.mediawiki#ref4|<nowiki>[4]</nowiki>]] and Invertible Bloom Lookup Tables (IBLTs) [[graphene-specification-v2.2.mediawiki#ref2|<nowiki>[2</nowiki>]][[graphene-specification-v2.2.mediawiki#ref3|<nowiki>,3]</nowiki>]]. The combination of the two data structures is more efficient than using either alone to express the transaction list, and it is typically more efficient than constructing a list from shortened transaction IDs.
+
+====Protocol 1====
+
+<A id='fig1'>
+{| class="wikitable" style="float:left"
+|[[File:media/graphene_protocol1.png]] 
+|  A diagram of Graphene's messaging between the sender and receiver during Protocol 1.
+|}</a>
+
+An overview of Graphene is presented in [[graphene-specification-v2.2.mediawiki#fig1|Figure 1]], which depicts the following steps between two peers that have confirmed that they are running the same version of the protocol. 
+
+# A sender informs the receiver that a new block containing ''n'' transactions is available using an '''inv''' message. 
+# If the block is not already known to the receiver, she responds with a '''get_grblk''' message that includes a count of transactions in her mempool, ''m''. (Note: the count should also include the number of transactions in the receiver's orphan pool, but for brevity we will henceforth assume that the mempool includes transactions in the orphan pool as well).
+# The sender creates a Bloom filter ''S'', having false positive rate ''fS'' (to be specified later), which contains all transaction IDs in the block along with an IBLT ''I'', of size ''a'' (where ''a'' minimizes the combined size of ''S'' and ''I'', defined below), containing just the "cheap hash" (first 8 bytes of the hash interpreted as an unsigned little endian 64 bit integer) of each transaction ID. Additionally, any full transactions likely missing from the receiver (such as the coinbase for the block) are collected into additional transactions list ''V''. If there does not exist a protocol-defined canonical transaction ordering, then the sender also creates a list of transaction ranks ''K'', listed lexicographically by ID, which indicates (with ''log(n)'' bits for each ID) the intended order for each transaction ID. The sender assembles ''S'', ''I'', ''V'', ''K'', and the block header into a '''grblk''' message, which he sends to the receiver.   
+# The receiver begins by aggregating all locally known transaction IDs into set ''T'', which is comprised of those found in ''V'' (see above) as well as her mempool (plus orphan pool). She then uses Bloom filter ''S'' to filter transaction IDs from ''T'', the result is '''candidate set''' ''Z''. All transactions in ''Z'' are added to her own IBLT, '' I' ''. She then performs an IBLT ''subtraction operation'' [[graphene-specification-v2.2.mediawiki#ref3|<nowiki>[3]</nowiki>]] on  ''I'' and  '' I' '' to decode the set of transaction IDs in the symmetric difference between the two sets. From this subtraction operation, she may learn either the set of false positive IDs ''Y'' in ''Z'', the set of true positive IDs ''X'' in ''Z'', and the set of IDs ''M'' that are in the block but missing from ''T''.  The subtraction operation either succeeds or fails; recovery is possible depending on the type of failure. 
+## Success: The IBLT subtraction succeeds and the set ''M'' is empty. All transactions in the block are possessed by the receiver.
+## Success: The IBLT subtraction succeeds and the set ''M'' is non-empty. Missing transactions must be requested. Here the receiver requests the missing transactions using a '''get_grblktx''' message, to which the receiver responds with a '''grblktx''' message containing the full transactions indicated by ''M''. 
+## IBLT Decode failure:  The IBLT subtraction operation fails entirely. In this case the receiver cannot be certain of the complete set of transaction IDs in the block. This failure occurs when the receiver does not possess many transactions in the block, but can also happen infrequently (e.g., 1/240 blocks) due to the probabilistic nature of IBLTs. In response, the receiver jumps to Protocol 2 to initiate failure recovery. 
+## IBLT Checksum failure, detected when the sender returns too few transactions with the '''grblktx''' message: IBLT subtraction succeeds, but returns an erroneous transaction ID due to faulty IBLT checksum. In this scenario, the receiver will issue a '''get_grblktx''' message for the erroneous transaction ID, for which the sender will not return a transaction. When the receiver detects that not all transactions have been sent, she will assume a checksum error has occurred and request a fail-over block (e.g., a full or XThin block). Although not precisely quantified, the probability of checksum failure is [https://github.com/bissias/graphene-experiments/blob/master/jupyter/min_checksum_IBLT.ipynb thought to be] quite low.
+# If IBLT subtraction succeeds (and missing transactions are received), and if no checksum error occurs, then the receiver will be left with an unordered set of transactions that are in the block. (Note that at this stage the receiver is certain to have the actual transactions, not just their IDs). 
+# The receiver places the transactions in a Merkle tree, which is validated against the root stated in the block header. The order of transactions in the Merkle tree is either determined by the network's protocol-defined canonical ordering or by the specific rank information ''K'' included in '''grblk'''. 
+
+==== Protocol 2 (failure recovery) ====
+
+<A id='fig1'>
+{| class="wikitable" style="float:left"
+|[[File:media/graphene_protocol2.png]] 
+|  Protocol 2 messaging between the sender and receiver. 
+|}</a>
+
+We begin with the following additional definitions. Let ''z = |Z|'', ''x = |X|'', and ''y = |Y|'' be sizes of the candidate, false positive and true positives sets, respectively. A property ''A'' is said to be held in data structure ''D'' with ''β''-assurance whenever it is possible to tune ''D'' so that ''A'' occurs in ''D'' with probability at least ''β''. The protocol unfolds as follows.
+
+# Because the values of ''x'' and ''y'' are obfuscated within the sum, the receiver calculates ''x*'' such that ''x* ≤ x'' with ''β''-assurance. She also calculates ''y*'' such that ''y* ≥ y'' with ''β''-assurance. We discuss the derivation of ''x*'' and ''y*'' in the Appendix.
+# The receiver creates Bloom filter ''R'' and adds all transaction IDs in ''Z'' to ''R''. The FPR of the filter is ''fR = b/(n−x*)'', where ''b'' minimizes the size of ''R'' and IBLT ''J'' (defined below). She sends ''R'', ''z'' to the sender using message '''get_grrec'''.
+# The sender passes all transaction IDs in the block through ''R''. Using message '''grrec''', he sends all transactions that are not in ''R'' directly to the receiver. In the same message, he also creates and sends an IBLT ''J'' of all transactions in the block such that ''b + y*'' items can be recovered from it. This size accounts for ''b'', the number of transactions that falsely appear to be in ''R'', and ''y*'', the number of transactions that falsely appear to be in ''S''.
+# Upon receiving this message, the receiver creates IBLT '' J' '' from the transaction IDs in ''Z'' and the new transaction IDs sent by the sender in the previous step. She decodes the subtraction of the two IBLTs ''J'' and '' J' ''. From the result, she adjusts set ''Z'', validates the Merkle root, and decodes the block.
+# If she finds that she is missing any transaction IDs, she follows the procedure in step 4 of Protocol 1 to request them from the sender.
+# If the second IBLT difference (''J - J' '') fails to decode, then the receiver requests a fail-over block such as XThin or a full block.
+
+==Protocol Versioning==
+The Bitcoin P2P protocol has a message versioning facility and Graphene version should be included in that facility.
+
+===Data structures===
+The following data structures appear in the network protocol of Graphene 2.2: '''CMemPoolInfo''', '''CGrapheneBlock''', '''CIblt''', '''HashTableEntry''', '''CGrapheneBlockTx''', '''CRequestGrapheneBlockTx''', '''CGrapheneReceiverRecover''', '''CRequestGrapheneReceiverRecover''', '''CVariableFastFilter''', and '''CBloomFilter'''.
+
+All data structures use the standard Bitcoin serialization format: they use little-endian order for integers; vector encoding is Bitcoin standard (compact int length, vector values); and other specific use of the Bitcoin standard "compact int" encoding is noted in the tables below. For brevity, encoding that is identical to the same data structure in existing messages is omitted from our descriptions. Except for '''CGrapheneBlock''', the data structures are comprised of relatively simple C++ constructs, which we detail below. '''CGrapheneBlock''' contains '''CGrapheneSet''', which itself contains Bloom filter and IBLT data structures, denoted '''CVariableFastFilter''' (or optionally '''CBloomFilter''' instead) and '''CIblt''', respectively.
+We defer description of these data structures to separate specification documents. 
+
+====CGrapheneBlock====
+''CGrapheneBlock'' is the fundamental data structure for Graphene block propagation. Assuming no unrecoverable failures arise, and combined with any missing transactions recovered from the sender, this data structure contains all information necessary to reconstruct the full block. It is sent as part of the '''grblk''' message.
+
+{|
+|'''Field Name'''||'''Type'''||'''Size'''||'''Purpose'''
+|-
+|sipHashNonce||uint64_t||8 bytes||Entropy for SipHash
+|-
+|shorttxidk0||uint64_t||8 bytes||Left half of SipHash key
+|-
+|shorttxidk1||uint64_t||8 bytes||Right half of SipHash key
+|-
+|header||Block header||80 bytes||The header of the block being provided, encoded as per the header portion of the BLOCK message (NOT including the nTx field of the HEADERS message)
+|-
+|vAdditionalTxs||<nowiki>vector<CTransaction></nowiki>||variable||Transactions that the receiver is probably missing. Standard transaction Bitcoin serialization is used.
+|-
+|nBlockTxs||uint64_t||8 bytes||Number of Transactions in the block
+|-
+|grapheneSet||CGrapheneSet||variable||Encapsulates Graphene set reconciliation logic
+|}
+
+The vAdditionalTxs field should include at least the coinbase transaction, since it is not possible for it to be in the receiver's mempool. The values ''shorttxidk0'' and ''shorttxidk1'' are derived from the first and last 64 bits in the following SHA256 hash ''h''. The sender generates the random 64 bit ''sipHashNonce'', whose bits are appended to the end of the block header bits. The SHA256 hash of the entire collection of bits is then hashed to form ''h''. 
+
+====CGrapheneSet====
+''CGrapheneSet'' contains all information critical to the Graphene set reconciliation process, absent any block-specific details. It is the only non-standard data structure in ''CGrapheneBlock''.
+
+{|
+|'''Field Name'''||'''Type'''||'''Size'''||'''Purpose'''
+|-
+|ordered||uint8_t||1 byte||1 if order is important in the set and 0 otherwise; other values are reserved for future use
+|-
+|nReceiverUniverseItems||uint64_t||8 bytes||The number of transactions in the receiver's mempool
+|-
+|shorttxidk0||uint64_t||8 bytes||Left half of SipHash key
+|-
+|shorttxidk1||uint64_t||8 bytes||Right half of SipHash key
+|-
+|ibltSalt||uint32_t||4 bytes||Entropy for IBLT hash functions
+|-
+|encodedRank||<nowiki>vector<unsigned char></nowiki>||ordered * ceil(n log(n))/8 bytes||Order information for items in set
+|-
+|setFilter||CBloomFilter||variable||Bloom filter containing items in set
+|-
+|pFastFilter||CVariableFastFilter||variable||Fast Bloom filter containing items in set
+|-
+|setIblt||CIblt||variable||IBLT containing items in set
+|}
+
+Note that only one of ''setFilter'' and ''pFastFilter'' is used, the former when ''computeOptimized'' is set to 0 and the latter otherwise. Whichever is not used is assumed not to have been allocated any memory. Accordingly, implementations of Graphene version 2.2 need only include an implementation of either ''setFilter'' or ''pFastFilter''.
+
+If the ''ordered'' field has value 1, then it is assumed that ordering information cannot be automatically inferred (e.g. there exists no canonical transaction ordering). In this case, the ''encodedRank'' field must encode the order of transactions. The order should be encoded by the sender as follows. First, vector ''L'' is formed by listing transactions in ascending lexicographical order according to their 32-byte ID. Second, each ID in ''L'' is visited in order (lowest index to highest) and its desired rank (distance from the first position in the list) is added to vector ''K''. Third, we populate boolean vector ''B'' by visiting each rank ''k'' in the order it appears in ''K'', interpreting ''k'' as a binary number with ceil(log(n)) bits, and adding each bit to ''B'' (lowest order bits first). Finally, the contents of field ''encodedRank'' are formed by interpreting consecutive groups of 8 bits from ''B'' as little-endian integers and packing them into a vector of ceil(n * ceil(log(n)) / 8) unsigned 8-bit integers (thus, the first bit from ''B'' will occupy the lowest order bit of the first integer added to ''encodedRank''). 
+
+====CBloomFilter====
+''CBloomFilter'' is Bitcoin's standard Bloom filter implementation with one adjustment, described below. It is used as part of the set reconciliation process in ''CGrapheneSet'' to filter out transactions from ''T'' that do not belong to the block.
+
+{|
+|'''Field Name'''||'''Type'''||'''Size'''||'''Purpose'''
+|-
+|vData||<nowiki>vector<unsigned char></nowiki>||variable||Bit array for filter
+|-
+|isFull||bool||1 byte||True if every bit in vData is set to 1
+|-
+|isEmpty||bool||1 byte||True if every bit in vData is set to 0
+|-
+|nHashFuncs||unsigned int||2, 4 bytes||Number of hash functions used in filter
+|-
+|nTweak||unsigned int||2, 4, bytes||Additive offset for hash function inputs
+|-
+|nFlags||unsigned char||1 byte||Defines behavior for transaction insertion
+|}
+
+The standard Bloom filter implementation does not always honor the false positive rate (FPR) requested during initialization. This behavior is problematic for Graphene because the FPR determines the number of erroneous transactions removed from IBLT ''I'', which affects the decode rate for ''I''. For this reason, it is required that ''nDesiredSize'' and ''nHashFuncs'' be defined slightly differently than in the standard ''CBloomFilter'' implementation, as follows.
+
+<code>
+nDesiredSize = (unsigned int)(ceil(-1 / LN2SQUARED * nElements * log(nFPRate) / 8));
+</code>
+<br />
+<code>
+nHashFuncs = (unsigned int)max(MIN_N_HASH_FUNC, int(vData.size() * 8 / nElements * LN2));
+</code>
+
+====CVariableFastFilter====
+''CVariableFastFilter'' is a new data structure that uses the entropy in a transaction's hash value to determine what bits to set in the Bloom filter. It is based on the existing implementation of [https://github.com/BitcoinUnlimited/BitcoinUnlimited/blob/release/src/fastfilter.h CFastFilter]. It is used as part of the set reconciliation process in ''CGrapheneSet'' to filter out transactions from ''T'' that do not belong to the block. Details can be found in the [https://github.com/BitcoinUnlimited/BitcoinUnlimited/tree/release/doc/variable-fast-filter.md release documentation].
+
+{|
+|'''Field Name'''||'''Type'''||'''Size'''||'''Purpose'''
+|-
+|vData||<nowiki>vector<unsigned char></nowiki>||variable||Bit array for filter
+|-
+|nHashFuncs||uint8_t||1 byte||Number of hash functions to be used for Bloom filter (must be between 1 and 32, inclusive)
+|-
+|nFilterBytes||uint32_t||4 bytes||Size of the Bloom filter data vector in bytes
+|-
+|nFilterBits||uint64_t||8 bytes||Size of the Bloom filter data vector in bits
+|}
+
+====CIblt====
+''CIblt'' is an IBLT implementation that is part of the ''CGrapheneSet'' reconciliation process. In the absence of a reconciliation failure, ''CIblt'' will generate false positive list ''F'' and missing transaction cheap hashes ''M''. Details can be found in the [https://github.com/BitcoinUnlimited/BitcoinUnlimited/tree/release/doc/iblt.md release documentation].
+
+{|
+|'''Field Name'''||'''Type'''||'''Size'''||'''Encoding Details'''||'''Purpose'''
+|-
+|version||uint64_t||8 bytes||Compact size||Version bits
+|-
+|mapHashIdxSeeds||<nowiki>map<uint8_t, uint32_t></nowiki>||variable||Standard||Mapping from hash function number (0 to ''n_hash - 1'') to random seed for that hash function
+|-
+|salt||uint32_t||4 bytes||Standard||Entropy for generating random seeds in ''mapHashIdxSeeds''
+|-
+|n_hash||uint8_t||1 byte||Standard||Number of hash functions used
+|-
+|is_modified||bool||1 byte||Standard||True if any items have been inserted into the IBLT
+|-
+|hashTable||<nowiki>vector<HashTableEntry></nowiki>||variable||Standard||Data cells for IBLT
+|}
+
+====HashTableEntry====
+''HashTableEntry'' implements a single cell of the ''CIblt'' data structure. Details can be found in the [https://github.com/BitcoinUnlimited/BitcoinUnlimited/tree/release/doc/iblt.md release documentation].
+
+{|
+|'''Field Name'''||'''Type'''||'''Size'''||'''Purpose'''
+|-
+|count||uint32_t||4 bytes||Number of items
+|-
+|keySum||uint64_t||8 bytes||XOR of all keys
+|-
+|keyCheck||uint32_t||4 bytes||Error checking for keySum
+|-
+|valueSum||vector<nowiki><uint8_t></nowiki>||variable||XOR of all values
+|}
+
+====CMemPoolInfo====
+''CMemPoolInfo'' provides a count of transactions in the receiver's mempool (plus orphan pool) and corresponds to the variable ''m'' in the description above. It is sent as part of the '''get_grblk''' message.
+
+{|
+|'''Field Name'''||'''Type'''||'''Size'''||'''Purpose'''
+|-
+|nTx||uint64_t||8 bytes||Number of transactions that appear in the union of the receiver's mempool and orphan pool
+|}
+ 
+====CRequestGrapheneBlockTx====
+''CRequestGrapheneBlockTx'' is used by the receiver to request missing transactions ''M'' according to their cheap hashes. It is sent as part of the '''get_grblktx''' message.
+
+{|
+|'''Field Name'''||'''Type'''||'''Size'''||'''Purpose'''
+|-
+|blockhash||uint256||32 bytes||The hash of the block corresponding to missing transactions
+|-
+|setCheapHashesToRequest||<nowiki>set<uint64_t></nowiki>||variable||Cheap hashes of missing transactions requested by receiver
+|}
+
+====CGrapheneBlockTx====
+''CGrapheneBlockTx'' is returned as part of the '''grblktx''' message. It contains full transactions corresponding to the cheap hashes included in ''CRequestGrapheneBlockTx'' and is returned by the sender in response to a '''get_grblktx''' message.
+
+{|
+|'''Field Name'''||'''Type'''||'''Size'''||'''Purpose'''
+|-
+|blockhash||uint256||32 bytes||The hash of the block corresponding to missing transactions
+|-
+|vMissingTx||<nowiki>vector<CTransaction></nowiki>||variable||Missing transactions requested by receiver
+|}
+
+====CRequestGrapheneReceiverRecover====
+''CRequestGrapheneReceiverRecover'' is sent by the receiver to request commencement of the Protocol 2 recovery procedure.
+
+{|
+|'''Field Name'''||'''Type'''||'''Size'''||'''Purpose'''
+|-
+|blockhash||uint256||32 bytes||The hash of the block being recovered
+|-
+|pReceiverFilter||CVariableFastFilter||variable||Bloom filter containing transaction IDs from candidate set ''Z''
+|-
+|nSenderFilterPositives||uint64_t||8 bytes||Size of candidate set ''Z''
+|}
+
+====CGrapheneReceiverRecover====
+''CGrapheneReceiverRecover'' is returned by the sender in response to the '''get_grrec''' message. It contains any transactions known to be missing by the receiver, as well as an updated IBLT ''J''.
+
+{|
+|'''Field Name'''||'''Type'''||'''Size'''||'''Purpose'''
+|-
+|blockhash||uint256||32 bytes||The hash of the block being recovered
+|-
+|pRevisedIblt||CIblt||variable||A resized IBLT ''J'' containing the cheap hashes of transactions in the block
+|-
+|vMissingTxs||<nowiki>vector<CTransaction></nowiki>||variable||Transactions known to be missing by receiver
+|}
+
+===Selecting parameters for the Bloom Filter and IBLT===
+Graphene is most efficient when the parameters of the Bloom Filter and IBLT are set optimally. Here we present two methods of setting these parameters. The approaches are applicable for both Protocols 1 and 2, however we present analysis in terms of Protocol 1. More details can be found in the latest Graphene paper [[graphene-specification-v2.2.mediawiki#ref10|<nowiki>[10]</nowiki>]]. In general, any method for parameterizing the Bloom Filter and IBLT can be used, but it is possible to discover the optimal choice resulting in the smallest possible serialized Graphene block. The first method is simpler to implement, but it is also less efficient and will result in a slightly lower decode rate than desired.
+
+1. Let ''m'' be the size of the receiver's mempool, and let ''n'' be the number of transactions in the block. Let ''t'' be the average size in bytes per item required to recover ''a'' items from the IBLT (i.e., total IBLT table size in bytes divided by ''a''). For example, in our implementation, t=17 bytes, approximately. Then the IBLT should be parameterized to recover ''a=n/(ct)'' items, where ''c=8ln<sup>2</sup>(2)''.  The Bloom filter should be set to have a false positive rate (FPR) of ''f=a/(m-n)''. The derivation of these values is presented in the Appendix of this specification. 
+
+2. The sizes of the Bloom filter and IBLT can be significantly smaller if a (brute force) linear search is used to parameterize the two data structures.  Simply put, for each integer value of ''a'' from 1 to m: (1)  determine  the  size of the IBLT from its actual implementation, taking into account serialization costs; (2) determine the size in bytes of the Bloom filter for a false positive rate of ''f=a/(m-n)'' when ''n'' items  are inserted from its implementation. The value of ''a'' that has the minimum sum cost in bytes is selected. 
+
+We also note that the IBLT decode rate varies with the number of recovered items ''a''. In order to ensure a consistent decode rate (1 out of 240 blocks, for example), it is necessary to modify the number of hash functions and overhead used when constructing the IBLT. This, in turn, changes the value of ''t'', which affects the accuracy of method 1 above. Determining the combination of hash function quantity and overhead that yields the smallest IBLT for a given decode rate is an orthogonal optimization problem. We have released a stand-alone implementation of [https://github.com/umass-forensics/IBLT-optimization IBLTs in C++] (with a Python wrapper) and a script to determine such values. 
+
+The optimization process is similar for Protocol 2, where we attempt to minimize the combined sizes of Bloom filter ''R'' and IBLT ''J''. For this optimization problem, we proceed as in Protocol 1, except that ''m'' is replaced by ''n'' and ''n'' is replaced by ''x*''. Derivation of ''x*'' is discussed in the Appendix.
+
+====Protocol design====
+A simple comparison of Graphene to related work is as follows. A block holds ''n=2000'' transactions, which the receiver holds in its mempool along with 4000 other transactions; in other words ''m=2000+4000=6000''.
+
+Using Graphene, the sender sends a block announcement, and the receiver responds with a '''get_grblk''' message, which includes the value ''m''. The sender computes that an IBLT that can recover ''a=27'' items and a Bloom filter of ''n'' items with a FPR of ''f=a/(m-n)=27/(6000-2000)=0.00675'' is minimal. In our test implementation, this results in 3,244 bytes total, the sum of a 643-byte IBLT and a 2,601-byte Bloom filter. Without a canonical transaction order, an expression of the transaction ordering must also be sent, increasing the total by 2,750 bytes to 5,994 bytes. (The receiver's IBLT is not sent over the network.)  
+
+XTreme Thin Blocks [[graphene-specification-v2.2.mediawiki#ref5|<nowiki>[5</nowiki>]][[graphene-specification-v2.2.mediawiki#ref8|<nowiki>, 8</nowiki>]][[graphene-specification-v2.2.mediawiki#ref9|<nowiki>, 9]</nowiki>]] has the receiver start by sending a 3,956-byte Bloom Filter of the mempool with an FPR of ''f=1/m=1/2000=0.0005'', and 8-bytes for each of the ''n=2000'' transactions. The total is therefore 3956+8*2000= 19,956.
+
+Compact Blocks [[graphene-specification-v2.2.mediawiki#ref6|<nowiki>[6]</nowiki>]] would send over just the 6 bytes for each of the ''n=2000'' transactions, for a total of 6*2000= 12,000.
+
+The above is a simplistic comparison, as the actual operation of all three protocols is more involved. For example, XTreme Thin Blocks v12.1 and above performs "Bloom Filter Targeting", which significantly reduces the size of the Bloom filter it uses.
+
+The size of all these approaches grows linearly with block size, but Graphene grows more slowly. As the example shows, Graphene would benefit significantly from a standardized, canonical ordering of transactions in blocks, which has been proposed by others for separate benefits.
+
+==Improper and Unsolicited Messages==
+In order to ensure protocol compatibility among different implementations, we clarify proper peer behavior in the following two potentially ambiguous scenarios.
+
+1. A receiver peer should ban any other peer that sends any improperly formatted Graphene message. 
+
+2. A receiver peer is never banned by a potential sender for requesting a Graphene block, even if the receiver was never initially sent an ''inv'' message for the requested block by the potential sender. 
+
+==Backward compatibility==
+Older clients remain fully compatible and interoperable after this change.
+
+==Implementation==
+
+https://github.com/BitcoinUnlimited/BitcoinUnlimited/tree/release
+
+==References==
+<a id='ref1'><nowiki>[1]</nowiki> OZISIK, A. P., ANDRESEN, G., BISSIAS G., HOUMANSADR, A. , and LEVINE, B. N. [https://link.springer.com/chapter/10.1007%2F978-3-319-67816-0_24 Graphene: A New Protocol for Block Propagation Using Set Reconciliation]. In Proc. of International Workshop on Cryptocurrencies and Blockchain Technology (ESORICS Workshop), (Sept 2017). [http://cryptoeconomics.cs.umass.edu/graphene/graphene-short.pdf (2 page pdf summary)]</a>
+
+<a id='ref2'><nowiki>[2]</nowiki> GOODRICH, M., and MITZENMACHER, M. [https://ieeexplore.ieee.org/document/6120248/ Invertible bloom lookup tables]. In Proc. Annual Allerton Conf. on Communications, Control, and Computing (Sept 2011), pp. 792–799. [https://arxiv.org/abs/1101.2245 (pdf)] </a>
+
+<a id='ref3'><nowiki>[3]</nowiki> EPPSTEIN, D., GOODRICH, M. T., UYEDA, F., and VARGHESE, G. [https://dl.acm.org/citation.cfm?id=2018462 What’s the Difference?: Efficient Set Reconciliation Without Prior Context]. In Proc. ACM SIGCOMM (2011). [https://www.ics.uci.edu/~eppstein/pubs/EppGooUye-SIGCOMM-11.pdf (pdf)]</a>
+
+<a id='ref4'><nowiki>[4]</nowiki> BLOOM, B. H. [https://dl.acm.org/citation.cfm?id=362692 Space/Time Trade-offs in Hash Coding with Allowable Errors]. Communications of the ACM 13, 7 (July 1970), 422–426. [https://en.wikipedia.org/wiki/Bloom_filter (wikipedia)]</a>
+
+<a id='ref5'><nowiki>[5]</nowiki> TSCHIPPER, P. [https://bitco.in/forum/threads/buip010-passed-xtreme-thinblocks.774/ BUIP 010 Xtreme Thinblocks]. Jan 2016.</a> 
+
+<a id='ref6'><nowiki>[6]</nowiki> CORALLO, M. [https://github.com/bitcoin/bips/blob/master/bip-0152.mediawiki BIP 152: Compact block relay]. April 2016.</a>
+
+<a id='ref7'><nowiki>[7]</nowiki> ANDRESEN, G. [https://gist.github.com/gavinandresen/e20c3b5a1d4b97f79ac2/ O(1) Block Propagation.] August 2014. </a>
+
+<a id='ref8'><nowiki>[8]</nowiki>  CLIFFORD, A.,  RIZUN, P.R., SUISANI, A., STONE, A., and TSCHIPPER, P.
+[https://medium.com/@peter_r/towards-massive-on-chain-scaling-presenting-our-block-propagation-results-with-xthin-da54e55dc0e4 Towards Massive On-Chain Scaling: Presenting Our Block Propagation Results With Xthin]. May 2016.</a>
+
+<a id='ref9'><nowiki>[9]</nowiki> TSCHIPPER, P. [https://github.com/BitcoinUnlimited/BitcoinUnlimited/blob/release/doc/bu-xthin-protocol.md Detailed Protocol Design for Xtreme Thin blocks] Apr 2017.</a>.
+
+<a id='ref10'><nowiki>[10]</nowiki> OZISIK, A. P., LEVINE, B. N., G., BISSIAS, ANDRESEN, G., Tapp, D., and Katkuri, S. [https://dl.acm.org/citation.cfm?id=3342082 Graphene: Efficient Interactive Set Reconciliation Applied to Blockchain Propagation]. In Proc. of the ACM Special Interest Group on Data Communication (SIGCOMM), (August 2019). [https://people.cs.umass.edu/~gbiss/graphene.sigcomm.pdf (full paper)]</a>
+
+==Appendix==
+
+===Minimizing IBLT and Bloom Filter size===
+
+The values for the simple (but less efficient) method of minimizing Graphene's Bloom filter and IBLT are derived as follows. The derivation relates to ''a'' and is expressed in terms of variables in protocol 1, but can be easily adjusted to derive ''b'' using variables from Protocol 2. Throughout, we assume that there are ''n'' transactions in the block, ''m'' in the receiver mempool, and ''x'' in the intersection between block and receiver mempool (note that the current Bitcoin Unlimited implementation assumes x = n-1). We derive the size of both Bloom filter and IBLT in terms of ''a'', the number of transactions that must be recovered from the IBLT.
+
+First, the [https://en.wikipedia.org/wiki/Bloom_filter#Optimal_number_of_hash_functions size of a Bloom filter] in bytes, ''T<sub>BF</sub>(a)'' is given by 
+
+''T<sub>BF</sub>(a) = -n ln(f(a)) / (8 ln<sup>2</sup>(2))'' bytes,
+
+where ''f(a)'' is the Bloom filter false positive rate defined as
+
+''f(a) = a / (m - x)''.
+
+Next, let ''T<sub>I</sub>(a)'' be the size of the IBLT. As specified above, there are 17 bytes per cell and in order to ensure a high decode rate, each item recovered from the IBLT requires approximately 1.4 cells. Thus, the typical size of an IBLT that is tuned to recover ''a'' transactions is
+
+''T<sub>I</sub>(a) = 1.4 * 17 * a'' bytes.
+
+It follows then that the aggregate size of the Bloom filter and IBLT is 
+
+''T(a) = T<sub>BF</sub>(a) + T<sub>I</sub>(a) = -n ln(a/(m-x))/(8ln<sup>2</sup>(2)) + 1.4 * 17 * a''. 
+
+Taking the derivative of this equation with respect to ''a'', setting it equal to 0, and solving it for ''a'', we see that ''T(a)'' is minimized when 
+
+''a = n / (1.4 * 8 * 17 * ln<sup>2</sup>(2))''.
+
+====When to use the analytical optimum====
+
+We have developed a [https://github.com/bissias/graphene-experiments/blob/master/jupyter/graphene_size_optimization.ipynb heuristic] for determining when to optimize IBLT and Bloom filter sizes analytically (using the technique described above) and when to perform exhaustive search. For a block containing ''n'' transactions, we find that when ''n > 500'' and the receiver mempool contains at least ''0.25 n'' transactions not in the block, the analytical solution above can be used without increasing the block size by more than 10% from optimal.
+
+===Deriving ''x*'' and ''y*''===
+
+In order to construct Bloom filter ''R'' and IBLT ''J'' in Protocol 2, it is necessary to determine the values ''x*'' and ''y*''. These values amount to, respectively, a lower bound on the number of true positives and an upper bound on the number of false positives found in the candidate set ''Z''. The mathematical procedure for deriving these values is given in the appendix of the latest graphene paper [[graphene-specification-v2.2.mediawiki#ref10|<nowiki>[10]</nowiki>]]. But these derivations are somewhat dense mathematically, so we also provide [https://github.com/bissias/graphene-experiments/blob/master/jupyter/graphene_v2_param_estimates.ipynb python implementations].
+
+===Reducing IBLT decode failures===
+
+Due to variations in sender and receiver mempools, IBLT decode failures were frequent in Graphene version 1. One of the improvements in version 2 was the introduction of a [https://gist.github.com/bissias/561151fef0b98f6e4d8813a08aefe349 heuristic] for determining a suitable increase in the number of IBLT cells to compensate for mempool differences.
+
+==Acknowledgments==
+
+We are grateful for insightful feedback from Andrew Stone, Peter Tschipper, Andrea Suisani, Awemany, and Peter Rizun.
+
+==Copyright==
+
+This document is placed in the public domain.

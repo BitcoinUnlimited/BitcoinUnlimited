@@ -7,15 +7,18 @@
 #ifndef BITCOIN_CONSENSUS_CONSENSUS_H
 #define BITCOIN_CONSENSUS_CONSENSUS_H
 
+#include "uint256.h"
+
 /** The maximum allowed size for a serialized block, in bytes (network rule) */
 // BU: this constant is deprecated but is still used in a few areas such as allocation of memory.  Removing it is a
 // tradeoff between being perfect and changing more code. TODO: remove this entirely
 // static const unsigned int BU_MAX_BLOCK_SIZE = 32000000;
 static const unsigned int BLOCKSTREAM_CORE_MAX_BLOCK_SIZE = 1000000;
 /** The maximum allowed number of signature check operations in a 1MB block (network rule), and the suggested max sigops
- * per (MB rounded up) in blocks > 1MB.  If greater, the block is considered excessive */
-static const unsigned int BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS = BLOCKSTREAM_CORE_MAX_BLOCK_SIZE / 50;
-static const unsigned int MAX_TX_SIGOPS = BLOCKSTREAM_CORE_MAX_BLOCK_SIZE / 50;
+ * per (MB rounded up) in blocks > 1MB. */
+static const unsigned int MAX_BLOCK_SIGOPS_PER_MB = 20000;
+static const unsigned int MAX_TX_SIGOPS_COUNT = 20000;
+static const unsigned int MAY2020_MAX_TX_SIGCHECK_COUNT = 3000;
 /** The maximum suggested length of a transaction.  If greater, the transaction is not relayed, and the > 1MB block is
    considered "excessive".
     For blocks < 1MB, there is no largest transaction so it is defacto 1MB.
@@ -39,9 +42,25 @@ static const unsigned int MIN_EXCESSIVE_BLOCK_SIZE = 32000000;
 static const unsigned int MIN_EXCESSIVE_BLOCK_SIZE_REGTEST = 1000;
 static const unsigned int DEFAULT_EXCESSIVE_BLOCK_SIZE = MIN_EXCESSIVE_BLOCK_SIZE;
 
+/**
+ * The ratio between the maximum allowable block size and the maximum allowable
+ * SigChecks (executed signature check operations) in the block. (network rule).
+ */
+static const int BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO = 141;
+
+static const unsigned int MAY2020_MAX_BLOCK_SIGCHECK_COUNT =
+    MIN_EXCESSIVE_BLOCK_SIZE / BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO;
+static_assert(MAY2020_MAX_BLOCK_SIGCHECK_COUNT == 226950, "Max block sigcheck value differs from specification");
+
 /** Allowed messages lengths will be this * the excessive block size */
 static const unsigned int DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER = 2;
 
+/** Compute the maximum sigops allowed in a block given the block size. */
+inline uint64_t GetMaxBlockSigOpsCount(uint64_t nBlockSize)
+{
+    auto nMbRoundedUp = 1 + ((nBlockSize - 1) / 1000000);
+    return nMbRoundedUp * MAX_BLOCK_SIGOPS_PER_MB;
+}
 
 /** Flags for nSequence and nLockTime locks */
 enum
@@ -52,5 +71,17 @@ enum
     /* Use GetMedianTimePast() instead of nTime for end point timestamp. */
     LOCKTIME_MEDIAN_TIME_PAST = (1 << 1),
 };
+
+/**
+ * Compute the maximum number of sigchecks that can be contained in a block
+ * given the MAXIMUM block size as parameter. The maximum sigchecks scale
+ * linearly with the maximum block size and do not depend on the actual
+ * block size. The returned value is rounded down (there are no fractional
+ * sigchecks so the fractional part is meaningless).
+ */
+inline uint64_t GetMaxBlockSigChecksCount(uint64_t maxBlockSize)
+{
+    return maxBlockSize / BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO;
+}
 
 #endif // BITCOIN_CONSENSUS_CONSENSUS_H

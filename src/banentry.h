@@ -10,7 +10,16 @@
 // NOTE: netaddress.h includes serialize.h which is required for serialization macros
 #include "netaddress.h" // for CSubNet
 
-typedef enum BanReason { BanReasonUnknown = 0, BanReasonNodeMisbehaving = 1, BanReasonManuallyAdded = 2 } BanReason;
+typedef enum BanReason {
+    BanReasonUnknown = 0,
+    BanReasonNodeMisbehaving = 1,
+    BanReasonManuallyAdded = 2,
+    BanReasonTooManyEvictions = 3,
+    BanReasonTooManyConnectionAttempts = 4,
+    BanReasonInvalidMessageStart = 5,
+    BanReasonInvalidInventory = 6,
+    BanReasonInvalidPeer = 7
+} BanReason;
 
 class CBanEntry
 {
@@ -20,6 +29,7 @@ public:
     int64_t nCreateTime;
     int64_t nBanUntil;
     uint8_t banReason;
+    std::string userAgent;
 
     CBanEntry();
     CBanEntry(int64_t nCreateTimeIn);
@@ -33,6 +43,7 @@ public:
         READWRITE(nCreateTime);
         READWRITE(nBanUntil);
         READWRITE(banReason);
+        READWRITE(userAgent);
     }
 
     void SetNull();

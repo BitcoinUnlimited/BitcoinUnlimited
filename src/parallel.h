@@ -26,11 +26,24 @@ class ValidationResourceTracker
 {
 private:
     mutable CCriticalSection cs_resource_tracker;
-    uint64_t nSigops;
-    uint64_t nSighashBytes;
+    uint64_t nSigops = 0;
+    uint64_t nSighashBytes = 0;
+
+    /** 2020-05-15 sigchecks consensus rule -- counts the number of sigops/potential sigops */
+    uint64_t consensusSigChecks = 0;
 
 public:
-    ValidationResourceTracker() : nSigops(0), nSighashBytes(0) {}
+    unsigned char sighashtype = 0;
+
+    ValidationResourceTracker() {}
+    ValidationResourceTracker(const ValidationResourceTracker &c)
+    {
+        LOCK(cs_resource_tracker);
+        nSigops = c.nSigops;
+        nSighashBytes = c.nSighashBytes;
+        consensusSigChecks = c.consensusSigChecks;
+        sighashtype = c.sighashtype;
+    }
     void Update(const uint256 &txid, uint64_t nSigopsIn, uint64_t nSighashBytesIn)
     {
         LOCK(cs_resource_tracker);
@@ -38,6 +51,24 @@ public:
         nSighashBytes += nSighashBytesIn;
         return;
     }
+
+    /** Update 2020-05-15 sigchecks consensus rule sigop count
+        @param ops added to the current count
+     */
+    void UpdateConsensusSigChecks(uint64_t ops)
+    {
+        LOCK(cs_resource_tracker);
+        consensusSigChecks += ops;
+    }
+
+    /** Get 2020-05-15 sigchecks consensus rule sigop count
+        @returns current number of sigops */
+    uint64_t GetConsensusSigChecks() const
+    {
+        LOCK(cs_resource_tracker);
+        return consensusSigChecks;
+    }
+
     uint64_t GetSigOps() const
     {
         LOCK(cs_resource_tracker);
@@ -110,6 +141,9 @@ public:
 
 class CParallelValidation
 {
+public:
+    CCriticalSection cs_blockvalidationthread;
+
 private:
     /** txn hashes that are in the previous block */
     CCriticalSection cs_previousblock;
@@ -138,9 +172,7 @@ private:
         bool fIsValidating; // is the block currently in connectblock() and validating inputs
         bool fIsReorgInProgress; // has a re-org to another chain been triggered.
     };
-    CCriticalSection cs_blockvalidationthread;
     std::map<boost::thread::id, CHandleBlockMsgThreads> mapBlockValidationThreads GUARDED_BY(cs_blockvalidationthread);
-
 
 public:
     /**
@@ -170,7 +202,7 @@ public:
     void QuitCompetingThreads(const uint256 &prevBlockHash);
 
     /** Is this block already running a validation thread? */
-    bool IsAlreadyValidating(const NodeId id);
+    bool IsAlreadyValidating(const NodeId id, const uint256 blockhash);
 
     /** Terminate all currently running Block Validation threads, except the passed thread */
     void StopAllValidationThreads(const boost::thread::id this_id = boost::thread::id());
@@ -201,7 +233,7 @@ public:
     void SetLocks(const bool fParallel);
 
     /** Is there a re-org in progress */
-    void IsReorgInProgress(const boost::thread::id this_id, const bool fReorg, const bool fParallel);
+    void MarkReorgInProgress(const boost::thread::id this_id, const bool fReorg, const bool fParallel);
     bool IsReorgInProgress();
 
     /** Update the nMostWorkOurFork when a new header arrives */

@@ -52,6 +52,9 @@ public:
     //! Remove undo data from the database
     virtual bool EraseUndo(const CBlockIndex *pindex) = 0;
 
+    //! Flush database files to disk
+    virtual void Flush() = 0;
+
     // clean up the undo data if supported by the db
     virtual void CondenseUndoData(const std::string &start, const std::string &end) = 0;
 

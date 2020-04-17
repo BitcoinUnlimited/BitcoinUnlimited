@@ -232,7 +232,7 @@ std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool valida
     {
         if (*item == 1)
         {
-            *item = Params().GetConsensus().nov2019ActivationTime;
+            *item = Params().GetConsensus().may2020ActivationTime;
         }
         settingsToUserAgentString();
     }
@@ -446,7 +446,7 @@ void UnlimitedSetup(void)
 
     // If the user configures it to 1, assume this means default
     if (miningForkTime.Value() == 1)
-        miningForkTime = Params().GetConsensus().nov2019ActivationTime;
+        miningForkTime = Params().GetConsensus().may2020ActivationTime;
 
     if (maxGeneratedBlock > excessiveBlockSize)
     {
@@ -944,12 +944,12 @@ int isChainExcessive(const CBlockIndex *blk, unsigned int goBack)
     return (recentExcessive && !oldExcessive);
 }
 
-bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, uint64_t nTx, uint64_t largestTx)
+bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nTx, uint64_t largestTx)
 {
     if (blockSize > excessiveBlockSize)
     {
-        LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " Sig:%d  :too many bytes\n",
-            block.nVersion, block.nTime, blockSize, nTx, nSigOps);
+        LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 "  :too many bytes\n", block.nVersion,
+            block.nTime, blockSize, nTx);
         return true;
     }
 
@@ -963,35 +963,14 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nSigOps, u
                 block.nVersion, block.nTime, blockSize, nTx, largestTx, maxTxSize.Value());
             return true;
         }
-
-        // check proportional sigops
-        uint64_t blockMbSize =
-            1 + ((blockSize - 1) /
-                    1000000); // block size in megabytes rounded up. 1-1000000 -> 1, 1000001-2000000 -> 2, etc.
-        if (nSigOps > blockSigopsPerMb.Value() * blockMbSize)
-        {
-            LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
-                 " Sig:%d  :too many sigops.  Expected less than: %d\n",
-                block.nVersion, block.nTime, blockSize, nTx, nSigOps, blockSigopsPerMb.Value() * blockMbSize);
-            return true;
-        }
     }
     else
     {
         // Within a 1MB block transactions can be 1MB, so nothing to check WRT transaction size
-
-        // Check max sigops
-        if (nSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS)
-        {
-            LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
-                 " Sig:%d  :too many sigops.  Expected < 1MB defined constant: %d\n",
-                block.nVersion, block.nTime, blockSize, nTx, nSigOps, BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS);
-            return true;
-        }
     }
 
-    LOGA("Acceptable block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " Sig:%d\n", block.nVersion, block.nTime,
-        blockSize, nTx, nSigOps);
+    LOGA("Acceptable block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " \n", block.nVersion, block.nTime, blockSize,
+        nTx);
     return false;
 }
 
@@ -1000,7 +979,7 @@ extern UniValue getminercomment(const UniValue &params, bool fHelp)
     if (fHelp || params.size() != 0)
         throw runtime_error("getminercomment\n"
                             "\nReturn the comment that will be put into each mined block's coinbase\n transaction "
-                            "after the Bitcoin Unlimited parameters."
+                            "after the BCH Unlimited parameters."
                             "\nResult\n"
                             "  minerComment (string) miner comment\n"
                             "\nExamples:\n" +
@@ -1014,7 +993,7 @@ extern UniValue setminercomment(const UniValue &params, bool fHelp)
     if (fHelp || params.size() != 1)
         throw runtime_error("setminercomment\n"
                             "\nSet the comment that will be put into each mined block's coinbase\n transaction after "
-                            "the Bitcoin Unlimited parameters.\n Comments that are too long will be truncated."
+                            "the BCH Unlimited parameters.\n Comments that are too long will be truncated."
                             "\nExamples:\n" +
                             HelpExampleCli("setminercomment", "\"bitcoin is fundamentally emergent consensus\"") +
                             HelpExampleRpc("setminercomment", "\"bitcoin is fundamentally emergent consensus\""));
@@ -1638,6 +1617,9 @@ UniValue getstat(const UniValue &params, bool fHelp)
 
         ret.push_back(ustat);
     }
+    if (ret.empty())
+        throw std::invalid_argument("No stat available for that selection");
+
     return ret;
 }
 
@@ -1969,7 +1951,23 @@ uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uint256> &
     return merkle_root;
 }
 
-/** Mining-Candidate end */
+#ifdef DEBUG
+// This RPC is very useful for checking that the test system works, but we don't want it to be part of the
+// normal release
+UniValue crash(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() >= 1)
+        throw runtime_error("crash \n"
+                            "\nCrashes this program, generating a core dump.\n"
+                            "\nArguments\n"
+                            "none\n"
+                            "\nResult:\n" +
+                            HelpExampleCli("crash", "") + HelpExampleRpc("crash", ""));
+
+
+    abort();
+}
+#endif
 
 /* clang-format off */
 static const CRPCCommand commands[] =
@@ -2001,7 +1999,8 @@ static const CRPCCommand commands[] =
     { "util",               "set",                    &settweak,               true  },
     { "util",               "validatechainhistory",   &validatechainhistory,   true  },
 #ifdef DEBUG
-    { "util",               "getstructuresizes",      &getstructuresizes,      true  },  // BU
+    { "util",               "getstructuresizes",      &getstructuresizes,      true  },
+    { "util",               "crash",                  &crash,                  true  },
 #endif
     { "util",               "getaddressforms",        &getaddressforms,        true  },
     { "util",               "log",                    &setlog,                 true  },
@@ -2217,13 +2216,7 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 #ifdef DEBUG_LOCKORDER
     {
         std::lock_guard<std::mutex> lock(lockdata.dd_mutex);
-        uint64_t lockorderssize = 0;
-        lockorderssize += lockdata.readlockswaiting.size();
-        lockorderssize += lockdata.writelockswaiting.size();
-        lockorderssize += lockdata.readlocksheld.size();
-        lockorderssize += lockdata.writelocksheld.size();
-        lockorderssize *= 2;
-        ret.pushKV("lockorders", lockorderssize);
+        ret.pushKV("lockorders", lockdata.ordertracker.size());
     }
 #endif
     LOCK(cs_vNodes);
@@ -2373,6 +2366,7 @@ UniValue getaddressforms(const UniValue &params, bool fHelp)
     node.pushKV("bitpay", bitpayAddr);
     return node;
 }
+
 
 std::string CStatusString::GetPrintable() const
 {

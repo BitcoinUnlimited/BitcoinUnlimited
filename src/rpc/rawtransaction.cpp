@@ -128,16 +128,6 @@ void TxToJSON(const CTransaction &tx, const uint256 hashBlock, UniValue &entry)
     entry.pushKV("hex", EncodeHexTx(tx));
 }
 
-static bool IsTxIndexReady()
-{
-    bool fReady = false;
-    if (g_txindex)
-    {
-        fReady = g_txindex->IsSynced();
-    }
-    return fReady;
-}
-
 UniValue getrawtransaction(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 3)
@@ -1470,7 +1460,7 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
         // push to local node and sync with wallets
         CValidationState state;
         bool fMissingInputs;
-        if (!AcceptToMemoryPool(mempool, state, std::move(ptx), false, &fMissingInputs, false, !fOverrideFees, txClass))
+        if (!AcceptToMemoryPool(mempool, state, ptx, false, &fMissingInputs, false, !fOverrideFees, txClass))
         {
             if (state.IsInvalid())
             {

@@ -12,6 +12,7 @@
 
 using namespace std;
 
+#ifndef ANDROID // limit dependencies
 CMerkleBlock::CMerkleBlock(const CBlock &block, CBloomFilter &filter)
 {
     header = block.GetBlockHeader();
@@ -44,6 +45,7 @@ CMerkleBlock::CMerkleBlock(const CBlock &block, CBloomFilter &filter)
 
     txn = CPartialMerkleTree(vHashes, vMatch);
 }
+#endif
 
 CMerkleBlock::CMerkleBlock(const CBlock &block, const std::set<uint256> &txids)
 {

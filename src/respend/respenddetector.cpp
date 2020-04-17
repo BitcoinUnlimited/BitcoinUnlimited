@@ -32,7 +32,7 @@ std::vector<RespendActionPtr> CreateDefaultActions()
 }
 
 RespendDetector::RespendDetector(const CTxMemPool &pool,
-    const CTransactionRef &ptx,
+    const CTransactionRef ptx,
     std::vector<RespendActionPtr> _actions)
     : actions(_actions)
 {
@@ -63,7 +63,7 @@ RespendDetector::~RespendDetector()
     }
 }
 
-void RespendDetector::CheckForRespend(const CTxMemPool &pool, const CTransactionRef &ptx)
+void RespendDetector::CheckForRespend(const CTxMemPool &pool, const CTransactionRef ptx)
 {
     READLOCK(pool.cs_txmempool); // protect pool.mapNextTx
 

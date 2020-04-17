@@ -71,7 +71,10 @@ static const unsigned int VERACK_TIMEOUT = 60;
 /** Number of headers sent in one getheaders result. We rely on the assumption that if a peer sends
  *  less than this number, we reached its tip. Changing this value is a protocol upgrade. */
 static const unsigned int MAX_HEADERS_RESULTS = 2000;
+/** Time to wait (in seconds) between flushing the blocks and the blockindex to disk */
 static const unsigned int DATABASE_WRITE_INTERVAL = 60 * 60;
+/** Time to wait (in seconds) between flushing the blocks and the blockindex to disk during IBD */
+static const unsigned int IBD_DATABASE_WRITE_INTERVAL = 5 * 60;
 /** Time to wait (in seconds) between flushing chainstate to disk. */
 static const unsigned int DATABASE_FLUSH_INTERVAL = 24 * 60 * 60;
 /** Maximum length of reject messages. */
@@ -140,8 +143,6 @@ extern bool fIsBareMultisigStd;
 extern unsigned int nBytesPerSigOp;
 extern bool fCheckBlockIndex;
 extern bool fCheckpointsEnabled;
-/** A fee rate smaller than this is considered zero fee (for relaying, mining and transaction creation) */
-extern CFeeRate minRelayTxFee;
 /** Absolute maximum transaction fee (in satoshis) used by wallet and mempool (rejects high fee in sendrawtransaction)
  */
 extern CTweak<CAmount> maxTxFee;
@@ -158,7 +159,7 @@ extern std::atomic<CBlockIndex *> pindexBestInvalid;
 extern int64_t nLastOrphanCheck;
 
 /** Minimum disk space required - used in CheckDiskSpace() */
-static const uint64_t nMinDiskSpace = 52428800;
+static const uint64_t nMinDiskSpace = 100000000;
 
 /** Pruning-related variables and constants */
 /** True if any block files have ever been pruned. */
@@ -265,7 +266,7 @@ bool AcceptBlock(CBlock &block, CValidationState &state, CBlockIndex **pindex, b
 CBlockIndex *FindForkInGlobalIndex(const CChain &chain, const CBlockLocator &locator);
 
 
-/** The currently-connected chain of blocks (protected by cs_main). */
+/** The currently-connected chain of blocks (protected internally). */
 extern CChain chainActive;
 
 /** Global variable that points to the active CCoinsView (protected by cs_utxo) */

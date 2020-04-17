@@ -26,38 +26,17 @@
 namespace
 {
 /**
- * We're hashing a nonce into the entries themselves, so we don't need extra
- * blinding in the set hash computation.
- *
- * This may exhibit platform endian dependent behavior but because these are
- * nonced hashes (random) and this state is only ever used locally it is safe.
- * All that matters is local consistency.
- */
-class SignatureCacheHasher
-{
-public:
-    template <uint8_t hash_select>
-    uint32_t operator()(const uint256 &key) const
-    {
-        static_assert(hash_select < 8, "SignatureCacheHasher only has 8 hashes available.");
-        uint32_t u;
-        std::memcpy(&u, key.begin() + 4 * hash_select, 4);
-        return u;
-    }
-};
-
-/**
  * Declare which flags absolutely do not affect VerifySignature() result.
  * We this to reduce unnecessary cache misses (such as when policy and consensus
  * flags differ on unrelated aspects).
  */
 static const uint32_t INVARIANT_FLAGS =
     SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC | SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S |
-    SCRIPT_VERIFY_NULLDUMMY | SCRIPT_VERIFY_SIGPUSHONLY | SCRIPT_VERIFY_MINIMALDATA |
-    SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS | SCRIPT_VERIFY_CLEANSTACK | SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY |
-    SCRIPT_VERIFY_CHECKSEQUENCEVERIFY | SCRIPT_VERIFY_MINIMALIF | SCRIPT_VERIFY_NULLFAIL |
-    SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_ENABLE_REPLAY_PROTECTION |
-    SCRIPT_ENABLE_CHECKDATASIG | SCRIPT_DISALLOW_SEGWIT_RECOVERY;
+    SCRIPT_VERIFY_SIGPUSHONLY | SCRIPT_VERIFY_MINIMALDATA | SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS |
+    SCRIPT_VERIFY_CLEANSTACK | SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY | SCRIPT_VERIFY_CHECKSEQUENCEVERIFY |
+    SCRIPT_VERIFY_MINIMALIF | SCRIPT_VERIFY_NULLFAIL | SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE |
+    SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_ENABLE_REPLAY_PROTECTION | SCRIPT_ENABLE_CHECKDATASIG |
+    SCRIPT_DISALLOW_SEGWIT_RECOVERY;
 
 /**
  * Valid signature cache, to avoid doing expensive ECDSA signature checking

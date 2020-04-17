@@ -119,7 +119,7 @@ private:
 public:
     unsigned char sighashType;
     CTxMemPoolEntry();
-    CTxMemPoolEntry(const CTransactionRef &_tx,
+    CTxMemPoolEntry(const CTransactionRef _tx,
         const CAmount &_nFee,
         int64_t _nTime,
         double _entryPriority,
@@ -149,10 +149,12 @@ public:
     int64_t GetModifiedFee() const { return nFee + feeDelta; }
     size_t DynamicMemoryUsage() const { return nUsageSize; }
     const LockPoints &GetLockPoints() const { return lockPoints; }
-    // Adjusts the descendant state, if this entry is not dirty.
+    // Increments the descendant state values, if this entry is not dirty.
     void UpdateDescendantState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount);
-    // Adjusts the ancestor state
+    // Increments the ancestor state values
     void UpdateAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps);
+    // Replaces the previous ancestor state with new set of values
+    void ReplaceAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps);
     // Updates the fee delta used for mining priority score, and the
     // modified fees with descendants.
     void UpdateFeeDelta(int64_t feeDelta);
@@ -195,6 +197,35 @@ struct update_ancestor_state
 
     void operator()(CTxMemPoolEntry &e) { e.UpdateAncestorState(modifySize, modifyFee, modifyCount, modifySigOps); }
 private:
+    int64_t modifySize;
+    CAmount modifyFee;
+    int64_t modifyCount;
+    int modifySigOps;
+};
+
+struct replace_ancestor_state
+{
+    replace_ancestor_state(int64_t _modifySize, CAmount _modifyFee, int64_t _modifyCount, int _modifySigOps)
+        : modifySize(_modifySize), modifyFee(_modifyFee), modifyCount(_modifyCount), modifySigOps(_modifySigOps)
+    {
+    }
+
+    void operator()(CTxMemPoolEntry &e) { e.ReplaceAncestorState(modifySize, modifyFee, modifyCount, modifySigOps); }
+private:
+    int64_t modifySize;
+    CAmount modifyFee;
+    int64_t modifyCount;
+    int modifySigOps;
+};
+
+struct ancestor_state
+{
+    ancestor_state(int64_t _modifySize, CAmount _modifyFee, int64_t _modifyCount, int _modifySigOps)
+        : modifySize(_modifySize), modifyFee(_modifyFee), modifyCount(_modifyCount), modifySigOps(_modifySigOps)
+    {
+    }
+
+public:
     int64_t modifySize;
     CAmount modifyFee;
     int64_t modifyCount;
@@ -304,6 +335,11 @@ public:
 
         if (f1 == f2)
         {
+            // Sorting by time here does two things when mining CPFP packages. In the case of long
+            // packages, it finds the part of the package that fits perfectly into the block, because
+            // we won't bail out early due to package insertion failures. Secondly it also preserves some
+            // sense of fairness that, all other things begin equal, the first transation to arrive in the
+            // mempool has priority over ones that follow.
             return a.GetTime() < b.GetTime();
         }
 
@@ -515,9 +551,11 @@ public:
     typedef std::set<txiter, CompareIteratorByHash> setEntries;
     typedef std::map<CTxMemPool::txiter, TxMempoolOriginalState, CTxMemPool::CompareIteratorByHash>
         TxMempoolOriginalStateMap;
+    typedef std::map<txiter, ancestor_state, CTxMemPool::CompareIteratorByHash> mapEntryHistory;
 
-
+    /** Return the set of mempool parents for this entry */
     const setEntries &GetMemPoolParents(txiter entry) const;
+    /** Return the set of mempool children for this entry */
     const setEntries &GetMemPoolChildren(txiter entry) const;
 
 private:
@@ -606,6 +644,11 @@ public:
     void removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed);
     void _removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed);
     void removeForBlock(const std::vector<CTransactionRef> &vtx,
+        uint64_t nBlockHeight,
+        std::list<CTransactionRef> &conflicted,
+        bool fCurrentEstimate = true,
+        std::vector<CTxChange> *txChange = nullptr);
+    void removeForBlock_Legacy(const std::vector<CTransactionRef> &vtx,
         unsigned int nBlockHeight,
         std::list<CTransactionRef> &conflicted,
         bool fCurrentEstimate = true,
@@ -642,6 +685,12 @@ public:
      *  that any in-mempool descendants have their ancestor state updated.
      */
     void _RemoveStaged(setEntries &stage, bool updateDescendants, TxMempoolOriginalStateMap *changeSet = nullptr);
+
+    /** Resumbit and clear all txns currently in the txCommitQ and txCommitQFinal.
+     *  This has the effect of removing and descendants for txns that were already removed
+     *  from the mempool
+     */
+    void ResubmitCommitQ();
 
     /** When adding transactions from a disconnected block back to the mempool,
      *  new mempool entries may have children in the mempool (which is generally
@@ -686,7 +735,7 @@ public:
 
     /** Populate setDescendants with all in-mempool descendants of hash.  Assumes that setDescendants includes
      *  all in-mempool descendants of anything already in it.  */
-    void _CalculateDescendants(txiter it, setEntries &setDescendants);
+    void _CalculateDescendants(txiter it, setEntries &setDescendants, mapEntryHistory *mapTxnChainTips = nullptr);
 
     /** Similar to CalculateMemPoolAncestors, except only requires the inputs and just returns true/false depending on
      * whether the input set conforms to the passed limits */
@@ -773,23 +822,8 @@ public:
     TxMempoolInfo info(const uint256 &hash) const;
     std::vector<TxMempoolInfo> AllTxMempoolInfo() const;
 
-    /** Estimate fee rate needed to get into the next nBlocks
-     *  If no answer can be given at nBlocks, return an estimate
-     *  at the lowest number of blocks where one can be given
-     */
-    CFeeRate estimateSmartFee(int nBlocks, int *answerFoundAtBlocks = nullptr) const;
-
     /** Estimate fee rate needed to get into the next nBlocks */
     CFeeRate estimateFee(int nBlocks) const;
-
-    /** Estimate priority needed to get into the next nBlocks
-     *  If no answer can be given at nBlocks, return an estimate
-     *  at the lowest number of blocks where one can be given
-     */
-    double estimateSmartPriority(int nBlocks, int *answerFoundAtBlocks = nullptr) const;
-
-    /** Estimate priority needed to get into the next nBlocks */
-    double estimatePriority(int nBlocks) const;
 
     /** Write/Read estimates to disk */
     bool WriteFeeEstimates(CAutoFile &fileout) const;
@@ -825,6 +859,12 @@ private:
         TxMempoolOriginalStateMap *changeSet);
     /** Sever link between specified transaction and direct children. */
     void UpdateChildrenForRemoval(txiter entry);
+
+    /** Update the ancestor state for the set of supplied transaction chains. This step is done after
+     *  a block has finished processing and we have already removed the transactions from the mempool
+     */
+    void UpdateTxnChainState(mapEntryHistory &mapTxnChainTips);
+
     /** Internal implementation of transaction per sec rate update logic
      *  Requires that the cs_txPerSec lock be held by the calling method
      */
