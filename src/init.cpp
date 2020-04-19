@@ -760,11 +760,11 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     nMaxConnections = std::max(nUserMaxConnections, 0);
 
     // Trim requested connection counts, to fit into system limitations
-    nMaxConnections = std::max(std::min(nMaxConnections, (int)(FD_SETSIZE - nBind - MIN_CORE_FILEDESCRIPTORS)), 0);
-    int nFD = RaiseFileDescriptorLimit(nMaxConnections + MIN_CORE_FILEDESCRIPTORS);
+    int nFD = RaiseFileDescriptorLimit(nMaxConnections + MIN_CORE_FILEDESCRIPTORS + nBind);
     if (nFD < MIN_CORE_FILEDESCRIPTORS)
         return InitError(_("Not enough file descriptors available."));
-    nMaxConnections = std::min(nFD - MIN_CORE_FILEDESCRIPTORS, nMaxConnections);
+
+    nMaxConnections = std::min(nFD - MIN_CORE_FILEDESCRIPTORS - nBind, nMaxConnections);
 
     if (nMaxConnections < nUserMaxConnections)
         InitWarning(strprintf(_("Reducing -maxconnections from %d to %d, because of system limitations."),
