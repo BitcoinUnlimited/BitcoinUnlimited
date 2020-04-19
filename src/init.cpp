@@ -770,6 +770,23 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         InitWarning(strprintf(_("Reducing -maxconnections from %d to %d, because of system limitations."),
             nUserMaxConnections, nMaxConnections));
 
+
+    // make outbound conns modifiable by the user
+    int nUserMaxOutConnections = GetArg("-maxoutconnections", DEFAULT_MAX_OUTBOUND_CONNECTIONS);
+    nMaxOutConnections = std::max(nUserMaxOutConnections, 0);
+    if (nMaxConnections < nMaxOutConnections)
+    {
+        // uiInterface.ThreadSafeMessageBox((strprintf(_("Reducing -maxoutconnections from %d to %d, because this value
+        // is higher than max available connections."), nUserMaxOutConnections, nMaxConnections)),"",
+        // CClientUIInterface::MSG_WARNING);
+        LOGA(
+            "Reducing -maxoutconnections from %d to %d, because this value is higher than max available connections.\n",
+            nUserMaxOutConnections, nMaxConnections);
+        nMaxOutConnections = nMaxConnections;
+    }
+
+
+
     // ********************************************************* Step 3: parameter-to-internal-flags
 
     fDebug = !mapMultiArgs["-debug"].empty();
