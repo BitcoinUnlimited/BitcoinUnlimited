@@ -778,9 +778,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     nMaxOutConnections = std::max(nUserMaxOutConnections, 0);
     if (nMaxConnections < nMaxOutConnections)
     {
-        // uiInterface.ThreadSafeMessageBox((strprintf(_("Reducing -maxoutconnections from %d to %d, because this value
-        // is higher than max available connections."), nUserMaxOutConnections, nMaxConnections)),"",
-        // CClientUIInterface::MSG_WARNING);
         LOGA(
             "Reducing -maxoutconnections from %d to %d, because this value is higher than max available connections.\n",
             nUserMaxOutConnections, nMaxConnections);
