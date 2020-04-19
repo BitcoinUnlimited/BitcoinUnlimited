@@ -767,7 +767,9 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     nMaxConnections = std::min(nFD - MIN_CORE_FILEDESCRIPTORS - nBind, nMaxConnections);
 
     if (nMaxConnections < nUserMaxConnections)
-        InitWarning(strprintf(_("Reducing -maxconnections from %d to %d, because of system limitations."),
+        InitWarning(strprintf(_("Reducing -maxconnections from %d to %d because of file descriptor limitations (unix) "
+                                "or winsocket fd_set limitations (windows). If you are a windows user there is a hard "
+                                "upper limit of 1024 which cannot be changed by adjusting the node's configuration."),
             nUserMaxConnections, nMaxConnections));
 
 
@@ -784,7 +786,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
             nUserMaxOutConnections, nMaxConnections);
         nMaxOutConnections = nMaxConnections;
     }
-
 
 
     // ********************************************************* Step 3: parameter-to-internal-flags
@@ -971,7 +972,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     LOGA("Default data directory %s\n", GetDefaultDataDir().string());
     LOGA("Using data directory %s\n", strDataDir);
     LOGA("Using config file %s\n", GetConfigFile(GetArg("-conf", BITCOIN_CONF_FILENAME)).string());
-    LOGA("Using at most %i connections (%i file descriptors available)\n", nMaxConnections, nFD);
+    LOGA("Using at most %i connections\n", nMaxConnections);
     std::ostringstream strErrors;
 
     // bip135 begin
