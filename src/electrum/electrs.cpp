@@ -225,9 +225,10 @@ void set_xversion_flags(CXVersionMessage &xver, const std::string &network)
         return;
     }
 
-    constexpr double PROTOCOL_VERSION = 1.4;
+    constexpr double ELECTRUM_PROTOCOL_VERSION = 1.4;
 
     xver.set_u64c(XVer::BU_ELECTRUM_SERVER_PORT_TCP, std::stoul(rpc_port(network)));
-    xver.set_u64c(XVer::BU_ELECTRUM_SERVER_PROTOCOL_VERSION, static_cast<uint64_t>(PROTOCOL_VERSION * 1000000));
+    xver.set_u64c(
+        XVer::BU_ELECTRUM_SERVER_PROTOCOL_VERSION, static_cast<uint64_t>(ELECTRUM_PROTOCOL_VERSION * 1000000));
 }
 } // ns electrum
