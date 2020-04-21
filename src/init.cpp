@@ -1670,8 +1670,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 
     StartNode(threadGroup);
 
-    // ********************************************************* Step 11: finished
-
 #ifdef ENABLE_WALLET
     if (pwalletMain)
     {
