@@ -589,6 +589,11 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
         g_txindex = std::make_unique<TxIndex>(txindex_db);
         g_txindex->Start();
     }
+
+    // This should be done last in init. If not, then RPC's could be allowed before the wallet
+    // is ready.
+    uiInterface.InitMessage(_("Done loading"));
+    SetRPCWarmupFinished();
 }
 
 /** Sanity checks
@@ -1666,13 +1671,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     StartNode(threadGroup);
 
     // ********************************************************* Step 11: finished
-
-    uiInterface.InitMessage(_("Done loading"));
-
-
-    // This should be done last in init. If not, then RPC's could be allowed before the wallet
-    // is ready.
-    SetRPCWarmupFinished();
 
 #ifdef ENABLE_WALLET
     if (pwalletMain)
