@@ -62,7 +62,7 @@
 
 const QString BitcoinGUI::DEFAULT_WALLET = "~Default";
 
-BitcoinGUI::BitcoinGUI(const Config *_cfg, const PlatformStyle *platformStyle, const NetworkStyle *networkStyle, QWidget *parent) :
+BitcoinGUI::BitcoinGUI(const Config *_cfg, const PlatformStyle *_platformStyle, const NetworkStyle *networkStyle, QWidget *parent) :
     QMainWindow(parent),
     clientModel(0),
     walletFrame(0),
@@ -88,6 +88,7 @@ BitcoinGUI::BitcoinGUI(const Config *_cfg, const PlatformStyle *platformStyle, c
     receiveCoinsAction(0),
     receiveCoinsMenuAction(0),
     optionsAction(0),
+    unlimitedAction(0),
     toggleHideAction(0),
     encryptWalletAction(0),
     backupWalletAction(0),
@@ -104,7 +105,8 @@ BitcoinGUI::BitcoinGUI(const Config *_cfg, const PlatformStyle *platformStyle, c
     modalOverlay(0),
     prevBlocks(0),
     spinnerFrame(0),
-    platformStyle(platformStyle)
+    platformStyle(_platformStyle),
+    cfg(_cfg)
 {
     GUIUtil::restoreWindowGeometry("nWindow", QSize(850, 550), this);
 
