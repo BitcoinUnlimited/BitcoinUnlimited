@@ -40,6 +40,7 @@ class BlockchainTest(BitcoinTestFramework):
         self.nodes = []
         self.nodes.append(start_node(0, self.options.tmpdir, ["-debug=net"]))
         self.nodes.append(start_node(1, self.options.tmpdir, ["-debug=net"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug=net", "-prune=1550"]))
         connect_nodes_bi(self.nodes, 0, 1)
         self.is_network_split = False
         self.sync_all()
@@ -68,11 +69,28 @@ class BlockchainTest(BitcoinTestFramework):
             'mediantime',
             'pruned',
             'softforks',
+            'size_on_disk',
             'verificationprogress',
         ]
-        res = self.nodes[0].getblockchaininfo()
 
-        assert_equal(sorted(res.keys()), keys)
+        res = self.nodes[2].getblockchaininfo()
+        # result should have pruneheight and default keys if pruning is enabled
+        assert_equal(sorted(res.keys()), sorted(keys + ['pruneheight', 'prune_target_size']))
+        # pruneheight should be greater or equal to 0
+        assert res['pruneheight'] >= 0
+
+        # size_on_disk should be > 0
+        assert res['size_on_disk'] > 0
+
+        # check other pruning fields given that prune=1
+        assert res['pruned']
+
+        assert_equal(res['prune_target_size'], 1625292800)
+
+        stop_node(self.nodes[2], 2)
+        del(self.nodes[-1])
+        res = self.nodes[0].getblockchaininfo()
+        assert_equal(sorted(res.keys()), sorted(keys))
 
     def _test_gettxoutsetinfo(self):
         node = self.nodes[0]
