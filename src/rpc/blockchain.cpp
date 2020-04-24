@@ -5,8 +5,10 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "rpc/blockchain.h"
+
 #include "amount.h"
 #include "blockstorage/blockstorage.h"
+#include "blockstorage/sequential_files.h"
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "coins.h"
@@ -1136,8 +1138,12 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
             "  \"initialblockdownload\": xxxx, (bool) (debug information) estimate of whether this node is in Initial "
             "Block Download mode.\n"
             "  \"chainwork\": \"xxxx\"     (string) total amount of work in active chain, in hexadecimal\n"
+            "  \"size_on_disk\": xxxxxx,   (numeric) the estimated size of the block and undo files on disk\n"
             "  \"pruned\": xx,             (boolean) if the blocks are subject to pruning\n"
-            "  \"pruneheight\": xxxxxx,    (numeric) lowest-height complete block stored\n"
+            "  \"pruneheight\": xxxxxx,    (numeric) lowest-height complete block stored (only present if pruning is "
+            "enabled)\n"
+            "  \"prune_target_size\": xxxxxx,  (numeric) the target size used by pruning (only present if automatic "
+            "pruning is enabled)\n"
             "  \"softforks\": [            (array) status of softforks in progress\n"
             "     {\n"
             "        \"id\": \"xxxx\",        (string) name of softfork\n"
@@ -1195,7 +1201,32 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
         "verificationprogress", Checkpoints::GuessVerificationProgress(Params().Checkpoints(), chainActive.Tip()));
     obj.pushKV("initialblockdownload", IsInitialBlockDownload());
     obj.pushKV("chainwork", chainActive.Tip()->nChainWork.GetHex());
+    obj.pushKV("size_on_disk", CalculateCurrentUsage());
     obj.pushKV("pruned", fPruneMode);
+    if (fPruneMode)
+    {
+        CBlockIndex *block = chainActive.Tip();
+        assert(block);
+        {
+            READLOCK(cs_mapBlockIndex);
+            assert(block);
+            while (block && block->pprev && (block->pprev->nStatus & BLOCK_HAVE_DATA))
+            {
+                block = block->pprev;
+            }
+        }
+
+        if (block != nullptr)
+        {
+            obj.pushKV("pruneheight", block->nHeight);
+        }
+        else
+        {
+            obj.pushKV("pruneheight", 0);
+        }
+
+        obj.pushKV("prune_target_size", nPruneTarget);
+    }
 
     const Consensus::Params &consensusParams = Params().GetConsensus();
     CBlockIndex *tip = chainActive.Tip();
@@ -1223,18 +1254,6 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
     obj.pushKV("bip135_forks", bip135_forks);
     // bip135 end
 
-    if (fPruneMode)
-    {
-        CBlockIndex *block = chainActive.Tip();
-        {
-            READLOCK(cs_mapBlockIndex);
-            while (block && block->pprev && (block->pprev->nStatus & BLOCK_HAVE_DATA))
-                block = block->pprev;
-        }
-
-        if (block != nullptr)
-            obj.pushKV("pruneheight", block->nHeight);
-    }
     return obj;
 }
 
