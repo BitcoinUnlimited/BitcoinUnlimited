@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-# Copyright (c) 2019 The Bitcoin Unlimited developers
+# Copyright (c) 2019-2020 The Bitcoin Unlimited developers
 
 import asyncio
 import time
-from test_framework.util import assert_equal
+from test_framework.util import assert_equal, assert_raises
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.loginit import logging
 from test_framework.electrumutil import (ElectrumConnection,
@@ -19,16 +19,43 @@ class ElectrumSubscriptionsTest(BitcoinTestFramework):
 
     def run_test(self):
         n = self.nodes[0]
-        n.generate(1)
+        n.generate(110)
         sync_electrum_height(n)
 
         cli = ElectrumConnection()
+        self.test_unsubscribe_scripthash(n, cli)
         self.test_subscribe_headers(n, cli)
         self.test_subscribe_scripthash(n, cli)
 
+    def test_unsubscribe_scripthash(self, n, cli):
+        addr = n.getnewaddress()
+        scripthash = address_to_scripthash(addr)
+        _, queue = cli.subscribe('blockchain.scripthash.subscribe', scripthash)
+
+        # Verify that we're receiving notifications
+        n.sendtoaddress(addr, 10)
+        sh, _ = cli.loop.run_until_complete(
+                asyncio.wait_for(queue.get(), timeout = 10))
+        assert_equal(scripthash, sh)
+
+        ok = cli.call('blockchain.scripthash.unsubscribe', scripthash)
+        assert(ok)
+
+        # Verify that we're no longer receiving notifications
+        def wait():
+            cli.loop.run_until_complete(
+                asyncio.wait_for(queue.get(), timeout = 10))
+
+        n.sendtoaddress(addr, 10)
+        assert_raises(asyncio.TimeoutError, wait)
+
+        # Unsubscribing from a hash we're not subscribed to should return false
+        ok = cli.call('blockchain.scripthash.unsubscribe',
+                address_to_scripthash(n.getnewaddress()))
+        assert(not ok)
+
     def test_subscribe_scripthash(self, n, cli):
         logging.info("Testing scripthash subscription")
-        n.generate(100)
         addr = n.getnewaddress()
         scripthash = address_to_scripthash(addr)
         statushash, queue = cli.subscribe('blockchain.scripthash.subscribe', scripthash)
