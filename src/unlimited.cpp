@@ -487,21 +487,6 @@ void UnlimitedSetup(void)
         mallocedStats.push_front(new CStatHistory<uint64_t>("net/send/msg/" + *i));
     }
 
-    // make outbound conns modifiable by the user
-    int nUserMaxOutConnections = GetArg("-maxoutconnections", DEFAULT_MAX_OUTBOUND_CONNECTIONS);
-    nMaxOutConnections = std::max(nUserMaxOutConnections, 0);
-
-    if (nMaxConnections < nMaxOutConnections)
-    {
-        // uiInterface.ThreadSafeMessageBox((strprintf(_("Reducing -maxoutconnections from %d to %d, because this value
-        // is higher than max available connections."), nUserMaxOutConnections, nMaxConnections)),"",
-        // CClientUIInterface::MSG_WARNING);
-        LOGA(
-            "Reducing -maxoutconnections from %d to %d, because this value is higher than max available connections.\n",
-            nUserMaxOutConnections, nMaxConnections);
-        nMaxOutConnections = nMaxConnections;
-    }
-
     // Start Internal CPU miner
     // Generate coins in the background
     GenerateBitcoins(GetBoolArg("-gen", DEFAULT_GENERATE), GetArg("-genproclimit", DEFAULT_GENERATE_THREADS), Params());

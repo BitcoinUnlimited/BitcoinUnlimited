@@ -760,15 +760,30 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     nMaxConnections = std::max(nUserMaxConnections, 0);
 
     // Trim requested connection counts, to fit into system limitations
-    nMaxConnections = std::max(std::min(nMaxConnections, (int)(FD_SETSIZE - nBind - MIN_CORE_FILEDESCRIPTORS)), 0);
-    int nFD = RaiseFileDescriptorLimit(nMaxConnections + MIN_CORE_FILEDESCRIPTORS);
+    int nFD = RaiseFileDescriptorLimit(nMaxConnections + MIN_CORE_FILEDESCRIPTORS + nBind);
     if (nFD < MIN_CORE_FILEDESCRIPTORS)
         return InitError(_("Not enough file descriptors available."));
-    nMaxConnections = std::min(nFD - MIN_CORE_FILEDESCRIPTORS, nMaxConnections);
+
+    nMaxConnections = std::min(nFD - MIN_CORE_FILEDESCRIPTORS - nBind, nMaxConnections);
 
     if (nMaxConnections < nUserMaxConnections)
-        InitWarning(strprintf(_("Reducing -maxconnections from %d to %d, because of system limitations."),
+        InitWarning(strprintf(_("Reducing -maxconnections from %d to %d because of file descriptor limitations (unix) "
+                                "or winsocket fd_set limitations (windows). If you are a windows user there is a hard "
+                                "upper limit of 1024 which cannot be changed by adjusting the node's configuration."),
             nUserMaxConnections, nMaxConnections));
+
+
+    // make outbound conns modifiable by the user
+    int nUserMaxOutConnections = GetArg("-maxoutconnections", DEFAULT_MAX_OUTBOUND_CONNECTIONS);
+    nMaxOutConnections = std::max(nUserMaxOutConnections, 0);
+    if (nMaxConnections < nMaxOutConnections)
+    {
+        LOGA(
+            "Reducing -maxoutconnections from %d to %d, because this value is higher than max available connections.\n",
+            nUserMaxOutConnections, nMaxConnections);
+        nMaxOutConnections = nMaxConnections;
+    }
+
 
     // ********************************************************* Step 3: parameter-to-internal-flags
 
@@ -954,7 +969,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     LOGA("Default data directory %s\n", GetDefaultDataDir().string());
     LOGA("Using data directory %s\n", strDataDir);
     LOGA("Using config file %s\n", GetConfigFile(GetArg("-conf", BITCOIN_CONF_FILENAME)).string());
-    LOGA("Using at most %i connections (%i file descriptors available)\n", nMaxConnections, nFD);
+    LOGA("Using at most %i connections\n", nMaxConnections);
     std::ostringstream strErrors;
 
     // bip135 begin
