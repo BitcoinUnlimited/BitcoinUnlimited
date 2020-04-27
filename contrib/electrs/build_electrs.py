@@ -6,8 +6,8 @@ import sys
 import shutil
 PROJECT_NAME = "ElectrsCash"
 GIT_REPO = "https://github.com/BitcoinUnlimited/{}.git".format(PROJECT_NAME)
-GIT_BRANCH = "v1.1.1" # When released put a tag here
-EXPECT_HEAD = "6572f5d321bde6ed16427fb128addd96d426dbd2" # When released put a hash here: "aa95d64d050c286356dadb78d19c2e687dec85cf"
+GIT_BRANCH = "master" # When released put a tag here
+EXPECT_HEAD = None # When released put a hash here: "aa95d64d050c286356dadb78d19c2e687dec85cf"
 
 ROOT_DIR = os.path.realpath(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
