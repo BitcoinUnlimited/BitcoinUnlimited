@@ -22,6 +22,11 @@ BenchRunner::BenchRunner(std::string name, BenchFunction func) { benchmarks().in
 void BenchRunner::RunAll(benchmark::duration elapsedTimeForOne)
 {
     perf_init();
+    if (std::ratio_less_equal<benchmark::clock::period, std::micro>::value)
+    {
+        std::cerr << "WARNING: Clock precision is worse than microsecond - benchmarks may be less accurate!\n";
+    }
+
     std::cout << "#Benchmark"
               << ","
               << "count"
