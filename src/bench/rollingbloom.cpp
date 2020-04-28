@@ -7,7 +7,6 @@
 
 #include "bench.h"
 #include "bloom.h"
-#include "utiltime.h"
 
 static void RollingBloom(benchmark::State& state)
 {
@@ -24,10 +23,10 @@ static void RollingBloom(benchmark::State& state)
         data[2] = count >> 16;
         data[3] = count >> 24;
         if (countnow == nEntriesPerGeneration) {
-            int64_t b = GetStopwatchMicros();
+            auto b = benchmark::clock::now();
             filter.insert(data);
-            int64_t e = GetStopwatchMicros();
-            std::cout << "RollingBloom-refresh,1," << (e-b)*0.000001 << "," << (e-b)*0.000001 << "," << (e-b)*0.000001 << "\n";
+            auto total = std::chrono::duration_cast<std::chrono::nanoseconds>(benchmark::clock::now() - b).count();
+            std::cout << "RollingBloom-refresh,1," << total << "," << total << "," << total << "\n";
             countnow = 0;
         } else {
             filter.insert(data);
