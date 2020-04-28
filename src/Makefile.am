@@ -733,8 +733,7 @@ CLEANFILES += univalue/*.gcda univalue/*.gcno
 CLEANFILES += wallet/*.gcda wallet/*.gcno
 CLEANFILES += wallet/test/*.gcda wallet/test/*.gcno
 CLEANFILES += zmq/*.gcda zmq/*.gcno
-
-DISTCLEANFILES = obj/build.h xversionkeys.h
+CLEANFILES += obj/build.h xversionkeys.h
 
 EXTRA_DIST = leveldb $(CTAES_DIST) $(srcdir)/xversionkeys.dat $(top_srcdir)/contrib/devtools/xversionkeys.py
 
