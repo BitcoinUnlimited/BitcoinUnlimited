@@ -12,7 +12,11 @@
 
 using namespace benchmark;
 
-std::map<std::string, BenchFunction> BenchRunner::benchmarks;
+benchmark::BenchRunner::BenchmarkMap &benchmark::BenchRunner::benchmarks()
+{
+    static std::map<std::string, benchmark::BenchFunction> benchmarks_map;
+    return benchmarks_map;
+}
 
 static double gettimedouble(void)
 {
@@ -21,7 +25,7 @@ static double gettimedouble(void)
     return tv.tv_usec * 0.000001 + tv.tv_sec;
 }
 
-BenchRunner::BenchRunner(std::string name, BenchFunction func) { benchmarks.insert(std::make_pair(name, func)); }
+BenchRunner::BenchRunner(std::string name, BenchFunction func) { benchmarks().insert(std::make_pair(name, func)); }
 void BenchRunner::RunAll(double elapsedTimeForOne)
 {
     perf_init();
@@ -42,11 +46,10 @@ void BenchRunner::RunAll(double elapsedTimeForOne)
               << "average_cycles"
               << "\n";
 
-    for (std::map<std::string, BenchFunction>::iterator it = benchmarks.begin(); it != benchmarks.end(); ++it)
+    for (const auto &p : benchmarks())
     {
-        State state(it->first, elapsedTimeForOne);
-        BenchFunction &func = it->second;
-        func(state);
+        State state(p.first, elapsedTimeForOne);
+        p.second(state);
     }
     perf_fini();
 }
