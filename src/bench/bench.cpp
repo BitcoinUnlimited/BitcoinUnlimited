@@ -73,7 +73,7 @@ bool State::KeepRunning()
     {
         now = gettimedouble();
         double elapsed = now - lastTime;
-        double elapsedOne = elapsed * countMaskInv;
+        double elapsedOne = elapsed / (countMask + 1);
         if (elapsedOne < minTime)
             minTime = elapsedOne;
         if (elapsedOne > maxTime)
@@ -81,7 +81,7 @@ bool State::KeepRunning()
 
         // We only use relative values, so don't have to handle 64-bit wrap-around specially
         nowCycles = perf_cpucycles();
-        uint64_t elapsedOneCycles = (nowCycles - lastCycles) * countMaskInv;
+        uint64_t elapsedOneCycles = (nowCycles - lastCycles) / (countMask + 1);
         if (elapsedOneCycles < minCycles)
             minCycles = elapsedOneCycles;
         if (elapsedOneCycles > maxCycles)
@@ -93,7 +93,6 @@ bool State::KeepRunning()
             // timing.
             // The restart avoids including the overhead of this code in the measurement.
             countMask = ((countMask << 3) | 7) & ((1LL << 60) - 1);
-            countMaskInv = 1. / (countMask + 1);
             count = 0;
             minTime = std::numeric_limits<double>::max();
             maxTime = std::numeric_limits<double>::min();
@@ -107,7 +106,6 @@ bool State::KeepRunning()
             if ((count & newCountMask) == 0)
             {
                 countMask = newCountMask;
-                countMaskInv = 1. / (countMask + 1);
             }
         }
     }
