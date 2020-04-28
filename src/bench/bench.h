@@ -64,13 +64,11 @@ class State
     uint64_t maxCycles;
 
 public:
-    State(std::string _name, duration _maxElapsed) : name(_name), maxElapsed(_maxElapsed), count(0)
+    State(std::string _name, duration _maxElapsed)
+        : name(_name), maxElapsed(_maxElapsed), minTime(duration::max()), maxTime(duration::zero()), count(0),
+          countMask(1), beginCycles(0), lastCycles(0), minCycles(std::numeric_limits<uint64_t>::max()),
+          maxCycles(std::numeric_limits<uint64_t>::min())
     {
-        minTime = duration::max();
-        maxTime = duration::zero();
-        minCycles = std::numeric_limits<uint64_t>::max();
-        maxCycles = std::numeric_limits<uint64_t>::min();
-        countMask = 1;
     }
     bool KeepRunning();
 };
