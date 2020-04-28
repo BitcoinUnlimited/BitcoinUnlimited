@@ -1209,7 +1209,6 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
         assert(block);
         {
             READLOCK(cs_mapBlockIndex);
-            assert(block);
             while (block && block->pprev && (block->pprev->nStatus & BLOCK_HAVE_DATA))
             {
                 block = block->pprev;
