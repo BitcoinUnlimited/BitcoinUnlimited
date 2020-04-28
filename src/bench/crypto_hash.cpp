@@ -50,7 +50,7 @@ static void SHA256_32b(benchmark::State &state)
     {
         for (int i = 0; i < 1000000; i++)
         {
-            CSHA256().Write(in.data(), in.size()).Finalize(&in[0]);
+            CSHA256().Write(in.data(), in.size()).Finalize(in.data());
         }
     }
 }
