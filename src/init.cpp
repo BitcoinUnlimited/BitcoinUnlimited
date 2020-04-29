@@ -357,7 +357,7 @@ void OnRPCPreCommand(const CRPCCommand &cmd)
 
 // BU LicenseInfo() is moved to unlimited.cpp
 
-static void BlockNotifyCallback(bool initialSync, const CBlockIndex *pBlockIndex)
+static void BlockNotifyCallback(bool initialSync, const CBlockIndex *pBlockIndex, bool fHeader)
 {
     if (initialSync || !pBlockIndex)
         return;

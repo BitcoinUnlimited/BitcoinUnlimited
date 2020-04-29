@@ -209,7 +209,7 @@ static void BannedListChanged(ClientModel *clientmodel)
     QMetaObject::invokeMethod(clientmodel, "updateBanlist", Qt::QueuedConnection);
 }
 
-static void BlockTipChanged(ClientModel *clientmodel, bool initialSync, const CBlockIndex *pIndex)
+static void BlockTipChanged(ClientModel *clientmodel, bool initialSync, const CBlockIndex *pIndex, bool fHeader)
 {
     // lock free async UI updates in case we have a new block tip
     // during initial sync, only update the UI if the last update
@@ -225,7 +225,8 @@ static void BlockTipChanged(ClientModel *clientmodel, bool initialSync, const CB
         // pass a async signal to the UI thread
         QMetaObject::invokeMethod(clientmodel, "numBlocksChanged", Qt::QueuedConnection, Q_ARG(int, pIndex->nHeight),
             Q_ARG(QDateTime, QDateTime::fromTime_t(clientmodel->lastBlockTime)),
-            Q_ARG(double, clientmodel->getVerificationProgress(pIndex)));
+            Q_ARG(double, clientmodel->getVerificationProgress(pIndex)),
+            Q_ARG(bool, fHeader));
         nLastBlockTipUpdateNotification = now;
     }
 }
@@ -237,7 +238,8 @@ void ClientModel::subscribeToCoreSignals()
     uiInterface.NotifyNumConnectionsChanged.connect(boost::bind(NotifyNumConnectionsChanged, this, _1));
     uiInterface.NotifyAlertChanged.connect(boost::bind(NotifyAlertChanged, this));
     uiInterface.BannedListChanged.connect(boost::bind(BannedListChanged, this));
-    uiInterface.NotifyBlockTip.connect(boost::bind(BlockTipChanged, this, _1, _2));
+    uiInterface.NotifyBlockTip.connect(boost::bind(BlockTipChanged, this, _1, _2, _3));
+    uiInterface.NotifyHeaderTip.connect(boost::bind(BlockTipChanged, this, _1, _2, _3));
 }
 
 void ClientModel::unsubscribeFromCoreSignals()
@@ -247,5 +249,6 @@ void ClientModel::unsubscribeFromCoreSignals()
     uiInterface.NotifyNumConnectionsChanged.disconnect(boost::bind(NotifyNumConnectionsChanged, this, _1));
     uiInterface.NotifyAlertChanged.disconnect(boost::bind(NotifyAlertChanged, this));
     uiInterface.BannedListChanged.disconnect(boost::bind(BannedListChanged, this));
-    uiInterface.NotifyBlockTip.disconnect(boost::bind(BlockTipChanged, this, _1, _2));
+    uiInterface.NotifyBlockTip.disconnect(boost::bind(BlockTipChanged, this, _1, _2, _3));
+    uiInterface.NotifyHeaderTip.disconnect(boost::bind(BlockTipChanged, this, _1, _2, _3));
 }

@@ -479,9 +479,9 @@ void BitcoinGUI::setClientModel(ClientModel *_clientModel)
         connect(_clientModel, SIGNAL(numConnectionsChanged(int)), this, SLOT(setNumConnections(int)));
 
         setNumBlocks(_clientModel->getNumBlocks(), _clientModel->getLastBlockDate(),
-            _clientModel->getVerificationProgress(nullptr));
-        connect(_clientModel, SIGNAL(numBlocksChanged(int, QDateTime, double)), this,
-            SLOT(setNumBlocks(int, QDateTime, double)));
+            _clientModel->getVerificationProgress(nullptr), false);
+        connect(_clientModel, SIGNAL(numBlocksChanged(int, QDateTime, double, bool)), this,
+            SLOT(setNumBlocks(int, QDateTime, double, bool)));
 
         // Receive and report messages from client model
         connect(_clientModel, SIGNAL(message(QString, QString, unsigned int)), this,
@@ -732,11 +732,15 @@ void BitcoinGUI::setNumConnections(int count)
     labelConnectionsIcon->setToolTip(tr("%n active connection(s) to Bitcoin network", "", count));
 }
 
-void BitcoinGUI::setNumBlocks(int count, const QDateTime &blockDate, double nVerificationProgress)
+void BitcoinGUI::setNumBlocks(int count, const QDateTime &blockDate, double nVerificationProgress, bool fHeader)
 {
     if (modalOverlay)
     {
-        modalOverlay->tipUpdate(count, blockDate, nVerificationProgress);
+        if (!fHeader)
+        {
+            modalOverlay->setKnownBestHeight(count, blockDate);
+            modalOverlay->tipUpdate(count, blockDate, nVerificationProgress);
+        }
     }
     if (!clientModel)
         return;

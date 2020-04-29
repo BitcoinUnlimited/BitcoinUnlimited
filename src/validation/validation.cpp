@@ -186,6 +186,20 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &sta
     return true;
 }
 
+static void NotifyHeaderTip()
+{
+    if (!pindexBestHeader.load())
+        return;
+
+    static std::atomic<CBlockIndex *> pindexHeaderOld{pindexBestHeader.load()};
+    static std::atomic<int64_t> nLastTime{0};
+    if (pindexBestHeader.load()->nChainWork > pindexHeaderOld.load()->nChainWork && (GetTime() - nLastTime > 1 || !IsInitialBlockDownload()))
+    {
+        uiInterface.NotifyHeaderTip(false, pindexBestHeader.load(), true);
+        pindexHeaderOld.store(pindexBestHeader.load());
+        nLastTime = GetTime();
+    }
+}
 bool AcceptBlockHeader(const CBlockHeader &block,
     CValidationState &state,
     const CChainParams &chainparams,
@@ -311,7 +325,12 @@ CBlockIndex *AddToBlockIndex(const CBlockHeader &block)
     CBlockIndex *pBestHeader = pindexBestHeader.load();
     if ((!(pindexNew->nStatus & BLOCK_FAILED_MASK)) &&
         (pBestHeader == nullptr || pBestHeader->nChainWork < pindexNew->nChainWork))
-        pindexBestHeader = pindexNew;
+    {
+        pindexBestHeader.store(pindexNew);
+    }
+
+    // Update the ui if the best header has changed.
+    NotifyHeaderTip();
 
     setDirtyBlockIndex.insert(pindexNew);
 
@@ -1459,7 +1478,7 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
         pindexBestHeader = mostWork;
     }
 
-    uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev);
+    uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev, false);
     return true;
 }
 
@@ -3435,7 +3454,7 @@ bool ActivateBestChainStep(CValidationState &state,
                 static std::atomic<int64_t> nLastUpdate = {GetTime()};
                 if (nLastUpdate.load() < GetTime() - 5)
                 {
-                    uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindexNewTip);
+                    uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindexNewTip, false);
                     pindexLastNotify = pindexNewTip;
                     nLastUpdate.store(GetTime());
                 }
@@ -3460,7 +3479,7 @@ bool ActivateBestChainStep(CValidationState &state,
 
         // Notify the UI with the new block tip information.
         if (pindexMostWork->nHeight >= nHeight && pindexNewTip != nullptr && pindexLastNotify != pindexNewTip)
-            uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindexNewTip);
+            uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindexNewTip, false);
 
         if (fContinue)
         {

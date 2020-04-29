@@ -113,7 +113,7 @@ private:
 
 Q_SIGNALS:
     void numConnectionsChanged(int count);
-    void numBlocksChanged(int count, const QDateTime &blockDate, double nVerificationProgress);
+    void numBlocksChanged(int count, const QDateTime &blockDate, double nVerificationProgress, bool fHeader);
     void timeSinceLastBlockChanged(qint64 lastBlockTime);
     void mempoolSizeChanged(long count, size_t mempoolSizeInBytes);
     void orphanPoolSizeChanged(long count);

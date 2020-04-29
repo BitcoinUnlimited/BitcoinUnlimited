@@ -6,6 +6,7 @@
 #include "ui_modaloverlay.h"
 
 #include "guiutil.h"
+#include "main.h"
 
 #include <QResizeEvent>
 #include <QPropertyAnimation>
@@ -65,15 +66,8 @@ bool ModalOverlay::event(QEvent* ev) {
 
 void ModalOverlay::setKnownBestHeight(int count, const QDateTime& blockDate)
 {
-
-    /* only update the blockheight if the headerschain-tip is not older then 30 days */
-    int64_t now = QDateTime::currentDateTime().toTime_t();
-    int64_t btime = blockDate.toTime_t();
-    if (btime+3600*24*30 > now)
-    {
-        if (count > bestBlockHeight)
-            bestBlockHeight = count;
-    }
+    if (count > bestBlockHeight.load())
+        bestBlockHeight.store(count);
 }
 
 void ModalOverlay::tipUpdate(int count, const QDateTime& blockDate, double nVerificationProgress)
@@ -126,10 +120,18 @@ void ModalOverlay::tipUpdate(int count, const QDateTime& blockDate, double nVeri
     ui->progressBar->setValue(nVerificationProgress*100);
 
     // show remaining amount of blocks
-    if (bestBlockHeight > 0)
-        ui->amountOfBlocksLeft->setText(QString::number(bestBlockHeight-count));
+    // estimate the number of headers left based on nPowTargetSpacing
+    int nEstimateNumHeadersLeft = QDateTime::fromTime_t(pindexBestHeader.load()->nTime).secsTo(currentDate) / Params().GetConsensus().nPowTargetSpacing;
+    bool fHasBestHeader = pindexBestHeader.load()->nHeight >= count;
+    if (nEstimateNumHeadersLeft < HEADER_HEIGHT_SYNC_DELTA && fHasBestHeader)
+    {
+        ui->amountOfBlocksLeft->setText(QString::number(pindexBestHeader.load()->nHeight - bestBlockHeight));
+    }
     else
+    {
+        ui->amountOfBlocksLeft->setText(tr("Unknown. Syncing Headers (%1)...").arg(pindexBestHeader.load()->nHeight));
         ui->expectedTimeLeft->setText(tr("Unknown. Syncing Headers..."));
+    }
 }
 
 void ModalOverlay::showHide(bool hide, bool userRequested)
