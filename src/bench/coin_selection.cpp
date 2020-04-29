@@ -59,4 +59,4 @@ static void CoinSelectionBench(benchmark::State& state)
     }
 }
 
-BENCHMARK(CoinSelectionBench);
+BENCHMARK(CoinSelectionBench, 650);

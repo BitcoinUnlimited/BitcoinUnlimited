@@ -84,8 +84,8 @@ static void BloomContains(benchmark::State &state)
     sideEffect = contains;
 }
 
-BENCHMARK(BloomCheckSet);
-BENCHMARK(BloomContains);
+BENCHMARK(BloomCheckSet, 1);
+BENCHMARK(BloomContains, 1);
 
 
 static void FastFilterCheckSet(benchmark::State &state)
@@ -185,8 +185,8 @@ static void Nothing(benchmark::State &state)
 }
 
 
-BENCHMARK(Nothing);
-BENCHMARK(FastFilterCheckSet);
-BENCHMARK(FastFilterCheckSet2);
-BENCHMARK(FastFilterContains);
-BENCHMARK(FastFilterContains2);
+BENCHMARK(Nothing, 1);
+BENCHMARK(FastFilterCheckSet, 2);
+BENCHMARK(FastFilterCheckSet2, 1);
+BENCHMARK(FastFilterContains, 1);
+BENCHMARK(FastFilterContains2, 1);
