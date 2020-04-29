@@ -4,7 +4,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "bench.h"
-#include "main.h"
 #include "utiltime.h"
 
 // Sanity test: this should loop ten times, and
