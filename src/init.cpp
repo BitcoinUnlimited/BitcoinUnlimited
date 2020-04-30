@@ -658,7 +658,7 @@ void InitLogging()
 #else
     version_string += " (release build)";
 #endif
-    LOGA("BCH Unlimited version %s (%s)\n", version_string, CLIENT_DATE);
+    LOGA(PACKAGE_NAME " version %s (%s)\n", version_string, CLIENT_DATE);
 }
 
 /** Initialize bitcoin.
