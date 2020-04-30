@@ -664,7 +664,7 @@ public:
      * Check that none of this transactions inputs are in the mempool, and thus
      * the tx is not dependent on other mempool transactions to be included in a block.
      */
-    bool HasNoInputsOf(const CTransaction &tx) const;
+    bool HasNoInputsOf(const CTransactionRef &tx) const;
 
     /** Affect CreateNewBlock prioritisation of transactions */
     void PrioritiseTransaction(const uint256 hash,
