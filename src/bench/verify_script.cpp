@@ -69,7 +69,7 @@ static void VerifyScriptBench(benchmark::State &state)
     CScript scriptSig;
     CScript witScriptPubkey = CScript() << OP_DUP << OP_HASH160 << ToByteVector(pubkeyHash) << OP_EQUALVERIFY
                                         << OP_CHECKSIG;
-    CTransaction txCredit = BuildCreditingTransaction(scriptPubKey);
+    const CMutableTransaction &txCredit = BuildCreditingTransaction(scriptPubKey);
     CMutableTransaction txSpend = BuildSpendingTransaction(scriptSig, txCredit);
     CScript &ssig = txSpend.vin[0].scriptSig;
     uint256 sighash = SignatureHash(witScriptPubkey, txSpend, 0, SIGHASH_ALL, txCredit.vout[0].nValue);

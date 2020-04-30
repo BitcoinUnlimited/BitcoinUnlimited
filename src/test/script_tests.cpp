@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2015 The Bitcoin Core developers
+// Copyright (c) 2012-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -2011,7 +2011,10 @@ BOOST_AUTO_TEST_CASE(script_PushData)
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
 }
 
-CScript sign_multisig(const CScript &scriptPubKey, std::vector<CKey> keys, const CTransaction &transaction, CAmount amt)
+CScript sign_multisig(const CScript &scriptPubKey,
+    const std::vector<CKey> &keys,
+    const CTransaction &transaction,
+    CAmount amt)
 {
     unsigned char sighashType = SIGHASH_ALL | SIGHASH_FORKID;
 
