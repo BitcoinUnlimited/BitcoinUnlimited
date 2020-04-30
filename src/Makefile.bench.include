@@ -27,9 +27,7 @@ bench_bench_bitcoin_SOURCES = \
   bench/ccoins_caching.cpp \
   bench/mempool_eviction.cpp \
   bench/verify_script.cpp \
-  bench/base58.cpp \
-  bench/perf.cpp \
-  bench/perf.h
+  bench/base58.cpp
 
 nodist_bench_bench_bitcoin_SOURCES = $(GENERATED_BENCH_FILES)
 

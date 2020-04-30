@@ -464,8 +464,6 @@ bench/Examples.cpp
 bench/mempool_eviction.cpp
 bench/merkle_root.cpp
 bench/murmur_hash.cpp
-bench/perf.cpp
-bench/perf.h
 bench/prevector.cpp
 bench/rollingbloom.cpp
 bench/verify_script.cpp

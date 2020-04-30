@@ -3,8 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "bench.h"
-#include "perf.h"
+#include "bench/bench.h"
 
 #include <algorithm>
 #include <assert.h>
@@ -104,7 +103,6 @@ void benchmark::BenchRunner::RunAll(Printer &printer,
     const std::string &filter,
     bool is_list_only)
 {
-    perf_init();
     if (!std::ratio_less_equal<benchmark::clock::period, std::micro>::value)
     {
         std::cerr << "WARNING: Clock precision is worse than microsecond - benchmarks may be less accurate!\n";
@@ -140,8 +138,6 @@ void benchmark::BenchRunner::RunAll(Printer &printer,
     }
 
     printer.footer();
-
-    perf_fini();
 }
 
 bool benchmark::State::UpdateTimer(const benchmark::time_point current_time)
