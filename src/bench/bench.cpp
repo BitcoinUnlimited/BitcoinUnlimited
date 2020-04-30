@@ -110,6 +110,10 @@ void benchmark::BenchRunner::RunAll(Printer &printer,
         std::cerr << "WARNING: Clock precision is worse than microsecond - benchmarks may be less accurate!\n";
     }
 
+#ifdef DEBUG
+    std::cerr << "WARNING: This is a debug build - may result in slower benchmarks.\n";
+#endif
+
     std::regex reFilter(filter);
     std::smatch baseMatch;
 
