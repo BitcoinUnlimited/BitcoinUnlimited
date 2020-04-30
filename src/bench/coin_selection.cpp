@@ -10,7 +10,7 @@
 
 using namespace std;
 
-static void addCoin(const CAmount& nValue, const CWallet& wallet, vector<COutput>& vCoins)
+static void addCoin(const CAmount &nValue, const CWallet &wallet, vector<COutput> &vCoins)
 {
     int nInput = 0;
 
@@ -19,7 +19,7 @@ static void addCoin(const CAmount& nValue, const CWallet& wallet, vector<COutput
     tx.nLockTime = nextLockTime++; // so all transactions get different hashes
     tx.vout.resize(nInput + 1);
     tx.vout[nInput].nValue = nValue;
-    CWalletTx* wtx = new CWalletTx(&wallet, tx);
+    CWalletTx *wtx = new CWalletTx(&wallet, tx);
 
     int nAge = 6 * 24;
     COutput output(wtx, nInput, nAge, true);
@@ -33,19 +33,20 @@ static void addCoin(const CAmount& nValue, const CWallet& wallet, vector<COutput
 // same one over and over isn't too useful. Generating random isn't useful
 // either for measurements."
 // (https://github.com/bitcoin/bitcoin/issues/7883#issuecomment-224807484)
-static void CoinSelectionBench(benchmark::State& state)
+static void CoinSelectionBench(benchmark::State &state)
 {
     const CWallet wallet;
     vector<COutput> vCoins;
     LOCK(wallet.cs_wallet);
 
-    while (state.KeepRunning()) {
+    while (state.KeepRunning())
+    {
         // Add coins.
         for (int i = 0; i < 1000; i++)
             addCoin(1000 * COIN, wallet, vCoins);
         addCoin(3 * COIN, wallet, vCoins);
 
-        set<pair<const CWalletTx*, unsigned int> > setCoinsRet;
+        set<pair<const CWalletTx *, unsigned int> > setCoinsRet;
         CAmount nValueRet;
         bool success = wallet.SelectCoinsMinConf(1003 * COIN, 1, 6, vCoins, setCoinsRet, nValueRet);
         assert(success);
@@ -58,7 +59,6 @@ static void CoinSelectionBench(benchmark::State& state)
             delete output.tx;
         }
         vCoins.clear();
-
     }
 }
 

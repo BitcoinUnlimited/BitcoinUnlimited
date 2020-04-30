@@ -9,7 +9,7 @@
 #include <list>
 #include <vector>
 
-static void AddTx(const CTransaction& tx, const CAmount& nFee, CTxMemPool& pool)
+static void AddTx(const CTransaction &tx, const CAmount &nFee, CTxMemPool &pool)
 {
     int64_t nTime = 0;
     double dPriority = 10.0;
@@ -17,15 +17,14 @@ static void AddTx(const CTransaction& tx, const CAmount& nFee, CTxMemPool& pool)
     bool spendsCoinbase = false;
     unsigned int sigOpCost = 4;
     LockPoints lp;
-    pool.addUnchecked(tx.GetHash(), CTxMemPoolEntry(
-                                        MakeTransactionRef(tx), nFee, nTime, dPriority, nHeight, pool.HasNoInputsOf(tx),
-                                        tx.GetValueOut(), spendsCoinbase, sigOpCost, lp));
+    pool.addUnchecked(tx.GetHash(), CTxMemPoolEntry(MakeTransactionRef(tx), nFee, nTime, dPriority, nHeight,
+                                        pool.HasNoInputsOf(tx), tx.GetValueOut(), spendsCoinbase, sigOpCost, lp));
 }
 
 // Right now this is only testing eviction performance in an extremely small
 // mempool. Code needs to be written to generate a much wider variety of
 // unique transactions for a more meaningful performance measurement.
-static void MempoolEviction(benchmark::State& state)
+static void MempoolEviction(benchmark::State &state)
 {
     CMutableTransaction tx1 = CMutableTransaction();
     tx1.vin.resize(1);
@@ -100,7 +99,8 @@ static void MempoolEviction(benchmark::State& state)
     CTxMemPool pool(CFeeRate(1000));
     const CTransactionRef tx1_r{MakeTransactionRef(tx1)};
 
-    while (state.KeepRunning()) {
+    while (state.KeepRunning())
+    {
         AddTx(tx1, 10000LL, pool);
         AddTx(tx2, 5000LL, pool);
         AddTx(tx3, 20000LL, pool);

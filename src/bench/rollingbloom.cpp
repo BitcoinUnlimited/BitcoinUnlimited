@@ -8,13 +8,14 @@
 #include "bench.h"
 #include "bloom.h"
 
-static void RollingBloom(benchmark::State& state)
+static void RollingBloom(benchmark::State &state)
 {
     CRollingBloomFilter filter(120000, 0.000001);
     std::vector<unsigned char> data(32);
     uint32_t count = 0;
     uint64_t match = 0;
-    while (state.KeepRunning()) {
+    while (state.KeepRunning())
+    {
         count++;
         data[0] = count;
         data[1] = count >> 8;

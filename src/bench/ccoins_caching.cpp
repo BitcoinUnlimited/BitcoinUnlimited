@@ -16,15 +16,15 @@
 // paid to a TX_PUBKEY, the second 21 and 22 CENT outputs
 // paid to a TX_PUBKEYHASH.
 //
-static std::vector<CMutableTransaction>
-SetupDummyInputs(CBasicKeyStore& keystoreRet, CCoinsViewCache& coinsRet)
+static std::vector<CMutableTransaction> SetupDummyInputs(CBasicKeyStore &keystoreRet, CCoinsViewCache &coinsRet)
 {
     std::vector<CMutableTransaction> dummyTransactions;
     dummyTransactions.resize(2);
 
     // Add some keys to the keystore:
     CKey key[4];
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++)
+    {
         key[i].MakeNewKey(i % 2);
         keystoreRet.AddKey(key[i]);
     }
@@ -53,7 +53,7 @@ SetupDummyInputs(CBasicKeyStore& keystoreRet, CCoinsViewCache& coinsRet)
 // characteristics than e.g. reindex timings. But that's not a requirement of
 // every benchmark."
 // (https://github.com/bitcoin/bitcoin/issues/7883#issuecomment-224807484)
-static void CCoinsCaching(benchmark::State& state)
+static void CCoinsCaching(benchmark::State &state)
 {
     CBasicKeyStore keystore;
     CCoinsView coinsDummy;
@@ -76,7 +76,8 @@ static void CCoinsCaching(benchmark::State& state)
     t1.vout[0].scriptPubKey << OP_1;
 
     // Benchmark
-    while (state.KeepRunning()) {
+    while (state.KeepRunning())
+    {
         bool success = AreInputsStandard(MakeTransactionRef(t1), coins, true);
         assert(success);
         CAmount value = coins.GetValueIn(t1);
