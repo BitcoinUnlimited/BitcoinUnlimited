@@ -3706,7 +3706,7 @@ bool ProcessNewBlock(CValidationState &state,
         // demerit the sender
         return error("%s: CheckBlockHeader FAILED", __func__);
     }
-    if (IsChainNearlySyncd() && !fImporting && !fReindex)
+    if (IsChainNearlySyncd() && !fImporting && !fReindex && connmgr->ExpeditedBlockNodes().size())
         SendExpeditedBlock(*pblock, pfrom);
 
     bool checked = CheckBlock(*pblock, state);
