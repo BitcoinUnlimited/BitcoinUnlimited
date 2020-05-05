@@ -2329,8 +2329,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
             if (GetArg("-pvtest", false))
                 MilliSleep(1000);
         }
-        LOG(THIN, "Number of CheckInputs() performed: %d  Unverified count: %d\n", nChecked, nUnVerifiedChecked);
-
+        LOG(BENCH, "Number of CheckInputs() performed: %d  Unverified count: %d\n", nChecked, nUnVerifiedChecked);
 
         // Wait for all sig check threads to finish before updating utxo
         LOG(PARALLEL, "Waiting for script threads to finish\n");
@@ -2577,7 +2576,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                 MilliSleep(1000);
         }
         LOG(BENCH, "Number of CheckInputs() performed: %d  Unverified count: %d\n", nChecked, nUnVerifiedChecked);
-
 
         // Wait for all sig check threads to finish before updating utxo
         LOG(PARALLEL, "Waiting for script threads to finish\n");

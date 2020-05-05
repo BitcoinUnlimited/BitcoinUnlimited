@@ -42,6 +42,7 @@ std::atomic<int64_t> nTotalScore{0};
 
 /** Maximum number of failed attempts to insert a package into a block */
 static const unsigned int MAX_PACKAGE_FAILURES = 5;
+extern CTweak<unsigned int> xvalTweak;
 
 using namespace std;
 
@@ -322,6 +323,11 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         else // coinbase May2020 Sigchecks is always 0 since no scripts executed in coinbase tx.
             pblocktemplate->vTxSigOps[0] = 0;
     }
+
+    // All the transactions in this block are from the mempool and therefore we can use XVal to speed
+    // up the testing of the block validity. Set XVal flag for new blocks to true unless otherwise
+    // configured.
+    pblock->fXVal = xvalTweak.Value();
 
     CValidationState state;
     if (blockstreamCoreCompatible)
