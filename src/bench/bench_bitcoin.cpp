@@ -6,6 +6,7 @@
 #include "bench.h"
 
 #include "allowed_args.h"
+#include "bench/bench_constants.h"
 #include "crypto/sha256.h"
 #include "key.h"
 #include "main.h"
@@ -16,49 +17,13 @@
 #include <boost/lexical_cast.hpp>
 #include <memory>
 
-static const int64_t DEFAULT_BENCH_EVALUATIONS = 5;
-static const char *DEFAULT_BENCH_FILTER = ".*";
-static const char *DEFAULT_BENCH_SCALING = "1.0";
-static const char *DEFAULT_BENCH_PRINTER = "console";
-static const char *DEFAULT_PLOT_PLOTLYURL = "https://cdn.plot.ly/plotly-latest.min.js";
-static const int64_t DEFAULT_PLOT_WIDTH = 1024;
-static const int64_t DEFAULT_PLOT_HEIGHT = 768;
-
-
-class BitcoinBenchArgs : public AllowedArgs::BitcoinCli
-{
-public:
-    BitcoinBenchArgs(CTweakMap *pTweaks = nullptr)
-    {
-        addHeader("Bitcoin Bench options:")
-            .addArg("-list", ::AllowedArgs::optionalStr,
-                "List benchmarks without executing them. Can be combined with -scaling and -filter")
-            .addArg("-evals=<n>", ::AllowedArgs::requiredInt,
-                strprintf("Number of measurement evaluations to perform. (default: %u)", DEFAULT_BENCH_EVALUATIONS))
-            .addArg("-filter=<regex>", ::AllowedArgs::requiredInt,
-                strprintf("Regular expression filter to select benchmark by name (default: %s)", DEFAULT_BENCH_FILTER))
-            .addArg("-scaling=<n>", ::AllowedArgs::requiredInt,
-                strprintf("Scaling factor for benchmark's runtime (default: %u)", DEFAULT_BENCH_SCALING))
-            .addArg("-printer=(console|plot)", ::AllowedArgs::requiredStr,
-                strprintf("Choose printer format. console: print data to console. plot: Print results as HTML graph "
-                          "(default: %s)",
-                        DEFAULT_BENCH_PRINTER))
-            .addArg("-plot-plotlyurl=<uri>", ::AllowedArgs::requiredInt,
-                strprintf("URL to use for plotly.js (default: %s)", DEFAULT_PLOT_PLOTLYURL))
-            .addArg("-plot-width=<x>", ::AllowedArgs::requiredInt,
-                strprintf("Plot width in pixel (default: %u)", DEFAULT_PLOT_WIDTH))
-            .addArg("-plot-height=<x>", ::AllowedArgs::requiredInt,
-                strprintf("Plot height in pixel (default: %u)", DEFAULT_PLOT_HEIGHT));
-    }
-};
-
 int main(int argc, char *argv[])
 {
     try
     {
         std::string appname("bench_bitcoin");
         std::string usage = "\n" + std::string("Usage:") + "\n" + "  " + appname + " [options] " + "\n";
-        int ret = AppInitRPC(usage, BitcoinBenchArgs(), argc, argv);
+        int ret = AppInitRPC(usage, AllowedArgs::BitcoinBench(), argc, argv);
         if (ret != CONTINUE_EXECUTION)
             return ret;
     }

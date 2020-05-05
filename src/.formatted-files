@@ -453,6 +453,7 @@ primitives/transaction.cpp
 primitives/transaction.h
 bench/base58.cpp
 bench/bench_bitcoin.cpp
+bench/bench_constants.h
 bench/bench.cpp
 bench/bench.h
 bench/block_assemble.cpp
