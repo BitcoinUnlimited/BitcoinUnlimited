@@ -193,7 +193,8 @@ static void NotifyHeaderTip()
 
     static std::atomic<CBlockIndex *> pindexHeaderOld{pindexBestHeader.load()};
     static std::atomic<int64_t> nLastTime{0};
-    if (pindexBestHeader.load()->nChainWork > pindexHeaderOld.load()->nChainWork && (GetTime() - nLastTime > 1 || !IsInitialBlockDownload()))
+    if (pindexBestHeader.load()->nChainWork > pindexHeaderOld.load()->nChainWork &&
+        (GetTime() - nLastTime > 1 || !IsInitialBlockDownload()))
     {
         uiInterface.NotifyHeaderTip(false, pindexBestHeader.load(), true);
         pindexHeaderOld.store(pindexBestHeader.load());

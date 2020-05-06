@@ -225,8 +225,7 @@ static void BlockTipChanged(ClientModel *clientmodel, bool initialSync, const CB
         // pass a async signal to the UI thread
         QMetaObject::invokeMethod(clientmodel, "numBlocksChanged", Qt::QueuedConnection, Q_ARG(int, pIndex->nHeight),
             Q_ARG(QDateTime, QDateTime::fromTime_t(clientmodel->lastBlockTime)),
-            Q_ARG(double, clientmodel->getVerificationProgress(pIndex)),
-            Q_ARG(bool, fHeader));
+            Q_ARG(double, clientmodel->getVerificationProgress(pIndex)), Q_ARG(bool, fHeader));
         nLastBlockTipUpdateNotification = now;
     }
 }

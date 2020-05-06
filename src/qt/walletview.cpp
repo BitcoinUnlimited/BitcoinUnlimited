@@ -310,7 +310,4 @@ void WalletView::showProgress(const QString &title, int nProgress)
         progressDialog->setValue(nProgress);
 }
 
-void WalletView::requestedSyncWarningInfo()
-{
-    Q_EMIT outOfSyncWarningClicked();
-}
+void WalletView::requestedSyncWarningInfo() { Q_EMIT outOfSyncWarningClicked(); }
