@@ -376,6 +376,7 @@ public:
     CCriticalSection cs_vRecvMsg;
     uint64_t nRecvBytes GUARDED_BY(cs_vRecvMsg);
     std::deque<CNetMessage> vRecvMsg GUARDED_BY(cs_vRecvMsg);
+    std::deque<CNetMessage> vRecvMsg_handshake GUARDED_BY(cs_vRecvMsg);
     // the next message we receive from the socket
     CNetMessage msg GUARDED_BY(cs_vRecvMsg);
     CStatHistory<uint64_t> currentRecvMsgSize;

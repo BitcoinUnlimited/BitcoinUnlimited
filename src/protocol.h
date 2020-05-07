@@ -403,6 +403,9 @@ enum
     // of only serving a small subset of the blockchain
     // See BIP159 for details on how this is implemented.
     NODE_NETWORK_LIMITED = (1 << 10),
+
+    // indicates if node is using xversion
+    NODE_XVERSION = (1 << 11),
 };
 
 /** A CService with information about it as peer */

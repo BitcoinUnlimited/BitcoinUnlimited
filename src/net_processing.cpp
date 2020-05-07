@@ -515,8 +515,45 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // Potentially mark this peer as a preferred download peer.
         UpdatePreferredDownload(pfrom);
 
-        // Send VERACK handshake message
-        pfrom->PushMessage(NetMsgType::VERACK);
+        // TODO :  change this true to testing if xversion versionbit is present
+        if (pfrom->nServices & NODE_XVERSION)
+        {
+            // BU expedited procecessing requires the exchange of the listening port id
+            // The former BUVERSION message has now been integrated into the xmap field in CXVersionMessage.
+
+            // prepare xversion message. This *must* be the next message after the verack has been received,
+            // if it comes at all.
+            CXVersionMessage xver;
+            xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
+            xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
+            xver.set_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED, grapheneMaxVersionSupported.Value());
+            xver.set_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED, grapheneMinVersionSupported.Value());
+            xver.set_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF, grapheneFastFilterCompatibility.Value());
+            xver.set_u64c(XVer::BU_MEMPOOL_SYNC, syncMempoolWithPeers.Value());
+            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED, mempoolSyncMaxVersionSupported.Value());
+            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED, mempoolSyncMinVersionSupported.Value());
+            xver.set_u64c(XVer::BU_XTHIN_VERSION, 2); // xthin version
+
+            size_t nLimitAncestors = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
+            size_t nLimitAncestorSize = GetArg("-limitancestorsize", BU_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
+            size_t nLimitDescendants = GetArg("-limitdescendantcount", BU_DEFAULT_DESCENDANT_LIMIT);
+            size_t nLimitDescendantSize = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
+
+            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT, nLimitAncestors);
+            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT, nLimitAncestorSize);
+            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT, nLimitDescendants);
+            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT, nLimitDescendantSize);
+            xver.set_u64c(XVer::BU_TXN_CONCATENATION, 1);
+
+            electrum::set_xversion_flags(xver, chainparams.NetworkIDString());
+
+            pfrom->PushMessage(NetMsgType::XVERSION, xver);
+        }
+        else
+        {
+            // Send VERACK handshake message
+            pfrom->PushMessage(NetMsgType::VERACK);
+        }
 
         // Change version
         {
@@ -545,58 +582,81 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
     }
 
-    /* Since we are processing messages in multiple threads, we may process them out of order.  Does enforcing this
-       order actually matter?  Note we allow mis-order (or no version message at all) if whitelisted...
-        else if (pfrom->nVersion == 0 && !pfrom->fWhitelisted)
+    else if (strCommand == NetMsgType::XVERSION)
+    {
+        vRecv >> pfrom->xVersion;
+
+        if (pfrom->addrFromPort != 0)
         {
-            // Must have version message before anything else (Although we may send our VERSION before
-            // we receive theirs, it would not be possible to receive their VERACK before their VERSION).
-            pfrom->fDisconnect = true;
-            return error("%s receieved before VERSION message - disconnecting peer=%s", strCommand,
-       pfrom->GetLogName());
+            LOG(NET, "Encountered odd node that sent BUVERSION before XVERSION. Ignoring duplicate addrFromPort "
+                     "setting. peer=%s version=%s\n",
+                pfrom->GetLogName(), pfrom->cleanSubVer);
         }
-    */
+
+        pfrom->ReadConfigFromXVersion();
+
+        pfrom->PushMessage(NetMsgType::VERACK);
+    }
+
+    else if ((pfrom->nVersion == 0 || pfrom->tVersionSent < 0) && !pfrom->fWhitelisted)
+    {
+        // Must have a version message before anything else
+        dosMan.Misbehaving(pfrom, 1);
+        pfrom->fDisconnect = true;
+        return error("%s receieved before VERSION message - disconnecting peer=%s", strCommand, pfrom->GetLogName());
+    }
 
     else if (strCommand == NetMsgType::VERACK)
     {
+        if (GetTime() - pfrom->tVersionSent > VERACK_TIMEOUT)
+        {
+            dosMan.Misbehaving(pfrom, 1);
+            return error("verack message receieved after verack timeout limit reached");
+        }
 
+        if (pfrom->fSuccessfullyConnected == true)
+        {
+            dosMan.Misbehaving(pfrom, 1);
+            pfrom->fDisconnect = true;
+            return error("duplicate verack messages");
+        }
         pfrom->SetRecvVersion(std::min(pfrom->nVersion, PROTOCOL_VERSION));
 
-        // BU expedited procecessing requires the exchange of the listening port id
-        // The former BUVERSION message has now been integrated into the xmap field in CXVersionMessage.
-
-        // prepare xversion message. This *must* be the next message after the verack has been received,
-        // if it comes at all.
-        CXVersionMessage xver;
-        xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
-        xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
-        xver.set_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED, grapheneMaxVersionSupported.Value());
-        xver.set_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED, grapheneMinVersionSupported.Value());
-        xver.set_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF, grapheneFastFilterCompatibility.Value());
-        xver.set_u64c(XVer::BU_MEMPOOL_SYNC, syncMempoolWithPeers.Value());
-        xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED, mempoolSyncMaxVersionSupported.Value());
-        xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED, mempoolSyncMinVersionSupported.Value());
-        xver.set_u64c(XVer::BU_XTHIN_VERSION, 2); // xthin version
-
-        size_t nLimitAncestors = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
-        size_t nLimitAncestorSize = GetArg("-limitancestorsize", BU_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
-        size_t nLimitDescendants = GetArg("-limitdescendantcount", BU_DEFAULT_DESCENDANT_LIMIT);
-        size_t nLimitDescendantSize = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
-
-        xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT, nLimitAncestors);
-        xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT, nLimitAncestorSize);
-        xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT, nLimitDescendants);
-        xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT, nLimitDescendantSize);
-        xver.set_u64c(XVer::BU_TXN_CONCATENATION, 1);
-
-        electrum::set_xversion_flags(xver, chainparams.NetworkIDString());
-
-        pfrom->PushMessage(NetMsgType::XVERSION, xver);
+        handleAddressAfterInit(pfrom);
+        enableSendHeaders(pfrom);
+        enableCompactBlocks(pfrom);
 
 
-        if (pfrom->nVersion >= EXPEDITED_VERSION)
-            // also send legacy message (at least for now)
-            pfrom->PushMessage(NetMsgType::BUVERSION, GetListenPort());
+        /// LEGACY xversion code (old spec)
+        {
+            // prepare xversion message. This *must* be the next message after the verack has been received,
+            // if it comes at all.
+            CXVersionMessage xver;
+            xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
+            xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
+            xver.set_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED, grapheneMaxVersionSupported.Value());
+            xver.set_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED, grapheneMinVersionSupported.Value());
+            xver.set_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF, grapheneFastFilterCompatibility.Value());
+            xver.set_u64c(XVer::BU_MEMPOOL_SYNC, syncMempoolWithPeers.Value());
+            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED, mempoolSyncMaxVersionSupported.Value());
+            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED, mempoolSyncMinVersionSupported.Value());
+            xver.set_u64c(XVer::BU_XTHIN_VERSION, 2); // xthin version
+
+            size_t nLimitAncestors = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
+            size_t nLimitAncestorSize = GetArg("-limitancestorsize", BU_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
+            size_t nLimitDescendants = GetArg("-limitdescendantcount", BU_DEFAULT_DESCENDANT_LIMIT);
+            size_t nLimitDescendantSize = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
+
+            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT, nLimitAncestors);
+            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT, nLimitAncestorSize);
+            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT, nLimitDescendants);
+            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT, nLimitDescendantSize);
+            xver.set_u64c(XVer::BU_TXN_CONCATENATION, 1);
+
+            electrum::set_xversion_flags(xver, chainparams.NetworkIDString());
+
+            pfrom->PushMessage(NetMsgType::XVERSION_OLD, xver);
+        }
 
         // Tell the peer what maximum xthin bloom filter size we will consider acceptable.
         // FIXME: integrate into xversion as well
@@ -604,9 +664,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         {
             pfrom->PushMessage(NetMsgType::FILTERSIZEXTHIN, nXthinBloomFilterSize);
         }
-    }
+
+        // This step done after final handshake
+        CheckAndRequestExpeditedBlocks(pfrom);
 
         pfrom->fSuccessfullyConnected = true;
+    }
 
     else if (!pfrom->fSuccessfullyConnected && GetTime() - pfrom->tVersionSent > VERACK_TIMEOUT &&
              pfrom->tVersionSent >= 0)
@@ -629,7 +692,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         return true; // return true so we don't get any process message failures in the log.
     }
 
-    else if (strCommand == NetMsgType::XVERSION)
+    else if (strCommand == NetMsgType::XVERSION_OLD)
     {
         vRecv >> pfrom->xVersion;
 
@@ -642,16 +705,17 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         pfrom->ReadConfigFromXVersion();
 
-        pfrom->PushMessage(NetMsgType::XVERACK);
+        pfrom->PushMessage(NetMsgType::XVERACK_OLD);
         handleAddressAfterInit(pfrom);
         enableSendHeaders(pfrom);
         enableCompactBlocks(pfrom);
     }
-    else if (strCommand == NetMsgType::XVERACK)
+    else if (strCommand == NetMsgType::XVERACK_OLD)
     {
         // This step done after final handshake
         CheckAndRequestExpeditedBlocks(pfrom);
     }
+
     else if (strCommand == NetMsgType::XUPDATE)
     {
         CXVersionMessage xUpdate;
@@ -2032,13 +2096,59 @@ bool ProcessMessages(CNode *pfrom)
         READLOCK(pfrom->csMsgSerializer);
         CNetMessage msg;
         bool fUseLowPriorityMsg = true;
+        bool fUsePriorityMsg = true;
+        // try to complete the handshake before handling messages that require us to be fSuccessfullyConnected
+        if (pfrom->fSuccessfullyConnected == false)
         {
+            TRY_LOCK(pfrom->cs_vRecvMsg, lockRecv);
+            if (!lockRecv)
+                break;
+            if (pfrom->vRecvMsg_handshake.empty())
+                break;
+
+            // get the message from the queue
+            // simply getting the front message should be sufficient, the only time a xversion or verack is sent is
+            // once the previous has been processed so tracking which stage of the handshake we are on is overkill
+            std::swap(msg, pfrom->vRecvMsg_handshake.front());
+            pfrom->vRecvMsg_handshake.pop_front();
+            pfrom->currentRecvMsgSize -= msg.size();
+            msgsProcessed++;
+        }
+        else
+        {
+            {
+                TRY_LOCK(pfrom->cs_vRecvMsg, lockRecv);
+                if (!lockRecv)
+                    break;
+                if (pfrom->vRecvMsg_handshake.empty() == false)
+                {
+                    std::string frontCommand = pfrom->vRecvMsg_handshake.front().hdr.GetCommand();
+                    if (frontCommand == NetMsgType::VERSION || frontCommand == NetMsgType::VERACK ||
+                        frontCommand == NetMsgType::XVERSION)
+                    {
+                        pfrom->vRecvMsg_handshake.clear();
+                        pfrom->fDisconnect = true;
+                        dosMan.Misbehaving(pfrom, 1);
+                        return error(
+                            "recieved early handshake message after successfully connected, disconnecting peer=%s",
+                            pfrom->GetLogName());
+                    }
+
+                    // this code should only handle XVERSION_OLD and XVERACK_OLD messages
+                    std::swap(msg, pfrom->vRecvMsg_handshake.front());
+                    pfrom->vRecvMsg_handshake.pop_front();
+                    pfrom->currentRecvMsgSize -= msg.size();
+                    msgsProcessed++;
+                    fUsePriorityMsg = false;
+                    fUseLowPriorityMsg = false;
+                }
+            }
             // Get next message to process checking whether it is a priority messasge and if so then
             // process it right away. It doesn't matter that the peer where the message came from is
             // different than the one we are currently procesing as we will switch to the correct peer
             // automatically. Furthermore by using and holding the CNodeRef we automatically maintain
             // a node reference to the priority peer.
-            if (fPriorityRecvMsg.load())
+            if (fUsePriorityMsg && fPriorityRecvMsg.load())
             {
                 TRY_LOCK(cs_priorityRecvQ, locked);
                 if (locked && !vPriorityRecvQ.empty())

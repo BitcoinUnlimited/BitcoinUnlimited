@@ -515,7 +515,10 @@ void CNode::CloseSocketDisconnect()
     // in case this fails, we'll empty the recv buffer when the CNode is deleted
     TRY_LOCK(cs_vRecvMsg, lockRecv);
     if (lockRecv)
+    {
         vRecvMsg.clear();
+        vRecvMsg_handshake.clear();
+    }
 }
 
 void CNode::PushVersion()
@@ -708,7 +711,16 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 
             if (fSendLowPriority)
             {
-                vRecvMsg.push_back(std::move(msg));
+                if (strCommand == NetMsgType::VERSION || strCommand == NetMsgType::XVERSION ||
+                    strCommand == NetMsgType::XVERSION_OLD || strCommand == NetMsgType::XVERACK_OLD ||
+                    strCommand == NetMsgType::VERACK)
+                {
+                    vRecvMsg_handshake.push_back(std::move(msg));
+                }
+                else
+                {
+                    vRecvMsg.push_back(std::move(msg));
+                }
                 msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
             }
             messageHandlerCondition.notify_one();
@@ -2807,6 +2819,7 @@ void NetCleanup()
             {
                 LOCK(pnode->cs_vRecvMsg);
                 pnode->vRecvMsg.clear();
+                pnode->vRecvMsg_handshake.clear();
             }
             {
                 LOCK(pnode->cs_vSend);
