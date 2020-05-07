@@ -258,6 +258,7 @@ testScripts = [ RpcTest(t) for t in [
     'graphene_stage2',
     'thinblocks',
     Disabled('checkdatasig_activation', "CDSV has been already succesfully activated, keep test around as a template for other OP activation"),
+    'xversion_old',
     'xversion',
     'sighashmatch',
     'getlogcategories',
