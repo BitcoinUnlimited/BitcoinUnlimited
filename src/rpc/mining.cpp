@@ -137,19 +137,15 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
         }
 
 		// Generally look for weak PoW
-		while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount && CheckProofOfWork(pblock->GetHash(), weakPOWfromPOW(pblock->nBits), Params().GetConsensus()))
+		while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount && !CheckProofOfWork(pblock->GetHash(), weakPOWfromPOW(pblock->nBits), Params().GetConsensus(), true))
 		{
 			++pblock->nNonce;
 			--nMaxTries;
 		}
 		if (nMaxTries == 0)
-		{
 			break;
-		}
 		if (pblock->nNonce == nInnerLoopCount)
-		{
 			continue;
-		}
 
 		LOG(WB, "PROCESS NEW WEAK\n");
 		CNetDeltaBlock::processNew(pblock, nullptr);

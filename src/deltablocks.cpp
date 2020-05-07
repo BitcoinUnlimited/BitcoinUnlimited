@@ -27,9 +27,8 @@ static std::vector<uint256> strongs_for_db;
 extern unsigned int weakPOWfromPOW(unsigned int nBits) {
     arith_uint256 a;
     a.SetCompact(nBits);
-    a = ~a;
-    a *= 1000;
-    a = ~a;
+    a /= 1000;
+
     return a.GetCompact();
 }
 
@@ -56,7 +55,7 @@ std::vector<uint256> CDeltaBlock::deltaParentHashes() const {
 std::vector<ConstCDeltaBlockRef> CDeltaBlock::ancestors() const {
     LOCK(cs_db);
     std::vector<ConstCDeltaBlockRef> result;
-    for (auto hash : delta_parent_hashes) {
+    for (auto &hash : delta_parent_hashes) {
         if (!known_dbs.count(hash)) {
             LOG(WB, "Delta block misses ancestor(s)!\n");
             return std::vector<ConstCDeltaBlockRef>();
@@ -435,7 +434,7 @@ void CDeltaBlock::add(const CTransactionRef &txref) {
 void CDeltaBlock::tryRegister(const CDeltaBlockRef& ref) {
     LOCK(cs_db);
     LOG(WB, "Trying to register delta block %s.\n", ref->GetHash().GetHex());
-    if (known_dbs.count(ref->GetHash())) {
+    if (known_dbs[ref->GetHash()] != nullptr) {
         LOG(WB, "Ignoring, already known.\n");
         return;
     }
