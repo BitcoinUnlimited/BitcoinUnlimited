@@ -101,6 +101,8 @@ static const unsigned int MAX_DISCONNECTS = 200;
 static const uint64_t DEFAULT_MAX_UPLOAD_TARGET = 0;
 /** Default for blocks only*/
 static const bool DEFAULT_BLOCKSONLY = false;
+/** Default for XVersion */
+static const bool DEFAULT_USE_XVERSION = true;
 
 // BITCOINUNLIMITED START
 static const bool DEFAULT_FORCEBITNODES = false;
