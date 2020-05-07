@@ -673,41 +673,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         return true; // return true so we don't get any process message failures in the log.
     }
-    // BUVERSION is used to pass BU specific version information similar to NetMsgType::VERSION
-    // and is exchanged after the VERSION and VERACK are both sent and received.
-    else if (strCommand == NetMsgType::BUVERSION)
-    {
-        if (!ensureConnectionState(strCommand,
-                ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION | ConnectionStateIncoming::READY,
-                ConnectionStateOutgoing::READY | ConnectionStateOutgoing::SENT_VERSION, pfrom))
-            return false;
 
-        // Each connection can only send one version message
-        if (pfrom->addrFromPort != 0)
-        {
-            LOG(NET, "Ignoring duplicate BUVERSION or extra addrFromPort setting. peer=%s version=%s\n",
-                pfrom->GetLogName(), pfrom->cleanSubVer);
-            unsigned short dummy;
-            vRecv >> dummy;
-        }
-        else
-        {
-            // addrFromPort is needed for connecting and initializing Xpedited forwarding.
-            vRecv >> pfrom->addrFromPort;
-            pfrom->PushMessage(NetMsgType::BUVERACK);
-        }
-    }
-    // Final handshake for BU specific version information similar to NetMsgType::VERACK
-    else if (strCommand == NetMsgType::BUVERACK)
-    {
-        if (!ensureConnectionState(strCommand,
-                ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION | ConnectionStateIncoming::READY,
-                ConnectionStateOutgoing::READY, pfrom))
-            return false;
-
-        // This step done after final handshake
-        CheckAndRequestExpeditedBlocks(pfrom);
-    }
     else if (strCommand == NetMsgType::XVERSION)
     {
         if (!ensureConnectionState(strCommand, ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION,
