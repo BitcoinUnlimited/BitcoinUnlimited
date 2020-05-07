@@ -109,7 +109,7 @@ DoubleSpendProof DoubleSpendProof::create(const CTransaction &t1, const CTransac
     size_t inputIndex2 = 0;
     for (; inputIndex1 < t1.vin.size(); ++inputIndex1) {
         const CTxIn &in1 = t1.vin.at(inputIndex1);
-        for (inputIndex2 = 0;inputIndex2 < t2.vin.size(); ++inputIndex2) {
+        for (inputIndex2 = 0; inputIndex2 < t2.vin.size(); ++inputIndex2) {
             const CTxIn &in2 = t2.vin.at(inputIndex2);
             if (in1.prevout == in2.prevout) {
                 answer.m_prevOutIndex = in1.prevout.n;
@@ -128,6 +128,10 @@ DoubleSpendProof DoubleSpendProof::create(const CTransaction &t1, const CTransac
                 s2.pushData.resize(1);
                 getP2PKHSignature(in2.scriptSig, s2.pushData.front());
 
+                assert(!s1.pushData.empty()); // we resized it
+                assert(!s2.pushData.empty()); // we resized it
+                if (s1.pushData.front().empty() || s2.pushData.front().empty())
+                    throw std::runtime_error("scriptSig has no signature");
                 auto hashType = s1.pushData.front().back();
                 if (!(hashType & SIGHASH_FORKID))
                     throw std::runtime_error("Tx1 Not a Bitcoin Cash transaction");
@@ -153,7 +157,7 @@ DoubleSpendProof DoubleSpendProof::create(const CTransaction &t1, const CTransac
     hashTx(s1, t1, inputIndex1);
     hashTx(s2, t2, inputIndex2);
 
-    // sort the spenders to have proof be independent of the order of txs coming in
+    // sort the spenders so the proof stays the same, independent of the order of tx seen first
     int diff = s1.hashOutputs.Compare(s2.hashOutputs);
     if (diff == 0)
         diff = s1.hashPrevOutputs.Compare(s2.hashPrevOutputs);
