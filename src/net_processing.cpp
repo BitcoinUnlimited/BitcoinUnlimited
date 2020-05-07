@@ -331,25 +331,6 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
     }
 }
 
-static bool ensureConnectionState(const std::string msg,
-    const ConnectionStateIncoming &expected_incoming,
-    const ConnectionStateOutgoing &expected_outgoing,
-    CNode *peer)
-{
-    if (!((uint64_t)expected_incoming & (uint64_t)peer->state_incoming) ||
-        !((uint64_t)expected_outgoing & (uint64_t)peer->state_outgoing))
-    {
-        // FIXME: note review ban always now
-        dosMan.Misbehaving(peer, 100);
-        peer->fDisconnect = true;
-
-        return error("%s message received unexpectedly from peer=%s version=%s state_incoming=%s state_outgoing=%s",
-            msg, peer->GetLogName(), peer->cleanSubVer, toString(peer->state_incoming), toString(peer->state_outgoing));
-    }
-    else
-        return true;
-}
-
 static void handleAddressAfterInit(CNode *pfrom)
 {
     if (!pfrom->fInbound)
@@ -447,31 +428,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     {
         grapheneVersionCompatible = false;
     }
-
-    /* Special handling for xversion messages, as they are optional but still
-     have to be properly sequenced to be at the beginning of a connection. So
-     if anything but an xversion comes in whilst in
-     SENT_VERACK_READY_FOR_POTENTIAL_XVERSION, transition to READY state and
-     thus disallow any further incoming xversions. */
-    if (pfrom->state_incoming == ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION &&
-        strCommand != NetMsgType::XVERSION && strCommand != NetMsgType::VERACK)
-    {
-        LOG(NET, "This node does not support XVERSION as it did not send it at the right time but answered with %s "
-                 "instead. peer=%s version=%s\n",
-            strCommand, pfrom->GetLogName(), pfrom->cleanSubVer);
-
-        pfrom->state_incoming = ConnectionStateIncoming::READY;
-        handleAddressAfterInit(pfrom);
-        enableSendHeaders(pfrom);
-        enableCompactBlocks(pfrom);
-    }
     // ------------------------- BEGIN INITIAL COMMAND SET PROCESSING
     if (strCommand == NetMsgType::VERSION)
     {
-        if (!ensureConnectionState(
-                strCommand, ConnectionStateIncoming::CONNECTED_WAIT_VERSION, ConnectionStateOutgoing::ANY, pfrom))
-            return false;
-
         int64_t nTime;
         CAddress addrMe;
         uint64_t nNonce = 1;
@@ -584,7 +543,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 pfrom->fDisconnect = true;
             }
         }
-        pfrom->state_incoming = ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION;
     }
 
     /* Since we are processing messages in multiple threads, we may process them out of order.  Does enforcing this
@@ -601,9 +559,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
     else if (strCommand == NetMsgType::VERACK)
     {
-        if (!ensureConnectionState(
-                strCommand, ConnectionStateIncoming::ANY, ConnectionStateOutgoing::SENT_VERSION, pfrom))
-            return false;
 
         pfrom->SetRecvVersion(std::min(pfrom->nVersion, PROTOCOL_VERSION));
 
@@ -642,7 +597,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (pfrom->nVersion >= EXPEDITED_VERSION)
             // also send legacy message (at least for now)
             pfrom->PushMessage(NetMsgType::BUVERSION, GetListenPort());
-        pfrom->state_outgoing = ConnectionStateOutgoing::READY;
 
         // Tell the peer what maximum xthin bloom filter size we will consider acceptable.
         // FIXME: integrate into xversion as well
@@ -652,8 +606,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
     }
 
+        pfrom->fSuccessfullyConnected = true;
 
-    else if (!pfrom->successfullyConnected() && GetTime() - pfrom->tVersionSent > VERACK_TIMEOUT &&
+    else if (!pfrom->fSuccessfullyConnected && GetTime() - pfrom->tVersionSent > VERACK_TIMEOUT &&
              pfrom->tVersionSent >= 0)
     {
         // If verack is not received within timeout then disconnect.
@@ -676,9 +631,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
     else if (strCommand == NetMsgType::XVERSION)
     {
-        if (!ensureConnectionState(strCommand, ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION,
-                ConnectionStateOutgoing::ANY, pfrom))
-            return false;
         vRecv >> pfrom->xVersion;
 
         if (pfrom->addrFromPort != 0)
@@ -691,16 +643,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->ReadConfigFromXVersion();
 
         pfrom->PushMessage(NetMsgType::XVERACK);
-        pfrom->state_incoming = ConnectionStateIncoming::READY;
         handleAddressAfterInit(pfrom);
         enableSendHeaders(pfrom);
         enableCompactBlocks(pfrom);
     }
     else if (strCommand == NetMsgType::XVERACK)
     {
-        if (!ensureConnectionState(strCommand, ConnectionStateIncoming::ANY, ConnectionStateOutgoing::READY, pfrom))
-            return false;
-
         // This step done after final handshake
         CheckAndRequestExpeditedBlocks(pfrom);
     }
@@ -795,7 +743,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     }
 
     // ------------------------- END INITIAL COMMAND SET PROCESSING
-    else if (!pfrom->successfullyConnected())
+    else if (!pfrom->fSuccessfullyConnected)
     {
         LOG(NET, "Ignoring command %s that comes in before initial handshake is finished. peer=%s version=%s\n",
             strCommand, pfrom->GetLogName(), pfrom->cleanSubVer);
@@ -2284,7 +2232,7 @@ bool SendMessages(CNode *pto)
 
         // Now exit early if disconnecting or the version handshake is not complete.  We must not send PING or other
         // connection maintenance messages before the handshake is done.
-        if (pto->fDisconnect || !pto->successfullyConnected())
+        if (pto->fDisconnect || !pto->fSuccessfullyConnected)
             return true;
 
         //

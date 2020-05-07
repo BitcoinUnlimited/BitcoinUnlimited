@@ -242,7 +242,7 @@ bool IsPeerAddrLocalGood(CNode *pnode)
 // pushes our own address to a peer
 void AdvertiseLocal(CNode *pnode)
 {
-    if (fListen && pnode->successfullyConnected())
+    if (fListen && pnode->fSuccessfullyConnected)
     {
         CAddress addrLocal = GetLocalAddress(&pnode->addr);
         // If discovery is enabled, sometimes give our peer the address it
@@ -350,38 +350,6 @@ bool IsReachable(const CNetAddr &addr)
     return IsReachable(net);
 }
 
-// clang-format off
-static const std::map<uint64_t, std::string> bitMeaningsCSI(
-{
-    {(uint64_t)ConnectionStateIncoming::CONNECTED_WAIT_VERSION, "CONNECTED_WAIT_VERSION"},
-    {(uint64_t)ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION, "SENT_VERACK_READY_FOR_POTENTIAL_XVERSION"},
-    {(uint64_t)ConnectionStateIncoming::READY, "READY"},
-    {(uint64_t)ConnectionStateIncoming::ANY, "ALL"}
-});
-
-static const std::map<uint64_t, std::string> bitMeaningsCSO(
-{
-    {(uint64_t)ConnectionStateOutgoing::CONNECTED, "CONNECTED"},
-    {(uint64_t)ConnectionStateOutgoing::SENT_VERSION, "SENT_VERSION"},
-    {(uint64_t)ConnectionStateOutgoing::READY, "READY"},
-    {(uint64_t)ConnectionStateOutgoing::ANY, "ALL"}
-});
-// clang-format on
-
-ConnectionStateIncoming operator|(const ConnectionStateIncoming &a, const ConnectionStateIncoming &b)
-{
-    return (ConnectionStateIncoming)((uint64_t)a | (uint64_t)b);
-}
-
-ConnectionStateOutgoing operator|(const ConnectionStateOutgoing &a, const ConnectionStateOutgoing &b)
-{
-    return (ConnectionStateOutgoing)((uint64_t)a | (uint64_t)b);
-}
-
-std::string toString(const ConnectionStateIncoming &state) { return toString((uint64_t)state, bitMeaningsCSI); }
-std::ostream &operator<<(std::ostream &os, const ConnectionStateIncoming &state) { return (os << toString(state)); }
-std::string toString(const ConnectionStateOutgoing &state) { return toString((uint64_t)state, bitMeaningsCSO); }
-std::ostream &operator<<(std::ostream &os, const ConnectionStateOutgoing &state) { return (os << toString(state)); }
 // Initialize static CNode variables used in static CNode functions.
 std::atomic<uint64_t> CNode::nTotalBytesRecv{0};
 std::atomic<uint64_t> CNode::nTotalBytesSent{0};
@@ -574,8 +542,6 @@ void CNode::PushVersion()
         FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, BUComments), nBestHeight,
         !GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY));
     tVersionSent = GetTime();
-    DbgAssert(state_outgoing == ConnectionStateOutgoing::CONNECTED, {});
-    state_outgoing = ConnectionStateOutgoing::SENT_VERSION;
 }
 
 
@@ -2513,7 +2479,7 @@ void ThreadMessageHandler()
             if (pnode->fDisconnect)
                 continue;
 
-            if (pnode->successfullyConnected())
+            if (pnode->fSuccessfullyConnected)
             {
                 // parallel processing
                 fSleep &= threadProcessMessages(pnode);
@@ -2532,7 +2498,7 @@ void ThreadMessageHandler()
 
             // Put transaction and block requests into the request manager
             // and all other requests into the send queue.
-            if (pnode->successfullyConnected())
+            if (pnode->fSuccessfullyConnected)
             {
                 // parallel processing
                 g_signals.SendMessages(pnode);
@@ -3048,7 +3014,7 @@ uint64_t CNode::GetTotalBytesSent() { return nTotalBytesSent; }
 void CNode::Fuzz(int nChance)
 {
     AssertLockHeld(cs_vSend);
-    if (!successfullyConnected())
+    if (!fSuccessfullyConnected)
         return; // Don't fuzz initial handshake
     if (GetRand(nChance) != 0)
         return; // Fuzz 1 of every nChance messages
@@ -3212,8 +3178,6 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     addr = addrIn;
     addrName = addrNameIn == "" ? addr.ToStringIPPort() : addrNameIn;
     nVersion = 0;
-    state_incoming = ConnectionStateIncoming::CONNECTED_WAIT_VERSION;
-    state_outgoing = ConnectionStateOutgoing::CONNECTED;
     strSubVer = "";
     fWhitelisted = false;
     fOneShot = false;
@@ -3224,6 +3188,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     fAutoOutbound = false;
     fNetworkNode = false;
     tVersionSent = -1;
+    fSuccessfullyConnected = false;
     fDisconnect = false;
     fDisconnectRequest = false;
     nRefCount = 0;
@@ -3329,7 +3294,7 @@ CNode::~CNode()
     addrFromPort = 0;
 
     // Update addrman timestamp
-    if (nMisbehavior == 0 && successfullyConnected())
+    if (nMisbehavior == 0 && fSuccessfullyConnected)
         addrman.Connected(addr);
 
     // Decrement thintype peer counters
