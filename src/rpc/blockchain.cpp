@@ -1792,7 +1792,7 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
     }
 
     const CBlock block = GetBlockChecked(pindex);
-    const CBlockUndo blockUndo = GetUndoChecked(pindex);
+    const CBlockUndo blockUndo = pindex->pprev ? GetUndoChecked(pindex) : CBlockUndo();
     // This property is required in the for loop below (and ofc every tx should have undo data)
     DbgAssert(blockUndo.vtxundo.size() >= block.vtx.size() - 1,
         throw JSONRPCError(RPC_DATABASE_ERROR, "Block undo data is corrupt"));

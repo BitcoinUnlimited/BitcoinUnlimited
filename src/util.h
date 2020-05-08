@@ -497,6 +497,14 @@ void UnsetArg(const std::string &strArg);
  */
 void SetBoolArg(const std::string &strArg, bool fValue);
 
+/*
+ * Convert string into true/false
+ *
+ * @param strValue String to parse as a boolean
+ * @return true or false
+ */
+bool InterpretBool(const std::string &strValue);
+
 /**
  * Set an argument if it doesn't already have a value
  *
