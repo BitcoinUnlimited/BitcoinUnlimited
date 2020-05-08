@@ -45,7 +45,7 @@ std::atomic<uint64_t> avgCommitBatchSize(0);
 Snapshot txHandlerSnap;
 
 void ThreadCommitToMempool();
-void ThreadTxAdmission();
+static void ThreadTxAdmission(thread_group threadGroup);
 void ProcessOrphans(std::vector<uint256> &vWorkQueue);
 
 CTransactionRef CommitQGet(uint256 hash)
@@ -82,7 +82,7 @@ void StartTxAdmission(thread_group &threadGroup)
     // Start incoming transaction processing threads
     for (unsigned int i = 0; i < numTxAdmissionThreads.Value(); i++)
     {
-        threadGroup.create_thread(&ThreadTxAdmission);
+        threadGroup.create_thread(&ThreadTxAdmission, threadGroup);
     }
 
     // Start tx commitment thread
@@ -381,13 +381,36 @@ void CommitTxToMempool()
 }
 
 
-void ThreadTxAdmission()
+static void ThreadTxAdmission(thread_group threadGroup)
 {
     // Process at most this many transactions before letting the commit thread take over
     const int maxTxPerRound = 200;
 
     while (shutdown_threads.load() == false)
     {
+        // Start or Stop threads as determined by the numTxAdmissionThreads tweak
+        {
+            static CCriticalSection cs_threads;
+            static uint32_t numThreads = numTxAdmissionThreads.Value() GUARDED_BY(cs_threads);
+            LOCK(cs_threads);
+            if (numTxAdmissionThreads.Value() >= 1 && numThreads > numTxAdmissionThreads.Value())
+            {
+                // Kill this thread thread
+                numThreads--;
+                LOGA("Stopping a tx admission thread: Current admission threads are %d\n", numThreads);
+
+                return;
+            }
+            else if (numThreads < numTxAdmissionThreads.Value())
+            {
+                // Launch another thread
+                numThreads++;
+               // threadGroup.create_thread(&ThreadTxAdmission, threadGroup);
+                LOGA("Starting a new tx admission thread: Current admission threads are %d\n", numThreads);
+            }
+         }
+
+        // Loop processing starts here
         bool acceptedSomething = false;
         if (shutdown_threads.load() == true)
         {
