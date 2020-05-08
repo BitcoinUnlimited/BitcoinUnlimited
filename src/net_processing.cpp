@@ -584,6 +584,13 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
     else if (strCommand == NetMsgType::XVERSION)
     {
+        if (pfrom->fSuccessfullyConnected == true)
+        {
+            dosMan.Misbehaving(pfrom, 1);
+            pfrom->fDisconnect = true;
+            return error("odd peer behavior: received verack message before xversion, disconnecting \n");
+        }
+
         vRecv >> pfrom->xVersion;
 
         if (pfrom->addrFromPort != 0)
