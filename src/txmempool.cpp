@@ -1538,10 +1538,10 @@ void CTxMemPool::ClearPrioritisation(const uint256 hash)
     mapDeltas.erase(hash);
 }
 void CTxMemPool::_ClearPrioritisation(const uint256 hash) { mapDeltas.erase(hash); }
-bool CTxMemPool::HasNoInputsOf(const CTransaction &tx) const
+bool CTxMemPool::HasNoInputsOf(const CTransactionRef &tx) const
 {
-    for (unsigned int i = 0; i < tx.vin.size(); i++)
-        if (exists(tx.vin[i].prevout.hash))
+    for (unsigned int i = 0; i < tx->vin.size(); i++)
+        if (exists(tx->vin[i].prevout.hash))
             return false;
     return true;
 }
