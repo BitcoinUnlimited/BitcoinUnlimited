@@ -628,6 +628,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
 
         /// LEGACY xversion code (old spec)
+        if (!(pfrom->nServices & NODE_XVERSION))
         {
             // prepare xversion message. This *must* be the next message after the verack has been received,
             // if it comes at all.
