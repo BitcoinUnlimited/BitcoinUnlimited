@@ -515,7 +515,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // Potentially mark this peer as a preferred download peer.
         UpdatePreferredDownload(pfrom);
 
-        // TODO :  change this true to testing if xversion versionbit is present
         if (pfrom->nServices & NODE_XVERSION)
         {
             // BU expedited procecessing requires the exchange of the listening port id
