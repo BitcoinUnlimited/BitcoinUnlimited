@@ -87,6 +87,9 @@ using namespace std;
 
 bool fFeeEstimatesInitialized = false;
 
+/** Has the AppInit2() startup phase returned */
+std::atomic<bool> fAppInit2{false};
+
 #if ENABLE_ZMQ
 static CZMQNotificationInterface *pzmqNotificationInterface = nullptr;
 #endif
@@ -424,7 +427,7 @@ void CleanupBlockRevFiles()
     }
 }
 
-void ThreadImport(std::vector<fs::path> vImportFiles)
+void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
 {
     const CChainParams &chainparams = Params();
     RenameThread("loadblk");
@@ -492,13 +495,105 @@ void ThreadImport(std::vector<fs::path> vImportFiles)
     {
         LOGA("Stopping after block import\n");
         StartShutdown();
+        return;
     }
 
+    // At this point the genesis block should have been loaded. We pause here and allow
+    // the node to complete StartNode() before continuing with ActivateBestChain(). For some
+    // reason QT will get hung while activating the chain if we don't do this wait, and it
+    // may be some time before the node appears as up and running giving the operator the impression
+    // that startup is very slow.
+    while (!fAppInit2.load())
+    {
+        MilliSleep(100);
+        if (fRequestShutdown)
+            return;
+    }
+
+    // scan for better chains in the block chain database, that are not yet connected in the active best chain
+    uiInterface.InitMessage(_("Activating best chain..."));
+    CValidationState state;
+    if (!ActivateBestChain(state, chainparams))
+    {
+        StartShutdown();
+        return;
+    }
+
+    // Reconsider the most work chain if we're not already synced. This is necessary
+    // when switching from an ABC/BCHN client or when a operator failed to upgrade their BU
+    // node before a hardfork.
+    if (!fReindex)
+    {
+        // Get the set of chaintips
+        std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
+        {
+            LOCK(cs_main);
+            setTips = GetChainTips();
+        }
+
+        // Find out if we're already synced to one of the chaintips. If so then we
+        // can and must skip reconsidermostworkchain().
+        bool fReconsider = false;
+        CBlockIndex *pMostWork = chainActive.Tip();
+        for (CBlockIndex *pTip : setTips)
+        {
+            if (pMostWork->nChainWork < pTip->nChainWork)
+                fReconsider = true;
+        }
+        if (fReconsider)
+        {
+            UniValue obj(UniValue::VARR);
+            reconsidermostworkchain(obj, false);
+        }
+    }
+
+    // Initialize the atomic flags used for determining whether we are in IBD or whether the chain
+    // is almost synced.
+    IsChainNearlySyncdInit();
+    IsInitialBlockDownloadInit();
+
+#ifdef ENABLE_WALLET
+    uiInterface.InitMessage(_("Reaccepting Wallet Transactions"));
+    if (pwalletMain)
+    {
+        {
+            TxAdmissionPause pause; // Get an initial state to use during wallet tx acceptance
+            // Add wallet transactions that aren't already in a block to mapTransactions
+            pwalletMain->ReacceptWalletTransactions();
+        }
+    }
+#endif
+
+    // Load the mempool if necessary
     if (GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
     {
         LoadMempool();
         fDumpMempoolLater = !fRequestShutdown;
     }
+
+    // Startup txindex. If we start it earlier and before ActivateBestChain
+    // we can end up grinding slowly through ActivateBestChain when txindex still has unfinished
+    // compaction to do from a prior run.
+    fTxIndex = GetBoolArg("-txindex", DEFAULT_TXINDEX);
+    if (fTxIndex)
+    {
+        uiInterface.InitMessage(_("Starting txindex"));
+
+        // When reindexing we want to wipe the previous txindex database however we don't want to
+        // rely on the fReindex flag since it's possible that by the time we get to this point in the
+        // node startup that the reindex is already completed (in the case of a very small reindex) and
+        // therefore fReindex would already be false and the txindex would not get rebuilt.
+        bool fWipeDatabase = GetBoolArg("-reindex", DEFAULT_REINDEX);
+        auto txindex_db = new TxIndexDB(nTxIndexCache, false, fWipeDatabase);
+
+        g_txindex = std::make_unique<TxIndex>(txindex_db);
+        g_txindex->Start();
+    }
+
+    // This should be done last in init. If not, then RPC's could be allowed before the wallet
+    // is ready.
+    uiInterface.InitMessage(_("Done loading"));
+    SetRPCWarmupFinished();
 }
 
 /** Sanity checks
@@ -1353,72 +1448,6 @@ bool AppInit2(Config &config, thread_group &threadGroup)
         }
     }
 
-    // ********************************************************* Step 9: import blocks
-
-    if (mapArgs.count("-blocknotify"))
-        uiInterface.NotifyBlockTip.connect(BlockNotifyCallback);
-
-    // scan for better chains in the block chain database, that are not yet connected in the active best chain
-    uiInterface.InitMessage(_("Activating best chain..."));
-    CValidationState state;
-    if (!ActivateBestChain(state, chainparams))
-    {
-        if (fRequestShutdown)
-            return false;
-        else
-            strErrors << "Failed to connect best block";
-    }
-
-    // Reconsider the most work chain if we're not already synced. This is necessary
-    // when switching from an ABC/BCHN client or when a operator failed to upgrade their BU
-    // node before a hardfork.
-    if (!fReindex)
-    {
-        LOCK(cs_main);
-
-        // Get the set of chaintips
-        std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
-        setTips = GetChainTips();
-
-        // Find out if we're already synced to one of the chaintips. If so then we
-        // can and must skip reconsidermostworkchain().
-        bool fReconsider = false;
-        CBlockIndex *pMostWork = chainActive.Tip();
-        for (CBlockIndex *pTip : setTips)
-        {
-            if (pMostWork->nChainWork < pTip->nChainWork)
-                fReconsider = true;
-        }
-        if (fReconsider)
-        {
-            UniValue obj(UniValue::VARR);
-            reconsidermostworkchain(obj, false);
-        }
-    }
-
-    IsChainNearlySyncdInit();
-    IsInitialBlockDownloadInit();
-
-    std::vector<fs::path> vImportFiles;
-    if (mapArgs.count("-loadblock"))
-    {
-        for (const std::string &strFile : mapMultiArgs["-loadblock"])
-            vImportFiles.push_back(strFile);
-    }
-    threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles));
-
-    LOGA("Waiting for genesis block to be imported...\n");
-    CBlockIndex *tip = nullptr;
-    while (!fRequestShutdown && !tip)
-    {
-        {
-            LOCK(cs_main);
-            tip = chainActive.Tip();
-        }
-        if (!tip)
-            MilliSleep(10);
-    }
-
     // ********************************************************* Step 10: network initialization
 
     RegisterNodeSignals(GetNodeSignals());
@@ -1591,7 +1620,45 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     }
 
 
-    // ********************************************************* Step 11: start node
+    // Monitor the chain, and alert if we get blocks much quicker or slower than expected
+    // The "bad chain alert" scheduler has been disabled because the current system gives far
+    // too many false positives, such that users are starting to ignore them.
+    // This code will be disabled for 0.12.1 while a fix is deliberated in #7568
+    // this was discussed in the IRC meeting on 2016-03-31.
+    //
+    // --- disabled ---
+    // int64_t nPowTargetSpacing = Params().GetConsensus().nPowTargetSpacing;
+    // CScheduler::Function f = boost::bind(&PartitionCheck, &IsInitialBlockDownload,
+    //                                     boost::ref(cs_main), boost::cref(pindexBestHeader), nPowTargetSpacing);
+    // scheduler.scheduleEvery(f, nPowTargetSpacing);
+    // --- end disabled ---
+
+
+    // ********************************************************* Step 9: import blocks
+
+    if (mapArgs.count("-blocknotify"))
+        uiInterface.NotifyBlockTip.connect(BlockNotifyCallback);
+
+    std::vector<fs::path> vImportFiles;
+    if (mapArgs.count("-loadblock"))
+    {
+        for (const std::string &strFile : mapMultiArgs["-loadblock"])
+            vImportFiles.push_back(strFile);
+    }
+    threadGroup.create_thread(boost::bind(&ThreadImport, vImportFiles, cacheConfig.nTxIndexCache));
+
+    uiInterface.InitMessage(_("Waiting for Genesis Block..."));
+    CBlockIndex *tip = nullptr;
+    while (!fRequestShutdown && !tip)
+    {
+        tip = chainActive.Tip();
+        MilliSleep(10);
+
+        if (fRequestShutdown)
+            return false;
+    }
+
+    // ********************************************************* Step 10: start node
 
     if (!CheckDiskSpace())
         return false;
@@ -1615,63 +1682,19 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
         StartTorControl(threadGroup);
 
-    // Startup txindex just before StartNode. If we start it earlier and before ActivateBestChain
-    // we can end up grinding slowly through ActivateBestChain when txindex still has unfinished
-    // compaction to do from a prior run.
-    fTxIndex = GetBoolArg("-txindex", DEFAULT_TXINDEX);
-    if (fTxIndex)
-    {
-        uiInterface.InitMessage(_("Starting txindex"));
-
-        // When reindexing we want to wipe the previous txindex database however we don't want to
-        // rely on the fReindex flag since it's possible that by the time we get to this point in the
-        // node startup that the reindex is already completed (in the case of a very small reindex) and
-        // therefore fReindex would already be false and the txindex would not get rebuilt.
-        bool fWipeDatabase = GetBoolArg("-reindex", DEFAULT_REINDEX);
-        auto txindex_db = new TxIndexDB(cacheConfig.nTxIndexCache, false, fWipeDatabase);
-
-        g_txindex = std::make_unique<TxIndex>(txindex_db);
-        g_txindex->Start();
-    }
 
     StartNode(threadGroup);
 
-// Monitor the chain, and alert if we get blocks much quicker or slower than expected
-// The "bad chain alert" scheduler has been disabled because the current system gives far
-// too many false positives, such that users are starting to ignore them.
-// This code will be disabled for 0.12.1 while a fix is deliberated in #7568
-// this was discussed in the IRC meeting on 2016-03-31.
-//
-// --- disabled ---
-// int64_t nPowTargetSpacing = Params().GetConsensus().nPowTargetSpacing;
-// CScheduler::Function f = boost::bind(&PartitionCheck, &IsInitialBlockDownload,
-//                                     boost::ref(cs_main), boost::cref(pindexBestHeader), nPowTargetSpacing);
-// scheduler.scheduleEvery(f, nPowTargetSpacing);
-// --- end disabled ---
-
-// ********************************************************* Step 12: finished
-
 #ifdef ENABLE_WALLET
-    uiInterface.InitMessage(_("Reaccepting Wallet Transactions"));
     if (pwalletMain)
     {
-        {
-            TxAdmissionPause pause; // Get an initial state to use during wallet tx acceptance
-            // Add wallet transactions that aren't already in a block to mapTransactions
-            pwalletMain->ReacceptWalletTransactions();
-        }
-
         // Run a thread to flush wallet periodically
         threadGroup.create_thread(&ThreadFlushWalletDB, boost::ref(pwalletMain->strWalletFile));
     }
 #endif
 
-    uiInterface.InitMessage(_("Done loading"));
-
-
-    // This should be done last in init. If not, then RPC's could be allowed before the wallet
-    // is ready.
-    SetRPCWarmupFinished();
+    // Done with intialization. Set flag so that threadimport can begin.
+    fAppInit2.store(true);
 
     return true;
 }
