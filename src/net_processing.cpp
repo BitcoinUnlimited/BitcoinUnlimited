@@ -628,11 +628,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
         pfrom->SetRecvVersion(std::min(pfrom->nVersion, PROTOCOL_VERSION));
 
-        handleAddressAfterInit(pfrom);
-        enableSendHeaders(pfrom);
-        enableCompactBlocks(pfrom);
-
-
         /// LEGACY xversion code (old spec)
         if (!(pfrom->nServices & NODE_XVERSION))
         {
@@ -664,6 +659,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
             pfrom->PushMessage(NetMsgType::XVERSION_OLD, xver);
         }
+
+        handleAddressAfterInit(pfrom);
+        enableSendHeaders(pfrom);
+        enableCompactBlocks(pfrom);
 
         // Tell the peer what maximum xthin bloom filter size we will consider acceptable.
         // FIXME: integrate into xversion as well
@@ -713,14 +712,14 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->ReadConfigFromXVersion();
 
         pfrom->PushMessage(NetMsgType::XVERACK_OLD);
-        handleAddressAfterInit(pfrom);
-        enableSendHeaders(pfrom);
-        enableCompactBlocks(pfrom);
+        // handleAddressAfterInit(pfrom);
+        // enableSendHeaders(pfrom);
+        // enableCompactBlocks(pfrom);
     }
     else if (strCommand == NetMsgType::XVERACK_OLD)
     {
         // This step done after final handshake
-        CheckAndRequestExpeditedBlocks(pfrom);
+        // CheckAndRequestExpeditedBlocks(pfrom);
     }
 
     else if (strCommand == NetMsgType::XUPDATE)
