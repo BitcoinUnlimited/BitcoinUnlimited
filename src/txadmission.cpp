@@ -394,7 +394,7 @@ void ThreadTxAdmission()
             LOCK(cs_threads);
             if (numTxAdmissionThreads.Value() >= 1 && numThreads > numTxAdmissionThreads.Value())
             {
-                // Kill this thread thread
+                // Kill this thread
                 numThreads--;
                 LOGA("Stopping a tx admission thread: Current admission threads are %d\n", numThreads);
 
