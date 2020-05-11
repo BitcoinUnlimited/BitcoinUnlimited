@@ -82,7 +82,7 @@ void StartTxAdmission()
     // Start incoming transaction processing threads
     for (unsigned int i = 0; i < numTxAdmissionThreads.Value(); i++)
     {
-       threadGroup.create_thread(&ThreadTxAdmission);
+        threadGroup.create_thread(&ThreadTxAdmission);
     }
 
     // Start tx commitment thread
@@ -390,7 +390,7 @@ void ThreadTxAdmission()
         // Start or Stop threads as determined by the numTxAdmissionThreads tweak
         {
             static CCriticalSection cs_threads;
-            static uint32_t numThreads = numTxAdmissionThreads.Value() GUARDED_BY(cs_threads);
+            static uint32_t numThreads GUARDED_BY(cs_threads) = numTxAdmissionThreads.Value();
             LOCK(cs_threads);
             if (numTxAdmissionThreads.Value() >= 1 && numThreads > numTxAdmissionThreads.Value())
             {
@@ -407,7 +407,7 @@ void ThreadTxAdmission()
                 threadGroup.create_thread(&ThreadTxAdmission);
                 LOGA("Starting a new tx admission thread: Current admission threads are %d\n", numThreads);
             }
-         }
+        }
 
         // Loop processing starts here
         bool acceptedSomething = false;
