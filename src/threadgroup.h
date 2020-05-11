@@ -44,5 +44,5 @@ public:
         join_all();
     }
 };
-
+extern thread_group threadGroup;
 #endif

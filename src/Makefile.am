@@ -605,6 +605,7 @@ bitcoind_LDADD = \
   $(LIBRSM) \
   $(LIBSECP256K1)
 
+
 bitcoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
 
 # bitcoin-cli binary #

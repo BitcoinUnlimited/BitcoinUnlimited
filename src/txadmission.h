@@ -158,7 +158,7 @@ extern std::map<uint256, CTxCommitData> *txCommitQ;
 CTransactionRef CommitQGet(uint256 hash);
 
 /** Start the transaction mempool admission threads */
-void StartTxAdmission(thread_group &threadGroup);
+void StartTxAdmission();
 /** Stop the transaction mempool admission threads (assumes that ShutdownRequested() will return true) */
 void StopTxAdmission();
 /** Wait for the currently enqueued transactions to be flushed.  If new tx keep coming in, you may wait a while */
@@ -198,9 +198,14 @@ void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age);
 // Return > 0 if its likely that we have already dealt with this transaction. inv MUST be MSG_TX type.
 unsigned int TxAlreadyHave(const CInv &inv);
 
-// Commit all accepted tx into the mempool.  Corral with CORRAL_TX_PAUSE before calling to stop
-// threads from adding new tx into the q.
+/**
+ * Commit all accepted tx into the mempool.  Corral with CORRAL_TX_PAUSE before calling to stop
+ * threads from adding new tx into the q.
+ */
 void CommitTxToMempool();
+
+/** Run the transaction admission thread */
+void ThreadTxAdmission();
 
 /**
  * Check if transaction will be final in the next block to be created.

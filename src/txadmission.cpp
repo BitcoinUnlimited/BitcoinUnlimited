@@ -16,6 +16,7 @@
 #include "policy/mempool.h"
 #include "requestManager.h"
 #include "respend/respenddetector.h"
+#include "threadgroup.h"
 #include "timedata.h"
 #include "txorphanpool.h"
 #include "unlimited.h"
@@ -45,7 +46,6 @@ std::atomic<uint64_t> avgCommitBatchSize(0);
 Snapshot txHandlerSnap;
 
 void ThreadCommitToMempool();
-static void ThreadTxAdmission(thread_group threadGroup);
 void ProcessOrphans(std::vector<uint256> &vWorkQueue);
 
 CTransactionRef CommitQGet(uint256 hash)
@@ -72,7 +72,7 @@ static inline uint256 IncomingConflictHash(const COutPoint &prevout)
     return hash;
 }
 
-void StartTxAdmission(thread_group &threadGroup)
+void StartTxAdmission()
 {
     if (txCommitQ == nullptr)
         txCommitQ = new std::map<uint256, CTxCommitData>();
@@ -82,7 +82,7 @@ void StartTxAdmission(thread_group &threadGroup)
     // Start incoming transaction processing threads
     for (unsigned int i = 0; i < numTxAdmissionThreads.Value(); i++)
     {
-        threadGroup.create_thread(&ThreadTxAdmission, threadGroup);
+       threadGroup.create_thread(&ThreadTxAdmission);
     }
 
     // Start tx commitment thread
@@ -380,8 +380,7 @@ void CommitTxToMempool()
     ProcessOrphans(vWhatChanged);
 }
 
-
-static void ThreadTxAdmission(thread_group threadGroup)
+void ThreadTxAdmission()
 {
     // Process at most this many transactions before letting the commit thread take over
     const int maxTxPerRound = 200;
@@ -405,7 +404,7 @@ static void ThreadTxAdmission(thread_group threadGroup)
             {
                 // Launch another thread
                 numThreads++;
-               // threadGroup.create_thread(&ThreadTxAdmission, threadGroup);
+                threadGroup.create_thread(&ThreadTxAdmission);
                 LOGA("Starting a new tx admission thread: Current admission threads are %d\n", numThreads);
             }
          }

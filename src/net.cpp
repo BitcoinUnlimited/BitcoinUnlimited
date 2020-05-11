@@ -2732,7 +2732,7 @@ void static Discover(thread_group &threadGroup)
 #endif
 }
 
-void StartNode(thread_group &threadGroup)
+void StartNode()
 {
     uiInterface.InitMessage(_("Loading addresses..."));
     // Load addresses from peers.dat

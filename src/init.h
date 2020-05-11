@@ -17,13 +17,13 @@ class CWallet;
 void StartShutdown();
 bool ShutdownRequested();
 /** Interrupt threads */
-void Interrupt(thread_group &threadGroup);
+void Interrupt();
 void Shutdown();
 //! Initialize the logging infrastructure
 void InitLogging();
 //! Parameter interaction: change current parameters depending on various rules
 void InitParameterInteraction();
-bool AppInit2(Config &config, thread_group &threadGroup);
+bool AppInit2(Config &config);
 
 void MainCleanup();
 void NetCleanup();
