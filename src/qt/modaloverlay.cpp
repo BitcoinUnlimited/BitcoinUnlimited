@@ -66,8 +66,12 @@ bool ModalOverlay::event(QEvent* ev) {
 
 void ModalOverlay::setKnownBestHeight(int count, const QDateTime& blockDate)
 {
-    if (count > bestBlockHeight.load())
-        bestBlockHeight.store(count);
+    int nHeight = bestBlockHeight.load();
+    if (count > nHeight)
+    {
+        bestBlockHeight.compare_exchange_weak(nHeight, count);
+        nHeight = bestBlockHeight.load();
+    }
 }
 
 void ModalOverlay::tipUpdate(int count, const QDateTime& blockDate, double nVerificationProgress)
