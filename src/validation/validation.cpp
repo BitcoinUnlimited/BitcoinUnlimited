@@ -147,9 +147,8 @@ bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state, bool f
 {
     int k = 3; // FIXME
     std::shared_ptr<const CDeltaBlock> deltaBlock = known_dbs[block.GetHash()];
-    if (fCheckPOW && !CheckBobtailPoW(*deltaBlock, deltaBlock->allAncestorHashes(), Params().GetConsensus(), k))
+    if (fCheckPOW && (deltaBlock == nullptr || !CheckBobtailPoW(*deltaBlock, deltaBlock->allAncestorHashes(), Params().GetConsensus(), k)))
     {
-        assert(false);
         return state.DoS(50, error("CheckBlockHeader(): bobtail proof of work failed"), REJECT_INVALID, "high-hash");
     }
 

@@ -376,11 +376,17 @@ bool CNetDeltaBlock::HandleMessage(CDataStream& vRecv, CNode* pfrom) {
 
 
         LOG(WB, "DELTABLOCK not known yet.\n");
+        // Code below is causing nodes to fall out of sync during block production / dissemination.
+        // Disabling the code does not seem to cause any problem.
+        // TODO: Determine if it is safe to permanently remove this.
+        /*
         if (!IsRecentDeltaBlock(ndb.header.hashPrevBlock)) {
             LOG(WB, "Delta block's parent hash %s is not recent enough (or even known) to be worth considering.\n",
                 ndb.header.hashPrevBlock.GetHex());
             return false;
         }
+        */
+
         if (ndb.delta_tx_additional.size() < 1) {
             LOG(WB, "Malformed DELTABLOCK without coinbase received. Ignoring.\n");
             return false;

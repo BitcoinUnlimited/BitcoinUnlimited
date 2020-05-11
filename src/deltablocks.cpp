@@ -558,6 +558,9 @@ bool CheckBobtailPoW(CBlockHeader deltaHeader, std::vector<uint256> ancestors, c
     bool fOverflow;
     arith_uint256 bnTarget;
 
+    if (ancestors.size() < (uint8_t)(k-1))
+        return false;
+
     bnTarget.SetCompact(deltaHeader.nBits, &fNegative, &fOverflow);
 
     if (fNegative || fOverflow)
@@ -571,9 +574,6 @@ bool CheckBobtailPoW(CBlockHeader deltaHeader, std::vector<uint256> ancestors, c
         LOG(WB, "Illegal target value bnTarget=%d for pow limit\n", bnTarget.getdouble());
         return false;
     }
-
-    if (ancestors.size() < (uint8_t)(k-1))
-        return false;
 
     std::sort(ancestors.begin(), ancestors.end()); 
     std::vector<arith_uint256> lowestK;

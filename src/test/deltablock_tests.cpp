@@ -349,4 +349,22 @@ BOOST_AUTO_TEST_CASE(check_bobtail_statistic)
     BOOST_CHECK_EQUAL(CheckBobtailPoWFromOrderedProofs(proofs, targetLow, 3), false);
 }
 
+BOOST_AUTO_TEST_CASE(arith_uint256_sanity)
+{
+    unsigned int nBits = 545259519;
+    arith_uint256 a;
+    a.SetCompact(nBits);
+    arith_uint256 b;
+    b.SetCompact(nBits);
+    b /= 1000;
+    arith_uint256 c;
+    a.SetCompact(nBits);
+    c = ~c;
+    c *= 1000;
+    c = ~c;
+
+    BOOST_CHECK(a > b);
+    BOOST_CHECK(a > c);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
