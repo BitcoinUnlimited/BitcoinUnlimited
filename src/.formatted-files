@@ -229,6 +229,8 @@ qt/intro.cpp
 qt/intro.h
 qt/macdockiconhandler.h
 qt/macnotificationhandler.h
+qt/modaloverlay.cpp
+qt/modaloverlay.h
 qt/networkstyle.cpp
 qt/networkstyle.h
 qt/notificator.cpp

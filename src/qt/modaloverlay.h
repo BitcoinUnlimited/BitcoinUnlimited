@@ -11,8 +11,9 @@
 //! The required delta of headers to the estimated number of available headers until we show the IBD progress
 static constexpr int HEADER_HEIGHT_SYNC_DELTA = 24;
 
-namespace Ui {
-    class ModalOverlay;
+namespace Ui
+{
+class ModalOverlay;
 }
 
 /** Modal overlay to display information about the chain-sync state */
@@ -25,20 +26,20 @@ public:
     ~ModalOverlay();
 
 public Q_SLOTS:
-    void tipUpdate(int count, const QDateTime& blockDate, double nVerificationProgress);
-    void setKnownBestHeight(int count, const QDateTime& blockDate);
+    void tipUpdate(int count, const QDateTime &blockDate, double nVerificationProgress);
+    void setKnownBestHeight(int count, const QDateTime &blockDate);
 
     // will show or hide the modal layer
     void showHide(bool hide = false, bool userRequested = false);
     void closeClicked();
 
 protected:
-    bool eventFilter(QObject * obj, QEvent * ev);
-    bool event(QEvent* ev);
+    bool eventFilter(QObject *obj, QEvent *ev);
+    bool event(QEvent *ev);
 
 private:
     Ui::ModalOverlay *ui;
-    std::atomic<int> bestBlockHeight{0}; //best known height (based on the headers)
+    std::atomic<int> bestBlockHeight{0}; // best known height (based on the headers)
     QVector<QPair<qint64, double> > blockProcessTime;
     bool layerIsVisible;
     bool userClosed;
