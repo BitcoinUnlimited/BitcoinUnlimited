@@ -2473,6 +2473,28 @@ void ThreadMessageHandler()
 
     while (shutdown_threads.load() == false)
     {
+        // Start or Stop threads as determined by the numMsgHandlerThreads tweak
+        {
+            static CCriticalSection cs_threads;
+            static uint32_t numThreads GUARDED_BY(cs_threads) = numMsgHandlerThreads.Value();
+            LOCK(cs_threads);
+            if (numMsgHandlerThreads.Value() >= 1 && numThreads > numMsgHandlerThreads.Value())
+            {
+                // Kill this thread
+                numThreads--;
+                LOGA("Stopping a message handler thread: Current handler threads are %d\n", numThreads);
+
+                return;
+            }
+            else if (numThreads < numMsgHandlerThreads.Value())
+            {
+                // Launch another thread
+                numThreads++;
+                threadGroup.create_thread(&ThreadMessageHandler);
+                LOGA("Starting a new message handler thread: Current handler threads are %d\n", numThreads);
+            }
+        }
+
         vector<CNode *> vNodesCopy;
         {
             // We require the vNodes lock here, throughout, even though we are only incrementing
@@ -2677,7 +2699,7 @@ bool BindListenPort(const CService &addrBind, string &strError, bool fWhiteliste
     return true;
 }
 
-void static Discover(thread_group &threadGroup)
+void static Discover()
 {
     if (!fDiscover)
         return;
@@ -2777,7 +2799,7 @@ void StartNode()
     if (pnodeLocalHost == nullptr)
         pnodeLocalHost = new CNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), nLocalServices));
 
-    Discover(threadGroup);
+    Discover();
 
     //
     // Start threads
