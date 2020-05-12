@@ -554,7 +554,7 @@ UniValue getblockheader(const UniValue &params, bool fHelp)
             "\nIf verbose is false, returns a string that is serialized, hex-encoded data for blockheader 'hash'.\n"
             "If verbose is true, returns an Object with information about blockheader <hash>.\n"
             "\nArguments:\n"
-            "1. \"hash_or_height\"          (string, required) The block hash\n"
+            "1. \"hash_or_height\"          (string|numeric, required) The block hash\n"
             "2. verbose           (boolean, optional, default=true) true for a json object, false for the hex encoded "
             "data\n"
             "\nResult (for verbose = true):\n"
