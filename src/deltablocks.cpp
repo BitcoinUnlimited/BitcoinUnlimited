@@ -558,7 +558,10 @@ bool CheckBobtailPoW(CBlockHeader deltaHeader, std::vector<uint256> ancestors, c
     bool fOverflow;
     arith_uint256 bnTarget;
 
-    if (ancestors.size() < (uint8_t)(k-1))
+    if (k == 0)
+        return true;
+
+    if (ancestors.size() < k-1)
         return false;
 
     bnTarget.SetCompact(deltaHeader.nBits, &fNegative, &fOverflow);
