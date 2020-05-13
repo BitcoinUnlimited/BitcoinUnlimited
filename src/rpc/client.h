@@ -4,8 +4,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef BITCOIN_RPCCLIENT_H
-#define BITCOIN_RPCCLIENT_H
+#ifndef BITCOIN_RPC_CLIENT_H
+#define BITCOIN_RPC_CLIENT_H
 
 #include "allowed_args.h"
 #include <univalue.h>
@@ -34,4 +34,4 @@ UniValue ParseNonRFCJSONValue(const std::string &strVal);
 // or CONTINUE_EXECUTION when it's expected to continue further.
 int AppInitRPC(const std::string &usage, const AllowedArgs::AllowedArgs &allowedArgs, int argc, char *argv[]);
 
-#endif // BITCOIN_RPCCLIENT_H
+#endif // BITCOIN_RPC_CLIENT_H

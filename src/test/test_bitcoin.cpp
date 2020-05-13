@@ -34,7 +34,8 @@
 #include <boost/test/unit_test.hpp>
 #include <thread>
 
-FastRandomContext insecure_rand_ctx;
+uint256 insecure_rand_seed = GetRandHash();
+FastRandomContext insecure_rand_ctx(insecure_rand_seed);
 
 extern bool fPrintToConsole;
 extern void noui_connect();

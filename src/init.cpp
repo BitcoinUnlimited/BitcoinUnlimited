@@ -747,7 +747,13 @@ void InitLogging()
     Logging::LogInit();
 
     LOGA("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
-    LOGA("BCH Unlimited version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
+    std::string version_string = FormatFullVersion();
+#ifdef DEBUG
+    version_string += " (debug build)";
+#else
+    version_string += " (release build)";
+#endif
+    LOGA(PACKAGE_NAME " version %s (%s)\n", version_string, CLIENT_DATE);
 }
 
 /** Initialize bitcoin.

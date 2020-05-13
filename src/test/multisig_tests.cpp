@@ -29,7 +29,10 @@ typedef vector<unsigned char> valtype;
 
 BOOST_FIXTURE_TEST_SUITE(multisig_tests, BasicTestingSetup)
 
-CScript sign_multisig(CScript scriptPubKey, vector<CKey> keys, CTransaction transaction, int whichIn)
+CScript sign_multisig(const CScript scriptPubKey,
+    const std::vector<CKey> &keys,
+    const CMutableTransaction &transaction,
+    int whichIn)
 {
     uint256 hash = SignatureHash(scriptPubKey, transaction, whichIn, SIGHASH_ALL | SIGHASH_FORKID, 0);
     BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);

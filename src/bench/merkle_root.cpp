@@ -25,4 +25,4 @@ static void MerkleRoot(benchmark::State &state)
     }
 }
 
-BENCHMARK(MerkleRoot);
+BENCHMARK(MerkleRoot, 800);

@@ -7,6 +7,8 @@
 #include "bench.h"
 #include "bloom.h"
 #include "fastfilter.h"
+#include "key.h"
+#include "pubkey.h"
 #include "utiltime.h"
 
 
@@ -25,6 +27,8 @@ public:
 
     ALotOfSHA256() : bloom(1000000, 0.000001, 0x49393, BLOOM_UPDATE_NONE, 100000000)
     {
+        const ECCVerifyHandle verify_handle;
+        ECC_Start();
         data.reserve(amt);
         for (int i = 0; i < amt; i++)
         {
@@ -37,6 +41,7 @@ public:
                 bloom.insert(num);
             }
         }
+        ECC_Stop();
     }
 };
 
@@ -84,8 +89,8 @@ static void BloomContains(benchmark::State &state)
     sideEffect = contains;
 }
 
-BENCHMARK(BloomCheckSet);
-BENCHMARK(BloomContains);
+BENCHMARK(BloomCheckSet, 1);
+BENCHMARK(BloomContains, 1);
 
 
 static void FastFilterCheckSet(benchmark::State &state)
@@ -185,8 +190,8 @@ static void Nothing(benchmark::State &state)
 }
 
 
-BENCHMARK(Nothing);
-BENCHMARK(FastFilterCheckSet);
-BENCHMARK(FastFilterCheckSet2);
-BENCHMARK(FastFilterContains);
-BENCHMARK(FastFilterContains2);
+BENCHMARK(Nothing, 1);
+BENCHMARK(FastFilterCheckSet, 2);
+BENCHMARK(FastFilterCheckSet2, 1);
+BENCHMARK(FastFilterContains, 1);
+BENCHMARK(FastFilterContains2, 1);

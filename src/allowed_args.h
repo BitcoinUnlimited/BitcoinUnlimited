@@ -150,6 +150,12 @@ public:
     ConfigFile(CTweakMap *pTweaks);
 };
 
+class BitcoinBench : public AllowedArgs
+{
+public:
+    BitcoinBench();
+};
+
 
 /** These APIs validate the parameter and are typically used in .addArg */
 bool validateString(const std::string &str, const std::set<char> &validChars);
