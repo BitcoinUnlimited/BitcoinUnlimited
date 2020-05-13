@@ -1194,7 +1194,8 @@ bool TestBlockValidity(CValidationState &state,
     const CBlock &block,
     CBlockIndex *pindexPrev,
     bool fCheckPOW,
-    bool fCheckMerkleRoot)
+    bool fCheckMerkleRoot,
+    bool fConservative)
 {
     AssertLockHeld(cs_main);
     assert(pindexPrev && pindexPrev == chainActive.Tip());
@@ -1212,13 +1213,24 @@ bool TestBlockValidity(CValidationState &state,
         return false;
     if (!CheckBlock(block, state, fCheckPOW, fCheckMerkleRoot))
         return false;
-    if (!ContextualCheckBlock(block, state, pindexPrev))
+    if (!ContextualCheckBlock(block, state, pindexPrev, fConservative))
         return false;
     if (!ConnectBlock(block, state, &indexDummy, viewNew, chainparams, true))
         return false;
     assert(state.IsValid());
 
     return true;
+}
+
+// Similar to TestBlockValidity but is very conservative in parameters (used in mining)
+bool TestConservativeBlockValidity(CValidationState &state,
+    const CChainParams &chainparams,
+    const CBlock &block,
+    CBlockIndex *pindexPrev,
+    bool fCheckPOW,
+    bool fCheckMerkleRoot)
+{
+    return TestBlockValidity(state, chainparams, block, pindexPrev, fCheckPOW, fCheckMerkleRoot, true);
 }
 
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams)
