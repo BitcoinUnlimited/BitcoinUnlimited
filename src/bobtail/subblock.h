@@ -36,6 +36,8 @@ public:
     CBlockHeader GetBlockHeader() const;
 
     std::string ToString() const;
+
+    std::set<uint256> GetAncestorHashes() const;
 };
 
 

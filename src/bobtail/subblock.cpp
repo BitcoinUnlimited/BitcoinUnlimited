@@ -40,3 +40,21 @@ std::string CSubBlock::ToString() const
     }
     return s.str();
 }
+
+std::set<uint256> CSubBlock::GetAncestorHashes() const
+{
+    std::set<uint256> ancestors;
+    if (vtx.empty())
+    {
+        return ancestors;
+    }
+    if (vtx[0]->IsProofBase() == false)
+    {
+        return ancestors;
+    }
+    for (auto &input : vtx[0]->vin)
+    {
+        ancestors.emplace(input.prevout.hash);
+    }
+    return ancestors;
+}
