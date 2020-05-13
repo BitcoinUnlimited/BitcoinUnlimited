@@ -730,9 +730,8 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                         vPriorityRecvQ.push_back(std::make_pair<CNodeRef, CNetMessage>(CNodeRef(this), std::move(msg)));
                         msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
 
-                        LOG(THIN | GRAPHENE | CMPCT,
-                            "Receive Queue: pushed %s to the priority queue, %d bytes, peer(%d)\n", strCommand,
-                            vPriorityRecvQ.back().second.hdr.nMessageSize, this->GetId());
+                        LOG(PRIORITYQ, "Receive Queue: pushed %s to the priority queue, %d bytes, peer(%d)\n",
+                            strCommand, vPriorityRecvQ.back().second.hdr.nMessageSize, this->GetId());
                         // Indicate we have a priority message to process
                         fPriorityRecvMsg.store(true);
                         fSendLowPriority = false;
@@ -3411,8 +3410,7 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
         it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
         ssSend.GetAndClear(*it);
         nSendSize.fetch_add((*it).size());
-        LOG(THIN | GRAPHENE | CMPCT, "Send Queue: pushed %s to the priority queue, peer(%d)\n", strCommand,
-            this->GetId());
+        LOG(PRIORITYQ, "Send Queue: pushed %s to the priority queue, peer(%d)\n", strCommand, this->GetId());
 
         LOCK(cs_prioritySendQ);
         vPrioritySendQ.push_back(CNodeRef(this));
