@@ -40,27 +40,7 @@ enum {
 }; // enum keys
 
 
-
-const std::unordered_map<uint64_t, std::string> name = {
-    {             BU_ELECTRUM_SERVER_PORT_TCP,              "BU_ELECTRUM_SERVER_PORT_TCP" },
-    {     BU_ELECTRUM_SERVER_PROTOCOL_VERSION,      "BU_ELECTRUM_SERVER_PROTOCOL_VERSION" },
-    {            BU_GRAPHENE_FAST_FILTER_PREF,             "BU_GRAPHENE_FAST_FILTER_PREF" },
-    {       BU_GRAPHENE_MAX_VERSION_SUPPORTED,        "BU_GRAPHENE_MAX_VERSION_SUPPORTED" },
-    {       BU_GRAPHENE_MIN_VERSION_SUPPORTED,        "BU_GRAPHENE_MIN_VERSION_SUPPORTED" },
-    {                          BU_LISTEN_PORT,                           "BU_LISTEN_PORT" },
-    {         BU_MEMPOOL_ANCESTOR_COUNT_LIMIT,          "BU_MEMPOOL_ANCESTOR_COUNT_LIMIT" },
-    {          BU_MEMPOOL_ANCESTOR_SIZE_LIMIT,           "BU_MEMPOOL_ANCESTOR_SIZE_LIMIT" },
-    {       BU_MEMPOOL_DESCENDANT_COUNT_LIMIT,        "BU_MEMPOOL_DESCENDANT_COUNT_LIMIT" },
-    {        BU_MEMPOOL_DESCENDANT_SIZE_LIMIT,         "BU_MEMPOOL_DESCENDANT_SIZE_LIMIT" },
-    {                         BU_MEMPOOL_SYNC,                          "BU_MEMPOOL_SYNC" },
-    {   BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED,    "BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED" },
-    {   BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED,    "BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED" },
-    {                  BU_MSG_IGNORE_CHECKSUM,                   "BU_MSG_IGNORE_CHECKSUM" },
-    {                    BU_TXN_CONCATENATION,                     "BU_TXN_CONCATENATION" },
-    {                        BU_XTHIN_VERSION,                         "BU_XTHIN_VERSION" },
-}; // const unordered_map name
-
-
+#define GetKeyName(key) #key
 
 enum {
                 xvt_u64c,
