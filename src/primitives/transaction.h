@@ -250,6 +250,7 @@ public:
     unsigned int CalculateModifiedSize(unsigned int nSize = 0) const;
 
     bool IsCoinBase() const { return (vin.size() == 1 && vin[0].prevout.IsNull()); }
+    bool IsProofBase() const { return (vin.size() > 1 && vin[0].prevout.IsNull() && vout.empty()); }
     friend bool operator==(const CTransaction &a, const CTransaction &b) { return a.hash == b.hash; }
     friend bool operator!=(const CTransaction &a, const CTransaction &b) { return a.hash != b.hash; }
     std::string ToString() const;
