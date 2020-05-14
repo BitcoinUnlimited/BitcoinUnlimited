@@ -147,20 +147,6 @@ void CRequestManager::cleanup(OdMap::iterator &itemIt)
     pendingTxns -= 1;
 
     // remove all the source nodes
-    for (CUnknownObj::ObjectSourceList::iterator i = item.availableFrom.begin(); i != item.availableFrom.end(); ++i)
-    {
-        CNode *node = i->node;
-        if (node != nullptr)
-        {
-            // LOG(REQ, "ReqMgr: %s cleanup - removed ref to %d count %d.\n", item.obj.ToString(), node->GetId(),
-            //    node->GetRefCount());
-            //
-            // A cs_vNodes lock is not required here when releasing refs for two reasons: one, this only decrements
-            // an atomic counter, and two, the counter will always be > 0 at this point, so we don't have to worry
-            // that a pnode could be disconnected and no longer exist before the decrement takes place.
-            node->Release();
-        }
-    }
     item.availableFrom.clear();
 
     if (item.obj.type == MSG_TX)
@@ -508,12 +494,6 @@ bool CUnknownObj::AddSource(CNode *from)
     {
         LOG(REQ, "AddSource %s is available at %s.\n", obj.ToString(), from->GetLogName());
 
-        // We do not have to take a vNodes lock here as would usually be the case because the counter is
-        // atomic, and also at this point there will be at least one ref already and we therefore don't
-        // have to worry about the node getting disconnected and no longer existing.
-        DbgAssert(from->GetRefCount() > 0, );
-        from->AddRef();
-
         CNodeRequestData req(from);
         for (ObjectSourceList::iterator i = availableFrom.begin(); i != availableFrom.end(); ++i)
         {
@@ -725,11 +705,6 @@ void CRequestManager::SendRequests()
                         {
                             LOG(REQ, "ReqMgr: %s removed block ref to %s count %d (on disconnect).\n",
                                 item.obj.ToString(), next.node->GetLogName(), next.node->GetRefCount());
-                            // A cs_vNodes lock is not required here when releasing refs for two reasons: one, this
-                            // only decrements an atomic counter, and two, the counter will always be > 0 at this
-                            // point, so we don't have to worry that a pnode could be disconnected and no longer exist
-                            // before the decrement takes place.
-                            next.node->Release();
                             next.node = nullptr; // force the loop to get another node
                         }
                     }
@@ -751,16 +726,6 @@ void CRequestManager::SendRequests()
 
                     if (fBatchBlockRequests)
                     {
-                        // Add a node ref if we haven't already added a map entry for this node.
-                        if (mapBatchBlockRequests.find(next.node) == mapBatchBlockRequests.end())
-                        {
-                            // We do not have to take a vNodes lock here as would usually be the case because the
-                            // counter is atomic, and also at this point there will be at least one ref already and
-                            // we therefore don't have to worry about the node getting disconnected and no longer
-                            // existing.
-                            DbgAssert(next.node->GetRefCount() > 0, );
-                            next.node->AddRef();
-                        }
                         mapBatchBlockRequests[next.node].emplace_back(obj);
                     }
                     else
@@ -788,11 +753,6 @@ void CRequestManager::SendRequests()
                     // we don't lose the block source.
                     if (fReqBlkResult)
                     {
-                        // A cs_vNodes lock is not required here when releasing refs for two reasons: one, this only
-                        // decrements an atomic counter, and two, the counter will always be > 0 at this point, so we
-                        // don't have to worry that a pnode could be disconnected and no longer exist before the
-                        // decrement takes place.
-                        next.node->Release();
                         next.node = nullptr;
                     }
                     else
@@ -837,13 +797,6 @@ void CRequestManager::SendRequests()
         }
         ENTER_CRITICAL_SECTION(cs_objDownloader);
 
-        for (auto iter : mapBatchBlockRequests)
-        {
-            // A cs_vNodes lock is not required here when releasing refs for two reasons: one, this only decrements
-            // an atomic counter, and two, the counter will always be > 0 at this point, so we don't have to worry
-            // that a pnode could be disconnected and no longer exist before the decrement takes place.
-            iter.first->Release();
-        }
         mapBatchBlockRequests.clear();
     }
 
@@ -900,13 +853,6 @@ void CRequestManager::SendRequests()
                         {
                             if (next.node->fDisconnect) // Node was disconnected so we can't request from it
                             {
-                                LOG(REQ, "ReqMgr: %s removed tx ref to %d count %d (on disconnect).\n",
-                                    item.obj.ToString(), next.node->GetId(), next.node->GetRefCount());
-                                // A cs_vNodes lock is not required here when releasing refs for two reasons: one, this
-                                // only decrements an atomic counter, and two, the counter will always be > 0 at this
-                                // point, so we don't have to worry that a pnode could be disconnected and no longer
-                                // exist before the decrement takes place.
-                                next.node->Release();
                                 next.node = nullptr; // force the loop to get another node
                             }
                         }
@@ -921,16 +867,6 @@ void CRequestManager::SendRequests()
                             item.outstandingReqs++;
                             item.lastRequestTime = now;
 
-                            // Add a node ref if we haven't already added a map entry for this node.
-                            if (mapBatchTxnRequests.find(next.node) == mapBatchTxnRequests.end())
-                            {
-                                // We do not have to take a vNodes lock here as would usually be the case because the
-                                // counter is atomic, and also at this point there will be at least one ref already and
-                                // we therefore don't have to worry about the node getting disconnected and no longer
-                                // existing.
-                                DbgAssert(next.node->GetRefCount() > 0, );
-                                next.node->AddRef();
-                            }
                             mapBatchTxnRequests[next.node].emplace_back(item.obj);
 
                             // If we have 1000 requests for this peer then send them right away.
@@ -945,18 +881,10 @@ void CRequestManager::SendRequests()
                                 ENTER_CRITICAL_SECTION(cs_objDownloader);
 
                                 mapBatchTxnRequests.erase(next.node);
-                                {
-                                    // A cs_vNodes lock is not required here when releasing refs for two reasons: one,
-                                    // this only decrements an atomic counter, and two, the counter will always be > 0
-                                    // at this point, so we don't have to worry that a pnode could be disconnected and
-                                    // no longer exist before the decrement takes place.
-                                    next.node->Release();
-                                }
                             }
 
                             // Now that we've completed setting up our request for this transaction
-                            // we're done with this node, for this item, and can release and delete it.
-                            next.node->Release();
+                            // we're done with this node, for this item, and can delete it.
                             next.node = nullptr;
                         }
 
@@ -981,13 +909,6 @@ void CRequestManager::SendRequests()
         }
         ENTER_CRITICAL_SECTION(cs_objDownloader);
 
-        for (auto iter : mapBatchTxnRequests)
-        {
-            // A cs_vNodes lock is not required here when releasing refs for two reasons: one, this only decrements
-            // an atomic counter, and two, the counter will always be > 0 at this point, so we don't have to worry
-            // that a pnode could be disconnected and no longer exist before the decrement takes place.
-            iter.first->Release();
-        }
         mapBatchTxnRequests.clear();
     }
 }
