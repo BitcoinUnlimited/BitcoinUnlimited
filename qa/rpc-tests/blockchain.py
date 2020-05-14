@@ -138,6 +138,12 @@ class BlockchainTest(BitcoinTestFramework):
         assert isinstance(int(header['versionHex'], 16), int)
         assert isinstance(header['difficulty'], Decimal)
 
+        header_by_height = node.getblockheader(header['height'])
+        assert_equal (header_by_height, header)
+
+        header_by_height = node.getblockheader("200")
+        assert_equal (header_by_height, header)
+
     def _test_rollbackchain_and_reconsidermostworkchain(self):
         # Save the hash of the current chaintip and then mine 10 blocks
         blockcount = self.nodes[0].getblockcount()
