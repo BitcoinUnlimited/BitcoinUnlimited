@@ -485,6 +485,10 @@ libbitcoin_consensus_a_SOURCES = \
   amount.h \
   arith_uint256.cpp \
   arith_uint256.h \
+  bobtail/bobtail.cpp \
+  bobtail/bobtail.h \
+  bobtail/subblock.cpp \
+  bobtail/subblock.h \
   consensus/merkle.cpp \
   consensus/merkle.h \
   consensus/params.h \
