@@ -520,8 +520,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             // BU expedited procecessing requires the exchange of the listening port id
             // The former BUVERSION message has now been integrated into the xmap field in CXVersionMessage.
 
-            // prepare xversion message. This *must* be the next message after the verack has been received,
-            // if it comes at all.
+            // prepare xversion message. This must be sent before we send a verack message in the new xversion spec
             CXVersionMessage xver;
             xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
             xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
@@ -632,7 +631,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (!(pfrom->nServices & NODE_XVERSION))
         {
             // prepare xversion message. This *must* be the next message after the verack has been received,
-            // if it comes at all.
+            // if it comes at all in the old xversion spec.
             CXVersionMessage xver;
             xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
             xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
