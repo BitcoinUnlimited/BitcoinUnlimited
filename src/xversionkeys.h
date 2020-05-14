@@ -7,6 +7,7 @@
 #define BITCOIN_XVERSIONKEYS_H
 
 #include <unordered_map>
+#include <unordered_set>
 
 #define EXP_VER_PREFIX      0x0000
 #define BCHN_PREFIX         0x0001
@@ -88,34 +89,14 @@ const std::unordered_map<uint64_t, int> valtype = {
 
 
 
-enum keyType {
-    initial,
-    changeable,
-}; // enum keyType
-
-
-
-const std::unordered_map<uint64_t, keyType> mapKeyType = {
-    {             BU_ELECTRUM_SERVER_PORT_TCP,                                    initial },
-    {     BU_ELECTRUM_SERVER_PROTOCOL_VERSION,                                    initial },
-    {            BU_GRAPHENE_FAST_FILTER_PREF,                                    initial },
-    {       BU_GRAPHENE_MAX_VERSION_SUPPORTED,                                    initial },
-    {       BU_GRAPHENE_MIN_VERSION_SUPPORTED,                                    initial },
-    {                          BU_LISTEN_PORT,                                    initial },
-    {         BU_MEMPOOL_ANCESTOR_COUNT_LIMIT,                                    initial },
-    {          BU_MEMPOOL_ANCESTOR_SIZE_LIMIT,                                    initial },
-    {       BU_MEMPOOL_DESCENDANT_COUNT_LIMIT,                                    initial },
-    {        BU_MEMPOOL_DESCENDANT_SIZE_LIMIT,                                    initial },
-    {                         BU_MEMPOOL_SYNC,                                    initial },
-    {   BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED,                                    initial },
-    {   BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED,                                    initial },
-    {                  BU_MSG_IGNORE_CHECKSUM,                                    initial },
-    {                    BU_TXN_CONCATENATION,                                    initial },
-    {                        BU_XTHIN_VERSION,                                    initial },
+const std::unordered_set<uint64_t> setChangableKeys =
+{
 }; // const unordered_map keytype
 
-
-
+inline bool IsChangableKey(const int64_t &key)
+{
+    return setChangableKeys.count(key);
+}
 
 } // namespace XVer
 

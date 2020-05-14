@@ -728,12 +728,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // check for peer trying to change non-changeable key
         for (auto entry : xUpdate.xmap)
         {
-            auto iter = XVer::mapKeyType.find(entry.first);
-            if (iter == XVer::mapKeyType.end())
-            {
-                continue;
-            }
-            else if (iter->second == XVer::keyType::changeable)
+            if (XVer::IsChangableKey(entry.first))
             {
                 LOCK(pfrom->cs_xversion);
                 pfrom->xVersion.xmap[entry.first] = xUpdate.xmap[entry.first];
