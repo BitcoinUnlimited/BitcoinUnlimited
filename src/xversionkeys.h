@@ -21,22 +21,23 @@ namespace XVer
 {
 
 enum {
-                   BU_ELECTRUM_SERVER_PORT_TCP = 0x000000000002f00dUL,
-           BU_ELECTRUM_SERVER_PROTOCOL_VERSION = 0x000000000002f00eUL,
-                  BU_GRAPHENE_FAST_FILTER_PREF = 0x0000000000020004UL,
-             BU_GRAPHENE_MAX_VERSION_SUPPORTED = 0x0000000000020001UL,
-             BU_GRAPHENE_MIN_VERSION_SUPPORTED = 0x0000000000020005UL,
-                                BU_LISTEN_PORT = 0x0000000000020000UL,
-               BU_MEMPOOL_ANCESTOR_COUNT_LIMIT = 0x0000000000020009UL,
-                BU_MEMPOOL_ANCESTOR_SIZE_LIMIT = 0x000000000002000aUL,
-             BU_MEMPOOL_DESCENDANT_COUNT_LIMIT = 0x000000000002000bUL,
-              BU_MEMPOOL_DESCENDANT_SIZE_LIMIT = 0x000000000002000cUL,
-                               BU_MEMPOOL_SYNC = 0x0000000000020006UL,
-         BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED = 0x0000000000020008UL,
-         BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED = 0x0000000000020007UL,
-                        BU_MSG_IGNORE_CHECKSUM = 0x0000000000020002UL,
-                          BU_TXN_CONCATENATION = 0x000000000002000dUL,
-                              BU_XTHIN_VERSION = 0x0000000000020003UL,
+    BU_LISTEN_PORT                          = 0x0000000000020000UL,
+    BU_GRAPHENE_MAX_VERSION_SUPPORTED       = 0x0000000000020001UL,
+    BU_MSG_IGNORE_CHECKSUM                  = 0x0000000000020002UL,
+    BU_XTHIN_VERSION                        = 0x0000000000020003UL,
+    BU_GRAPHENE_FAST_FILTER_PREF            = 0x0000000000020004UL,
+    BU_GRAPHENE_MIN_VERSION_SUPPORTED       = 0x0000000000020005UL,
+    BU_MEMPOOL_SYNC                         = 0x0000000000020006UL,
+    BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED   = 0x0000000000020007UL,
+    BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED   = 0x0000000000020008UL,
+    BU_MEMPOOL_ANCESTOR_COUNT_LIMIT         = 0x0000000000020009UL,
+    BU_MEMPOOL_ANCESTOR_SIZE_LIMIT          = 0x000000000002000aUL,
+    BU_MEMPOOL_DESCENDANT_COUNT_LIMIT       = 0x000000000002000bUL,
+    BU_MEMPOOL_DESCENDANT_SIZE_LIMIT        = 0x000000000002000cUL,
+    BU_TXN_CONCATENATION                    = 0x000000000002000dUL,
+// there is a gap here from 000d to f00d
+    BU_ELECTRUM_SERVER_PORT_TCP             = 0x000000000002f00dUL,
+    BU_ELECTRUM_SERVER_PROTOCOL_VERSION     = 0x000000000002f00eUL,
 }; // enum keys
 
 
@@ -49,22 +50,22 @@ enum {
 
 
 const std::unordered_map<uint64_t, int> valtype = {
-    {             BU_ELECTRUM_SERVER_PORT_TCP,                                   xvt_u64c },
-    {     BU_ELECTRUM_SERVER_PROTOCOL_VERSION,                                   xvt_u64c },
-    {            BU_GRAPHENE_FAST_FILTER_PREF,                                   xvt_u64c },
-    {       BU_GRAPHENE_MAX_VERSION_SUPPORTED,                                   xvt_u64c },
-    {       BU_GRAPHENE_MIN_VERSION_SUPPORTED,                                   xvt_u64c },
-    {                          BU_LISTEN_PORT,                                   xvt_u64c },
-    {         BU_MEMPOOL_ANCESTOR_COUNT_LIMIT,                                   xvt_u64c },
-    {          BU_MEMPOOL_ANCESTOR_SIZE_LIMIT,                                   xvt_u64c },
-    {       BU_MEMPOOL_DESCENDANT_COUNT_LIMIT,                                   xvt_u64c },
-    {        BU_MEMPOOL_DESCENDANT_SIZE_LIMIT,                                   xvt_u64c },
-    {                         BU_MEMPOOL_SYNC,                                   xvt_u64c },
-    {   BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED,                                   xvt_u64c },
-    {   BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED,                                   xvt_u64c },
-    {                  BU_MSG_IGNORE_CHECKSUM,                                   xvt_u64c },
-    {                    BU_TXN_CONCATENATION,                                   xvt_u64c },
-    {                        BU_XTHIN_VERSION,                                   xvt_u64c },
+    {             BU_ELECTRUM_SERVER_PORT_TCP,  xvt_u64c },
+    {     BU_ELECTRUM_SERVER_PROTOCOL_VERSION,  xvt_u64c },
+    {            BU_GRAPHENE_FAST_FILTER_PREF,  xvt_u64c },
+    {       BU_GRAPHENE_MAX_VERSION_SUPPORTED,  xvt_u64c },
+    {       BU_GRAPHENE_MIN_VERSION_SUPPORTED,  xvt_u64c },
+    {                          BU_LISTEN_PORT,  xvt_u64c },
+    {         BU_MEMPOOL_ANCESTOR_COUNT_LIMIT,  xvt_u64c },
+    {          BU_MEMPOOL_ANCESTOR_SIZE_LIMIT,  xvt_u64c },
+    {       BU_MEMPOOL_DESCENDANT_COUNT_LIMIT,  xvt_u64c },
+    {        BU_MEMPOOL_DESCENDANT_SIZE_LIMIT,  xvt_u64c },
+    {                         BU_MEMPOOL_SYNC,  xvt_u64c },
+    {   BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED,  xvt_u64c },
+    {   BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED,  xvt_u64c },
+    {                  BU_MSG_IGNORE_CHECKSUM,  xvt_u64c },
+    {                    BU_TXN_CONCATENATION,  xvt_u64c },
+    {                        BU_XTHIN_VERSION,  xvt_u64c },
 }; // const unordered_map valtype
 
 
