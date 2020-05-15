@@ -24,6 +24,7 @@ class BlockchainTest(BitcoinTestFramework):
 
         - gettxoutsetinfo
         - getblockheader
+        - getblock
         - rollbackchain
         - reconsidermostworkchain
         - getmempoolinfo
@@ -48,6 +49,7 @@ class BlockchainTest(BitcoinTestFramework):
         self._test_getblockchaininfo()
         self._test_gettxoutsetinfo()
         self._test_getblockheader()
+        self._test_getblock()
         self._test_rollbackchain_and_reconsidermostworkchain()
         self._test_transaction_pools()
         self.nodes[0].verifychain(4, 0)
@@ -143,6 +145,19 @@ class BlockchainTest(BitcoinTestFramework):
 
         header_by_height = node.getblockheader("200")
         assert_equal (header_by_height, header)
+
+    def _test_getblock(self):
+        node = self.nodes[0]
+
+        assert_raises(
+            JSONRPCException, lambda: node.getblock('nonsense'))
+
+        besthash = node.getbestblockhash()
+
+        block_by_hash = node.getblock(besthash)
+        block_by_height = node.getblock(200)
+
+        assert_equal (block_by_height, block_by_hash)
 
     def _test_rollbackchain_and_reconsidermostworkchain(self):
         # Save the hash of the current chaintip and then mine 10 blocks
