@@ -264,7 +264,7 @@ void entryToJSON(UniValue &info, const CTxMemPoolEntry &e)
     info.pushKV("spentby", spent);
 }
 
-UniValue mempoolToJSON(bool fVerbose = false)
+UniValue mempoolToJSON(bool fVerbose /* = false */)
 {
     if (fVerbose)
     {
