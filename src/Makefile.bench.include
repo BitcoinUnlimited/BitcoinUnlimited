@@ -30,6 +30,7 @@ bench_bench_bitcoin_SOURCES = \
   bench/merkle_root.cpp \
   bench/murmur_hash.cpp \
   bench/rpc_mempool.cpp \
+  bench/rpc_blockchain.cpp \
   bench/rollingbloom.cpp \
   bench/bloom.cpp \
   bench/prevector.cpp \
