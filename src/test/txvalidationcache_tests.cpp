@@ -420,10 +420,10 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
     uint256 prevout = coinbaseTxns[0].GetHash();
     uint256 hash;
 
-    // Create a chain of 25 unconfirmed transactions
-    SetArg("-limitancestorcount", std::to_string(25));
-    SetArg("-limitdescendantcount", std::to_string(25));
-    for (int i = 1; i <= 25; i++)
+    // Create a chain of 50 unconfirmed transactions
+    SetArg("-limitancestorcount", std::to_string(50));
+    SetArg("-limitdescendantcount", std::to_string(50));
+    for (int i = 1; i <= 50; i++)
     {
         CMutableTransaction tx;
         tx.vin.resize(1);
@@ -453,7 +453,7 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
     }
 
 
-    // Add one more which should fail because it's over the 25 limit.
+    // Add one more which should fail because it's over the 50 limit.
     {
         CMutableTransaction tx;
         tx.vin.resize(1);
@@ -473,10 +473,10 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
         BOOST_CHECK(!ToMemPool(tx, "too-long-mempool-chain"));
     }
 
-    SetArg("-limitancestorcount", std::to_string(27));
-    SetArg("-limitdescendantcount", std::to_string(27));
+    SetArg("-limitancestorcount", std::to_string(52));
+    SetArg("-limitdescendantcount", std::to_string(52));
 
-    // Add one more which should should work because the limit is now 27
+    // Add one more which should should work because the limit is now 52
     {
         CMutableTransaction tx;
         tx.vin.resize(1);
@@ -552,7 +552,7 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
     }
 
     // Now try to add one more tx with only one input. It should fail because
-    // we are over the limit of 27.
+    // we are over the limit of 52.
     {
         CMutableTransaction tx;
         tx.vin.resize(1);
