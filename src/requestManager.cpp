@@ -456,10 +456,9 @@ void CRequestManager::Rejected(const CInv &obj, CNode *from, unsigned char reaso
     }
 }
 
-CNodeRequestData::CNodeRequestData(CNode *n)
+CNodeRequestData::CNodeRequestData(CNodeRef n)
 {
-    assert(n);
-    node = n;
+    noderef = n;
     requestCount = 0;
     desirability = 0;
 
@@ -468,13 +467,13 @@ CNodeRequestData::CNodeRequestData(CNode *n)
     // Calculate how much we like this node:
 
     // Prefer thin block nodes over low latency ones when the chain is syncd
-    if (node->ThinBlockCapable() && IsChainNearlySyncd())
+    if (noderef.get()->ThinBlockCapable() && IsChainNearlySyncd())
     {
         desirability += MaxLatency;
     }
 
     // The bigger the latency (in microseconds), the less we want to request from this node
-    int latency = node->txReqLatency.GetTotalTyped();
+    int latency = noderef.get()->txReqLatency.GetTotalTyped();
     // data has never been requested from this node.  Should we encourage investigation into whether this node is fast,
     // or stick with nodes that we do have data on?
     if (latency == 0)
@@ -494,7 +493,8 @@ bool CUnknownObj::AddSource(CNode *from)
     {
         LOG(REQ, "AddSource %s is available at %s.\n", obj.ToString(), from->GetLogName());
 
-        CNodeRequestData req(from);
+        CNodeRef noderef(from);
+        CNodeRequestData req(noderef);
         for (ObjectSourceList::iterator i = availableFrom.begin(); i != availableFrom.end(); ++i)
         {
             if (i->desirability < req.desirability)
@@ -636,6 +636,11 @@ void CRequestManager::ResetLastBlockRequestTime(const uint256 &hash)
     }
 }
 
+struct CompareIteratorByNodeRef
+{
+    bool operator()(const CNodeRef &a, const CNodeRef &b) const { return a.get() < b.get(); }
+};
+
 void CRequestManager::SendRequests()
 {
     int64_t now = 0;
@@ -664,12 +669,12 @@ void CRequestManager::SendRequests()
     // asking for one at time. We can do this because there will be no XTHIN requests possible during
     // this time.
     bool fBatchBlockRequests = IsInitialBlockDownload();
-    std::map<CNode *, std::vector<CInv> > mapBatchBlockRequests;
+    std::map<CNodeRef, std::vector<CInv>, CompareIteratorByNodeRef> mapBatchBlockRequests;
 
     // Batch any transaction requests when possible. The process of batching and requesting batched transactions
     // is simlilar to batched block requests, however, we don't make the distinction of whether we're in the process
     // of syncing the chain, as we do with block requests.
-    std::map<CNode *, std::vector<CInv> > mapBatchTxnRequests;
+    std::map<CNodeRef, std::vector<CInv>, CompareIteratorByNodeRef> mapBatchTxnRequests;
 
     // Get Blocks
     while (sendBlkIter != mapBlkInfo.end())
@@ -694,23 +699,21 @@ void CRequestManager::SendRequests()
             {
                 CNodeRequestData next;
                 // Go thru the availableFrom list, looking for the first node that isn't disconnected
-                while (!item.availableFrom.empty() && (next.node == nullptr))
+                while (!item.availableFrom.empty() && (next.noderef.get() == nullptr))
                 {
                     next = item.availableFrom.front(); // Grab the next location where we can find this object.
                     item.availableFrom.pop_front();
-                    if (next.node != nullptr)
+                    if (next.noderef.get() != nullptr)
                     {
                         // Do not request from this node if it was disconnected
-                        if (next.node->fDisconnect)
+                        if (next.noderef.get()->fDisconnect)
                         {
-                            LOG(REQ, "ReqMgr: %s removed block ref to %s count %d (on disconnect).\n",
-                                item.obj.ToString(), next.node->GetLogName(), next.node->GetRefCount());
-                            next.node = nullptr; // force the loop to get another node
+                            next.noderef.~CNodeRef(); // force the loop to get another node
                         }
                     }
                 }
 
-                if (next.node != nullptr)
+                if (next.noderef.get() != nullptr)
                 {
                     // If item.lastRequestTime is true then we've requested at least once and we'll try a re-request
                     if (item.lastRequestTime)
@@ -726,12 +729,12 @@ void CRequestManager::SendRequests()
 
                     if (fBatchBlockRequests)
                     {
-                        mapBatchBlockRequests[next.node].emplace_back(obj);
+                        mapBatchBlockRequests[next.noderef].emplace_back(obj);
                     }
                     else
                     {
                         LEAVE_CRITICAL_SECTION(cs_objDownloader); // item and itemIter are now invalid
-                        fReqBlkResult = RequestBlock(next.node, obj);
+                        fReqBlkResult = RequestBlock(next.noderef.get(), obj);
                         ENTER_CRITICAL_SECTION(cs_objDownloader);
 
                         if (!fReqBlkResult)
@@ -753,7 +756,7 @@ void CRequestManager::SendRequests()
                     // we don't lose the block source.
                     if (fReqBlkResult)
                     {
-                        next.node = nullptr;
+                        next.noderef.~CNodeRef();
                     }
                     else
                     {
@@ -788,11 +791,11 @@ void CRequestManager::SendRequests()
             {
                 for (auto &inv : iter.second)
                 {
-                    MarkBlockAsInFlight(iter.first->GetId(), inv.hash);
+                    MarkBlockAsInFlight(iter.first.get()->GetId(), inv.hash);
                 }
-                iter.first->PushMessage(NetMsgType::GETDATA, iter.second);
+                iter.first.get()->PushMessage(NetMsgType::GETDATA, iter.second);
                 LOG(REQ, "Sent batched request with %d blocks to node %s\n", iter.second.size(),
-                    iter.first->GetLogName());
+                    iter.first.get()->GetLogName());
             }
         }
         ENTER_CRITICAL_SECTION(cs_objDownloader);
@@ -845,20 +848,20 @@ void CRequestManager::SendRequests()
                 {
                     CNodeRequestData next;
                     // Go thru the availableFrom list, looking for the first node that isn't disconnected
-                    while (!item.availableFrom.empty() && (next.node == nullptr))
+                    while (!item.availableFrom.empty() && (next.noderef.get() == nullptr))
                     {
                         next = item.availableFrom.front(); // Grab the next location where we can find this object.
                         item.availableFrom.pop_front();
-                        if (next.node != nullptr)
+                        if (next.noderef.get() != nullptr)
                         {
-                            if (next.node->fDisconnect) // Node was disconnected so we can't request from it
+                            if (next.noderef.get()->fDisconnect) // Node was disconnected so we can't request from it
                             {
-                                next.node = nullptr; // force the loop to get another node
+                                next.noderef.~CNodeRef(); // force the loop to get another node
                             }
                         }
                     }
 
-                    if (next.node != nullptr)
+                    if (next.noderef.get() != nullptr)
                     {
                         // This commented code skips requesting TX if the node is not synced. The request
                         // manager should not make this decision but rather the caller should not give us the TX.
@@ -867,25 +870,26 @@ void CRequestManager::SendRequests()
                             item.outstandingReqs++;
                             item.lastRequestTime = now;
 
-                            mapBatchTxnRequests[next.node].emplace_back(item.obj);
+                            mapBatchTxnRequests[next.noderef].emplace_back(item.obj);
 
                             // If we have 1000 requests for this peer then send them right away.
-                            if (mapBatchTxnRequests[next.node].size() >= 1000)
+                            if (mapBatchTxnRequests[next.noderef].size() >= 1000)
                             {
                                 LEAVE_CRITICAL_SECTION(cs_objDownloader);
                                 {
-                                    next.node->PushMessage(NetMsgType::GETDATA, mapBatchTxnRequests[next.node]);
+                                    next.noderef.get()->PushMessage(
+                                        NetMsgType::GETDATA, mapBatchTxnRequests[next.noderef]);
                                     LOG(REQ, "Sent batched request with %d transations to node %s\n",
-                                        mapBatchTxnRequests[next.node].size(), next.node->GetLogName());
+                                        mapBatchTxnRequests[next.noderef].size(), next.noderef.get()->GetLogName());
                                 }
                                 ENTER_CRITICAL_SECTION(cs_objDownloader);
 
-                                mapBatchTxnRequests.erase(next.node);
+                                mapBatchTxnRequests.erase(next.noderef);
                             }
 
                             // Now that we've completed setting up our request for this transaction
                             // we're done with this node, for this item, and can delete it.
-                            next.node = nullptr;
+                            next.noderef.~CNodeRef();
                         }
 
                         inFlight++;
@@ -902,9 +906,9 @@ void CRequestManager::SendRequests()
         {
             for (auto iter : mapBatchTxnRequests)
             {
-                iter.first->PushMessage(NetMsgType::GETDATA, iter.second);
+                iter.first.get()->PushMessage(NetMsgType::GETDATA, iter.second);
                 LOG(REQ, "Sent batched request with %d transations to node %s\n", iter.second.size(),
-                    iter.first->GetLogName());
+                    iter.first.get()->GetLogName());
             }
         }
         ENTER_CRITICAL_SECTION(cs_objDownloader);
