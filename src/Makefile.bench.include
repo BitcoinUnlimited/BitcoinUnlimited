@@ -16,6 +16,7 @@ bench_bench_bitcoin_SOURCES = \
   test/testutil.h \
   test/testutil.cpp \
   $(RAW_BENCH_FILES) \
+  bench/bench_constants.h \
   bench/bench_bitcoin.cpp \
   bench/bench.cpp \
   bench/bench.h \
