@@ -611,14 +611,29 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         return error("%s receieved before VERSION message - disconnecting peer=%s", strCommand, pfrom->GetLogName());
     }
 
+    else if (!pfrom->fSuccessfullyConnected && GetTime() - pfrom->tVersionSent > VERACK_TIMEOUT &&
+             pfrom->tVersionSent >= 0)
+    {
+        // If verack is not received within timeout then disconnect.
+        // The peer may be slow so disconnect them only, to give them another chance if they try to re-connect.
+        // If they are a bad peer and keep trying to reconnect and still do not VERACK, they will eventually
+        // get banned by the connection slot algorithm which tracks disconnects and reconnects.
+        pfrom->fDisconnect = true;
+        LOG(NET, "ERROR: disconnecting - VERACK not received within %d seconds for peer=%s version=%s\n",
+            VERACK_TIMEOUT, pfrom->GetLogName(), pfrom->cleanSubVer);
+
+        // update connection tracker which is used by the connection slot algorithm.
+        LOCK(cs_mapInboundConnectionTracker);
+        CNetAddr ipAddress = (CNetAddr)pfrom->addr;
+        mapInboundConnectionTracker[ipAddress].nEvictions += 1;
+        mapInboundConnectionTracker[ipAddress].nLastEvictionTime = GetTime();
+        mapInboundConnectionTracker[ipAddress].userAgent = pfrom->cleanSubVer;
+
+        return true; // return true so we don't get any process message failures in the log.
+    }
+
     else if (strCommand == NetMsgType::VERACK)
     {
-        if (GetTime() - pfrom->tVersionSent > VERACK_TIMEOUT)
-        {
-            dosMan.Misbehaving(pfrom, 1);
-            return error("verack message receieved after verack timeout limit reached");
-        }
-
         if (pfrom->fSuccessfullyConnected == true)
         {
             dosMan.Misbehaving(pfrom, 1);
@@ -674,27 +689,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         CheckAndRequestExpeditedBlocks(pfrom);
 
         pfrom->fSuccessfullyConnected = true;
-    }
-
-    else if (!pfrom->fSuccessfullyConnected && GetTime() - pfrom->tVersionSent > VERACK_TIMEOUT &&
-             pfrom->tVersionSent >= 0)
-    {
-        // If verack is not received within timeout then disconnect.
-        // The peer may be slow so disconnect them only, to give them another chance if they try to re-connect.
-        // If they are a bad peer and keep trying to reconnect and still do not VERACK, they will eventually
-        // get banned by the connection slot algorithm which tracks disconnects and reconnects.
-        pfrom->fDisconnect = true;
-        LOG(NET, "ERROR: disconnecting - VERACK not received within %d seconds for peer=%s version=%s\n",
-            VERACK_TIMEOUT, pfrom->GetLogName(), pfrom->cleanSubVer);
-
-        // update connection tracker which is used by the connection slot algorithm.
-        LOCK(cs_mapInboundConnectionTracker);
-        CNetAddr ipAddress = (CNetAddr)pfrom->addr;
-        mapInboundConnectionTracker[ipAddress].nEvictions += 1;
-        mapInboundConnectionTracker[ipAddress].nLastEvictionTime = GetTime();
-        mapInboundConnectionTracker[ipAddress].userAgent = pfrom->cleanSubVer;
-
-        return true; // return true so we don't get any process message failures in the log.
     }
 
     else if (strCommand == NetMsgType::XVERSION_OLD)
