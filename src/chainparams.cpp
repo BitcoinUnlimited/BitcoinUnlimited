@@ -215,7 +215,8 @@ public:
         checkpoints[582680] = uint256S("0x000000000000000001b4b8e36aec7d4f9671a47872cb9a74dc16ca398c7dcc18");
         // Nov 15th 2019 activate Schnorr Multisig, minimal data
         checkpoints[609136] = uint256S("0x000000000000000000b48bb207faac5ac655c313e41ac909322eaa694f5bc5b1");
-
+        // May 15th 2020 activate op_reverse, SigChecks
+        checkpoints[635259] = uint256S("0x00000000000000000033dfef1fc2d6a5d5520b078c55193a9bf498c5b27530f7");
 
         // clang-format on
         // * UNIX timestamp of last checkpoint block
@@ -418,6 +419,8 @@ public:
         checkpoints[1303885] = uint256S("0x00000000000000479138892ef0e4fa478ccc938fb94df862ef5bde7e8dee23d3");
         // Nov 15th 2019 activate Schnorr Multisig, minimal data
         checkpoints[1341712] = uint256S("0x00000000fffc44ea2e202bd905a9fbbb9491ef9e9d5a9eed4039079229afa35b");
+        // May 15th 2020 activate op_reverse, SigCheck
+        checkpoints[1378461] = uint256S("0x0000000099f5509b5f36b1926bcf82b21d936ebeadee811030dfbbb7fae915d7");
 
         // clang-format on
         // Data as of block
