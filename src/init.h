@@ -36,6 +36,7 @@ static const bool DEFAULT_PV_TESTMODE = false;
 
 extern CTweak<double> dMinLimiterTxFee;
 extern CTweak<double> dMaxLimiterTxFee;
+extern CTweak<bool> avoidReconsiderMostWorkChain;
 
 /** Returns licensing information (for -version) */
 std::string LicenseInfo();

@@ -522,7 +522,7 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
     // Reconsider the most work chain if we're not already synced. This is necessary
     // when switching from an ABC/BCHN client or when a operator failed to upgrade their BU
     // node before a hardfork.
-    if (!fReindex)
+    if (!fReindex && !(avoidReconsiderMostWorkChain.Value()))
     {
         // Get the set of chaintips
         std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
