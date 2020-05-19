@@ -468,6 +468,7 @@ bench/merkle_root.cpp
 bench/murmur_hash.cpp
 bench/prevector.cpp
 bench/rollingbloom.cpp
+bench/rpc_mempool.cpp
 bench/verify_script.cpp
 compat/byteswap.h
 compat/endian.h
