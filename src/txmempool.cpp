@@ -1465,8 +1465,8 @@ CTransactionRef CTxMemPool::get(const uint256 &hash) const
 
 static TxMempoolInfo GetInfo(CTxMemPool::indexed_transaction_set::const_iterator it)
 {
-    return TxMempoolInfo{
-        it->GetSharedTx(), it->GetTimeMicros(), CFeeRate(it->GetFee(), it->GetTxSize()), it->GetModifiedFee() - it->GetFee()};
+    return TxMempoolInfo{it->GetSharedTx(), it->GetTimeMicros(), CFeeRate(it->GetFee(), it->GetTxSize()),
+        it->GetModifiedFee() - it->GetFee()};
 }
 
 std::vector<TxMempoolInfo> CTxMemPool::AllTxMempoolInfo() const

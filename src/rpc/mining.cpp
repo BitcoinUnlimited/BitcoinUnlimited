@@ -128,57 +128,58 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
         }
         if (!pblocktemplate.get())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
-		LOG(WB, "Using delta block for RPC generate.\n");
-		pblock = pblocktemplate->delta_block;
+        LOG(WB, "Using delta block for RPC generate.\n");
+        pblock = pblocktemplate->delta_block;
 
         {
             // LOCK(cs_main);
             IncrementExtraNonce(pblock.get(), nExtraNonce);
         }
 
-		// Generally look for weak PoW
-		while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount && !CheckProofOfWork(pblock->GetHash(), weakPOWfromPOW(pblock->nBits), Params().GetConsensus(), true))
-		{
-			++pblock->nNonce;
-			--nMaxTries;
-		}
-		if (nMaxTries == 0)
-			break;
-		if (pblock->nNonce == nInnerLoopCount)
-			continue;
+        // Generally look for weak PoW
+        while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount &&
+               !CheckProofOfWork(pblock->GetHash(), weakPOWfromPOW(pblock->nBits), Params().GetConsensus(), true))
+        {
+            ++pblock->nNonce;
+            --nMaxTries;
+        }
+        if (nMaxTries == 0)
+            break;
+        if (pblock->nNonce == nInnerLoopCount)
+            continue;
 
-		LOG(WB, "PROCESS NEW WEAK\n");
-		CNetDeltaBlock::processNew(pblock, nullptr);
-		CDeltaBlock::tryRegister(pblock);
+        LOG(WB, "PROCESS NEW WEAK\n");
+        CNetDeltaBlock::processNew(pblock, nullptr);
+        CDeltaBlock::tryRegister(pblock);
 
-		// Now check if Bobtail PoW is also satisfied
-		int k = 3; //FIXME
-		if (CheckBobtailPoW(*pblock, pblock->allAncestorHashes(), Params().GetConsensus(), k))
-		{
-			LOG(WB, "PROCESS NEW STRONG %s\n", pblock->GetHash().ToString());
-			for (int i=0;i < pblock->allAncestorHashes().size();i++)
-			{
-				LOG(WB, "\t%s\n", pblock->allAncestorHashes()[i].ToString());
-			}
-			// In we are mining our own block or not running in parallel for any reason
-			// we must terminate any block validation threads that are currently running,
-			// Unless they have more work than our own block or are processing a chain
-			// that has more work than our block.
-			PV->StopAllValidationThreads(pblock->GetBlockHeader().nBits);
+        // Now check if Bobtail PoW is also satisfied
+        int k = 3; // FIXME
+        if (CheckBobtailPoW(*pblock, pblock->allAncestorHashes(), Params().GetConsensus(), k))
+        {
+            LOG(WB, "PROCESS NEW STRONG %s\n", pblock->GetHash().ToString());
+            for (int i = 0; i < pblock->allAncestorHashes().size(); i++)
+            {
+                LOG(WB, "\t%s\n", pblock->allAncestorHashes()[i].ToString());
+            }
+            // In we are mining our own block or not running in parallel for any reason
+            // we must terminate any block validation threads that are currently running,
+            // Unless they have more work than our own block or are processing a chain
+            // that has more work than our block.
+            PV->StopAllValidationThreads(pblock->GetBlockHeader().nBits);
 
-			CValidationState state;
-			if (!ProcessNewBlock(state, Params(), nullptr, pblock.get(), true, nullptr, false))
-				throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
+            CValidationState state;
+            if (!ProcessNewBlock(state, Params(), nullptr, pblock.get(), true, nullptr, false))
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
 
-			// mark script as important because it was used at least for one coinbase output if the script came from the
-			// wallet
-			if (keepScript)
-			{
-				coinbaseScript->KeepScript();
-			}
+            // mark script as important because it was used at least for one coinbase output if the script came from the
+            // wallet
+            if (keepScript)
+            {
+                coinbaseScript->KeepScript();
+            }
             numblocks++;
-			LOG(WB, "DONE PROCESS NEW STRONG\n");
-		}
+            LOG(WB, "DONE PROCESS NEW STRONG\n");
+        }
         blockHashes.push_back(pblock->GetHash().GetHex());
     }
 

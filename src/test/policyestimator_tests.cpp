@@ -199,7 +199,8 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_gradual_fee_inc)
             }
         }
         mpool.removeForBlock(block, ++blocknum, dummyConflicted);
-        block.SetNull();;
+        block.SetNull();
+        ;
         if (blocknum % 5 == 0)
         {
             // we use *6 because our tx size is 188 bytes, if we add 1 sat to our fee it will make our fee rate go up by
