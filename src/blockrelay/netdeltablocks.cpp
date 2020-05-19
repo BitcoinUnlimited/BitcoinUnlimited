@@ -529,7 +529,6 @@ void CNetDeltaBlock::processNew(CDeltaBlockRef dbr, CNode *pfrom) {
     // if it is a strong block, process it as such as well
     // FIXME: copy'n'paste from unlimited.cpp
     if (dbr->isStrong()) {
-        int k = 3; //FIXME
         PV->StopAllValidationThreads(dbr->nBits);
         if (!ProcessNewBlock(state, Params() , nullptr, dbr.get(), true, nullptr, false)) {
             LOG(WB, "Delta block that is strong block has not been accepted!\n");

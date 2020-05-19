@@ -153,8 +153,7 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
         CDeltaBlock::tryRegister(pblock);
 
         // Now check if Bobtail PoW is also satisfied
-        int k = 3; // FIXME
-        if (CheckBobtailPoW(*pblock, pblock->allAncestorHashes(), Params().GetConsensus(), k))
+        if (CheckBobtailPoW(*pblock, pblock->allAncestorHashes(), Params().GetConsensus(), BOBTAIL_K))
         {
             LOG(WB, "PROCESS NEW STRONG %s\n", pblock->GetHash().ToString());
             for (int i = 0; i < pblock->allAncestorHashes().size(); i++)
