@@ -1142,8 +1142,9 @@ SLAPI int RandomBytes(unsigned char *buf, int num)
     javaEnv->DeleteLocalRef(bArray);
     return num;
 }
-// Implement API normally provided by random.cpp calling openssl
+// Implement APIs normally provided by random.cpp calling openssl
 void GetRandBytes(unsigned char *buf, int num) { RandomBytes(buf, num); }
+void GetStrongRandBytes(unsigned char *buf, int num) { RandomBytes(buf, num); }
 #define JAVA_ANDROID
 
 #endif

@@ -90,9 +90,7 @@ UniValue getinfo(const UniValue &params, bool fHelp)
     }
 
 #ifdef ENABLE_WALLET
-    LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : nullptr);
-#else
-    LOCK(cs_main);
+    LOCK(pwalletMain ? &pwalletMain->cs_wallet : nullptr);
 #endif
 
     proxyType proxy;
