@@ -546,12 +546,12 @@ UniValue getblockhash(const UniValue &params, bool fHelp)
 UniValue getblockheader(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
-        throw runtime_error(
-            "getblockheader \"hash\" ( verbose )\n"
+        throw std::runtime_error(
+            "getblockheader hash_or_height ( verbose )\n"
             "\nIf verbose is false, returns a string that is serialized, hex-encoded data for blockheader 'hash'.\n"
             "If verbose is true, returns an Object with information about blockheader <hash>.\n"
             "\nArguments:\n"
-            "1. \"hash\"          (string, required) The block hash\n"
+            "1. \"hash_or_height\"          (string, required) The block hash\n"
             "2. verbose           (boolean, optional, default=true) true for a json object, false for the hex encoded "
             "data\n"
             "\nResult (for verbose = true):\n"
@@ -579,26 +579,80 @@ UniValue getblockheader(const UniValue &params, bool fHelp)
             HelpExampleCli("getblockheader", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\"") +
             HelpExampleRpc("getblockheader", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\""));
 
-    std::string strHash = params[0].get_str();
-    uint256 hash(uint256S(strHash));
+    CBlockIndex *pindex = nullptr;
+    bool isNumber = true;
+    int height = -1;
+    if (!params[0].isNum())
+    {
+        // determine if string is the height or block hash
+        const std::string param0 = params[0].get_str();
+        isNumber = (param0.size() <= 20);
+        if (isNumber)
+        {
+            // if it was a number as a string, try to convert it to an int
+            try
+            {
+                height = std::stoi(param0);
+            }
+            catch (const std::invalid_argument &ia)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    strprintf("Invalid argument: %s. Block height %s is not a valid value", ia.what(), param0.c_str()));
+            }
+        }
+        else
+        {
+            // if not grab the block by hash
+            const uint256 hash(uint256S(param0));
+            pindex = LookupBlockIndex(hash);
+            if (!pindex)
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found by block hash");
+            }
+            if (!chainActive.Contains(pindex))
+            {
+                throw JSONRPCError(
+                    RPC_INVALID_PARAMETER, strprintf("Block is not in chain %s", Params().NetworkIDString()));
+            }
+        }
+    }
+    else
+    {
+        height = params[0].get_int();
+    }
+    if (isNumber)
+    {
+        const int current_tip = chainActive.Height();
+        if (height < 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Target block height %d is negative", height));
+        }
+        if (height > current_tip)
+        {
+            throw JSONRPCError(
+                RPC_INVALID_PARAMETER, strprintf("Target block height %d after current tip %d", height, current_tip));
+        }
+        LOG(RPC, "%s for height %d (tip is at %d)", __func__, height, current_tip);
+        pindex = chainActive[height];
+        DbgAssert(pindex && pindex->nHeight == height, throw std::runtime_error(__func__));
+    }
+
+    DbgAssert(pindex != nullptr, throw std::runtime_error(__func__));
 
     bool fVerbose = true;
     if (params.size() > 1)
         fVerbose = params[1].get_bool();
 
-    CBlockIndex *pblockindex = LookupBlockIndex(hash);
-    if (!pblockindex)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
 
     if (!fVerbose)
     {
         CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
-        ssBlock << pblockindex->GetBlockHeader();
+        ssBlock << pindex->GetBlockHeader();
         std::string strHex = HexStr(ssBlock.begin(), ssBlock.end());
         return strHex;
     }
 
-    return blockheaderToJSON(pblockindex);
+    return blockheaderToJSON(pindex);
 }
 
 // Allows passing int instead of bool
