@@ -29,7 +29,7 @@ fi
 if [ $DIST = "RPM" ]; then
   travis_retry DOCKER_EXEC yum update -y
   travis_retry DOCKER_EXEC yum groupinstall -y development
-  travis_retry DOCKER_EXEC yum install -y https://centos7.iuscommunity.org/ius-release.rpm
+  travis_retry DOCKER_EXEC yum install -y https://repo.ius.io/ius-release-el7.rpm
   travis_retry DOCKER_EXEC yum install -y http://repo.okay.com.mx/centos/7/x86_64/release/okay-release-1-1.noarch.rpm
   travis_retry DOCKER_EXEC yum install -y boost166-devel
   # this is temporary until the default compiler on centos/rhel supports c++14
