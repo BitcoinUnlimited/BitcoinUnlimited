@@ -438,19 +438,16 @@ static void ReconsiderChainOnStartup()
             setTips = GetChainTips();
         }
 
-        // Find out if we're already synced to one of the chaintips. If so then we
-        // can and must skip reconsidermostworkchain().
-        bool fReconsider = false;
-        CBlockIndex *pMostWork = chainActive.Tip();
-        for (CBlockIndex *pTip : setTips)
-        {
-            if (pMostWork->nChainWork < pTip->nChainWork)
-                fReconsider = true;
-        }
-        if (fReconsider)
+        // Set the override to true so that we don't get stuck trying to reconsider which
+        // can happen when an operator failed to upgrade their node before a hard fork.
+        try
         {
             UniValue obj(UniValue::VARR);
             reconsidermostworkchain(obj, false);
+        }
+        catch (...)
+        {
+            LOGA("Checked for mostwork chain and we are already on the correct chain\n");
         }
     }
 }
