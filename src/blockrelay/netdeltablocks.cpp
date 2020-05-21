@@ -1,3 +1,5 @@
+
+#include "bobtail/bobtail.h"
 #include "netdeltablocks.h"
 #include "txmempool.h"
 #include "txorphanpool.h"

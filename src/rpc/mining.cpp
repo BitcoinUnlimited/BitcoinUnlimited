@@ -7,6 +7,7 @@
 #include "amount.h"
 #include "blockrelay/netdeltablocks.h"
 #include "blockstorage/blockstorage.h"
+#include "bobtail/bobtail.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "consensus/consensus.h"

@@ -1,3 +1,5 @@
+
+#include "bobtail/bobtail.h"
 #include "main.h"
 #include "pow.h"
 #include "chainparams.h"
@@ -21,16 +23,6 @@ extern std::map<uint256, ConstCDeltaBlockRef> known_dbs;
 static std::map<uint256, std::vector<ConstCDeltaBlockRef> > incoming_dbs;
 // strong blocks in receive order, limited to TRACK_N_STRONG
 static std::vector<uint256> strongs_for_db;
-
-// to check wpow use sth like this:
-// if (!CheckProofOfWork(ahashMerkleRoot, weakPOWfromPOW(nBits), Consensus::Params(), true)) { ...
-extern unsigned int weakPOWfromPOW(unsigned int nBits) {
-    arith_uint256 a;
-    a.SetCompact(nBits);
-    a /= 1000;
-
-    return a.GetCompact();
-}
 
 bool CDeltaBlock::isEnabled(const CChainParams& params, const CBlockIndex *pindexPrev) {
     // FIXME: completely broken!
@@ -550,72 +542,4 @@ void CDeltaBlock::resetAll() {
 
 bool CDeltaBlock::spendsOutput(const COutPoint &out) const {
     return spent.contains(out);
-}
-
-bool CheckBobtailPoW(CBlockHeader deltaHeader, std::vector<uint256> ancestors, const Consensus::Params &params, uint8_t k)
-{
-    bool fNegative;
-    bool fOverflow;
-    arith_uint256 bnTarget;
-
-    if (k == 0)
-        return true;
-
-    if (ancestors.size() < k-1)
-        return false;
-
-    bnTarget.SetCompact(deltaHeader.nBits, &fNegative, &fOverflow);
-
-    if (fNegative || fOverflow)
-    {
-        LOG(WB, "Illegal value encountered when decoding target bits=%d\n", deltaHeader.nBits);
-        return false;
-    }
-
-    if (bnTarget > UintToArith256(params.powLimit))
-    {
-        LOG(WB, "Illegal target value bnTarget=%d for pow limit\n", bnTarget.getdouble());
-        return false;
-    }
-
-    std::sort(ancestors.begin(), ancestors.end()); 
-    std::vector<arith_uint256> lowestK;
-    for (int i=0;i < k-1;i++)
-    {
-        lowestK.push_back(UintToArith256(ancestors[i]));
-    }
-
-    arith_uint256 childTarget = UintToArith256(deltaHeader.GetHash());
-    if (ancestors.size() == (uint8_t)(k-1))
-        lowestK.push_back(childTarget);
-    else
-    {
-        arith_uint256 parentTarget = UintToArith256(ancestors[k-1]);
-        if (parentTarget < childTarget)
-            lowestK.push_back(parentTarget);
-        else
-            lowestK.push_back(childTarget);
-    }
-
-    if (k < 1)
-    {
-        LOG(WB, "Illegal value for k=%d, value must exceed 0\n", k);
-        return false;
-    }
-
-    return CheckBobtailPoWFromOrderedProofs(lowestK, bnTarget, k);
-}
-
-bool CheckBobtailPoWFromOrderedProofs(std::vector<arith_uint256> proofs, arith_uint256 target, uint8_t k)
-{
-    arith_uint256 average(0);
-    arith_uint256 kTarget(k);
-    for (auto proof : proofs)
-        average += proof;
-    average /= kTarget;
-
-    if (average < target)
-        return true;
-
-    return false;
 }

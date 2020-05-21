@@ -10,6 +10,7 @@
 #include "blockrelay/netdeltablocks.h"
 #include "blockrelay/thinblock.h"
 #include "blockstorage/blockstorage.h"
+#include "bobtail/bobtail.h"
 #include "cashaddrenc.h"
 #include "chain.h"
 #include "chainparams.h"

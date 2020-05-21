@@ -1,3 +1,5 @@
+
+#include "bobtail/bobtail.h"
 #include "test/test_bitcoin.h"
 #include "test/test_random.h"
 #include "arith_uint256.h"
