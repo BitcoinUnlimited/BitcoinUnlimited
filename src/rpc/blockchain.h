@@ -40,5 +40,6 @@ void CalculatePercentilesBySize(CAmount result[NUM_GETBLOCKSTATS_PERCENTILES],
 UniValue reconsidermostworkchain(const UniValue &params, bool fHelp);
 std::set<CBlockIndex *, CompareBlocksByHeight> GetChainTips();
 UniValue mempoolToJSON(bool fVerbose = false);
+UniValue blockToJSON(const CBlock &block, const CBlockIndex *blockindex, bool txDetails = false, bool listTxns = true);
 
 #endif

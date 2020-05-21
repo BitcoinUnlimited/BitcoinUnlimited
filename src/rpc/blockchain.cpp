@@ -103,7 +103,10 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex)
     return result;
 }
 
-UniValue blockToJSON(const CBlock &block, const CBlockIndex *blockindex, bool txDetails = false, bool listTxns = true)
+UniValue blockToJSON(const CBlock &block,
+    const CBlockIndex *blockindex,
+    bool txDetails /* = false */,
+    bool listTxns /* = true */)
 {
     UniValue result(UniValue::VOBJ);
     result.pushKV("hash", blockindex->GetBlockHash().GetHex());
