@@ -1661,30 +1661,63 @@ UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
         if (pMostWork->nChainWork < pTip->nChainWork)
             pMostWork = pTip;
     }
+    std::set<CBlockIndex *, CompareBlocksByHeight> setTipsToVerify;
+    setTipsToVerify.insert(pMostWork);
 
-    // If already on the longest chain then return
-    if (pMostWork == chainActive.Tip())
-        throw runtime_error("Nothing to do. Already on the correct chain.");
-
-    // Find where chainActive meets the most work chaintip
-    const CBlockIndex *pFork;
-    pFork = chainActive.FindFork(pMostWork);
-
-    // Rollback to the common forkheight so that both chains will be invalidated.
-    UniValue obj(UniValue::VARR);
-    obj.push_back(pFork->nHeight);
-    if (params.size() > 0)
+    // We need to check if there are duplicate chaintips that have the most work
+    // as could happen during a fork. If there are duplicates then we need to test each tip
+    // to find out which is the correct fork.
     {
-        // Set the rollbackchain override flag if there was one provided.
-        obj.push_back(params[0]);
+        // parse though chaintips again to find if there are duplicates
+        for (CBlockIndex *pTip : setTips)
+        {
+            if (pMostWork->nChainWork == pTip->nChainWork)
+                setTipsToVerify.insert(pTip);
+        }
     }
-    rollbackchain(obj, false);
 
-    // If we got here then rollbackchain() was sucessful and we didn't throw an exception.
-    // Now reconsider the most work chain.
-    UniValue obj_hash(UniValue::VARR);
-    obj_hash.push_back(pMostWork->GetBlockHash().ToString());
-    reconsiderblock(obj_hash, false);
+    for (CBlockIndex *pTipToVerify : setTipsToVerify)
+    {
+        // if no duplicates then return since there is nothing to do. We are already on the correct chain
+        if (pTipToVerify->nChainWork == chainActive.Tip()->nChainWork)
+        {
+            LOGA("Nothing to do. Already on the correct chain.");
+            throw runtime_error("Nothing to do. Already on the correct chain.");
+        }
+
+        // Find where chainActive meets the most work chaintip
+        const CBlockIndex *pFork;
+        pFork = chainActive.FindFork(pTipToVerify);
+
+        // Rollback to the common forkheight so that both chains will be invalidated.
+        UniValue obj(UniValue::VARR);
+        obj.push_back(pFork->nHeight);
+        if (params.size() > 0)
+        {
+            // Set the rollbackchain override flag if there was one provided.
+            obj.push_back(params[0]);
+        }
+        rollbackchain(obj, false);
+
+        // If we got here then rollbackchain() was sucessful and we didn't throw an exception.
+        // Now reconsider the new chain.
+        UniValue obj_hash(UniValue::VARR);
+        obj_hash.push_back(pTipToVerify->GetBlockHash().ToString());
+        try
+        {
+            LOGA("reconsider block: %s\n", pTipToVerify->GetBlockHash().ToString().c_str());
+            reconsiderblock(obj_hash, false);
+        }
+        catch (...)
+        {
+            LOGA("ERROR: reconsider block: %s\n", pTipToVerify->GetBlockHash().ToString().c_str());
+        }
+
+        if (pTipToVerify->nChainWork == chainActive.Tip()->nChainWork)
+        {
+            LOGA("Active chain has been successfully moved to a new chaintip.");
+        }
+    }
 
     return NullUniValue;
 }

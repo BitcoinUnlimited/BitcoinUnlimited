@@ -447,7 +447,6 @@ static void ReconsiderChainOnStartup()
         }
         catch (...)
         {
-            LOGA("Checked for mostwork chain and we are already on the correct chain\n");
         }
     }
 }
