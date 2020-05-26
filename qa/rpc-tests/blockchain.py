@@ -301,6 +301,12 @@ class BlockchainTest(BitcoinTestFramework):
         self.nodes[0].reconsidermostworkchain(True)
         assert_equal(self.nodes[0].getbestblockhash(), bestblockhashfork3);
 
+        # check that we are already on the correct chain by issuing another reconsider
+        try:
+            self.nodes[0].reconsidermostworkchain()
+        except JSONRPCException as e:
+            logging.info (e.error['message'])
+            assert("Nothing to do. Already on the correct chain." in e.error['message'])
 
         # check that we can run reconsidermostworkchain when we're already on the correct chain
         try:
