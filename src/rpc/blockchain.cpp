@@ -554,7 +554,7 @@ UniValue getblockheader(const UniValue &params, bool fHelp)
             "\nIf verbose is false, returns a string that is serialized, hex-encoded data for blockheader 'hash'.\n"
             "If verbose is true, returns an Object with information about blockheader <hash>.\n"
             "\nArguments:\n"
-            "1. \"hash_or_height\"          (string, required) The block hash\n"
+            "1. \"hash_or_height\"          (string|numeric, required) The block hash\n"
             "2. verbose           (boolean, optional, default=true) true for a json object, false for the hex encoded "
             "data\n"
             "\nResult (for verbose = true):\n"
@@ -709,16 +709,16 @@ static UniValue getblock(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 3)
         throw runtime_error(
-            "getblock \"hash\" ( verbose ) ( listtransactions )\n"
+            "getblock hash_or_height ( verbose ) ( listtransactions )\n"
             "\nIf verbose is false, returns a string that is serialized, hex-encoded data for block 'hash'.\n"
             "If verbose is true, returns an Object with information about block <hash>.\n"
             "If listtransactions is true, a list of the IDs of all the transactions included in the block will be "
             "shown.\n"
             "\nArguments:\n"
-            "1. \"hash\"          (string, required) The block hash or height\n"
-            "2. verbose           (boolean, optional, default=true) true for a json object, false for the hex encoded "
+            "1. \"hash_or_height\" (string|numeric, required) The block hash or height\n"
+            "2. verbose            (boolean, optional, default=true) true for a json object, false for the hex encoded "
             "data\n"
-            "3. listtransactions  (boolean, optional, default=true) true to get a list of all txns, false to get just "
+            "3. listtransactions   (boolean, optional, default=true) true to get a list of all txns, false to get just "
             "txns count\n"
             "\nResult (for verbose = true, listtransactions = true):\n"
             "{\n"
@@ -750,9 +750,66 @@ static UniValue getblock(const UniValue &params, bool fHelp)
             HelpExampleCli("getblock", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\"") +
             HelpExampleRpc("getblock", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\""));
 
+    CBlockIndex *pindex = nullptr;
+    bool isNumber = true;
+    int height = -1;
+    if (!params[0].isNum())
+    {
+        // determine if string is the height or block hash
+        const std::string param0 = params[0].get_str();
+        isNumber = (param0.size() <= 20);
+        if (isNumber)
+        {
+            // if it was a number as a string, try to convert it to an int
+            try
+            {
+                height = std::stoi(param0);
+            }
+            catch (const std::invalid_argument &ia)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    strprintf("Invalid argument: %s. Block height %s is not a valid value", ia.what(), param0.c_str()));
+            }
+        }
+        else
+        {
+            // if not grab the block by hash
+            const uint256 hash(uint256S(param0));
+            pindex = LookupBlockIndex(hash);
+            if (!pindex)
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found by block hash");
+            }
+            if (!chainActive.Contains(pindex))
+            {
+                throw JSONRPCError(
+                    RPC_INVALID_PARAMETER, strprintf("Block is not in chain %s", Params().NetworkIDString()));
+            }
+        }
+    }
+    else
+    {
+        height = params[0].get_int();
+    }
+    if (isNumber)
+    {
+        const int current_tip = chainActive.Height();
+        if (height < 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Target block height %d is negative", height));
+        }
+        if (height > current_tip)
+        {
+            throw JSONRPCError(
+                RPC_INVALID_PARAMETER, strprintf("Target block height %d after current tip %d", height, current_tip));
+        }
+        LOG(RPC, "%s for height %d (tip is at %d)", __func__, height, current_tip);
+        pindex = chainActive[height];
+        DbgAssert(pindex && pindex->nHeight == height, throw std::runtime_error(__func__));
+    }
 
-    std::string strHash = params[0].get_str();
-    uint256 hash(uint256S(strHash));
+    DbgAssert(pindex != nullptr, throw std::runtime_error(__func__));
+
     bool fVerbose = true;
     bool fListTxns = true;
     if (params.size() > 1)
@@ -764,23 +821,7 @@ static UniValue getblock(const UniValue &params, bool fHelp)
         fListTxns = is_param_trueish(params[2]);
     }
 
-    CBlockIndex *pblockindex = LookupBlockIndex(hash);
-    if (!pblockindex)
-    {
-        arith_uint256 h = UintToArith256(hash);
-        if (h.bits() < 65)
-        {
-            LOCK(cs_main);
-            uint64_t height = std::stoull(strHash);
-            if (height > (uint64_t)chainActive.Height())
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block index out of range");
-            pblockindex = chainActive[height];
-        }
-        else
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-    }
-
-    const CBlock block = GetBlockChecked(pblockindex);
+    const CBlock block = GetBlockChecked(pindex);
 
     if (!fVerbose)
     {
@@ -790,7 +831,7 @@ static UniValue getblock(const UniValue &params, bool fHelp)
         return strHex;
     }
 
-    return blockToJSON(block, pblockindex, false, fListTxns);
+    return blockToJSON(block, pindex, false, fListTxns);
 }
 
 static void ApplyStats(CCoinsStats &stats,
