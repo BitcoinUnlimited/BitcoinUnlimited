@@ -9,7 +9,9 @@
 
 #include "arith_uint256.h"
 #include "chain.h"
+#include "consensus/consensus.h"
 #include "primitives/block.h"
+#include "deltablocks.h"
 #include "uint256.h"
 #include "util.h"
 
@@ -163,7 +165,7 @@ bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params 
     }
 
     // Check proof of work matches claimed amount
-    if (UintToArith256(hash) > bnTarget)
+    if (UintToArith256(hash).getdouble() > GetKOSThreshold(bnTarget, BOBTAIL_K))
     {
         if (weak_mode)
         {

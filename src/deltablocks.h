@@ -8,6 +8,8 @@
 #include <memory>
 #include <vector>
 
+const double KOS_INCLUSION_PROB = 0.99999;
+
 // Deltablocks / Merged weak blocks for Bitcoin
 
 class CDeltaBlock;
@@ -157,5 +159,7 @@ private:
 
     friend int weakPOW_internal(const std::vector<ConstCDeltaBlockRef>& merge_set, const uint256& hashPrevBlock);
 };
+
+double GetKOSThreshold(arith_uint256 target, uint8_t k);
 
 #endif
