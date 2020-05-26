@@ -510,6 +510,18 @@ CTweak<double> dMinLimiterTxFee("minlimitertxfee",
                                     DEFAULT_MINLIMITERTXFEE),
     DEFAULT_MINLIMITERTXFEE);
 
+/** Disable reconsidermostworkchain during initial bootstrap when chain is not synced.
+  * This is for testing purpose only and hence it is disabled by default.
+  * This tweak will be useful during multiple clients interop network upgrade tests.
+  * During this tests  official testnet is forked via invalidate block, that means that
+  * if for what ever reason you need to restart your client during the test, you need to
+  * rollbackchain and then reconsiderblock the first block of the forked testnet. This is because
+  * if more than 1 block at time have to be invalidated so that the utxo may get undone correctly.
+  */
+CTweak<bool> avoidReconsiderMostWorkChain("test.avoidReconsiderMostWorkChain",
+    "Disable reconsidermostworkchain during initial bootstrap when chain is not synced",
+    false);
+
 CRequestManager requester; // after the maps nodes and tweaks
 CState nodestate;
 
