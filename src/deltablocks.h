@@ -130,6 +130,10 @@ public:
     //! Reset internal data; mostly for unit testing
     static void resetAll();
 
+    /*! Call this when a new delta block arrived, weak or strong. This
+     *  will process it and send it around to everyone. */
+    static void processNew(CDeltaBlockRef dbr);
+
     //! Test outpoint for whether it is spent in the delta block already
     bool spendsOutput(const COutPoint &out) const;
 

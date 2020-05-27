@@ -727,7 +727,8 @@ void static BitcoinMiner(const CChainParams &chainparams)
                         bool is_strong = UintToArith256(hash) <= hashStrongTarget;
                         if (pblocktemplate->delta_block != nullptr)
                         {
-                            CNetDeltaBlock::processNew(pblocktemplate->delta_block, nullptr);
+                            CDeltaBlock::processNew(pblocktemplate->delta_block);
+                            //TODO: ACTUALLY CALL sendDeltaBlock here
                         }
                         if (is_strong)
                         {

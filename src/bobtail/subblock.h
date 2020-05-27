@@ -7,10 +7,14 @@
 
 #include "primitives/block.h"
 
+class CSubBlock;
+typedef std::shared_ptr<CSubBlock> CSubBlockRef;
+
 class CSubBlock : public CBlockHeader
 {
 public:
     std::vector<CTransactionRef> vtx;
+    bool fXVal;
 
     CSubBlock() { SetNull(); }
 
@@ -38,6 +42,10 @@ public:
     std::string ToString() const;
 
     std::set<uint256> GetAncestorHashes() const;
+
+    std::vector<uint256> GetTxHashes() const;
+
+    static const CSubBlockRef SubBlockByHash(const uint256& hash);
 };
 
 

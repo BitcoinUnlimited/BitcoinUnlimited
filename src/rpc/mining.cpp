@@ -150,7 +150,8 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
             continue;
 
         LOG(WB, "PROCESS NEW WEAK\n");
-        CNetDeltaBlock::processNew(pblock, nullptr);
+        CDeltaBlock::processNew(pblock);
+        //TODO: ACTUALLY CALL sendDeltaBlock here
         CDeltaBlock::tryRegister(pblock);
 
         // Now check if Bobtail PoW is also satisfied

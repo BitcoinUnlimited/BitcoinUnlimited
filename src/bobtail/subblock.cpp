@@ -58,3 +58,20 @@ std::set<uint256> CSubBlock::GetAncestorHashes() const
     }
     return ancestors;
 }
+
+std::vector<uint256> CSubBlock::GetTxHashes() const
+{
+    std::vector<uint256> hashes;
+    for (const auto &txref : vtx)
+    {
+        hashes.push_back(txref->GetHash());
+    }
+
+    return hashes;
+}
+
+const CSubBlockRef CSubBlock::SubBlockByHash(const uint256& hash)
+{
+    //TODO: ADD DAG LOOKUP LOGIC HERE!!!
+    return nullptr;
+}

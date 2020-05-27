@@ -1,5 +1,5 @@
-
 #include "bobtail/bobtail.h"
+#include "bobtail/subblock.h"
 #include "netdeltablocks.h"
 #include "txmempool.h"
 #include "txorphanpool.h"
@@ -67,8 +67,8 @@ static std::map<uint64_t, uint256> getPartialTxHashesFromAllSources(
 }
 
 
-CNetDeltaBlock::CNetDeltaBlock(ConstCDeltaBlockRef &dbref,
-                               uint64_t nReceiverMemPoolTx) : delta_tx_size(dbref->deltaSet().size() + 1) {
+CNetDeltaBlock::CNetDeltaBlock(const CSubBlockRef &dbref,
+                               uint64_t nReceiverMemPoolTx) : delta_tx_size(dbref->vtx.size() + 1) {
     LOG(WB, "Constructing network representation for delta block %s\n",
         dbref->GetHash().GetHex());
 
@@ -82,15 +82,11 @@ CNetDeltaBlock::CNetDeltaBlock(ConstCDeltaBlockRef &dbref,
     }
     */
     header = dbref->GetBlockHeader();
-    std::vector<uint256> delta_hashes;
-    delta_hashes.emplace_back(dbref->coinbase()->GetHash());
-    for (auto& txref : dbref->deltaSet())
-        delta_hashes.emplace_back(txref->GetHash());
 
-    // FIXME: why is coinbase excluded? c.f. graphene.cpp
-    uint64_t nSenderMempoolPlusDeltaBlock = GetGrapheneMempoolInfo().nTx + delta_tx_size - 1; // exclude coinbase
+    // coinbase is excluded from count because receiver would definitely not have it in mempool
+    uint64_t nSenderMempoolPlusDeltaBlock = GetGrapheneMempoolInfo().nTx + delta_tx_size - 1; 
 
-    delta_gset = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusDeltaBlock, delta_hashes,
+    delta_gset = new CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusDeltaBlock, dbref->GetTxHashes(),
                                   shorttxidk1, shorttxidk2, 2, sipHashNonce, false);
 }
 
@@ -122,7 +118,7 @@ static CTransactionRef getTXFromWherever(const uint256& hash,
     return txr;
 }
 
-bool CNetDeltaBlock::reconstruct(CDeltaBlockRef& dbr, CNetDeltaRequestMissing** ppmissing_tx) {
+bool CNetDeltaBlock::reconstruct(CSubBlockRef& dbr, CNetDeltaRequestMissing** ppmissing_tx) {
     // FIXME: logging!
     // Check corner case of the graphene-set based block being
     // simplified to just a full transmission of the delta set
@@ -138,16 +134,19 @@ bool CNetDeltaBlock::reconstruct(CDeltaBlockRef& dbr, CNetDeltaRequestMissing** 
 
     if (delta_tx_additional.size() == delta_tx_size) {
         // reconstruct from complete delta set
-        dbr = CDeltaBlockRef(new CDeltaBlock(header, delta_tx_additional[0]));
+        dbr = CSubBlockRef(new CSubBlock(header));
 
         // shuffle to make resulting persistent_map roughly balanced
         std::random_shuffle(delta_tx_additional.begin(), delta_tx_additional.end());
 
-        dbr->tryMakeComplete(delta_tx_additional);
+        //TODO: ADD NEW TXS TO SUBBLOCK HERE!!!
+        //dbr->tryMakeComplete(delta_tx_additional);
+        /*
         LOG(WB, "Reconstructed delta block has all txn: %d\n", dbr->allTransactionsKnown());
         LOG(WB, "Reconstructed (from full set) delta block max depth: %d, for size: %d\n",
                 dbr->treeMaxDepth(), dbr->numTransactions());
         if (!dbr->allTransactionsKnown()) return false;
+        */
 
         // dummy object just to signal completeness to the caller
         *ppmissing_tx = new CNetDeltaRequestMissing();
@@ -236,12 +235,15 @@ bool CNetDeltaBlock::reconstruct(CDeltaBlockRef& dbr, CNetDeltaRequestMissing** 
         delta_tx.emplace_back(txr);
     }
 
-    dbr = CDeltaBlockRef(new CDeltaBlock(header, delta_tx_additional[0]));
-    dbr->tryMakeComplete(delta_tx);
+    dbr = CSubBlockRef(new CSubBlock(header));
+    //TODO: ADD NEW TXS TO SUBBLOCK HERE!!!
+    //dbr->tryMakeComplete(delta_tx);
+    /*
     LOG(WB, "Reconstructed delta block has all txn: %d\n", dbr->allTransactionsKnown());
     LOG(WB, "Reconstructed (from graphene-slimmed set) delta block max depth: %d, for size: %d\n",
                 dbr->treeMaxDepth(), dbr->numTransactions());
     if (!dbr->allTransactionsKnown()) return false;
+    */
     return true;
 }
 
@@ -250,12 +252,14 @@ typedef CNetDeltaBlock CNDB;
 
 /*! Checks whether a delta block's parent hash is recent enough to be considered for further processing.
  */
+/*
 bool IsRecentDeltaBlock(const uint256& prevhash) {
     LOCK(cs_main); // FIXME: necessary?
     return CDeltaBlock::knownStrong(prevhash);
 }
+*/
 
-bool sendFullDeltaBlock(ConstCDeltaBlockRef db, CNode* pto) {
+bool sendFullDeltaBlock(const CSubBlockRef db, CNode* pto) {
     // FIXME: Approximate receiver mempool tx number with own value which is inaccurate. But by how much?
     LOG(WB, "Sending full delta block %s (complete delta set) to node %s.\n",
         db->GetHash().GetHex(), pto->GetLogName());
@@ -265,26 +269,26 @@ bool sendFullDeltaBlock(ConstCDeltaBlockRef db, CNode* pto) {
     delete ndb.delta_gset;
     ndb.delta_gset = nullptr;
     ndb.delta_tx_additional.clear();
-    ndb.delta_tx_additional.emplace_back(db->coinbase());
-    for (auto& txref : db->deltaSet())
+    //ndb.delta_tx_additional.emplace_back(db->coinbase()); TODO: not necessary?
+    for (auto& txref : db->vtx)
         ndb.delta_tx_additional.emplace_back(txref);
     pto->PushMessage(NetMsgType::DELTABLOCK, ndb);
     return true;
 }
 
-bool sendDeltaBlock(ConstCDeltaBlockRef db, CNode* pto, std::set<uint64_t> requestedCheapHashes) {
+bool sendDeltaBlock(const CSubBlockRef db, CNode* pto, std::set<uint64_t> requestedCheapHashes) {
     std::map<uint64_t, uint256> mapMissingTx = getPartialTxHashesFromAllSources(shorttxidk1,
                                                                                 shorttxidk2,
-                                                                                db->deltaSet(),
-                                                                                db->coinbase());
+                                                                                db->vtx,
+                                                                                nullptr);
     // FIXME: Again, approximate receiver mempool tx number with own value which is inaccurate. But by how much?
     CNetDeltaBlock ndb(db, GetGrapheneMempoolInfo().nTx);
 
     // delta_tx_additional always contains the coinbase first
-    ndb.delta_tx_additional.emplace_back(db->coinbase());
-    LOG(WB, "Adding coinbase %s to set of included txn.\n", db->coinbase()->GetHash().GetHex());
+    //ndb.delta_tx_additional.emplace_back(db->coinbase()); TODO not needed?
+    //LOG(WB, "Adding coinbase %s to set of included txn.\n", db->coinbase()->GetHash().GetHex());
     std::map<uint256, CTransactionRef> delta_map;
-    for (auto txr : db->deltaSet())
+    for (auto txr : db->vtx)
         delta_map[txr->GetHash()] = txr;
 
     for (auto cheaphash : requestedCheapHashes) {
@@ -314,7 +318,7 @@ bool sendDeltaBlock(ConstCDeltaBlockRef db, CNode* pto, std::set<uint64_t> reque
 bool CNetDeltaRequestMissing::HandleMessage(CDataStream& vRecv, CNode* pfrom) {
     CNDRMT req;
     vRecv >> req;
-    ConstCDeltaBlockRef db = CDeltaBlock::byHash(req.blockhash);
+    const CSubBlockRef db = CSubBlock::SubBlockByHash(req.blockhash);
     LOG(WB, "Got DBMISSTX for delta block %s", req.blockhash.GetHex());
     if (db == nullptr) {
         LOG(WB, "Got a DBMISSTX message for delta block %s, which is unknown to me.\n",
@@ -394,11 +398,11 @@ bool CNetDeltaBlock::HandleMessage(CDataStream& vRecv, CNode* pfrom) {
             return false;
         }
     }
-    CDeltaBlockRef db(new CDeltaBlock(ndb.header, ndb.delta_tx_additional[0]));
+    CSubBlockRef db(new CSubBlock(ndb.header));
 
     bool missing_anc = false;
 
-    for (auto h : db->deltaParentHashes()) {
+    for (auto h : db->GetAncestorHashes()) {
         if (CDeltaBlock::byHash(h) == nullptr) {
             LOG(WB, "Ancestor %s missing.\n", h.GetHex());
             if (pfrom != nullptr) {
@@ -447,12 +451,17 @@ bool CNetDeltaBlock::HandleMessage(CDataStream& vRecv, CNode* pfrom) {
         return true;
     }
 
+    //TODO: What is below for?
+    /*
     if (!db->allTransactionsKnown()) {
         LOG(WB, "Reconstruction of delta block failed.\n");
         return false;
     }
+    */
 
-    processNew(db, pfrom);
+    //TODO: ACTUALLY CALL PROCESS HERE
+    //processNew(db);
+    //TODO: ACTUALLY CALL sendDeltaBlock here
 
     std::vector<CNetDeltaBlock> retry;
     {
@@ -470,77 +479,4 @@ bool CNetDeltaBlock::HandleMessage(CDataStream& vRecv, CNode* pfrom) {
     // FIXME: The whole situation of a node feeding us wrong delta
     // blocks data needs to be dealt with properly and lead to
     // banning!
-    }
-
-
-void CNetDeltaBlock::processNew(CDeltaBlockRef dbr, CNode *pfrom) {
-    const uint256 hash = dbr->GetHash();
-    LOG(WB, "Processing new delta block %s with strong parent %s.\n", hash.GetHex(), dbr->hashPrevBlock.GetHex());
-
-    // first, check for sufficient weak POW
-    if (!CheckProofOfWork(hash, weakPOWfromPOW(dbr->nBits), Params().GetConsensus(), true)) {
-        LOG(WB, "Delta block failed WPOW check. Ignoring.\n");
-        return;
-    }
-
-    // next, check block's validity
-    CValidationState state;
-    CBlockIndex* pindexPrev = LookupBlockIndex(dbr->hashPrevBlock);
-
-    /* FIXME: Deltablocks receival needs to be allowed also on top of
-       non-tips in case there are strong block races.  The trouble is
-       that TestBlockValidity uses a coins view and there's only one
-       available for the tip. With a persistent data store for the
-       UTXO that one can move around on, this should become easier. */
-
-
-    // Testing: Assume nodes are meaning well and not generating junk
-    // Still, run TestBlockValidity when on the main chain
-    // (which should be most times), to simulate processing time.
-    // FIXME!
-    {
-        LOCK(cs_main);
-        if (pindexPrev == chainActive.Tip()) {
-            TestBlockValidity(state, Params(), *dbr, pindexPrev, false, true);
-        } else {
-            LOG(WB, "FIXME: Delta block skipped validation as it is not based on the strong chain tip.\n");
-        }
-    }
-
-      // any block here should be completely reconstructed
-    DbgAssert(dbr->allTransactionsKnown(), return);
-    {
-        LOCK(cs_db);
-        CDeltaBlock::tryRegister(dbr);
-        if (CDeltaBlock::byHash(dbr->GetHash()) == nullptr) {
-            LOG(WB, "Delta block %s failed to register. Dropping it.\n", dbr->GetHash().GetHex());
-            return;
-        }
-        LOG(WB, "Delta block %s successfully checked for WPOW, validity and registered.\n",
-            dbr->GetHash().GetHex());
-    }
-    // FIXME: Do not send it to the peer(s) it has been received from!
-    {
-        LOCK(cs_vNodes);
-        for (CNode* pto : vNodes)
-            if (pto != pfrom && pto->successfullyConnected())
-                sendDeltaBlock(dbr, pto, std::set<uint64_t>());
-    }
-
-    dbr->fXVal = true;
-    // if it is a strong block, process it as such as well
-    // FIXME: copy'n'paste from unlimited.cpp
-    if (dbr->isStrong()) {
-        PV->StopAllValidationThreads(dbr->nBits);
-        if (!ProcessNewBlock(state, Params() , nullptr, dbr.get(), true, nullptr, false)) {
-            LOG(WB, "Delta block that is strong block has not been accepted!\n");
-            return;
-        }
-    }
-
-    LOG(WB, "Bobtail PoW:\n");
-    for (auto &hash : dbr->ancestorHashes())
-    {
-        LOG(WB, "\t%s\n", hash.ToString());
-    }
 }

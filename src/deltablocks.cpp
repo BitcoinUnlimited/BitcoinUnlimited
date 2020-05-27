@@ -6,6 +6,8 @@
 #include "arith_uint256.h"
 #include "deltablocks.h"
 #include "consensus/merkle.h"
+#include "validation/validation.h"
+
 #include <boost/math/distributions/gamma.hpp>
 #include <stack>
 #include <queue>
@@ -541,6 +543,68 @@ void CDeltaBlock::resetAll() {
     strongs_for_db.clear();
 }
 
+void CDeltaBlock::processNew(CDeltaBlockRef dbr) {
+    const uint256 hash = dbr->GetHash();
+    LOG(WB, "Processing new delta block %s with strong parent %s.\n", hash.GetHex(), dbr->hashPrevBlock.GetHex());
+
+    // first, check for sufficient weak POW
+    if (!CheckProofOfWork(hash, weakPOWfromPOW(dbr->nBits), Params().GetConsensus(), true)) {
+        LOG(WB, "Delta block failed WPOW check. Ignoring.\n");
+        return;
+    }
+
+    // next, check block's validity
+    CValidationState state;
+    CBlockIndex* pindexPrev = LookupBlockIndex(dbr->hashPrevBlock);
+
+    /* FIXME: Deltablocks receival needs to be allowed also on top of
+       non-tips in case there are strong block races.  The trouble is
+       that TestBlockValidity uses a coins view and there's only one
+       available for the tip. With a persistent data store for the
+       UTXO that one can move around on, this should become easier. */
+
+
+    // Testing: Assume nodes are meaning well and not generating junk
+    // Still, run TestBlockValidity when on the main chain
+    // (which should be most times), to simulate processing time.
+    // FIXME!
+    {
+        LOCK(cs_main);
+        if (pindexPrev == chainActive.Tip()) {
+            TestBlockValidity(state, Params(), *dbr, pindexPrev, false, true);
+        } else {
+            LOG(WB, "FIXME: Delta block skipped validation as it is not based on the strong chain tip.\n");
+        }
+    }
+
+      // any block here should be completely reconstructed
+    //DbgAssert(dbr->vtx, return);
+    {
+        LOCK(cs_db);
+        // TODO: REGISTER SUBBLOCK HERE!!!!
+        //CDeltaBlock::tryRegister(dbr);
+        if (CDeltaBlock::byHash(dbr->GetHash()) == nullptr) {
+            LOG(WB, "Delta block %s failed to register. Dropping it.\n", dbr->GetHash().GetHex());
+            return;
+        }
+        LOG(WB, "Delta block %s successfully checked for WPOW, validity and registered.\n",
+            dbr->GetHash().GetHex());
+    }
+
+    dbr->fXVal = true;
+    // if it is a strong block, process it as such as well
+    // FIXME: copy'n'paste from unlimited.cpp
+    // TODO: CHECK FOR BOBTAIL BLOCK HERE!!!
+    /*
+    if (dbr->isStrong()) {
+        PV->StopAllValidationThreads(dbr->nBits);
+        if (!ProcessNewBlock(state, Params() , nullptr, dbr.get(), true, nullptr, false)) {
+            LOG(WB, "Delta block that is strong block has not been accepted!\n");
+            return;
+        }
+    }
+    */
+}
 bool CDeltaBlock::spendsOutput(const COutPoint &out) const {
     return spent.contains(out);
 }
