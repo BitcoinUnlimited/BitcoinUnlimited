@@ -431,13 +431,6 @@ static void ReconsiderChainOnStartup()
 {
     if (!fReindex && !(avoidReconsiderMostWorkChain.Value()))
     {
-        // Get the set of chaintips
-        std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
-        {
-            LOCK(cs_main);
-            setTips = GetChainTips();
-        }
-
         // Set the override to true so that we don't get stuck trying to reconsider which
         // can happen when an operator failed to upgrade their node before a hard fork.
         try
