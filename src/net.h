@@ -670,7 +670,7 @@ public:
 
     // Examine the current message (msg) to see if block or thintype blocks have begun downloading data.
     std::atomic<bool> fLookedOnce{false};
-    void LookAhead(CNetMessage &_msg);
+    void LookAhead();
 
     // requires LOCK(cs_vRecvMsg)
     bool ReceiveMsgBytes(const char *pch, unsigned int nBytes) EXCLUSIVE_LOCKS_REQUIRED(cs_vRecvMsg);

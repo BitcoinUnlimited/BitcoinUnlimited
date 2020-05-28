@@ -676,7 +676,7 @@ static bool IsPriorityMsg(std::string strCommand)
     }
 }
 
-void CNode::LookAhead(CNetMessage &_msg)
+void CNode::LookAhead()
 {
     // Do lookahead for CBlock messages.  If it's a block then get the blockhash
     // and indicate we are downloading it so that we don't re-request the block
@@ -684,12 +684,12 @@ void CNode::LookAhead(CNetMessage &_msg)
     // flag so that we can get another block from somewhere.
     static const CBlockHeader temp_header;
     static const unsigned int nSizeHeader = ::GetSerializeSize(temp_header, SER_NETWORK, PROTOCOL_VERSION);
-    if (_msg.hdr.GetCommand() == NetMsgType::BLOCK)
+    if (msg.hdr.GetCommand() == NetMsgType::BLOCK)
     {
-        if (_msg.nDataPos > nSizeHeader)
+        if (msg.nDataPos > nSizeHeader)
         {
             CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-            ss.append(_msg.vRecv, nSizeHeader);
+            ss.append(msg.vRecv, nSizeHeader);
 
             CBlockHeader header;
             ss >> header;
@@ -717,7 +717,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 
             // Do a lookahead if we haven't already done one for this message.
             if (!fLookedOnce.load())
-                LookAhead(msg);
+                LookAhead();
         }
 
         if (handled < 0)
