@@ -678,13 +678,13 @@ static bool IsPriorityMsg(std::string strCommand)
 
 void CNode::LookAhead()
 {
-    // Do lookahead for CBlock messages.  If it's a block then get the blockhash
-    // and indicate we are downloading it so that we don't re-request the block
-    // prematurely. If it's downloading and fails then we can reset the re-request
-    // flag so that we can get another block from somewhere.
+    // Do lookahead for block downloads.  If it is a block or thintype block then get the blockhash
+    // and indicate we are downloading it so that we don't re-request the block prematurely.
     static const CBlockHeader temp_header;
     static const unsigned int nSizeHeader = ::GetSerializeSize(temp_header, SER_NETWORK, PROTOCOL_VERSION);
-    if (msg.hdr.GetCommand() == NetMsgType::BLOCK)
+    if (msg.hdr.GetCommand() == NetMsgType::BLOCK || msg.hdr.GetCommand() == NetMsgType::GRAPHENEBLOCK ||
+        msg.hdr.GetCommand() == NetMsgType::CMPCTBLOCK || msg.hdr.GetCommand() == NetMsgType::XTHINBLOCK ||
+        msg.hdr.GetCommand() == NetMsgType::THINBLOCK)
     {
         if (msg.nDataPos > nSizeHeader)
         {
