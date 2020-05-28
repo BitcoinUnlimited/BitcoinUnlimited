@@ -870,7 +870,20 @@ extern "C" JNIEXPORT jstring JNICALL Java_bitcoinunlimited_libbitcoincash_PayAdd
     jbyte *data = env->GetByteArrayElements(arg, 0);
 
     uint160 tmp((const uint8_t *)data);
-    CTxDestination dst = CKeyID(tmp);
+
+    CTxDestination dst = CNoDestination();
+    if (typ == 2 /* P2PKH */) {
+        dst = CKeyID(tmp);
+    }
+    else if (typ == 3 /* P2PSH */) {
+        dst = CScriptID(tmp);
+    }
+    else {
+        triggerJavaIllegalStateException(env,
+                "Address type cannot be encoded to cashaddr");
+        return nullptr;
+    }
+
 
     env->ReleaseByteArrayElements(arg, data, 0);
 
