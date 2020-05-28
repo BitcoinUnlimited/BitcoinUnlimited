@@ -16,8 +16,17 @@
 /* Define this symbol to compile out all VERIFY code */
 /* #undef COVERAGE */
 
+/* Set ecmult gen precision bits */
+#define ECMULT_GEN_PREC_BITS 4
+
+/* Set window size for ecmult precomputation */
+#define ECMULT_WINDOW_SIZE 15
+
 /* Define this symbol to enable the ECDH module */
 /* #undef ENABLE_MODULE_ECDH */
+
+/* Define this symbol to enable the multiset module */
+/* #undef ENABLE_MODULE_MULTISET */
 
 /* Define this symbol to enable the ECDSA pubkey recovery module */
 #define ENABLE_MODULE_RECOVERY 1
