@@ -12,8 +12,9 @@
 #include <list>
 #include <vector>
 
+extern CTxMemPool mempool;
 
-static void AddTx(const CTransactionRef &tx, const CAmount &nFee, CTxMemPool &pool)
+static void AddTx(const CTransactionRef &tx, const CAmount &nFee)
 {
     int64_t nTime = 0;
     double dPriority = 10.0;
@@ -21,13 +22,13 @@ static void AddTx(const CTransactionRef &tx, const CAmount &nFee, CTxMemPool &po
     bool spendsCoinbase = false;
     unsigned int sigOpCost = 4;
     LockPoints lp;
-    pool.addUnchecked(tx->GetHash(), CTxMemPoolEntry(tx, nFee, nTime, dPriority, nHeight, pool.HasNoInputsOf(tx),
-                                         tx->GetValueOut(), spendsCoinbase, sigOpCost, lp));
+    mempool.addUnchecked(tx->GetHash(), CTxMemPoolEntry(tx, nFee, nTime, dPriority, nHeight, mempool.HasNoInputsOf(tx),
+                                            tx->GetValueOut(), spendsCoinbase, sigOpCost, lp));
 }
 
 static void RpcMempool(benchmark::State &state)
 {
-    CTxMemPool pool(CFeeRate(1000));
+    mempool.clear();
 
     for (int i = 0; i < 1000; ++i)
     {
@@ -38,7 +39,38 @@ static void RpcMempool(benchmark::State &state)
         tx.vout[0].scriptPubKey = CScript() << OP_1 << OP_EQUAL;
         tx.vout[0].nValue = i * CENT;
         const CTransactionRef tx_r{MakeTransactionRef(tx)};
-        AddTx(tx_r, /* fee */ i * CENT, pool);
+        AddTx(tx_r, /* fee */ i * CENT);
+    }
+
+    while (state.KeepRunning())
+    {
+        (void)mempoolToJSON(true);
+    }
+}
+
+static void RpcMempool10k(benchmark::State &state)
+{
+    mempool.clear();
+
+    const size_t nTx = 10000, nIns = 10, nOuts = 10;
+
+    for (size_t i = 0; i < nTx; ++i)
+    {
+        CMutableTransaction tx = CMutableTransaction();
+        tx.vin.resize(nIns);
+        for (size_t j = 0; j < nIns; ++j)
+        {
+            tx.vin[j].scriptSig = CScript() << OP_1;
+        }
+        tx.vout.resize(nOuts);
+        for (size_t j = 0; j < nOuts; ++j)
+        {
+            tx.vin[j].scriptSig = CScript() << OP_1;
+            tx.vout[j].scriptPubKey = CScript() << OP_1 << OP_EQUAL;
+            tx.vout[j].nValue = int64_t(i * j) * CENT;
+        }
+        const CTransactionRef tx_r{MakeTransactionRef(tx)};
+        AddTx(tx_r, /* fee */ int64_t(i) * CENT);
     }
 
     while (state.KeepRunning())
@@ -48,3 +80,4 @@ static void RpcMempool(benchmark::State &state)
 }
 
 BENCHMARK(RpcMempool, 40);
+BENCHMARK(RpcMempool10k, 10);
