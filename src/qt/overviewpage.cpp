@@ -135,6 +135,8 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent)
 
     // start with displaying the "out of sync" warnings
     showOutOfSyncWarning(true);
+    connect(ui->labelWalletStatus, SIGNAL(clicked()), this, SLOT(handleOutOfSyncWarningClicks()));
+    connect(ui->labelTransactionsStatus, SIGNAL(clicked()), this, SLOT(handleOutOfSyncWarningClicks()));
 }
 
 void OverviewPage::handleTransactionClicked(const QModelIndex &index)
@@ -143,6 +145,7 @@ void OverviewPage::handleTransactionClicked(const QModelIndex &index)
         Q_EMIT transactionClicked(filter->mapToSource(index));
 }
 
+void OverviewPage::handleOutOfSyncWarningClicks() { Q_EMIT outOfSyncWarningClicked(); }
 OverviewPage::~OverviewPage() { delete ui; }
 void OverviewPage::setBalance(const CAmount &balance,
     const CAmount &unconfirmedBalance,

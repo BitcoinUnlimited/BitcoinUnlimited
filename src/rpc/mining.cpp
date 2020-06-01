@@ -175,7 +175,7 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
     LOCK(cs_main);
     FlushStateToDisk(state, FLUSH_STATE_ALWAYS); // we made lots of blocks
     CBlockIndex *pindexNewTip = chainActive.Tip();
-    uiInterface.NotifyBlockTip(false, pindexNewTip);
+    uiInterface.NotifyBlockTip(false, pindexNewTip, false);
     return blockHashes;
 }
 
