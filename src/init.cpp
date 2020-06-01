@@ -177,7 +177,7 @@ public:
 static CCoinsViewErrorCatcher *pcoinscatcher = nullptr;
 static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
 
-void Interrupt(thread_group &threadGroup)
+void Interrupt()
 {
     // Interrupt Parallel Block Validation threads if there are any running.
     if (PV)
@@ -620,7 +620,7 @@ bool InitSanityCheck(void)
     return true;
 }
 
-bool AppInitServers(thread_group &threadGroup, int rpcport, const std::string &network)
+bool AppInitServers(int rpcport, const std::string &network)
 {
     RPCServer::OnStopped(&OnRPCStopped);
     RPCServer::OnPreCommand(&OnRPCPreCommand);
@@ -759,7 +759,7 @@ void InitLogging()
 /** Initialize bitcoin.
  *  @pre Parameters should be parsed and config file should be read.
  */
-bool AppInit2(Config &config, thread_group &threadGroup)
+bool AppInit2(Config &config)
 {
     // ********************************************************* Step 1: setup
 
@@ -1160,7 +1160,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     if (fServer)
     {
         uiInterface.InitMessage.connect(SetRPCWarmupStatus);
-        if (!AppInitServers(threadGroup, BaseParams().RPCPort(), chainparams.NetworkIDString()))
+        if (!AppInitServers(BaseParams().RPCPort(), chainparams.NetworkIDString()))
         {
             return InitError(_("Unable to start RPC services. See debug log for details."));
         }
@@ -1235,7 +1235,7 @@ bool AppInit2(Config &config, thread_group &threadGroup)
     LOGA("* Using %.1fMiB for in-memory UTXO set\n", nCoinCacheMaxSize * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
-    StartTxAdmission(threadGroup);
+    StartTxAdmission();
 
     while (!fLoaded)
     {
@@ -1686,10 +1686,10 @@ bool AppInit2(Config &config, thread_group &threadGroup)
 #endif
 
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
-        StartTorControl(threadGroup);
+        StartTorControl();
 
 
-    StartNode(threadGroup);
+    StartNode();
 
 #ifdef ENABLE_WALLET
     if (pwalletMain)

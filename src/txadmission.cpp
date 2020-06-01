@@ -16,6 +16,7 @@
 #include "policy/mempool.h"
 #include "requestManager.h"
 #include "respend/respenddetector.h"
+#include "threadgroup.h"
 #include "timedata.h"
 #include "txorphanpool.h"
 #include "unlimited.h"
@@ -45,7 +46,6 @@ std::atomic<uint64_t> avgCommitBatchSize(0);
 Snapshot txHandlerSnap;
 
 void ThreadCommitToMempool();
-void ThreadTxAdmission();
 void ProcessOrphans(std::vector<uint256> &vWorkQueue);
 
 CTransactionRef CommitQGet(uint256 hash)
@@ -72,7 +72,7 @@ static inline uint256 IncomingConflictHash(const COutPoint &prevout)
     return hash;
 }
 
-void StartTxAdmission(thread_group &threadGroup)
+void StartTxAdmission()
 {
     if (txCommitQ == nullptr)
         txCommitQ = new std::map<uint256, CTxCommitData>();
@@ -380,7 +380,6 @@ void CommitTxToMempool()
     ProcessOrphans(vWhatChanged);
 }
 
-
 void ThreadTxAdmission()
 {
     // Process at most this many transactions before letting the commit thread take over
@@ -388,6 +387,29 @@ void ThreadTxAdmission()
 
     while (shutdown_threads.load() == false)
     {
+        // Start or Stop threads as determined by the numTxAdmissionThreads tweak
+        {
+            static CCriticalSection cs_threads;
+            static uint32_t numThreads GUARDED_BY(cs_threads) = numTxAdmissionThreads.Value();
+            LOCK(cs_threads);
+            if (numTxAdmissionThreads.Value() >= 1 && numThreads > numTxAdmissionThreads.Value())
+            {
+                // Kill this thread
+                numThreads--;
+                LOGA("Stopping a tx admission thread: Current admission threads are %d\n", numThreads);
+
+                return;
+            }
+            else if (numThreads < numTxAdmissionThreads.Value())
+            {
+                // Launch another thread
+                numThreads++;
+                threadGroup.create_thread(&ThreadTxAdmission);
+                LOGA("Starting a new tx admission thread: Current admission threads are %d\n", numThreads);
+            }
+        }
+
+        // Loop processing starts here
         bool acceptedSomething = false;
         if (shutdown_threads.load() == true)
         {

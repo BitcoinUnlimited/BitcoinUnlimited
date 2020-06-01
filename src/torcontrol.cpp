@@ -750,7 +750,7 @@ static void TorControlThread()
     event_base_dispatch(base);
 }
 
-void StartTorControl(thread_group &threadGroup)
+void StartTorControl()
 {
     assert(!base);
 #ifdef WIN32

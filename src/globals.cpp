@@ -34,6 +34,7 @@
 #include "script/standard.h"
 #include "stat.h"
 #include "sync.h"
+#include "threadgroup.h"
 #include "timedata.h"
 #include "tinyformat.h"
 #include "tweak.h"
@@ -524,6 +525,7 @@ CTweak<bool> avoidReconsiderMostWorkChain("test.avoidReconsiderMostWorkChain",
 
 CRequestManager requester; // after the maps nodes and tweaks
 CState nodestate;
+thread_group threadGroup;
 
 CStatHistory<unsigned int> txAdded; //"memPool/txAdded");
 CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize; // "memPool/size",STAT_OP_AVE);

@@ -14,7 +14,7 @@
 extern const std::string DEFAULT_TOR_CONTROL;
 static const bool DEFAULT_LISTEN_ONION = true;
 
-void StartTorControl(thread_group &threadGroup);
+void StartTorControl();
 void InterruptTorControl();
 void StopTorControl();
 

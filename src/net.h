@@ -134,7 +134,7 @@ bool OpenNetworkConnection(const CAddress &addrConnect,
 void MapPort(bool fUseUPnP);
 unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string &strError, bool fWhitelisted = false);
-void StartNode(thread_group &threadGroup);
+void StartNode();
 bool StopNode();
 
 struct CombinerAll
