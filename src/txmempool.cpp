@@ -992,7 +992,7 @@ void CTxMemPool::removeForBlock(const CBlock &block,
     setEntries setAncestorsFromBlock;
     {
         setEntries setTxnsInBlock;
-        for (const auto &tx : block)
+        for (const auto &tx : block.vtx)
         {
             uint256 hash = tx->GetHash();
             txiter it = mapTx.find(hash);
@@ -1097,7 +1097,7 @@ void CTxMemPool::removeForBlock(const CBlock &block,
     }
 
     // Remove conflicting tx
-    for (const auto &tx : block)
+    for (const auto &tx : block.vtx)
     {
         _removeConflicts(*tx, conflicts);
         _ClearPrioritisation(tx->GetHash());
@@ -1127,7 +1127,7 @@ void CTxMemPool::removeForBlock_Legacy(const CBlock &block,
     CTxMemPool::TxMempoolOriginalStateMap changeSet;
 
     setEntries setTxnsInBlock;
-    for (const auto &tx : block)
+    for (const auto &tx : block.vtx)
     {
         uint256 hash = tx->GetHash();
         txiter i = mapTx.find(hash);
@@ -1218,7 +1218,7 @@ void CTxMemPool::removeForBlock_Legacy(const CBlock &block,
     }
 
     // Remove conflicting tx
-    for (const auto &tx : block)
+    for (const auto &tx : block.vtx)
     {
         _removeConflicts(*tx, conflicts);
         _ClearPrioritisation(tx->GetHash());

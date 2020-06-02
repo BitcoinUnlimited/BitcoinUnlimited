@@ -57,16 +57,16 @@ CompactBlock::CompactBlock(const CBlock &block, const CRollingFastFilter<4 * 102
 {
     FillShortTxIDSelector();
 
-    if (block.empty())
+    if (block.vtx.empty())
         throw std::invalid_argument(__func__ + std::string(" expects coinbase tx"));
 
     //< Index of a prefilled tx is its diff from last index.
     size_t prevIndex = 0;
-    prefilledtxn.push_back(PrefilledTransaction{0, *block.coinbase()});
-    CBlock::const_iterator txniter = block.begin();
+    prefilledtxn.push_back(PrefilledTransaction{0, *block.vtx[0]});
+    std::vector<CTransactionRef>::const_iterator txniter = block.vtx.begin();
     ++txniter;
     size_t i = 0;
-    while (txniter != block.end())
+    while (txniter != block.vtx.end())
     {
         i++;
         const CTransaction &tx = **(txniter++);
@@ -345,7 +345,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock
 
     nWaitingForTxns = missingCount;
     LOG(CMPCT, "compactblock waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n", nWaitingForTxns,
-        unnecessaryCount, pblock->numTransactions(), cmpctBlock->mapMissingTx.size());
+        unnecessaryCount, pblock->vtx.size(), cmpctBlock->mapMissingTx.size());
 
     // If there are any missing hashes or transactions then we request them here.
     // This must be done outside of the mempool.cs lock or may deadlock.
@@ -673,7 +673,7 @@ static bool ReconstructBlock(CNode *pfrom,
 
         // Add this transaction. If the tx is null we still add it as a placeholder to keep the correct
         // ordering.
-        pblock->add(ptx);
+        pblock->vtx.push_back(ptx);
     }
     // Now that we've rebuilt the block successfully we can set the XVal flag which is used in
     // ConnectBlock() to determine which if any inputs we can skip the checking of inputs.

@@ -183,10 +183,10 @@ void TxIndex::ThreadSync()
 
 bool TxIndex::WriteBlock(const CBlock &block, const CBlockIndex *pindex)
 {
-    CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.numTransactions()));
+    CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
     std::vector<std::pair<uint256, CDiskTxPos> > vPos;
-    vPos.reserve(block.numTransactions());
-    for (const auto &tx : block)
+    vPos.reserve(block.vtx.size());
+    for (const auto &tx : block.vtx)
     {
         vPos.emplace_back(tx->GetHash(), pos);
         pos.nTxOffset += ::GetSerializeSize(*tx, SER_DISK, CLIENT_VERSION);

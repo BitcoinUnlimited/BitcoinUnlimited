@@ -41,14 +41,14 @@ static CBlock TestBlock()
     tx.vout.resize(1);
     tx.vout[0].nValue = 42;
 
-    block.add(MakeTransactionRef(tx));
+    block.vtx.push_back(MakeTransactionRef(tx));
     block.nVersion = 42;
     block.hashPrevBlock = InsecureRand256();
     block.nBits = 0x207fffff;
 
     tx.vin[0].prevout.hash = InsecureRand256();
     tx.vin[0].prevout.n = 0;
-    block.add(MakeTransactionRef(tx));
+    block.vtx.push_back(MakeTransactionRef(tx));
 
     tx.vin.resize(10);
     for (size_t i = 0; i < tx.vin.size(); i++)
@@ -56,7 +56,7 @@ static CBlock TestBlock()
         tx.vin[i].prevout.hash = InsecureRand256();
         tx.vin[i].prevout.n = 0;
     }
-    block.add(MakeTransactionRef(tx));
+    block.vtx.push_back(MakeTransactionRef(tx));
 
     bool mutated;
     block.hashMerkleRoot = BlockMerkleRoot(block, &mutated);

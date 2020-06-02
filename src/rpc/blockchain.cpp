@@ -125,7 +125,7 @@ UniValue blockToJSON(const CBlock &block,
     UniValue txs(UniValue::VARR);
     if (listTxns)
     {
-        for (const auto &tx : block)
+        for (const auto &tx : block.vtx)
         {
             if (txDetails)
             {
@@ -142,7 +142,7 @@ UniValue blockToJSON(const CBlock &block,
     }
     else
     {
-        result.pushKV("txcount", (uint64_t)block.numTransactions());
+        result.pushKV("txcount", (uint64_t)block.vtx.size());
     }
     result.pushKV("time", block.GetBlockTime());
     result.pushKV("mediantime", (int64_t)blockindex->GetMedianTimePast());
@@ -1971,7 +1971,7 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
     const CBlock block = GetBlockChecked(pindex);
     const CBlockUndo blockUndo = pindex->pprev ? GetUndoChecked(pindex) : CBlockUndo();
     // This property is required in the for loop below (and ofc every tx should have undo data)
-    DbgAssert(blockUndo.vtxundo.size() >= block.numTransactions() - 1,
+    DbgAssert(blockUndo.vtxundo.size() >= block.vtx.size() - 1,
         throw JSONRPCError(RPC_DATABASE_ERROR, "Block undo data is corrupt"));
 
     const bool do_all = stats.size() == 0; // Calculate everything if nothing selected (default)
@@ -2002,9 +2002,9 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
     std::vector<std::pair<CAmount, int64_t> > feerate_array;
     std::vector<int64_t> txsize_array;
 
-    for (size_t i = 0; i < block.numTransactions(); ++i)
+    for (size_t i = 0; i < block.vtx.size(); ++i)
     {
-        CTransactionRef txref = block.by_pos(i);
+        CTransactionRef txref = block.vtx[i];
         outputs += txref->vout.size();
 
         CAmount tx_total_out = 0;
@@ -2081,9 +2081,9 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
 
     UniValue ret_all(UniValue::VOBJ);
     ret_all.pushKV(
-        "avgfee", ValueFromAmount((block.numTransactions() > 1) ? totalfee / (block.numTransactions() - 1) : 0));
+        "avgfee", ValueFromAmount((block.vtx.size() > 1) ? totalfee / (block.vtx.size() - 1) : 0));
     ret_all.pushKV("avgfeerate", ValueFromAmount(total_size ? totalfee / total_size : 0)); // Unit: sat/byte
-    ret_all.pushKV("avgtxsize", (block.numTransactions() > 1) ? total_size / (block.numTransactions() - 1) : 0);
+    ret_all.pushKV("avgtxsize", (block.vtx.size() > 1) ? total_size / (block.vtx.size() - 1) : 0);
     ret_all.pushKV("blockhash", pindex->GetBlockHash().GetHex());
     ret_all.pushKV("feerate_percentiles", feerates_res);
     ret_all.pushKV("height", (int64_t)pindex->nHeight);
@@ -2103,7 +2103,7 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
     ret_all.pushKV("total_out", ValueFromAmount(total_out));
     ret_all.pushKV("total_size", total_size);
     ret_all.pushKV("totalfee", ValueFromAmount(totalfee));
-    ret_all.pushKV("txs", (int64_t)block.numTransactions());
+    ret_all.pushKV("txs", (int64_t)block.vtx.size());
     ret_all.pushKV("utxo_increase", outputs - inputs);
     ret_all.pushKV("utxo_size_inc", utxo_size_inc);
 

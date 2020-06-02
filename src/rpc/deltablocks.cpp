@@ -29,7 +29,7 @@ UniValue getDeltaInfo(const ConstCDeltaBlockRef& dbr) {
         ancestors.push_back(anc->GetHash().GetHex());
     res.pushKV("ancestors", ancestors);
     res.pushKV("delta_size", dbr->deltaSet().size());
-    res.pushKV("full_size", dbr->numTransactions());
+    res.pushKV("full_size", dbr->vtx.size());
     res.pushKV("wpow", dbr->weakPOW());
     return res;
 }

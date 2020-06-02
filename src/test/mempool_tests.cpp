@@ -840,16 +840,16 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     // Add txns that will be mined
     CBlock block;
     // Chain1:
-    block.add(MakeTransactionRef(tx1));
-    block.add(MakeTransactionRef(tx2));
-    block.add(MakeTransactionRef(tx3));
-    block.add(MakeTransactionRef(tx4));
+    block.vtx.push_back(MakeTransactionRef(tx1));
+    block.vtx.push_back(MakeTransactionRef(tx2));
+    block.vtx.push_back(MakeTransactionRef(tx3));
+    block.vtx.push_back(MakeTransactionRef(tx4));
     // Chain2:
-    block.add(MakeTransactionRef(tx21));
+    block.vtx.push_back(MakeTransactionRef(tx21));
     // Chain3:
-    block.add(MakeTransactionRef(tx39));
-    block.add(MakeTransactionRef(tx44));
-    block.add(MakeTransactionRef(tx47));
+    block.vtx.push_back(MakeTransactionRef(tx39));
+    block.vtx.push_back(MakeTransactionRef(tx44));
+    block.vtx.push_back(MakeTransactionRef(tx47));
 
     // Now assume they were mined and do a removeForBlock()
     std::list<CTransactionRef> dummy;
@@ -930,8 +930,8 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     }
 
     // Mine two transactions which end up giving us the same txnchaintip.
-    block.add(MakeTransactionRef(tx40));
-    block.add(MakeTransactionRef(tx41));
+    block.vtx.push_back(MakeTransactionRef(tx40));
+    block.vtx.push_back(MakeTransactionRef(tx41));
     pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 39);
 
@@ -967,9 +967,9 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
     // Starting to simulate mining all the rest of the transactions in the chains defined in the
     // above tests and following that with a mempool consistency
-    block.add(MakeTransactionRef(tx5));
-    block.add(MakeTransactionRef(tx6));
-    block.add(MakeTransactionRef(tx7));
+    block.vtx.push_back(MakeTransactionRef(tx5));
+    block.vtx.push_back(MakeTransactionRef(tx6));
+    block.vtx.push_back(MakeTransactionRef(tx7));
     pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 36);
 
@@ -1012,9 +1012,9 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     }
 
 
-    block.add(MakeTransactionRef(tx8));
-    block.add(MakeTransactionRef(tx9));
-    block.add(MakeTransactionRef(tx10));
+    block.vtx.push_back(MakeTransactionRef(tx8));
+    block.vtx.push_back(MakeTransactionRef(tx9));
+    block.vtx.push_back(MakeTransactionRef(tx10));
     pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 33);
 
@@ -1057,9 +1057,9 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     }
 
 
-    block.add(MakeTransactionRef(tx11));
-    block.add(MakeTransactionRef(tx14));
-    block.add(MakeTransactionRef(tx20));
+    block.vtx.push_back(MakeTransactionRef(tx11));
+    block.vtx.push_back(MakeTransactionRef(tx14));
+    block.vtx.push_back(MakeTransactionRef(tx20));
     pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 30);
 
@@ -1100,9 +1100,9 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
         CheckAncestors(txns_result5[i], pool);
     }
 
-    block.add(MakeTransactionRef(tx12));
-    block.add(MakeTransactionRef(tx13));
-    block.add(MakeTransactionRef(tx15));
+    block.vtx.push_back(MakeTransactionRef(tx12));
+    block.vtx.push_back(MakeTransactionRef(tx13));
+    block.vtx.push_back(MakeTransactionRef(tx15));
     pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 27);
 
@@ -1164,8 +1164,8 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
                             26
     */
 
-    block.add(MakeTransactionRef(tx22));
-    block.add(MakeTransactionRef(tx23));
+    block.vtx.push_back(MakeTransactionRef(tx22));
+    block.vtx.push_back(MakeTransactionRef(tx23));
     pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 25);
 
@@ -1206,9 +1206,9 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     }
 
 
-    block.add(MakeTransactionRef(tx31));
-    block.add(MakeTransactionRef(tx33));
-    block.add(MakeTransactionRef(tx34));
+    block.vtx.push_back(MakeTransactionRef(tx31));
+    block.vtx.push_back(MakeTransactionRef(tx33));
+    block.vtx.push_back(MakeTransactionRef(tx34));
     pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 22);
 
@@ -1247,10 +1247,10 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
         CheckAncestors(txns_result8[i], pool);
     }
 
-    block.add(MakeTransactionRef(tx24));
-    block.add(MakeTransactionRef(tx25));
-    block.add(MakeTransactionRef(tx27));
-    block.add(MakeTransactionRef(tx28));
+    block.vtx.push_back(MakeTransactionRef(tx24));
+    block.vtx.push_back(MakeTransactionRef(tx25));
+    block.vtx.push_back(MakeTransactionRef(tx27));
+    block.vtx.push_back(MakeTransactionRef(tx28));
     pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 18);
 
@@ -1289,10 +1289,10 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
         CheckAncestors(txns_result9[i], pool);
     }
 
-    block.add(MakeTransactionRef(tx26));
-    block.add(MakeTransactionRef(tx29));
-    block.add(MakeTransactionRef(tx32));
-    block.add(MakeTransactionRef(tx35));
+    block.vtx.push_back(MakeTransactionRef(tx26));
+    block.vtx.push_back(MakeTransactionRef(tx29));
+    block.vtx.push_back(MakeTransactionRef(tx32));
+    block.vtx.push_back(MakeTransactionRef(tx35));
     pool.removeForBlock(block, 1, dummy, false);
     BOOST_CHECK_EQUAL(pool.size(), 14);
 
@@ -1765,7 +1765,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest)
 
     /* after tx6 is mined, tx7 should move up in the sort */
     CBlock block;
-    block.add(MakeTransactionRef(tx6));
+    block.vtx.push_back(MakeTransactionRef(tx6));
     std::list<CTransactionRef> dummy;
     pool.removeForBlock(block, 1, dummy, false);
 

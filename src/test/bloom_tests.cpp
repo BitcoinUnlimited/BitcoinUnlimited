@@ -502,7 +502,7 @@ BOOST_AUTO_TEST_CASE(merkle_block_2_reversed)
     // this test is the same as merkle_block_2 above except the transaction
     // indices get reversed too.
     std::vector<CTransactionRef> vtx;
-    for (auto iter : block)
+    for (auto iter : block.vtx)
         vtx.emplace_back(iter);
     std::reverse(vtx.begin(), vtx.end());
     block.hashMerkleRoot = BlockMerkleRoot(block);

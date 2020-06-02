@@ -72,7 +72,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_no_fee_inc)
         }
 
         // include 40 transactions into a block
-        while (block.numTransactions() < 40)
+        while (block.vtx.size() < 40)
         {
             if (curfee >= 0) // cant access negative index in array
             {
@@ -88,7 +88,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_no_fee_inc)
                 CTransactionRef ptx = mpool.get(txhash);
                 if (ptx)
                 {
-                    block.add(ptx);
+                    block.vtx.push_back(ptx);
                 }
                 assert((txHashesSize - 1) >= curfee);
                 txHashes[curfee].pop_back();
@@ -172,7 +172,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_gradual_fee_inc)
             txHashes[curfee].push_back(hash);
         }
         // include 40 transactions into a block
-        while (block.numTransactions() < 40)
+        while (block.vtx.size() < 40)
         {
             if (curfee >= 0) // cant access negative index in array
             {
@@ -188,7 +188,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_gradual_fee_inc)
                 CTransactionRef ptx = mpool.get(txhash);
                 if (ptx)
                 {
-                    block.add(ptx);
+                    block.vtx.push_back(ptx);
                 }
                 assert((txHashesSize - 1) >= curfee);
                 txHashes[curfee].pop_back();
@@ -301,7 +301,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_short_partial_fee_inc)
             }
         }
         // include 40 transactions into a block
-        while (block.numTransactions() < 40)
+        while (block.vtx.size() < 40)
         {
             if (!highfeeholder.empty())
             {
@@ -309,7 +309,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_short_partial_fee_inc)
                 CTransactionRef ptx = mpool.get(txhash);
                 if (ptx)
                 {
-                    block.add(ptx);
+                    block.vtx.push_back(ptx);
                 }
                 highfeeholder.pop_back();
             }
@@ -327,7 +327,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_short_partial_fee_inc)
                 CTransactionRef ptx = mpool.get(txhash);
                 if (ptx)
                 {
-                    block.add(ptx);
+                    block.vtx.push_back(ptx);
                 }
                 assert((txHashesSize - 1) >= curfee);
                 txHashes[curfee].pop_back();
@@ -443,7 +443,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_short_full_fee_inc)
             }
         }
         // include 40 transactions into a block
-        while (block.numTransactions() < 40)
+        while (block.vtx.size() < 40)
         {
             if (!highfeeholder.empty())
             {
@@ -451,7 +451,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_short_full_fee_inc)
                 CTransactionRef ptx = mpool.get(txhash);
                 if (ptx)
                 {
-                    block.add(ptx);
+                    block.vtx.push_back(ptx);
                 }
                 highfeeholder.pop_back();
             }
@@ -469,7 +469,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_short_full_fee_inc)
                 CTransactionRef ptx = mpool.get(txhash);
                 if (ptx)
                 {
-                    block.add(ptx);
+                    block.vtx.push_back(ptx);
                 }
                 assert((txHashesSize - 1) >= curfee);
                 txHashes[curfee].pop_back();
@@ -565,7 +565,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_tx_bell_curve)
         }
         // include 40 transactions into a block
         int index = curfee;
-        while (block.numTransactions() < 40)
+        while (block.vtx.size() < 40)
         {
             if (index >= 0) // cant access negative index in array
             {
@@ -581,7 +581,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_tx_bell_curve)
                 CTransactionRef ptx = mpool.get(txhash);
                 if (ptx)
                 {
-                    block.add(ptx);
+                    block.vtx.push_back(ptx);
                 }
                 assert((txHashesSize - 1) >= curfee);
                 txHashes[index].pop_back();

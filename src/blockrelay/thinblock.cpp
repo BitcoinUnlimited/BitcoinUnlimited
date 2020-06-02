@@ -41,10 +41,10 @@ CThinBlock::CThinBlock(const CBlock &block, const CBloomFilter &filter) : nSize(
 {
     header = block.GetBlockHeader();
 
-    unsigned int nTx = block.numTransactions();
+    unsigned int nTx = block.vtx.size();
     vTxHashes.reserve(nTx);
     size_t i = 0;
-    for (const auto &tx : block)
+    for (const auto &tx : block.vtx)
     {
         const uint256 &hash = tx->GetHash();
         vTxHashes.push_back(hash);
@@ -164,7 +164,7 @@ bool CThinBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock)
 
         nWaitingForTxns = missingCount;
         LOG(THIN, "Thinblock %s waiting for: %d, unnecessary: %d, total txns: %d received txns: %d peer=%s\n",
-            pblock->GetHash().ToString(), nWaitingForTxns, unnecessaryCount, pblock->numTransactions(),
+            pblock->GetHash().ToString(), nWaitingForTxns, unnecessaryCount, pblock->vtx.size(),
             pblock->thinblock->mapMissingTx.size(), pfrom->GetLogName());
 
     } // end lock orphanpool.cs, mempool.cs
@@ -212,12 +212,12 @@ CXThinBlock::CXThinBlock(const CBlock &block, const CBloomFilter *filter) : nSiz
     header = block.GetBlockHeader();
     this->collision = false;
 
-    unsigned int nTx = block.numTransactions();
+    unsigned int nTx = block.vtx.size();
     vTxHashes.reserve(nTx);
     std::set<uint64_t> setPartialTxHash;
 
     size_t i = 0;
-    for (const auto &tx : block)
+    for (const auto &tx : block.vtx)
     {
         const uint256 hash256 = tx->GetHash();
         uint64_t cheapHash = hash256.GetCheapHash();
@@ -242,13 +242,13 @@ CXThinBlock::CXThinBlock(const CBlock &block) : nSize(0), collision(false)
     header = block.GetBlockHeader();
     this->collision = false;
 
-    unsigned int nTx = block.numTransactions();
+    unsigned int nTx = block.vtx.size();
     vTxHashes.reserve(nTx);
     std::set<uint64_t> setPartialTxHash;
 
     READLOCK(orphanpool.cs_orphanpool);
     size_t i = 0;
-    for (const auto &tx : block)
+    for (const auto &tx : block.vtx)
     {
         const uint256 hash256 = tx->GetHash();
         uint64_t cheapHash = hash256.GetCheapHash();
@@ -455,7 +455,7 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         }
         else
         {
-            for (const auto &tx : block)
+            for (const auto &tx : block.vtx)
             {
                 uint64_t cheapHash = tx->GetHash().GetCheapHash();
                 if (thinRequestBlockTx.setCheapHashesToRequest.count(cheapHash))
@@ -738,7 +738,7 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<
 
     nWaitingForTxns = missingCount;
     LOG(THIN, "xthinblock waiting for: %d, unnecessary: %d, total txns: %d received txns: %d\n", nWaitingForTxns,
-        unnecessaryCount, pblock->numTransactions(), thinBlock->mapMissingTx.size());
+        unnecessaryCount, pblock->vtx.size(), thinBlock->mapMissingTx.size());
 
     // If there are any missing hashes or transactions then we request them here.
     // This must be done outside of the mempool.cs lock or may deadlock.
@@ -881,7 +881,7 @@ static bool ReconstructBlock(CNode *pfrom,
         }
 
         // Add this transaction. If the tx is null we still add it as a placeholder to keep the correct ordering.
-        pblock->add(ptx);
+        pblock->vtx.push_back(ptx);
     }
     // Now that we've rebuilt the block successfully we can set the XVal flag which is used in
     // ConnectBlock() to determine which if any inputs we can skip the checking of inputs.

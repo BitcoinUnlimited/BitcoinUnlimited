@@ -20,11 +20,11 @@ CMerkleBlock::CMerkleBlock(const CBlock &block, CBloomFilter &filter)
     vector<bool> vMatch;
     vector<uint256> vHashes;
 
-    vMatch.reserve(block.numTransactions());
-    vHashes.reserve(block.numTransactions());
+    vMatch.reserve(block.vtx.size());
+    vHashes.reserve(block.vtx.size());
 
     size_t i = 0;
-    for (const auto &tx : block)
+    for (const auto &tx : block.vtx)
     {
         const uint256 &hash = tx->GetHash();
         if (filter.IsRelevantAndUpdate(tx))
@@ -47,11 +47,11 @@ CMerkleBlock::CMerkleBlock(const CBlock &block, const std::set<uint256> &txids)
     vector<bool> vMatch;
     vector<uint256> vHashes;
 
-    vMatch.reserve(block.numTransactions());
-    vHashes.reserve(block.numTransactions());
+    vMatch.reserve(block.vtx.size());
+    vHashes.reserve(block.vtx.size());
 
     size_t i = 0;
-    for (const auto &tx : block)
+    for (const auto &tx : block.vtx)
     {
         const uint256 &hash = tx->GetHash();
         if (txids.count(hash))

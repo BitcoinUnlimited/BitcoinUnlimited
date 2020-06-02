@@ -1607,8 +1607,8 @@ bool ContextualCheckBlock(const CBlock &block,
     {
         // For legacy reasons keep the original way of checking BIP34 compliance
         CScript expect = CScript() << nHeight;
-        if (block.coinbase()->vin[0].scriptSig.size() < expect.size() ||
-            !std::equal(expect.begin(), expect.end(), block.coinbase()->vin[0].scriptSig.begin()))
+        if (block.vtx[0]->vin[0].scriptSig.size() < expect.size() ||
+            !std::equal(expect.begin(), expect.end(), block.vtx[0]->vin[0].scriptSig.begin()))
         {
             // However the original way only checks a specific serialized int encoding, BUT BIP34 does not mandate
             // the most efficient encoding, only that it be a "serialized CScript", and then gives an example with
@@ -1675,19 +1675,22 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
     // because we receive the wrong transactions for it.
 
     // Size limits
-    if (block.empty())
+    if (block.vtx.empty())
         return state.DoS(100, error("CheckBlock(): size limits failed"), REJECT_INVALID, "bad-blk-length");
 
     // First transaction must be coinbase, the rest must not be
-    if (block.empty() || !block.coinbase()->IsCoinBase())
+    if (block.vtx.empty() || !block.vtx[0]->IsCoinBase())
         return state.DoS(100, error("CheckBlock(): first tx is not coinbase"), REJECT_INVALID, "bad-cb-missing");
-    for (CBlock::const_iterator txiter = block.begin_past_coinbase(); txiter != block.end(); txiter++)
+
+    for (unsigned int i = 1; i < block.vtx.size(); i++)
     {
-        if ((*txiter)->IsCoinBase())
+        if (block.vtx[i]->IsCoinBase())
+        {
             return state.DoS(100, error("CheckBlock(): more than one coinbase"), REJECT_INVALID, "bad-cb-multiple");
+        }
     }
     // Check transactions
-    for (const auto &tx : block)
+    for (const auto &tx : block.vtx)
         if (!CheckTransaction(tx, state))
             return error("CheckBlock(): CheckTransaction of %s failed with %s", tx->GetHash().ToString(),
                 FormatStateMessage(state));
@@ -1707,7 +1710,7 @@ bool ReceivedBlockTransactions(const CBlock &block,
     AssertLockHeld(cs_main); // for setBlockIndexCandidates
     WRITELOCK(cs_mapBlockIndex); // for nStatus and nSequenceId
 
-    pindexNew->nTx = block.numTransactions();
+    pindexNew->nTx = block.vtx.size();
     pindexNew->nChainTx = 0;
     pindexNew->nFile = pos.nFile;
     pindexNew->nDataPos = pos.nPos;
@@ -2002,7 +2005,7 @@ DisconnectResult DisconnectBlock(const CBlock &block, const CBlockIndex *pindex,
         error("DisconnectBlock(): failure reading undo data");
         return DISCONNECT_FAILED;
     }
-    if (blockUndo.vtxundo.size() + 1 != block.numTransactions())
+    if (blockUndo.vtxundo.size() + 1 != block.vtx.size())
     {
         error("DisconnectBlock(): block and undo data inconsistent");
         return DISCONNECT_FAILED;
@@ -2012,10 +2015,9 @@ DisconnectResult DisconnectBlock(const CBlock &block, const CBlockIndex *pindex,
     // we already know that the block is valid.
 
     // restore inputs
-    size_t i = 1;
-    for (CBlock::const_iterator txiter = block.begin_past_coinbase(); txiter != block.end(); txiter++)
+    for (unsigned int i = 1; i < block.vtx.size(); i++) // i=1 to skip the coinbase, it has no inputs
     {
-        const CTransaction &tx = **txiter;
+        const CTransaction &tx = *(block.vtx[i]);
         CTxUndo &txundo = blockUndo.vtxundo[i - 1];
         if (txundo.vprevout.size() != tx.vin.size())
         {
@@ -2038,7 +2040,7 @@ DisconnectResult DisconnectBlock(const CBlock &block, const CBlockIndex *pindex,
     }
 
     // remove outputs
-    for (const auto &txref : block)
+    for (const auto &txref : block.vtx)
     {
         const CTransaction &tx = *txref;
         uint256 hash = tx.GetHash();
@@ -2155,7 +2157,7 @@ bool ConnectBlockPrevalidations(const CBlock &block,
 
         if (fEnforceBIP30)
         {
-            for (const auto &tx : block)
+            for (const auto &tx : block.vtx)
             {
                 for (size_t o = 0; o < tx->vout.size(); o++)
                 {
@@ -2234,8 +2236,8 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
     std::vector<int> prevheights;
     int nInputs = 0;
     unsigned int nSigOps = 0;
-    CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.numTransactions()));
-    blockundo.vtxundo.reserve(block.numTransactions() - 1);
+    CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
+    blockundo.vtxundo.reserve(block.vtx.size() - 1);
     int nChecked = 0;
     int nUnVerifiedChecked = 0;
     const arith_uint256 nStartingChainWork = chainActive.Tip()->nChainWork;
@@ -2277,7 +2279,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
         // NOTE: the only place where cs_main is needed is if we hit PV->ChainWorkHasChanged, which
         //       internally grabs the cs_main lock when needed.
         size_t i = 0;
-        for (const auto &txref : block)
+        for (const auto &txref : block.vtx)
         {
             const CTransaction &tx = *txref;
 
@@ -2396,8 +2398,8 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
     int64_t nTime3 = GetStopwatchMicros();
     nTimeConnect += nTime3 - nTime2;
     LOG(BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n",
-        (unsigned)block.numTransactions(), 0.001 * (nTime3 - nTime2),
-        0.001 * (nTime3 - nTime2) / block.numTransactions(),
+        (unsigned)block.vtx.size(), 0.001 * (nTime3 - nTime2),
+        0.001 * (nTime3 - nTime2) / block.vtx.size(),
         nInputs <= 1 ? 0 : 0.001 * (nTime3 - nTime2) / (nInputs - 1), nTimeConnect * 0.000001);
 
     int64_t nTime4 = GetStopwatchMicros();
@@ -2441,8 +2443,8 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     std::vector<int> prevheights;
     int nInputs = 0;
     unsigned int nSigOps = 0;
-    CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.numTransactions()));
-    blockundo.vtxundo.reserve(block.numTransactions() - 1);
+    CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
+    blockundo.vtxundo.reserve(block.vtx.size() - 1);
     int nChecked = 0;
     int nUnVerifiedChecked = 0;
     const arith_uint256 nStartingChainWork = chainActive.Tip()->nChainWork;
@@ -2483,7 +2485,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
         // and validate lexical ordering
         uint256 prevTxHash;
         size_t i = 0;
-        for (const auto &txref : block)
+        for (const auto &txref : block.vtx)
         {
             const CTransaction &tx = *txref;
             try
@@ -2522,7 +2524,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
         // NOTE: the only place where cs_main is needed is if we hit PV->ChainWorkHasChanged, which
         //       internally grabs the cs_main lock when needed.
         i = 0;
-        for (const auto &txref : block)
+        for (const auto &txref : block.vtx)
         {
             const CTransaction &tx = *(block.vtx[i]);
             const CTransactionRef &txref = block.vtx[i];
@@ -2674,8 +2676,8 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     int64_t nTime3 = GetStopwatchMicros();
     nTimeConnect += nTime3 - nTime2;
     LOG(BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n",
-        (unsigned)block.numTransactions(), 0.001 * (nTime3 - nTime2),
-        0.001 * (nTime3 - nTime2) / block.numTransactions(),
+        (unsigned)block.vtx.size(), 0.001 * (nTime3 - nTime2),
+        0.001 * (nTime3 - nTime2) / block.vtx.size(),
         nInputs <= 1 ? 0 : 0.001 * (nTime3 - nTime2) / (nInputs - 1), nTimeConnect * 0.000001);
 
     int64_t nTime4 = GetStopwatchMicros();
@@ -2741,7 +2743,7 @@ bool ConnectBlock(const CBlock &block,
     CAmount nFees = 0;
     CBlockUndo blockundo;
     std::vector<std::pair<uint256, CDiskTxPos> > vPos;
-    vPos.reserve(block.numTransactions());
+    vPos.reserve(block.vtx.size());
 
     // Discover how to handle this block
     bool canonical = fCanonicalTxsOrder;
@@ -2775,9 +2777,9 @@ bool ConnectBlock(const CBlock &block,
     }
 
     CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
-    if (block.coinbase()->GetValueOut() > blockReward)
+    if (block.vtx[0]->GetValueOut() > blockReward)
         return state.DoS(100, error("ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)",
-                                  block.coinbase()->GetValueOut(), blockReward),
+                                  block.vtx[0]->GetValueOut(), blockReward),
             REJECT_INVALID, "bad-cb-amount");
 
     if (fJustCheck)
@@ -2846,7 +2848,7 @@ bool ConnectBlock(const CBlock &block,
     // Watch for changes to the previous coinbase transaction.
     static uint256 hashPrevBestCoinBase;
     GetMainSignals().UpdatedTransaction(hashPrevBestCoinBase);
-    hashPrevBestCoinBase = block.coinbase()->GetHash();
+    hashPrevBestCoinBase = block.vtx[0]->GetHash();
 
     int64_t nTime6 = GetStopwatchMicros();
     nTimeCallbacks += nTime6 - nTime5;
@@ -2856,7 +2858,7 @@ bool ConnectBlock(const CBlock &block,
 
     // Track all recent txns in a block so we don't re-request them again. This can happen a txn announcement
     // arrives just after the block is received.
-    for (const CTransactionRef &ptx : block)
+    for (const CTransactionRef &ptx : block.vtx)
     {
         txRecentlyInBlock.insert(ptx->GetHash());
     }
@@ -3171,7 +3173,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     UpdateTip(pindexDelete->pprev);
     // Let wallets know transactions went from 1-confirmed to
     // 0-confirmed or conflicted:
-    for (const auto &ptx : block)
+    for (const auto &ptx : block.vtx)
     {
         SyncWithWallets(ptx, nullptr, -1);
     }
@@ -3288,7 +3290,7 @@ bool ConnectTip(CValidationState &state,
     }
     // ... and about transactions that got confirmed:
     int txIdx = 0;
-    for (const auto &ptx : *pblock)
+    for (const auto &ptx : pblock->vtx)
     {
         SyncWithWallets(ptx, pblock, txIdx);
         txIdx++;
@@ -3755,7 +3757,7 @@ bool ProcessNewBlock(CValidationState &state,
     if (!checked)
     {
         LOGA("Invalid block: ver:%x time:%d Tx size:%d len:%d\n", pblock->nVersion, pblock->nTime,
-            pblock->numTransactions(), pblock->GetBlockSize());
+            pblock->vtx.size(), pblock->GetBlockSize());
     }
     else if (IsInitialBlockDownload())
     {
@@ -3841,7 +3843,7 @@ bool ProcessNewBlock(CValidationState &state,
         CTransaction txOut;
         CTransaction txLen;
 
-        for (const auto &txref : *pblock)
+        for (const auto &txref : pblock->vtx)
         {
             if (txref->vin.size() > maxVin)
             {
@@ -3863,7 +3865,7 @@ bool ProcessNewBlock(CValidationState &state,
 
         LOG(BENCH,
             "ProcessNewBlock, time: %d, block: %s, len: %d, numTx: %d, maxVin: %llu, maxVout: %llu, maxTx:%llu\n",
-            end - start, pblock->GetHash().ToString(), pblock->GetBlockSize(), pblock->numTransactions(), maxVin,
+            end - start, pblock->GetHash().ToString(), pblock->GetBlockSize(), pblock->vtx.size(), maxVin,
             maxVout, maxTxSizeLocal);
         LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txIn.GetHash().ToString(), txIn.vin.size(),
             txIn.vout.size(), ::GetSerializeSize(txIn, SER_NETWORK, PROTOCOL_VERSION));

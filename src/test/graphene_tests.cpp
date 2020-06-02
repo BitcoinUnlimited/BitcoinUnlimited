@@ -163,7 +163,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_finds_brute_force_opt_for_small_blocks)
     uint64_t version = MAX_GRAPHENE_SET_VERSION;
     CGrapheneSet grapheneSet(version);
 
-    uint16_t approx_items_thresh = version >= 4 ? APPROX_ITEMS_THRESH_REDUCE_CHECK : APPROX_ITEMS_THRESH;   
+    uint16_t approx_items_thresh = version >= 4 ? APPROX_ITEMS_THRESH_REDUCE_CHECK : APPROX_ITEMS_THRESH;
     int n = (int)std::floor(approx_items_thresh / 2);
     int mu = 100;
     int m = (int)std::floor(n / 8) + mu;
@@ -191,7 +191,7 @@ BOOST_AUTO_TEST_CASE(graphene_set_finds_brute_force_opt_for_small_blocks)
 BOOST_AUTO_TEST_CASE(graphene_set_finds_approx_opt_for_large_blocks)
 {
     uint64_t version = MAX_GRAPHENE_SET_VERSION;
-    uint16_t approx_items_thresh = version >= 4 ? APPROX_ITEMS_THRESH_REDUCE_CHECK : APPROX_ITEMS_THRESH;   
+    uint16_t approx_items_thresh = version >= 4 ? APPROX_ITEMS_THRESH_REDUCE_CHECK : APPROX_ITEMS_THRESH;
     int n = 4 * approx_items_thresh;
     int mu = 1000;
     int m = approx_items_thresh + mu;
@@ -380,7 +380,7 @@ BOOST_AUTO_TEST_CASE(graphene_block_can_serde)
             SER_DISK, CLIENT_VERSION);
         stream >> tx;
         const CTransactionRef ptx = MakeTransactionRef(tx);
-        block.add(ptx);
+        block.vtx.push_back(ptx);
         CGrapheneBlock senderGrapheneBlock(MakeBlockRef(block), 5, 6, version, false);
         CGrapheneBlock receiverGrapheneBlock(4);
         CDataStream ss(SER_DISK, 0);
@@ -403,7 +403,7 @@ BOOST_AUTO_TEST_CASE(graphene_block_can_serde)
             SER_DISK, CLIENT_VERSION);
         stream >> tx;
         const CTransactionRef ptx = MakeTransactionRef(tx);
-        block.add(ptx);
+        block.vtx.push_back(ptx);
         CGrapheneBlock senderGrapheneBlock(MakeBlockRef(block), 5, 6, version, true);
         CGrapheneBlock receiverGrapheneBlock(4, true);
         CDataStream ss(SER_DISK, 0);
@@ -415,7 +415,7 @@ BOOST_AUTO_TEST_CASE(graphene_block_can_serde)
 
 BOOST_AUTO_TEST_CASE(nchecksumbits_gives_correct_value)
 {
-    double tol = 1 / std::pow(2, 11); 
+    double tol = 1 / std::pow(2, 11);
     uint8_t bits = CGrapheneSet::NChecksumBits(10, 2, 1, 0.5, tol);
 
     BOOST_CHECK_EQUAL(bits, 11);

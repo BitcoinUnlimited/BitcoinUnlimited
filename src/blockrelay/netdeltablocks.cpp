@@ -161,7 +161,7 @@ bool CNetDeltaBlock::reconstruct(CSubBlockRef &dbr, CNetDeltaRequestMissing **pp
         /*
         LOG(WB, "Reconstructed delta block has all txn: %d\n", dbr->allTransactionsKnown());
         LOG(WB, "Reconstructed (from full set) delta block max depth: %d, for size: %d\n",
-                dbr->treeMaxDepth(), dbr->numTransactions());
+                dbr->treeMaxDepth(), dbr->vtx.size());
         if (!dbr->allTransactionsKnown()) return false;
         */
 
@@ -268,7 +268,7 @@ bool CNetDeltaBlock::reconstruct(CSubBlockRef &dbr, CNetDeltaRequestMissing **pp
     /*
     LOG(WB, "Reconstructed delta block has all txn: %d\n", dbr->allTransactionsKnown());
     LOG(WB, "Reconstructed (from graphene-slimmed set) delta block max depth: %d, for size: %d\n",
-                dbr->treeMaxDepth(), dbr->numTransactions());
+                dbr->treeMaxDepth(), dbr->vtx.size());
     if (!dbr->allTransactionsKnown()) return false;
     */
     return true;
@@ -297,8 +297,8 @@ bool sendFullDeltaBlock(const CSubBlockRef db, CNode *pto)
     delete ndb.delta_gset;
     ndb.delta_gset = nullptr;
     ndb.delta_tx_additional.clear();
-    // ndb.delta_tx_additional.emplace_back(db->coinbase()); TODO: not necessary?
-    for (auto &txref : db->vtx)
+    // ndb.delta_tx_additional.emplace_back(db->vtx[0]); TODO: not necessary?
+    for (auto& txref : db->vtx)
         ndb.delta_tx_additional.emplace_back(txref);
     pto->PushMessage(NetMsgType::DELTABLOCK, ndb);
     return true;
@@ -312,8 +312,8 @@ bool sendDeltaBlock(const CSubBlockRef db, CNode *pto, std::set<uint64_t> reques
     CNetDeltaBlock ndb(db, GetGrapheneMempoolInfo().nTx);
 
     // delta_tx_additional always contains the coinbase first
-    // ndb.delta_tx_additional.emplace_back(db->coinbase()); TODO not needed?
-    // LOG(WB, "Adding coinbase %s to set of included txn.\n", db->coinbase()->GetHash().GetHex());
+    //ndb.delta_tx_additional.emplace_back(db->vtx[0]); TODO not needed?
+    //LOG(WB, "Adding coinbase %s to set of included txn.\n", db->vtx[0]->GetHash().GetHex());
     std::map<uint256, CTransactionRef> delta_map;
     for (auto txr : db->vtx)
         delta_map[txr->GetHash()] = txr;

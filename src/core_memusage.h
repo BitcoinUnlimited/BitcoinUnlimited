@@ -50,7 +50,6 @@ static inline size_t RecursiveDynamicUsage(const CMutableTransaction &tx)
     return mem;
 }
 
-static inline size_t RecursiveDynamicUsage(const CBlock &block) { return block.RecursiveDynamicUsage(); }
 static inline size_t RecursiveDynamicUsage(const CBlockLocator &locator)
 {
     return memusage::DynamicUsage(locator.vHave);

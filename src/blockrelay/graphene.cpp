@@ -44,14 +44,14 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
       nSize(0), nWaitingFor(0), shorttxidk0(0), shorttxidk1(0), version(_version), computeOptimized(_computeOptimized)
 {
     header = pblock->GetBlockHeader();
-    nBlockTxs = pblock->numTransactions();
+    nBlockTxs = pblock->vtx.size();
     uint64_t grapheneSetVersion = CGrapheneBlock::GetGrapheneSetVersion(version);
 
     if (version >= 2)
         FillShortTxIDSelector();
 
     std::vector<uint256> blockHashes;
-    for (const auto &tx : *pblock)
+    for (const auto &tx : pblock->vtx)
     {
         blockHashes.push_back(tx->GetHash());
 
@@ -1319,7 +1319,7 @@ void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CM
         try
         {
             uint64_t nSenderMempoolPlusBlock =
-                GetGrapheneMempoolInfo().nTx + pblock->numTransactions() - 1; // exclude coinbase
+                GetGrapheneMempoolInfo().nTx + pblock->vtx.size() - 1; // exclude coinbase
             CGrapheneBlock grapheneBlock(pblock, mempoolinfo.nTx, nSenderMempoolPlusBlock,
                 NegotiateGrapheneVersion(pfrom), NegotiateFastFilterSupport(pfrom));
 

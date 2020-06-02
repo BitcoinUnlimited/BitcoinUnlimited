@@ -76,114 +76,16 @@ public:
     int64_t GetBlockTime() const { return (int64_t)nTime; }
 };
 
-/*! Class used as the key in the block's internal transaction map to
-  order it, supports < comparison as used by persistent_map. */
-class CTransactionSlot
-{
-public:
-    CTransactionSlot(const CTransactionRef _tx, const int _idx = -1) : tx(_tx), idx(_idx) {}
-    bool operator<(const CTransactionSlot &other) const;
-    bool operator==(const CTransactionSlot &other) const { return !(*this < other) && !(other < *this); }
-    std::string ToString() const;
-
-private:
-    const CTransactionRef tx;
-    int idx; // position. if negative, determined through hash
-};
-
-
-class CPersistentTransactionMap : public persistent_map<CTransactionSlot, const CTransaction>
-{
-public:
-    template <typename Stream>
-    inline void Serialize(Stream &os) const
-    {
-        WriteCompactSize(os, size());
-        for (auto i : *this)
-            i.second.Serialize(os);
-    }
-
-    // FIXME: This very unpersistent method is quite ugly and the Bitcoin stream system seems to be too
-    // unflexible to avoid calling Unserialize(..) like this on a deserializable class and should be extended
-    // to handle this and similar cases in a proper way.
-    template <typename Stream>
-    inline void Unserialize(Stream &is)
-    {
-        unsigned int nSize = ReadCompactSize(is);
-        std::vector<std::pair<unsigned int, std::shared_ptr<CTransaction> > > v;
-        v.reserve(nSize);
-
-        bool needs_order = false;
-        unsigned i;
-
-        for (i = 0; i < nSize; i++)
-        {
-            std::shared_ptr<CTransaction> item = std::shared_ptr<CTransaction>(new CTransaction());
-            item->Unserialize(is);
-            needs_order |= v.size() > 1 && !(CTransactionSlot(v.back().second) < CTransactionSlot(item));
-            v.emplace_back(std::pair<size_t, std::shared_ptr<CTransaction> >(i, item));
-        }
-        *this = CPersistentTransactionMap();
-
-        /*! FIXME: Maybe do something better than random shuffling here? */
-        std::random_shuffle(v.begin(), v.end());
-
-        if (needs_order)
-            for (i = 0; i < nSize; i++)
-                *this = insert(CTransactionSlot(v[i].second, v[i].first), v[i].second);
-        else
-            for (i = 0; i < nSize; i++)
-                *this = insert(CTransactionSlot(v[i].second, (v[i].first == 0 ? 0 : -1)), v[i].second);
-
-        LOG(WB, "Deserialized block transaction tree needs_order: %d, max depth: %d, for size: %d", needs_order,
-            max_depth(), v.size());
-    }
-    CPersistentTransactionMap &operator=(const persistent_map<CTransactionSlot, const CTransaction> &other)
-    {
-        *(persistent_map<CTransactionSlot, const CTransaction> *)this = other;
-        return *this;
-    }
-};
-
-//! Used to unpack the map iterator type over pairs to just the value (CTransactionRef)
-class CPersistentMapBlockIterator
-{
-    typedef CPersistentTransactionMap::const_iterator parent_iterator;
-
-public:
-    typedef CTransactionRef value_type;
-    typedef std::input_iterator_tag iterator_category;
-    CPersistentMapBlockIterator(parent_iterator _iter) : iter(_iter) {}
-    const CTransactionRef operator*() const { return iter.value_ptr(); }
-    bool operator==(const CPersistentMapBlockIterator &other) const { return iter == other.iter; }
-    bool operator!=(const CPersistentMapBlockIterator &other) const { return iter != other.iter; }
-    CPersistentMapBlockIterator &operator++()
-    { // prefix
-        ++iter;
-        return *this;
-    }
-    CPersistentMapBlockIterator operator++(int)
-    { // postfix
-        parent_iterator x = iter;
-        ++iter;
-        return CPersistentMapBlockIterator(x);
-    }
-
-private:
-    parent_iterator iter;
-};
-
-
 class CBlock : public CBlockHeader
 {
 private:
     // memory only
     mutable uint64_t nBlockSize; // Serialized block size in bytes
-protected:
-    // network and disk
-    CPersistentTransactionMap mtx;
 
 public:
+    // network and disk
+    std::vector<CTransactionRef> vtx;
+    
     // Xpress Validation: (memory only)
     //! Orphans, or Missing transactions that have been re-requested, are stored here.
     std::set<uint256> setUnVerifiedTxns;
@@ -193,31 +95,6 @@ public:
     bool fXVal;
 
 public:
-    typedef CPersistentMapBlockIterator const_iterator;
-
-    // functions to access internal transaction data
-    const_iterator begin() const { return const_iterator(mtx.begin()); }
-    const_iterator begin_past_coinbase() const
-    {
-        const_iterator b = begin();
-        ++b;
-        return b;
-    }
-    const_iterator end() const { return const_iterator(mtx.end()); }
-    const CTransactionRef coinbase() const
-    {
-        if (mtx.size())
-            return *begin();
-        else
-            return nullptr;
-    }
-    uint64_t numTransactions() const { return mtx.size(); }
-    bool empty() const { return numTransactions() == 0; }
-    void add(const CTransactionRef &txnref) { mtx = mtx.insert(CTransactionSlot(txnref, mtx.size()), txnref); }
-    void setCoinbase(const CTransactionRef &txnref) { mtx = mtx.insert(CTransactionSlot(txnref, 0), txnref); }
-    // sort block to be LTOR (leaves coinbase alone)
-    void sortLTOR(const bool no_dups = false);
-    const CTransactionRef by_pos(size_t index) const { return mtx.by_rank(index).value_ptr(); }
     // memory only
     // 0.11: mutable std::vector<uint256> vMerkleTree;
     mutable bool fChecked;
@@ -250,30 +127,12 @@ public:
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
         READWRITE(*(CBlockHeader *)this);
-        READWRITE(mtx);
+        READWRITE(vtx);
     }
-
-    /*
-    template <typename Stream>
-    void Serialize(Stream &s) const
-    {
-        (CBlockHeader*)(this) -> Serialize(s);
-        Serialize(s, mtx);
-    }
-
-    template <typename Stream>
-    void Unserialize(Stream &s)
-    {
-        (CBlockHeader*)(this) -> Unserialize(s);
-        Unserialize(s, mtx);
-        }*/
-
 
     uint64_t GetHeight() const // Returns the block's height as specified in its coinbase transaction
     {
-        if (coinbase() == nullptr)
-            return 0;
-        const CScript &sig = coinbase()->vin[0].scriptSig;
+        const CScript &sig = vtx[0]->vin[0].scriptSig;
         int numlen = sig[0];
         if (numlen == OP_0)
             return 0;
@@ -288,7 +147,7 @@ public:
     void SetNull()
     {
         CBlockHeader::SetNull();
-        mtx = CPersistentTransactionMap();
+        vtx.clear();
         fChecked = false;
         fExcessive = false;
         fXVal = false;
@@ -312,12 +171,6 @@ public:
     // Return the serialized block size in bytes. This is only done once and then the result stored
     // in nBlockSize for future reference, saving unncessary and expensive serializations.
     uint64_t GetBlockSize() const;
-
-    size_t RecursiveDynamicUsage() const;
-
-
-    //! Maximum depth of underlying binary tree to store transaction set
-    size_t treeMaxDepth() const { return mtx.max_depth(); }
 };
 
 /**

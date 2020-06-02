@@ -527,7 +527,7 @@ extern void UnlimitedLogBlock(const CBlock &block, const std::string &hash, uint
         long int byteLen = block.GetBlockSize();
         CBlockHeader bh = block.GetBlockHeader();
         fprintf(blockReceiptLog, "%" PRIu64 ",%" PRIu64 ",%ld,%ld,%s\n", receiptTime, (uint64_t)bh.nTime, byteLen,
-                block.numTransactions(), hash.c_str());
+                block.vtx.size(), hash.c_str());
         fflush(blockReceiptLog);
     }
 #endif
@@ -590,7 +590,7 @@ bool static ScanHash(const CBlockHeader *pblock, uint32_t &nNonce, uint256 *phas
 static bool ProcessBlockFound(const CBlock *pblock, const CChainParams &chainparams)
 {
     // LOGA("%s\n", pblock->ToString());
-    LOGA("generated %s\n", FormatMoney(pblock->coinbase()->vout[0].nValue));
+    LOGA("generated %s\n", FormatMoney(pblock->vtx[0]->vout[0].nValue));
 
     // Found a solution
     {
@@ -698,7 +698,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
             }
             IncrementExtraNonce(pblock.get(), nExtraNonce);
 
-            LOGA("Running BitcoinMiner with %u transactions in block (%u bytes)\n", pblock->numTransactions(),
+            LOGA("Running BitcoinMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
                 pblock->GetBlockSize());
 
             //
@@ -1731,7 +1731,7 @@ std::vector<uint256> GetMerkleProofBranches(CBlock *pblock)
     std::vector<uint256> ret;
     std::vector<uint256> leaves;
 
-    for (const auto &tx : *pblock)
+    for (const auto &tx : pblock->vtx)
         leaves.push_back(tx->GetHash());
 
     ret = ComputeMerkleBranch(leaves, 0);
@@ -1755,7 +1755,7 @@ static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
     ret.pushKV("prevhash", block.hashPrevBlock.GetHex());
 
     {
-        const CTransactionRef &tran = block.coinbase();
+        const CTransactionRef &tran = block.vtx[0];
         ret.pushKV("coinbase", EncodeHexTx(*tran));
     }
 
@@ -1911,7 +1911,7 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
     if (!cbhex.isNull())
     {
         if (DecodeHexTx(coinbase, cbhex.get_str()))
-            block.setCoinbase(MakeTransactionRef(std::move(coinbase)));
+            block.vtx[0] = MakeTransactionRef(std::move(coinbase));
         else
         {
             throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "coinbase decode failed");
@@ -1921,7 +1921,7 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
     // MerkleRoot:
     {
         std::vector<uint256> merkleProof = GetMerkleProofBranches(&block);
-        uint256 t = block.coinbase()->GetHash();
+        uint256 t = block.vtx[0]->GetHash();
         block.hashMerkleRoot = CalculateMerkleRoot(t, merkleProof);
     }
 

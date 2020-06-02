@@ -119,11 +119,11 @@ public:
     CompactReReqResponse(const CBlock &block, const std::vector<uint32_t> &indexes)
     {
         blockhash = block.GetHash();
-        if (indexes.size() > block.numTransactions())
+        if (indexes.size() > block.vtx.size())
             throw std::invalid_argument("request more transactions than are in a block");
         for (uint32_t i : indexes)
         {
-            CTransactionRef txref = block.by_pos(i);
+            CTransactionRef txref = block.vtx[i];
             if (txref == nullptr)
                 throw std::invalid_argument("out of bound tx in rerequest");
             txn.push_back(*txref);

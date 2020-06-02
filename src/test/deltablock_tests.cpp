@@ -69,7 +69,7 @@ BOOST_AUTO_TEST_CASE(construct1_and_some_static_fns)
 
     BOOST_CHECK_EQUAL(CDeltaBlock::tips(hash1).size(), 0);
     BOOST_CHECK_EQUAL(CDeltaBlock::tips(dbr->hashPrevBlock).size(), 0);
-    BOOST_CHECK_EQUAL(dbr->numTransactions(), 1); // only CB
+    BOOST_CHECK_EQUAL(dbr->vtx.size(), 1); // only CB
     BOOST_CHECK_EQUAL(CDeltaBlock::knownInReceiveOrder().size(), 0);
 
     CMutableTransaction dummytx;
@@ -134,9 +134,9 @@ BOOST_AUTO_TEST_CASE(deltatree)
     CDeltaBlockRef dbr(new CDeltaBlock(headertemplate, CTransactionRef(new CTransaction(cbtmpl))));
     addSomeTx(dbr, 100);
     finalize(dbr);
-    BOOST_CHECK(dbr->coinbase()->IsCoinBase());
+    BOOST_CHECK(dbr->vtx[0]->IsCoinBase());
     BOOST_CHECK(dbr->allTransactionsKnown());
-    BOOST_CHECK_EQUAL(dbr->numTransactions(), 101);
+    BOOST_CHECK_EQUAL(dbr->vtx.size(), 101);
     BOOST_CHECK_EQUAL(dbr->deltaSet().size(), 100);
     BOOST_CHECK(dbr->compatible(*dbr));
 
@@ -165,8 +165,8 @@ BOOST_AUTO_TEST_CASE(deltatree)
     CDeltaBlockRef b2 = CDeltaBlock::bestTemplate(hash1);
     addSomeTx(b2, 30);
     finalize(b2);
-    BOOST_CHECK(b2->coinbase()->IsCoinBase());
-    BOOST_CHECK_EQUAL(b2->numTransactions(), 131);
+    BOOST_CHECK(b2->vtx[0]->IsCoinBase());
+    BOOST_CHECK_EQUAL(b2->vtx.size(), 131);
     BOOST_CHECK_EQUAL(b2->deltaSet().size(), 30);
     BOOST_CHECK(b2->compatible(*dbr));
     BOOST_CHECK(dbr->compatible(*b2));
@@ -180,8 +180,8 @@ BOOST_AUTO_TEST_CASE(deltatree)
     b3->add(b2->deltaSet()[20]);
 
     finalize(b3);
-    BOOST_CHECK(b3->coinbase()->IsCoinBase());
-    BOOST_CHECK_EQUAL(b3->numTransactions(), 144);
+    BOOST_CHECK(b3->vtx[0]->IsCoinBase());
+    BOOST_CHECK_EQUAL(b3->vtx.size(), 144);
     BOOST_CHECK_EQUAL(b3->deltaSet().size(), 43);
     BOOST_CHECK(b2->compatible(*dbr));
     BOOST_CHECK(dbr->compatible(*b2));
@@ -200,12 +200,12 @@ BOOST_AUTO_TEST_CASE(deltatree)
     finalize(b4);
     for (auto anc : b4->ancestors()) {
         BOOST_TEST_MESSAGE("ancestor b4: " << anc->GetHash() << " "
-                           << anc->numTransactions() << " "
+                           << anc->vtx.size() << " "
                            << anc->deltaSet().size());
     }
     BOOST_CHECK_EQUAL(b4->ancestors().size(), 2); // b2, b3
-    BOOST_CHECK(b4->coinbase()->IsCoinBase());
-    BOOST_CHECK_EQUAL(b4->numTransactions(), 101+30+40+50);
+    BOOST_CHECK(b4->vtx[0]->IsCoinBase());
+    BOOST_CHECK_EQUAL(b4->vtx.size(), 101+30+40+50);
     BOOST_CHECK_EQUAL(b4->deltaSet().size(), 50);
     BOOST_CHECK_EQUAL(b4->weakPOW(), 4);
 
@@ -218,7 +218,7 @@ BOOST_AUTO_TEST_CASE(deltatree)
     b5->add(rndTransaction(b4->deltaSet()[25]));
     finalize(b5);
     BOOST_CHECK_EQUAL(b5->ancestors().size(), 2); // b2, b3
-    BOOST_CHECK_EQUAL(b5->numTransactions(), 101+30+40+61);
+    BOOST_CHECK_EQUAL(b5->vtx.size(), 101+30+40+61);
     BOOST_CHECK_EQUAL(b5->deltaSet().size(), 61);
     BOOST_CHECK(!b4->compatible(*b5));
     BOOST_CHECK(!b5->compatible(*b4));
@@ -233,7 +233,7 @@ BOOST_AUTO_TEST_CASE(deltatree)
     finalize(b6);
     BOOST_CHECK_EQUAL(b6->ancestors().size(), 1); // b5
     BOOST_CHECK_EQUAL(b6->ancestors()[0], b5);
-    BOOST_CHECK_EQUAL(b6->numTransactions(), 101+30+40+61+70);
+    BOOST_CHECK_EQUAL(b6->vtx.size(), 101+30+40+61+70);
     BOOST_CHECK_EQUAL(b6->deltaSet().size(), 70);
     BOOST_CHECK(!b4->compatible(*b6));
     BOOST_CHECK(b5->compatible(*b6));
@@ -261,7 +261,7 @@ BOOST_AUTO_TEST_CASE(deltatree)
 
     BOOST_CHECK_EQUAL(b7->ancestors().size(), 1); // b4
     BOOST_CHECK_EQUAL(b7->ancestors()[0], b4);
-    BOOST_CHECK_EQUAL(b7->numTransactions(), 101+30+40+50+8);
+    BOOST_CHECK_EQUAL(b7->vtx.size(), 101+30+40+50+8);
     BOOST_CHECK_EQUAL(b7->deltaSet().size(), 8);
     BOOST_CHECK(!b7->compatible(*b6));
     BOOST_CHECK(b7->compatible(*b4));
@@ -283,7 +283,7 @@ BOOST_AUTO_TEST_CASE(deltatree)
 
     BOOST_CHECK_EQUAL(b8->ancestors().size(), 1); // b7
     BOOST_CHECK_EQUAL(b8->ancestors()[0], b7);
-    BOOST_CHECK_EQUAL(b8->numTransactions(), 101+30+40+50+8+9);
+    BOOST_CHECK_EQUAL(b8->vtx.size(), 101+30+40+50+8+9);
     BOOST_CHECK_EQUAL(b8->deltaSet().size(), 9);
     BOOST_CHECK(!b7->compatible(*b6));
     BOOST_CHECK(b7->compatible(*b4));
