@@ -89,29 +89,27 @@ void CDagForrest::Clear()
     _dag.clear();
 }
 
-bool CDagForrest::Find(const uint256 &hash, CDagNode* node)
+CDagNode* CDagForrest::Find(const uint256 &hash)
 {
     // TODO : replace with std::find
-    node = nullptr;
     auto iter = _dag.begin();
     while (iter != _dag.end())
     {
         CDagNode* temp = *iter;
         if (temp->hash == hash)
         {
-            node = *iter;
-            return true;
+            return *iter;
         }
         ++iter;
     }
-    return false;
+    return nullptr;
 }
 
 bool CDagForrest::Insert(const CSubBlock &sub_block)
 {
     uint256 sub_block_hash = sub_block.GetHash();
-    CDagNode* temp;
-    if (Find(sub_block_hash, temp))
+    CDagNode* temp = Find(sub_block_hash);
+    if (temp != nullptr)
     {
         // we have this node.
         return false;
@@ -122,8 +120,8 @@ bool CDagForrest::Insert(const CSubBlock &sub_block)
     std::set<int16_t> merge_list;
     for (auto &hash : sub_block.GetAncestorHashes())
     {
-        CDagNode* ancestor = nullptr;
-        if (Find(hash, ancestor) == false)
+        CDagNode* ancestor = Find(hash);
+        if (ancestor == nullptr)
         {
             // TODO : A subblock is missing, try to re-request it or something
             continue;
@@ -174,8 +172,8 @@ bool CDagForrest::IsSubgraphValid(std::set<uint256> sgHashes)
     std::set<CDagNode*> subgraph;
     for (auto &hash : sgHashes)
     {
-        CDagNode* node;
-        if(Find(hash, node) == false)
+        CDagNode* node = Find(hash);
+        if(node == nullptr)
         {
             // missing a subblock, we need to request it
             // TODO : request missing subblock or throw an error or something

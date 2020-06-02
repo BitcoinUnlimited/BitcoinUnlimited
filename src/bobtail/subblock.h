@@ -44,8 +44,6 @@ public:
     std::set<uint256> GetAncestorHashes() const;
 
     std::vector<uint256> GetTxHashes() const;
-
-    static const CSubBlockRef SubBlockByHash(const uint256& hash);
 };
 
 

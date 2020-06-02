@@ -51,7 +51,7 @@ public:
 
     void Clear();
 
-    bool Find(const uint256 &hash, CDagNode* node);
+    CDagNode* Find(const uint256 &hash);
 
     bool Insert(const CSubBlock &sub_block);
     void TemporalSort();

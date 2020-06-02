@@ -7,6 +7,7 @@
 #ifndef BITCOIN_MINER_H
 #define BITCOIN_MINER_H
 
+#include "bobtail/subblock.h"
 #include "deltablocks.h"
 #include "primitives/block.h"
 #include "txmempool.h"
@@ -41,7 +42,7 @@ static const bool DEFAULT_PRINTPRIORITY = false;
 struct CBlockTemplate
 {
     CBlockRef block;
-    CDeltaBlockRef delta_block;
+    CSubBlockRef delta_block;
     std::vector<CAmount> vTxFees;
     std::vector<int64_t> vTxSigOps;
     CBlockTemplate() : block(new CBlock()) {}
@@ -107,7 +108,7 @@ public:
 
 private:
     // delta block template which is used to create the block
-    CDeltaBlockRef best_delta_template;
+    CSubBlockRef best_delta_template;
 
     // utility functions
     /** Clear the block's state and prepare for assembling a new block */

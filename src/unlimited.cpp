@@ -673,7 +673,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
             int64_t micros_after = GetTimeMicros();
             if (pblocktemplate->delta_block != nullptr)
                 LOG(WB, "Time for building and checking delta block template %s with %d txn: %d\n",
-                    pblocktemplate->delta_block->GetHash().GetHex(), pblocktemplate->delta_block->numTransactions(),
+                    pblocktemplate->delta_block->GetHash().GetHex(), pblocktemplate->delta_block->vtx.size(),
                     micros_after - micros_before);
 
             // COZ_END("CreateNewBlock");
@@ -688,7 +688,9 @@ void static BitcoinMiner(const CChainParams &chainparams)
             if (pblocktemplate->delta_block != nullptr)
             {
                 LOG(WB, "Using delta block for mining.\n");
-                pblock = pblocktemplate->delta_block;
+                //pblock = pblocktemplate->delta_block;
+                //TODO: NEED MINING TEMPLATE FOR BOBTAIL
+                //pblock = pblocktemplate->delta_block;
             }
             else
             {
@@ -709,7 +711,7 @@ void static BitcoinMiner(const CChainParams &chainparams)
             uint256 hash;
             uint32_t nNonce = 0;
 
-            ConstCDeltaBlockRef latest_delta(CDeltaBlock::latestForStrong(pblock->hashPrevBlock));
+            //ConstCDeltaBlockRef latest_delta(CDeltaBlock::latestForStrong(pblock->hashPrevBlock));
             while (true)
             {
                 // Check if something found
@@ -727,7 +729,8 @@ void static BitcoinMiner(const CChainParams &chainparams)
                         bool is_strong = UintToArith256(hash) <= hashStrongTarget;
                         if (pblocktemplate->delta_block != nullptr)
                         {
-                            CDeltaBlock::processNew(pblocktemplate->delta_block);
+                            //CDeltaBlock::processNew(pblocktemplate->delta_block);
+                            //TODO: PROCESS NEW BLOCK HERE
                             //TODO: ACTUALLY CALL sendDeltaBlock here
                         }
                         if (is_strong)
@@ -753,8 +756,9 @@ void static BitcoinMiner(const CChainParams &chainparams)
                 boost::this_thread::interruption_point();
 
                 // rebuild when a new delta block arrived
-                if (CDeltaBlock::latestForStrong(pblock->hashPrevBlock) != latest_delta)
-                    break;
+                //if (CDeltaBlock::latestForStrong(pblock->hashPrevBlock) != latest_delta)
+                //    break;
+                // TODO: WHAT IS THIS DOING? DO WE NEED IT?
                 // Regtest mode doesn't require peers
                 if (vNodes.empty() && chainparams.MiningRequiresPeers())
                     break;

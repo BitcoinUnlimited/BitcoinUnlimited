@@ -8,6 +8,7 @@
 #include "blockrelay/netdeltablocks.h"
 #include "blockstorage/blockstorage.h"
 #include "bobtail/bobtail.h"
+#include "bobtail/dag.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "consensus/consensus.h"
@@ -39,6 +40,7 @@
 #include <univalue.h>
 
 using namespace std;
+extern CDagForrest bobtailDag;
 
 /**
  * Return average network hashes per second based on the last 'lookup' blocks,
@@ -122,7 +124,6 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
     while (numblocks < nGenerate)
     {
         std::unique_ptr<CBlockTemplate> pblocktemplate;
-        CDeltaBlockRef pblock;
         {
             TxAdmissionPause lock; // flush any tx waiting to enter the mempool
             pblocktemplate = BlockAssembler(Params()).CreateNewBlock(coinbaseScript->reserveScript);
@@ -130,7 +131,9 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
         if (!pblocktemplate.get())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
         LOG(WB, "Using delta block for RPC generate.\n");
-        pblock = pblocktemplate->delta_block;
+        CBlockRef pblock;
+        //TODO: MAKE SUBBLOCK COMPATIBLE
+        //pblock = pblocktemplate->delta_block;
 
         {
             // LOCK(cs_main);
@@ -150,18 +153,17 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
             continue;
 
         LOG(WB, "PROCESS NEW WEAK\n");
-        CDeltaBlock::processNew(pblock);
+        //CDeltaBlock::processNew(pblock);
+        //TODO: PROCESS BLOCK
+        //CDeltaBlock::tryRegister(pblock);
         //TODO: ACTUALLY CALL sendDeltaBlock here
-        CDeltaBlock::tryRegister(pblock);
+        //TODO: REGISTER BLOCK
 
         // Now check if Bobtail PoW is also satisfied
-        if (CheckBobtailPoW(*pblock, pblock->allAncestorHashes(), Params().GetConsensus(), BOBTAIL_K))
+        // TODO: CheckBobtailPoW NEEDS TO TAKE A DAG NOT VECTOR OF HASHES
+        std::vector<uint256> ancestors; //DELETE ME
+        if (CheckBobtailPoW(*pblock, ancestors, Params().GetConsensus(), BOBTAIL_K))
         {
-            LOG(WB, "PROCESS NEW STRONG %s\n", pblock->GetHash().ToString());
-            for (int i = 0; i < pblock->allAncestorHashes().size(); i++)
-            {
-                LOG(WB, "\t%s\n", pblock->allAncestorHashes()[i].ToString());
-            }
             // In we are mining our own block or not running in parallel for any reason
             // we must terminate any block validation threads that are currently running,
             // Unless they have more work than our own block or are processing a chain

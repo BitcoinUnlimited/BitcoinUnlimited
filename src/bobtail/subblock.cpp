@@ -69,9 +69,3 @@ std::vector<uint256> CSubBlock::GetTxHashes() const
 
     return hashes;
 }
-
-const CSubBlockRef CSubBlock::SubBlockByHash(const uint256& hash)
-{
-    //TODO: ADD DAG LOOKUP LOGIC HERE!!!
-    return nullptr;
-}
