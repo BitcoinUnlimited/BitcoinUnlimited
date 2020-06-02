@@ -141,11 +141,7 @@ public:
     std::set<ConstCDeltaBlockRef> allAncestors() const;
     std::vector<uint256> allAncestorHashes() const;
 private:
-    static void mergeDeltablocks(
-        const std::vector<ConstCDeltaBlockRef> &ancestors,
-        CPersistentTransactionMap &all_tx,
-        CSpentMap &all_spent);
-
+    
     void parseCBhashes();
 
     std::vector<uint256> delta_parent_hashes;

@@ -38,7 +38,7 @@ CDeltaBlock::CDeltaBlock(const CBlockHeader &header,
                          const CTransactionRef &coinbase) :
     weakpow_cached(false), cached_weakpow(-1), fAllTransactionsKnown(false) {
     *(CBlockHeader*)this = header;
-    setCoinbase(coinbase);
+    vtx.push_back(coinbase);
     parseCBhashes();
 }
 
@@ -168,7 +168,7 @@ void CDeltaBlock::parseCBhashes() {
 
     LOG(WB, "Analyzing delta block (maybe template) %s for weak ancestor hashes.\n", GetHash().GetHex());
 
-    for (const CTxOut out : coinbase()->vout) {
+    for (const CTxOut out : vtx[0]->vout) {
         const CScript& cand = out.scriptPubKey;
         // is it OP_RETURN, size byte (34), 'DB'+32 byte hash?
         if (cand.size() == 36) {
@@ -240,182 +240,9 @@ std::vector<CTransactionRef> CDeltaBlock::deltaSet() const {
     return delta_set;
 }
 
-/*! Internal function to merge given delta blocks into one new one, saving memory by reusing the biggest
-  contained block (by number of transactions). */
-void CDeltaBlock::mergeDeltablocks(const std::vector<ConstCDeltaBlockRef> &ancestors,
-                                          CPersistentTransactionMap &all_tx,
-                                          CSpentMap &all_spent) {
-    LOCK(cs_db);
-    LOG(WB, "Merging deltablocks. Merging %d ancestors.\n", ancestors.size());
-    ConstCDeltaBlockRef biggest = nullptr;
-    size_t num_tx_max = 0;
-    for (auto anc : ancestors) {
-        if (anc->numTransactions() > num_tx_max) {
-            num_tx_max = anc->numTransactions();
-            biggest = anc;
-        }
-    }
-    if (biggest != nullptr) {
-        LOG(WB, "Found biggest (number of txn) ancestor: %s with %d total txns.\n", biggest->GetHash().GetHex(),
-            num_tx_max);
-    } else {
-        LOG(WB, "No biggest ancestor found.\n");
-    }
-    if (biggest == nullptr) {
-        all_tx = CPersistentTransactionMap();
-        all_spent = CSpentMap();
-        return;
-    } else {
-        all_tx = biggest->mtx.remove(*(biggest->mtx.by_rank(0).key_ptr())); // rm coinbase
-        all_spent = biggest->spent;
-    }
-
-    //! Set of blocks which either have themselves been merged or a child of them has
-    //  been merged, including all delta transactions
-    std::set<ConstCDeltaBlockRef> done;
-    done.insert(biggest);
-    for (auto p : biggest->allAncestors()) {
-        /*LOG(WB, "Marking (possibly indirect) ancestor %s of biggest ancestor %s as done.\n", p->GetHash().GetHex(),
-          biggest->GetHash().GetHex()); */
-        done.insert(p);
-    }
-    /* FIXME: document that this current approach is in principle O(n^2) for a strong
-     * block period but as there'll be on the order of a thousand
-     * blocks (for 600ms emission), one million operations over 600s
-     * doesn't seem too bad yet ...
-
-     This can probably be made a lot closer to O(n) by just using a
-     priority queue for all ancestors to look at and marking ancestors
-     with highest WPOW as done first, while also tracking which
-     ancestors are done because they're part of the biggest one.
- */
-
-    std::stack<ConstCDeltaBlockRef> todo;
-    for (auto anc : ancestors)
-        todo.push(anc);
-
-    while (todo.size() > 0) {
-        auto db = todo.top(); todo.pop();
-        if (done.count(db) != 0) {
-            LOG(WB, "Skipping %s, marked as done already.\n", db->GetHash().GetHex());
-            continue;
-        }
-        auto eps = db->deltaSet();
-        LOG(WB, "Adding %d transactions (excl. coinbase) from ancestor %s.\n", eps.size(), db->GetHash().GetHex());
-        for (size_t i=0; i < eps.size(); i++) { // skip coinbase
-            auto txref = eps[i];
-            all_tx=all_tx.insert(CTransactionSlot(txref), txref); // LTOR
-            auto hash = txref->GetHash();
-            for (auto input : txref->vin)
-                // FIXME: additional check here?
-                all_spent = all_spent.insert(input.prevout, hash);
-        }
-        for (auto parent : db->ancestors()) {
-            LOG(WB, "Marking (possibly indirect) ancestor %s of %s as done.\n", db->GetHash().GetHex(),
-                db->GetHash().GetHex());
-            todo.push(parent);
-        }
-        done.insert(db);
-    }
-    LOG(WB,"Merge result: All transactions: %d, All spent: %d\n", all_tx.size(), all_spent.size());
-    /* Ideas: There might be a better heuristic here that iterates
-       through a full block and adds all transactions instead of going
-       through the deltas - at least when the full block is
-       sufficiently small.  Or, more generally, it might make sense
-       to add a nice and fast union function to the
-       persistent_map. Though it seems that knowing the common, shared
-       points (Deltablocks) helps with the efficiency of the merge
-       operation. */
-}
-
-CDeltaBlockRef CDeltaBlock::bestTemplate(const uint256& strongparenthash,
-                                         const std::vector<ConstCDeltaBlockRef>* tips_override) {
-    LOCK(cs_db);
-    /*! Gather potential sets of delta block tips to merge.
-      Note that this is in up to O(n^2) for n weak chain tips. */
-    LOG(WB, "Creating best delta block template for strong parent %s.\n", strongparenthash.GetHex());
-
-    std::vector< std::vector<ConstCDeltaBlockRef> > candidate_merges;
-
-    auto all_tips = tips(strongparenthash);
-    const std::vector<ConstCDeltaBlockRef>* used_tips = tips_override == nullptr ? &all_tips : tips_override;
-    for (auto cblock : *used_tips) {
-        LOG(WB, "Finding matching sets for block %s.\n", cblock->GetHash().GetHex());
-        bool merged = false;
-        for (auto& cm :  candidate_merges) {
-            if (cblock->compatible(cm)) {
-                cm.emplace_back(cblock);
-                merged = true;
-            }
-        }
-        if (!merged) {
-            std::vector<ConstCDeltaBlockRef> new_cm;
-            new_cm.emplace_back(cblock);
-            candidate_merges.emplace_back(new_cm);
-        }
-    }
-
-    LOG(WB, "Found %d candidate mergeable sets.\n", candidate_merges.size());
-    for (auto cm : candidate_merges)
-        LOG(WB, "Candidate set size: %d\n", cm.size());
-
-    // total amount of weak pow for above merges
-    std::vector<int> total_weak_pow;
-    for (auto cm : candidate_merges)
-        total_weak_pow.emplace_back(weakPOW_internal(cm, strongparenthash));
-
-    // and gather maximum
-    int max_weak_pow = -1;
-    std::vector<ConstCDeltaBlockRef> merge_set;
-    for (size_t i = 0; i < candidate_merges.size(); i++) {
-        if (total_weak_pow[i] > max_weak_pow) {
-            max_weak_pow = total_weak_pow[i];
-            merge_set = candidate_merges[i];
-        }
-    }
-    LOG(WB, "Maximum WPOW %d for a set of %d ancestors.\n", max_weak_pow, merge_set.size());
-
-    CBlockHeader header;
-    header.hashPrevBlock = strongparenthash;
-
-    //! Set parent hashes
-    std::vector<uint256> dph;
-
-    for (ConstCDeltaBlockRef cdbr : merge_set) {
-        dph.emplace_back(cdbr->GetHash());
-    }
-
-    /*! The coinbase that is returned by this function is very
-      rudimentary and incomplete.  This is as to not take over too
-      much of what the miner code in miner.cpp etc. should be
-      doing. The coinbase here has basically just a vout filled with
-      the OP_RETURNs for the ancestor pointers and that's it. It needs
-      to be reworked by the miner code correspondingly. */
-    CMutableTransaction coinbase_template;
-
-    // make sure IsCoinBase() is true
-    coinbase_template.vin.resize(1);
-    coinbase_template.vin[0].prevout.SetNull();
-
-    addAncestorOPRETURNs(coinbase_template, dph);
-
-    CPersistentTransactionMap all_tx;
-    CSpentMap all_spent;
-
-    CDeltaBlock::mergeDeltablocks(merge_set, all_tx, all_spent);
-
-    CTransactionRef cb(new CTransaction(coinbase_template));
-
-    CDeltaBlockRef cdr = std::shared_ptr<CDeltaBlock>(
-        new CDeltaBlock(header, cb));
-    cdr->mtx = all_tx.insert(CTransactionSlot(cb, 0), cb);
-    cdr->spent = all_spent;
-    return cdr;
-}
-
 void CDeltaBlock::add(const CTransactionRef &txref) {
     // support LTOR only
-    mtx = mtx.insert(CTransactionSlot(txref), txref);
+    vtx.push_back(txref);
     // also needs to update spent index
     auto hash = txref->GetHash();
     for (auto input : txref->vin) {
@@ -457,14 +284,13 @@ void CDeltaBlock::tryMakeComplete(const std::vector<CTransactionRef>& delta_txns
     LOG(WB, "Trying to complete delta block %s with a delta set of size %d.\n",
         GetHash().GetHex(), delta_txns.size());
 
-    CTransactionRef cb_saved = coinbase();
+    CTransactionRef cb_saved = vtx[0];
     delta_set.clear();
-    mtx = CPersistentTransactionMap();
+    std::vector<CTransactionRef> vtx;
     spent = CSpentMap();
-    mergeDeltablocks(ancestors(),
-                     mtx, spent);
+    // mergeDeltablocks(ancestors(), mtx, spent);
 
-    setCoinbase(cb_saved);
+    vtx.push_back(cb_saved);
 
     for (size_t i=0; i < delta_txns.size(); i++)
         if (!delta_txns[i]->IsCoinBase())
