@@ -431,12 +431,10 @@ static void ReconsiderChainOnStartup()
 {
     if (!fReindex && !(avoidReconsiderMostWorkChain.Value()))
     {
-        // Set the override to true so that we don't get stuck trying to reconsider which
-        // can happen when an operator failed to upgrade their node before a hard fork.
         try
         {
-            UniValue obj(UniValue::VARR);
-            reconsidermostworkchain(obj, false);
+            bool fOverride = false;
+            ReconsiderMostWorkChain(fOverride);
         }
         catch (...)
         {

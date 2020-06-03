@@ -37,8 +37,15 @@ void CalculatePercentilesBySize(CAmount result[NUM_GETBLOCKSTATS_PERCENTILES],
     std::vector<std::pair<CAmount, int64_t> > &scores,
     int64_t total_size);
 
-UniValue reconsidermostworkchain(const UniValue &params, bool fHelp);
+/** Roll the chain back to the given height.  If the override flag is set to true
+ *  then you can rollback more than 100 blocks.
+ */
+std::string RollBackChain(int nRollBackHeight, bool fOverride);
+
+/** Check if we are on the most work chain and if not then re-org to it */
+std::string ReconsiderMostWorkChain(bool fOverride);
 std::set<CBlockIndex *, CompareBlocksByHeight> GetChainTips();
+
 UniValue mempoolToJSON(bool fVerbose = false);
 UniValue blockToJSON(const CBlock &block, const CBlockIndex *blockindex, bool txDetails = false, bool listTxns = true);
 

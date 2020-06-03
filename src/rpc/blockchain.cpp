@@ -1568,6 +1568,51 @@ UniValue reconsiderblock(const UniValue &params, bool fHelp)
     return NullUniValue;
 }
 
+std::string RollBackChain(int nRollBackHeight, bool fOverride)
+{
+    LOCK(cs_main);
+    uint32_t nRollBack = chainActive.Height() - nRollBackHeight;
+    if (nRollBack > nDefaultRollbackLimit && !fOverride)
+        return "You are attempting to rollback the chain by " + std::to_string(nRollBack) +
+               " blocks, however the limit is " + std::to_string(nDefaultRollbackLimit) + " blocks. Set " +
+               "the override to true if you want rollback more than the default";
+
+    // Lock block validation threads to make sure no new inbound block announcements
+    // cause any block validation state to change while we're unwinding the chain.
+    LOCK(PV->cs_blockvalidationthread);
+
+    while (chainActive.Height() > nRollBackHeight)
+    {
+        // save the current tip
+        CBlockIndex *pindex = chainActive.Tip();
+
+        CValidationState state;
+        // Disconnect the tip and by setting the third param (fRollBack) to true we avoid having to resurrect
+        // the transactions from the block back into the mempool, which saves a great deal of time.
+        if (!DisconnectTip(state, Params().GetConsensus(), true))
+        {
+            return "RPC_DATABASE_ERROR: " + state.GetRejectReason();
+        }
+
+        if (!state.IsValid())
+        {
+            return "RPC_DATABASE_ERROR: " + state.GetRejectReason();
+        }
+
+        // Invalidate the now previous block tip after it was diconnected so that the chain will not reconnect
+        // if another block arrives.
+        InvalidateBlock(state, Params().GetConsensus(), pindex);
+        if (!state.IsValid())
+        {
+            return "RPC_DATABASE_ERROR: " + state.GetRejectReason();
+        }
+
+        uiInterface.NotifyBlockTip(false, chainActive.Tip(), false);
+    }
+
+    return "";
+}
+
 UniValue rollbackchain(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
@@ -1587,65 +1632,24 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
                             HelpExampleCli("rollbackchain", "\"495623 true\"") +
                             HelpExampleRpc("rollbackchain", "\"blockheight\""));
 
+    std::string error;
     int nRollBackHeight = params[0].get_int();
     bool fOverride = false;
     if (params.size() > 1)
         fOverride = params[1].get_bool();
 
-    LOCK(cs_main);
-    uint32_t nRollBack = chainActive.Height() - nRollBackHeight;
-    if (nRollBack > nDefaultRollbackLimit && !fOverride)
-        throw runtime_error("You are attempting to rollback the chain by " + std::to_string(nRollBack) +
-                            " blocks, however the limit is " + std::to_string(nDefaultRollbackLimit) +
-                            " blocks. Set "
-                            "the override to true if you want rollback more than the default");
+    error = RollBackChain(nRollBackHeight, fOverride);
 
-    // Lock block validation threads to make sure no new inbound block announcements
-    // cause any block validation state to change while we're unwinding the chain.
-    LOCK(PV->cs_blockvalidationthread);
+    if (error.size() > 0)
+        throw runtime_error(error.c_str());
 
-    while (chainActive.Height() > nRollBackHeight)
-    {
-        // save the current tip
-        CBlockIndex *pindex = chainActive.Tip();
-
-        CValidationState state;
-        // Disconnect the tip and by setting the third param (fRollBack) to true we avoid having to resurrect
-        // the transactions from the block back into the mempool, which saves a great deal of time.
-        if (!DisconnectTip(state, Params().GetConsensus(), true))
-            throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
-
-        if (!state.IsValid())
-            throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
-
-        // Invalidate the now previous block tip after it was diconnected so that the chain will not reconnect
-        // if another block arrives.
-        InvalidateBlock(state, Params().GetConsensus(), pindex);
-        if (!state.IsValid())
-        {
-            throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
-        }
-
-        uiInterface.NotifyBlockTip(false, chainActive.Tip(), false);
-    }
     return NullUniValue;
 }
 
-UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
+std::string ReconsiderMostWorkChain(bool fOverride)
 {
-    if (fHelp || params.size() > 1)
-        throw runtime_error("reconsidermostworkchain \"[override]\"\n"
-                            "\nWill rollback the chain if needed and then sync to the most work chain. If this\n"
-                            "client was not upgraded before a hard fork and marked the \"real\" chain as invalid,\n"
-                            "then this command should be run after upgrading the client so as to join the correct\n"
-                            "and most work chain\n"
-                            "\nArguments:\n"
-                            "1. override      (boolean, optional, default=false)"
-                            "\nResult:\n"
-                            "\nExamples:\n" +
-                            HelpExampleCli("reconsidermostworkchain", "") +
-                            HelpExampleCli("reconsidermostworkchain", "\"true\"") +
-                            HelpExampleRpc("reconsidermostworkchain", "\"true\""));
+    // Error message to return;
+    std::string error;
 
     // Find pindex of most work chain regardless of whether is is valid or not.
     LOCK(cs_main);
@@ -1682,7 +1686,7 @@ UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
         if (pTipToVerify->nChainWork == chainActive.Tip()->nChainWork)
         {
             LOGA("Nothing to do. Already on the correct chain.");
-            throw runtime_error("Nothing to do. Already on the correct chain.");
+            return "Nothing to do. Already on the correct chain.";
         }
 
         // Find where chainActive meets the most work chaintip
@@ -1690,27 +1694,22 @@ UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
         pFork = chainActive.FindFork(pTipToVerify);
 
         // Rollback to the common forkheight so that both chains will be invalidated.
-        UniValue obj(UniValue::VARR);
-        obj.push_back(pFork->nHeight);
-        if (params.size() > 0)
-        {
-            // Set the rollbackchain override flag if there was one provided.
-            obj.push_back(params[0]);
-        }
-        rollbackchain(obj, false);
+        error = RollBackChain(pFork->nHeight, fOverride);
+        if (error.size() > 0)
+            return error;
 
         // If we got here then rollbackchain() was sucessful and we didn't throw an exception.
         // Now reconsider the new chain.
-        UniValue obj_hash(UniValue::VARR);
-        obj_hash.push_back(pTipToVerify->GetBlockHash().ToString());
-        try
+        LOGA("reconsider block: %s\n", pTipToVerify->GetBlockHash().ToString().c_str());
+        CValidationState state;
+        ReconsiderBlock(state, pTipToVerify);
+        if (state.IsValid())
         {
-            LOGA("reconsider block: %s\n", pTipToVerify->GetBlockHash().ToString().c_str());
-            reconsiderblock(obj_hash, false);
+            ActivateBestChain(state, Params());
         }
-        catch (...)
+        if (!state.IsValid())
         {
-            LOGA("ERROR: reconsider block: %s\n", pTipToVerify->GetBlockHash().ToString().c_str());
+            return "RPC_DATABASE_ERROR: " + state.GetRejectReason();
         }
 
         if (pTipToVerify->nChainWork == chainActive.Tip()->nChainWork)
@@ -1718,6 +1717,35 @@ UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
             LOGA("Active chain has been successfully moved to a new chaintip.");
         }
     }
+
+    return "";
+}
+
+UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() > 1)
+        throw runtime_error("reconsidermostworkchain \"[override]\"\n"
+                            "\nWill rollback the chain if needed and then sync to the most work chain. If this\n"
+                            "client was not upgraded before a hard fork and marked the \"real\" chain as invalid,\n"
+                            "then this command should be run after upgrading the client so as to join the correct\n"
+                            "and most work chain\n"
+                            "\nArguments:\n"
+                            "1. override      (boolean, optional, default=false)"
+                            "\nResult:\n"
+                            "\nExamples:\n" +
+                            HelpExampleCli("reconsidermostworkchain", "") +
+                            HelpExampleCli("reconsidermostworkchain", "\"true\"") +
+                            HelpExampleRpc("reconsidermostworkchain", "\"true\""));
+
+    std::string error;
+    bool fOverride = false;
+    if (params.size() > 0)
+        fOverride = params[0].get_bool();
+
+    error = ReconsiderMostWorkChain(fOverride);
+
+    if (error.size() > 0)
+        throw runtime_error(error.c_str());
 
     return NullUniValue;
 }
