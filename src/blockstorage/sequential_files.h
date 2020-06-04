@@ -41,5 +41,7 @@ bool WriteUndoToDiskSequenatial(const CBlockUndo &blockundo,
     const CMessageHeader::MessageStartChars &messageStart);
 bool ReadUndoFromDiskSequential(CBlockUndo &blockundo, const CDiskBlockPos &pos, const uint256 &hashBlock);
 
+/** Calculate the amount of disk space the block & undo files currently use */
+uint64_t CalculateCurrentUsage();
 
 #endif // BLOCKDB_SEQUENTIAL_H

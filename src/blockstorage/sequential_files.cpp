@@ -143,6 +143,8 @@ bool ReadBlockFromDiskSequential(CBlock &block, const CDiskBlockPos &pos, const 
 /* Calculate the amount of disk space the block & undo files currently use */
 uint64_t CalculateCurrentUsage()
 {
+    LOCK(cs_LastBlockFile);
+
     uint64_t retval = 0;
     for (const CBlockFileInfo &file : vinfoBlockFile)
     {
