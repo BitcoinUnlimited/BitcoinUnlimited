@@ -32,7 +32,6 @@
 #include <unordered_set>
 
 
-extern CDagForrest bobtailDag;
 extern CTweak<unsigned int> unconfPushAction;
 
 class Hasher
@@ -147,16 +146,9 @@ static ThresholdConditionCache warningcache[Consensus::MAX_VERSION_BITS_DEPLOYME
 
 bool CheckBlockHeader(const CBlockHeader &block, CValidationState &state, bool fCheckPOW)
 {
-    CDagNode *dagNode = bobtailDag.Find(block.GetHash());
-    CSubBlockRef deltaBlock = std::make_shared<CSubBlock>(dagNode->subblock);
-    //TODO: CheckBobtailPoW SHOULD TAKE DAG NOT HASHES
-    std::vector<uint256> ancestors; //DELETE ME
-    if (fCheckPOW &&
-        (deltaBlock == nullptr ||
-            !CheckBobtailPoW(*deltaBlock, ancestors, Params().GetConsensus(), BOBTAIL_K)))
-    {
-        return state.DoS(50, error("CheckBlockHeader(): bobtail proof of work failed"), REJECT_INVALID, "high-hash");
-    }
+    // Check proof of work matches claimed amount
+    if (fCheckPOW && !CheckProofOfWork(block.GetHash(), block.nBits, Params().GetConsensus()))
+        return state.DoS(50, error("CheckBlockHeader(): proof of work failed"), REJECT_INVALID, "high-hash");
 
     // Check timestamp
     if (block.GetBlockTime() > GetAdjustedTime() + 2 * 60 * 60)
@@ -1473,7 +1465,7 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
     }
 
     LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
-        GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 1000000);
+        GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
 
     // The resulting new best tip may not be in setBlockIndexCandidates anymore, so
     // add it again.
@@ -1681,14 +1673,10 @@ bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bo
     // First transaction must be coinbase, the rest must not be
     if (block.vtx.empty() || !block.vtx[0]->IsCoinBase())
         return state.DoS(100, error("CheckBlock(): first tx is not coinbase"), REJECT_INVALID, "bad-cb-missing");
-
     for (unsigned int i = 1; i < block.vtx.size(); i++)
-    {
         if (block.vtx[i]->IsCoinBase())
-        {
             return state.DoS(100, error("CheckBlock(): more than one coinbase"), REJECT_INVALID, "bad-cb-multiple");
-        }
-    }
+
     // Check transactions
     for (const auto &tx : block.vtx)
         if (!CheckTransaction(tx, state))
@@ -2036,13 +2024,12 @@ DisconnectResult DisconnectBlock(const CBlock &block, const CBlockIndex *pindex,
             fClean = fClean && res != DISCONNECT_UNCLEAN;
         }
         // At this point, all of txundo.vprevout should have been moved out.
-        i++;
     }
 
     // remove outputs
-    for (const auto &txref : block.vtx)
+    for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
-        const CTransaction &tx = *txref;
+        const CTransaction &tx = *(block.vtx[i]);
         uint256 hash = tx.GetHash();
 
         // Check that all outputs are available and match the outputs in the block itself exactly.
@@ -2278,10 +2265,10 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
         // a chance to process in parallel. This is crucial for parallel validation to work.
         // NOTE: the only place where cs_main is needed is if we hit PV->ChainWorkHasChanged, which
         //       internally grabs the cs_main lock when needed.
-        size_t i = 0;
-        for (const auto &txref : block.vtx)
+        for (unsigned int i = 0; i < block.vtx.size(); i++)
         {
-            const CTransaction &tx = *txref;
+            const CTransaction &tx = *(block.vtx[i]);
+            const CTransactionRef &txref = block.vtx[i];
 
             nInputs += tx.vin.size();
 
@@ -2377,7 +2364,6 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
             // and run python regression tests and is an testing feature.
             if (GetArg("-pvtest", false))
                 MilliSleep(1000);
-            i++;
         }
         LOG(BENCH, "Number of CheckInputs() performed: %d  Unverified count: %d\n", nChecked, nUnVerifiedChecked);
 
@@ -2397,9 +2383,8 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
 
     int64_t nTime3 = GetStopwatchMicros();
     nTimeConnect += nTime3 - nTime2;
-    LOG(BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n",
-        (unsigned)block.vtx.size(), 0.001 * (nTime3 - nTime2),
-        0.001 * (nTime3 - nTime2) / block.vtx.size(),
+    LOG(BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n", (unsigned)block.vtx.size(),
+        0.001 * (nTime3 - nTime2), 0.001 * (nTime3 - nTime2) / block.vtx.size(),
         nInputs <= 1 ? 0 : 0.001 * (nTime3 - nTime2) / (nInputs - 1), nTimeConnect * 0.000001);
 
     int64_t nTime4 = GetStopwatchMicros();
@@ -2484,10 +2469,9 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
         // Outputs then Inputs algorithm: add outputs to the coin cache
         // and validate lexical ordering
         uint256 prevTxHash;
-        size_t i = 0;
-        for (const auto &txref : block.vtx)
+        for (unsigned int i = 0; i < block.vtx.size(); i++)
         {
-            const CTransaction &tx = *txref;
+            const CTransaction &tx = *(block.vtx[i]);
             try
             {
                 AddCoins(view, tx, pindex->nHeight);
@@ -2515,7 +2499,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                 }
                 prevTxHash = curTxHash;
             }
-            i++;
         }
 
         // Start checking Inputs
@@ -2523,8 +2506,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
         // a chance to process in parallel. This is crucial for parallel validation to work.
         // NOTE: the only place where cs_main is needed is if we hit PV->ChainWorkHasChanged, which
         //       internally grabs the cs_main lock when needed.
-        i = 0;
-        for (const auto &txref : block.vtx)
+        for (unsigned int i = 0; i < block.vtx.size(); i++)
         {
             const CTransaction &tx = *(block.vtx[i]);
             const CTransactionRef &txref = block.vtx[i];
@@ -2628,7 +2610,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
             // and run python regression tests and is an testing feature.
             if (GetArg("-pvtest", false))
                 MilliSleep(1000);
-            i++;
         }
         LOG(BENCH, "Number of CheckInputs() performed: %d  Unverified count: %d\n", nChecked, nUnVerifiedChecked);
 
@@ -2675,9 +2656,8 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
 
     int64_t nTime3 = GetStopwatchMicros();
     nTimeConnect += nTime3 - nTime2;
-    LOG(BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n",
-        (unsigned)block.vtx.size(), 0.001 * (nTime3 - nTime2),
-        0.001 * (nTime3 - nTime2) / block.vtx.size(),
+    LOG(BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n", (unsigned)block.vtx.size(),
+        0.001 * (nTime3 - nTime2), 0.001 * (nTime3 - nTime2) / block.vtx.size(),
         nInputs <= 1 ? 0 : 0.001 * (nTime3 - nTime2) / (nInputs - 1), nTimeConnect * 0.000001);
 
     int64_t nTime4 = GetStopwatchMicros();
@@ -3279,7 +3259,18 @@ bool ConnectTip(CValidationState &state,
     // be no transactions in the mempool during initial sync, and also there is no need then to parse through each
     // blocks transactions in removeForBlock() looking for transactions to remove.
     std::list<CTransactionRef> txConflicted;
-    mempool.removeForBlock(*pblock, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload());
+    std::vector<CTxChange> txChanges;
+    if (!IsInitialBlockDownload() && !fReindex)
+    {
+        // txChanges: only if some unconfirmed tx push is turned on, track what transactions may need to be pushed while
+        // confirmed transactions are removed from the mempool.
+        mempool.removeForBlock(*pblock, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload(),
+            (unconfPushAction.Value() == 0) ? nullptr : &txChanges);
+    }
+    else
+    {
+        mempool.clear();
+    }
     // Update chainActive & related variables.
     UpdateTip(pindexNew);
     // Tell wallet about transactions that went from mempool
@@ -3303,7 +3294,6 @@ bool ConnectTip(CValidationState &state,
     LOG(BENCH, "- Connect block: %.2fms [%.2fs]\n", (nTime6 - nTime1) * 0.001, nTimeTotal * 0.000001);
 
     // If some kind of unconfirmed push is turned on, then do the forwarding.
-    std::vector<CTxChange> txChanges;
     if (!IsInitialBlockDownload() && !fReindex && unconfPushAction.Value() != 0)
         ForwardAcceptableTransactions(txChanges);
 
@@ -3567,7 +3557,7 @@ bool ActivateBestChainStep(CValidationState &state,
     if (fBlocksDisconnected)
     {
         LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
-            GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 1000000);
+            GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
     }
     mempool.check(pcoinsTip);
 
@@ -3756,8 +3746,8 @@ bool ProcessNewBlock(CValidationState &state,
     bool checked = CheckBlock(*pblock, state);
     if (!checked)
     {
-        LOGA("Invalid block: ver:%x time:%d Tx size:%d len:%d\n", pblock->nVersion, pblock->nTime,
-            pblock->vtx.size(), pblock->GetBlockSize());
+        LOGA("Invalid block: ver:%x time:%d Tx size:%d len:%d\n", pblock->nVersion, pblock->nTime, pblock->vtx.size(),
+            pblock->GetBlockSize());
     }
     else if (IsInitialBlockDownload())
     {
@@ -3787,8 +3777,7 @@ bool ProcessNewBlock(CValidationState &state,
         bool ret = AcceptBlock(*pblock, state, chainparams, &pindex, fRequested, dbp);
         if (pindex && pfrom)
         {
-            const uint256 blockhash = pindex->GetBlockHash();
-            mapBlockSource[blockhash] = pfrom->GetId();
+            mapBlockSource[pindex->GetBlockHash()] = pfrom->GetId();
         }
         CheckBlockIndex(chainparams.GetConsensus());
 
@@ -3810,14 +3799,6 @@ bool ProcessNewBlock(CValidationState &state,
             requester.Received(inv, pfrom);
         }
     }
-    /*! FIXME: There is somewhat of a race here during regtesting: If
-      a lot of blocks are generated in one RPC call, parallel
-      validation will make the registration order arbitrary which
-      means delta blocks transmission and refering might sporadically
-      fail. */
-    //TODO: IS THIS NECESSARY?
-    //CDeltaBlock::newStrong(pblock->GetHash());
-
     if (!ActivateBestChain(state, chainparams, pblock, fParallel))
     {
         if (state.IsInvalid() || state.IsError())
@@ -3843,30 +3824,30 @@ bool ProcessNewBlock(CValidationState &state,
         CTransaction txOut;
         CTransaction txLen;
 
-        for (const auto &txref : pblock->vtx)
+        for (unsigned int i = 0; i < pblock->vtx.size(); i++)
         {
-            if (txref->vin.size() > maxVin)
+            if (pblock->vtx[i]->vin.size() > maxVin)
             {
-                maxVin = txref->vin.size();
-                txIn = *txref;
+                maxVin = pblock->vtx[i]->vin.size();
+                txIn = *pblock->vtx[i];
             }
-            if (txref->vout.size() > maxVout)
+            if (pblock->vtx[i]->vout.size() > maxVout)
             {
-                maxVout = txref->vout.size();
-                txOut = *txref;
+                maxVout = pblock->vtx[i]->vout.size();
+                txOut = *pblock->vtx[i];
             }
-            uint64_t len = ::GetSerializeSize(*txref, SER_NETWORK, PROTOCOL_VERSION);
+            uint64_t len = ::GetSerializeSize(pblock->vtx[i], SER_NETWORK, PROTOCOL_VERSION);
             if (len > maxTxSizeLocal)
             {
                 maxTxSizeLocal = len;
-                txLen = *txref;
+                txLen = *pblock->vtx[i];
             }
         }
 
         LOG(BENCH,
             "ProcessNewBlock, time: %d, block: %s, len: %d, numTx: %d, maxVin: %llu, maxVout: %llu, maxTx:%llu\n",
-            end - start, pblock->GetHash().ToString(), pblock->GetBlockSize(), pblock->vtx.size(), maxVin,
-            maxVout, maxTxSizeLocal);
+            end - start, pblock->GetHash().ToString(), pblock->GetBlockSize(), pblock->vtx.size(), maxVin, maxVout,
+            maxTxSizeLocal);
         LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txIn.GetHash().ToString(), txIn.vin.size(),
             txIn.vout.size(), ::GetSerializeSize(txIn, SER_NETWORK, PROTOCOL_VERSION));
         LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txOut.GetHash().ToString(), txOut.vin.size(),
@@ -3887,10 +3868,9 @@ bool IsBlockPruned(const CBlockIndex *pblockindex)
 }
 
 
-
-
 /* Bobtail
  */
+extern CDagForrest bobtailDag;
 
 struct unknownBobtailForkData
 {
