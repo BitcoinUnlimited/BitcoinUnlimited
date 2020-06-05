@@ -4939,9 +4939,9 @@ bool ReconsiderBobtailBlock(CValidationState &state, CBlockIndex *pindex)
     return true;
 }
 
-bool TestBobtailBlockValidity(CValidationState &state,
+bool TestSubBlockValidity(CValidationState &state,
     const CChainParams &chainparams,
-    const CBlock &block,
+    const CSubBlock &block,
     CBlockIndex *pindexPrev,
     bool fCheckPOW,
     bool fCheckMerkleRoot)
