@@ -240,7 +240,7 @@ bool ReconsiderBobtailBlock(CValidationState &state, CBlockIndex *pindex);
 
 /** Check a block is completely valid from start to finish (only works on top of our current best block, with cs_main
  * held) */
-bool TestBobtailBlockValidity(CValidationState &state,
+bool TestSubBlockValidity(CValidationState &state,
     const CChainParams &chainparams,
     const CBlock &block,
     CBlockIndex *pindexPrev,
