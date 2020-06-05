@@ -186,7 +186,8 @@ bool IsBlockPruned(const CBlockIndex *pblockindex);
  */
 
 /** Context-independent validity checks */
-bool CheckBobtailBlockHeader(const CBlockHeader &block, CValidationState &state, bool fCheckPOW = true);
+bool CheckSubBlockHeader(const CBlockHeader &block, CValidationState &state, bool fCheckPOW = true);
+bool CheckBobtailBlock(const CBlockHeader &block, CValidationState &state, bool fCheckPOW = true);
 
 /** Context-dependent validity header checks */
 bool ContextualCheckBobtailBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex *pindexPrev);
