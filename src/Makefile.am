@@ -492,8 +492,6 @@ libbitcoin_consensus_a_SOURCES = \
   bobtail/dag.h \
   bobtail/subblock.cpp \
   bobtail/subblock.h \
-  bobtail/validation.cpp \
-  bobtail/validation.h \
   consensus/merkle.cpp \
   consensus/merkle.h \
   consensus/params.h \
