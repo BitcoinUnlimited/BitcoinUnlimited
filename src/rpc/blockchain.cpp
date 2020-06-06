@@ -1586,6 +1586,51 @@ UniValue reconsiderblock(const UniValue &params, bool fHelp)
     return NullUniValue;
 }
 
+std::string RollBackChain(int nRollBackHeight, bool fOverride)
+{
+    LOCK(cs_main);
+    uint32_t nRollBack = chainActive.Height() - nRollBackHeight;
+    if (nRollBack > nDefaultRollbackLimit && !fOverride)
+        return "You are attempting to rollback the chain by " + std::to_string(nRollBack) +
+               " blocks, however the limit is " + std::to_string(nDefaultRollbackLimit) + " blocks. Set " +
+               "the override to true if you want rollback more than the default";
+
+    // Lock block validation threads to make sure no new inbound block announcements
+    // cause any block validation state to change while we're unwinding the chain.
+    LOCK(PV->cs_blockvalidationthread);
+
+    while (chainActive.Height() > nRollBackHeight)
+    {
+        // save the current tip
+        CBlockIndex *pindex = chainActive.Tip();
+
+        CValidationState state;
+        // Disconnect the tip and by setting the third param (fRollBack) to true we avoid having to resurrect
+        // the transactions from the block back into the mempool, which saves a great deal of time.
+        if (!DisconnectTip(state, Params().GetConsensus(), true))
+        {
+            return "RPC_DATABASE_ERROR: " + state.GetRejectReason();
+        }
+
+        if (!state.IsValid())
+        {
+            return "RPC_DATABASE_ERROR: " + state.GetRejectReason();
+        }
+
+        // Invalidate the now previous block tip after it was diconnected so that the chain will not reconnect
+        // if another block arrives.
+        InvalidateBlock(state, Params().GetConsensus(), pindex);
+        if (!state.IsValid())
+        {
+            return "RPC_DATABASE_ERROR: " + state.GetRejectReason();
+        }
+
+        uiInterface.NotifyBlockTip(false, chainActive.Tip(), false);
+    }
+
+    return "";
+}
+
 UniValue rollbackchain(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
@@ -1605,48 +1650,93 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
                             HelpExampleCli("rollbackchain", "\"495623 true\"") +
                             HelpExampleRpc("rollbackchain", "\"blockheight\""));
 
+    std::string error;
     int nRollBackHeight = params[0].get_int();
     bool fOverride = false;
     if (params.size() > 1)
         fOverride = params[1].get_bool();
 
+    error = RollBackChain(nRollBackHeight, fOverride);
+
+    if (error.size() > 0)
+        throw runtime_error(error.c_str());
+
+    return NullUniValue;
+}
+
+std::string ReconsiderMostWorkChain(bool fOverride)
+{
+    // Error message to return;
+    std::string error;
+
+    // Find pindex of most work chain regardless of whether is is valid or not.
     LOCK(cs_main);
-    uint32_t nRollBack = chainActive.Height() - nRollBackHeight;
-    if (nRollBack > nDefaultRollbackLimit && !fOverride)
-        throw runtime_error("You are attempting to rollback the chain by " + std::to_string(nRollBack) +
-                            " blocks, however the limit is " + std::to_string(nDefaultRollbackLimit) +
-                            " blocks. Set "
-                            "the override to true if you want rollback more than the default");
 
-    // Lock block validation threads to make sure no new inbound block announcements
-    // cause any block validation state to change while we're unwinding the chain.
-    LOCK(PV->cs_blockvalidationthread);
+    // Get the set of chaintips
+    std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
+    setTips = GetChainTips();
 
-    while (chainActive.Height() > nRollBackHeight)
+    // Find the longest chaintip regardless if it is currently the active one.
+    CBlockIndex *pMostWork = chainActive.Tip();
+    for (CBlockIndex *pTip : setTips)
     {
-        // save the current tip
-        CBlockIndex *pindex = chainActive.Tip();
+        if (pMostWork->nChainWork < pTip->nChainWork)
+            pMostWork = pTip;
+    }
+    std::set<CBlockIndex *, CompareBlocksByHeight> setTipsToVerify;
+    setTipsToVerify.insert(pMostWork);
 
-        CValidationState state;
-        // Disconnect the tip and by setting the third param (fRollBack) to true we avoid having to resurrect
-        // the transactions from the block back into the mempool, which saves a great deal of time.
-        if (!DisconnectTip(state, Params().GetConsensus(), true))
-            throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
-
-        if (!state.IsValid())
-            throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
-
-        // Invalidate the now previous block tip after it was diconnected so that the chain will not reconnect
-        // if another block arrives.
-        InvalidateBlock(state, Params().GetConsensus(), pindex);
-        if (!state.IsValid())
+    // We need to check if there are duplicate chaintips that have the most work
+    // as could happen during a fork. If there are duplicates then we need to test each tip
+    // to find out which is the correct fork.
+    {
+        // parse though chaintips again to find if there are duplicates
+        for (CBlockIndex *pTip : setTips)
         {
-            throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
+            if (pMostWork->nChainWork == pTip->nChainWork)
+                setTipsToVerify.insert(pTip);
+        }
+    }
+
+    for (CBlockIndex *pTipToVerify : setTipsToVerify)
+    {
+        // if no duplicates then return since there is nothing to do. We are already on the correct chain
+        if (pTipToVerify->nChainWork == chainActive.Tip()->nChainWork)
+        {
+            LOGA("Nothing to do. Already on the correct chain.");
+            return "Nothing to do. Already on the correct chain.";
         }
 
-        uiInterface.NotifyBlockTip(false, chainActive.Tip(), false);
+        // Find where chainActive meets the most work chaintip
+        const CBlockIndex *pFork;
+        pFork = chainActive.FindFork(pTipToVerify);
+
+        // Rollback to the common forkheight so that both chains will be invalidated.
+        error = RollBackChain(pFork->nHeight, fOverride);
+        if (error.size() > 0)
+            return error;
+
+        // If we got here then rollbackchain() was sucessful and we didn't throw an exception.
+        // Now reconsider the new chain.
+        LOGA("reconsider block: %s\n", pTipToVerify->GetBlockHash().ToString().c_str());
+        CValidationState state;
+        ReconsiderBlock(state, pTipToVerify);
+        if (state.IsValid())
+        {
+            ActivateBestChain(state, Params());
+        }
+        if (!state.IsValid())
+        {
+            return "RPC_DATABASE_ERROR: " + state.GetRejectReason();
+        }
+
+        if (pTipToVerify->nChainWork == chainActive.Tip()->nChainWork)
+        {
+            LOGA("Active chain has been successfully moved to a new chaintip.");
+        }
     }
-    return NullUniValue;
+
+    return "";
 }
 
 UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
@@ -1665,44 +1755,15 @@ UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
                             HelpExampleCli("reconsidermostworkchain", "\"true\"") +
                             HelpExampleRpc("reconsidermostworkchain", "\"true\""));
 
-    // Find pindex of most work chain regardless of whether is is valid or not.
-    LOCK(cs_main);
-
-    // Get the set of chaintips
-    std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
-    setTips = GetChainTips();
-
-    // Find the longest chaintip regardless if it is currently the active one.
-    CBlockIndex *pMostWork = chainActive.Tip();
-    for (CBlockIndex *pTip : setTips)
-    {
-        if (pMostWork->nChainWork < pTip->nChainWork)
-            pMostWork = pTip;
-    }
-
-    // If already on the longest chain then return
-    if (pMostWork == chainActive.Tip())
-        throw runtime_error("Nothing to do. Already on the correct chain.");
-
-    // Find where chainActive meets the most work chaintip
-    const CBlockIndex *pFork;
-    pFork = chainActive.FindFork(pMostWork);
-
-    // Rollback to the common forkheight so that both chains will be invalidated.
-    UniValue obj(UniValue::VARR);
-    obj.push_back(pFork->nHeight);
+    std::string error;
+    bool fOverride = false;
     if (params.size() > 0)
-    {
-        // Set the rollbackchain override flag if there was one provided.
-        obj.push_back(params[0]);
-    }
-    rollbackchain(obj, false);
+        fOverride = params[0].get_bool();
 
-    // If we got here then rollbackchain() was sucessful and we didn't throw an exception.
-    // Now reconsider the most work chain.
-    UniValue obj_hash(UniValue::VARR);
-    obj_hash.push_back(pMostWork->GetBlockHash().ToString());
-    reconsiderblock(obj_hash, false);
+    error = ReconsiderMostWorkChain(fOverride);
+
+    if (error.size() > 0)
+        throw runtime_error(error.c_str());
 
     return NullUniValue;
 }

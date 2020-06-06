@@ -427,6 +427,21 @@ void CleanupBlockRevFiles()
     }
 }
 
+static void ReconsiderChainOnStartup()
+{
+    if (!fReindex && !(avoidReconsiderMostWorkChain.Value()))
+    {
+        try
+        {
+            bool fOverride = false;
+            ReconsiderMostWorkChain(fOverride);
+        }
+        catch (...)
+        {
+        }
+    }
+}
+
 void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
 {
     const CChainParams &chainparams = Params();
@@ -510,42 +525,23 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
             return;
     }
 
+    // In case a previous shutdown left the chain in an incorrect state, reconsider
+    // the most work chain.
+    ReconsiderChainOnStartup();
+
     // scan for better chains in the block chain database, that are not yet connected in the active best chain
     uiInterface.InitMessage(_("Activating best chain..."));
     CValidationState state;
     if (!ActivateBestChain(state, chainparams))
     {
-        StartShutdown();
-        return;
+        LOGA("WARNING: ActivateBestChain failed on startup\n");
     }
 
     // Reconsider the most work chain if we're not already synced. This is necessary
     // when switching from an ABC/BCHN client or when a operator failed to upgrade their BU
-    // node before a hardfork.
-    if (!fReindex && !(avoidReconsiderMostWorkChain.Value()))
-    {
-        // Get the set of chaintips
-        std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
-        {
-            LOCK(cs_main);
-            setTips = GetChainTips();
-        }
-
-        // Find out if we're already synced to one of the chaintips. If so then we
-        // can and must skip reconsidermostworkchain().
-        bool fReconsider = false;
-        CBlockIndex *pMostWork = chainActive.Tip();
-        for (CBlockIndex *pTip : setTips)
-        {
-            if (pMostWork->nChainWork < pTip->nChainWork)
-                fReconsider = true;
-        }
-        if (fReconsider)
-        {
-            UniValue obj(UniValue::VARR);
-            reconsidermostworkchain(obj, false);
-        }
-    }
+    // node before a hardfork. This must be done directly after ActivateBestChain() or
+    // a switch from ABC/BCHN to a BU node may not work because some blocks may have been parked.
+    ReconsiderChainOnStartup();
 
     // Initialize the atomic flags used for determining whether we are in IBD or whether the chain
     // is almost synced.
