@@ -297,16 +297,6 @@ bool UniValue::pushKVs(UniValue&& obj)
     return true;
 }
 
-void UniValue::getObjMap(std::map<std::string,UniValue>& kv) const
-{
-    if (typ != VOBJ)
-        return;
-
-    kv.clear();
-    for (size_t i = 0, nKeys = keys.size(); i < nKeys; ++i)
-        kv[keys[i]] = values[i];
-}
-
 bool UniValue::findKey(const std::string& key, size_t& retIdx) const noexcept
 {
     for (size_t i = 0, nKeys = keys.size(); i < nKeys; ++i) {
