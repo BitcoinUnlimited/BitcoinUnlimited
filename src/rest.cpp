@@ -7,6 +7,7 @@
 #include "blockstorage/blockstorage.h"
 #include "chain.h"
 #include "chainparams.h"
+#include "core_io.h"
 #include "httpserver.h"
 #include "main.h"
 #include "primitives/block.h"
@@ -114,15 +115,6 @@ static string AvailableDataFormatsString()
         return formats.substr(0, formats.length() - 2);
 
     return formats;
-}
-
-static bool ParseHashStr(const string &strReq, uint256 &v)
-{
-    if (!IsHex(strReq) || (strReq.size() != 64))
-        return false;
-
-    v.SetHex(strReq);
-    return true;
 }
 
 static bool CheckWarmup(HTTPRequest *req)

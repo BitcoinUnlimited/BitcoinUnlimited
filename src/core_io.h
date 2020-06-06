@@ -22,6 +22,16 @@ extern bool DecodeHexTx(CTransaction &tx, const std::string &strHexTx);
 extern bool DecodeHexBlk(CBlock &, const std::string &strHexBlk);
 extern uint256 ParseHashUV(const UniValue &v, const std::string &strName);
 extern uint256 ParseHashStr(const std::string &, const std::string &strName);
+/**¶
+ * Parse a hex string into 256 bits
+ * @param[in] strHex a hex-formatted, 64-character string
+ * @param[out] result the result of the parsing
+ * @returns true if successful, false if not
+ *
+ * @see ParseHashV for an RPC-oriented version of this
+ */
+bool ParseHashStr(const std::string &strHex, uint256 &v);
+
 extern std::vector<unsigned char> ParseHexUV(const UniValue &v, const std::string &strName);
 
 // core_write.cpp

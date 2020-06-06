@@ -309,23 +309,6 @@ bool UniValue::findKey(const std::string& key, size_t& retIdx) const noexcept
     return false;
 }
 
-bool UniValue::checkObject(const std::map<std::string,UniValue::VType>& t) const noexcept
-{
-    if (typ != VOBJ)
-        return false;
-
-    size_t idx; // initialized if findKey below returns true
-    for (const auto & kv : t) {
-        if (!findKey(kv.first, idx))
-            return false;
-
-        if (values[idx].getType() != kv.second)
-            return false;
-    }
-
-    return true;
-}
-
 const UniValue& UniValue::operator[](const std::string& key) const noexcept
 {
     if (typ != VOBJ)

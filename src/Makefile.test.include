@@ -147,7 +147,6 @@ BITCOIN_TESTS =\
   test/versionbits_tests.cpp \
   test/genversionbits_tests.cpp \
   test/uint256_tests.cpp \
-  test/univalue_tests.cpp \
   test/util_tests.cpp \
   test/utilhttp_tests.cpp \
   test/utilprocess_tests.cpp \

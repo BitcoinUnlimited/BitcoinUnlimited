@@ -318,22 +318,19 @@ BOOST_AUTO_TEST_CASE(univalue_object)
 
     BOOST_CHECK(!obj.exists("nyuknyuknyuk"));
 
-    std::map<std::string, UniValue::VType> objTypes;
-    objTypes["age"] = UniValue::VNUM;
-    objTypes["first"] = UniValue::VSTR;
-    objTypes["last"] = UniValue::VSTR;
-    objTypes["distance"] = UniValue::VNUM;
-    objTypes["time"] = UniValue::VNUM;
-    objTypes["calories"] = UniValue::VNUM;
-    objTypes["temperature"] = UniValue::VNUM;
-    objTypes["moon"] = UniValue::VBOOL;
-    objTypes["spoon"] = UniValue::VBOOL;
-    objTypes["cat1"] = UniValue::VNUM;
-    objTypes["cat2"] = UniValue::VNUM;
-    BOOST_CHECK(obj.checkObject(objTypes));
+    BOOST_CHECK_EQUAL(obj["age"].getType(), UniValue::VNUM);
+    BOOST_CHECK_EQUAL(obj["first"].getType(), UniValue::VSTR);
+    BOOST_CHECK_EQUAL(obj["last"].getType(), UniValue::VSTR);
+    BOOST_CHECK_EQUAL(obj["distance"].getType(), UniValue::VNUM);
+    BOOST_CHECK_EQUAL(obj["time"].getType(), UniValue::VNUM);
+    BOOST_CHECK_EQUAL(obj["calories"].getType(), UniValue::VNUM);
+    BOOST_CHECK_EQUAL(obj["temperature"].getType(), UniValue::VNUM);
+    BOOST_CHECK_EQUAL(obj["moon"].getType(), UniValue::VBOOL);
+    BOOST_CHECK_EQUAL(obj["spoon"].getType(), UniValue::VBOOL);
+    BOOST_CHECK_EQUAL(obj["cat1"].getType(), UniValue::VNUM);
+    BOOST_CHECK_EQUAL(obj["cat2"].getType(), UniValue::VNUM);
 
-    objTypes["cat2"] = UniValue::VSTR;
-    BOOST_CHECK(!obj.checkObject(objTypes));
+    BOOST_CHECK_EQUAL(obj["nyuknyuknyuk"].getType(), UniValue::VNULL);
 
     obj.clear();
     BOOST_CHECK(obj.empty());

@@ -58,7 +58,6 @@ public:
     bool reserve(size_t n);
 
     constexpr bool getBool() const noexcept { return isTrue(); }
-    bool checkObject(const std::map<std::string,UniValue::VType>& memberTypes) const noexcept;
     const UniValue& operator[](const std::string& key) const noexcept;
     const UniValue& operator[](size_t index) const noexcept;
     bool exists(const std::string& key) const noexcept { size_t i; return findKey(key, i); }

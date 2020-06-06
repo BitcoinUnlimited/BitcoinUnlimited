@@ -216,6 +216,15 @@ uint256 ParseHashStr(const std::string &strHex, const std::string &strName)
     return result;
 }
 
+bool ParseHashStr(const string &strReq, uint256 &v)
+{
+    if (!IsHex(strReq) || (strReq.size() != 64))
+        return false;
+
+    v.SetHex(strReq);
+    return true;
+}
+
 vector<unsigned char> ParseHexUV(const UniValue &v, const string &strName)
 {
     string strHex;

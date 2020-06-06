@@ -491,19 +491,29 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
             if (!prevOut.isObject())
                 throw runtime_error("expected prevtxs internal object");
 
-            map<string, UniValue::VType> types = boost::assign::map_list_of("txid", UniValue::VSTR)(
-                "vout", UniValue::VNUM)("scriptPubKey", UniValue::VSTR);
-            if (!prevOut.checkObject(types))
-                throw runtime_error("prevtxs internal object typecheck fail");
+            const UniValue &txidUV = prevOut["txid"];
+            const UniValue &voutUV = prevOut["vout"];
+            const UniValue &scriptPubKeyUV = prevOut["scriptPubKey"];
+            if (txidUV.getType() != UniValue::VSTR || voutUV.getType() != UniValue::VNUM ||
+                scriptPubKeyUV.getType() != UniValue::VSTR)
+            {
+                throw std::runtime_error("prevtxs internal object typecheck fail");
+            }
+
+            uint256 hash;
+            if (!ParseHashStr(txidUV.get_str(), hash))
+            {
+                throw std::runtime_error("txid must be hexadecimal string (not '" + txidUV.get_str() + "')");
+            }
 
             uint256 txid = ParseHashUV(prevOut["txid"], "txid");
 
             int nOut = atoi(prevOut["vout"].getValStr());
             if (nOut < 0)
-                throw runtime_error("vout must be positive");
+                throw std::runtime_error("vout must be positive");
 
             COutPoint out(txid, nOut);
-            std::vector<unsigned char> pkData(ParseHexUV(prevOut["scriptPubKey"], "scriptPubKey"));
+            std::vector<unsigned char> pkData(ParseHexUV(scriptPubKeyUV, "scriptPubKey"));
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
             Coin newcoin;
