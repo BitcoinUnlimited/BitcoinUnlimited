@@ -929,32 +929,31 @@ UniValue createrawtransaction(const UniValue &params, bool fHelp)
     }
 
     std::set<CTxDestination> destinations;
-    std::vector<std::string> addrList = sendTo.getKeys();
-    for (const std::string &name_ : addrList)
+    for (auto &entry : sendTo.getObjectEntries())
     {
-        if (name_ == "data")
+        if (entry.first == "data")
         {
-            std::vector<unsigned char> data = ParseHexV(sendTo[name_].getValStr(), "Data");
+            std::vector<unsigned char> data = ParseHexV(sendTo[entry.first].getValStr(), "Data");
 
             CTxOut out(0, CScript() << OP_RETURN << data);
             rawTx.vout.push_back(out);
         }
         else
         {
-            CTxDestination destination = DecodeDestination(name_);
+            CTxDestination destination = DecodeDestination(entry.first);
             if (!IsValidDestination(destination))
             {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Bitcoin address: ") + name_);
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Bitcoin address: ") + entry.first);
             }
 
             if (!destinations.insert(destination).second)
             {
                 throw JSONRPCError(
-                    RPC_INVALID_PARAMETER, std::string("Invalid parameter, duplicated address: ") + name_);
+                    RPC_INVALID_PARAMETER, std::string("Invalid parameter, duplicated address: ") + entry.first);
             }
 
             CScript scriptPubKey = GetScriptForDestination(destination);
-            CAmount nAmount = AmountFromValue(sendTo[name_]);
+            CAmount nAmount = AmountFromValue(entry.second);
 
             CTxOut out(nAmount, scriptPubKey);
             rawTx.vout.push_back(out);

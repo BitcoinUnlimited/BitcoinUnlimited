@@ -1732,11 +1732,11 @@ UniValue listtransactions(const UniValue &params, bool fHelp)
     if ((nFrom + nCount) > (int)ret.size())
         nCount = ret.size() - nFrom;
 
-    vector<UniValue> arrTmp = ret.getValues();
+    std::vector<UniValue> arrTmp = ret.getArrayValues();
 
-    vector<UniValue>::iterator first = arrTmp.begin();
+    std::vector<UniValue>::iterator first = arrTmp.begin();
     std::advance(first, nFrom);
-    vector<UniValue>::iterator last = arrTmp.begin();
+    std::vector<UniValue>::iterator last = arrTmp.begin();
     std::advance(last, nFrom + nCount);
 
     if (last != arrTmp.end())
@@ -2623,6 +2623,7 @@ UniValue settxfee(const UniValue &params, bool fHelp)
     LOCK(pwalletMain->cs_wallet);
 
     // Amount
+    // TODO check against minRelayTxFee and for negative value
     CAmount nAmount = AmountFromValue(params[0]);
 
     payTxFee = CFeeRate(nAmount, 1000);

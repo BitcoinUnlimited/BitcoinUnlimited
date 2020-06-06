@@ -304,7 +304,7 @@ bool GetLeaderboardFromBitnodes(vector<string> &vIPs)
 
         if (result.isArray())
         {
-            std::vector<UniValue> v = result.getValues();
+            std::vector<UniValue> v = result.getArrayValues();
             for (std::vector<UniValue>::iterator it = v.begin(); it != v.end(); ++it)
             {
                 const UniValue &o = *it;

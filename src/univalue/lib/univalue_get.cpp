@@ -97,10 +97,17 @@ const std::vector<std::string>& UniValue::getKeys() const
     return keys;
 }
 
-const std::vector<UniValue>& UniValue::getValues() const
+const std::vector<UniValue>& UniValue::getObjectValues() const
 {
-    if (!isObject() && !isArray())
-        throw std::runtime_error("JSON value is not an object or array as expected");
+    if (!isObject())
+        throw std::runtime_error("JSON value is not an object as expected");
+    return values;
+}
+
+const std::vector<UniValue>& UniValue::getArrayValues() const
+{
+    if (!isArray())
+        throw std::runtime_error("JSON value is not an array as expected");
     return values;
 }
 
