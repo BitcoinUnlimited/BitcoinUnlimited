@@ -53,8 +53,8 @@ UniValue GetServicesNames(uint64_t services)
         servicesNames.push_back("CASH");
     if (services & NODE_GRAPHENE)
         servicesNames.push_back("GRAPHENE");
-    if (services & NODE_WEAKBLOCKS)
-        servicesNames.push_back("WEAKBLOCKS");
+    if (services & NODE_DELTABLOCKS)
+        servicesNames.push_back("DELTABLOCKS");
     if (services & NODE_CF)
         servicesNames.push_back("CF");
     if (services & NODE_NETWORK_LIMITED)

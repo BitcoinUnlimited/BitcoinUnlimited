@@ -5209,7 +5209,7 @@ bool InvalidateBobtailBlock(CValidationState &state, const Consensus::Params &co
         pindexBestHeader = mostWork;
     }
 
-    uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev);
+    uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev, false);
     return true;
 }
 
@@ -5289,7 +5289,10 @@ bool ContextualCheckBobtailBlock(const CBlock &block,
         nLockTimeCutoff =
             (nLockTimeFlags & LOCKTIME_MEDIAN_TIME_PAST) ? pindexPrev->GetMedianTimePast() : block.GetBlockTime();
 
-    // Check that all transactions are finalized
+    // Check that all transactions are finalized and count the number of
+    // transactions to check for excessive transaction limits.
+    uint64_t nTx = 0;
+    uint64_t nLargestTx = 0;
     for (const auto &tx : block.vtx)
     {
         if (!IsFinalTx(tx, nHeight, nLockTimeCutoff))
@@ -5297,16 +5300,12 @@ bool ContextualCheckBobtailBlock(const CBlock &block,
             return state.DoS(
                 10, error("%s: contains a non-final transaction", __func__), REJECT_INVALID, "bad-txns-nonfinal");
         }
+        if (!ContextualCheckTransaction(tx, state, pindexPrev, Params()))
+            return false;
 
-        // Make sure tx size is equal or higher to 100 bytes if we are on the BCH chain and Nov 15th 2018 activated
-        if (IsNov2018Activated(consensusParams, chainActive.Tip()))
-        {
-            if (tx->GetTxSize() < MIN_TX_SIZE)
-            {
-                return state.DoS(10, error("%s: contains transactions that are too small", __func__), REJECT_INVALID,
-                    "txn-undersize");
-            }
-        }
+        nTx++;
+        if (tx->GetTxSize() > nLargestTx)
+            nLargestTx = tx->GetTxSize();
     }
 
     // Enforce block nVersion=2 rule that the coinbase starts with serialized block height
@@ -5343,31 +5342,8 @@ bool ContextualCheckBobtailBlock(const CBlock &block,
     indexDummy.pprev = pindexPrev;
     indexDummy.nHeight = pindexPrev == nullptr ? 1 : pindexPrev->nHeight + 1;
 
-    const uint32_t flags = GetBlockScriptFlags(&indexDummy, Params().GetConsensus());
-
-
-    uint64_t nSigOps = 0;
-    // Count the number of transactions in case the CheckExcessive function wants to use this as criteria
-    uint64_t nTx = 0;
-    uint64_t nLargestTx = 0;
-
-    for (const auto &tx : block.vtx)
-    {
-        nTx++;
-
-        nSigOps += GetLegacySigOpCount(tx, flags);
-        if (tx->GetTxSize() > nLargestTx)
-            nLargestTx = tx->GetTxSize();
-    }
-
-    // BU only enforce sigops during block generation not acceptance
-    if (fConservative && (nSigOps > BLOCKSTREAM_CORE_MAX_BLOCK_SIGOPS))
-        return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"), REJECT_INVALID, "bad-blk-sigops", true);
-
-    // BU: Check whether this block exceeds what we want to relay.
-    block.fExcessive = CheckExcessive(block, block.GetBlockSize(), nSigOps, nTx, nLargestTx);
-
-
+    // Check whether this block exceeds what we want to relay.
+    block.fExcessive = CheckExcessive(block, block.GetBlockSize(), nTx, nLargestTx);
     return true;
 }
 
@@ -5657,10 +5633,15 @@ uint32_t GetBobtailBlockScriptFlags(const CBlockIndex *pindex, const Consensus::
 
     // This will check if current blocki is the first boock of the fork,
     // hence we add SCRIPT_ENABLE_SCHNORR_MULTISIG to the set of supported flags.
-    if (IsNov2019Enabled(consensusparams, pindex->pprev))
+    if (IsNov2019Activated(consensusparams, pindex->pprev))
     {
         flags |= SCRIPT_ENABLE_SCHNORR_MULTISIG;
         flags |= SCRIPT_VERIFY_MINIMALDATA;
+    }
+
+    if (IsMay2020Enabled(consensusparams, pindex->pprev))
+    {
+        flags |= SCRIPT_ENABLE_OP_REVERSEBYTES;
     }
 
     return flags;
@@ -6062,7 +6043,7 @@ bool ConnectBobtailBlockDependencyOrdering(const CBlock &block,
             {
                 blockundo.vtxundo.push_back(CTxUndo());
             }
-            UpdateCoins(tx, state, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
+            UpdateCoins(tx, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
             vPos.push_back(std::make_pair(tx.GetHash(), pos));
             pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
 
@@ -6304,7 +6285,7 @@ bool ConnectBobtailBlockCanonicalOrdering(const CBlock &block,
                 blockundo.vtxundo.push_back(CTxUndo());
             }
 
-            SpendCoins(tx, state, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
+            SpendCoins(tx, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
 
             vPos.push_back(std::make_pair(tx.GetHash(), pos));
             pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
@@ -7142,7 +7123,7 @@ bool BobtailActivateBestChainStep(CValidationState &state,
                 static std::atomic<int64_t> nLastUpdate = {GetTime()};
                 if (nLastUpdate.load() < GetTime() - 5)
                 {
-                    uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindexNewTip);
+                    uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindexNewTip, false);
                     pindexLastNotify = pindexNewTip;
                     nLastUpdate.store(GetTime());
                 }
@@ -7167,7 +7148,7 @@ bool BobtailActivateBestChainStep(CValidationState &state,
 
         // Notify the UI with the new block tip information.
         if (pindexMostWork->nHeight >= nHeight && pindexNewTip != nullptr && pindexLastNotify != pindexNewTip)
-            uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindexNewTip);
+            uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindexNewTip, false);
 
         if (fContinue)
         {

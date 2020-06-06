@@ -1,6 +1,6 @@
 #include "test/test_bitcoin.h"
-#include "test/test_random.h"
 #include "persistent_map.h"
+#include "random.h"
 #include <boost/test/unit_test.hpp>
 #include <map>
 
@@ -108,8 +108,8 @@ BOOST_AUTO_TEST_CASE(compare_std_map)
     pmii pm500, pm1000;
 
     for (size_t i=0; i < 500; i++) {
-        int k=insecure_rand() % 1000;
-        int v=insecure_rand() % 1000;
+        int k=FastRandomContext(true).rand32() % 1000;
+        int v=FastRandomContext(true).rand32() % 1000;
         map500[k]=v;
         pm500 = pm500.insert(k, v);
     }
@@ -118,8 +118,8 @@ BOOST_AUTO_TEST_CASE(compare_std_map)
     map1000 = map500;
     pm1000 = pm500;
     for (size_t i=0; i < 500; i++) {
-        int k=insecure_rand() % 1000;
-        int v=insecure_rand() % 1000;
+        int k=FastRandomContext(true).rand32() % 1000;
+        int v=FastRandomContext(true).rand32() % 1000;
         map1000[k]=v;
         pm1000 = pm1000.insert(k, v);
     }

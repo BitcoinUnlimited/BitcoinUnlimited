@@ -21,7 +21,7 @@
 std::shared_ptr<CBlock> PrepareBlock(const CScript &coinbase_scriptPubKey, const CChainParams &chainparams)
 {
     std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
-    auto block = std::make_shared<CBlock>(BlockAssembler(chainparams).CreateNewBlock(coinbase_scriptPubKey)->block);
+    auto block = std::make_shared<CBlock>(BlockAssembler(chainparams).CreateNewBlock(coinbase_scriptPubKey)->block->GetBlockHeader());
     block->nTime = chainActive.Tip()->GetMedianTimePast() + 1;
     block->hashMerkleRoot = BlockMerkleRoot(*block);
 

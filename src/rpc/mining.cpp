@@ -457,7 +457,7 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
     const unsigned int nTransactionsUpdatedLast)
 {
     bool may2020Enabled = IsMay2020Enabled(Params().GetConsensus(), pindexPrev);
-    CBlock *pblock = &pblocktemplate->block; // pointer for convenience
+    CBlock *pblock = &*(pblocktemplate->block); // pointer for convenience
     UniValue aCaps(UniValue::VARR);
     aCaps.push_back("proposal");
 
