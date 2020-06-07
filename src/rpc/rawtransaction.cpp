@@ -1,6 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2020 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -898,9 +899,17 @@ UniValue createrawtransaction(const UniValue &params, bool fHelp)
 
         uint256 txid = ParseHashO(o, "txid");
 
-        const UniValue &vout_v = find_value(o, "vout");
-        if (!vout_v.isNum())
+        const UniValue &vout_v = o["vout"];
+        if (vout_v.isNull())
+        {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, missing vout key");
+        }
+
+        if (!vout_v.isNum())
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, vout must be a number");
+        }
+
         int nOutput = vout_v.get_int();
         if (nOutput < 0)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, vout must be positive");
@@ -908,8 +917,8 @@ UniValue createrawtransaction(const UniValue &params, bool fHelp)
         uint32_t nSequence =
             (rawTx.nLockTime ? std::numeric_limits<uint32_t>::max() - 1 : std::numeric_limits<uint32_t>::max());
 
-        // set the sequence number if passed in the parameters object
-        const UniValue &sequenceObj = find_value(o, "sequence");
+        // Set the sequence number if passed in the parameters object.
+        const UniValue &sequenceObj = o["sequence"];
         if (sequenceObj.isNum())
         {
             int64_t seqNr64 = sequenceObj.get_int64();
@@ -1067,8 +1076,7 @@ UniValue decodescript(const UniValue &params, bool fHelp)
     }
     ScriptPubKeyToJSON(script, r, false);
 
-    UniValue type;
-    type = find_value(r, "type");
+    const UniValue &type = r["type"];
 
     if (type.isStr() && type.get_str() != "scripthash")
     {
@@ -1249,9 +1257,11 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
 
             uint256 txid = ParseHashO(prevOut, "txid");
 
-            int nOut = find_value(prevOut, "vout").get_int();
+            int nOut = prevOut["vout"].get_int();
             if (nOut < 0)
+            {
                 throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "vout must be positive");
+            }
 
             COutPoint out(txid, nOut);
             std::vector<unsigned char> pkData(ParseHexO(prevOut, "scriptPubKey"));
@@ -1297,10 +1307,10 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             {
                 RPCTypeCheckObj(prevOut, boost::assign::map_list_of("txid", UniValue::VSTR)("vout", UniValue::VNUM)(
                                              "scriptPubKey", UniValue::VSTR)("redeemScript", UniValue::VSTR));
-                UniValue v = find_value(prevOut, "redeemScript");
+                UniValue v = prevOut["redeemScript"];
                 if (!v.isNull())
                 {
-                    vector<unsigned char> rsData(ParseHexV(v, "redeemScript"));
+                    std::vector<unsigned char> rsData(ParseHexV(v, "redeemScript"));
                     CScript redeemScript(rsData.begin(), rsData.end());
                     tempKeystore.AddCScript(redeemScript);
                 }

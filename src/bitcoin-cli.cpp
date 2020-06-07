@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2020 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -73,8 +74,8 @@ int CommandLineRPC(int argc, char *argv[])
                 const UniValue reply = CallRPC(strMethod, params);
 
                 // Parse reply
-                const UniValue &result = find_value(reply, "result");
-                const UniValue &error = find_value(reply, "error");
+                const UniValue &result = reply["result"];
+                const UniValue &error = reply["error"];
 
                 if (!error.isNull())
                 {
@@ -86,8 +87,8 @@ int CommandLineRPC(int argc, char *argv[])
                     nRet = abs(code);
                     if (error.isObject())
                     {
-                        UniValue errCode = find_value(error, "code");
-                        UniValue errMsg = find_value(error, "message");
+                        const UniValue &errCode = error["code"];
+                        const UniValue &errMsg = error["message"];
                         strPrint = errCode.isNull() ? "" : "error code: " + errCode.getValStr() + "\n";
 
                         if (errMsg.isStr())

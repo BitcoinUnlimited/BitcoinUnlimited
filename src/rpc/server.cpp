@@ -260,7 +260,7 @@ void RPCTypeCheckObj(const UniValue &o,
 {
     for (const auto &t : typesExpected)
     {
-        const UniValue &v = find_value(o, t.first);
+        const UniValue &v = o[t.first];
         if (!fAllowNull && v.isNull())
             throw JSONRPCError(RPC_TYPE_ERROR, strprintf("Missing %s", t.first));
 
@@ -314,13 +314,13 @@ uint256 ParseHashV(const UniValue &v, string strName)
     if (!IsHex(strHex)) // Note: IsHex("") is false
         throw JSONRPCError(RPC_INVALID_PARAMETER, strName + " must be hexadecimal string (not '" + strHex + "')");
     if (64 != strHex.length())
-        throw JSONRPCError(
-            RPC_INVALID_PARAMETER, strprintf("%s must be of length %d (not %d)", strName, 64, strHex.length()));
-    uint256 result;
-    result.SetHex(strHex);
-    return result;
+        throw JSONRPCError(RPC_INVALID_PARAMETER,
+            strprintf("%s must be of length %d (not %d, for %s)", strName, 64, strHex.length(), strHex));
+    if (!IsHex(strHex))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, strName + " must be hexadecimal string (not '" + strHex + "')");
+    return uint256S(strHex);
 }
-uint256 ParseHashO(const UniValue &o, string strKey) { return ParseHashV(find_value(o, strKey), strKey); }
+uint256 ParseHashO(const UniValue &o, std::string strKey) { return ParseHashV(o[strKey], strKey); }
 vector<unsigned char> ParseHexV(const UniValue &v, string strName)
 {
     string strHex;
@@ -330,7 +330,7 @@ vector<unsigned char> ParseHexV(const UniValue &v, string strName)
         throw JSONRPCError(RPC_INVALID_PARAMETER, strName + " must be hexadecimal string (not '" + strHex + "')");
     return ParseHex(strHex);
 }
-vector<unsigned char> ParseHexO(const UniValue &o, string strKey) { return ParseHexV(find_value(o, strKey), strKey); }
+vector<uint8_t> ParseHexO(const UniValue &o, string strKey) { return ParseHexV(o[strKey], strKey); }
 /**
  * Note: This interface may still be subject to change.
  */
@@ -525,10 +525,10 @@ void JSONRequest::parse(const UniValue &valRequest)
     const UniValue &request = valRequest.get_obj();
 
     // Parse id now so errors from here on will have the id
-    id = find_value(request, "id");
+    id = request["id"];
 
     // Parse method
-    UniValue valMethod = find_value(request, "method");
+    UniValue valMethod = request["method"];
     if (valMethod.isNull())
         throw JSONRPCError(RPC_INVALID_REQUEST, "Missing method");
     if (!valMethod.isStr())
@@ -538,7 +538,7 @@ void JSONRequest::parse(const UniValue &valRequest)
         LOG(RPC, "ThreadRPCServer method=%s\n", SanitizeString(strMethod));
 
     // Parse params
-    UniValue valParams = find_value(request, "params");
+    UniValue valParams = request["params"];
     if (valParams.isArray())
         params = valParams.get_array();
     else if (valParams.isNull())

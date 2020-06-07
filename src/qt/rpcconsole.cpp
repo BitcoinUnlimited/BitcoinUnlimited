@@ -1,5 +1,6 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2020 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -250,8 +251,8 @@ void RPCExecutor::request(const QString &command)
     {
         try // Nice formatting for standard-format error
         {
-            int code = find_value(objError, "code").get_int();
-            std::string message = find_value(objError, "message").get_str();
+            int code = objError["code"].get_int();
+            std::string message = objError["message"].get_str();
             Q_EMIT reply(
                 RPCConsole::CMD_ERROR, QString::fromStdString(message) + " (code " + QString::number(code) + ")");
         }

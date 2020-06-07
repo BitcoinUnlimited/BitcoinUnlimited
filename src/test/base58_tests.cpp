@@ -132,15 +132,15 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_parse)
         std::string exp_base58string = test[0].get_str();
         std::vector<unsigned char> exp_payload = ParseHex(test[1].get_str());
         const UniValue &metadata = test[2].get_obj();
-        bool isPrivkey = find_value(metadata, "isPrivkey").get_bool();
-        bool isTestnet = find_value(metadata, "isTestnet").get_bool();
+        bool isPrivkey = metadata["isPrivkey"].get_bool();
+        bool isTestnet = metadata["isTestnet"].get_bool();
         if (isTestnet)
             SelectParams(CBaseChainParams::TESTNET);
         else
             SelectParams(CBaseChainParams::MAIN);
         if (isPrivkey)
         {
-            bool isCompressed = find_value(metadata, "isCompressed").get_bool();
+            bool isCompressed = metadata["isCompressed"].get_bool();
             // Must be valid private key
             // Note: CBitcoinSecret::SetString tests isValid, whereas CBitcoinAddress does not!
             BOOST_CHECK_MESSAGE(secret.SetString(exp_base58string), "!SetString:" + strTest);
@@ -158,7 +158,7 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_parse)
         else
         {
             // "script" or "pubkey"
-            std::string exp_addrType = find_value(metadata, "addrType").get_str();
+            std::string exp_addrType = metadata["addrType"].get_str();
             // Must be valid public key
             destination = DecodeLegacyAddr(exp_base58string, Params());
             BOOST_CHECK_MESSAGE(IsValidDestination(destination), "!IsValid:" + strTest);
@@ -193,15 +193,15 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_gen)
         std::string exp_base58string = test[0].get_str();
         std::vector<unsigned char> exp_payload = ParseHex(test[1].get_str());
         const UniValue &metadata = test[2].get_obj();
-        bool isPrivkey = find_value(metadata, "isPrivkey").get_bool();
-        bool isTestnet = find_value(metadata, "isTestnet").get_bool();
+        bool isPrivkey = metadata["isPrivkey"].get_bool();
+        bool isTestnet = metadata["isTestnet"].get_bool();
         if (isTestnet)
             SelectParams(CBaseChainParams::TESTNET);
         else
             SelectParams(CBaseChainParams::MAIN);
         if (isPrivkey)
         {
-            bool isCompressed = find_value(metadata, "isCompressed").get_bool();
+            bool isCompressed = metadata["isCompressed"].get_bool();
             CKey key;
             key.Set(exp_payload.begin(), exp_payload.end(), isCompressed);
             assert(key.IsValid());
@@ -211,7 +211,7 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_gen)
         }
         else
         {
-            std::string exp_addrType = find_value(metadata, "addrType").get_str();
+            std::string exp_addrType = metadata["addrType"].get_str();
             CTxDestination dest;
             if (exp_addrType == "pubkey")
             {

@@ -296,7 +296,7 @@ bool GetLeaderboardFromBitnodes(vector<string> &vIPs)
         }
 
         // Parse Leaderboard
-        const UniValue &result = find_value(reply, "results");
+        const UniValue &result = reply["results"];
         if (result.isNull() || !result.isArray())
         {
             throw runtime_error("Bitnodes: server returned invalid results");
@@ -308,7 +308,7 @@ bool GetLeaderboardFromBitnodes(vector<string> &vIPs)
             for (std::vector<UniValue>::iterator it = v.begin(); it != v.end(); ++it)
             {
                 const UniValue &o = *it;
-                const UniValue &_result = find_value(o, "node");
+                const UniValue &_result = o["node"];
                 if (_result.isStr())
                 {
                     string s = _result.get_str();

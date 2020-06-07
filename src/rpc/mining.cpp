@@ -570,7 +570,7 @@ UniValue mkblocktemplate(const UniValue &params,
     LOCK(cs_main);
 
     std::string strMode = "template";
-    UniValue lpval = NullUniValue;
+    const UniValue *lpval = &NullUniValue;
     std::set<std::string> setClientRules;
     int64_t nMaxVersionPreVB = -1;
     CScript coinbaseScript(coinbaseScriptIn); // non-const copy (we may modify this below)
@@ -578,7 +578,7 @@ UniValue mkblocktemplate(const UniValue &params,
     if (params.size() > 0)
     {
         const UniValue &oparam = params[0].get_obj();
-        const UniValue &modeval = find_value(oparam, "mode");
+        const UniValue &modeval = oparam["mode"];
         if (modeval.isStr())
             strMode = modeval.get_str();
         else if (modeval.isNull())
@@ -587,11 +587,11 @@ UniValue mkblocktemplate(const UniValue &params,
         }
         else
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mode");
-        lpval = find_value(oparam, "longpollid");
+        lpval = &oparam["longpollid"];
 
         if (strMode == "proposal")
         {
-            const UniValue &dataval = find_value(oparam, "data");
+            const UniValue &dataval = oparam["data"];
             if (!dataval.isStr())
                 throw JSONRPCError(RPC_TYPE_ERROR, "Missing data String key for proposal");
 
@@ -622,7 +622,7 @@ UniValue mkblocktemplate(const UniValue &params,
             return BIP22ValidationResult(state);
         }
 
-        const UniValue &aClientRules = find_value(oparam, "rules");
+        const UniValue &aClientRules = oparam["rules"];
         if (aClientRules.isArray())
         {
             for (unsigned int i = 0; i < aClientRules.size(); ++i)
@@ -634,7 +634,7 @@ UniValue mkblocktemplate(const UniValue &params,
         else
         {
             // NOTE: It is important that this NOT be read if versionbits is supported
-            const UniValue &uvMaxVersion = find_value(oparam, "maxversion");
+            const UniValue &uvMaxVersion = oparam["maxversion"];
             if (uvMaxVersion.isNum())
             {
                 nMaxVersionPreVB = uvMaxVersion.get_int64();
@@ -656,17 +656,17 @@ UniValue mkblocktemplate(const UniValue &params,
 
     static unsigned int nTransactionsUpdatedLast;
 
-    if (!lpval.isNull())
+    if (!lpval->isNull())
     {
         // Wait to respond until either the best block changes, OR a minute has passed and there are more transactions
         uint256 hashWatchedChain;
         boost::system_time checktxtime;
         unsigned int nTransactionsUpdatedLastLP;
 
-        if (lpval.isStr())
+        if (lpval->isStr())
         {
             // Format: <hashBestChain><nTransactionsUpdatedLast>
-            std::string lpstr = lpval.get_str();
+            const std::string &lpstr = lpval->get_str();
 
             hashWatchedChain.SetHex(lpstr.substr(0, 64));
             nTransactionsUpdatedLastLP = atoi64(lpstr.substr(64));
