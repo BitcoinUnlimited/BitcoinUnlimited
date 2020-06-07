@@ -43,7 +43,7 @@ public:
     bool setInt(uint64_t val);
     bool setInt(int64_t val);
     bool setInt(unsigned int val);
-    inline bool setInt(int val_) { return setInt(int64_t(val_)); }
+    bool setInt(int val_) { return setInt(int64_t(val_)); }
     bool setFloat(double val);
     bool setStr(const std::string& val);
     bool setStr(std::string&& val) noexcept;
@@ -53,8 +53,8 @@ public:
     constexpr enum VType getType() const noexcept { return typ; }
     constexpr const std::string& getValStr() const noexcept { return val; }
 
-    inline bool empty() const noexcept { return values.empty(); }
-    inline size_t size() const noexcept { return values.size(); }
+    bool empty() const noexcept { return values.empty(); }
+    size_t size() const noexcept { return values.size(); }
     bool reserve(size_t n);
 
     constexpr bool getBool() const noexcept { return isTrue(); }
@@ -93,8 +93,8 @@ public:
                       unsigned int indentLevel = 0) const;
 
     bool read(const char *raw, size_t len);
-    inline bool read(const char *raw) { return read(raw, strlen(raw)); }
-    inline bool read(const std::string& rawStr) { return read(rawStr.data(), rawStr.size()); }
+    bool read(const char *raw) { return read(raw, strlen(raw)); }
+    bool read(const std::string& rawStr) { return read(rawStr.data(), rawStr.size()); }
 
 private:
     UniValue::VType typ;

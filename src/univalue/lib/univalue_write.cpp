@@ -11,11 +11,11 @@
 // Opaque type used for writing. This can be further optimized later.
 struct UniValue::Stream {
     std::string & str; // this is a reference for RVO to always work in UniValue::write() below
-    inline void put(char c) { str.push_back(c); }
-    inline void put(char c, size_t nFill) { str.append(nFill, c); }
-    inline void write(const char *s, size_t len) { str.append(s, len); }
-    inline Stream & operator<<(const char *s) { str.append(s); return *this; }
-    inline Stream & operator<<(const std::string &s) { str.append(s); return *this; }
+    void put(char c) { str.push_back(c); }
+    void put(char c, size_t nFill) { str.append(nFill, c); }
+    void write(const char *s, size_t len) { str.append(s, len); }
+    Stream & operator<<(const char *s) { str.append(s); return *this; }
+    Stream & operator<<(const std::string &s) { str.append(s); return *this; }
 };
 
 /* static */
