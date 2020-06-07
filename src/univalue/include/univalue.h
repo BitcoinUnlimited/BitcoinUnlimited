@@ -116,7 +116,7 @@ private:
     void writeArray(Stream & stream, unsigned int prettyIndent, unsigned int indentLevel) const;
     void writeObject(Stream & stream, unsigned int prettyIndent, unsigned int indentLevel) const;
     static void jsonEscape(Stream & stream, const std::string & inString);
-    static void indentStr(Stream & stream, unsigned int prettyIndent, unsigned int indentLevel);
+    static inline void indentStr(Stream & stream, unsigned int prettyIndent, unsigned int indentLevel);
 
 public:
     // Strict type-specific getters, these throw std::runtime_error if the
