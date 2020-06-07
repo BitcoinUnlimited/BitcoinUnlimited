@@ -4,13 +4,13 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "txadmission.h"
+#include "DoubleSpendProof.h"
+#include "DoubleSpendProofStorage.h"
 #include "blockstorage/blockstorage.h"
 #include "connmgr.h"
 #include "consensus/tx_verify.h"
 #include "core_io.h"
 #include "dosman.h"
-#include "DoubleSpendProof.h"
-#include "DoubleSpendProofStorage.h"
 #include "fastfilter.h"
 #include "init.h"
 #include "main.h"
@@ -34,26 +34,29 @@
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/thread/thread.hpp>
 
-namespace {
-
+namespace
+{
 void broadcastDspInv(const CTransactionRef &dspTx, const uint256 &hash)
 {
     // send INV to all peers
     CInv inv(MSG_DOUBLESPENDPROOF, hash);
     LOCK(cs_vNodes);
-    for (CNode* pnode : vNodes) {
-        if(!pnode->fRelayTxes)
+    for (CNode *pnode : vNodes)
+    {
+        if (!pnode->fRelayTxes)
             continue;
         LOCK(pnode->cs_filter);
-        if (pnode->pfilter) {
+        if (pnode->pfilter)
+        {
             // For nodes that we sent this Tx before, send a proof.
             if (pnode->pfilter->IsRelevantAndUpdate(dspTx))
                 pnode->PushInventory(inv);
-        } else {
+        }
+        else
+        {
             pnode->PushInventory(inv);
         }
     }
-
 }
 }
 
@@ -233,8 +236,8 @@ unsigned int TxAlreadyHave(const CInv &inv)
         return 0;
     }
     case MSG_DOUBLESPENDPROOF:
-        return mempool.doubleSpendProofStorage()->exists(inv.hash)
-                || mempool.doubleSpendProofStorage()->isRecentlyRejectedProof(inv.hash);
+        return mempool.doubleSpendProofStorage()->exists(inv.hash) ||
+               mempool.doubleSpendProofStorage()->isRecentlyRejectedProof(inv.hash);
     }
     DbgAssert(0, return false); // this fn should only be called if CInv is a tx
 }
@@ -333,8 +336,7 @@ void CommitTxToMempool()
                 auto rc = dsp.validate();
 
                 // it can't be missing utxo or transaction, assert we are internally consistent.
-                assert(rc == DoubleSpendProof::Valid
-                       || rc == DoubleSpendProof::Invalid);
+                assert(rc == DoubleSpendProof::Valid || rc == DoubleSpendProof::Invalid);
 
                 if (rc == DoubleSpendProof::Valid)
                 {
@@ -365,24 +367,23 @@ void CommitTxToMempool()
             requester.Received(CInv(MSG_TX, data.hash), nullptr);
         }
     }
-#ifdef ENABLE_WALLET
     for (auto &it : *txCommitQFinal)
     {
         CTxCommitData &data = it.second;
+#ifdef ENABLE_WALLET
         SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
-    }
 #endif
+        // TODO:  this is probably in the wrong place...we should be broadcasting invs
+        //        for ds's when we discover them not here at the end of txadmission.
+        if (data.entry.dsproof != -1)
+        {
+            auto dsp = mempool.doubleSpendProofStorage()->proof(data.entry.dsproof);
+            if (!dsp.isEmpty())
+                broadcastDspInv(data.entry.GetSharedTx(), dsp.createHash());
+        }
+    }
     txCommitQFinal->clear();
     delete txCommitQFinal;
-
-    // TODO:  this is probably in the wrong place...we should be broadcasting invs
-    //        for ds's when we discover them not here at the end of txadmission.
-    if (data.entry.dsproof != -1)
-    {
-        auto dsp = mempool.doubleSpendProofStorage()->proof(data.entry.dsproof);
-        if (!dsp.isEmpty())
-            broadcastDspInv(data.entry.GetSharedTx(), dsp.createHash());
-    }
 
     std::map<uint256, CTxInputData> mapWasDeferred;
     {
@@ -1373,9 +1374,11 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // check each input for a double-spend.
         WRITELOCK(mempool.cs_txmempool);
         std::list<std::pair<int, int> > rescuedOrphans; // <proofId,nodeId>
-        for (const CTxIn &txin : entry.GetTx().vin) {
+        for (const CTxIn &txin : entry.GetTx().vin)
+        {
             auto orphans = mempool.doubleSpendProofStorage()->findOrphans(txin.prevout);
-            if (!orphans.empty()) {
+            if (!orphans.empty())
+            {
                 for (auto o : orphans)
                     rescuedOrphans.push_back(o);
                 // if we find the DSP here, AS AN ORPHAN, then nothing has entered the mempool yet
@@ -1384,19 +1387,25 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
 
             auto oldTx = mempool.mapNextTx.find(txin.prevout);
-            if (oldTx != mempool.mapNextTx.end()) { // double spend detected!
+            if (oldTx != mempool.mapNextTx.end())
+            { // double spend detected!
                 auto iter = mempool.mapTx.find(oldTx->second.ptx->GetHash());
                 assert(mempool.mapTx.end() != iter);
-                if (iter->dsproof == -1) { // no DS proof exists, lets make one.
-                    try {
+                if (iter->dsproof == -1)
+                { // no DS proof exists, lets make one.
+                    try
+                    {
                         auto item = *iter;
                         const auto dsp = DoubleSpendProof::create(*oldTx->second.ptx, entry.GetTx());
                         item.dsproof = mempool.doubleSpendProofStorage()->add(dsp);
                         LOG(DSPROOF, "Double spend found, creating double spend proof %d\n", item.dsproof);
                         mempool.mapTx.replace(iter, item);
 
-                        broadcastDspInv(mempool._get(oldTx->second.ptx->GetHash()), dsp.createHash()); // send INV to all peers
-                    } catch (const std::exception &e) {
+                        // send INV to all peers
+                        broadcastDspInv(mempool._get(oldTx->second.ptx->GetHash()), dsp.createHash());
+                    }
+                    catch (const std::exception &e)
+                    {
                         LOG(DSPROOF, "Double spend creation failed: %s\n", e.what());
                     }
                 }
