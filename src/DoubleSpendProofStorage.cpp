@@ -2,29 +2,23 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "DoubleSpendProofStorage.h"
-#include <utiltime.h>
-#include <primitives/transaction.h>
+#include "dosman.h"
 #include "hashwrapper.h"
 #include "util.h"
-#include "dosman.h"
+#include <primitives/transaction.h>
+#include <utiltime.h>
 
 #define SECONDS_TO_KEEP_ORPHANS 90
 
 extern boost::asio::io_service stat_io_service;
 
-DoubleSpendProofStorage::DoubleSpendProofStorage()
-    : m_recentRejects(120000, 0.000001),
-    m_timer(stat_io_service)
+DoubleSpendProofStorage::DoubleSpendProofStorage() : m_recentRejects(120000, 0.000001), m_timer(stat_io_service)
 {
     m_timer.expires_from_now(boost::posix_time::minutes(2));
     m_timer.async_wait(std::bind(&DoubleSpendProofStorage::periodicCleanup, this, std::placeholders::_1));
 }
 
-DoubleSpendProofStorage::~DoubleSpendProofStorage()
-{
-    m_timer.cancel();
-}
-
+DoubleSpendProofStorage::~DoubleSpendProofStorage() { m_timer.cancel(); }
 DoubleSpendProof DoubleSpendProofStorage::proof(int proof) const
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
@@ -44,7 +38,8 @@ int DoubleSpendProofStorage::add(const DoubleSpendProof &proof)
         return lookupIter->second;
 
     auto iter = m_proofs.find(m_nextId);
-    while (iter != m_proofs.end()) {
+    while (iter != m_proofs.end())
+    {
         if (++m_nextId < 0)
             m_nextId = 1;
         iter = m_proofs.find(m_nextId);
@@ -67,23 +62,26 @@ void DoubleSpendProofStorage::addOrphan(const DoubleSpendProof &proof, int peerI
     m_prevTxIdLookupTable[proof.prevTxId().GetCheapHash()].push_back(id);
 }
 
-std::list<std::pair<int, int>> DoubleSpendProofStorage::findOrphans(const COutPoint &prevOut)
+std::list<std::pair<int, int> > DoubleSpendProofStorage::findOrphans(const COutPoint &prevOut)
 {
-    std::list<std::pair<int, int>> answer;
+    std::list<std::pair<int, int> > answer;
     std::lock_guard<std::recursive_mutex> lock(m_lock);
     auto iter = m_prevTxIdLookupTable.find(prevOut.hash.GetCheapHash());
     if (iter == m_prevTxIdLookupTable.end())
         return answer;
 
     std::deque<int> &q = iter->second;
-    for (auto proofId = q.begin(); proofId != q.end(); ++proofId) {
+    for (auto proofId = q.begin(); proofId != q.end(); ++proofId)
+    {
         auto proofIter = m_proofs.find(*proofId);
-        assert (proofIter != m_proofs.end());
+        assert(proofIter != m_proofs.end());
         if (proofIter->second.prevOutIndex() != int(prevOut.n))
             continue;
-        if (proofIter->second.prevTxId() == prevOut.hash) {
+        if (proofIter->second.prevTxId() == prevOut.hash)
+        {
             auto orphanIter = m_orphans.find(*proofId);
-            if (orphanIter != m_orphans.end()) {
+            if (orphanIter != m_orphans.end())
+            {
                 answer.push_back(std::make_pair(*proofId, orphanIter->second.first));
             }
         }
@@ -95,13 +93,17 @@ void DoubleSpendProofStorage::claimOrphan(int proofId)
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
     auto orphan = m_orphans.find(proofId);
-    if (orphan != m_orphans.end()) {
+    if (orphan != m_orphans.end())
+    {
         m_orphans.erase(orphan);
 
-        for (auto iter = m_prevTxIdLookupTable.begin(); iter != m_prevTxIdLookupTable.end(); ++iter) {
+        for (auto iter = m_prevTxIdLookupTable.begin(); iter != m_prevTxIdLookupTable.end(); ++iter)
+        {
             auto &list = iter->second;
-            for (auto i = list.begin(); i != list.end(); ++i) {
-                if (*i == proofId) {
+            for (auto i = list.begin(); i != list.end(); ++i)
+            {
+                if (*i == proofId)
+                {
                     list.erase(i);
                     if (list.size() == 0)
                         m_prevTxIdLookupTable.erase(iter);
@@ -120,18 +122,24 @@ void DoubleSpendProofStorage::remove(int proof)
         return;
 
     auto orphan = m_orphans.find(iter->first);
-    if (orphan != m_orphans.end()) {
+    if (orphan != m_orphans.end())
+    {
         m_orphans.erase(orphan);
         auto orphanLookup = m_prevTxIdLookupTable.find(iter->second.prevTxId().GetCheapHash());
-        if (orphanLookup != m_prevTxIdLookupTable.end()) {
+        if (orphanLookup != m_prevTxIdLookupTable.end())
+        {
             std::deque<int> &queue = orphanLookup->second;
-            if (queue.size() == 1) {
+            if (queue.size() == 1)
+            {
                 assert(queue.front() == proof);
                 m_prevTxIdLookupTable.erase(orphanLookup);
             }
-            else {
-                for (auto i = queue.begin(); i != queue.end(); ++i) {
-                    if (*i == proof) {
+            else
+            {
+                for (auto i = queue.begin(); i != queue.end(); ++i)
+                {
+                    if (*i == proof)
+                    {
                         queue.erase(i);
                         break;
                     }
@@ -169,8 +177,10 @@ void DoubleSpendProofStorage::periodicCleanup(const boost::system::error_code &e
     std::lock_guard<std::recursive_mutex> lock(m_lock);
     auto expire = GetTime() - SECONDS_TO_KEEP_ORPHANS;
     auto iter = m_orphans.begin();
-    while (iter != m_orphans.end()) {
-        if (iter->second.second <= expire) {
+    while (iter != m_orphans.end())
+    {
+        if (iter->second.second <= expire)
+        {
             const int peerId = iter->second.first;
             const int proofId = iter->first;
             iter = m_orphans.erase(iter);
@@ -178,7 +188,8 @@ void DoubleSpendProofStorage::periodicCleanup(const boost::system::error_code &e
 
             dosMan.Misbehaving(peerId, 1);
         }
-        else {
+        else
+        {
             ++iter;
         }
     }

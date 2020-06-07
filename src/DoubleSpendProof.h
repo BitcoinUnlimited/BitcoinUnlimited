@@ -4,9 +4,9 @@
 #ifndef DOUBLESPENDPROOF_H
 #define DOUBLESPENDPROOF_H
 
-#include <uint256.h>
 #include "serialize.h"
 #include <deque>
+#include <uint256.h>
 
 class CTxMemPool;
 class CTransaction;
@@ -20,7 +20,8 @@ public:
 
     bool isEmpty() const;
 
-    enum Validity {
+    enum Validity
+    {
         Valid,
         MissingTransaction,
         MissingUTXO,
@@ -32,24 +33,21 @@ public:
     uint256 prevTxId() const;
     int prevOutIndex() const;
 
-    struct Spender {
+    struct Spender
+    {
         uint32_t txVersion = 0, outSequence = 0, lockTime = 0;
         uint256 hashPrevOutputs, hashSequence, hashOutputs;
-        std::vector<std::vector<uint8_t>> pushData;
+        std::vector<std::vector<uint8_t> > pushData;
     };
 
-    Spender firstSpender() const {
-        return m_spender1;
-    }
-    Spender doubleSpender() const {
-        return m_spender2;
-    }
-
+    Spender firstSpender() const { return m_spender1; }
+    Spender doubleSpender() const { return m_spender2; }
     // old fashioned serialization.
     ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
+    inline void SerializationOp(Stream &s, Operation ser_action)
+    {
         READWRITE(m_prevTxId);
         READWRITE(m_prevOutIndex);
 

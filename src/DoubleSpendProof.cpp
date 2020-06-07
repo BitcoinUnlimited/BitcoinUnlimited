@@ -9,93 +9,99 @@
 #include "script/interpreter.h"
 #include "txmempool.h"
 
-namespace {
-    enum ScriptType {
-        P2PKH
-    };
+namespace
+{
+enum ScriptType
+{
+    P2PKH
+};
 
-    void getP2PKHSignature(const CScript &script, std::vector<uint8_t> &vchRet)
+void getP2PKHSignature(const CScript &script, std::vector<uint8_t> &vchRet)
+{
+    auto scriptIter = script.begin();
+    opcodetype type;
+    script.GetOp(scriptIter, type, vchRet);
+}
+
+void hashTx(DoubleSpendProof::Spender &spender, const CTransaction &tx, int inputIndex)
+{
+    assert(!spender.pushData.empty());
+    assert(!spender.pushData.front().empty());
+    auto hashType = spender.pushData.front().back();
+    if (!(hashType & SIGHASH_ANYONECANPAY))
     {
-        auto scriptIter = script.begin();
-        opcodetype type;
-        script.GetOp(scriptIter, type, vchRet);
-    }
-
-    void hashTx(DoubleSpendProof::Spender &spender, const CTransaction &tx, int inputIndex)
-    {
-        assert(!spender.pushData.empty());
-        assert(!spender.pushData.front().empty());
-        auto hashType = spender.pushData.front().back();
-        if (!(hashType & SIGHASH_ANYONECANPAY)) {
-            CHashWriter ss(SER_GETHASH, 0);
-            for (size_t n = 0; n < tx.vin.size(); ++n) {
-                ss << tx.vin[n].prevout;
-            }
-            spender.hashPrevOutputs = ss.GetHash();
-        }
-        if (!(hashType & SIGHASH_ANYONECANPAY) && (hashType & 0x1f) != SIGHASH_SINGLE
-                && (hashType & 0x1f) != SIGHASH_NONE) {
-            CHashWriter ss(SER_GETHASH, 0);
-            for (size_t n = 0; n < tx.vin.size(); ++n) {
-                ss << tx.vin[n].nSequence;
-            }
-            spender.hashSequence = ss.GetHash();
-        }
-        if ((hashType & 0x1f) != SIGHASH_SINGLE && (hashType & 0x1f) != SIGHASH_NONE) {
-            CHashWriter ss(SER_GETHASH, 0);
-            for (size_t n = 0; n < tx.vout.size(); ++n) {
-                ss << tx.vout[n];
-            }
-            spender.hashOutputs = ss.GetHash();
-        } else if ((hashType & 0x1f) == SIGHASH_SINGLE && inputIndex < tx.vout.size()) {
-            CHashWriter ss(SER_GETHASH, 0);
-            ss << tx.vout[inputIndex];
-            spender.hashOutputs = ss.GetHash();
-        }
-    }
-
-    class DSPSignatureChecker : public BaseSignatureChecker {
-    public:
-        DSPSignatureChecker(const DoubleSpendProof *proof, const DoubleSpendProof::Spender &spender, int64_t amount)
-            : m_proof(proof),
-              m_spender(spender),
-              m_amount(amount)
+        CHashWriter ss(SER_GETHASH, 0);
+        for (size_t n = 0; n < tx.vin.size(); ++n)
         {
+            ss << tx.vin[n].prevout;
         }
-
-        bool CheckSig(const std::vector<uint8_t> &vchSigIn, const std::vector<uint8_t> &vchPubKey, const CScript &scriptCode) const override {
-            CPubKey pubkey(vchPubKey);
-            if (!pubkey.IsValid())
-                return false;
-
-            std::vector<uint8_t> vchSig(vchSigIn);
-            if (vchSig.empty())
-                return false;
-            vchSig.pop_back(); // drop the hashtype byte tacked on to the end of the signature
-
-            CHashWriter ss(SER_GETHASH, 0);
-            ss << m_spender.txVersion << m_spender.hashPrevOutputs << m_spender.hashSequence;
-            ss <<  COutPoint(m_proof->prevTxId(), m_proof->prevOutIndex());
-            ss << static_cast<const CScriptBase &>(scriptCode);
-            ss << m_amount << m_spender.outSequence << m_spender.hashOutputs;
-            ss << m_spender.lockTime << (int) m_spender.pushData.front().back();
-            const uint256 sighash = ss.GetHash();
-
-            if (vchSig.size() == 64)
-                return pubkey.VerifySchnorr(sighash, vchSig);
-            return pubkey.VerifyECDSA(sighash, vchSig);
+        spender.hashPrevOutputs = ss.GetHash();
+    }
+    if (!(hashType & SIGHASH_ANYONECANPAY) && (hashType & 0x1f) != SIGHASH_SINGLE && (hashType & 0x1f) != SIGHASH_NONE)
+    {
+        CHashWriter ss(SER_GETHASH, 0);
+        for (size_t n = 0; n < tx.vin.size(); ++n)
+        {
+            ss << tx.vin[n].nSequence;
         }
-        bool CheckLockTime(const CScriptNum&) const override {
-            return true;
+        spender.hashSequence = ss.GetHash();
+    }
+    if ((hashType & 0x1f) != SIGHASH_SINGLE && (hashType & 0x1f) != SIGHASH_NONE)
+    {
+        CHashWriter ss(SER_GETHASH, 0);
+        for (size_t n = 0; n < tx.vout.size(); ++n)
+        {
+            ss << tx.vout[n];
         }
-        bool CheckSequence(const CScriptNum&) const override {
-            return true;
-        }
+        spender.hashOutputs = ss.GetHash();
+    }
+    else if ((hashType & 0x1f) == SIGHASH_SINGLE && inputIndex < tx.vout.size())
+    {
+        CHashWriter ss(SER_GETHASH, 0);
+        ss << tx.vout[inputIndex];
+        spender.hashOutputs = ss.GetHash();
+    }
+}
 
-        const DoubleSpendProof *m_proof;
-        const DoubleSpendProof::Spender &m_spender;
-        const int64_t m_amount;
-    };
+class DSPSignatureChecker : public BaseSignatureChecker
+{
+public:
+    DSPSignatureChecker(const DoubleSpendProof *proof, const DoubleSpendProof::Spender &spender, int64_t amount)
+        : m_proof(proof), m_spender(spender), m_amount(amount)
+    {
+    }
+
+    bool CheckSig(const std::vector<uint8_t> &vchSigIn,
+        const std::vector<uint8_t> &vchPubKey,
+        const CScript &scriptCode) const override
+    {
+        CPubKey pubkey(vchPubKey);
+        if (!pubkey.IsValid())
+            return false;
+
+        std::vector<uint8_t> vchSig(vchSigIn);
+        if (vchSig.empty())
+            return false;
+        vchSig.pop_back(); // drop the hashtype byte tacked on to the end of the signature
+
+        CHashWriter ss(SER_GETHASH, 0);
+        ss << m_spender.txVersion << m_spender.hashPrevOutputs << m_spender.hashSequence;
+        ss << COutPoint(m_proof->prevTxId(), m_proof->prevOutIndex());
+        ss << static_cast<const CScriptBase &>(scriptCode);
+        ss << m_amount << m_spender.outSequence << m_spender.hashOutputs;
+        ss << m_spender.lockTime << (int)m_spender.pushData.front().back();
+        const uint256 sighash = ss.GetHash();
+
+        if (vchSig.size() == 64)
+            return pubkey.VerifySchnorr(sighash, vchSig);
+        return pubkey.VerifyECDSA(sighash, vchSig);
+    }
+    bool CheckLockTime(const CScriptNum &) const override { return true; }
+    bool CheckSequence(const CScriptNum &) const override { return true; }
+    const DoubleSpendProof *m_proof;
+    const DoubleSpendProof::Spender &m_spender;
+    const int64_t m_amount;
+};
 }
 
 // static
@@ -107,11 +113,14 @@ DoubleSpendProof DoubleSpendProof::create(const CTransaction &t1, const CTransac
 
     size_t inputIndex1 = 0;
     size_t inputIndex2 = 0;
-    for (; inputIndex1 < t1.vin.size(); ++inputIndex1) {
+    for (; inputIndex1 < t1.vin.size(); ++inputIndex1)
+    {
         const CTxIn &in1 = t1.vin.at(inputIndex1);
-        for (inputIndex2 = 0; inputIndex2 < t2.vin.size(); ++inputIndex2) {
+        for (inputIndex2 = 0; inputIndex2 < t2.vin.size(); ++inputIndex2)
+        {
             const CTxIn &in2 = t2.vin.at(inputIndex2);
-            if (in1.prevout == in2.prevout) {
+            if (in1.prevout == in2.prevout)
+            {
                 answer.m_prevOutIndex = in1.prevout.n;
                 answer.m_prevTxId = in1.prevout.hash;
 
@@ -167,21 +176,14 @@ DoubleSpendProof DoubleSpendProof::create(const CTransaction &t1, const CTransac
     return answer;
 }
 
-DoubleSpendProof::DoubleSpendProof()
-{
-}
-
-bool DoubleSpendProof::isEmpty() const
-{
-    return m_prevOutIndex == -1 || m_prevTxId.IsNull();
-}
-
+DoubleSpendProof::DoubleSpendProof() {}
+bool DoubleSpendProof::isEmpty() const { return m_prevOutIndex == -1 || m_prevTxId.IsNull(); }
 DoubleSpendProof::Validity DoubleSpendProof::validate() const
 {
     if (m_prevTxId.IsNull() || m_prevOutIndex < 0)
         return Invalid;
-    if (m_spender1.pushData.empty() || m_spender1.pushData.front().empty()
-            || m_spender2.pushData.empty() || m_spender2.pushData.front().empty())
+    if (m_spender1.pushData.empty() || m_spender1.pushData.front().empty() || m_spender2.pushData.empty() ||
+        m_spender2.pushData.front().empty())
         return Invalid;
 
     // check if ordering is proper
@@ -195,15 +197,19 @@ DoubleSpendProof::Validity DoubleSpendProof::validate() const
     int64_t amount;
     CScript prevOutScript;
     auto prevTx = mempool.get(m_prevTxId);
-    if (prevTx.get()) {
+    if (prevTx.get())
+    {
         if (prevTx->vout.size() <= m_prevOutIndex)
             return Invalid;
         auto output = prevTx->vout.at(m_prevOutIndex);
         amount = output.nValue;
         prevOutScript = output.scriptPubKey;
-    } else {
+    }
+    else
+    {
         Coin coin;
-        if (!pcoinsTip->GetCoin({m_prevTxId, (uint32_t)m_prevOutIndex}, coin)) {
+        if (!pcoinsTip->GetCoin({m_prevTxId, (uint32_t)m_prevOutIndex}, coin))
+        {
             /* if the output we spend is missing then either the tx just got mined
              * or, more likely, our mempool just doesn't have it.
              */
@@ -222,7 +228,8 @@ DoubleSpendProof::Validity DoubleSpendProof::validate() const
     {
         READLOCK(mempool.cs_txmempool);
         auto it = mempool.mapNextTx.find({m_prevTxId, (uint32_t)m_prevOutIndex});
-        if (it == mempool.mapNextTx.end() || m_prevOutIndex >= it->second.ptx->vout.size()) {
+        if (it == mempool.mapNextTx.end() || m_prevOutIndex >= it->second.ptx->vout.size())
+        {
             return MissingTransaction;
         }
         tx = *(it->second.ptx);
@@ -238,10 +245,10 @@ DoubleSpendProof::Validity DoubleSpendProof::validate() const
     ScriptType scriptType = P2PKH; // FUTURE: look at prevTx to find out script-type
 
     std::vector<uint8_t> pubkey;
-    for (size_t i = 0; i < tx.vin.size(); ++i) {
-        if (tx.vin[i].prevout.n == m_prevOutIndex
-                && tx.vin[i].prevout.hash == m_prevTxId) {
-
+    for (size_t i = 0; i < tx.vin.size(); ++i)
+    {
+        if (tx.vin[i].prevout.n == m_prevOutIndex && tx.vin[i].prevout.hash == m_prevTxId)
+        {
             // Found the input script we need!
 
             CScript inScript = tx.vin[i].scriptSig;
@@ -257,41 +264,34 @@ DoubleSpendProof::Validity DoubleSpendProof::validate() const
         return Invalid;
 
     CScript inScript;
-    if (scriptType == P2PKH) {
+    if (scriptType == P2PKH)
+    {
         inScript << m_spender1.pushData.front();
         inScript << pubkey;
     }
     DSPSignatureChecker checker1(this, m_spender1, amount);
     ScriptError_t error;
-    if (!VerifyScript(inScript, prevOutScript, 0 /*flags*/, MAX_OPS_PER_SCRIPT, checker1, &error)) {
+    if (!VerifyScript(inScript, prevOutScript, 0 /*flags*/, MAX_OPS_PER_SCRIPT, checker1, &error))
+    {
         LOGA("DoubleSpendProof failed validating first tx due to %s\n", ScriptErrorString(error));
         return Invalid;
     }
 
     inScript.clear();
-    if (scriptType == P2PKH) {
+    if (scriptType == P2PKH)
+    {
         inScript << m_spender2.pushData.front();
         inScript << pubkey;
     }
     DSPSignatureChecker checker2(this, m_spender2, amount);
-    if (!VerifyScript(inScript, prevOutScript, 0 /*flags*/, MAX_OPS_PER_SCRIPT, checker2, &error)) {
+    if (!VerifyScript(inScript, prevOutScript, 0 /*flags*/, MAX_OPS_PER_SCRIPT, checker2, &error))
+    {
         LOGA("DoubleSpendProof failed validating second tx due to %s\n", ScriptErrorString(error));
         return Invalid;
     }
     return Valid;
 }
 
-uint256 DoubleSpendProof::prevTxId() const
-{
-    return m_prevTxId;
-}
-
-int DoubleSpendProof::prevOutIndex() const
-{
-    return m_prevOutIndex;
-}
-
-uint256 DoubleSpendProof::createHash() const
-{
-    return SerializeHash(*this);
-}
+uint256 DoubleSpendProof::prevTxId() const { return m_prevTxId; }
+int DoubleSpendProof::prevOutIndex() const { return m_prevOutIndex; }
+uint256 DoubleSpendProof::createHash() const { return SerializeHash(*this); }
