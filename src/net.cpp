@@ -678,15 +678,18 @@ static bool IsPriorityMsg(std::string strCommand)
 
 void CNode::LookAhead()
 {
+    if (fDownloading.load())
+        return;
+
     // Do lookahead for block downloads.  If it is a block or thintype block then get the blockhash
     // and indicate we are downloading it so that we don't re-request the block prematurely.
-    static const CBlockHeader temp_header;
-    static const unsigned int nSizeHeader = ::GetSerializeSize(temp_header, SER_NETWORK, PROTOCOL_VERSION);
-    if (msg.hdr.GetCommand() == NetMsgType::BLOCK || msg.hdr.GetCommand() == NetMsgType::GRAPHENEBLOCK ||
-        msg.hdr.GetCommand() == NetMsgType::CMPCTBLOCK || msg.hdr.GetCommand() == NetMsgType::XTHINBLOCK ||
-        msg.hdr.GetCommand() == NetMsgType::THINBLOCK)
+    const std::string &strCommand = msg.hdr.GetCommand();
+    static const unsigned int nSizeHeader = ::GetSerializeSize(CBlockHeader(), SER_NETWORK, PROTOCOL_VERSION);
+    if (strCommand == NetMsgType::BLOCK || strCommand == NetMsgType::GRAPHENEBLOCK ||
+        strCommand == NetMsgType::CMPCTBLOCK || strCommand == NetMsgType::XTHINBLOCK ||
+        strCommand == NetMsgType::THINBLOCK)
     {
-        if (msg.nDataPos > nSizeHeader)
+        if (msg.nDataPos >= nSizeHeader)
         {
             CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
             ss.append(msg.vRecv, nSizeHeader);
@@ -695,7 +698,7 @@ void CNode::LookAhead()
             ss >> header;
             requester.Downloading(header.GetHash(), this);
 
-            fLookedOnce.store(true);
+            fDownloading.store(true);
         }
     }
 }
@@ -715,9 +718,8 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
         {
             handled = msg.readData(pch, nBytes);
 
-            // Do a lookahead if we haven't already done one for this message.
-            if (!fLookedOnce.load())
-                LookAhead();
+            // Do a lookahead to determine if we need to set the downloading flag.
+            LookAhead();
         }
 
         if (handled < 0)
@@ -777,7 +779,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                 msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
             }
             messageHandlerCondition.notify_one();
-            fLookedOnce.store(false);
+            fDownloading.store(false);
         }
     }
 

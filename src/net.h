@@ -669,7 +669,7 @@ public:
     }
 
     // Examine the current message (msg) to see if block or thintype blocks have begun downloading data.
-    std::atomic<bool> fLookedOnce{false};
+    std::atomic<bool> fDownloading{false};
     void LookAhead();
 
     // requires LOCK(cs_vRecvMsg)
