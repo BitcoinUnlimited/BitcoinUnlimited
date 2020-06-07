@@ -203,7 +203,7 @@ DoubleSpendProof::Validity DoubleSpendProof::validate() const
         prevOutScript = output.scriptPubKey;
     } else {
         Coin coin;
-        if (!pcoinsTip->GetCoin({m_prevTxId, m_prevOutIndex}, coin)) {
+        if (!pcoinsTip->GetCoin({m_prevTxId, (uint32_t)m_prevOutIndex}, coin)) {
             /* if the output we spend is missing then either the tx just got mined
              * or, more likely, our mempool just doesn't have it.
              */
@@ -221,7 +221,7 @@ DoubleSpendProof::Validity DoubleSpendProof::validate() const
     CTransaction tx;
     {
         READLOCK(mempool.cs_txmempool);
-        auto it = mempool.mapNextTx.find({m_prevTxId, m_prevOutIndex});
+        auto it = mempool.mapNextTx.find({m_prevTxId, (uint32_t)m_prevOutIndex});
         if (it == mempool.mapNextTx.end() || m_prevOutIndex >= it->second.ptx->vout.size()) {
             return MissingTransaction;
         }
