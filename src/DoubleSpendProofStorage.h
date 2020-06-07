@@ -6,12 +6,12 @@
 
 #include "DoubleSpendProof.h"
 #include "bloom.h"
-#include <boost/unordered_map.hpp>
 #include <boost/asio.hpp>
+#include <boost/unordered_map.hpp>
 
 #include <map>
-#include <set>
 #include <mutex>
+#include <set>
 
 class COutPoint;
 

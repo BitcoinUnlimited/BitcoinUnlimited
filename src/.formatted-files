@@ -78,6 +78,10 @@ deadlock-detection/threaddeadlock.cpp
 deadlock-detection/threaddeadlock.h
 dosman.cpp
 dosman.h
+DoubleSpendProof.h
+DoubleSpendProof.cpp
+DoubleSpendProofStorage.h
+DoubleSpendProofStorage.cpp
 dstencode.cpp
 dstencode.h
 electrum/electrs.cpp
