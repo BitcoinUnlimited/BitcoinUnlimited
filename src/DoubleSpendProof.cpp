@@ -55,7 +55,7 @@ void hashTx(DoubleSpendProof::Spender &spender, const CTransaction &tx, int inpu
         }
         spender.hashOutputs = ss.GetHash();
     }
-    else if ((hashType & 0x1f) == SIGHASH_SINGLE && inputIndex < tx.vout.size())
+    else if ((hashType & 0x1f) == SIGHASH_SINGLE && (size_t)inputIndex < tx.vout.size())
     {
         CHashWriter ss(SER_GETHASH, 0);
         ss << tx.vout[inputIndex];
@@ -199,7 +199,7 @@ DoubleSpendProof::Validity DoubleSpendProof::validate() const
     auto prevTx = mempool.get(m_prevTxId);
     if (prevTx.get())
     {
-        if (prevTx->vout.size() <= m_prevOutIndex)
+        if (prevTx->vout.size() <= (size_t)m_prevOutIndex)
             return Invalid;
         auto output = prevTx->vout.at(m_prevOutIndex);
         amount = output.nValue;
@@ -228,7 +228,7 @@ DoubleSpendProof::Validity DoubleSpendProof::validate() const
     {
         READLOCK(mempool.cs_txmempool);
         auto it = mempool.mapNextTx.find({m_prevTxId, (uint32_t)m_prevOutIndex});
-        if (it == mempool.mapNextTx.end() || m_prevOutIndex >= it->second.ptx->vout.size())
+        if (it == mempool.mapNextTx.end() || (size_t)m_prevOutIndex >= it->second.ptx->vout.size())
         {
             return MissingTransaction;
         }
@@ -247,7 +247,7 @@ DoubleSpendProof::Validity DoubleSpendProof::validate() const
     std::vector<uint8_t> pubkey;
     for (size_t i = 0; i < tx.vin.size(); ++i)
     {
-        if (tx.vin[i].prevout.n == m_prevOutIndex && tx.vin[i].prevout.hash == m_prevTxId)
+        if (tx.vin[i].prevout.n == (size_t)m_prevOutIndex && tx.vin[i].prevout.hash == m_prevTxId)
         {
             // Found the input script we need!
 
