@@ -49,6 +49,9 @@ public:
     void newBlockFound();
 
 private:
+    // m_lock guards all the following data structures
+    mutable std::recursive_mutex m_lock;
+
     std::map<int, DoubleSpendProof> m_proofs;
     int m_nextId = 1;
     std::map<int, std::pair<int, int64_t> > m_orphans;
@@ -56,9 +59,10 @@ private:
     typedef boost::unordered_map<uint256, int, HashShortener> LookupTable;
     LookupTable m_dspIdLookupTable;
     std::map<uint64_t, std::deque<int> > m_prevTxIdLookupTable;
-    mutable std::recursive_mutex m_lock;
 
     CRollingBloomFilter m_recentRejects;
+
+    // initialize timer
     boost::asio::deadline_timer m_timer;
 };
 
