@@ -8,7 +8,6 @@
 #include "consensus/merkle.h"
 #include "validation/validation.h"
 
-#include <boost/math/distributions/gamma.hpp>
 #include <stack>
 #include <queue>
 // FIXME: Add copyright here (awemany / BU devs)
@@ -433,14 +432,4 @@ void CDeltaBlock::processNew(CDeltaBlockRef dbr) {
 }
 bool CDeltaBlock::spendsOutput(const COutPoint &out) const {
     return spent.contains(out);
-}
-
-double GetKOSThreshold(arith_uint256 target, uint8_t k)
-{
-    if (k == 0)
-        return true;
-
-    boost::math::gamma_distribution<> bobtail_gamma(k, target.getdouble());
-
-    return quantile(bobtail_gamma, KOS_INCLUSION_PROB);
 }

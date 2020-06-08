@@ -8,10 +8,10 @@
 #include "pow.h"
 
 #include "arith_uint256.h"
+#include "bobtail/bobtail.h"
 #include "chain.h"
 #include "consensus/consensus.h"
 #include "primitives/block.h"
-#include "deltablocks.h"
 #include "uint256.h"
 #include "util.h"
 

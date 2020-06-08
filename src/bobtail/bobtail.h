@@ -9,6 +9,8 @@
 #include "consensus/params.h"
 #include "subblock.h"
 
+const double KOS_INCLUSION_PROB = 0.99999;
+
 bool IsSubBlockMalformed(const CSubBlock &subblock);
 bool CheckBobtailPoW(CBlockHeader deltaBlock, std::vector<uint256> ancestors, const Consensus::Params &params, uint8_t k);
 bool CheckBobtailPoWFromOrderedProofs(std::vector<arith_uint256> proofs, arith_uint256 target, uint8_t k);
@@ -18,5 +20,6 @@ bool CheckBobtailPoWFromOrderedProofs(std::vector<arith_uint256> proofs, arith_u
   correct POW is out of the scope of the deltablocks subsystem
   itself!! */
 extern unsigned int weakPOWfromPOW(unsigned int nBits);
+double GetKOSThreshold(arith_uint256 target, uint8_t k);
 
 #endif

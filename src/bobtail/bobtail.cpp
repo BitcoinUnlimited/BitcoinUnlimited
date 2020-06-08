@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "bobtail.h"
+#include <boost/math/distributions/gamma.hpp>
 
 bool IsSubBlockMalformed(const CSubBlock &subblock)
 {
@@ -106,4 +107,14 @@ unsigned int weakPOWfromPOW(unsigned int nBits) {
     a /= 1000;
 
     return a.GetCompact();
+}
+
+double GetKOSThreshold(arith_uint256 target, uint8_t k)
+{
+    if (k == 0)
+        return true;
+
+    boost::math::gamma_distribution<> bobtail_gamma(k, target.getdouble());
+
+    return quantile(bobtail_gamma, KOS_INCLUSION_PROB);
 }
