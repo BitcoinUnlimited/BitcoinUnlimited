@@ -2111,6 +2111,7 @@ bool ProcessMessages(CNode *pfrom)
     int msgsProcessed = 0;
     // Don't bother if send buffer is too full to respond anyway
     CNode *pfrom_original = pfrom;
+    std::deque<std::pair<CNodeRef, CNetMessage> > vPriorityRecvQ_delay;
     while ((!pfrom->fDisconnect) && (pfrom->nSendSize < SendBufferSize()) && (shutdown_threads.load() == false))
     {
         CNodeRef noderef;
@@ -2139,8 +2140,16 @@ bool ProcessMessages(CNode *pfrom)
 
                     // check if we should process the message.
                     CNode *pnode = noderef.get();
-                    if (pnode->fDisconnect || pnode->nSendSize > SendBufferSize())
+                    if (pnode->fDisconnect)
                     {
+                        // if the node is to be disconnected dont bother responding
+                        continue;
+                    }
+                    if (pnode->nSendSize > SendBufferSize())
+                    {
+                        // if the nodes send is full, delay the processing of this message until a time when
+                        // send is not full
+                        vPriorityRecvQ_delay.emplace_back(std::move(noderef), std::move(msg));
                         continue;
                     }
 
@@ -2289,6 +2298,12 @@ bool ProcessMessages(CNode *pfrom)
         // Swap back to the original peer if we just processed a priority message
         if (fIsPriority)
             pfrom = pfrom_original;
+    }
+
+    {
+        LOCK(cs_priorityRecvQ);
+        // re-add the priority messages we delayed back to the queue so that we can try them again later
+        vPriorityRecvQ.insert(vPriorityRecvQ.end(), vPriorityRecvQ_delay.begin(), vPriorityRecvQ_delay.end());
     }
 
     return fOk;
