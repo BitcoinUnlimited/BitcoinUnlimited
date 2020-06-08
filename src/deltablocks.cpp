@@ -359,7 +359,7 @@ void CDeltaBlock::setAllTransactionsKnown() { fAllTransactionsKnown = true; }
 bool CDeltaBlock::allTransactionsKnown() const { return fAllTransactionsKnown; }
 
 //bool CDeltaBlock::isStrong() const { return is_strong; }
-bool CDeltaBlock::isStrong() const { int k=3; /*FIXME*/ return CheckBobtailPoW(*((CBlockHeader *)this), delta_parent_hashes, Params().GetConsensus(), k); }
+bool CDeltaBlock::isStrong() const { /*FIXME*/ return true; }
 
 void CDeltaBlock::resetAll() {
     LOCK(cs_db);

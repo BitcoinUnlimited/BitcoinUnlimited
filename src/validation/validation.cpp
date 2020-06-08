@@ -3913,9 +3913,7 @@ static int64_t nBobtailTimePostConnect = 0;
 
 bool CheckSubBlockHeader(const CBlockHeader &block, CValidationState &state, bool fCheckPOW)
 {
-    CDagNode *dagNode = bobtailDagSet.Find(block.GetHash());
-    CSubBlockRef deltaBlock = std::make_shared<CSubBlock>(dagNode->subblock);
-    if (fCheckPOW && CheckSubBlockPoW(block, Params().GetConsensus(), BOBTAIL_K))
+    if (fCheckPOW && !CheckSubBlockPoW(block, Params().GetConsensus(), BOBTAIL_K))
     {
         return state.DoS(50, error("CheckSubBlockHeader(): subblock proof of work failed"), REJECT_INVALID, "high-hash");
     }
@@ -3928,23 +3926,17 @@ bool CheckSubBlockHeader(const CBlockHeader &block, CValidationState &state, boo
     return true;
 }
 
-bool CheckBobtailBlock(const CBlockHeader &block, CValidationState &state, bool fCheckPOW)
+bool CheckBobtailBlock(const CBobtailBlock &block, CValidationState &state, bool fCheckPOW)
 {
-    CDagNode *dagNode = bobtailDagSet.Find(block.GetHash());
-    CSubBlockRef deltaBlock = std::make_shared<CSubBlock>(dagNode->subblock);
-    //TODO: CheckBobtailPoW SHOULD TAKE DAG NOT HASHES
-    std::vector<uint256> ancestors; //DELETE ME
-    if (fCheckPOW &&
-        (deltaBlock == nullptr ||
-            !CheckBobtailPoW(*deltaBlock, ancestors, Params().GetConsensus(), BOBTAIL_K)))
+    if (fCheckPOW && !CheckBobtailPoW(block, Params().GetConsensus(), BOBTAIL_K))
     {
-        return state.DoS(50, error("CheckBlockHeader(): bobtail proof of work failed"), REJECT_INVALID, "high-hash");
+        return state.DoS(50, error("CheckBobtailBlock(): bobtail proof of work failed"), REJECT_INVALID, "high-hash");
     }
 
     // Check timestamp
     if (block.GetBlockTime() > GetAdjustedTime() + 2 * 60 * 60)
         return state.Invalid(
-            error("CheckBlockHeader(): block timestamp too far in the future"), REJECT_INVALID, "time-too-new");
+            error("CheckBobtailBlock(): block timestamp too far in the future"), REJECT_INVALID, "time-too-new");
 
     return true;
 }

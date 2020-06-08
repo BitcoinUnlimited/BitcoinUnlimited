@@ -160,9 +160,8 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
         //TODO: REGISTER BLOCK
 
         // Now check if Bobtail PoW is also satisfied
-        // TODO: CheckBobtailPoW NEEDS TO TAKE A DAG NOT VECTOR OF HASHES
-        std::vector<uint256> ancestors; //DELETE ME
-        if (CheckBobtailPoW(*pblock, ancestors, Params().GetConsensus(), BOBTAIL_K))
+        // TODO: Use CheckBobtailPoW instead 
+        if (CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus()))
         {
             // In we are mining our own block or not running in parallel for any reason
             // we must terminate any block validation threads that are currently running,

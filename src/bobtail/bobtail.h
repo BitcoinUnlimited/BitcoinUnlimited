@@ -6,13 +6,14 @@
 #define BITCOIN_BOBTAIL_BOBTAIL_H
 
 #include "arith_uint256.h"
+#include "bobtailblock.h"
 #include "consensus/params.h"
 #include "subblock.h"
 
 const double KOS_INCLUSION_PROB = 0.99999;
 
 bool IsSubBlockMalformed(const CSubBlock &subblock);
-bool CheckBobtailPoW(CBlockHeader deltaBlock, std::vector<uint256> ancestors, const Consensus::Params &params, uint8_t k);
+bool CheckBobtailPoW(CBobtailBlock block, const Consensus::Params &params, uint8_t k);
 bool CheckBobtailPoWFromOrderedProofs(std::vector<arith_uint256> proofs, arith_uint256 target, uint8_t k);
 bool CheckSubBlockPoW(const CBlockHeader header, const Consensus::Params &params, uint8_t k);
 /*! Given a strong block parent, calculates the weak block POW

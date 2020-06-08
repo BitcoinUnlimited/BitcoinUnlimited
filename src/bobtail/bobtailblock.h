@@ -5,7 +5,7 @@
 #ifndef BITCOIN_BOBTAIL_BOBTAILBLOCK_H
 #define BITCOIN_BOBTAIL_BOBTAILBLOCK_H
 
-#include "block.h"
+#include "primitives/block.h"
 #include "subblock.h"
 
 class CBobtailBlock : public CBlock
