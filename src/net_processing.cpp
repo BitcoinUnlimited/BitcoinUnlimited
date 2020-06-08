@@ -2627,10 +2627,10 @@ bool SendMessages(CNode *pto)
             LOCK(pto->cs_inventory);
             haveInv2Send = !pto->vInventoryToSend.empty();
         }
-        std::vector<CInv> vInvSend;
-        FastRandomContext rnd;
         if (haveInv2Send)
         {
+            std::vector<CInv> vInvSend;
+            FastRandomContext rnd;
             while (1)
             {
                 // Send message INV up to the MAX_INV_TO_SEND. Once we reach the max then send the INV message
