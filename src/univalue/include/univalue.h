@@ -60,6 +60,15 @@ public:
     constexpr bool getBool() const noexcept { return isTrue(); }
     const UniValue& operator[](const std::string& key) const noexcept;
     const UniValue& operator[](size_t index) const noexcept;
+    // Returns true if the two objects are of the same type and have the exact same data.
+    // For VARR and VOBJ, keys and/or values must also be in the exact same order (otherwise false is returned).
+    bool operator==(const UniValue& other) const noexcept;
+    bool operator!=(const UniValue& other) const noexcept { return !(*this == other); }
+
+    // If this is of type VARR or VOBJ and is not empty, returns the first value, or NullUniValue otherwise.
+    const UniValue& front() const noexcept;
+    // If this is of type VARR or VOBJ and is not empty, returns the last value, or NullUniValue otherwise.
+    const UniValue& back() const noexcept;
 
     /**
      * Returns a pointer to value corresponding to the given key in the object,
@@ -135,6 +144,13 @@ public:
     const std::vector<std::string>& getKeys() const;
     const std::vector<UniValue>& getObjectValues() const;
     const std::vector<UniValue>& getArrayValues() const;
+    /**
+     * Like getArrayValues(), except returns a move-constructed vector of this object's values (a constant-time swap).
+     * Precondition:  This object must be of type VARR (isArray() == true), otherwise std::runtime_error will be thrown.
+     * Postcondition: This object will become an empty UniValue array (isArray() == true, empty() == true), and the
+     *                returned vector will contain the UniValues that this object previously contained (if any). */
+    std::vector<UniValue> takeArrayValues();
+
     bool get_bool() const;
     const std::string& get_str() const;
     int get_int() const;

@@ -331,6 +331,40 @@ const UniValue& UniValue::operator[](size_t index) const noexcept
     return values[index];
 }
 
+const UniValue& UniValue::front() const noexcept
+{
+    if (empty() || (typ != VOBJ && typ != VARR))
+        return NullUniValue;
+    return values.front();
+}
+
+const UniValue& UniValue::back() const noexcept
+{
+    if (empty() || (typ != VOBJ && typ != VARR))
+        return NullUniValue;
+    return values.back();
+}
+
+bool UniValue::operator==(const UniValue& other) const noexcept
+{
+    if (typ != other.typ)
+        return false;
+    switch(typ) {
+    case VNULL:
+        return true;
+    case VBOOL:
+    case VNUM:
+    case VSTR:
+        return val == other.val;
+    case VARR:
+        return values == other.values;
+    case VOBJ:
+        return keys == other.keys && values == other.values;
+    }
+    // not reached
+    return false;
+}
+
 bool UniValue::reserve(size_t n) {
     bool ret = false;
     if (isArray() || isObject()) {
@@ -344,7 +378,6 @@ bool UniValue::reserve(size_t n) {
     return ret;
 }
 
-
 const char *uvTypeName(UniValue::VType t) noexcept
 {
     switch (t) {
@@ -357,7 +390,7 @@ const char *uvTypeName(UniValue::VType t) noexcept
     }
 
     // not reached
-    return NULL;
+    return nullptr;
 }
 
 const UniValue& find_value(const UniValue& obj, const std::string& name) noexcept

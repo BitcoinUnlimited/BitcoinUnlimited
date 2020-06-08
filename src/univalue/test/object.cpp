@@ -352,6 +352,30 @@ BOOST_AUTO_TEST_CASE(univalue_object)
     obj.pushKV("name", "foo bar");
     BOOST_CHECK_EQUAL(obj["name"].getValStr(), "foo bar");
 
+    // test takeArrayValues(), front() / back() as well as operator==
+    UniValue arr{UniValue::VNUM}; // this is intentional.
+    BOOST_CHECK_THROW(arr.takeArrayValues(), std::runtime_error); // should throw if !array
+    BOOST_CHECK_EQUAL(&arr.front(), &NullUniValue); // should return the NullUniValue if !array
+    arr.setArray(); // reset to array
+    std::vector<UniValue> vals = {{
+        "foo", "bar", UniValue::VOBJ, "baz", "bat", false, {}, 1.2, true, 10, -42, -12345678.11234678,
+        UniValue{UniValue::VARR}
+    }};
+    vals[2].pushKV("akey", "this is a value");
+    vals.back().push_backV(vals); // vals recursively contains a partial copy of vals!
+    const auto valsExpected = vals; // save a copy
+    arr.push_backV(std::move(vals)); // assign to array via move
+    BOOST_CHECK(vals.empty()); // vector should be empty after move
+    BOOST_CHECK(!arr.empty()); // but our array should not be
+    BOOST_CHECK(arr != UniValue{UniValue::VARR}); // check that UniValue::operator== is not a yes-man
+    BOOST_CHECK(arr != UniValue{1.234}); // check operator== for differing types
+    BOOST_CHECK_EQUAL(arr.front(), valsExpected.front());
+    BOOST_CHECK_EQUAL(arr.back(), valsExpected.back());
+    BOOST_CHECK(arr.getArrayValues() == valsExpected);
+    auto vals2 = arr.takeArrayValues(); // take the values back
+    BOOST_CHECK(arr.empty());
+    BOOST_CHECK(!vals2.empty());
+    BOOST_CHECK_EQUAL(vals2, valsExpected);
 }
 
 static const char *json1 =
@@ -361,6 +385,7 @@ BOOST_AUTO_TEST_CASE(univalue_readwrite)
 {
     UniValue v;
     BOOST_CHECK(v.read(json1));
+    const UniValue vjson1 = v; // save a copy for below
 
     std::string strJson1(json1);
     BOOST_CHECK(v.read(strJson1));
@@ -398,11 +423,29 @@ BOOST_AUTO_TEST_CASE(univalue_readwrite)
     BOOST_CHECK(!v.read("[]{}"));
     BOOST_CHECK(!v.read("{}[]"));
     BOOST_CHECK(!v.read("{} 42"));
+
+    // check that json escapes work correctly by putting a json string INTO a UniValue
+    // and doing a round of ser/deser on it.
+    v.setArray();
+    v.push_back(json1);
+    const auto vcopy = v;
+    BOOST_CHECK(!vcopy.empty());
+    v.clear();
+    BOOST_CHECK(v.empty());
+    BOOST_CHECK(v.read(vcopy.write(2, 4)));
+    BOOST_CHECK(!v.empty());
+    BOOST_CHECK_EQUAL(v, vcopy);
+    BOOST_CHECK_EQUAL(v[0], json1);
+    v.clear();
+    BOOST_CHECK(v.empty());
+    BOOST_CHECK(v.read(vcopy[0].get_str())); // now deserialize the embedded json string
+    BOOST_CHECK(!v.empty());
+    BOOST_CHECK_EQUAL(v, vjson1); // ensure it deserializes to equal
 }
 
 BOOST_AUTO_TEST_SUITE_END()
 
-int main (int argc, char *argv[])
+int main()
 {
     univalue_constructor();
     univalue_typecheck();
