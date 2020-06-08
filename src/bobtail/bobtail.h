@@ -14,6 +14,7 @@ const double KOS_INCLUSION_PROB = 0.99999;
 bool IsSubBlockMalformed(const CSubBlock &subblock);
 bool CheckBobtailPoW(CBlockHeader deltaBlock, std::vector<uint256> ancestors, const Consensus::Params &params, uint8_t k);
 bool CheckBobtailPoWFromOrderedProofs(std::vector<arith_uint256> proofs, arith_uint256 target, uint8_t k);
+bool CheckSubBlockPoW(const CBlockHeader header, const Consensus::Params &params, uint8_t k);
 /*! Given a strong block parent, calculates the weak block POW
   necessary to be a valid weak block.  NOTE: Dealing with making sure
   that all weak blocks that go into the weak blocks subsystem have

@@ -99,6 +99,31 @@ bool CheckBobtailPoWFromOrderedProofs(std::vector<arith_uint256> proofs, arith_u
     return false;
 }
 
+bool CheckSubBlockPoW(const CBlockHeader header, const Consensus::Params &params, uint8_t k)
+{
+    arith_uint256 bnTarget;
+    bool fNegative;
+    bool fOverflow;
+
+    bnTarget.SetCompact(header.nBits, &fNegative, &fOverflow);
+
+    if (fNegative || fOverflow)
+    {
+        LOG(WB, "Illegal value encountered when decoding target bits=%d\n", header.nBits);
+        return false;
+    }
+
+    if (bnTarget > UintToArith256(params.powLimit))
+    {
+        LOG(WB, "Illegal target value bnTarget=%d for pow limit\n", bnTarget.getdouble());
+        return false;
+    }
+
+    arith_uint256 pow = UintToArith256(header.GetHash());
+
+    pow.getdouble() < GetKOSThreshold(bnTarget, k);
+}
+
 // to check wpow use sth like this:
 // if (!CheckProofOfWork(ahashMerkleRoot, weakPOWfromPOW(nBits), Consensus::Params(), true)) { ...
 unsigned int weakPOWfromPOW(unsigned int nBits) {
