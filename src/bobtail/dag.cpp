@@ -120,6 +120,10 @@ void CBobtailDagSet::SetNewIds(std::priority_queue<int16_t> &removed_ids)
     {
         // TODO : dont use assert here
         assert(i == vdags[i].id);
+        for (auto &node : vdags[i]._dag)
+        {
+            node->dag_id = i;
+        }
     }
 }
 
