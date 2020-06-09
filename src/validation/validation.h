@@ -8,6 +8,7 @@
 #ifndef BITCOIN_VALIDATION_H
 #define BITCOIN_VALIDATION_H
 
+#include "bobtail/bobtailblock.h"
 #include "chainparams.h"
 #include "consensus/validation.h"
 #include "deltablocks.h"
@@ -187,7 +188,6 @@ bool IsBlockPruned(const CBlockIndex *pblockindex);
 
 /** Context-independent validity checks */
 bool CheckSubBlockHeader(const CBlockHeader &block, CValidationState &state, bool fCheckPOW = true);
-bool CheckBobtailBlock(const CBlockHeader &block, CValidationState &state, bool fCheckPOW = true);
 
 /** Context-dependent validity header checks */
 bool ContextualCheckBobtailBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex *pindexPrev);
@@ -267,8 +267,7 @@ bool ContextualCheckBobtailBlock(const CBlock &block,
     CBlockIndex *pindexPrev,
     const bool fConservative = false);
 
-// BU: returns the blocksize if block is valid.  Otherwise 0
-bool CheckBobtailBlock(const CBlock &block, CValidationState &state, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
+bool CheckBobtailBlock(const CBobtailBlock &block, CValidationState &state, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
 
 /** Mark a block as having its data received and checked (up to BLOCK_VALID_TRANSACTIONS). */
 bool ReceivedBobtailBlockTransactions(const CBlock &block,

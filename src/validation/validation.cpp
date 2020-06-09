@@ -10,6 +10,7 @@
 #include "blockstorage/blockstorage.h"
 #include "blockstorage/sequential_files.h"
 #include "bobtail/bobtail.h"
+#include "bobtail/bobtailblock.h"
 #include "bobtail/dag.h"
 #include "checkpoints.h"
 #include "connmgr.h"
@@ -3926,21 +3927,6 @@ bool CheckSubBlockHeader(const CBlockHeader &block, CValidationState &state, boo
     return true;
 }
 
-bool CheckBobtailBlock(const CBobtailBlock &block, CValidationState &state, bool fCheckPOW)
-{
-    if (fCheckPOW && !CheckBobtailPoW(block, Params().GetConsensus(), BOBTAIL_K))
-    {
-        return state.DoS(50, error("CheckBobtailBlock(): bobtail proof of work failed"), REJECT_INVALID, "high-hash");
-    }
-
-    // Check timestamp
-    if (block.GetBlockTime() > GetAdjustedTime() + 2 * 60 * 60)
-        return state.Invalid(
-            error("CheckBobtailBlock(): block timestamp too far in the future"), REJECT_INVALID, "time-too-new");
-
-    return true;
-}
-
 bool ContextualCheckBobtailBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex *const pindexPrev)
 {
     const Consensus::Params &consensusParams = Params().GetConsensus();
@@ -5335,8 +5321,18 @@ bool ContextualCheckBobtailBlock(const CBlock &block,
     return true;
 }
 
-bool CheckBobtailBlock(const CBlock &block, CValidationState &state, bool fCheckPOW, bool fCheckMerkleRoot)
+bool CheckBobtailBlock(const CBobtailBlock &block, CValidationState &state, bool fCheckPOW, bool fCheckMerkleRoot)
 {
+    if (fCheckPOW && !CheckBobtailPoW(block, Params().GetConsensus(), BOBTAIL_K))
+    {
+        return state.DoS(50, error("CheckBobtailBlock(): bobtail proof of work failed"), REJECT_INVALID, "high-hash");
+    }
+
+    // Check timestamp
+    if (block.GetBlockTime() > GetAdjustedTime() + 2 * 60 * 60)
+        return state.Invalid(
+            error("CheckBobtailBlock(): block timestamp too far in the future"), REJECT_INVALID, "time-too-new");
+
     // These are checks that are independent of context.
 
     if (block.fChecked)
@@ -5375,20 +5371,15 @@ bool CheckBobtailBlock(const CBlock &block, CValidationState &state, bool fCheck
     // First transaction must be coinbase, the rest must not be
     if (block.vtx.empty() || !block.vtx[0]->IsCoinBase())
         return state.DoS(100, error("CheckBlock(): first tx is not coinbase"), REJECT_INVALID, "bad-cb-missing");
-
     for (unsigned int i = 1; i < block.vtx.size(); i++)
-    {
         if (block.vtx[i]->IsCoinBase())
-        {
             return state.DoS(100, error("CheckBlock(): more than one coinbase"), REJECT_INVALID, "bad-cb-multiple");
-        }
-    }
+
     // Check transactions
     for (const auto &tx : block.vtx)
         if (!CheckTransaction(tx, state))
             return error("CheckBlock(): CheckTransaction of %s failed with %s", tx->GetHash().ToString(),
                 FormatStateMessage(state));
-
 
     if (fCheckPOW && fCheckMerkleRoot)
         block.fChecked = true;
@@ -7366,7 +7357,7 @@ bool BobtailActivateBestChain(CValidationState &state,
 bool ProcessNewBobtailBlock(CValidationState &state,
     const CChainParams &chainparams,
     CNode *pfrom,
-    const CBlock *pblock,
+    const CBobtailBlock *pblock,
     bool fForceProcessing,
     CDiskBlockPos *dbp,
     bool fParallel)
@@ -7374,19 +7365,13 @@ bool ProcessNewBobtailBlock(CValidationState &state,
     int64_t start = GetStopwatchMicros();
     LOG(THIN, "Processing new block %s from peer %s.\n", pblock->GetHash().ToString(),
         pfrom ? pfrom->GetLogName() : "myself");
-    // Preliminary checks
-    if (!CheckBlockHeader(*pblock, state, true))
-    { // block header is bad
-        // demerit the sender
-        return error("%s: CheckBlockHeader FAILED", __func__);
-    }
     // if (IsChainNearlySyncd() && !fImporting && !fReindex)
     //    SendExpeditedBlock(*pblock, pfrom);
 
-    bool checked = CheckBlock(*pblock, state);
+    bool checked = CheckBobtailBlock(*pblock, state);
     if (!checked)
     {
-        LOGA("Invalid block: ver:%x time:%d Tx size:%d len:%d\n", pblock->nVersion, pblock->nTime,
+        LOGA("Invalid bobtail block: ver:%x time:%d Tx size:%d len:%d\n", pblock->nVersion, pblock->nTime,
             pblock->vtx.size(), pblock->GetBlockSize());
     }
 
@@ -7402,7 +7387,7 @@ bool ProcessNewBobtailBlock(CValidationState &state,
         fRequested |= fForceProcessing;
         if (!checked)
         {
-            return error("%s: CheckBlock FAILED", __func__);
+            return error("%s: CheckBobtailBlock FAILED", __func__);
         }
 
         // Store to disk
@@ -7480,7 +7465,7 @@ bool ProcessNewBobtailBlock(CValidationState &state,
         }
 
         LOG(BENCH,
-            "ProcessNewBlock, time: %d, block: %s, len: %d, numTx: %d, maxVin: %llu, maxVout: %llu, maxTx:%llu\n",
+            "ProcessNewBobtailBlock, time: %d, block: %s, len: %d, numTx: %d, maxVin: %llu, maxVout: %llu, maxTx:%llu\n",
             end - start, pblock->GetHash().ToString(), pblock->GetBlockSize(), pblock->vtx.size(), maxVin,
             maxVout, maxTxSizeLocal);
         LOG(BENCH, "tx: %s, vin: %llu, vout: %llu, len: %d\n", txIn.GetHash().ToString(), txIn.vin.size(),
