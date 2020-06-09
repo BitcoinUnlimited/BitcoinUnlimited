@@ -40,7 +40,7 @@
 #include <univalue.h>
 
 using namespace std;
-extern CDagForrest bobtailDag;
+extern CBobtailDagSet bobtailDagSet;
 
 /**
  * Return average network hashes per second based on the last 'lookup' blocks,
