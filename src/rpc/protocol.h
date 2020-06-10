@@ -14,7 +14,10 @@
 #include <stdint.h>
 #include <string>
 
+#include "uint256.h"
 #include "univalue/include/univalue.h"
+
+class CTransaction;
 
 //! HTTP status codes
 enum HTTPStatusCode
@@ -83,6 +86,11 @@ std::string JSONRPCRequest(const std::string &strMethod, const UniValue &params,
 UniValue JSONRPCReplyObj(const UniValue &result, const UniValue &error, const UniValue &id);
 std::string JSONRPCReply(const UniValue &result, const UniValue &error, const UniValue &id);
 UniValue JSONRPCError(int code, const std::string &message);
+
+// rawtransaction.cpp
+/** This function supplies transaction JSON data for different interfaces (REST and RPC).
+Pass -1 to txTime to not include (used to avoid redundancy when tx are being shown within a block) */
+void TxToJSON(const CTransaction &tx, const int64_t txTime, const uint256 hashBlock, UniValue &entry);
 
 /** Get name of RPC authentication cookie file */
 fs::path GetAuthCookieFile();

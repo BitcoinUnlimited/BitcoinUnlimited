@@ -220,9 +220,18 @@ void PartitionCheck(bool (*initialDownloadCheck)(),
  * This function only returns the highest priority warning of the set selected by strFor.
  */
 std::string GetWarnings(const std::string &strFor);
-/** Retrieve a transaction (from memory pool, or from disk, if possible) */
+
+/** Retrieve a transaction (from memory pool, UTXO, txindex, or from disk)
+    @param tx (out) The transaction data
+    @param txTime (out) The time the transaction was confirmed or first seen
+    @param params Blockchain consensus parameters
+    @param hashBlock What block this transaction was in (or uint256() if no block)
+    @param fAllowSlow Use the UTXO and disk to find the transaction, if needed
+    @param blockIndex Help this API find this transaction quickly by providing this info if you have it
+*/
 bool GetTransaction(const uint256 &hash,
     CTransactionRef &tx,
+    int64_t &txTime,
     const Consensus::Params &params,
     uint256 &hashBlock,
     bool fAllowSlow = false,

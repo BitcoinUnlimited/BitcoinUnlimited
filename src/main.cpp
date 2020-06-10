@@ -281,6 +281,7 @@ bool AreFreeTxnsDisallowed()
 
 bool GetTransaction(const uint256 &hash,
     CTransactionRef &txOut,
+    int64_t &txTime,
     const Consensus::Params &consensusParams,
     uint256 &hashBlock,
     bool fAllowSlow,
@@ -288,7 +289,17 @@ bool GetTransaction(const uint256 &hash,
 {
     const CBlockIndex *pindexSlow = blockIndex;
 
-    CTransactionRef ptx = mempool.get(hash);
+    CTransactionRef ptx;
+    txTime = 0;
+    {
+        READLOCK(mempool.cs_txmempool);
+        CTxMemPool::txiter entryPtr = mempool.mapTx.find(hash);
+        if (entryPtr != mempool.mapTx.end())
+        {
+            txTime = entryPtr->GetTime();
+            ptx = entryPtr->GetSharedTx();
+        }
+    }
     if (ptx)
     {
         txOut = ptx;
