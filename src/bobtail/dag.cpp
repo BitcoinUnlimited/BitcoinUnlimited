@@ -4,12 +4,7 @@
 
 #include "dag.h"
 
-CDagNode::CDagNode(CSubBlock _subblock)
-{
-    hash = _subblock.GetHash();
-    subblock = _subblock;
-    subgraph_id = -1;
-}
+#include "consensus/consensus.h"
 
 void CDagNode::AddAncestor(CDagNode* ancestor)
 {
@@ -66,46 +61,117 @@ uint16_t CDagNode::GetNodeScore()
 
 bool CDagNode::IsValid()
 {
-    return (subblock.IsNull() == false && subgraph_id >= 0);
+    return (subblock.IsNull() == false && dag_id >= 0);
 }
 
-int16_t CDagForrest::MergeTrees(const std::set<int16_t> &tree_ids)
+void CBobtailDag::SetId(int16_t new_id)
 {
-    int16_t new_subgraph_id = next_subgraph_id;
-    next_subgraph_id++;
-    for (auto &node : _dag)
+    id = new_id;
+}
+
+bool CBobtailDag::Insert(CDagNode* new_node)
+{
+    std::set<COutPoint> new_spends;
+    for (auto &tx : new_node->subblock.vtx)
     {
-        if (tree_ids.count(node->subgraph_id))
+        if (tx->IsProofBase() == false)
         {
-            node->subgraph_id = new_subgraph_id;
+            for (auto &input : tx->vin)
+            {
+                // TODO : change to contains in c++17
+                if (spent_outputs.count(input.prevout) != 0)
+                {
+                    return false;
+                }
+                new_spends.emplace(input.prevout);
+            }
         }
     }
-    return new_subgraph_id;
+    // change to merge in c++17
+    spent_outputs.insert(new_spends.begin(), new_spends.end());
+    _dag.emplace_back(new_node);
+    return true;
 }
 
-void CDagForrest::Clear()
+void CBobtailDagSet::SetNewIds(std::priority_queue<int16_t> &removed_ids)
 {
-    next_subgraph_id = 0;
-    _dag.clear();
-}
-
-CDagNode* CDagForrest::Find(const uint256 &hash)
-{
-    // TODO : replace with std::find
-    auto iter = _dag.begin();
-    while (iter != _dag.end())
+    int16_t last_value;
+    for (auto riter = vdags.rbegin(); riter != vdags.rend(); ++riter)
     {
-        CDagNode* temp = *iter;
-        if (temp->hash == hash)
+        last_value = removed_ids.top();
+        // TODO : dont use assert here
+        assert(riter->id != last_value);
+        if (riter->id > last_value)
         {
-            return *iter;
+            riter->id = riter->id - removed_ids.size();
         }
-        ++iter;
+        else // <
+        {
+            removed_ids.pop();
+            riter->id = riter->id - removed_ids.size();
+        }
+        if (removed_ids.empty())
+        {
+            break;
+        }
+    }
+    // do a check to ensure everything lines up
+    for (size_t i = 0; i < vdags.size(); ++i)
+    {
+        // TODO : dont use assert here
+        assert(i == vdags[i].id);
+        for (auto &node : vdags[i]._dag)
+        {
+            node->dag_id = i;
+        }
+    }
+}
+
+bool CBobtailDagSet::MergeDags(std::set<int16_t> &tree_ids, int16_t &new_id)
+{
+    int16_t base_dag_id = *(tree_ids.begin());
+    // remove the first element, it is not being deleted
+    tree_ids.erase(tree_ids.begin());
+    for (auto &id : tree_ids)
+    {
+        if (id < 0 || (size_t)id >= vdags.size())
+        {
+            return false;
+        }
+        for (CDagNode* node : vdags[id]._dag)
+        {
+            vdags[base_dag_id].Insert(node);
+        }
+    }
+    std::priority_queue<int16_t> removed_ids;
+    // erase after we move all nodes to ensure indexes still align
+    // go in reverse order so indexes still align
+    for (auto riter = tree_ids.rbegin(); riter != tree_ids.rend(); ++riter)
+    {
+        vdags.erase(vdags.begin() + (*riter));
+        removed_ids.push(*riter);
+    }
+    SetNewIds(removed_ids);
+    new_id = base_dag_id;
+    return true;
+}
+
+void CBobtailDagSet::Clear()
+{
+    vdags.clear();
+}
+
+CDagNode* CBobtailDagSet::Find(const uint256 &hash)
+{
+    std::map<uint256, CDagNode*>::iterator iter = mapAllNodes.find(hash);
+    if (iter != mapAllNodes.end())
+    {
+        return iter->second;
     }
     return nullptr;
 }
 
-bool CDagForrest::Insert(const CSubBlock &sub_block)
+bool CBobtailDagSet::Insert(const CSubBlock &sub_block)
 {
     uint256 sub_block_hash = sub_block.GetHash();
     CDagNode* temp = Find(sub_block_hash);
@@ -127,13 +193,16 @@ bool CDagForrest::Insert(const CSubBlock &sub_block)
             continue;
         }
         newNode->AddAncestor(ancestor);
-        merge_list.emplace(ancestor->subgraph_id);
+        merge_list.emplace(ancestor->dag_id);
         ancestor->AddDescendant(newNode);
     }
     int16_t new_id = -1;
     if (merge_list.size() > 1)
     {
-        new_id = MergeTrees(merge_list);
+        if (!MergeDags(merge_list, new_id))
+        {
+            return false;
+        }
     }
     else if (merge_list.size() == 1)
     {
@@ -141,91 +210,54 @@ bool CDagForrest::Insert(const CSubBlock &sub_block)
     }
     else // if(merge_list.size() == 0)
     {
-        new_id = next_subgraph_id;
-        next_subgraph_id = next_subgraph_id + 1;
+        new_id = vdags.size();
+        vdags.emplace_back(new_id, newNode);
     }
-    newNode->subgraph_id = new_id;
+    newNode->dag_id = new_id;
+    vdags[new_id].Insert(newNode);
     // TODO : should insert to maintain temporal ordering not just emplace_back
-    _dag.emplace_back(newNode);
+    mapAllNodes.emplace(newNode->hash, newNode);
     return true;
 }
 
-void CDagForrest::TemporalSort()
+void CBobtailDagSet::TemporalSort()
 {
 
 }
 
-bool CDagForrest::IsTemporallySorted()
+bool CBobtailDagSet::IsTemporallySorted()
 {
     return true;
 }
 
-bool CDagForrest::IsSubgraphValid(std::set<uint256> sgHashes)
+bool CBobtailDagSet::GetBestDag(std::set<CDagNode*> &dag)
 {
-    // TODO : replace 15 with consensus k variable
-    if (sgHashes.size() < 15)
+    if (vdags.empty())
     {
-        // subgraph not large enough
         return false;
     }
-    // check if we have all subblocks in our dag
-    std::set<CDagNode*> subgraph;
-    for (auto &hash : sgHashes)
+    int16_t best_dag = -1;
+    uint64_t best_dag_score = -1;
+    // Get all dags that are big enough
+    for (size_t i = 0; i < vdags.size(); ++i)
     {
-        CDagNode* node = Find(hash);
-        if(node == nullptr)
+        if (vdags[i]._dag.size() < BOBTAIL_K)
         {
-            // missing a subblock, we need to request it
-            // TODO : request missing subblock or throw an error or something
-            return false;
+            continue;
         }
-        if(node->IsValid() == false)
+        if (vdags[i].score > best_dag_score)
         {
-            // there was an error somewhere and this node does not have valid data
-            return false;
+            best_dag = i;
         }
-        subgraph.emplace(node);
     }
-    int16_t tree_id = -1;
-    for (auto &node : subgraph)
+    if (best_dag < 0)
     {
-        if (tree_id < 0)
-        {
-            tree_id = node->subgraph_id;
-        }
-        if (tree_id != node->subgraph_id)
-        {
-            // TODO : handle this somewhow
-            // nodes dont all belong to the same subbgraph
-            // this can cause a false positive if we are missing a proof that links the trees
-            // as long as that proof isnt also in the nodes selected for the subgraph
-            return false;
-        }
+        // should never happen
+        return false;
+    }
+    for (auto& node :vdags[best_dag]._dag)
+    {
+        dag.emplace(node);
     }
     return true;
-
-}
-
-// K should be 15
-std::set<CDagNode*> CDagForrest::GetBestSubgraph(const uint8_t &k)
-{
-    std::set<CDagNode*> Kset;
-    if (_dag.size() < k)
-    {
-        for (auto &entry : _dag)
-        {
-            Kset.emplace(entry);
-        }
-        return Kset;
-    }
-    std::set<CDagNode*> subgraph;
-    auto iter = _dag.end();
-    uint8_t j = 0;
-    while (j < k)
-    {
-        iter--;
-        Kset.emplace(*iter);
-        ++j;
-    }
-    return Kset;
 }

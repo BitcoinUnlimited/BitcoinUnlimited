@@ -10,7 +10,7 @@
 #include "validation/validation.h"
 // FIXME: Add copyright here (awemany / BU devs)
 
-extern CDagForrest bobtailDag;
+extern CBobtailDagSet bobtailDagSet;
 extern CTxMemPool mempool;
 extern CCriticalSection cs_db;
 
@@ -351,7 +351,7 @@ bool CNetDeltaRequestMissing::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 {
     CNDRMT req;
     vRecv >> req;
-    CDagNode *dagNode = bobtailDag.Find(req.blockhash);
+    CDagNode *dagNode = bobtailDagSet.Find(req.blockhash);
     CSubBlockRef db = std::make_shared<CSubBlock>(dagNode->subblock);
     LOG(WB, "Got DBMISSTX for delta block %s", req.blockhash.GetHex());
     if (db == nullptr)
@@ -392,7 +392,7 @@ bool CNetDeltaBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         LOG(WB, "Retrying deltablock with hash %s.\n", hash.GetHex());
 
     // Let's see whether we know this one already
-    const bool known = bobtailDag.Find(hash) != nullptr;
+    const bool known = bobtailDagSet.Find(hash) != nullptr;
     if (known)
     {
         if (pfrom != nullptr)
@@ -449,7 +449,7 @@ bool CNetDeltaBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 
     for (auto h : db->GetAncestorHashes())
     {
-        if (bobtailDag.Find(h) == nullptr)
+        if (bobtailDagSet.Find(h) == nullptr)
         {
             LOG(WB, "Ancestor %s missing.\n", h.GetHex());
             if (pfrom != nullptr)

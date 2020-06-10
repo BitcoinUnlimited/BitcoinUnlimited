@@ -78,7 +78,7 @@
  */
 
 /*! Known, complete delta blocks. */
-CDagForrest bobtailDag;
+CBobtailDagSet bobtailDagSet;
 std::map<uint256, ConstCDeltaBlockRef> known_dbs;
 
 std::atomic<bool> fImporting{false};
