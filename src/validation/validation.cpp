@@ -3873,40 +3873,6 @@ bool IsBlockPruned(const CBlockIndex *pblockindex)
  */
 extern CBobtailDagSet bobtailDagSet;
 
-struct unknownBobtailForkData
-{
-    int unknownBobtailForkSignalStrength{0};
-    bool unknownBobtailForkSignalFirstDetected{false};
-    bool unknownBobtailForkSignalLost{false};
-    bool unknownBobtailForkSignalAt25Percent{false};
-    bool unknownBobtailForkSignalAt50Percent{false};
-    bool unknownBobtailForkSignalAt70Percent{false};
-    bool unknownBobtailForkSignalAt90Percent{false};
-    bool unknownBobtailForkSignalAt95Percent{false};
-};
-
-static unknownBobtailForkData unknownBobtailFork[Consensus::MAX_VERSION_BITS_DEPLOYMENTS];
-std::set<CBlockIndex *, CBlockIndexWorkComparator> setBobtailBlockIndexCandidates GUARDED_BY(cs_main);
-
-// Last time the block tip was updated
-std::atomic<int64_t> nBobtailTimeBestReceived{0};
-
-CBlockIndex *pindexBobtailBestForkTip = nullptr;
-CBlockIndex *pindexBobtailBestForkBase = nullptr;
-
-static int64_t nBobtailTimeCheck = 0;
-static int64_t nBobtailTimeForks = 0;
-static int64_t nBobtailTimeVerify = 0;
-static int64_t nBobtailTimeConnect = 0;
-static int64_t nBobtailTimeIndex = 0;
-static int64_t nBobtailTimeCallbacks = 0;
-static int64_t nBobtailTimeTotal = 0;
-static int64_t nBobtailTimeReadFromDisk = 0;
-static int64_t nBobtailTimeConnectTotal = 0;
-static int64_t nBobtailTimeFlush = 0;
-static int64_t nBobtailTimeChainState = 0;
-static int64_t nBobtailTimePostConnect = 0;
-
 //////////////////////////////////////////////////////////////////
 //
 // Header
@@ -4170,7 +4136,7 @@ bool ConnectBobtailBlockPrevalidations(const CBobtailBlock &block,
     const CChainParams &chainparams,
     bool fJustCheck)
 {
-    int64_t nBobtailTimeStart = GetStopwatchMicros();
+    int64_t nTimeStart = GetStopwatchMicros();
 
     // Check it again in case a previous version let a bad block in
     if (!CheckBobtailBlock(block, state, !fJustCheck, !fJustCheck))
@@ -4182,9 +4148,9 @@ bool ConnectBobtailBlockPrevalidations(const CBobtailBlock &block,
     uint256 hashPrevBlock = pindex->pprev == nullptr ? uint256() : pindex->pprev->GetBlockHash();
     assert(hashPrevBlock == view.GetBestBlock());
 
-    int64_t nBobtailTime1 = GetStopwatchMicros();
-    nBobtailTimeCheck += nBobtailTime1 - nBobtailTimeStart;
-    LOG(BENCH, "    - Sanity checks: %.2fms [%.2fs]\n", 0.001 * (nBobtailTime1 - nBobtailTimeStart), nBobtailTimeCheck * 0.000001);
+    int64_t nTime1 = GetStopwatchMicros();
+    nTimeCheck += nTime1 - nTimeStart;
+    LOG(BENCH, "    - Sanity checks: %.2fms [%.2fs]\n", 0.001 * (nTime1 - nTimeStart), nTimeCheck * 0.000001);
 
     // Do not allow blocks that contain transactions which 'overwrite' older transactions,
     // unless those are already completely spent.
@@ -4239,9 +4205,9 @@ bool ConnectBobtailBlockPrevalidations(const CBobtailBlock &block,
         }
     }
 
-    int64_t nBobtailTime2 = GetStopwatchMicros();
-    nBobtailTimeForks += nBobtailTime2 - nBobtailTime1;
-    LOG(BENCH, "    - Fork checks: %.2fms [%.2fs]\n", 0.001 * (nBobtailTime2 - nBobtailTime1), nBobtailTimeForks * 0.000001);
+    int64_t nTime2 = GetStopwatchMicros();
+    nTimeForks += nTime2 - nTime1;
+    LOG(BENCH, "    - Fork checks: %.2fms [%.2fs]\n", 0.001 * (nTime2 - nTime1), nTimeForks * 0.000001);
 
     return true;
 }
@@ -4342,7 +4308,7 @@ bool ConnectBobtailBlock(const CBobtailBlock &block,
     if (fJustCheck)
         return true;
 
-    int64_t nBobtailTime4 = GetStopwatchMicros();
+    int64_t nTime4 = GetStopwatchMicros();
 
     /*****************************************************************************************************************
      *                         Start update of UTXO, if this block wins the validation race *
@@ -4398,18 +4364,18 @@ bool ConnectBobtailBlock(const CBobtailBlock &block,
     // add this block to the view's block chain (the main UTXO in memory cache)
     view.SetBestBlock(pindex->GetBlockHash());
 
-    int64_t nBobtailTime5 = GetStopwatchMicros();
-    nBobtailTimeIndex += nBobtailTime5 - nBobtailTime4;
-    LOG(BENCH, "    - Index writing: %.2fms [%.2fs]\n", 0.001 * (nBobtailTime5 - nBobtailTime4), nBobtailTimeIndex * 0.000001);
+    int64_t nTime5 = GetStopwatchMicros();
+    nTimeIndex += nTime5 - nTime4;
+    LOG(BENCH, "    - Index writing: %.2fms [%.2fs]\n", 0.001 * (nTime5 - nTime4), nTimeIndex * 0.000001);
 
     // Watch for changes to the previous coinbase transaction.
     static uint256 hashPrevBestCoinBase;
     GetMainSignals().UpdatedTransaction(hashPrevBestCoinBase);
     hashPrevBestCoinBase = block.vtx[0]->GetHash();
 
-    int64_t nBobtailTime6 = GetStopwatchMicros();
-    nBobtailTimeCallbacks += nBobtailTime6 - nBobtailTime5;
-    LOG(BENCH, "    - Callbacks: %.2fms [%.2fs]\n", 0.001 * (nBobtailTime6 - nBobtailTime5), nBobtailTimeCallbacks * 0.000001);
+    int64_t nTime6 = GetStopwatchMicros();
+    nTimeCallbacks += nTime6 - nTime5;
+    LOG(BENCH, "    - Callbacks: %.2fms [%.2fs]\n", 0.001 * (nTime6 - nTime5), nTimeCallbacks * 0.000001);
 
     PV->Cleanup(block, pindex); // NOTE: this must be run whether in fParallel or not!
 
