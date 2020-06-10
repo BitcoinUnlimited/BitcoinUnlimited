@@ -101,6 +101,8 @@ static const unsigned int MAX_DISCONNECTS = 200;
 static const uint64_t DEFAULT_MAX_UPLOAD_TARGET = 0;
 /** Default for blocks only*/
 static const bool DEFAULT_BLOCKSONLY = false;
+/** Default for XVersion */
+static const bool DEFAULT_USE_XVERSION = true;
 
 // BITCOINUNLIMITED START
 static const bool DEFAULT_FORCEBITNODES = false;
@@ -323,45 +325,6 @@ public:
 };
 #endif
 
-
-// clang-format off
-
-
-/*! Corresponding ConnectionStateOutgoing, this is used to track incoming versioning information from a peer. */
-enum class ConnectionStateIncoming : uint8_t {
-    //! initial state after TCP connection is up - waiting for version message
-    CONNECTED_WAIT_VERSION                       = 0x01,
-    //! Sent verack message - ready for xversion (or any other message, aborting the xversion-handling process)
-    SENT_VERACK_READY_FOR_POTENTIAL_XVERSION     = 0x02,
-    //! Sent xverack and am thus ready for general data transfer
-    READY                                        = 0x04,
-    //! placeholder value to allow any when checking for a particular state
-    ANY                                          = 0xff
-};
-ConnectionStateIncoming operator|(const ConnectionStateIncoming& a, const ConnectionStateIncoming& b);
-/** This is enum is used to track the state of the versioning information
-    that has been sent to the remote node. */
-enum class ConnectionStateOutgoing : uint8_t {
-    //! initial state after TCP connection is up
-    CONNECTED     = 0x01,
-    //! the VERSION message has been sent
-    SENT_VERSION  = 0x02,
-    //! Connection is ready for general data transfer into peer's direction (and the xversion as well as BU version has been sent)
-    READY         = 0x04,
-    //! placeholder value to allow any when checking for a particular state
-    ANY           = 0xff
-};
-ConnectionStateOutgoing operator|(const ConnectionStateOutgoing& a, const ConnectionStateOutgoing& b);
-// clang-format on
-
-//! ConnectionStateIncoming enum to string
-std::string toString(const ConnectionStateIncoming &state) PURE_FUNCTION;
-std::ostream &operator<<(std::ostream &os, const ConnectionStateIncoming &state);
-
-//! ConnectionStateOutgoing enum to string
-std::string toString(const ConnectionStateOutgoing &state) PURE_FUNCTION;
-std::ostream &operator<<(std::ostream &os, const ConnectionStateOutgoing &state);
-
 /** Information about a peer */
 class CNode
 {
@@ -415,6 +378,7 @@ public:
     CCriticalSection cs_vRecvMsg;
     uint64_t nRecvBytes GUARDED_BY(cs_vRecvMsg);
     std::deque<CNetMessage> vRecvMsg GUARDED_BY(cs_vRecvMsg);
+    std::deque<CNetMessage> vRecvMsg_handshake GUARDED_BY(cs_vRecvMsg);
     // the next message we receive from the socket
     CNetMessage msg GUARDED_BY(cs_vRecvMsg);
     CStatHistory<uint64_t> currentRecvMsgSize;
@@ -446,12 +410,6 @@ public:
     /** The the remote peer sees us as this address (may be different than our IP due to NAT) */
     CService addrLocal;
     int nVersion;
-
-    /** The state of informing the remote peer of our version information */
-    ConnectionStateOutgoing state_outgoing;
-
-    /** The state of being informed by the remote peer of his version information */
-    ConnectionStateIncoming state_incoming;
 
     /** used to make processing serial when version handshake is taking place */
     CCriticalSection csSerialPhase;
@@ -488,11 +446,6 @@ public:
     bool fAutoOutbound; // any outbound node not connected with -addnode, connect-thinblock or -connect
     bool fNetworkNode; // any outbound node
     int64_t tVersionSent;
-
-    bool successfullyConnected() const
-    {
-        return (state_outgoing == ConnectionStateOutgoing::READY && state_incoming == ConnectionStateIncoming::READY);
-    }
 
     std::atomic<bool> fDisconnect;
     std::atomic<bool> fDisconnectRequest;
@@ -547,6 +500,8 @@ public:
     std::atomic<int64_t> nMaxBlocksInTransit;
 
     unsigned short addrFromPort;
+
+    std::atomic<bool> fSuccessfullyConnected;
 
 protected:
     // Basic fuzz-testing

@@ -305,19 +305,6 @@ extern const char *XPEDITEDBLK;
 extern const char *XPEDITEDTXN;
 
 /**
- * BU specific version information similar to NetMsgType::VERSION
- * @since protocol version 80002.
- */
-extern const char *BUVERSION;
-
-
-/**
- * BU specific version information similar to NetMsgType::VERACK
- * @since protocol version 80002.
- */
-extern const char *BUVERACK;
-
-/**
  * Indicates that a node accepts Compact Blocks and provides version and
  * configuration information.
  * @since protocol version 70014.
@@ -332,13 +319,10 @@ extern const char *SENDCMPCT;
  * Cash specific version information extending NetMsgType::VERSION
  * @since protocol version FIXME.
  */
-extern const char *XVERSION;
 
-/**
- * Cash specific acknowledgement of xversion
- * @since protocol version FIXME.
- */
-extern const char *XVERACK;
+extern const char *XVERSION_OLD;
+extern const char *XVERACK_OLD;
+extern const char *XVERSION;
 
 extern const char *XUPDATE;
 
@@ -419,6 +403,9 @@ enum
     // of only serving a small subset of the blockchain
     // See BIP159 for details on how this is implemented.
     NODE_NETWORK_LIMITED = (1 << 10),
+
+    // indicates if node is using xversion
+    NODE_XVERSION = (1 << 11),
 };
 
 /** A CService with information about it as peer */

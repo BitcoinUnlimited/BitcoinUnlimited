@@ -2183,7 +2183,7 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 
         node.pushKV("vSendMsg", (int64_t)inode.vSendMsg.size());
         node.pushKV("vRecvGetData", (int64_t)inode.vRecvGetData.size());
-        node.pushKV("vRecvMsg", (int64_t)inode.vRecvMsg.size());
+        node.pushKV("vRecvMsg", (int64_t)inode.vRecvMsg.size() + (int64_t)inode.vRecvMsg_handshake.size());
         {
             LOCK(inode.cs_filter);
             if (inode.pfilter)

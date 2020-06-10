@@ -332,16 +332,12 @@ class SendHeadersTest(BitcoinTestFramework):
 
         NetworkThread().start() # Start up network handling in another thread
 
-        # Test logic begins here
-        inv_node.wait_for_verack()
-        test_node.wait_for_verack()
-
         inv_node.send_message(msg_xversion(), True)
         test_node.send_message(msg_xversion(), True)
 
         # Test logic begins here
-        inv_node.wait_for_xverack()
-        test_node.wait_for_xverack()
+        inv_node.wait_for_verack()
+        test_node.wait_for_verack()
 
         tip = int(self.nodes[0].getbestblockhash(), 16)
 

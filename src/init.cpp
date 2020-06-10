@@ -1004,6 +1004,9 @@ bool AppInit2(Config &config)
 
     // BitcoinCash service bit
     nLocalServices |= NODE_BITCOIN_CASH;
+    // we use xversion by default
+    if (GetBoolArg("-use-xversion", DEFAULT_USE_XVERSION))
+        nLocalServices |= NODE_XVERSION;
 
     nMaxTipAge = GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);
 

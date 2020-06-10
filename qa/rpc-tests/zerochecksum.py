@@ -76,9 +76,6 @@ class MyTest(BitcoinTestFramework):
             # now it is time for xversion
             conn.send_message(msg_xversion({0x00020002 : int(chksum_zero_recv_advertise)}))
 
-            # send extra buversion and buverack, shouldn't harm
-            conn.send_message(msg_buversion(addrFromPort = 12345))
-            conn.send_message(msg_buverack())
             conn.wait_for(lambda : conn.remote_xversion)
             if len(self.hndlr.exceptions):
                 return
