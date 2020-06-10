@@ -3954,6 +3954,84 @@ bool AcceptSubBlockBlockHeader(const CBlockHeader &block,
     return true;
 }
 
+bool CheckBobtailBlockHeader(const CBlockHeader &block, CValidationState &state)
+{
+    // fCheckPOW kept only for legacy compatibility
+    if (true) //TODO: add Bobtail header validty check here
+    {
+        return state.DoS(50, error("CheckBobtailBlockHeader(): bobtail block validity check failed"), REJECT_INVALID, "high-hash");
+    }
+
+    // Check timestamp
+    if (block.GetBlockTime() > GetAdjustedTime() + 2 * 60 * 60)
+        return state.Invalid(
+            error("CheckBobtailBlockHeader(): block timestamp too far in the future"), REJECT_INVALID, "time-too-new");
+
+    return true;
+}
+
+bool AcceptBobtailBlockBlockHeader(const CBlockHeader &block,
+    CValidationState &state,
+    const CChainParams &chainparams,
+    CBlockIndex **ppindex)
+{
+    AssertLockHeld(cs_main);
+    // Check for duplicate
+    uint256 hash = block.GetHash();
+    CBlockIndex *pindex = nullptr;
+    if (hash != chainparams.GetConsensus().hashGenesisBlock)
+    {
+        pindex = LookupBlockIndex(hash);
+        if (pindex)
+        {
+            // Block header is already known.
+            if (ppindex)
+                *ppindex = pindex;
+            {
+                READLOCK(cs_mapBlockIndex);
+                if (pindex->nStatus & BLOCK_FAILED_MASK)
+                    return state.Invalid(
+                        error("%s: subblock %s height %d is marked invalid", __func__, hash.ToString(), pindex->nHeight),
+                        0, "duplicate");
+            }
+            return true;
+        }
+
+        if (!CheckBobtailBlockHeader(block, state))
+            return false;
+
+        // Get prev block index
+        CBlockIndex *pindexPrev = LookupBlockIndex(block.hashPrevBlock);
+        if (!pindexPrev)
+            return state.DoS(10, error("%s: previous block %s not found while accepting %s", __func__,
+                                     block.hashPrevBlock.ToString(), hash.ToString()),
+                0, "bad-prevblk");
+        {
+            READLOCK(cs_mapBlockIndex);
+            if (pindexPrev->nStatus & BLOCK_FAILED_MASK)
+                return state.DoS(100,
+                    error("%s: previous block %s is invalid", __func__, pindexPrev->GetBlockHash().GetHex().c_str()),
+                    REJECT_INVALID, "bad-prevblk");
+        }
+
+        // If the parent block belongs to the set of checkpointed blocks but it has a mismatched hash,
+        // then we are on the wrong fork so ignore
+        if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindexPrev->nHeight, *pindexPrev->phashBlock, chainparams))
+            return error("%s: CheckAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
+
+        if (!ContextualCheckBlockHeader(block, state, pindexPrev))
+            return false;
+    }
+    if (pindex == nullptr)
+        pindex = AddToBlockIndex(block);
+
+    if (ppindex)
+        *ppindex = pindex;
+
+    return true;
+}
+
+
 //////////////////////////////////////////////////////////////////
 //
 // Block/chain

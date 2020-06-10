@@ -194,6 +194,15 @@ bool AcceptSubBlockBlockHeader(const CBlockHeader &block,
     const CChainParams &chainparams,
     CBlockIndex **ppindex = nullptr);
 
+//TODO: This should accept a CBobtailBlockHeader once it is defined
+bool CheckBobtailBlockHeader(const CBlockHeader &block, CValidationState &state);
+
+//TODO: This should accept a CBobtailBlockHeader once it is defined
+bool AcceptBobtailBlockBlockHeader(const CBlockHeader &block,
+    CValidationState &state,
+    const CChainParams &chainparams,
+    CBlockIndex **ppindex = nullptr);
+
 bool CheckBobtailBlock(const CBobtailBlock &block, CValidationState &state, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
 
 /** Apply the effects of this block (with given index) on the UTXO set represented by coins */
