@@ -189,120 +189,21 @@ bool IsBlockPruned(const CBlockIndex *pblockindex);
 /** Context-independent validity checks */
 bool CheckSubBlockHeader(const CBlockHeader &block, CValidationState &state, bool fCheckPOW = true);
 
-/** Context-dependent validity header checks */
-bool ContextualCheckBobtailBlockHeader(const CBlockHeader &block, CValidationState &state, CBlockIndex *pindexPrev);
-
-bool AcceptBobtailBlockHeader(const CBlockHeader &block,
+bool AcceptSubBlockBlockHeader(const CBlockHeader &block,
     CValidationState &state,
     const CChainParams &chainparams,
     CBlockIndex **ppindex = nullptr);
 
-CBlockIndex *AddToBobtailBlockIndex(const CBlockHeader &block);
-
-/** Create a new block index entry for a given block hash */
-CBlockIndex *InsertBobtailBlockIndex(const uint256 &hash);
-
-/** Look up the block index entry for a given block hash. returns nullptr if it does not exist */
-CBlockIndex *LookupBobtailBlockIndex(const uint256 &hash);
-
-
-/** Unload database information */
-void UnloadBobtailBlockIndex();
-
-/** Load the block tree and coins database from disk */
-bool LoadBobtailBlockIndex();
-
-/** Initialize a new block tree database + block data on disk */
-bool InitBobtailBlockIndex(const CChainParams &chainparams);
-
-void CheckBobtailBlockIndex(const Consensus::Params &consensusParams);
-
-/**
- * Check whether all inputs of this transaction are valid (no double spends, scripts & sigs, amounts)
- * This does not modify the UTXO set. If pvChecks is not nullptr, script checks are pushed onto it
- * instead of being performed inline.
- */
-bool CheckBobtailInputs(const CTransactionRef &tx,
-    CValidationState &state,
-    const CCoinsViewCache &view,
-    bool fScriptChecks,
-    unsigned int flags,
-    unsigned int maxOps,
-    bool cacheStore,
-    ValidationResourceTracker *resourceTracker,
-    std::vector<CScriptCheck> *pvChecks = nullptr,
-    unsigned char *sighashType = nullptr,
-    CValidationDebugger *debugger = nullptr);
-
-
-/** Remove invalidity status from a block and its descendants. */
-bool ReconsiderBobtailBlock(CValidationState &state, CBlockIndex *pindex);
-
-/** Check a block is completely valid from start to finish (only works on top of our current best block, with cs_main
- * held) */
-bool TestSubBlockValidity(CValidationState &state,
-    const CChainParams &chainparams,
-    const CBlock &block,
-    CBlockIndex *pindexPrev,
-    bool fCheckPOW = true,
-    bool fCheckMerkleRoot = true);
-
-CAmount GetBobtailBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
-
-/**
- * Determine what nVersion a new block should use.
- */
-int32_t ComputeBobtailBlockVersion(const CBlockIndex *pindexPrev, const Consensus::Params &params);
-
-CBlockIndex *FindMostBobtailWorkChain();
-
-/** Mark a block as invalid. */
-bool InvalidateBobtailBlock(CValidationState &state, const Consensus::Params &consensusParams, CBlockIndex *pindex);
-
-void InvalidBobtailChainFound(CBlockIndex *pindexNew);
-
-/** Context-dependent validity block checks */
-bool ContextualCheckBobtailBlock(const CBlock &block,
-    CValidationState &state,
-    CBlockIndex *pindexPrev,
-    const bool fConservative = false);
-
 bool CheckBobtailBlock(const CBobtailBlock &block, CValidationState &state, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
 
-/** Mark a block as having its data received and checked (up to BLOCK_VALID_TRANSACTIONS). */
-bool ReceivedBobtailBlockTransactions(const CBlock &block,
-    CValidationState &state,
-    CBlockIndex *pindexNew,
-    const CDiskBlockPos &pos);
-
-uint32_t GetBobtailBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params &consensusparams);
-
-/** Undo the effects of this block (with given index) on the UTXO set represented by coins.
- *  In case pfClean is provided, operation will try to be tolerant about errors, and *pfClean
- *  will be true if no problems were found. Otherwise, the return value will be false in case
- *  of problems. Note that in any case, coins may be modified. */
-DisconnectResult DisconnectBobtailBlock(const CBlock &block, const CBlockIndex *pindex, CCoinsViewCache &view);
-
 /** Apply the effects of this block (with given index) on the UTXO set represented by coins */
-bool ConnectBobtailBlock(const CBlock &block,
+bool ConnectBobtailBlock(const CBobtailBlock &block,
     CValidationState &state,
     CBlockIndex *pindex,
     CCoinsViewCache &view,
     const CChainParams &chainparams,
     bool fJustCheck = false,
     bool fParallel = false);
-
-/** Disconnect the current chainActive.Tip() */
-bool DisconnectBobtailBlockTip(CValidationState &state, const Consensus::Params &consensusParams, const bool fRollBack = false);
-
-/** Find the best known block, and make it the tip of the block chain */
-/*
-bool ActivateBestChain(CValidationState &state,
-    const CChainParams &chainparams,
-    const CBlock *pblock = nullptr,
-    bool fParallel = false,
-    CNode *pfrom = nullptr);
-*/
 
 /**
  * Process an incoming block. This only returns after the best known valid
@@ -329,8 +230,5 @@ bool ProcessNewBobtailBlock(CValidationState &state,
     bool fForceProcessing,
     CDiskBlockPos *dbp,
     bool fParallel);
-
-//! Check whether the block associated with this index entry is pruned or not.
-bool IsBobtailBlockPruned(const CBlockIndex *pblockindex);
 
 #endif
