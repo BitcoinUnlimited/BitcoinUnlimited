@@ -1,5 +1,6 @@
 // Copyright 2014 BitPay Inc.
 // Copyright 2015 Bitcoin Core Developers
+// Copyright (c) 2020 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -90,18 +91,11 @@ bool ParseDouble(const std::string& str, double *out)
 }
 } // end anonymous namespace
 
-const std::vector<std::string>& UniValue::getKeys() const
+const std::vector<std::pair<std::string, UniValue>>& UniValue::getObjectEntries() const
 {
     if (!isObject())
         throw std::runtime_error("JSON value is not an object as expected");
-    return keys;
-}
-
-const std::vector<UniValue>& UniValue::getObjectValues() const
-{
-    if (!isObject())
-        throw std::runtime_error("JSON value is not an object as expected");
-    return values;
+    return entries;
 }
 
 const std::vector<UniValue>& UniValue::getArrayValues() const

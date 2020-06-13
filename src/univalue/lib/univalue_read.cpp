@@ -1,4 +1,5 @@
 // Copyright 2014 BitPay Inc.
+// Copyright (c) 2020 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -327,10 +328,17 @@ bool UniValue::read(const char *raw, size_t size)
                 stack.push_back(this);
             } else {
                 UniValue *top = stack.back();
-                top->values.emplace_back(utyp);
-
-                UniValue *newTop = &(top->values.back());
-                stack.push_back(newTop);
+                if (top->typ == VOBJ) {
+                    auto& entry = top->entries.back();
+                    if (utyp == VOBJ)
+                        entry.second.setObject();
+                    else
+                        entry.second.setArray();
+                    stack.push_back(&entry.second);
+                } else {
+                    top->values.emplace_back(utyp);
+                    stack.push_back(&top->values.back());
+                }
             }
 
             if (stack.size() > MAX_JSON_DEPTH)
@@ -407,7 +415,11 @@ bool UniValue::read(const char *raw, size_t size)
             }
 
             UniValue *top = stack.back();
-            top->values.emplace_back(std::move(tmpVal));
+            if (top->typ == VOBJ) {
+                top->entries.back().second = std::move(tmpVal);
+            } else {
+                top->values.emplace_back(std::move(tmpVal));
+            }
 
             setExpect(NOT_VALUE);
             break;
@@ -421,7 +433,11 @@ bool UniValue::read(const char *raw, size_t size)
             }
 
             UniValue *top = stack.back();
-            top->values.emplace_back(std::move(tmpVal));
+            if (top->typ == VOBJ) {
+                top->entries.back().second = std::move(tmpVal);
+            } else {
+                top->values.emplace_back(std::move(tmpVal));
+            }
 
             setExpect(NOT_VALUE);
             break;
@@ -430,7 +446,9 @@ bool UniValue::read(const char *raw, size_t size)
         case JTOK_STRING: {
             if (expect(OBJ_NAME)) {
                 UniValue *top = stack.back();
-                top->keys.push_back(tokenVal);
+                top->entries.emplace_back(std::piecewise_construct,
+                                          std::forward_as_tuple(std::move(tokenVal)),
+                                          std::forward_as_tuple());
                 clearExpect(OBJ_NAME);
                 setExpect(COLON);
             } else {
@@ -440,7 +458,11 @@ bool UniValue::read(const char *raw, size_t size)
                     break;
                 }
                 UniValue *top = stack.back();
-                top->values.emplace_back(std::move(tmpVal));
+                if (top->typ == VOBJ) {
+                    top->entries.back().second = std::move(tmpVal);
+                } else {
+                    top->values.emplace_back(std::move(tmpVal));
+                }
             }
 
             setExpect(NOT_VALUE);

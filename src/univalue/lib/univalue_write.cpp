@@ -1,4 +1,5 @@
 // Copyright 2014 BitPay Inc.
+// Copyright (c) 2020 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -105,16 +106,15 @@ void UniValue::writeObject(Stream & ss, unsigned int prettyIndent, unsigned int 
     if (prettyIndent)
         ss.put('\n');
 
-    // Note: if typ == VOBJ, then keys.size() == values.size() always, so we can
-    // use the non-bounds-checking operator[]() for both keys and values here safely.
-    for (size_t i = 0, nItems = keys.size(); i < nItems; ++i) {
+    for (size_t i = 0, nEntries = entries.size(); i < nEntries; ++i) {
         if (prettyIndent)
             indentStr(ss, prettyIndent, indentLevel);
-        ss.put('"'); jsonEscape(ss, keys[i]); ss.write("\":", 2);
+        auto& entry = entries[i];
+        ss.put('"'); jsonEscape(ss, entry.first); ss.write("\":", 2);
         if (prettyIndent)
             ss.put(' ');
-        values[i].writeStream(ss, prettyIndent, indentLevel + 1);
-        if (i != (nItems - 1))
+        entry.second.writeStream(ss, prettyIndent, indentLevel + 1);
+        if (i != (nEntries - 1))
             ss.put(',');
         if (prettyIndent)
             ss.put('\n');

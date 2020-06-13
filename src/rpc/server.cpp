@@ -273,11 +273,11 @@ void RPCTypeCheckObj(const UniValue &o,
 
         if (fStrict)
         {
-            for (const std::string &k : o.getKeys())
+            for (auto &kv : o.getObjectEntries())
             {
-                if (typesExpected.count(k) == 0)
+                if (typesExpected.count(kv.first) == 0)
                 {
-                    string err = strprintf("Unexpected keys %s", k);
+                    std::string err = strprintf("Unexpected keys %s", kv.first);
                     throw JSONRPCError(RPC_TYPE_ERROR, err);
                 }
             }

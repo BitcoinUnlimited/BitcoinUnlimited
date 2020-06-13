@@ -1,5 +1,6 @@
 // Copyright 2014 BitPay Inc.
 // Copyright 2015 Bitcoin Core Developers
+// Copyright (c) 2020 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -53,8 +54,26 @@ public:
     constexpr enum VType getType() const noexcept { return typ; }
     constexpr const std::string& getValStr() const noexcept { return val; }
 
-    bool empty() const noexcept { return values.empty(); }
-    size_t size() const noexcept { return values.size(); }
+    bool empty() const noexcept {
+        switch (typ) {
+        case VOBJ:
+            return entries.empty();
+        case VARR:
+            return values.empty();
+        default:
+            return true;
+        }
+    }
+    size_t size() const noexcept {
+        switch (typ) {
+        case VOBJ:
+            return entries.size();
+        case VARR:
+            return values.size();
+        default:
+            return 0;
+        }
+    }
     bool reserve(size_t n);
 
     constexpr bool getBool() const noexcept { return isTrue(); }
@@ -79,7 +98,7 @@ public:
      */
     const UniValue* find(const std::string& key) const noexcept {
         size_t i;
-        return findKey(key, i) ? &values[i] : nullptr;
+        return findKey(key, i) ? &entries[i].second : nullptr;
     }
 
     constexpr bool isNull() const noexcept { return typ == VNULL; }
@@ -119,7 +138,7 @@ public:
 private:
     UniValue::VType typ;
     std::string val;                       // numbers are stored as C++ strings
-    std::vector<std::string> keys;
+    std::vector<std::pair<std::string, UniValue>> entries;
     std::vector<UniValue> values;
     static const std::string boolTrueVal; // = "1"
 
@@ -141,8 +160,7 @@ private:
 public:
     // Strict type-specific getters, these throw std::runtime_error if the
     // value is of unexpected type
-    const std::vector<std::string>& getKeys() const;
-    const std::vector<UniValue>& getObjectValues() const;
+    const std::vector<std::pair<std::string, UniValue>>& getObjectEntries() const;
     const std::vector<UniValue>& getArrayValues() const;
     /**
      * Like getArrayValues(), except returns a move-constructed vector of this object's values (a constant-time swap).

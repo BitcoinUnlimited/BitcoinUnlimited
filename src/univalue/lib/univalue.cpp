@@ -1,5 +1,6 @@
 // Copyright 2014 BitPay Inc.
 // Copyright 2015 Bitcoin Core Developers
+// Copyright (c) 2020 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -19,7 +20,7 @@ void UniValue::clear() noexcept
 {
     typ = VNULL;
     val.clear();
-    keys.clear();
+    entries.clear();
     values.clear();
 }
 
@@ -186,26 +187,22 @@ bool UniValue::push_backV(std::vector<UniValue>&& vec)
 
 void UniValue::__pushKV(const std::string& key, UniValue&& val_)
 {
-    keys.push_back(key);
-    values.emplace_back(std::move(val_));
+    entries.emplace_back(key, std::move(val_));
 }
 
 void UniValue::__pushKV(std::string&& key, UniValue&& val_)
 {
-    keys.emplace_back(std::move(key));
-    values.emplace_back(std::move(val_));
+    entries.emplace_back(std::move(key), std::move(val_));
 }
 
 void UniValue::__pushKV(std::string&& key, const UniValue& val_)
 {
-    keys.emplace_back(std::move(key));
-    values.push_back(val_);
+    entries.emplace_back(std::move(key), val_);
 }
 
 void UniValue::__pushKV(const std::string& key, const UniValue& val_)
 {
-    keys.push_back(key);
-    values.push_back(val_);
+    entries.emplace_back(key, val_);
 }
 
 bool UniValue::pushKV(const std::string& key, const UniValue& val_, bool check)
@@ -220,7 +217,7 @@ bool UniValue::pushKV(const std::string& key, const UniValue& val_, bool check)
 #endif
     size_t idx;
     if (check && findKey(key, idx))
-        values[idx] = val_;
+        entries[idx].second = val_;
     else
         __pushKV(key, val_);
     return true;
@@ -232,7 +229,7 @@ bool UniValue::pushKV(const std::string& key, UniValue&& val_, bool check)
 
     size_t idx;
     if (check && findKey(key, idx))
-        values[idx] = std::move(val_);
+        entries[idx].second = std::move(val_);
     else
         __pushKV(key, std::move(val_));
     return true;
@@ -244,7 +241,7 @@ bool UniValue::pushKV(std::string&& key, const UniValue& val_, bool check)
 
     size_t idx;
     if (check && findKey(key, idx))
-        values[idx] = val_;
+        entries[idx].second = val_;
     else
         __pushKV(std::move(key), val_);
     return true;
@@ -256,7 +253,7 @@ bool UniValue::pushKV(std::string&& key, UniValue&& val_, bool check)
 
     size_t idx;
     if (check && findKey(key, idx))
-        values[idx] = std::move(val_);
+        entries[idx].second = std::move(val_);
     else
         __pushKV(std::move(key), std::move(val_));
     return true;
@@ -274,8 +271,8 @@ bool UniValue::pushKVs(const UniValue& obj)
     }
 #endif
 
-    for (size_t i = 0, nKeys = obj.keys.size(); i < nKeys; i++)
-        __pushKV(obj.keys[i], obj.values[i]);
+    for (auto& entry : obj.entries)
+        entries.emplace_back(entry);
 
     return true;
 }
@@ -290,8 +287,8 @@ bool UniValue::pushKVs(UniValue&& obj)
     }
 #endif
 
-    for (size_t i = 0, nKeys = obj.keys.size(); i < nKeys; i++)
-        __pushKV(std::move(obj.keys[i]), std::move(obj.values[i]));
+    for (auto& entry : obj.entries)
+        entries.emplace_back(std::move(entry));
     obj.setObject(); // reset moved obj now to be tidy with memory.
 
     return true;
@@ -299,8 +296,8 @@ bool UniValue::pushKVs(UniValue&& obj)
 
 bool UniValue::findKey(const std::string& key, size_t& retIdx) const noexcept
 {
-    for (size_t i = 0, nKeys = keys.size(); i < nKeys; ++i) {
-        if (keys[i] == key) {
+    for (size_t i = 0, nEntries = entries.size(); i != nEntries; ++i) {
+        if (entries[i].first == key) {
             retIdx = i;
             return true;
         }
@@ -318,40 +315,64 @@ const UniValue& UniValue::operator[](const std::string& key) const noexcept
     if (!findKey(key, index))
         return NullUniValue;
 
-    return values[index];
+    return entries[index].second;
 }
 
 const UniValue& UniValue::operator[](size_t index) const noexcept
 {
-    if (typ != VOBJ && typ != VARR)
+    switch (typ) {
+    case VOBJ:
+        if (index < entries.size())
+            return entries[index].second;
         return NullUniValue;
-    if (index >= values.size())
+    case VARR:
+        if (index < values.size())
+            return values[index];
         return NullUniValue;
-
-    return values[index];
+    default:
+        return NullUniValue;
+    }
 }
 
 const UniValue& UniValue::front() const noexcept
 {
-    if (empty() || (typ != VOBJ && typ != VARR))
+    switch (typ) {
+    case VOBJ:
+        if (!entries.empty())
+            return entries.front().second;
         return NullUniValue;
-    return values.front();
+    case VARR:
+        if (!values.empty())
+            return values.front();
+        return NullUniValue;
+    default:
+        return NullUniValue;
+    }
 }
 
 const UniValue& UniValue::back() const noexcept
 {
-    if (empty() || (typ != VOBJ && typ != VARR))
+    switch (typ) {
+    case VOBJ:
+        if (!entries.empty())
+            return entries.back().second;
         return NullUniValue;
-    return values.back();
+    case VARR:
+        if (!values.empty())
+            return values.back();
+        return NullUniValue;
+    default:
+        return NullUniValue;
+    }
 }
 
 bool UniValue::operator==(const UniValue& other) const noexcept
 {
+    // Type must be equal.
     if (typ != other.typ)
         return false;
-    switch(typ) {
-    case VNULL:
-        return true;
+    // Some types have additional requirements for equality.
+    switch (typ) {
     case VBOOL:
     case VNUM:
     case VSTR:
@@ -359,23 +380,27 @@ bool UniValue::operator==(const UniValue& other) const noexcept
     case VARR:
         return values == other.values;
     case VOBJ:
-        return keys == other.keys && values == other.values;
+        return entries == other.entries;
+    case VNULL:
+        break;
     }
-    // not reached
-    return false;
+    // Returning true is the default behavior, but this is not included as a default statement inside the switch statement,
+    // so that the compiler warns if some type is not explicitly listed there.
+    return true;
 }
 
-bool UniValue::reserve(size_t n) {
-    bool ret = false;
-    if (isArray() || isObject()) {
+bool UniValue::reserve(size_t n)
+{
+    switch (typ) {
+    case VOBJ:
+        entries.reserve(n);
+        return true;
+    case VARR:
         values.reserve(n);
-        ret = true;
+        return true;
+    default:
+        return false;
     }
-    if (isObject()) {
-        keys.reserve(n);
-        ret = true;
-    }
-    return ret;
 }
 
 const char *uvTypeName(UniValue::VType t) noexcept
