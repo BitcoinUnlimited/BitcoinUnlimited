@@ -4,6 +4,8 @@
 
 #include <bench/bench.h>
 #include <bench/data.h>
+#include <chainparams.h>
+#include <test/test_bitcoin.h>
 
 #include <rpc/blockchain.h>
 #include <streams.h>
@@ -13,6 +15,7 @@
 
 static void BlockToJsonVerbose(benchmark::State &state)
 {
+    TestingSetup test_setup(CBaseChainParams::REGTEST);
     CDataStream stream(benchmark::data::block413567, SER_NETWORK, PROTOCOL_VERSION);
     char a = '\0';
     stream.write(&a, 1); // Prevent compaction
