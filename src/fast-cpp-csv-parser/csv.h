@@ -73,9 +73,9 @@ namespace io{
                                 std::memset(file_name, 0, sizeof(file_name));
                         }
 
-                        void set_file_name(const char*file_name){
-                                if(file_name != nullptr){
-                                        strncpy(this->file_name, file_name, sizeof(this->file_name));
+                        void set_file_name(const char*_file_name){
+                                if(_file_name != nullptr){
+                                        strncpy(this->file_name, _file_name, sizeof(this->file_name));
                                         this->file_name[sizeof(this->file_name)-1] = '\0';
                                 }else{
                                         this->file_name[0] = '\0';
@@ -90,8 +90,8 @@ namespace io{
                                 file_line = -1;
                         }
 
-                        void set_file_line(int file_line){
-                                this->file_line = file_line;
+                        void set_file_line(int _file_line){
+                                this->file_line = _file_line;
                         }
 
                         int file_line;
@@ -102,8 +102,8 @@ namespace io{
                                 errno_value = 0;
                         }
 
-                        void set_errno(int errno_value){
-                                this->errno_value = errno_value;
+                        void set_errno(int _errno_value){
+                                this->errno_value = _errno_value;
                         }
 
                         int errno_value;
@@ -420,9 +420,9 @@ namespace io{
                         set_file_name(_file_name.c_str());
                 }
 
-                void set_file_name(const char*file_name){
-                        if(file_name != nullptr){
-                                strncpy(this->file_name, file_name, sizeof(this->file_name));
+                void set_file_name(const char*_file_name){
+                        if(_file_name != nullptr){
+                                strncpy(this->file_name, _file_name, sizeof(this->file_name));
                                 this->file_name[sizeof(this->file_name)-1] = '\0';
                         }else{
                                 this->file_name[0] = '\0';
@@ -505,9 +505,9 @@ namespace io{
                                 std::memset(column_name, 0, max_column_name_length+1);
                         }
 
-                        void set_column_name(const char*column_name){
-                                if(column_name != nullptr){
-                                        std::strncpy(this->column_name, column_name, max_column_name_length);
+                        void set_column_name(const char*_column_name){
+                                if(_column_name != nullptr){
+                                        std::strncpy(this->column_name, _column_name, max_column_name_length);
                                         this->column_name[max_column_name_length] = '\0';
                                 }else{
                                         this->column_name[0] = '\0';
@@ -525,9 +525,9 @@ namespace io{
                                 std::memset(column_content, 0, max_column_content_length+1);
                         }
 
-                        void set_column_content(const char*column_content){
-                                if(column_content != nullptr){
-                                        std::strncpy(this->column_content, column_content, max_column_content_length);
+                        void set_column_content(const char*_column_content){
+                                if(_column_content != nullptr){
+                                        std::strncpy(this->column_content, _column_content, max_column_content_length);
                                         this->column_content[max_column_content_length] = '\0';
                                 }else{
                                         this->column_content[0] = '\0';
