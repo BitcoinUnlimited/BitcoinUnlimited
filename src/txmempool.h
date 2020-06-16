@@ -131,6 +131,8 @@ public:
         LockPoints lp);
     CTxMemPoolEntry(const CTxMemPoolEntry &other);
 
+    CTxMemPoolEntry &operator=(const CTxMemPoolEntry &) = default;
+
     const CTransaction &GetTx() const { return *this->tx; }
     CTransactionRef GetSharedTx() const { return this->tx; }
     /**
