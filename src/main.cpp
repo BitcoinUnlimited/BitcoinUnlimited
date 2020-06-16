@@ -290,7 +290,6 @@ bool GetTransaction(const uint256 &hash,
     const CBlockIndex *pindexSlow = blockIndex;
 
     CTransactionRef ptx;
-    txTime = 0;
     {
         READLOCK(mempool.cs_txmempool);
         CTxMemPool::txiter entryPtr = mempool.mapTx.find(hash);
@@ -308,8 +307,11 @@ bool GetTransaction(const uint256 &hash,
 
     if (g_txindex)
     {
-        if (g_txindex->FindTx(hash, hashBlock, txOut))
+        int32_t time = -1;
+        if (g_txindex->FindTx(hash, hashBlock, txOut, time))
         {
+            if (txTime != -1)
+                txTime = time;
             return true;
         }
     }
@@ -337,6 +339,7 @@ bool GetTransaction(const uint256 &hash,
                 return false;
             }
             txOut = block.vtx.at(pos);
+            txTime = block.nTime;
             return true;
         }
     }

@@ -223,7 +223,8 @@ std::string GetWarnings(const std::string &strFor);
 
 /** Retrieve a transaction (from memory pool, UTXO, txindex, or from disk)
     @param tx (out) The transaction data
-    @param txTime (out) The time the transaction was confirmed or first seen
+    @param txTime (out) The time the transaction was confirmed or first seen.  If no information about this transaction
+                        exists, this parameter is untouched.
     @param params Blockchain consensus parameters
     @param hashBlock What block this transaction was in (or uint256() if no block)
     @param fAllowSlow Use the UTXO and disk to find the transaction, if needed

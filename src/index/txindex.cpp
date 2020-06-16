@@ -230,7 +230,7 @@ void TxIndex::BlockConnected(const CBlock &block, CBlockIndex *pindex)
 }
 
 bool TxIndex::IsSynced() { return fSynced.load(); }
-bool TxIndex::FindTx(const uint256 &txhash, uint256 &blockhash, CTransactionRef &ptx) const
+bool TxIndex::FindTx(const uint256 &txhash, uint256 &blockhash, CTransactionRef &ptx, int32_t &txTime) const
 {
     CDiskTxPos postx;
     if (!db->ReadTxPos(txhash, postx))
@@ -253,6 +253,7 @@ bool TxIndex::FindTx(const uint256 &txhash, uint256 &blockhash, CTransactionRef 
     blockhash = header.GetHash();
     if (ptx->GetHash() != txhash)
         return error("%s: txid mismatch", __func__);
+    txTime = header.nTime;
 
     return true;
 }
