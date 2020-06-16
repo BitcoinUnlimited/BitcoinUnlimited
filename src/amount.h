@@ -59,6 +59,7 @@ public:
     friend bool operator==(const CFeeRate &a, const CFeeRate &b) { return a.nSatoshisPerK == b.nSatoshisPerK; }
     friend bool operator<=(const CFeeRate &a, const CFeeRate &b) { return a.nSatoshisPerK <= b.nSatoshisPerK; }
     friend bool operator>=(const CFeeRate &a, const CFeeRate &b) { return a.nSatoshisPerK >= b.nSatoshisPerK; }
+    CFeeRate &operator=(const CFeeRate &a) = default;
     CFeeRate &operator+=(const CFeeRate &a)
     {
         nSatoshisPerK += a.nSatoshisPerK;
