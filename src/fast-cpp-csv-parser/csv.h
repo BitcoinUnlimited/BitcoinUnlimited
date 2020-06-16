@@ -422,7 +422,7 @@ namespace io{
 
                 void set_file_name(const char*_file_name){
                         if(_file_name != nullptr){
-                                strncpy(this->file_name, _file_name, sizeof(this->file_name));
+                                strncpy(this->file_name, _file_name, sizeof(this->file_name)-1);
                                 this->file_name[sizeof(this->file_name)-1] = '\0';
                         }else{
                                 this->file_name[0] = '\0';
