@@ -825,7 +825,7 @@ BitcoinCli::BitcoinCli() : AllowedArgs(true)
                                          "(recommended for sensitive information such as passphrases)"));
 }
 
-BitcoinBench::BitcoinBench() : AllowedArgs(false)
+BitcoinBench::BitcoinBench() : AllowedArgs(true)
 {
     addHelpOptions(*this);
 
