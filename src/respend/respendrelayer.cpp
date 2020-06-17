@@ -4,12 +4,17 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "respend/respendrelayer.h"
+#include "DoubleSpendProof.h"
+#include "DoubleSpendProofStorage.h"
+#include "txmempool.h"
 #include "net.h" // RelayTransaction
 #include "primitives/transaction.h"
 #include "protocol.h"
 #include "streams.h"
 #include "util.h"
 #include <mutex>
+
+extern CTxMemPool mempool;
 
 namespace respend
 {
@@ -58,7 +63,7 @@ private:
 
 RespendRelayer::RespendRelayer() : interesting(false), valid(false) {}
 bool RespendRelayer::AddOutpointConflict(const COutPoint &,
-    const CTxMemPool::txiter,
+    const CTxMemPool::txiter iter,
     const CTransactionRef pRespendTx,
     bool seenBefore,
     bool isEquivalent)
@@ -75,6 +80,7 @@ bool RespendRelayer::AddOutpointConflict(const COutPoint &,
         return false;
     }
 
+    originalTxIter = iter;
     pRespend = pRespendTx;
     interesting = true;
     return false;
@@ -87,7 +93,29 @@ void RespendRelayer::Trigger()
     if (!valid || !interesting)
         return;
 
-    RelayTransaction(pRespend, true);
+    assert(mempool.mapTx.end() != originalTxIter);
+
+    // no DS proof exists, lets make one.
+    if (originalTxIter->dsproof == -1)
+    {
+        try
+        {
+            auto item = *originalTxIter;
+            const auto dsp = DoubleSpendProof::create(originalTxIter->GetTx(), *pRespend);
+            item.dsproof = mempool.doubleSpendProofStorage()->add(dsp);
+            LOG(DSPROOF, "Double spend found, creating double spend proof %d\n", item.dsproof);
+            mempool.mapTx.replace(originalTxIter, item);
+
+            // send INV to all peers
+            broadcastDspInv(mempool._get(originalTxIter->GetTx().GetHash()), dsp.createHash());
+        }
+        catch (const std::exception &e)
+        {
+            LOG(DSPROOF, "Double spend creation failed: %s\n", e.what());
+        }
+    }
+
+    //RelayTransaction(pRespend, true);
 }
 
 } // ns respend

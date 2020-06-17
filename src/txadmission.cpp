@@ -34,32 +34,6 @@
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/thread/thread.hpp>
 
-namespace
-{
-void broadcastDspInv(const CTransactionRef &dspTx, const uint256 &hash)
-{
-    // send INV to all peers
-    CInv inv(MSG_DOUBLESPENDPROOF, hash);
-    LOCK(cs_vNodes);
-    for (CNode *pnode : vNodes)
-    {
-        if (!pnode->fRelayTxes)
-            continue;
-        LOCK(pnode->cs_filter);
-        if (pnode->pfilter)
-        {
-            // For nodes that we sent this Tx before, send a proof.
-            if (pnode->pfilter->IsRelevantAndUpdate(dspTx))
-                pnode->PushInventory(inv);
-        }
-        else
-        {
-            pnode->PushInventory(inv);
-        }
-    }
-}
-}
-
 using namespace std;
 
 static void TestConflictEnqueueTx(CTxInputData &txd);

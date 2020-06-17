@@ -292,6 +292,29 @@ DoubleSpendProof::Validity DoubleSpendProof::validate() const
     return Valid;
 }
 
+void broadcastDspInv(const CTransactionRef &dspTx, const uint256 &hash)
+{
+    // send INV to all peers
+    CInv inv(MSG_DOUBLESPENDPROOF, hash);
+    LOCK(cs_vNodes);
+    for (CNode *pnode : vNodes)
+    {
+        if (!pnode->fRelayTxes)
+            continue;
+        LOCK(pnode->cs_filter);
+        if (pnode->pfilter)
+        {
+            // For nodes that we sent this Tx before, send a proof.
+            if (pnode->pfilter->IsRelevantAndUpdate(dspTx))
+                pnode->PushInventory(inv);
+        }
+        else
+        {
+            pnode->PushInventory(inv);
+        }
+    }
+}
+
 uint256 DoubleSpendProof::prevTxId() const { return m_prevTxId; }
 int DoubleSpendProof::prevOutIndex() const { return m_prevOutIndex; }
 uint256 DoubleSpendProof::createHash() const { return SerializeHash(*this); }
