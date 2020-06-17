@@ -4,6 +4,7 @@
 #ifndef DOUBLESPENDPROOF_H
 #define DOUBLESPENDPROOF_H
 
+#include "primitives/transaction.h"
 #include "serialize.h"
 #include <deque>
 #include <uint256.h>
@@ -76,5 +77,7 @@ private:
 
     Spender m_spender1, m_spender2;
 };
+
+void broadcastDspInv(const CTransactionRef &dspTx, const uint256 &hash);
 
 #endif
