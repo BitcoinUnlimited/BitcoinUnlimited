@@ -299,42 +299,7 @@ void CommitTxToMempool()
         for (auto &it : *txCommitQFinal)
         {
             CTxCommitData &data = it.second;
-            assert(data.entry.dsproof == -1);
             mempool._addUnchecked(it.first, data.entry, !IsInitialBlockDownload());
-
-            for (auto i = data.rescuedOrphans.begin(); i != data.rescuedOrphans.end(); ++i)
-            {
-                const int proofId = i->first;
-                auto dsp = mempool.doubleSpendProofStorage()->proof(proofId);
-                LOG(DSPROOF, "Rescued a DSP orphan %d\n", proofId);
-                auto rc = dsp.validate();
-
-                // it can't be missing utxo or transaction, assert we are internally consistent.
-                assert(rc == DoubleSpendProof::Valid || rc == DoubleSpendProof::Invalid);
-
-                if (rc == DoubleSpendProof::Valid)
-                {
-                    LOG(DSPROOF, "  Using DSP, it validated just fine\n");
-                    mempool.doubleSpendProofStorage()->claimOrphan(proofId);
-                    data.entry.dsproof = proofId;
-                    auto iter = mempool.mapTx.find(data.hash);
-                    mempool.mapTx.replace(iter, data.entry);
-
-                    while (++i != data.rescuedOrphans.end())
-                    {
-                        LOG(DSPROOF, "Killing DSP orphan, we don't need more than one\n");
-                        mempool.doubleSpendProofStorage()->remove(i->first);
-                    }
-                    break;
-                }
-                else
-                {
-                    LOG(DSPROOF, "  DSP didn't validate! %s\n", dsp.createHash().ToString());
-                    mempool.doubleSpendProofStorage()->remove(proofId);
-                    dosMan.Misbehaving(i->second, 10);
-                }
-            }
-
             vWhatChanged.push_back(data.hash);
 
             // Indicate that this tx was fully processed/accepted and can now be removed from the req mgr.
@@ -347,14 +312,6 @@ void CommitTxToMempool()
 #ifdef ENABLE_WALLET
         SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
 #endif
-        // TODO:  this is probably in the wrong place...we should be broadcasting invs
-        //        for ds's when we discover them not here at the end of txadmission.
-        if (data.entry.dsproof != -1)
-        {
-            auto dsp = mempool.doubleSpendProofStorage()->proof(data.entry.dsproof);
-            if (!dsp.isEmpty())
-                broadcastDspInv(data.entry.GetSharedTx(), dsp.createHash());
-        }
     }
     txCommitQFinal->clear();
     delete txCommitQFinal;
@@ -1345,55 +1302,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
         }
 
-        // check each input for a double-spend.
-        WRITELOCK(mempool.cs_txmempool);
-        std::list<std::pair<int, int> > rescuedOrphans; // <proofId,nodeId>
-        for (const CTxIn &txin : entry.GetTx().vin)
-        {
-            auto orphans = mempool.doubleSpendProofStorage()->findOrphans(txin.prevout);
-            if (!orphans.empty())
-            {
-                for (auto o : orphans)
-                    rescuedOrphans.push_back(o);
-                // if we find the DSP here, AS AN ORPHAN, then nothing has entered the mempool yet
-                // that claimed it. As such we don't have to check for conflicts.
-                continue;
-            }
-
-            auto oldTx = mempool.mapNextTx.find(txin.prevout);
-            if (oldTx != mempool.mapNextTx.end())
-            { // double spend detected!
-                auto iter = mempool.mapTx.find(oldTx->second.ptx->GetHash());
-                assert(mempool.mapTx.end() != iter);
-                if (iter->dsproof == -1)
-                { // no DS proof exists, lets make one.
-                    try
-                    {
-                        auto item = *iter;
-                        const auto dsp = DoubleSpendProof::create(*oldTx->second.ptx, entry.GetTx());
-                        item.dsproof = mempool.doubleSpendProofStorage()->add(dsp);
-                        LOG(DSPROOF, "Double spend found, creating double spend proof %d\n", item.dsproof);
-                        mempool.mapTx.replace(iter, item);
-
-                        // send INV to all peers
-                        broadcastDspInv(mempool._get(oldTx->second.ptx->GetHash()), dsp.createHash());
-                    }
-                    catch (const std::exception &e)
-                    {
-                        LOG(DSPROOF, "Double spend creation failed: %s\n", e.what());
-                    }
-                }
-                if (debugger)
-                {
-                    debugger->AddInvalidReason("txn-mempool-conflict");
-                }
-                else
-                {
-                    return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
-                }
-            }
-        }
-
         respend.SetValid(true);
         if (respend.IsRespend())
         {
@@ -1413,7 +1321,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             CTxCommitData eData;
             eData.entry = std::move(entry);
             eData.hash = hash;
-            eData.rescuedOrphans = rescuedOrphans;
 
             boost::unique_lock<boost::mutex> lock(csCommitQ);
             (*txCommitQ).emplace(eData.hash, eData);
