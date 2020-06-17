@@ -840,7 +840,11 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Pay
 
     if (len != 32)
     {
-        __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "secret has incorrect length\n");
+        std::stringstream err;
+        err << "GetPubKey: Incorrect length for argument 'secret'. "
+            << "Expected 32, got " << len << ".";
+        triggerJavaIllegalStateException(env, err.str().c_str());
+        return nullptr;
     }
     assert(len == 32);
 
