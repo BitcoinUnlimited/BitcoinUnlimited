@@ -77,8 +77,7 @@ The hash-ID for the double-spend-proof is a double sha256 over the entire
 serialized content of the proof, as defined next.
 
 In response to an INV any peer can issue a `getdata` message which will
-cause a reply with the following message. The name of the message (until
-this spec is finalized) is **`dsproof-beta`**.
+cause a reply with the following message. The name of the message is **`dsproof`**.
 
 
 | Field Size | Description | Data Type  | Comments |
