@@ -4,7 +4,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <cstring>
-#include <sstream>
 #include <stdio.h>
 #include "univalue.h"
 #include "univalue_escapes.h"

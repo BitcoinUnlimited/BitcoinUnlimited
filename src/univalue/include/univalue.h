@@ -249,6 +249,10 @@ private:
     static void jsonEscape(Stream & stream, const std::string & inString);
     static inline void indentStr(Stream & stream, unsigned int prettyIndent, unsigned int indentLevel);
 
+    // Used by the various setInt() and setFloat() overloads
+    template<typename Num>
+    bool setIntOrFloat(Num numVal);
+
 public:
     // Strict type-specific getters, these throw std::runtime_error if the
     // value is of unexpected type

@@ -5,10 +5,13 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <algorithm>
+#include <array>
+#include <cinttypes>
+#include <cmath>
+#include <cstdio>
 #include <stdint.h>
-#include <iomanip>
-#include <sstream>
 #include <stdlib.h>
+#include <type_traits>
 
 #include "univalue.h"
 
@@ -68,22 +71,42 @@ bool UniValue::setNumStr(std::string&& val_) noexcept
     return true;
 }
 
+template<typename Num>
+bool UniValue::setIntOrFloat(Num num)
+{
+    constexpr int bufSize = std::is_integral<Num>::value ? 32 : 64; // use 32 byte buffer for ints, 64 for double
+    constexpr auto fmt =
+            std::is_same<Num, double>::value
+            ? "%1.16g"
+            : (std::is_same<Num, int64_t>::value
+               ? "%" PRId64
+               : (std::is_same<Num, uint64_t>::value
+                  ? "%" PRIu64
+                    // this is here to enforce uint64_t, int64_t or double (if evaluated will fail at compile-time)
+                  : throw std::runtime_error("Unexpected type")));
+    if (std::is_floating_point<Num>::value) {
+        // ensure not NaN or inf, which are not representable by the JSON Number type
+        if (!std::isfinite(num))
+            return false;
+    }
+    std::array<char, bufSize> buf;
+    int n = std::snprintf(buf.data(), size_t(bufSize), fmt, num); // C++11 snprintf always NUL terminates
+    if (n <= 0 || n >= bufSize) // should never happen
+        return false;
+    clear();
+    typ = VNUM;
+    val.assign(buf.data(), std::string::size_type(n));
+    return true;
+}
+
 bool UniValue::setInt(uint64_t val_)
 {
-    std::ostringstream oss;
-
-    oss << val_;
-
-    return setNumStr(oss.str());
+    return setIntOrFloat(val_);
 }
 
 bool UniValue::setInt(int64_t val_)
 {
-    std::ostringstream oss;
-
-    oss << val_;
-
-    return setNumStr(oss.str());
+    return setIntOrFloat(val_);
 }
 
 bool UniValue::setInt(unsigned int val_)
@@ -97,11 +120,7 @@ bool UniValue::setInt(unsigned int val_)
 
 bool UniValue::setFloat(double val_)
 {
-    std::ostringstream oss;
-
-    oss << std::setprecision(16) << val_;
-
-    return setNumStr(oss.str());
+    return setIntOrFloat(val_);
 }
 
 bool UniValue::setStr(const std::string& val_)
