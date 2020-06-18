@@ -44,7 +44,6 @@ static uint32_t nDefaultRollbackLimit = 100;
 
 using namespace std;
 
-extern void TxToJSON(const CTransaction &tx, const uint256 hashBlock, UniValue &entry);
 void ScriptPubKeyToJSON(const CScript &scriptPubKey, UniValue &out, bool fIncludeHex);
 
 double GetDifficulty(const CBlockIndex *blockindex)
@@ -125,12 +124,13 @@ UniValue blockToJSON(const CBlock &block,
     UniValue txs(UniValue::VARR);
     if (listTxns)
     {
+        int64_t txTime = -1; // Don't display the time in the tx because its in the block data.
         for (const auto &tx : block.vtx)
         {
             if (txDetails)
             {
                 UniValue objTx(UniValue::VOBJ);
-                TxToJSON(*tx, uint256(), objTx);
+                TxToJSON(*tx, txTime, uint256(), objTx);
                 txs.push_back(objTx);
             }
             else
