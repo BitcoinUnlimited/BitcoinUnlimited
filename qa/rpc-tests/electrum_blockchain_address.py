@@ -4,11 +4,12 @@
 Tests to check if basic electrum server integration works
 """
 import random
-from test_framework.util import waitFor, assert_equal, assert_raises
+import asyncio
+from test_framework.util import waitForAsync, assert_equal, assert_raises_async
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.loginit import logging
 from test_framework.electrumutil import compare, bitcoind_electrum_args, \
-    create_electrum_connection, address_to_scripthash, sync_electrum_height
+    address_to_scripthash, sync_electrum_height, ElectrumConnection
 from test_framework.nodemessages import COIN, CTransaction, ToHex, CTxIn, COutPoint
 
 
@@ -30,18 +31,21 @@ class ElectrumBlockchainAddress(BitcoinTestFramework):
 
         n.generate(200)
 
-        cli = create_electrum_connection()
-        self.test_invalid_args(cli)
-
-        self.test_get_balance(n, cli)
-        self.test_get_frist_use(n, cli)
-        self.test_get_history(n, cli)
-        self.test_list_unspent(n, cli)
+        async def async_tests():
+            cli = ElectrumConnection()
+            await cli.connect()
+            await self.test_invalid_args(cli)
+            await self.test_get_balance(n, cli)
+            await self.test_get_frist_use(n, cli)
+            await self.test_get_history(n, cli)
+            await self.test_list_unspent(n, cli)
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(async_tests())
 
     def setup_network(self, dummy = None):
         self.nodes = self.setup_nodes()
 
-    def test_invalid_args(self, cli):
+    async def test_invalid_args(self, cli):
         from test_framework.connectrum.exc import ElectrumErrorResponse
         error_code = "-32602"
 
@@ -51,54 +55,53 @@ class ElectrumBlockchainAddress(BitcoinTestFramework):
             "blockchain.address.listunspent")
 
         for method in hash_param_methods:
-            assert_raises(
+            await assert_raises_async(
                 ElectrumErrorResponse,
                 cli.call,
                 method, "invalidaddress")
 
-    def test_get_balance(self, n, cli):
+    async def test_get_balance(self, n, cli):
         addr = n.getnewaddress()
         balance = 11.42
         txhash = n.sendtoaddress(addr, balance)
 
-        def check_address(address, unconfirmed = 0, confirmed = 0):
-            res = cli.call("blockchain.address.get_balance", addr)
+        async def check_address(address, unconfirmed = 0, confirmed = 0):
+            res = await cli.call("blockchain.address.get_balance", addr)
 
             return res["unconfirmed"] == unconfirmed * COIN \
                 and res["confirmed"] == confirmed * COIN
 
-        waitFor(10, lambda: check_address(addr, unconfirmed = balance))
+        await waitForAsync(10, lambda: check_address(addr, unconfirmed = balance))
         n.generate(1)
-        waitFor(10, lambda: check_address(addr, confirmed = balance))
+        await waitForAsync(10, lambda: check_address(addr, confirmed = balance))
 
-    def test_get_frist_use(self, n, cli):
+    async def test_get_frist_use(self, n, cli):
         addr = n.getnewaddress()
         n.sendtoaddress(addr, 12)
 
         utxo = [ ]
-        def fetch_utxo():
-            utxo = cli.call("blockchain.address.listunspent", addr)
+        async def fetch_utxo():
+            utxo = await cli.call("blockchain.address.listunspent", addr)
             return len(utxo) > 0
 
-        waitFor(10, lambda: fetch_utxo())
-
-        firstuse = cli.call("blockchain.address.get_first_use", addr)
+        await waitForAsync(10, fetch_utxo)
+        #firstuse = await cli.call("blockchain.address.get_first_use", addr)
 
         # NYI. Api not stable.
 
-    def test_list_unspent(self, n, cli):
+    async def test_list_unspent(self, n, cli):
         addr = n.getnewaddress()
-        utxo = cli.call("blockchain.address.listunspent", addr)
+        utxo = await cli.call("blockchain.address.listunspent", addr)
         assert_equal(0, len(utxo))
 
         txid = n.sendtoaddress(addr, 21)
-        def fetch_utxo():
-            utxo = cli.call("blockchain.address.listunspent", addr)
+        async def fetch_utxo():
+            utxo = await cli.call("blockchain.address.listunspent", addr)
             if len(utxo) > 0:
                 return utxo
             return None
 
-        utxo = waitFor(10, fetch_utxo)
+        utxo = await waitForAsync(10, fetch_utxo)
         assert_equal(1, len(utxo))
 
         assert_equal(0, utxo[0]['height'])
@@ -107,28 +110,32 @@ class ElectrumBlockchainAddress(BitcoinTestFramework):
         assert(utxo[0]['tx_pos'] in [0, 1])
 
         n.generate(1)
-        utxo = waitFor(10, fetch_utxo)
-        waitFor(10, lambda: fetch_utxo()[0]['height'] == n.getblockcount())
+        async def wait_for_confheight():
+            utxo = await cli.call("blockchain.address.listunspent", addr)
+            return len(utxo) == 1 and utxo[0]['height'] == n.getblockcount()
+        await waitForAsync(10, wait_for_confheight)
 
 
-    def test_get_history(self, n, cli):
+    async def test_get_history(self, n, cli):
         addr = n.getnewaddress()
         txid = n.sendtoaddress(addr, 11)
-        def fetch_history():
-            h = cli.call("blockchain.address.get_history", addr)
+        async def fetch_history():
+            h = await cli.call("blockchain.address.get_history", addr)
             if len(h) > 0:
                 return h
             return None
-        history = waitFor(10, fetch_history)
+        history = await waitForAsync(10, fetch_history)
         assert_equal(1, len(history))
 
-        assert_equal(0, history[0]['height'])
+        UNCONFIRMED_HEIGHT = 0
+        assert_equal(UNCONFIRMED_HEIGHT, history[0]['height'])
         assert_equal(txid, history[0]['tx_hash'])
 
         n.generate(1)
-        history = waitFor(10, fetch_history)
-        assert_equal(1, len(history))
-        waitFor(10, lambda: fetch_history()[0]['height'] == n.getblockcount())
+        async def wait_for_confheight():
+            h = await cli.call("blockchain.address.get_history", addr)
+            return len(h) == 1 and h[0]['height'] == n.getblockcount()
+        await waitForAsync(10, wait_for_confheight)
 
 if __name__ == '__main__':
     ElectrumBlockchainAddress().main()
