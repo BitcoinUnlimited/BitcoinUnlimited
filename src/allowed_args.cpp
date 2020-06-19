@@ -730,6 +730,8 @@ static void addElectrumOptions(AllowedArgs &allowedArgs)
             "(example: -electrum.rawarg=\"--server-banner=\\\"Welcome to my server!\\\"\"). "
             "This option can be specified multiple times.")
         .addArg("electrum.shutdownonerror", optionalBool, "Shutdown if the electrum server exits unexpectedly")
+        .addArg("electrum.blocknotify", optionalBool, "Instantly notify electrum server of new blocks. "
+                                                      "Must only be used with ElectrsCash version greater than 1.1.1")
         .addDebugArg("electrum.exec", requiredStr, "Path to electrum daemon executable")
         .addDebugArg("electrum.monitoring.port", requiredStr, "Port to bind monitoring service")
         .addDebugArg("electrum.monitoring.host", requiredStr, "Host to bind monitoring service")
