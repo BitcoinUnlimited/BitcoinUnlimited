@@ -15,8 +15,13 @@
 #define MAKE_KEY_BCHN(suffix)           ADD_UL(0x00000001##suffix, UL)
 #define MAKE_KEY_BU(suffix)             ADD_UL(0x00000002##suffix, UL)
 
-/// old header
+// this is a similar system to how we calculate client version
 
+#define XVERSION_MAJOR      0
+#define XVERSION_MINOR      1
+#define XVERSION_REVISION   0
+
+#define XVERSION_VERSION_VALUE ((10000 * XVERSION_MAJOR ) + (100 * XVERSION_MINOR) + (1 * XVERSION_REVISION))
 
 namespace XVer
 {

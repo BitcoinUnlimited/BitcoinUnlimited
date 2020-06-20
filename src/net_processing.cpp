@@ -522,6 +522,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
             // prepare xversion message. This must be sent before we send a verack message in the new xversion spec
             CXVersionMessage xver;
+            xver.set_u64c(XVer::XVERSION_VERSION_KEY, XVERSION_VERSION_VALUE);
             xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
             xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
             xver.set_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED, grapheneMaxVersionSupported.Value());
