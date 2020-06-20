@@ -191,10 +191,8 @@ public:
      *
      * If you want to treat missing keys as null values, please use the [] operator with string argument instead.
      */
-    const UniValue* find(const std::string& key) const noexcept {
-        size_t i;
-        return findKey(key, i) ? &entries[i].second : nullptr;
-    }
+    const UniValue* find(const std::string& key) const noexcept;
+    UniValue* find(const std::string& key) noexcept;
 
     constexpr bool isNull() const noexcept { return typ == VNULL; }
     constexpr bool isTrue() const noexcept { return typ == VBOOL && val == boolTrueVal; }
@@ -237,7 +235,6 @@ private:
     std::vector<UniValue> values;
     static const std::string boolTrueVal; // = "1"
 
-    bool findKey(const std::string& key, size_t& retIdx) const noexcept;
     // __pushKV does not check for duplicate keys and simply appends at the end
     void __pushKV(const std::string& key, const UniValue& val);
     void __pushKV(const std::string& key, UniValue&& val);

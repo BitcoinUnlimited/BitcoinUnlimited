@@ -215,50 +215,54 @@ bool UniValue::pushKV(const std::string& key, const UniValue& val_, bool check)
         return false;
     }
 #endif
-    size_t idx;
-    if (check && findKey(key, idx))
-        entries[idx].second = val_;
-    else
-        __pushKV(key, val_);
+    if (check) {
+        if (auto found = find(key)) {
+            *found = val_;
+            return true;
+        }
+    }
+    __pushKV(key, val_);
     return true;
 }
 bool UniValue::pushKV(const std::string& key, UniValue&& val_, bool check)
 {
     if (typ != VOBJ)
         return false;
-
-    size_t idx;
-    if (check && findKey(key, idx))
-        entries[idx].second = std::move(val_);
-    else
-        __pushKV(key, std::move(val_));
+    if (check) {
+        if (auto found = find(key)) {
+            *found = std::move(val_);
+            return true;
+        }
+    }
+    __pushKV(key, std::move(val_));
     return true;
 }
 bool UniValue::pushKV(std::string&& key, const UniValue& val_, bool check)
 {
     if (typ != VOBJ)
         return false;
-
-    size_t idx;
-    if (check && findKey(key, idx))
-        entries[idx].second = val_;
-    else
-        __pushKV(std::move(key), val_);
+    if (check) {
+        if (auto found = find(key)) {
+            *found = val_;
+            return true;
+        }
+    }
+    __pushKV(std::move(key), val_);
     return true;
 }
 bool UniValue::pushKV(std::string&& key, UniValue&& val_, bool check)
 {
     if (typ != VOBJ)
         return false;
-
-    size_t idx;
-    if (check && findKey(key, idx))
-        entries[idx].second = std::move(val_);
-    else
-        __pushKV(std::move(key), std::move(val_));
+    if (check) {
+        if (auto found = find(key)) {
+            *found = std::move(val_);
+            return true;
+        }
+    }
+    __pushKV(std::move(key), std::move(val_));
     return true;
 }
-
 
 bool UniValue::pushKVs(const UniValue& obj)
 {
@@ -294,28 +298,12 @@ bool UniValue::pushKVs(UniValue&& obj)
     return true;
 }
 
-bool UniValue::findKey(const std::string& key, size_t& retIdx) const noexcept
-{
-    for (size_t i = 0, nEntries = entries.size(); i != nEntries; ++i) {
-        if (entries[i].first == key) {
-            retIdx = i;
-            return true;
-        }
-    }
-
-    return false;
-}
-
 const UniValue& UniValue::operator[](const std::string& key) const noexcept
 {
-    if (typ != VOBJ)
-        return NullUniValue;
-
-    size_t index; // initialized below if findKey returns true
-    if (!findKey(key, index))
-        return NullUniValue;
-
-    return entries[index].second;
+    if (auto found = find(key)) {
+        return *found;
+    }
+    return NullUniValue;
 }
 
 const UniValue& UniValue::operator[](size_t index) const noexcept
@@ -364,6 +352,23 @@ const UniValue& UniValue::back() const noexcept
     default:
         return NullUniValue;
     }
+}
+
+const UniValue* UniValue::find(const std::string& key) const noexcept {
+    for (auto& entry : entries) {
+        if (entry.first == key) {
+            return &entry.second;
+        }
+    }
+    return nullptr;
+}
+UniValue* UniValue::find(const std::string& key) noexcept {
+    for (auto& entry : entries) {
+        if (entry.first == key) {
+            return &entry.second;
+        }
+    }
+    return nullptr;
 }
 
 bool UniValue::operator==(const UniValue& other) const noexcept
