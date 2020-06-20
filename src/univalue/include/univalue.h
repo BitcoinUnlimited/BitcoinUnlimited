@@ -54,6 +54,14 @@ public:
     constexpr enum VType getType() const noexcept { return typ; }
     constexpr const std::string& getValStr() const noexcept { return val; }
 
+    /**
+     * VOBJ/VARR: Returns whether the object/array is empty.
+     * Other types: Returns true.
+     *
+     * Complexity: constant.
+     *
+     * Compatible with the upstream UniValue API.
+     */
     bool empty() const noexcept {
         switch (typ) {
         case VOBJ:
@@ -64,6 +72,15 @@ public:
             return true;
         }
     }
+
+    /**
+     * VOBJ/VARR: Returns the size of the object/array.
+     * Other types: Returns zero.
+     *
+     * Complexity: constant.
+     *
+     * Compatible with the upstream UniValue API.
+     */
     size_t size() const noexcept {
         switch (typ) {
         case VOBJ:
@@ -74,27 +91,105 @@ public:
             return 0;
         }
     }
-    bool reserve(size_t n);
+
+    /**
+     * VOBJ/VARR: Increases the capacity of the underlying vector to at least n.
+     * Other types: Does nothing.
+     *
+     * Complexity: at most linear in number of elements.
+     *
+     * Compatible with the upstream UniValue API for VOBJ/VARR but does not implement upstream behavior for other types.
+     */
+    void reserve(size_t n);
 
     constexpr bool getBool() const noexcept { return isTrue(); }
+
+    /**
+     * VOBJ: Returns a reference to the first value associated with the key, or NullUniValue if the key does not exist.
+     * Other types: Returns NullUniValue.
+     *
+     * The returned reference follows the iterator invalidation rules of the underlying vector.
+     *
+     * Complexity: linear in number of elements.
+     *
+     * Compatible with the upstream UniValue API.
+     *
+     * If you want to distinguish between null values and missing keys, please use find() instead.
+     */
     const UniValue& operator[](const std::string& key) const noexcept;
+
+    /**
+     * VOBJ: Returns a reference to the value at the numeric index (regardless of key), or NullUniValue if index >= object size.
+     * VARR: Returns a reference to the element at the index, or NullUniValue if index >= array size.
+     * Other types: Returns NullUniValue.
+     *
+     * The returned reference follows the iterator invalidation rules of the underlying vector.
+     *
+     * Complexity: constant.
+     *
+     * Compatible with the upstream UniValue API.
+     *
+     * To access the first or last value, consider using front() or back() instead.
+     */
     const UniValue& operator[](size_t index) const noexcept;
-    // Returns true if the two objects are of the same type and have the exact same data.
-    // For VARR and VOBJ, keys and/or values must also be in the exact same order (otherwise false is returned).
+
+    /**
+     * Returns whether the UniValues are of the same type and contain equal data.
+     * Two objects/arrays are not considered equal if elements are ordered differently.
+     *
+     * Complexity: linear in the amount of data to compare.
+     *
+     * This is a Bitcoin Cash Node extension of the UniValue API.
+     */
     bool operator==(const UniValue& other) const noexcept;
+
+    /**
+     * Returns whether the UniValues are not of the same type or contain unequal data.
+     * Two objects/arrays are not considered equal if elements are ordered differently.
+     *
+     * Complexity: linear in the amount of data to compare.
+     *
+     * This is a Bitcoin Cash Node extension of the UniValue API.
+     */
     bool operator!=(const UniValue& other) const noexcept { return !(*this == other); }
 
-    // If this is of type VARR or VOBJ and is not empty, returns the first value, or NullUniValue otherwise.
+    /**
+     * VOBJ: Returns a reference to the first value (regardless of key), or NullUniValue if the object is empty.
+     * VARR: Returns a reference to the first element, or NullUniValue if the array is empty.
+     * Other types: Returns NullUniValue.
+     *
+     * The returned reference follows the iterator invalidation rules of the underlying vector.
+     *
+     * Complexity: constant.
+     *
+     * This is a Bitcoin Cash Node extension of the UniValue API.
+     */
     const UniValue& front() const noexcept;
-    // If this is of type VARR or VOBJ and is not empty, returns the last value, or NullUniValue otherwise.
+
+    /**
+     * VOBJ: Returns a reference to the last value (regardless of key), or NullUniValue if the object is empty.
+     * VARR: Returns a reference to the last element, or NullUniValue if the array is empty.
+     * Other types: Returns NullUniValue.
+     *
+     * The returned reference follows the iterator invalidation rules of the underlying vector.
+     *
+     * Complexity: constant.
+     *
+     * This is a Bitcoin Cash Node extension of the UniValue API.
+     */
     const UniValue& back() const noexcept;
 
     /**
-     * Returns a pointer to value corresponding to the given key in the object,
-     * or nullptr if the key does not exist. Returns the first occurrence in
-     * case of duplicate keys. The returned pointer can become invalid according
-     * to the iterator invalidation rules of the underlying vector, and does not
-     * reflect later key modifications.
+     * VOBJ: Returns a pointer to the first value associated with the key, or nullptr if the key does not exist.
+     * Other types: Returns nullptr.
+     *
+     * The returned pointer follows the iterator invalidation rules of the underlying vector.
+     *
+     * Complexity: linear in the number of elements.
+     *
+     * This is a Bitcoin Cash Node extension of the UniValue API.
+     *
+     * If you want to treat missing keys as null values, please use the [] operator with string argument instead.
      */
     const UniValue* find(const std::string& key) const noexcept {
         size_t i;
@@ -160,13 +255,43 @@ private:
 public:
     // Strict type-specific getters, these throw std::runtime_error if the
     // value is of unexpected type
-    const std::vector<std::pair<std::string, UniValue>>& getObjectEntries() const;
-    const std::vector<UniValue>& getArrayValues() const;
+
     /**
-     * Like getArrayValues(), except returns a move-constructed vector of this object's values (a constant-time swap).
-     * Precondition:  This object must be of type VARR (isArray() == true), otherwise std::runtime_error will be thrown.
-     * Postcondition: This object will become an empty UniValue array (isArray() == true, empty() == true), and the
-     *                returned vector will contain the UniValues that this object previously contained (if any). */
+     * VOBJ: Returns a reference to the underlying vector of key-value pairs.
+     * Other types: Throws std::runtime_error.
+     *
+     * Destroying the object invalidates the returned reference.
+     *
+     * Complexity: constant.
+     *
+     * This is a Bitcoin Cash Node extension of the UniValue API.
+     */
+    const std::vector<std::pair<std::string, UniValue>>& getObjectEntries() const;
+
+    /**
+     * VARR: Returns a reference to the underlying vector of values.
+     * Other types: Throws std::runtime_error.
+     *
+     * Destroying the array invalidates the returned reference.
+     *
+     * Complexity: constant.
+     *
+     * This is a Bitcoin Cash Node extension of the UniValue API.
+     *
+     * If you want to clear the array after using this method, consider using takeArrayValues() instead.
+     */
+    const std::vector<UniValue>& getArrayValues() const;
+
+    /**
+     * VARR: Changes the UniValue into an empty array and returns the old array contents as a vector.
+     * Other types: Throws std::runtime_error.
+     *
+     * Complexity: constant.
+     *
+     * This is a Bitcoin Cash Node extension of the UniValue API.
+     *
+     * If you do not want to make the array empty, please use getArrayValues() instead.
+     */
     std::vector<UniValue> takeArrayValues();
 
     bool get_bool() const;

@@ -389,17 +389,17 @@ bool UniValue::operator==(const UniValue& other) const noexcept
     return true;
 }
 
-bool UniValue::reserve(size_t n)
+void UniValue::reserve(size_t n)
 {
     switch (typ) {
     case VOBJ:
         entries.reserve(n);
-        return true;
+        break;
     case VARR:
         values.reserve(n);
-        return true;
+        break;
     default:
-        return false;
+        break;
     }
 }
 
