@@ -3466,6 +3466,35 @@ void CNode::DisconnectIfBanned()
     }
 }
 
+void CNode::ReadConfigFromXVersion_OLD()
+{
+    xVersionEnabled = true;
+    LOCK(cs_xversion);
+    skipChecksum = (xVersion.as_u64c(XVer::BU_MSG_IGNORE_CHECKSUM_OLD) == 1);
+    if (addrFromPort == 0)
+    {
+        addrFromPort = xVersion.as_u64c(XVer::BU_LISTEN_PORT_OLD) & 0xffff;
+    }
+
+    uint64_t num = xVersion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT_OLD);
+    if (num)
+        nLimitAncestorCount = num; // num == 0 means the field was not provided.
+    num = xVersion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT_OLD);
+    if (num)
+        nLimitAncestorSize = num;
+
+    num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT_OLD);
+    if (num)
+        nLimitDescendantCount = num;
+    num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT_OLD);
+    if (num)
+        nLimitDescendantSize = num;
+
+    canSyncMempoolWithPeers = (xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_OLD) == 1);
+    nMempoolSyncMinVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED_OLD);
+    nMempoolSyncMaxVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED_OLD);
+}
+
 void CNode::ReadConfigFromXVersion()
 {
     xVersionEnabled = true;

@@ -648,26 +648,26 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             // prepare xversion message. This *must* be the next message after the verack has been received,
             // if it comes at all in the old xversion spec.
             CXVersionMessage xver;
-            xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
-            xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
-            xver.set_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED, grapheneMaxVersionSupported.Value());
-            xver.set_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED, grapheneMinVersionSupported.Value());
-            xver.set_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF, grapheneFastFilterCompatibility.Value());
-            xver.set_u64c(XVer::BU_MEMPOOL_SYNC, syncMempoolWithPeers.Value());
-            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED, mempoolSyncMaxVersionSupported.Value());
-            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED, mempoolSyncMinVersionSupported.Value());
-            xver.set_u64c(XVer::BU_XTHIN_VERSION, 2); // xthin version
+            xver.set_u64c(XVer::BU_LISTEN_PORT_OLD, GetListenPort());
+            xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM_OLD, 1); // we will ignore 0 value msg checksums
+            xver.set_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED_OLD, grapheneMaxVersionSupported.Value());
+            xver.set_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED_OLD, grapheneMinVersionSupported.Value());
+            xver.set_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF_OLD, grapheneFastFilterCompatibility.Value());
+            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_OLD, syncMempoolWithPeers.Value());
+            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED_OLD, mempoolSyncMaxVersionSupported.Value());
+            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED_OLD, mempoolSyncMinVersionSupported.Value());
+            xver.set_u64c(XVer::BU_XTHIN_VERSION_OLD, 2); // xthin version
 
             size_t nLimitAncestors = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
             size_t nLimitAncestorSize = GetArg("-limitancestorsize", BU_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
             size_t nLimitDescendants = GetArg("-limitdescendantcount", BU_DEFAULT_DESCENDANT_LIMIT);
             size_t nLimitDescendantSize = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
 
-            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT, nLimitAncestors);
-            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT, nLimitAncestorSize);
-            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT, nLimitDescendants);
-            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT, nLimitDescendantSize);
-            xver.set_u64c(XVer::BU_TXN_CONCATENATION, 1);
+            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT_OLD, nLimitAncestors);
+            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT_OLD, nLimitAncestorSize);
+            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT_OLD, nLimitDescendants);
+            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT_OLD, nLimitDescendantSize);
+            xver.set_u64c(XVer::BU_TXN_CONCATENATION_OLD, 1);
 
             electrum::set_xversion_flags(xver, chainparams.NetworkIDString());
 
@@ -702,7 +702,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 pfrom->GetLogName(), pfrom->cleanSubVer);
         }
 
-        pfrom->ReadConfigFromXVersion();
+        pfrom->ReadConfigFromXVersion_OLD();
 
         pfrom->PushMessage(NetMsgType::XVERACK_OLD);
         // handleAddressAfterInit(pfrom);
