@@ -29,6 +29,7 @@
 #include <unordered_set>
 
 extern CTweak<unsigned int> unconfPushAction;
+void ProcessOrphans(std::vector<uint256> &vWorkQueue);
 
 class Hasher
 {
@@ -3236,6 +3237,14 @@ bool ConnectTip(CValidationState &state,
         nTime3 = GetStopwatchMicros();
         nTimeConnectTotal += nTime3 - nTime2;
         LOG(BENCH, "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
+
+        // Search orphan queue for anything that is no longer an orphan due to tx in this block
+        std::vector<uint256> vWhatChanged;
+        for (unsigned int j = 0; j < pblock->vtx.size(); j++)
+        {
+            vWhatChanged.push_back(pblock->vtx[j]->GetHash());
+        }
+        ProcessOrphans(vWhatChanged);
     }
 
     int64_t nTime4 = GetStopwatchMicros();

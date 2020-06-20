@@ -1201,6 +1201,9 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 }
                 else
                 {
+                    // this is effectively "missing inputs" since they are not usable due to unconf depth, so set the
+                    // flag so that this tx gets on the orphan queue
+                    *pfMissingInputs = true;
                     // If the chain is not sync'd entirely then we'll defer this tx until the new block is processed.
                     if (!IsChainSyncd() && IsChainNearlySyncd())
                         return state.DoS(0, false, REJECT_WAITING, "too-long-mempool-chain");
@@ -1216,7 +1219,13 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             restrictInputs.Value() == true)
         {
             if (tx->vin.size() > 1)
+            {
+                // this is effectively "missing inputs" since they are not usable due to unconf depth, so set the
+                // flag so that this tx gets on the orphan queue
+                *pfMissingInputs = true;
+
                 return state.DoS(0, false, REJECT_NONSTANDARD, "bad-txn-too-many-inputs");
+            }
         }
 
         if (txProps) // This is inefficient since _CalculateMemPoolAncestors also calculates this
