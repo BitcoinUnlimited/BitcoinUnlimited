@@ -396,7 +396,7 @@ void RPCConsole::setClientModel(ClientModel *model)
         setNumConnections(model->getNumConnections());
         connect(model, SIGNAL(numConnectionsChanged(int)), this, SLOT(setNumConnections(int)));
 
-        setNumBlocks(model->getNumBlocks(), model->getLastBlockDate(), model->getVerificationProgress(nullptr));
+        setNumBlocks(model->getNumBlocks(), model->getLastBlockDate(), model->getVerificationProgress(nullptr), false);
         connect(model, SIGNAL(numBlocksChanged(int, QDateTime, double, bool)), this,
             SLOT(setNumBlocks(int, QDateTime, double, bool)));
         connect(model, SIGNAL(timeSinceLastBlockChanged(qint64)), this, SLOT(updateTimeSinceLastBlock(qint64)));
@@ -639,18 +639,21 @@ void RPCConsole::setNumConnections(int count)
     ui->numberOfConnections->setText(connections);
 }
 
-void RPCConsole::setNumBlocks(int count, const QDateTime &blockDate, double nVerificationProgress)
+void RPCConsole::setNumBlocks(int count, const QDateTime &blockDate, double nVerificationProgress, bool fHeader)
 {
-    ui->numberOfBlocks->setText(QString::number(count));
-    ui->lastBlockTime->setText(blockDate.toString(time_format));
+    if (!fHeader)
+    {
+        ui->numberOfBlocks->setText(QString::number(count));
+        ui->lastBlockTime->setText(blockDate.toString(time_format));
 
-    ui->lastBlockSize->setText(QString::number(nBlockSizeAtChainTip.load()));
-    if (nBlockSizeAtChainTip.load() == 0)
-        ui->lastBlockSize->setText("N/A");
-    else if (nBlockSizeAtChainTip.load() < 1000000)
-        ui->lastBlockSize->setText(QString::number(nBlockSizeAtChainTip.load() / 1000.0, 'f', 2) + " KB");
-    else
-        ui->lastBlockSize->setText(QString::number(nBlockSizeAtChainTip.load() / 1000000.0, 'f', 2) + " MB");
+        ui->lastBlockSize->setText(QString::number(nBlockSizeAtChainTip.load()));
+        if (nBlockSizeAtChainTip.load() == 0)
+            ui->lastBlockSize->setText("N/A");
+        else if (nBlockSizeAtChainTip.load() < 1000000)
+            ui->lastBlockSize->setText(QString::number(nBlockSizeAtChainTip.load() / 1000.0, 'f', 2) + " KB");
+        else
+            ui->lastBlockSize->setText(QString::number(nBlockSizeAtChainTip.load() / 1000000.0, 'f', 2) + " MB");
+    }
 }
 
 void RPCConsole::updateTimeSinceLastBlock(qint64 lastBlockTime)
