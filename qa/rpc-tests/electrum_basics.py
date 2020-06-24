@@ -4,11 +4,12 @@
 Tests to check if basic electrum server integration works
 """
 import random
-from test_framework.util import waitFor, assert_equal, assert_raises
+import asyncio
+from test_framework.util import waitFor, assert_equal, assert_raises_async, waitForAsync
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.loginit import logging
 from test_framework.electrumutil import compare, bitcoind_electrum_args, \
-    create_electrum_connection, address_to_scripthash
+    ElectrumConnection, address_to_scripthash
 from test_framework.nodemessages import COIN, CTransaction, ToHex, CTxIn, COutPoint
 
 
@@ -27,10 +28,14 @@ class ElectrumBasicTests(BitcoinTestFramework):
         n.generate(200)
 
         self.test_mempoolsync(n)
-        electrum_client = create_electrum_connection()
-        self.test_unknown_method(electrum_client)
-        self.test_invalid_args(electrum_client)
-        self.test_address_balance(n, electrum_client)
+        async def async_tests():
+            electrum_client = ElectrumConnection()
+            await electrum_client.connect()
+            await self.test_unknown_method(electrum_client)
+            await self.test_invalid_args(electrum_client)
+            await self.test_address_balance(n, electrum_client)
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(async_tests())
 
     def test_mempoolsync(self, n):
         # waitFor throws on timeout, failing the test
@@ -49,19 +54,21 @@ class ElectrumBasicTests(BitcoinTestFramework):
         waitFor(10, lambda: compare(n, "mempool_count", 0, True))
         waitFor(10, lambda: compare(n, "index_txns", n.getblockcount() + 2, True))
 
-    def test_unknown_method(self, electrum_client):
+    async def test_unknown_method(self, electrum_client):
         from test_framework.connectrum.exc import ElectrumErrorResponse
-        assert_raises(
-            ElectrumErrorResponse,
-            electrum_client.call,
-            "method.that.does.not.exist", 42)
+
+        await assert_raises_async(
+                ElectrumErrorResponse,
+                electrum_client.call,
+                "method.that.does.not.exist", 42)
+
         try:
-            electrum_client.call("method.that.does.not.exist")
-        except Exception as e:
+            await electrum_client.call("method.that.does.not.exist")
+        except ElectrumErrorResponse as e:
             error_code = "-32601"
             assert error_code in str(e)
 
-    def test_invalid_args(self, electrum_client):
+    async def test_invalid_args(self, electrum_client):
         from test_framework.connectrum.exc import ElectrumErrorResponse
         error_code = "-32602"
 
@@ -71,14 +78,13 @@ class ElectrumBasicTests(BitcoinTestFramework):
             "blockchain.scripthash.listunspent")
 
         for method in hash_param_methods:
-            assert_raises(
-                ElectrumErrorResponse,
-                electrum_client.call,
-                method, "invalidhash")
-
+            await assert_raises_async(
+                    ElectrumErrorResponse,
+                    electrum_client.call,
+                    method, "invalidhash")
             try:
-                electrum_client.call(method, "invalidhash")
-            except Exception as e:
+                await electrum_client.call(method, "invalidhash")
+            except ElectrumErrorResponse as e:
                 print("ERROR:" + str(e))
                 assert error_code in str(e)
 
@@ -87,7 +93,7 @@ class ElectrumBasicTests(BitcoinTestFramework):
             tx = CTransaction()
             tx.calc_sha256()
             tx.vin = [CTxIn(COutPoint(0xbeef, 1))]
-            electrum_client.call("blockchain.transaction.broadcast", ToHex(tx))
+            await electrum_client.call("blockchain.transaction.broadcast", ToHex(tx))
         except Exception as e:
             print("ERROR: " + str(e))
             assert error_code in str(e)
@@ -95,22 +101,22 @@ class ElectrumBasicTests(BitcoinTestFramework):
 
 
 
-    def test_address_balance(self, n, electrum_client):
+    async def test_address_balance(self, n, electrum_client):
         addr = n.getnewaddress()
         txhash = n.sendtoaddress(addr, 1)
 
         scripthash = address_to_scripthash(addr)
 
-        def check_address(address, unconfirmed = 0, confirmed = 0):
-            res = electrum_client.call("blockchain.scripthash.get_balance",
-                address_to_scripthash(addr))
+        async def check_address(address, unconfirmed = 0, confirmed = 0):
+            res = await electrum_client.call("blockchain.scripthash.get_balance",
+                    address_to_scripthash(addr))
 
             return res["unconfirmed"] == unconfirmed * COIN \
                 and res["confirmed"] == confirmed * COIN
 
-        waitFor(10, lambda: check_address(scripthash, unconfirmed = 1))
+        await waitForAsync(10, lambda: check_address(scripthash, unconfirmed = 1))
         n.generate(1)
-        waitFor(10, lambda: check_address(scripthash, confirmed = 1))
+        await waitForAsync(10, lambda: check_address(scripthash, confirmed = 1))
 
 
 

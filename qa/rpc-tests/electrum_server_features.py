@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 The Bitcoin Unlimited developers
+import asyncio
 from test_framework.util import assert_equal
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.loginit import logging
 from test_framework.electrumutil import bitcoind_electrum_args, \
-    create_electrum_connection
+    ElectrumConnection
 
 def versiontuple(v):
     v = tuple(map(int, (v.split("."))))
@@ -26,15 +27,19 @@ class ElectrumBasicTests(BitcoinTestFramework):
         # Bump out of IBD
         n.generate(1)
 
-        electrum_client = create_electrum_connection()
-        res = electrum_client.call("server.features")
+        async def async_tests():
+            electrum_client = ElectrumConnection()
+            await electrum_client.connect()
+            res = await electrum_client.call("server.features")
 
-        # Keys that the server MUST support
-        assert_equal(n.getblockhash(0), res['genesis_hash'])
-        assert_equal("sha256", res['hash_function'])
-        assert(versiontuple(res['protocol_min']) >= versiontuple("1.4"))
-        assert(versiontuple(res['protocol_max']) >= versiontuple("1.4"))
-        assert(len(res['server_version']))
+            # Keys that the server MUST support
+            assert_equal(n.getblockhash(0), res['genesis_hash'])
+            assert_equal("sha256", res['hash_function'])
+            assert(versiontuple(res['protocol_min']) >= versiontuple("1.4"))
+            assert(versiontuple(res['protocol_max']) >= versiontuple("1.4"))
+            assert(len(res['server_version']))
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(async_tests())
 
 if __name__ == '__main__':
     ElectrumBasicTests().main()
