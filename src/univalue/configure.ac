@@ -23,7 +23,7 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AC_PREREQ(2.60)
 AC_CONFIG_SRCDIR([lib/univalue.cpp])
 AC_CONFIG_AUX_DIR([build-aux])
-AC_CONFIG_MACRO_DIR([build-aux/m4])
+AC_CONFIG_MACRO_DIR([../../build-aux/m4])
 AC_CONFIG_HEADERS([univalue-config.h])
 AM_INIT_AUTOMAKE([subdir-objects foreign])
 
@@ -66,6 +66,10 @@ fi
 if test "x$enable_std_debug" = xyes; then
     CPPFLAGS="$CPPFLAGS -D_GLIBCXX_DEBUG -DGLIB_CXX_DEBUG_PEDANTIC"
 fi
+
+dnl Require C++14 compiler (no GNU extensions)
+AX_CXX_COMPILE_STDCXX([14], [noext], [mandatory], [nodefault])
+
 
 case $host in
   *mingw*)

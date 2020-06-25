@@ -1,4 +1,4 @@
-ACLOCAL_AMFLAGS = -I build-aux/m4
+ACLOCAL_AMFLAGS = -I ../../build-aux/m4
 .PHONY: gen
 .INTERMEDIATE: $(GENBIN)
 
