@@ -115,7 +115,7 @@ void RespendRelayer::Trigger()
         }
     }
 
-    //RelayTransaction(pRespend, true);
+    RelayTransaction(pRespend, true);
 }
 
 } // ns respend
