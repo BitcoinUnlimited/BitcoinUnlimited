@@ -101,9 +101,7 @@ bool UniValue::setFloat(double val_)
 
     oss << std::setprecision(16) << val_;
 
-    bool ret = setNumStr(oss.str());
-    typ = VNUM;
-    return ret;
+    return setNumStr(oss.str());
 }
 
 bool UniValue::setStr(const std::string& val_)

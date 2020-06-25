@@ -1,10 +1,12 @@
 // Copyright (c) 2014 BitPay Inc.
 // Copyright (c) 2014-2016 The Bitcoin Core developers
+// Copyright (c) 2020 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <stdint.h>
+#include <cstdint>
 #include <vector>
+#include <limits>
 #include <string>
 #include <map>
 #include <cassert>
@@ -159,21 +161,169 @@ BOOST_AUTO_TEST_CASE(univalue_set)
     BOOST_CHECK(v.isStr());
     BOOST_CHECK_EQUAL(v.getValStr(), "zum");
 
+    BOOST_CHECK(!v.setFloat(std::numeric_limits<double>::quiet_NaN()));
+    BOOST_CHECK(v.isStr());
+    BOOST_CHECK_EQUAL(v.getValStr(), "zum");
+
+    BOOST_CHECK(!v.setFloat(std::numeric_limits<double>::signaling_NaN()));
+    BOOST_CHECK(v.isStr());
+    BOOST_CHECK_EQUAL(v.getValStr(), "zum");
+
+    BOOST_CHECK(!v.setFloat(std::numeric_limits<double>::infinity()));
+    BOOST_CHECK(v.isStr());
+    BOOST_CHECK_EQUAL(v.getValStr(), "zum");
+
+    BOOST_CHECK(!v.setFloat(-std::numeric_limits<double>::infinity()));
+    BOOST_CHECK(v.isStr());
+    BOOST_CHECK_EQUAL(v.getValStr(), "zum");
+
     BOOST_CHECK(v.setFloat(-1.01));
     BOOST_CHECK(v.isNum());
     BOOST_CHECK_EQUAL(v.getValStr(), "-1.01");
 
-    BOOST_CHECK(v.setInt((int)1023));
+    BOOST_CHECK(v.setFloat(-std::numeric_limits<double>::max()));
+    BOOST_CHECK(v.isNum());
+
+    BOOST_CHECK(v.setFloat(-1.79769313486231570e+308));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "-1.797693134862316e+308");
+
+    BOOST_CHECK(v.setFloat(-100000000000000000. / 3.));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "-3.333333333333333e+16");
+
+    BOOST_CHECK(v.setFloat(-10000000000000000. / 3.));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "-3333333333333334");
+
+    BOOST_CHECK(v.setFloat(-1000000000000000. / 3.));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "-333333333333333.3");
+
+    BOOST_CHECK(v.setFloat(-10. / 3.));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "-3.333333333333333");
+
+    BOOST_CHECK(v.setFloat(-1.));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "-1");
+
+    BOOST_CHECK(v.setFloat(-1. / 3.));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "-0.3333333333333333");
+
+    BOOST_CHECK(v.setFloat(-1. / 3000.));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "-0.0003333333333333333");
+
+    BOOST_CHECK(v.setFloat(-1. / 30000.));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "-3.333333333333333e-05");
+
+    BOOST_CHECK(v.setFloat(-4.94065645841246544e-324));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "-4.940656458412465e-324");
+
+    BOOST_CHECK(v.setFloat(-std::numeric_limits<double>::min()));
+    BOOST_CHECK(v.isNum());
+
+    BOOST_CHECK(v.setFloat(-1. / std::numeric_limits<double>::infinity()));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "-0");
+
+    BOOST_CHECK(v.setFloat(1. / std::numeric_limits<double>::infinity()));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "0");
+
+    BOOST_CHECK(v.setFloat(std::numeric_limits<double>::min()));
+    BOOST_CHECK(v.isNum());
+
+    BOOST_CHECK(v.setFloat(4.94065645841246544e-324));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "4.940656458412465e-324");
+
+    BOOST_CHECK(v.setFloat(1. / 30000.));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "3.333333333333333e-05");
+
+    BOOST_CHECK(v.setFloat(1. / 3000.));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "0.0003333333333333333");
+
+    BOOST_CHECK(v.setFloat(1. / 3.));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "0.3333333333333333");
+
+    BOOST_CHECK(v.setFloat(1.));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "1");
+
+    BOOST_CHECK(v.setFloat(10. / 3.));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "3.333333333333333");
+
+    BOOST_CHECK(v.setFloat(1000000000000000. / 3.));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "333333333333333.3");
+
+    BOOST_CHECK(v.setFloat(10000000000000000. / 3.));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "3333333333333334");
+
+    BOOST_CHECK(v.setFloat(100000000000000000. / 3.));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "3.333333333333333e+16");
+
+    BOOST_CHECK(v.setFloat(1.79769313486231570e+308));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "1.797693134862316e+308");
+
+    BOOST_CHECK(v.setFloat(std::numeric_limits<double>::max()));
+    BOOST_CHECK(v.isNum());
+
+    BOOST_CHECK(v.setInt(1023));
     BOOST_CHECK(v.isNum());
     BOOST_CHECK_EQUAL(v.getValStr(), "1023");
 
-    BOOST_CHECK(v.setInt((int64_t)-1023LL));
+    BOOST_CHECK(v.setInt(0));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "0");
+
+    BOOST_CHECK(v.setInt(std::numeric_limits<int>::min()));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), std::to_string(std::numeric_limits<int>::min()));
+
+    BOOST_CHECK(v.setInt(std::numeric_limits<int>::max()));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), std::to_string(std::numeric_limits<int>::max()));
+
+    BOOST_CHECK(v.setInt(int64_t(-1023)));
     BOOST_CHECK(v.isNum());
     BOOST_CHECK_EQUAL(v.getValStr(), "-1023");
 
-    BOOST_CHECK(v.setInt((uint64_t)1023ULL));
+    BOOST_CHECK(v.setInt(int64_t(0)));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "0");
+
+    BOOST_CHECK(v.setInt(std::numeric_limits<int64_t>::min()));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "-9223372036854775808");
+
+    BOOST_CHECK(v.setInt(std::numeric_limits<int64_t>::max()));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "9223372036854775807");
+
+    BOOST_CHECK(v.setInt(uint64_t(1023)));
     BOOST_CHECK(v.isNum());
     BOOST_CHECK_EQUAL(v.getValStr(), "1023");
+
+    BOOST_CHECK(v.setInt(uint64_t(0)));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "0");
+
+    BOOST_CHECK(v.setInt(std::numeric_limits<uint64_t>::max()));
+    BOOST_CHECK(v.isNum());
+    BOOST_CHECK_EQUAL(v.getValStr(), "18446744073709551615");
 
     BOOST_CHECK(v.setNumStr("-688"));
     BOOST_CHECK(v.isNum());
