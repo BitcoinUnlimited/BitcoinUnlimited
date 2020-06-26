@@ -304,19 +304,19 @@ BOOST_AUTO_TEST_CASE(univalue_object)
 
     BOOST_CHECK_EQUAL(obj["nyuknyuknyuk"].getValStr(), "");
 
-    BOOST_CHECK(obj.exists("age"));
-    BOOST_CHECK(obj.exists("first"));
-    BOOST_CHECK(obj.exists("last"));
-    BOOST_CHECK(obj.exists("distance"));
-    BOOST_CHECK(obj.exists("time"));
-    BOOST_CHECK(obj.exists("calories"));
-    BOOST_CHECK(obj.exists("temperature"));
-    BOOST_CHECK(obj.exists("moon"));
-    BOOST_CHECK(obj.exists("spoon"));
-    BOOST_CHECK(obj.exists("cat1"));
-    BOOST_CHECK(obj.exists("cat2"));
+    BOOST_CHECK_EQUAL(obj.find("age"), &obj["age"]);
+    BOOST_CHECK_EQUAL(obj.find("first"), &obj["first"]);
+    BOOST_CHECK_EQUAL(obj.find("last"), &obj["last"]);
+    BOOST_CHECK_EQUAL(obj.find("distance"), &obj["distance"]);
+    BOOST_CHECK_EQUAL(obj.find("time"), &obj["time"]);
+    BOOST_CHECK_EQUAL(obj.find("calories"), &obj["calories"]);
+    BOOST_CHECK_EQUAL(obj.find("temperature"), &obj["temperature"]);
+    BOOST_CHECK_EQUAL(obj.find("moon"), &obj["moon"]);
+    BOOST_CHECK_EQUAL(obj.find("spoon"), &obj["spoon"]);
+    BOOST_CHECK_EQUAL(obj.find("cat1"), &obj["cat1"]);
+    BOOST_CHECK_EQUAL(obj.find("cat2"), &obj["cat2"]);
 
-    BOOST_CHECK(!obj.exists("nyuknyuknyuk"));
+    BOOST_CHECK_EQUAL(obj.find("nyuknyuknyuk"), nullptr);
 
     BOOST_CHECK_EQUAL(obj["age"].getType(), UniValue::VNUM);
     BOOST_CHECK_EQUAL(obj["first"].getType(), UniValue::VSTR);

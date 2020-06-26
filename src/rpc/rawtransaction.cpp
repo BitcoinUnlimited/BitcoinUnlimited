@@ -1267,11 +1267,25 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
                     err = err + ScriptToAsmStr(coin->out.scriptPubKey) + "\nvs:\n" + ScriptToAsmStr(scriptPubKey);
                     throw JSONRPCError(RPC_DESERIALIZATION_ERROR, err);
                 }
+
                 newcoin.out.scriptPubKey = scriptPubKey;
                 newcoin.out.nValue = 0;
-                if (prevOut.exists("amount"))
+                if (auto amountUV = prevOut.find("amount"))
                 {
-                    newcoin.out.nValue = AmountFromValue(find_value(prevOut, "amount"));
+                    newcoin.out.nValue = AmountFromValue(*amountUV);
+                }
+                else
+                {
+                    // amount param is required in replay-protected txs.
+                    // Note that we must check for its presence here rather
+                    // than use RPCTypeCheckObj() above, since UniValue::VNUM
+                    // parser incorrectly parses numerics with quotes, eg
+                    // "3.12" as a string when JSON allows it to also parse
+                    // as numeric. And we have to accept numerics with quotes
+                    // because our own dogfood (our rpc results) always
+                    // produces decimal numbers that are quoted
+                    // eg getbalance returns "3.14152" rather than 3.14152
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing amount");
                 }
                 newcoin.nHeight = 1;
             }

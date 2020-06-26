@@ -60,7 +60,18 @@ public:
     constexpr bool getBool() const noexcept { return isTrue(); }
     const UniValue& operator[](const std::string& key) const noexcept;
     const UniValue& operator[](size_t index) const noexcept;
-    bool exists(const std::string& key) const noexcept { size_t i; return findKey(key, i); }
+
+    /**
+     * Returns a pointer to value corresponding to the given key in the object,
+     * or nullptr if the key does not exist. Returns the first occurrence in
+     * case of duplicate keys. The returned pointer can become invalid according
+     * to the iterator invalidation rules of the underlying vector, and does not
+     * reflect later key modifications.
+     */
+    const UniValue* find(const std::string& key) const noexcept {
+        size_t i;
+        return findKey(key, i) ? &values[i] : nullptr;
+    }
 
     constexpr bool isNull() const noexcept { return typ == VNULL; }
     constexpr bool isTrue() const noexcept { return typ == VBOOL && val == boolTrueVal; }

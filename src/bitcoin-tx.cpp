@@ -528,9 +528,9 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
 
                 newcoin.out.scriptPubKey = scriptPubKey;
                 newcoin.out.nValue = 0;
-                if (prevOut.exists("amount"))
+                if (auto amountUV = prevOut.find("amount"))
                 {
-                    newcoin.out.nValue = AmountFromValue(prevOut["amount"]);
+                    newcoin.out.nValue = AmountFromValue(*amountUV);
                 }
                 newcoin.nHeight = 1;
             }
@@ -538,12 +538,14 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
 
             // if redeemScript given and private keys given,
             // add redeemScript to the tempKeystore so it can be signed:
-            if (fGivenKeys && scriptPubKey.IsPayToScriptHash() && prevOut.exists("redeemScript"))
+            if (fGivenKeys && scriptPubKey.IsPayToScriptHash())
             {
-                UniValue v = prevOut["redeemScript"];
-                vector<unsigned char> rsData(ParseHexUV(v, "redeemScript"));
-                CScript redeemScript(rsData.begin(), rsData.end());
-                tempKeystore.AddCScript(redeemScript);
+                if (auto redeemScriptUV = prevOut.find("redeemScript"))
+                {
+                    std::vector<uint8_t> rsData(ParseHexUV(*redeemScriptUV, "redeemScript"));
+                    CScript redeemScript(rsData.begin(), rsData.end());
+                    tempKeystore.AddCScript(redeemScript);
+                }
             }
         }
     }
