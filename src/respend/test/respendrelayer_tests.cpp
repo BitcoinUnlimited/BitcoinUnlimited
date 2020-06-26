@@ -45,11 +45,32 @@ BOOST_AUTO_TEST_CASE(is_interesting)
 
 BOOST_AUTO_TEST_CASE(triggers_correctly)
 {
-    CTxMemPool::txiter dummy;
+    CTxMemPool pool(CFeeRate(0));
+    TestMemPoolEntryHelper entry;
+
+    // create a transaction with multiple inputs
+    CMutableTransaction tx = CMutableTransaction();
+    tx.vin.resize(3);
+    tx.vin[0].scriptSig = CScript();
+    tx.vin[0].prevout.hash = InsecureRand256();
+    tx.vin[0].prevout.n = 0;
+    tx.vin[1].scriptSig = CScript();
+    tx.vin[1].prevout.hash = InsecureRand256();
+    tx.vin[1].prevout.n = 0;
+    tx.vin[2].scriptSig = CScript();
+    tx.vin[2].prevout.hash = InsecureRand256();
+    tx.vin[2].prevout.n = 0;
+    tx.vout.resize(1);
+    tx.vout[0].scriptPubKey = CScript();
+    tx.vout[0].nValue = 6 * COIN;
+    pool.addUnchecked(tx.GetHash(), entry.FromTx(tx));
+    CTxMemPool::txiter iter = pool.mapTx.find(tx.GetHash());
+
+    // create another transaction that spends one of the same inputs as the above tx
     CMutableTransaction respend;
     respend.vin.resize(1);
     respend.vin[0].prevout.n = 0;
-    respend.vin[0].prevout.hash = InsecureRand256();
+    respend.vin[0].prevout.hash = tx.vin[1].prevout.hash;
     respend.vin[0].scriptSig << OP_1;
 
     CNode node(INVALID_SOCKET, CAddress());
@@ -59,7 +80,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
 
     // Create a "not interesting" respend
     RespendRelayer r;
-    r.AddOutpointConflict(COutPoint{}, dummy, MakeTransactionRef(respend), true, false);
+    r.AddOutpointConflict(COutPoint{}, iter, MakeTransactionRef(respend), true, false);
     r.Trigger();
     BOOST_CHECK_EQUAL(size_t(0), node.GetInventoryToSendSize());
     r.SetValid(true);
@@ -67,7 +88,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     BOOST_CHECK_EQUAL(size_t(0), node.GetInventoryToSendSize());
 
     // Create an interesting, but invalid respend
-    r.AddOutpointConflict(COutPoint{}, dummy, MakeTransactionRef(respend), false, false);
+    r.AddOutpointConflict(COutPoint{}, iter, MakeTransactionRef(respend), false, false);
     BOOST_CHECK(r.IsInteresting());
     r.SetValid(false);
     r.Trigger();

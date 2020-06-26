@@ -6,11 +6,11 @@
 #include "respend/respendrelayer.h"
 #include "DoubleSpendProof.h"
 #include "DoubleSpendProofStorage.h"
-#include "txmempool.h"
 #include "net.h" // RelayTransaction
 #include "primitives/transaction.h"
 #include "protocol.h"
 #include "streams.h"
+#include "txmempool.h"
 #include "util.h"
 #include <mutex>
 
@@ -93,9 +93,10 @@ void RespendRelayer::Trigger()
     if (!valid || !interesting)
         return;
 
-    assert(mempool.mapTx.end() != originalTxIter);
+    RelayTransaction(pRespend, true);
 
     // no DS proof exists, lets make one.
+    assert(mempool.mapTx.end() != originalTxIter);
     if (originalTxIter->dsproof == -1)
     {
         try
@@ -114,8 +115,6 @@ void RespendRelayer::Trigger()
             LOG(DSPROOF, "Double spend creation failed: %s\n", e.what());
         }
     }
-
-    RelayTransaction(pRespend, true);
 }
 
 } // ns respend
