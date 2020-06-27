@@ -273,7 +273,7 @@ DoubleSpendProof::Validity DoubleSpendProof::validate() const
     ScriptError_t error;
     if (!VerifyScript(inScript, prevOutScript, 0 /*flags*/, MAX_OPS_PER_SCRIPT, checker1, &error))
     {
-        LOGA("DoubleSpendProof failed validating first tx due to %s\n", ScriptErrorString(error));
+        LOG(DSPROOF, "DoubleSpendProof failed validating first tx due to %s\n", ScriptErrorString(error));
         return Invalid;
     }
 
@@ -286,7 +286,7 @@ DoubleSpendProof::Validity DoubleSpendProof::validate() const
     DSPSignatureChecker checker2(this, m_spender2, amount);
     if (!VerifyScript(inScript, prevOutScript, 0 /*flags*/, MAX_OPS_PER_SCRIPT, checker2, &error))
     {
-        LOGA("DoubleSpendProof failed validating second tx due to %s\n", ScriptErrorString(error));
+        LOG(DSPROOF, "DoubleSpendProof failed validating second tx due to %s\n", ScriptErrorString(error));
         return Invalid;
     }
     return Valid;
