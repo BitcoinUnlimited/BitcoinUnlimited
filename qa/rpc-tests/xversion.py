@@ -65,12 +65,14 @@ class XVersionTest(BitcoinTestFramework):
         conn = self.restart_node()
         nt = NetworkThread()
         nt.start()
-
+        print("sent version")
         conn.wait_for(lambda : conn.remote_xversion)
+        print("sent extversion")
         conn.send_message(msg_xversion({1000 : b"test string"}))
-
         conn.wait_for_verack()
+        print("sent verack")
         conn.send_message(msg_verack())
+
 
 
         # make sure xversion has actually been received properly
@@ -120,6 +122,25 @@ class XVersionTest(BitcoinTestFramework):
 
         conn.connection.disconnect_node()
         nt.join()
+
+        # Test versionbit mismatch
+
+        logging.info("Testing xversion service bit mismatch")
+
+        # test regular set up including xversion
+        conn = self.restart_node()
+        nt = NetworkThread()
+        nt.start()
+        print("sent version")
+        conn.wait_for(lambda : conn.remote_xversion)
+        # if we send verack instead of xversion we should get a verack response
+        print("sent verack")
+        conn.send_message(msg_verack())
+        conn.wait_for_verack()
+
+        conn.connection.disconnect_node()
+        nt.join()
+
 
 if __name__ == '__main__':
     xvt = XVersionTest()
