@@ -93,8 +93,6 @@ void RespendRelayer::Trigger()
     if (!valid || !interesting)
         return;
 
-    RelayTransaction(pRespend, true);
-
     // no DS proof exists, lets make one.
     assert(mempool.mapTx.end() != originalTxIter);
     if (originalTxIter->dsproof == -1)

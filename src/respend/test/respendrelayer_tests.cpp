@@ -96,11 +96,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     // make valid
     r.SetValid(true);
     r.Trigger();
-    BOOST_CHECK_EQUAL(size_t(1), node.GetInventoryToSendSize());
-    {
-        LOCK(node.cs_inventory);
-        BOOST_CHECK(respend.GetHash() == node.vInventoryToSend.at(0).hash);
-    }
+    BOOST_CHECK_EQUAL(size_t(0), node.GetInventoryToSendSize());
 
     // Create an interesting and valid respend to an SPV peer
     // add bloom filter using the respend hash.

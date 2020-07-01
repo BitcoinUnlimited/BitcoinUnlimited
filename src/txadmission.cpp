@@ -480,7 +480,7 @@ void ThreadTxAdmission()
                             false, TransactionClass::DEFAULT, vCoinsToUncache, &isRespend, nullptr, txProps))
                     {
                         acceptedSomething = true;
-                        RelayTransaction(tx, false, txProps);
+                        RelayTransaction(tx, txProps);
 
                         // LOG(MEMPOOL, "Accepted tx: peer=%s: accepted %s onto Q\n", txd.nodeName,
                         //     tx->GetHash().ToString());
@@ -613,7 +613,7 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
         fRejectAbsurdFee, allowedTx, vCoinsToUncache, &isRespend, nullptr, txProps);
     if (res)
     {
-        RelayTransaction(tx, false, txProps);
+        RelayTransaction(tx, txProps);
     }
 
     // Uncache any coins for txns that failed to enter the mempool but were NOT orphan txns
