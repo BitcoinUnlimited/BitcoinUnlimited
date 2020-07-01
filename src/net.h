@@ -1062,9 +1062,7 @@ private:
 typedef std::vector<CNodeRef> VNodeRefs;
 
 class CTransaction;
-void RelayTransaction(const CTransactionRef ptx,
-    const bool fRespend = false,
-    const CTxProperties *txproperties = nullptr);
+void RelayTransaction(const CTransactionRef ptx, const CTxProperties *txproperties = nullptr);
 
 /** Access to the (IP) address database (peers.dat) */
 class CAddrDB
