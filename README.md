@@ -2,6 +2,10 @@
 
 [![Build Status](https://travis-ci.org/BitcoinUnlimited/BitcoinUnlimited.svg?branch=release)](https://travis-ci.org/BitcoinUnlimited/BitcoinUnlimited)
 
+# The project has migrated over to GitLab.com
+
+## see https://gitlab.com/bitcoinunlimited/BCHUnlimited
+
 # What is Bitcoin Cash?
 
 Bitcoin Cash is an experimental new digital currency that enables instant payments to
