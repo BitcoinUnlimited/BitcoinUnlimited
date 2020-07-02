@@ -368,6 +368,21 @@ static void BlockNotifyCallback(bool initialSync, const CBlockIndex *pBlockIndex
     boost::thread t(runCommand, strCmd); // thread runs free
 }
 
+static void NotifyElectrumCallback(bool initialSync, const CBlockIndex *pBlockIndex, bool)
+{
+    if (initialSync || !pBlockIndex)
+        return;
+
+    if (!GetArg("-electrum.blocknotify", false))
+    {
+        // By default, this is false, as ElectrsCash <= 1.1.1 will interpret
+        // the signal as "shutdown", rather than block notification.
+        return;
+    }
+
+    electrum::ElectrumServer::Instance().NotifyNewBlock();
+}
+
 struct CImportingNow
 {
     CImportingNow()
@@ -1643,6 +1658,11 @@ bool AppInit2(Config &config)
 
     if (mapArgs.count("-blocknotify"))
         uiInterface.NotifyBlockTip.connect(BlockNotifyCallback);
+
+    if (mapArgs.count("-electrum"))
+    {
+        uiInterface.NotifyBlockTip.connect(NotifyElectrumCallback);
+    }
 
     std::vector<fs::path> vImportFiles;
     if (mapArgs.count("-loadblock"))

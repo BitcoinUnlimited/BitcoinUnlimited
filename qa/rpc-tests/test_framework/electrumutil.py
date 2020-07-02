@@ -27,6 +27,7 @@ def bitcoind_electrum_args():
     global ELECTRUM_PORT
     ELECTRUM_PORT = random.randint(40000, 60000)
     return ["-electrum=1", "-debug=electrum", "-debug=rpc",
+            "-electrum.blocknotify=1",
             "-electrum.port=" + str(ELECTRUM_PORT),
             "-electrum.monitoring.port=" + str(random.randint(40000, 60000)),
             "-electrum.rawarg=--cashaccount-activation-height=1"]

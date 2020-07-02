@@ -47,6 +47,7 @@ public:
     bool IsRunning() const { return is_running; }
     void Interrupt();
     void Terminate();
+    void SendSignal(int signal);
 
 
 private:
@@ -57,8 +58,6 @@ private:
     std::atomic<int> pid;
     std::atomic<bool> is_running;
     std::atomic<bool> run_started;
-
-    void SendSignal(int signal);
 };
 
 
