@@ -30,7 +30,7 @@ bool RespendLogger::IsInteresting() const
     return false;
 }
 
-void RespendLogger::Trigger()
+void RespendLogger::Trigger(CTxMemPool &pool)
 {
     if (respend.empty())
         return;

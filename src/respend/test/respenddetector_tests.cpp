@@ -38,7 +38,7 @@ public:
 
     bool IsInteresting() const override { return returnInteresting; }
     void SetValid(bool v) override { valid = v; }
-    void Trigger() override { triggered = true; }
+    void Trigger(CTxMemPool &pool) override { triggered = true; }
     int addOutpointCalls;
     bool respentBefore;
     bool isEquivalent;

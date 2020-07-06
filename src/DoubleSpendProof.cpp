@@ -144,6 +144,7 @@ DoubleSpendProof DoubleSpendProof::create(const CTransaction &t1, const CTransac
                 auto hashType = s1.pushData.front().back();
                 if (!(hashType & SIGHASH_FORKID))
                     throw std::runtime_error("Tx1 Not a Bitcoin Cash transaction");
+
                 hashType = s2.pushData.front().back();
                 if (!(hashType & SIGHASH_FORKID))
                     throw std::runtime_error("Tx2 Not a Bitcoin Cash transaction");

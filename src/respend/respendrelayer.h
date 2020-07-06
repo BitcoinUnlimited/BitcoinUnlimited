@@ -6,6 +6,9 @@
 #define BITCOIN_RESPEND_RESPENDRELAYER_H
 
 #include "respend/respendaction.h"
+#include "txmempool.h"
+
+extern CTxMemPool mempool;
 
 namespace respend
 {
@@ -26,7 +29,7 @@ public:
     bool IsInteresting() const override;
     void SetValid(bool v) override;
 
-    void Trigger() override;
+    void Trigger(CTxMemPool &pool) override;
 
 private:
     bool interesting;

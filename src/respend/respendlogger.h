@@ -23,7 +23,7 @@ public:
 
     virtual bool IsInteresting() const override;
 
-    void Trigger() override;
+    void Trigger(CTxMemPool &pool) override;
 
     void SetValid(bool v) override { valid = v ? "yes" : "no"; }
 private:

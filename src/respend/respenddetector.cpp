@@ -54,7 +54,7 @@ RespendDetector::~RespendDetector()
     {
         try
         {
-            a->Trigger();
+            a->Trigger(mempool);
         }
         catch (const std::exception &e)
         {

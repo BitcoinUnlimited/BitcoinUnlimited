@@ -10,11 +10,8 @@
 #include "primitives/transaction.h"
 #include "protocol.h"
 #include "streams.h"
-#include "txmempool.h"
 #include "util.h"
 #include <mutex>
-
-extern CTxMemPool mempool;
 
 namespace respend
 {
@@ -88,25 +85,26 @@ bool RespendRelayer::AddOutpointConflict(const COutPoint &,
 
 bool RespendRelayer::IsInteresting() const { return interesting; }
 void RespendRelayer::SetValid(bool v) { valid = v; }
-void RespendRelayer::Trigger()
+void RespendRelayer::Trigger(CTxMemPool &pool)
 {
     if (!valid || !interesting)
         return;
 
     // no DS proof exists, lets make one.
-    assert(mempool.mapTx.end() != originalTxIter);
+    WRITELOCK(pool.cs_txmempool);
+    assert(pool.mapTx.end() != originalTxIter);
     if (originalTxIter->dsproof == -1)
     {
         try
         {
             auto item = *originalTxIter;
             const auto dsp = DoubleSpendProof::create(originalTxIter->GetTx(), *pRespend);
-            item.dsproof = mempool.doubleSpendProofStorage()->add(dsp);
+            item.dsproof = pool.doubleSpendProofStorage()->add(dsp);
             LOG(DSPROOF, "Double spend found, creating double spend proof %d\n", item.dsproof);
-            mempool.mapTx.replace(originalTxIter, item);
+            pool.mapTx.replace(originalTxIter, item);
 
             // send INV to all peers
-            broadcastDspInv(mempool._get(originalTxIter->GetTx().GetHash()), dsp.createHash());
+            broadcastDspInv(pool._get(originalTxIter->GetTx().GetHash()), dsp.createHash());
         }
         catch (const std::exception &e)
         {
