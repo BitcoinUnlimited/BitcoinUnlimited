@@ -47,6 +47,9 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
 {
     CTxMemPool pool(CFeeRate(0));
     TestMemPoolEntryHelper entry;
+   // int nHashType = InsecureRand32();
+
+    uint256 outhash = InsecureRand256();
 
     // create a transaction with multiple inputs
     CMutableTransaction tx = CMutableTransaction();
@@ -65,6 +68,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     tx.vout[0].nValue = 6 * COIN;
     pool.addUnchecked(tx.GetHash(), entry.FromTx(tx));
     CTxMemPool::txiter iter = pool.mapTx.find(tx.GetHash());
+   // uint256 sh = SignatureHash(scriptCode, tx, nIn, SIGHASH_FORKID, 0, 0);
 
     // create another transaction that spends one of the same inputs as the above tx
     CMutableTransaction respend;
@@ -96,7 +100,12 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     // make valid
     r.SetValid(true);
     r.Trigger();
-    BOOST_CHECK_EQUAL(size_t(0), node.GetInventoryToSendSize());
+    BOOST_CHECK_EQUAL(size_t(1), node.GetInventoryToSendSize());
+    {
+        LOCK(node.cs_inventory);
+        BOOST_CHECK(respend.GetHash() == node.vInventoryToSend.at(0).hash);
+        BOOST_CHECK(0x94a0 == node.vInventoryToSend.at(0).type);
+    }
 
     // Create an interesting and valid respend to an SPV peer
     // add bloom filter using the respend hash.
