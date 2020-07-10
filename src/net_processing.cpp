@@ -1026,7 +1026,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                         inv.hash.ToString(), fAlreadyHaveBlock, fImporting, fReindex, IsChainNearlySyncd());
                 }
             }
-            else // If we get here then inv.type must == MSG_TX or MSG_DOUBLESPENDPROOF
+            else if (inv.type == MSG_TX)
             {
                 bool fAlreadyHaveTx = TxAlreadyHave(inv);
                 // LOG(NET, "got inv: %s  %d peer=%s\n", inv.ToString(), fAlreadyHaveTx ? "have" : "new",
@@ -1044,17 +1044,14 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 // transaction volumes increase.
                 else if (!fAlreadyHaveTx && !IsInitialBlockDownload())
                 {
-                    if (inv.type == MSG_DOUBLESPENDPROOF)
-                    {
-                        // this is a bit hacky because I'm not going to find out why BU no longer supports
-                        // generic INV/GETDATA pairs, as the requester.AskFor fails.
-                        std::vector<CInv> vGetData;
-                        vGetData.push_back(inv);
-                        pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
-                    }
-                    else
-                        requester.AskFor(inv, pfrom);
+                    requester.AskFor(inv, pfrom);
                 }
+            }
+            else if (inv.type == MSG_DOUBLESPENDPROOF)
+            {
+                std::vector<CInv> vGetData;
+                vGetData.push_back(inv);
+                pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
             }
 
             // Track requests for our stuff.
