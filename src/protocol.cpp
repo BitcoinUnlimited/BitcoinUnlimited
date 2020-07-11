@@ -94,11 +94,11 @@ const static std::string allNetMessageTypes[] = {
     NetMsgType::FILTERSIZEXTHIN, NetMsgType::REJECT, NetMsgType::SENDHEADERS, NetMsgType::THINBLOCK,
     NetMsgType::XTHINBLOCK, NetMsgType::XBLOCKTX, NetMsgType::GET_XBLOCKTX, NetMsgType::GET_XTHIN, NetMsgType::GET_THIN,
     NetMsgType::GRAPHENEBLOCK, NetMsgType::GRAPHENETX, NetMsgType::GET_GRAPHENETX, NetMsgType::GET_GRAPHENE,
-    NetMsgType::MEMPOOLSYNC, NetMsgType::MEMPOOLSYNCTX, NetMsgType::GET_MEMPOOLSYNC, NetMsgType::GET_MEMPOOLSYNCTX,
-    NetMsgType::XPEDITEDREQUEST, NetMsgType::XPEDITEDBLK, NetMsgType::XPEDITEDTXN, NetMsgType::XVERSION_OLD,
-    NetMsgType::XVERACK_OLD, NetMsgType::XVERSION, NetMsgType::XUPDATE, NetMsgType::SENDCMPCT, NetMsgType::SENDCMPCT,
-    NetMsgType::CMPCTBLOCK, NetMsgType::GETBLOCKTXN, NetMsgType::BLOCKTXN, NetMsgType::GET_GRAPHENE_RECOVERY,
-    NetMsgType::GRAPHENE_RECOVERY,
+    NetMsgType::GET_GRAPHENE_RECOVERY, NetMsgType::GRAPHENE_RECOVERY, NetMsgType::MEMPOOLSYNC,
+    NetMsgType::MEMPOOLSYNCTX, NetMsgType::GET_MEMPOOLSYNC, NetMsgType::GET_MEMPOOLSYNCTX, NetMsgType::XPEDITEDREQUEST,
+    NetMsgType::XPEDITEDBLK, NetMsgType::XPEDITEDTXN, NetMsgType::XVERSION_OLD, NetMsgType::XVERACK_OLD,
+    NetMsgType::XVERSION, NetMsgType::XUPDATE, NetMsgType::SENDCMPCT, NetMsgType::CMPCTBLOCK, NetMsgType::GETBLOCKTXN,
+    NetMsgType::BLOCKTXN, NetMsgType::DSPROOF,
 
 };
 const static std::vector<std::string> allNetMessageTypesVec(allNetMessageTypes,
