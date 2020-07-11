@@ -494,8 +494,6 @@ enum
     // With the introduction of compact block, this is being deprecated in favor of using the get_thin p2p
     // message, which solves the conflict with MSG_THINBLOCK and MSG_CMPCT_BLOCK.
     MSG_THINBLOCK = MSG_CMPCT_BLOCK,
-    // Uses Graphene set reconciliation to syncronize mempools between two peers.
-    MSG_MEMPOOLSYNC,
 };
 
 #endif // BITCOIN_PROTOCOL_H
