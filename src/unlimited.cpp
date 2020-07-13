@@ -53,6 +53,7 @@
 #include <iomanip>
 #include <limits>
 #include <queue>
+#include <stack>
 #include <thread>
 
 using namespace std;
