@@ -7,6 +7,7 @@ SDK_PATH ?= $(BASEDIR)/SDKs
 NO_QT ?=
 NO_WALLET ?=
 NO_UPNP ?=
+NO_RUST ?=
 FALLBACK_DOWNLOAD_PATH ?= https://www.bitcoinunlimited.info/depends-sources
 
 BUILD = $(shell ./config.guess)
@@ -77,8 +78,9 @@ qt_packages_$(NO_QT) = $(qt_packages) $(qt_$(host_os)_packages) $(qt_$(host_arch
 
 wallet_packages_$(NO_WALLET) = $(wallet_packages)
 upnp_packages_$(NO_UPNP) = $(upnp_packages)
+rust_packages_$(NO_RUST) = $(rust_packages)
 
-packages += $($(host_arch)_$(host_os)_packages) $($(host_os)_packages) $(qt_packages_) $(wallet_packages_) $(upnp_packages_)
+packages += $($(host_arch)_$(host_os)_packages) $($(host_os)_packages) $(qt_packages_) $(wallet_packages_) $(upnp_packages_) $(rust_packages_)
 native_packages += $($(host_arch)_$(host_os)_native_packages) $($(host_os)_native_packages)
 
 ifneq ($(qt_packages_),)
@@ -123,6 +125,7 @@ $(host_prefix)/share/config.site : config.site.in $(host_prefix)/.stamp_$(final_
             -e 's|@no_qt@|$(NO_QT)|' \
             -e 's|@no_wallet@|$(NO_WALLET)|' \
             -e 's|@no_upnp@|$(NO_UPNP)|' \
+            -e 's|@no_rust@|$(NO_RUST)|' \
             -e 's|@debug@|$(DEBUG)|' \
             $< > $@
 	$(AT)touch $@
