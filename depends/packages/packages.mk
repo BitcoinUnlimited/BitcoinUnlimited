@@ -1,6 +1,6 @@
 packages:=boost openssl libevent
 darwin_packages:=zeromq
-linux_packages:=zeromq rust
+linux_packages:=zeromq
 native_packages := native_ccache
 
 qt_native_packages = native_protobuf
@@ -13,7 +13,7 @@ qt_mingw32_packages=qt
 
 
 wallet_packages=bdb
-
+rust_packages=rust
 upnp_packages=miniupnpc
 
 darwin_native_packages = native_biplist native_ds_store native_mac_alias
