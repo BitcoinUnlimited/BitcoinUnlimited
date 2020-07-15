@@ -1,0 +1,503 @@
+#include:
+#    - template: Code-Quality.gitlab-ci.yml
+
+#code_quality:
+#    artifacts:
+#        paths: [gl-code-quality-report.json]
+
+#GENERAL SETTINGS
+
+# Top-level general rules determine when this pipeline is run:
+# - only on merge requests, new tags and changes to dev
+# - NOT on any branch except dev
+# - will run detached merge request pipelines for any merge request,
+#   targeting any branch
+
+workflow:
+    rules:
+        - if: $CI_MERGE_REQUEST_ID
+        - if: $CI_COMMIT_TAG
+        - if: $CI_COMMIT_BRANCH == "dev"
+
+image: ubuntu:18.04
+
+stages:
+    - static_checks
+    - build_depends
+    - build
+    - build_tests
+    - qa_tests
+    - benchmark_tests
+
+cache: &global_cache_settings
+    paths:
+        - ccache/
+
+.ccache_scripts:
+    before_script:
+        - set -o errexit; source .gitlab-ci/before_script.sh
+        - mkdir -p ccache
+        - export CCACHE_BASEDIR=${PWD}
+        - export CCACHE_DIR=${PWD}/ccache
+        - export CCACHE_COMPILERCHECK=content
+        - ccache --zero-stats || true
+
+# Linting
+.cache-linting:
+    extends: .ccache_scripts
+    cache:
+        <<: *global_cache_settings
+        key: linting_cache
+
+check-formatting:
+    stage: static_checks
+    extends: .cache-linting
+    needs: []
+    script:
+        - set -o errexit; source .gitlab-ci/install.sh
+        - export LINTER_DEB_URL=https://www.bitcoinunlimited.info/depends-sources/
+        - curl --location $LINTER_DEB_URL/libllvm3.8_3.8.1-27ubuntu1_amd64.deb -o llvm-3.8.deb;
+        - curl --location $LINTER_DEB_URL/clang-format-3.8_3.8.1-27ubuntu1_amd64.deb -o clang-format-3.8.deb;
+        - dpkg -i llvm-3.8.deb clang-format-3.8.deb;
+        - ./autogen.sh
+        - ./configure --with-incompatible-bdb --enable-glibc-back-compat --enable-reduce-exports
+        - make check-formatting
+
+# x86_64 Linux + deps as via system lib
+.cache-debian-nodeps:
+    extends: .ccache_scripts
+    cache:
+        <<: *global_cache_settings
+        key: debian_cache-nodeps
+
+build-debian-nodeps:
+    stage: build
+    extends: .cache-debian-nodeps
+    needs: []
+    script:
+        - set -o errexit; source .gitlab-ci/install.sh
+        - apt-get install -y qttools5-dev-tools qttools5-dev
+        - apt-get install -y libminiupnpc-dev libzmq3-dev libprotobuf-dev protobuf-compiler libqrencode-dev
+        - ./autogen.sh
+        - mkdir build; cd build
+        - ../configure --cache-file=config.cache --with-incompatible-bdb --with-gui=qt5 --enable-glibc-back-compat --enable-reduce-exports
+        - make -j `nproc`
+        - ccache --show-stats
+    artifacts:
+        paths:
+            - ./build/src/bitcoind
+            - ./build/src/bitcoin-cli
+            - ./build/src/bitcoin-miner
+            - ./build/src/bitcoin-tx
+            - ./build/src/test/test_bitcoin
+            - ./build/src/bench/bench_bitcoin
+
+build-debian-tests-nodeps:
+    stage: build_tests
+    extends: .cache-debian-nodeps
+    needs: ["build-debian-nodeps"]
+    script:
+        - set -o errexit; source .gitlab-ci/install.sh
+        - (cd build/src; ./test/test_bitcoin)
+    dependencies:
+        - build-debian-nodeps
+
+# Linux 64 bit, source deps
+.cache-debian:
+    extends: .ccache_scripts
+    cache:
+        <<: *global_cache_settings
+        key: debian_cache
+        paths:
+            - ccache/
+            - depends/sources
+            - depends/built
+            - depends/x86_64-unknown-linux-gnu
+
+build-debian-deps:
+    stage: build_depends
+    extends: .cache-debian
+    needs: []
+    script:
+        - cd depends
+        - make HOST=x86_64-unknown-linux-gnu -j `nproc` NO_RUST=1
+    artifacts:
+        paths:
+            - depends/x86_64-unknown-linux-gnu
+
+build-debian:
+    stage: build
+    extends: .cache-debian
+    needs: [build-debian-deps]
+    script:
+        - ./autogen.sh
+        - mkdir build; cd build
+        - ../configure --enable-shared --enable-debug --enable-zmq --enable-glibc-back-compat --enable-reduce-exports --cache-file=config.cache --prefix=$PWD/../depends/x86_64-unknown-linux-gnu CPPFLAGS=-DDEBUG_LOCKORDER
+        - make -j `nproc`
+        - ccache --show-stats
+    dependencies:
+        - build-debian-deps
+    artifacts:
+        paths:
+            - ./build/src/bitcoind
+            - ./build/src/bitcoin-cli
+            - ./build/src/bitcoin-miner
+            - ./build/src/bitcoin-tx
+            - ./build/src/test/test_bitcoin
+            - ./build/src/bench/bench_bitcoin
+            - ./build/qa/*
+            - ./qa/*
+
+build-debian-tests:
+    stage: build_tests
+    extends: .cache-debian
+    needs: ["build-debian"]
+    script:
+        - (cd build/src; ./test/test_bitcoin)
+    dependencies:
+        - build-debian
+
+test-debian-qa:
+    stage: qa_tests
+    tags:
+        - qa
+    extends: .cache-debian
+    needs: ["build-debian"]
+    script:
+        - apt-get install -y python3-zmq
+        - cd build;
+        - ./qa/pull-tester/rpc-tests.py --coverage --no-ipv6-rpc-listen
+    dependencies:
+        - build-debian
+    artifacts:
+        when: on_failure
+        paths:
+            - /tmp/test_*
+            - /tmp/coverage*
+
+test-debian-benchmarks:
+    stage: benchmark_tests
+    extends: .cache-debian
+    needs: ["build-debian-nodeps"]
+    script:
+        - set -o errexit; source .gitlab-ci/install.sh
+        - apt-get install -y qttools5-dev-tools qttools5-dev
+        - apt-get install -y libminiupnpc-dev libzmq3-dev libprotobuf-dev protobuf-compiler libqrencode-dev
+        - (./build/src/bench/bench_bitcoin -evals=1)
+    dependencies:
+        - build-debian-nodeps
+
+# TODO: Use Junit as a logger
+#test-debian-unittests:
+#    stage: test
+#    cache: {}
+#    needs: ["build-debian-tests"]
+#    script:
+#        - (cd src; ./test/test_bitcoin --logger=HRF:JUNIT,message,junit_unit_tests.xml)
+#    dependencies:
+#        - build-debian-tests
+#    artifacts:
+#        reports:
+#            junit: junit_unit_tests.xml
+
+
+# bitcoind clang (no depend, only system lib installed via apt)
+.cache-debian-clang:
+    extends: .ccache_scripts
+    cache:
+        <<: *global_cache_settings
+        key: debian_cache_clang
+
+.debian-clang-env:
+    extends: .cache-debian-clang
+    variables:
+        CC: clang-9
+        CXX: clang++-9
+
+build-debian-clang:
+    stage: build
+    extends: .debian-clang-env
+    needs: []
+    script:
+        - apt-get install -y libdb5.3++-dev libdb5.3-dev python3-zmq libzmq3-dev qttools5-dev-tools qttools5-dev libssl1.0-dev
+        - apt-get install -y libminiupnpc-dev libzmq3-dev libprotobuf-dev protobuf-compiler libqrencode-dev clang-9
+        - apt-get install -y libboost-program-options-dev libboost-filesystem-dev libboost-chrono-dev libboost-test-dev
+        - apt-get install -y libboost-system-dev libevent-dev bsdmainutils libboost-thread-dev
+        - ./autogen.sh
+        - mkdir build; cd build
+        - ../configure --cache-file=config.cache --enable-zmq --with-gui=qt5 --with-incompatible-bdb CPPFLAGS=-DDEBUG_LOCKORDER CXXFLAGS="-std=c++14"
+        - make -j `nproc`
+        - ccache --show-stats
+    artifacts:
+        paths:
+            - ./build/src/bitcoind
+            - ./build/src/bitcoin-cli
+            - ./build/src/bitcoin-miner
+            - ./build/src/bitcoin-tx
+            - ./build/src/test/test_bitcoin
+
+build-debian-tests-clang:
+    stage: build_tests
+    extends: .debian-clang-env
+    needs: ["build-debian-clang"]
+    script:
+        - apt-get install -y libdb5.3++-dev libdb5.3-dev python3-zmq libzmq3-dev qttools5-dev-tools qttools5-dev libssl1.0-dev
+        - apt-get install -y libminiupnpc-dev libzmq3-dev libprotobuf-dev protobuf-compiler libqrencode-dev clang-9
+        - apt-get install -y libboost-program-options-dev libboost-filesystem-dev libboost-chrono-dev libboost-test-dev
+        - apt-get install -y libboost-system-dev libevent-dev bsdmainutils libboost-thread-dev
+        - (cd build/src; ./test/test_bitcoin)
+    artifacts:
+        when: on_failure
+        paths:
+            - ./build/src/test/
+    dependencies:
+        - build-debian-clang
+
+# ARM64
+.cache-arm-64:
+    extends: .ccache_scripts
+    cache:
+        <<: *global_cache_settings
+        key: arm_cache-64
+        paths:
+            - ccache/
+            - depends/sources
+            - depends/built
+            - depends/aarch64-linux-gnu
+
+build-arm-depends-64:
+    stage: build_depends
+    extends: .cache-arm-64
+    script:
+        - apt-get install -y g++-aarch64-linux-gnu curl
+        - cd depends
+        - make HOST=aarch64-linux-gnu NO_QT=1 -j `nproc` NO_RUST=1
+    artifacts:
+        paths:
+            - depends/aarch64-linux-gnu
+
+build-arm-64:
+    stage: build
+    extends: .cache-arm-64
+    needs: ["build-arm-depends-64"]
+    script:
+        - apt-get install -y g++-aarch64-linux-gnu curl
+        - ./autogen.sh
+        - mkdir build; cd build
+        - ../configure --prefix=$PWD/../depends/aarch64-linux-gnu --enable-glibc-back-compat --enable-reduce-exports CXXFLAGS=-Wno-psabi
+        - make -j `nproc`
+        - ccache --show-stats
+    dependencies:
+        - build-arm-depends-64
+
+# ARM32
+.cache-arm-32:
+    extends: .ccache_scripts
+    cache:
+        <<: *global_cache_settings
+        key: arm_cache-32
+        paths:
+            - ccache/
+            - depends/sources
+            - depends/built
+            - depends/arm-linux-gnueabihf
+
+build-arm-depends-32:
+    stage: build_depends
+    extends: .cache-arm-32
+    script:
+        - apt-get install -y g++-arm-linux-gnueabihf curl
+        - cd depends
+        - make HOST=arm-linux-gnueabihf NO_QT=1 -j `nproc` NO_RUST=1
+    artifacts:
+        paths:
+            - depends/arm-linux-gnueabihf
+
+build-arm-32:
+    stage: build
+    extends: .cache-arm-32
+    needs: ["build-arm-depends-32"]
+    script:
+        - apt-get install -y g++-arm-linux-gnueabihf curl
+        - ./autogen.sh
+        - mkdir build; cd build
+        - ../configure --prefix=$PWD/../depends/arm-linux-gnueabihf --enable-glibc-back-compat --enable-reduce-exports
+        - make -j `nproc`
+        - ccache --show-stats
+    dependencies:
+        - build-arm-depends-32
+
+# Win64
+.cache-win-64:
+    extends: .ccache_scripts
+    cache:
+        <<: *global_cache_settings
+        key: win_cache-64
+        paths:
+            - ccache/
+            - depends/sources
+            - depends/built
+            - depends/x86_64-w64-mingw32
+
+build-win-64-depends:
+    stage: build_depends
+    extends: .cache-win-64
+    script:
+        - apt-get update
+        - apt-get install -y python3 nsis g++-mingw-w64-x86-64 wine64 wine-binfmt
+        - update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
+        - cd depends
+        - make HOST=x86_64-w64-mingw32 NO_QT=1 -j `nproc` NO_RUST=1
+    artifacts:
+        paths:
+            - depends/x86_64-w64-mingw32
+
+build-win-64:
+    stage: build
+    extends: .cache-win-64
+    needs: ["build-win-64-depends"]
+    script:
+        - apt-get update
+        - apt-get install -y python3 nsis g++-mingw-w64-x86-64 wine64 wine-binfmt
+        - update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
+        - ./autogen.sh
+        - - mkdir build; cd build
+        - ../configure --enable-reduce-exports --prefix=$PWD/../depends/x86_64-w64-mingw32
+        - make -j `nproc`
+        - ccache --show-stats
+    dependencies:
+        - build-win-64-depends
+
+# Win32
+.cache-win-32:
+    extends: .ccache_scripts
+    cache:
+        <<: *global_cache_settings
+        key: win_cache-32
+        paths:
+            - ccache/
+            - depends/sources
+            - depends/built
+            - depends/i686-w64-mingw32
+
+build-win-32-depends:
+    stage: build_depends
+    extends: .cache-win-32
+    script:
+        - dpkg --add-architecture i386
+        - apt-get update
+        - apt-get install -y python3 nsis g++-mingw-w64-i686 wine32 wine-binfmt
+        - update-alternatives --set i686-w64-mingw32-g++ /usr/bin/i686-w64-mingw32-g++-posix
+        - cd depends
+        - make HOST=i686-w64-mingw32 NO_QT=1 -j `nproc` NO_RUST=1
+    artifacts:
+        paths:
+            - depends/i686-w64-mingw32
+
+build-win-32:
+    stage: build
+    extends: .cache-win-32
+    needs: ["build-win-32-depends"]
+    script:
+        - dpkg --add-architecture i386
+        - apt-get update
+        - apt-get install -y python3 nsis g++-mingw-w64-i686 wine32 wine-binfmt
+        - update-alternatives --set i686-w64-mingw32-g++ /usr/bin/i686-w64-mingw32-g++-posix
+        - ./autogen.sh
+        - mkdir build; cd build
+        - ../configure --enable-reduce-exports --prefix=$PWD/../depends/i686-w64-mingw32
+        - make -j `nproc`
+        - ccache --show-stats
+    dependencies:
+        - build-win-32-depends
+
+# OSX
+.cache-osx:
+    extends: .ccache_scripts
+    cache:
+        <<: *global_cache_settings
+        key: osx_cache
+        paths:
+            - ccache/
+            - depends/sources
+            - depends/built
+            - depends/x86_64-apple-darwin11
+
+build-osx-depends:
+    stage: build_depends
+    extends: .cache-osx
+    script:
+        - apt-get update
+        - apt-get install -y cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev
+        - apt-get install -y libtiff-tools python-dev python3-setuptools-git
+        - mkdir -p depends/sdk-sources; mkdir depends/SDKs
+        - curl --location --fail https://www.bitcoinunlimited.info/sdks/MacOSX10.11.sdk.tar.gz -o ./depends/sdk-sources/MacOSX10.11.sdk.tar.gz
+        - tar -C depends/SDKs -xf depends/sdk-sources/MacOSX10.11.sdk.tar.gz
+        - cd depends
+        - make HOST=x86_64-apple-darwin11 -j `nproc` NO_RUST=1
+        - ccache --show-stats
+    artifacts:
+        paths:
+            - depends
+
+build-osx:
+    stage: build
+    extends: .cache-osx
+    needs: ["build-osx-depends"]
+    script:
+        - apt-get install -y cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev
+        - apt-get install -y libtiff-tools python-dev python3-setuptools-git libc++-dev
+        - ./autogen.sh
+        - mkdir build; cd build
+        - ../configure --enable-reduce-exports --prefix=$PWD/../depends/x86_64-apple-darwin11
+        - make -j `nproc`
+        - ccache --show-stats
+    dependencies:
+        - build-osx-depends
+    artifacts:
+        when: on_failure
+        paths:
+            - build/config.log
+            - depends/x86_64-apple-darwin11/share/config.site
+
+#Linux32-bit
+.cache-debian-32:
+    extends: .ccache_scripts
+    cache:
+        <<: *global_cache_settings
+        key: debian_cache_32
+        paths:
+            - ccache/
+            - depends/sources
+            - depends/built
+            - depends/i686-pc-linux-gnu
+
+build-debian-32-depends:
+    stage: build_depends
+    extends: .cache-debian-32
+    needs: []
+    script:
+        - dpkg --add-architecture i386
+        - apt-get update
+        - apt-get install -y python3 g++-multilib bc python3-zmq
+        - cd depends
+        - make HOST=i686-pc-linux-gnu -j `nproc` NO_RUST=1
+    artifacts:
+        paths:
+            - depends/i686-pc-linux-gnu
+
+build-debian-32:
+    stage: build
+    extends: .cache-debian-32
+    needs: ["build-debian-32-depends"]
+    script:
+        - dpkg --add-architecture i386
+        - apt-get update
+        - apt-get install -y python3 g++-multilib bc python3-zmq
+        - ./autogen.sh
+        - mkdir build; cd build
+        - ../configure --prefix=/$PWD/../depends/i686-pc-linux-gnu  --enable-zmq --enable-glibc-back-compat --enable-reduce-exports LDFLAGS=-static-libstdc++
+        - make -j `nproc`
+        - ccache --show-stats
+    dependencies:
+        - build-debian-32-depends
