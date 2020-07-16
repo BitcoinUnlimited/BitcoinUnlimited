@@ -107,6 +107,9 @@ public:
 // static
 DoubleSpendProof DoubleSpendProof::create(const CTransaction &t1, const CTransaction &t2)
 {
+    if (t1.GetHash() == t2.GetHash())
+        throw std::runtime_error("Can not create dsproof from identical transactions");
+
     DoubleSpendProof answer;
     Spender &s1 = answer.m_spender1;
     Spender &s2 = answer.m_spender2;

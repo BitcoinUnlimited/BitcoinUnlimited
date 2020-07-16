@@ -227,7 +227,6 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     const auto dsp_second = DoubleSpendProof::create(spend2b, iter->GetTx());
     BOOST_CHECK_EQUAL(dsp_first.createHash(), dsp_second.createHash());
 
-
     // The following tests will check for dsproof exceptions
 
     // 1) Create a dsproof where one transaction is not a bitcoin cash transaction (no fork id)
@@ -323,6 +322,16 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
         BOOST_CHECK_EQUAL(e.what(), "scriptSig has no signature");
     }
 
+    // 5) Should not be able to create a dsproof from two identical transactions
+    try
+    {
+        const auto dsp = DoubleSpendProof::create(iter->GetTx(), iter->GetTx());
+        BOOST_CHECK_MESSAGE(false, "We should have thrown");
+    }
+    catch (const std::runtime_error &e)
+    {
+        BOOST_CHECK_EQUAL(e.what(), "Can not create dsproof from identical transactions");
+    }
 
     // Cleanup
     vNodes.erase(vNodes.end() - 1);
