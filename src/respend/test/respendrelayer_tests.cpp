@@ -222,6 +222,12 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     BOOST_CHECK_EQUAL(size_t(0), node.GetInventoryToSendSize());
 
 
+    // Make sure dsproof is the same regardless of the order of txns
+    const auto dsp_first = DoubleSpendProof::create(iter->GetTx(), spend2b);
+    const auto dsp_second = DoubleSpendProof::create(spend2b, iter->GetTx());
+    BOOST_CHECK_EQUAL(dsp_first.createHash(), dsp_second.createHash());
+
+
     // The following tests will check for dsproof exceptions
 
     // 1) Create a dsproof where one transaction is not a bitcoin cash transaction (no fork id)
