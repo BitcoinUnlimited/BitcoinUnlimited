@@ -298,6 +298,8 @@ void broadcastDspInv(const CTransactionRef &dspTx, const uint256 &hash)
 {
     // send INV to all peers
     CInv inv(MSG_DOUBLESPENDPROOF, hash);
+    LOG(DSPROOF, "Broadcasting dsproof INV: %s\n", hash.ToString());
+
     LOCK(cs_vNodes);
     for (CNode *pnode : vNodes)
     {

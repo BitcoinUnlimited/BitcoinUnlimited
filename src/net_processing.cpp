@@ -2045,7 +2045,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 const auto tx = mempool.addDoubleSpendProof(dsp);
                 if (tx.get())
                 { // added to mempool correctly, then forward to nodes.
-                    LOG(DSPROOF, "  Good DSP, broadcasting an INV\n");
+                    LOG(DSPROOF, "  Good dsproof, broadcasting INV\n");
                     LOCK(cs_vNodes);
                     for (CNode *pnode : vNodes)
                     {
