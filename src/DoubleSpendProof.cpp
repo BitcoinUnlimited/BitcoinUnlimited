@@ -159,8 +159,6 @@ DoubleSpendProof DoubleSpendProof::create(const CTransaction &t1, const CTransac
 
     if (answer.m_prevOutIndex == -1)
         throw std::runtime_error("Transactions do not double spend each other");
-    if (s1.pushData.front().empty() || s2.pushData.front().empty())
-        throw std::runtime_error("Transactions not using known payment type. Could not find sig");
 
     s1.txVersion = t1.nVersion;
     s2.txVersion = t2.nVersion;
