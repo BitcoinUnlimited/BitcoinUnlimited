@@ -162,8 +162,6 @@ build-debian-tests:
 
 test-debian-qa:
     stage: qa_tests
-    tags:
-        - qa
     extends: .cache-debian
     needs: ["build-debian"]
     script:

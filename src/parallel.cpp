@@ -87,25 +87,35 @@ CParallelValidation::CParallelValidation() : nThreads(0), semThreadCount(nScript
     //-par=0 means autodetect number of cores.
     nThreads = GetArg("-par", DEFAULT_SCRIPTCHECK_THREADS);
     if (nThreads <= 0)
+    {
         nThreads += GetNumCores();
-    // A single thread has no parallelism so just use the main thread
-    // (Equivalent to parallel being turned off).
-    if (nThreads <= 1)
-        nThreads = 0;
+    }
+
+    // Must always assign at least one thread in case GetNumCores() fails.
+    if (nThreads <= 0)
+    {
+        nThreads = 1;
+    }
     else if (nThreads > MAX_SCRIPTCHECK_THREADS)
+    {
         nThreads = MAX_SCRIPTCHECK_THREADS;
+    }
 
     // Create each script check queue with all associated threads.
     LOGA("Launching %d ScriptQueues each using %d threads for script verification\n", nScriptCheckQueues, nThreads);
     while (QueueCount() < nScriptCheckQueues)
     {
         auto queue = new CCheckQueue<CScriptCheck>(128);
-        for (unsigned int i = 0; i < nThreads; i++)
+        for (unsigned int i = 1; i <= nThreads; i++)
         {
             threadGroup.create_thread(boost::bind(&AddScriptCheckThreads, i + 1, queue));
         }
         vQueues.push_back(queue);
     }
+
+    // Must always have at least one scriptcheck thread running or we'll
+    // end up not validating signatures when new blocks are mined.
+    DbgAssert(nThreads >= 1, nThreads = 1);
 }
 
 CParallelValidation::~CParallelValidation()
