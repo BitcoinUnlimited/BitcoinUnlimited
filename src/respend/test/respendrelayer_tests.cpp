@@ -41,7 +41,7 @@ static std::vector<CMutableTransaction> SetupDummyInputs(CBasicKeyStore &keystor
     // Create some dummy input transactions
     int nHeight = 1000; // any height will do
     dummyTransactions[0].vout.resize(2);
-    dummyTransactions[0].vout[0].nValue = 11 * CENT;
+    dummyTransactions[0].vout[0].nValue = 50 * CENT;
     dummyTransactions[0].vout[0].scriptPubKey << ToByteVector(key[0].GetPubKey()) << OP_CHECKSIG;
     dummyTransactions[0].vout[1].nValue = 50 * CENT;
     dummyTransactions[0].vout[1].scriptPubKey << ToByteVector(key[1].GetPubKey()) << OP_CHECKSIG;
@@ -102,7 +102,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     CCoinsViewCache coins(&coinsDummy);
     std::vector<CMutableTransaction> dummyTransactions = SetupDummyInputs(keystore, coins);
 
-    // Create a basic signed transaction and add it to the pool. We will use this transaction
+    // Create a basic signed transactions and add them to the pool. We will use these transactions
     // to create the spend and respend transactions.
     CMutableTransaction t1;
     t1.vin.resize(1);
@@ -124,14 +124,35 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     }
     pool.addUnchecked(tx1.GetHash(), entry.FromTx(tx1));
 
+    CMutableTransaction t2;
+    t2.vin.resize(1);
+    t2.vin[0].prevout.hash = dummyTransactions[1].GetHash();
+    t2.vin[0].prevout.n = 2;
+    t2.vout.resize(1);
+    t2.vout[0].nValue = 50 * CENT;
+    key.MakeNewKey(true);
+    keystore.AddKey(key);
+    t2.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
+    CTransaction tx2(t2);
+    {
+        TransactionSignatureCreator tsc(&keystore, &tx2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
+        const CScript &scriptPubKey = dummyTransactions[0].vout[1].scriptPubKey;
+        CScript &scriptSigRes = t2.vin[0].scriptSig;
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
+        BOOST_CHECK(worked);
+    }
+    pool.addUnchecked(tx2.GetHash(), entry.FromTx(tx2));
 
-    // Create a spend of tx1's output.
+
+    // Create a spend of tx1 and tx2's output.
     CMutableTransaction s1;
-    s1.vin.resize(1);
+    s1.vin.resize(2);
     s1.vin[0].prevout.hash = tx1.GetHash();
     s1.vin[0].prevout.n = 1;
+    s1.vin[1].prevout.hash = tx2.GetHash();
+    s1.vin[1].prevout.n = 1;
     s1.vout.resize(1);
-    s1.vout[0].nValue = 50 * CENT;
+    s1.vout[0].nValue = 100 * CENT;
     CKey key1;
     key1.MakeNewKey(true);
     keystore.AddKey(key1);
@@ -139,10 +160,15 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
 
     CTransaction spend1(s1);
     {
-        TransactionSignatureCreator tsc(&keystore, &spend1, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
+        TransactionSignatureCreator tsc(&keystore, &spend1, 0, 100 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = tx1.vout[0].scriptPubKey;
         CScript &scriptSigRes = s1.vin[0].scriptSig;
         bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
+        BOOST_CHECK(worked);
+
+        const CScript &scriptPubKey2 = tx2.vout[0].scriptPubKey;
+        CScript &scriptSigRes2 = s1.vin[1].scriptSig;
+        worked = ProduceSignature(tsc, scriptPubKey2, scriptSigRes2);
         BOOST_CHECK(worked);
     }
     CTransaction spend1a(s1);
@@ -150,7 +176,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     CTxMemPool::txiter iter = pool.mapTx.find(spend1a.GetHash());
 
 
-    // Create a respend of tx1's output.
+    // Create a respend tx1's output.
     CMutableTransaction s2;
     s2.vin.resize(1);
     s2.vin[0].prevout.hash = tx1.GetHash();
