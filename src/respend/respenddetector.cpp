@@ -4,7 +4,10 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "respend/respenddetector.h"
+#include "DoubleSpendProof.h"
+#include "DoubleSpendProofStorage.h"
 #include "bloom.h"
+#include "dosman.h"
 #include "respend/respendaction.h"
 #include "respend/respendlogger.h"
 #include "respend/respendrelayer.h"
@@ -71,6 +74,48 @@ void RespendDetector::CheckForRespend(const CTxMemPool &pool, const CTransaction
     {
         const COutPoint outpoint = in.prevout;
 
+        // Check first if there are already double spend orphans. If there are
+        // then we can broadcast them here and continue without needing to check
+        // further for conflicts for this outpoint.
+        auto orphans = pool.doubleSpendProofStorage()->findOrphans(outpoint);
+        if (!orphans.empty())
+        {
+            for (auto iter = orphans.begin(); iter != orphans.end(); iter++)
+            {
+                const int proofId = iter->first;
+                auto dsp = pool.doubleSpendProofStorage()->proof(proofId);
+                LOG(DSPROOF, "Rescued a DoubleSpendProof orphan %d", proofId);
+                auto rc = dsp.validate(ptx);
+
+                DbgAssert(rc == DoubleSpendProof::Valid || rc == DoubleSpendProof::Invalid, );
+
+                if (rc == DoubleSpendProof::Valid)
+                {
+                    LOG(DSPROOF, "DoubleSpendProof for orphan validated correctly %d", proofId);
+                    pool.doubleSpendProofStorage()->claimOrphan(proofId);
+                    {
+                        std::lock_guard<std::mutex> lock(respentBeforeMutex);
+                        dsproof = proofId;
+                    }
+
+                    // remove all other orphans since we only need one
+                    while (++iter != orphans.end())
+                    {
+                        pool.doubleSpendProofStorage()->remove(proofId);
+                        LOG(DSPROOF, "Removing DoubleSpendProof orphan, we only need one %d", proofId);
+                    }
+                    break;
+                }
+                else
+                {
+                    LOG(DSPROOF, "DoubleSpendProof did not validate %s", dsp.createHash().ToString());
+                    pool.doubleSpendProofStorage()->remove(proofId);
+                    dosMan.Misbehaving(iter->second, 5);
+                }
+            }
+            continue;
+        }
+
         // Is there a conflicting spend?
         auto spendIter = pool.mapNextTx.find(outpoint);
         if (spendIter == pool.mapNextTx.end())
@@ -122,4 +167,5 @@ bool RespendDetector::IsInteresting() const
     return std::any_of(begin(actions), end(actions), [](const RespendActionPtr &a) { return a->IsInteresting(); });
 }
 
+int RespendDetector::GetDsproof() const { return dsproof; }
 } // ns respend

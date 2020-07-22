@@ -180,7 +180,7 @@ DoubleSpendProof DoubleSpendProof::create(const CTransaction &t1, const CTransac
 
 DoubleSpendProof::DoubleSpendProof() {}
 bool DoubleSpendProof::isEmpty() const { return m_prevOutIndex == -1 || m_prevTxId.IsNull(); }
-DoubleSpendProof::Validity DoubleSpendProof::validate() const
+DoubleSpendProof::Validity DoubleSpendProof::validate(const CTransactionRef ptx) const
 {
     if (m_prevTxId.IsNull() || m_prevOutIndex < 0)
         return Invalid;
@@ -227,6 +227,7 @@ DoubleSpendProof::Validity DoubleSpendProof::validate() const
      * We need this because we want the public key that it contains.
      */
     CTransaction tx;
+    if (ptx == nullptr)
     {
         READLOCK(mempool.cs_txmempool);
         auto it = mempool.mapNextTx.find({m_prevTxId, (uint32_t)m_prevOutIndex});
@@ -236,6 +237,8 @@ DoubleSpendProof::Validity DoubleSpendProof::validate() const
         }
         tx = *(it->second.ptx);
     }
+    else
+        tx = *ptx;
 
     /*
      * TomZ: At this point (2019-07) we only support P2PKH payments.

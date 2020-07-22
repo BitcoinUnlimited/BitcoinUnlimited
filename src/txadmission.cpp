@@ -1302,6 +1302,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
         }
 
+        // Check for repend before committing the tx to the mempool
         respend.SetValid(true);
         if (respend.IsRespend())
         {
@@ -1314,10 +1315,12 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
             }
         }
-
-        // Add entry to the commit queue
-        if (debugger == nullptr)
+        else if (debugger == nullptr)
         {
+            // If it's not a respend it may have a reclaimed orphan associated with it
+            entry.dsproof = respend.GetDsproof();
+
+            // Add entry to the commit queue
             CTxCommitData eData;
             eData.entry = std::move(entry);
             eData.hash = hash;
