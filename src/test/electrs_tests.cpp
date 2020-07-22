@@ -128,4 +128,13 @@ BOOST_AUTO_TEST_CASE(electrum_xversion)
     BOOST_CHECK_EQUAL(PORT, ver->as_u64c(XVer::BU_ELECTRUM_SERVER_PORT_TCP));
 }
 
+// Test case for gitlab issue #2221, passing boolean parameters did not work.
+BOOST_AUTO_TEST_CASE(issue_2221)
+{
+    mapMultiArgs["-electrum.rawarg"].push_back("--disable-full-compaction");
+    mapMultiArgs["-electrum.rawarg"].push_back("--jsonrpc-import");
+    BOOST_CHECK(electrs_args_has("--disable-full-compaction"));
+    BOOST_CHECK(electrs_args_has("--jsonrpc-import"));
+}
+
 BOOST_AUTO_TEST_SUITE_END()
