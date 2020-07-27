@@ -140,7 +140,7 @@ def createTx(dests, sources, node, maxx=None, fee=1, nextWallet=None, generatedT
             txhex = hexlify(tx.serialize()).decode("utf-8")
             txid = None
             try:
-                txid = node.enqueuerawtransaction(txhex)
+                txid = node.sendrawtransaction(txhex)
             except JSONRPCException as e:
                 logging.error("TX submission failed because %s" % str(e))
                 logging.error("tx was: %s" % txhex)
@@ -228,9 +228,9 @@ class MyTest (BitcoinTestFramework):
 
             for n in self.nodes:
                 waitFor(30, lambda: True if n.getmempoolinfo()["size"] >= NTX - 5 else None)
-            time.sleep(1)
             # we have to allow < because bloom filter false positives in the node's
             # sending logic may cause it to not get an INV
+            time.sleep(1)
             for n in self.nodes:
                 assert(n.getmempoolinfo()["size"] <= NTX)  # if its > then a doublespend got through
             self.commitMempool()  # clear out this test
@@ -247,10 +247,9 @@ class MyTest (BitcoinTestFramework):
 
             gtx = zip(gtx2, gtx3)
             for g in gtx:
-                self.nodes[0].enqueuerawtransaction(g[0].toHex())
+                self.nodes[0].sendrawtransaction(g[0].toHex())
                 try:
-                    self.nodes[0].enqueuerawtransaction(g[1].toHex())
-                    # assert(0)  # double spend may not return an error because processing happens asynchronously
+                    self.nodes[0].sendrawtransaction(g[1].toHex())
                 except JSONRPCException as e:
                     if e.error["code"] != -26:  # txn-mempool-conflict
                         raise
@@ -258,12 +257,8 @@ class MyTest (BitcoinTestFramework):
             # forget about the tx I used above
             wallet = wallet[NTX:]
 
-            waitFor(30, lambda: True if self.nodes[0].getmempoolinfo()["size"] >= NTX else None)
-            waitFor(30, lambda: True if self.nodes[1].getmempoolinfo()["size"] >= NTX else None)
-            time.sleep(2)  # see if any conflicts will be added to the mempool
-
-            assert(self.nodes[0].getmempoolinfo()["size"] == NTX)
-            assert(self.nodes[1].getmempoolinfo()["size"] == NTX)
+            waitFor(30, lambda: True if self.nodes[0].getmempoolinfo()["size"] == NTX else None)
+            waitFor(30, lambda: True if self.nodes[1].getmempoolinfo()["size"] == NTX else None)
 
             NTX1 = NTX
 
@@ -287,17 +282,15 @@ class MyTest (BitcoinTestFramework):
                 try:
                     self.nodes[(count + 1) % numNodes].enqueuerawtransaction(g[1].toHex())
                 except JSONRPCException as e:
-                    if e.error["code"] != -26:  # txn-mempool-conflict
+                    if e.error["code"] != -26 or e.error["code"] == -26:  # txn-mempool-conflict
                         pass  # we may get an error or not depending on propagation speed of 1st tx
 
             # There is no good way to tell if the mempool sync process has fully
             # completed because out of testing the process of accepting tx is never
-            # complete
-            waitFor(30, lambda: True if self.nodes[0].getmempoolinfo()["size"] >= NTX + NTX1 else None)
-            waitFor(30, lambda: True if self.nodes[1].getmempoolinfo()["size"] >= NTX + NTX1 else None)
-            time.sleep(2)  # see if any conflicts will be added to the mempool
-            assert(self.nodes[0].getmempoolinfo()["size"] == NTX + NTX1)
-            assert(self.nodes[1].getmempoolinfo()["size"] == NTX + NTX1)
+            # complete so sleep a little while first before checking.
+            time.sleep(2) #wait for all txns to propagate
+            waitFor(30, lambda: True if self.nodes[0].getmempoolinfo()["size"] == NTX + NTX1 else None)
+            waitFor(30, lambda: True if self.nodes[1].getmempoolinfo()["size"] == NTX + NTX1 else None)
 
             # forget about the tx I used
             wallet = wallet[NTX:]

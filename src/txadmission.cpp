@@ -590,10 +590,18 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     bool fRejectAbsurdFee,
     TransactionClass allowedTx)
 {
+    // This lock is here to serialize AcceptToMemoryPool(). This must be done because
+    // we do not enqueue the transaction prior to calling this function, as we do with
+    // the normal multi-threaded tx admission.
+    static CCriticalSection cs_accept;
+    LOCK(cs_accept);
+
     std::vector<COutPoint> vCoinsToUncache;
 
     bool res = false;
 
+    // pause parallel tx entry and commit all txns to the pool so that there are no
+    // other threads running txadmission and to ensure that the mempool state is current.
     CORRAL(txProcessingCorral, CORRAL_TX_PAUSE);
     CommitTxToMempool();
 
