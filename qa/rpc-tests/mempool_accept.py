@@ -260,10 +260,6 @@ class MyTest (BitcoinTestFramework):
 
                 stdout_data1, stderr_data1 = p1.communicate(timeout=5)
                 stdout_data2, stderr_data2 = p2.communicate(timeout=5)
-                print("stdout1 " + str(stdout_data1))
-                print("stderr1 " + str(stderr_data1))
-                print("stdout2 " + str(stdout_data2))
-                print("stderr2 " + str(stderr_data2))
 
                 if (stderr_data1.find("txn-mempool-conflict") >= 0):
                     conflict_count += 1;
