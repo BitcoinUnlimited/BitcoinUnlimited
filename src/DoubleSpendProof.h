@@ -29,7 +29,7 @@ public:
         Invalid
     };
 
-    Validity validate(const CTransactionRef ptx = nullptr) const;
+    Validity validate(const CTxMemPool &pool, const CTransactionRef ptx = nullptr) const;
 
     uint256 prevTxId() const;
     int prevOutIndex() const;

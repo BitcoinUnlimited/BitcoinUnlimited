@@ -180,7 +180,7 @@ DoubleSpendProof DoubleSpendProof::create(const CTransaction &t1, const CTransac
 
 DoubleSpendProof::DoubleSpendProof() {}
 bool DoubleSpendProof::isEmpty() const { return m_prevOutIndex == -1 || m_prevTxId.IsNull(); }
-DoubleSpendProof::Validity DoubleSpendProof::validate(const CTransactionRef ptx) const
+DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, const CTransactionRef ptx) const
 {
     if (m_prevTxId.IsNull() || m_prevOutIndex < 0)
         return Invalid;
@@ -198,11 +198,12 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTransactionRef ptx)
     // Get the previous output we are spending.
     int64_t amount;
     CScript prevOutScript;
-    auto prevTx = mempool.get(m_prevTxId);
+    auto prevTx = pool.get(m_prevTxId);
     if (prevTx.get())
     {
         if (prevTx->vout.size() <= (size_t)m_prevOutIndex)
             return Invalid;
+
         auto output = prevTx->vout.at(m_prevOutIndex);
         amount = output.nValue;
         prevOutScript = output.scriptPubKey;
@@ -279,7 +280,10 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTransactionRef ptx)
     if (!VerifyScript(inScript, prevOutScript, 0 /*flags*/, MAX_OPS_PER_SCRIPT, checker1, &error))
     {
         LOG(DSPROOF, "DoubleSpendProof failed validating first tx due to %s\n", ScriptErrorString(error));
+  printf("DoubleSpendProof failed validating first tx due to %s\n", ScriptErrorString(error));
+printf("invalid 5\n");
         return Invalid;
+
     }
 
     inScript.clear();
@@ -292,7 +296,11 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTransactionRef ptx)
     if (!VerifyScript(inScript, prevOutScript, 0 /*flags*/, MAX_OPS_PER_SCRIPT, checker2, &error))
     {
         LOG(DSPROOF, "DoubleSpendProof failed validating second tx due to %s\n", ScriptErrorString(error));
+{
+  printf("DoubleSpendProof failed validating first tx due to %s\n", ScriptErrorString(error));
+printf("invalid 6\n");
         return Invalid;
+}
     }
     return Valid;
 }
