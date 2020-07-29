@@ -2050,8 +2050,25 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 const auto ptx = mempool.addDoubleSpendProof(dsp);
                 if (ptx.get())
                 {
+                    // find any descendants of this double spent transaction. If there are any
+                    // then we must also forward this double spend proof to any SPV peers that
+                    // want to know about this tx or its descendants.
+                    CTxMemPool::setEntries setDescendants;
+                    {
+                        READLOCK(mempool.cs_txmempool);
+                        CTxMemPool::indexed_transaction_set::const_iterator iter = mempool.mapTx.find(ptx->GetHash());
+                        if (iter == mempool.mapTx.end())
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            mempool._CalculateDescendants(iter, setDescendants);
+                        }
+                    }
+
                     // added to mempool correctly, then forward to nodes.
-                    broadcastDspInv(ptx, dspHash);
+                    broadcastDspInv(ptx, dspHash, &setDescendants);
                 }
                 break;
             }

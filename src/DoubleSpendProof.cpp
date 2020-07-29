@@ -299,7 +299,7 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
     return Valid;
 }
 
-void broadcastDspInv(const CTransactionRef &dspTx, const uint256 &hash)
+void broadcastDspInv(const CTransactionRef &dspTx, const uint256 &hash, CTxMemPool::setEntries *setDescendants)
 {
     // send INV to all peers
     CInv inv(MSG_DOUBLESPENDPROOF, hash);
@@ -313,8 +313,16 @@ void broadcastDspInv(const CTransactionRef &dspTx, const uint256 &hash)
         LOCK(pnode->cs_filter);
         if (pnode->pfilter)
         {
+            if (setDescendants)
+            {
+                for (auto iter : *setDescendants)
+                {
+                    if (pnode->pfilter->IsRelevantAndUpdate(iter->GetSharedTx()))
+                        pnode->PushInventory(inv);
+                }
+            }
             // For nodes that we sent this Tx before, send a proof.
-            if (pnode->pfilter->IsRelevantAndUpdate(dspTx))
+            else if (pnode->pfilter->IsRelevantAndUpdate(dspTx))
                 pnode->PushInventory(inv);
         }
         else

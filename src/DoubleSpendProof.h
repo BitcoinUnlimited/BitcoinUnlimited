@@ -6,11 +6,10 @@
 
 #include "primitives/transaction.h"
 #include "serialize.h"
+#include "txmempool.h"
 #include <deque>
 #include <uint256.h>
 
-class CTxMemPool;
-class CTransaction;
 
 class DoubleSpendProof
 {
@@ -68,7 +67,6 @@ public:
         READWRITE(m_spender2.hashOutputs);
         READWRITE(m_spender2.pushData);
     }
-
     uint256 createHash() const;
 
 private:
@@ -78,6 +76,8 @@ private:
     Spender m_spender1, m_spender2;
 };
 
-void broadcastDspInv(const CTransactionRef &dspTx, const uint256 &hash);
+void broadcastDspInv(const CTransactionRef &dspTx,
+    const uint256 &hash,
+    CTxMemPool::setEntries *setDescendants = nullptr);
 
 #endif
