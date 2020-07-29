@@ -167,7 +167,6 @@ class BitcoinTestFramework(object):
         wallets: Pass a list of wallet filenames.  Each wallet file will be copied into the node's directory
         before starting the node.
         """
-        import optparse
 
         parser = optparse.OptionParser(usage="%prog [options]")
         parser.add_option("--nocleanup", dest="nocleanup", default=False, action="store_true",
@@ -201,10 +200,19 @@ class BitcoinTestFramework(object):
                           "This is meant to deal with travis which is currently not supporting IPv6 sockets.")
         parser.add_option("--electrum.exec", dest="electrumexec",
             help="Set a custom path to the electrum server executable", default=None)
+        parser.add_option("--gitlab", dest="gitlab", default=False, action="store_true",
+                          help="Changes root directory for gitlab artifact exporting. overrides tmpdir and tmppfx")
 
 
         self.add_options(parser)
         (self.options, self.args) = parser.parse_args(argsOverride)
+
+        if self.options.gitlab is True:
+            basedir = os.path.normpath(os.path.dirname(os.path.realpath(__file__))+"/../../qa_tests")
+            if os.path.exists(basedir) == False:
+                os.mkdir(path=basedir, mode=0o700)
+            self.options.tmpdir = tempfile.mkdtemp(prefix="test_"+testname+"_", dir=basedir)
+
 
         UtilOptions.no_ipv6_rpc_listen = self.options.no_ipv6_rpc_listen
         UtilOptions.electrumexec = self.options.electrumexec
@@ -217,7 +225,7 @@ class BitcoinTestFramework(object):
         random.seed(self.randomseed)
         logging.info("Random seed: %s" % self.randomseed)
 
-        if self.options.tmppfx is not None:
+        if self.options.tmppfx is not None and self.options.gitlab is False:
             i = self.options.port_seed
             # find a short path that's easy to remember compared to mkdtemp
             while os.path.exists(self.options.tmppfx + os.sep + testname[0:-2] + str(i)):

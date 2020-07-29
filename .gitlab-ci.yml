@@ -167,14 +167,13 @@ test-debian-qa:
     script:
         - apt-get install -y python3-zmq
         - cd build;
-        - ./qa/pull-tester/rpc-tests.py --coverage --no-ipv6-rpc-listen
+        - ./qa/pull-tester/rpc-tests.py --coverage --no-ipv6-rpc-listen --gitlab
     dependencies:
         - build-debian
     artifacts:
         when: on_failure
         paths:
-            - /tmp/test_*
-            - /tmp/coverage*
+            - ./qa/qa_tests/
 
 test-debian-benchmarks:
     stage: benchmark_tests
