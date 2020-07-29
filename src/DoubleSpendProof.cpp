@@ -182,6 +182,8 @@ DoubleSpendProof::DoubleSpendProof() {}
 bool DoubleSpendProof::isEmpty() const { return m_prevOutIndex == -1 || m_prevTxId.IsNull(); }
 DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, const CTransactionRef ptx) const
 {
+    AssertLockHeld(pool.cs_txmempool);
+
     if (m_prevTxId.IsNull() || m_prevOutIndex < 0)
         return Invalid;
     if (m_spender1.pushData.empty() || m_spender1.pushData.front().empty() || m_spender2.pushData.empty() ||
@@ -198,7 +200,7 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
     // Get the previous output we are spending.
     int64_t amount;
     CScript prevOutScript;
-    auto prevTx = pool.get(m_prevTxId);
+    auto prevTx = pool._get(m_prevTxId);
     if (prevTx.get())
     {
         if (prevTx->vout.size() <= (size_t)m_prevOutIndex)
@@ -230,9 +232,8 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
     CTransaction tx;
     if (ptx == nullptr)
     {
-        READLOCK(mempool.cs_txmempool);
-        auto it = mempool.mapNextTx.find({m_prevTxId, (uint32_t)m_prevOutIndex});
-        if (it == mempool.mapNextTx.end() || (size_t)m_prevOutIndex >= it->second.ptx->vout.size())
+        auto it = pool.mapNextTx.find({m_prevTxId, (uint32_t)m_prevOutIndex});
+        if (it == pool.mapNextTx.end() || (size_t)m_prevOutIndex >= it->second.ptx->vout.size())
         {
             return MissingTransaction;
         }

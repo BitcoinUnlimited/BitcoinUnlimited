@@ -2038,7 +2038,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
             hash = dsp.createHash();
             CInv inv(MSG_DOUBLESPENDPROOF, hash);
-            switch (dsp.validate(mempool))
+            DoubleSpendProof::Validity validity;
+            {
+                READLOCK(mempool.cs_txmempool);
+                validity = dsp.validate(mempool);
+            }
+            switch (validity)
             {
             case DoubleSpendProof::Valid:
             {
