@@ -2027,17 +2027,16 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
     if (strCommand == NetMsgType::DSPROOF)
     {
-        LOG(DSPROOF, "Received a Double Spend Proof from peer %d\n", pfrom->id);
-        uint256 hash;
+        LOG(DSPROOF, "Received a double spend proof from peer:%d\n", pfrom->GetId());
+        uint256 dspHash;
         try
         {
             DoubleSpendProof dsp;
             vRecv >> dsp;
             if (dsp.isEmpty())
-                throw std::runtime_error("DSP empty");
+                throw std::runtime_error("Double spend proof is empty");
 
-            hash = dsp.createHash();
-            CInv inv(MSG_DOUBLESPENDPROOF, hash);
+            dspHash = dsp.createHash();
             DoubleSpendProof::Validity validity;
             {
                 READLOCK(mempool.cs_txmempool);
@@ -2047,37 +2046,22 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             {
             case DoubleSpendProof::Valid:
             {
-                const auto tx = mempool.addDoubleSpendProof(dsp);
-                if (tx.get())
-                { // added to mempool correctly, then forward to nodes.
-                    LOG(DSPROOF, "  Good dsproof, broadcasting INV\n");
-                    LOCK(cs_vNodes);
-                    for (CNode *pnode : vNodes)
-                    {
-                        if (!pnode->fRelayTxes || pnode == pfrom)
-                            continue;
-                        LOCK(pnode->cs_filter);
-                        if (pnode->pfilter)
-                        {
-                            // For nodes that we sent this Tx before, send a proof.
-                            if (pnode->pfilter->IsRelevantAndUpdate(tx))
-                                pnode->PushInventory(inv);
-                        }
-                        else
-                        {
-                            pnode->PushInventory(inv);
-                        }
-                    }
+                LOG(DSPROOF, "Double spend proof is valid from peer:%d\n", pfrom->GetId());
+                const auto ptx = mempool.addDoubleSpendProof(dsp);
+                if (ptx.get())
+                {
+                    // added to mempool correctly, then forward to nodes.
+                    broadcastDspInv(ptx, dspHash);
                 }
                 break;
             }
             case DoubleSpendProof::MissingUTXO:
             case DoubleSpendProof::MissingTransaction:
-                LOG(DSPROOF, "DoubleSpend Proof postponed: is orphan\n");
+                LOG(DSPROOF, "Double spend proof is orphan: postponed\n");
                 mempool.doubleSpendProofStorage()->addOrphan(dsp, pfrom->GetId());
                 break;
             case DoubleSpendProof::Invalid:
-                throw std::runtime_error("Proof didn't validate");
+                throw std::runtime_error("Double spend proof didn't validate");
             default:
                 return false;
             }
@@ -2085,8 +2069,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         catch (const std::exception &e)
         {
             LOG(DSPROOF, "Failure handling double spend proof. Peer: %d Reason: %s\n", pfrom->GetId(), e.what());
-            if (!hash.IsNull())
-                mempool.doubleSpendProofStorage()->markProofRejected(hash);
+            if (!dspHash.IsNull())
+                mempool.doubleSpendProofStorage()->markProofRejected(dspHash);
             dosMan.Misbehaving(pfrom->GetId(), 10);
             return false;
         }
