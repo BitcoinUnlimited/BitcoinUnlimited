@@ -85,15 +85,12 @@ void RespendDetector::CheckForRespend(const CTxMemPool &pool, const CTransaction
                 const int proofId = iter->first;
                 auto dsp = pool.doubleSpendProofStorage()->proof(proofId);
                 LOG(DSPROOF, "Rescued a DoubleSpendProof orphan %d", proofId);
-           printf( "Rescued a DoubleSpendProof orphan id:%d\n", proofId);
                 auto rc = dsp.validate(pool, ptx);
-//rc = DoubleSpendProof::Valid;
                 DbgAssert(rc == DoubleSpendProof::Valid || rc == DoubleSpendProof::Invalid, );
 
                 if (rc == DoubleSpendProof::Valid)
                 {
                     LOG(DSPROOF, "DoubleSpendProof for orphan validated correctly %d", proofId);
-     printf("DoubleSpendProof for orphan validated correctly %d\n", proofId);
                     pool.doubleSpendProofStorage()->claimOrphan(proofId);
                     {
                         std::lock_guard<std::mutex> lock(respentBeforeMutex);
@@ -108,14 +105,12 @@ void RespendDetector::CheckForRespend(const CTxMemPool &pool, const CTransaction
                     }
 
                     // Finally, send the dsp inventory message
-printf("about to broadcast dspinv\n");
                     broadcastDspInv(ptx, dsp.createHash());
                     break;
                 }
                 else
                 {
                     LOG(DSPROOF, "DoubleSpendProof did not validate %s", dsp.createHash().ToString());
-        printf("DoubleSpendProof did not validate %s\n", dsp.createHash().ToString().c_str());
                     pool.doubleSpendProofStorage()->remove(proofId);
                     dosMan.Misbehaving(iter->second, 5);
                 }

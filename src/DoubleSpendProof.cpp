@@ -281,10 +281,7 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
     if (!VerifyScript(inScript, prevOutScript, 0 /*flags*/, MAX_OPS_PER_SCRIPT, checker1, &error))
     {
         LOG(DSPROOF, "DoubleSpendProof failed validating first tx due to %s\n", ScriptErrorString(error));
-  printf("DoubleSpendProof failed validating first tx due to %s\n", ScriptErrorString(error));
-printf("invalid 5\n");
         return Invalid;
-
     }
 
     inScript.clear();
@@ -297,11 +294,7 @@ printf("invalid 5\n");
     if (!VerifyScript(inScript, prevOutScript, 0 /*flags*/, MAX_OPS_PER_SCRIPT, checker2, &error))
     {
         LOG(DSPROOF, "DoubleSpendProof failed validating second tx due to %s\n", ScriptErrorString(error));
-{
-  printf("DoubleSpendProof failed validating first tx due to %s\n", ScriptErrorString(error));
-printf("invalid 6\n");
         return Invalid;
-}
     }
     return Valid;
 }

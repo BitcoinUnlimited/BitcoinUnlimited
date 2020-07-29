@@ -1991,7 +1991,6 @@ bool VerifyScript(const CScript &scriptSig,
         }
         if (CastToBool(smStack.back()) == false)
         {
-printf("eval 2 size of stack:%d stackback %s\n", smStack.size(), smStack.back());
             return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
         }
     }
@@ -2035,7 +2034,7 @@ printf("eval 2 size of stack:%d stackback %s\n", smStack.size(), smStack.back())
             const vector<vector<unsigned char> > &smStack = sm.getStack();
             if (smStack.empty())
             {
-               return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
+                return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
             }
             if (!CastToBool(smStack.back()))
             {

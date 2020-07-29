@@ -280,11 +280,9 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
     // Create a spend of tx1 and tx2's output.
     CMutableTransaction s1;
     s1.nLockTime = 0;
-    s1.vin.resize(2);
+    s1.vin.resize(1);
     s1.vin[0].prevout.hash = tx1a.GetHash();
     s1.vin[0].prevout.n = 0;
-    s1.vin[1].prevout.hash = tx2a.GetHash();
-    s1.vin[1].prevout.n = 0;
     s1.vout.resize(1);
     s1.vout[0].nValue = 100 * CENT;
     CKey key1;
@@ -294,20 +292,13 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
 
     CTransaction spend1(s1);
     {
-        TransactionSignatureCreator tsc(&keystore, &spend1, 0, 100 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
+        TransactionSignatureCreator tsc(&keystore, &spend1, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = tx1a.vout[0].scriptPubKey;
         CScript &scriptSigRes = s1.vin[0].scriptSig;
         bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
         BOOST_CHECK(worked);
-
-        const CScript &scriptPubKey2 = tx2a.vout[0].scriptPubKey;
-        CScript &scriptSigRes2 = s1.vin[1].scriptSig;
-        worked = ProduceSignature(tsc, scriptPubKey2, scriptSigRes2);
-        BOOST_CHECK(worked);
     }
     CTransaction spend1a(s1);
-    //pool.addUnchecked(spend1a.GetHash(), entry.FromTx(spend1a));
-    //CTxMemPool::txiter iter = pool.mapTx.find(spend1a.GetHash());
 
 
     // Create a respend tx1's output.
@@ -340,15 +331,18 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
 
     // Check that the orphan is present and can be looked up correctly
     BOOST_CHECK(pool.doubleSpendProofStorage()->exists(dsp_first.createHash()) == true);
-    std::list<std::pair<int, int> > dsp_list1 = pool.doubleSpendProofStorage()->findOrphans(COutPoint(tx1a.GetHash(), 0));
+    std::list<std::pair<int, int> > dsp_list1 =
+        pool.doubleSpendProofStorage()->findOrphans(COutPoint(tx1a.GetHash(), 0));
     BOOST_CHECK(dsp_list1.size() == 1);
     BOOST_CHECK_EQUAL(size_t(0), node.GetInventoryToSendSize());
 
     // Try looking up orphans that should not exist
-    std::list<std::pair<int, int> > dsp_list2 = pool.doubleSpendProofStorage()->findOrphans(COutPoint(tx1a.GetHash(), 1));
+    std::list<std::pair<int, int> > dsp_list2 =
+        pool.doubleSpendProofStorage()->findOrphans(COutPoint(tx1a.GetHash(), 1));
     BOOST_CHECK(dsp_list2.size() == 0);
 
-    std::list<std::pair<int, int> > dsp_list3 = pool.doubleSpendProofStorage()->findOrphans(COutPoint(tx2a.GetHash(), 0));
+    std::list<std::pair<int, int> > dsp_list3 =
+        pool.doubleSpendProofStorage()->findOrphans(COutPoint(tx2a.GetHash(), 0));
     BOOST_CHECK(dsp_list3.size() == 0);
 
     // do a check for respend to trigger the orphan code with spend1a. The orphan will be removed and the inv
@@ -357,7 +351,8 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
     RespendDetector detector(pool, MakeTransactionRef(spend1a), {dummyaction});
     BOOST_CHECK_EQUAL(size_t(1), node.GetInventoryToSendSize());
     BOOST_CHECK(0x94a0 == node.vInventoryToSend.at(0).type);
-    std::list<std::pair<int, int> > dsp_list4 = pool.doubleSpendProofStorage()->findOrphans(COutPoint(tx1.GetHash(), 0));
+    std::list<std::pair<int, int> > dsp_list4 =
+        pool.doubleSpendProofStorage()->findOrphans(COutPoint(tx1.GetHash(), 0));
     BOOST_CHECK(dsp_list4.size() == 0);
 
 
