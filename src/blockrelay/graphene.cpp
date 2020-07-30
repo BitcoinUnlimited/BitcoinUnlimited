@@ -1419,7 +1419,7 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
     graphenedata.UpdateInBoundMemPoolInfo(::GetSerializeSize(mempoolinfo, SER_NETWORK, PROTOCOL_VERSION));
 
     // Message consistency checking
-    if (!(inv.type == MSG_GRAPHENEBLOCK) || inv.hash.IsNull())
+    if (inv.hash.IsNull())
     {
         dosMan.Misbehaving(pfrom, 100);
         return error("invalid GET_GRAPHENE message type=%u hash=%s", inv.type, inv.hash.ToString());
