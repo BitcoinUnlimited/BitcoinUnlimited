@@ -77,7 +77,7 @@ class XVersionTest(BitcoinTestFramework):
 
         # test that it contains the BU_LISTEN_PORT (replacement for buversion message)
         # FIXME: use proper constant
-        assert 1<<17 in conn.remote_xversion.xver.keys()
+        assert 1<<33 in conn.remote_xversion.xver.keys()
 
         # Likewise, check that the remote end got our message
         node = self.nodes[0]
