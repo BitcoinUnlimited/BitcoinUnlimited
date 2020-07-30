@@ -605,6 +605,7 @@ public:
     }
 
     /** Updates node configuration variables based on XVERSION data in the xVersion member variable */
+    void ReadConfigFromXVersion_OLD();
     void ReadConfigFromXVersion();
 
     // requires LOCK(cs_vRecvMsg)
