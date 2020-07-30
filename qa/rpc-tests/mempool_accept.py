@@ -7,6 +7,7 @@ import test_framework.loginit
 
 from threading import Thread
 import time
+import subprocess
 import sys
 if sys.version_info[0] < 3:
     raise "Use Python 3"
@@ -170,7 +171,7 @@ class MyTest (BitcoinTestFramework):
         initialize_chain(self.options.tmpdir, bitcoinConfDict, wallets)
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(2, self.options.tmpdir)
+        self.nodes = start_nodes(2, self.options.tmpdir, [["-rpcworkqueue=100"], ["-rpcworkqueue=100"]])
         # Now interconnect the nodes
         connect_nodes_bi(self.nodes, 0, 1)
         self.is_network_split = False
@@ -245,20 +246,32 @@ class MyTest (BitcoinTestFramework):
             # create conflicting tx with slightly different payment amounts
             amt = createTx(dests0, wallet[0:NTX], 1, NTX, 2, wallet3, gtx3)
 
+            # Send two double spending trnasactions using a subprocess. This checks that sendrawtransaction
+            # does not allow double spends into the mempool when multiple threads are sending transactions.
+            conflict_count = 0;
+            rpc_u, rpc_p = rpc_auth_pair(0)
             gtx = zip(gtx2, gtx3)
             for g in gtx:
-                self.nodes[0].sendrawtransaction(g[0].toHex())
-                try:
-                    self.nodes[0].sendrawtransaction(g[1].toHex())
-                except JSONRPCException as e:
-                    if e.error["code"] != -26:  # txn-mempool-conflict
-                        raise
+                # send first tx
+                p1 = subprocess.Popen([os.environ["BITCOINCLI"], "-rpcconnect=127.0.0.1", "-rpcport=" + str(rpc_port(0)), "-rpcuser=" + rpc_u, "-rpcpassword=" + rpc_p, "sendrawtransaction", g[0].toHex()], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                
+                # send double spend
+                p2 = subprocess.Popen([os.environ["BITCOINCLI"], "-rpcconnect=127.0.0.1", "-rpcport=" + str(rpc_port(0)), "-rpcuser=" + rpc_u, "-rpcpassword=" + rpc_p, "sendrawtransaction", g[1].toHex()], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-            # forget about the tx I used above
-            wallet = wallet[NTX:]
+                stdout_data1, stderr_data1 = p1.communicate(timeout=5)
+                stdout_data2, stderr_data2 = p2.communicate(timeout=5)
+
+                if (stderr_data1.find("txn-mempool-conflict") >= 0):
+                    conflict_count += 1;
+                if (stderr_data2.find("txn-mempool-conflict") >= 0):
+                    conflict_count += 1;
+            waitFor(1, lambda: True if conflict_count == NTX else print("num conflicts found:" + str(conflict_count) + ", node0 mempool size:" + str(self.nodes[0].getmempoolinfo()["size"]) + ", node1 mempool size:" + str(self.nodes[1].getmempoolinfo()["size"])))
 
             waitFor(30, lambda: True if self.nodes[0].getmempoolinfo()["size"] == NTX else None)
             waitFor(30, lambda: True if self.nodes[1].getmempoolinfo()["size"] == NTX else None)
+
+            # forget about the tx I used above
+            wallet = wallet[NTX:]
 
             NTX1 = NTX
 
