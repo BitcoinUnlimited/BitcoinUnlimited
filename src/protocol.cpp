@@ -72,7 +72,7 @@ const char *CMPCTBLOCK = "cmpctblock";
 const char *GETBLOCKTXN = "getblocktxn";
 const char *BLOCKTXN = "blocktxn";
 
-const char *DSPROOF = "dsproof";
+const char *DSPROOF = "dsproof-beta";
 };
 
 static const char *ppszTypeName[] = {
