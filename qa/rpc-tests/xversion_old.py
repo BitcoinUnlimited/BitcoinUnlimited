@@ -34,15 +34,15 @@ class XVersionTest(BitcoinTestFramework):
         banlist_fn = os.path.join(
             node_regtest_dir(self.options.tmpdir, 0),
             "banlist.dat")
-        print("Banlist file name:", banlist_fn)
+        logging.info("Banlist file name: " + str(banlist_fn))
         try:
             os.remove(banlist_fn)
-            print("Removed old banlist %s.")
+            logging.info("Removed old banlist %s.")
         except:
                 pass
         stop_nodes(self.nodes)
         wait_bitcoinds()
-        print("Initializing test directory " + self.options.tmpdir)
+        logging.info("Initializing test directory " + str(self.options.tmpdir))
         initialize_chain_clean(self.options.tmpdir, 1)
         self.nodes = [ start_node(0, self.options.tmpdir, ["-debug=net", "-use-xversion=0"]) ]
         self.pynode = pynode = BasicBUCashNode()
@@ -65,7 +65,7 @@ class XVersionTest(BitcoinTestFramework):
         def test_too_early(msg):
             """ Test that the given message if it comes right after start up will
             lead to rejection / banning as it comes too early. """
-            print("Testing that an an early %s fails." % msg)
+            logging.info("Testing that an an early %s fails." % msg)
             conn = self.restart_node(send_initial_version = False)
             conn.send_message(msg, pushbuf = True)
             self.network_and_finish()

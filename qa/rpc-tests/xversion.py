@@ -34,15 +34,15 @@ class XVersionTest(BitcoinTestFramework):
         banlist_fn = os.path.join(
             node_regtest_dir(self.options.tmpdir, 0),
             "banlist.dat")
-        print("Banlist file name:", banlist_fn)
+        logging.info("Banlist file name: " + str(banlist_fn))
         try:
             os.remove(banlist_fn)
-            print("Removed old banlist %s.")
+            logging.info("Removed old banlist %s.")
         except:
                 pass
         stop_nodes(self.nodes)
         wait_bitcoinds()
-        print("Initializing test directory " + self.options.tmpdir)
+        logging.info("Initializing test directory " + str(self.options.tmpdir))
         initialize_chain_clean(self.options.tmpdir, 1)
         self.nodes = [ start_node(0, self.options.tmpdir, ["-debug=net"]) ]
         self.pynode = pynode = BasicBUCashNode()
@@ -65,12 +65,14 @@ class XVersionTest(BitcoinTestFramework):
         conn = self.restart_node()
         nt = NetworkThread()
         nt.start()
-
+        logging.info("sent version")
         conn.wait_for(lambda : conn.remote_xversion)
+        logging.info("sent extversion")
         conn.send_message(msg_xversion({1000 : b"test string"}))
-
         conn.wait_for_verack()
+        logging.info("sent verack")
         conn.send_message(msg_verack())
+
 
 
         # make sure xversion has actually been received properly
@@ -120,6 +122,25 @@ class XVersionTest(BitcoinTestFramework):
 
         conn.connection.disconnect_node()
         nt.join()
+
+        # Test versionbit mismatch
+
+        logging.info("Testing xversion service bit mismatch")
+
+        # test regular set up including xversion
+        conn = self.restart_node()
+        nt = NetworkThread()
+        nt.start()
+        logging.info("sent version")
+        conn.wait_for(lambda : conn.remote_xversion)
+        # if we send verack instead of xversion we should get a verack response
+        logging.info("sent verack")
+        conn.send_message(msg_verack())
+        conn.wait_for_verack()
+
+        conn.connection.disconnect_node()
+        nt.join()
+
 
 if __name__ == '__main__':
     xvt = XVersionTest()
