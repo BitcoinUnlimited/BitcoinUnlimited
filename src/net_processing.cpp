@@ -2702,7 +2702,8 @@ bool SendMessages(CNode *pto)
                         {
                             if (fChokeTxInv)
                                 continue;
-                            if ((rnd.rand32() % 100) < randomlyDontInv.Value())
+                            // randomly don't inv but always send inventory to spv clients
+                            if (((rnd.rand32() % 100) < randomlyDontInv.Value()) && !pto->fClient)
                                 continue;
                             // skip if we already know about this one
                             if (pto->filterInventoryKnown.contains(inv.hash))
