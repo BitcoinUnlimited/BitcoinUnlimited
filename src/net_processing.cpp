@@ -545,6 +545,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
             electrum::set_xversion_flags(xver, chainparams.NetworkIDString());
 
+            pfrom->xVersionExpected = true;
             pfrom->PushMessage(NetMsgType::XVERSION, xver);
         }
         else
@@ -580,8 +581,18 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
     }
 
+    else if ((pfrom->nVersion == 0 || pfrom->tVersionSent < 0) && !pfrom->fWhitelisted)
+    {
+        // Must have a version message before anything else
+        dosMan.Misbehaving(pfrom, 1);
+        pfrom->fDisconnect = true;
+        return error("%s receieved before VERSION message - disconnecting peer=%s", strCommand, pfrom->GetLogName());
+    }
+
     else if (strCommand == NetMsgType::XVERSION)
     {
+        // set expected to false, we got the message
+        pfrom->xVersionExpected = false;
         if (pfrom->fSuccessfullyConnected == true)
         {
             dosMan.Misbehaving(pfrom, 1);
@@ -601,14 +612,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->ReadConfigFromXVersion();
 
         pfrom->PushMessage(NetMsgType::VERACK);
-    }
-
-    else if ((pfrom->nVersion == 0 || pfrom->tVersionSent < 0) && !pfrom->fWhitelisted)
-    {
-        // Must have a version message before anything else
-        dosMan.Misbehaving(pfrom, 1);
-        pfrom->fDisconnect = true;
-        return error("%s receieved before VERSION message - disconnecting peer=%s", strCommand, pfrom->GetLogName());
     }
 
     else if (!pfrom->fSuccessfullyConnected && GetTime() - pfrom->tVersionSent > VERACK_TIMEOUT &&
@@ -641,6 +644,14 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             return error("duplicate verack messages");
         }
         pfrom->SetRecvVersion(std::min(pfrom->nVersion, PROTOCOL_VERSION));
+
+        if (pfrom->xVersionExpected.load() == true)
+        {
+            // if we expected xversion but got a verack it is possible there is a service bit
+            // mismatch so we should send a verack response because the peer might not
+            // support xversion
+            pfrom->PushMessage(NetMsgType::VERACK);
+        }
 
         /// LEGACY xversion code (old spec)
         if (!(pfrom->nServices & NODE_XVERSION))

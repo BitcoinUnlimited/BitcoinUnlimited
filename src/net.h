@@ -352,7 +352,9 @@ public:
     /** Maximum supported mempool synchronization version */
     uint64_t nMempoolSyncMaxVersionSupported = 0;
     /** set to true if this node support xVersion */
-    bool xVersionEnabled;
+    std::atomic<bool> xVersionEnabled{false};
+    /** set to true if the next expected message is xVersion */
+    std::atomic<bool> xVersionExpected{false};
     /** set to true if this node is ok with no message checksum */
     bool skipChecksum;
 
