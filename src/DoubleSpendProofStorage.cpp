@@ -140,8 +140,7 @@ void DoubleSpendProofStorage::remove(int proof)
                 {
                     if (*i == proof)
                     {
-                        queue.erase(i);
-                        break;
+                        i = queue.erase(i);
                     }
                 }
             }
