@@ -158,7 +158,7 @@ SLAPI int GetPubKey(unsigned char *keyData, unsigned char *result, unsigned int 
 /** Sign data (compatible with OP_CHECKDATASIG) */
 SLAPI int SignData(unsigned char *data,
     int datalen,
-    unsigned char *keyData,
+    unsigned char *secret,
     unsigned char *result,
     unsigned int resultLen)
 {
@@ -169,11 +169,11 @@ SLAPI int SignData(unsigned char *data,
         verifyContext = new ECCVerifyHandle();
     }
 
-    CKey key = LoadKey(keyData);
+    CKey key = LoadKey(secret);
     uint256 hash;
     CSHA256().Write(data, datalen).Finalize(hash.begin());
     std::vector<uint8_t> sig;
-    if (!key.SignECDSA(hash, sig))
+    if (!key.SignSchnorr(hash, sig))
     {
         return 0;
     }
@@ -858,6 +858,40 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Pay
     env->ReleaseByteArrayElements(bArray, dest, 0);
     return bArray;
 }
+
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Key_signDataUsingSchnorr(JNIEnv *env,
+    jobject ths,
+    jbyteArray message,
+    jbyteArray secret)
+{
+    ByteArrayAccessor data(env, message);
+    ByteArrayAccessor privkey(env, secret);
+    if (privkey.size != 32)
+    {
+        std::stringstream err;
+        err << "signDataUsingSchnorr: Incorrect length for argument 'secret'. "
+            << "Expected 32, got " << privkey.size << ".";
+        triggerJavaIllegalStateException(env, err.str().c_str());
+        return nullptr;
+    }
+
+    if (data.size == 0)
+    {
+        triggerJavaIllegalStateException(env, "signDataUsingSchnorr: Cannot sign data of 0 length.");
+        return nullptr;
+    }
+
+    unsigned char result[MAX_SIG_LEN];
+    uint32_t resultLen = SignData(data.data, data.size, privkey.data, result, MAX_SIG_LEN);
+
+    if (resultLen == 0)
+    {
+        triggerJavaIllegalStateException(env, "signDataUsingSchnorr: Failed to sign data.");
+        return nullptr;
+    }
+    return makeJByteArray(env, result, resultLen);
+}
+
 
 extern "C" JNIEXPORT jstring JNICALL Java_bitcoinunlimited_libbitcoincash_PayAddress_EncodeCashAddr(JNIEnv *env,
     jobject ths,

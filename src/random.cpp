@@ -16,6 +16,7 @@
 #include "util.h" // for LOG()
 #include "utilstrencodings.h" // for GetTime()
 
+#include <atomic>
 #include <chrono>
 #include <limits>
 #include <stdlib.h>
