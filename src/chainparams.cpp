@@ -20,8 +20,8 @@
 #include "chainparamsseeds.h"
 
 // Next protocol upgrade will be activated once MTP >= Nov 15 12:00:00 UTC 2020
-const uint64_t MAY2020_ACTIVATION_TIME = 1589544000;
-uint64_t nMiningForkTime = MAY2020_ACTIVATION_TIME;
+const uint64_t NOV2020_ACTIVATION_TIME = 1605441600;
+uint64_t nMiningForkTime = NOV2020_ACTIVATION_TIME;
 
 CBlock CreateGenesisBlock(CScript prefix,
     const std::string &comment,
@@ -137,8 +137,10 @@ public:
         consensus.nov2018Height = 556766;
         // Noc, 15 2019 hard fork
         consensus.nov2019Height = 609135;
-        // May 15, 2020 12:00:00 UTC protocol upgrade¶
-        consensus.may2020ActivationTime = MAY2020_ACTIVATION_TIME;
+        // May, 15 2020 hard fork
+        consensus.may2020Height = 635259;
+        // Nov 15, 2020 12:00:00 UTC protocol upgrade¶
+        consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -283,8 +285,10 @@ public:
         consensus.may2019Height = 0;
         // May 15, 2020 12:00:00 UTC protocol upgrade¶
         consensus.nov2019Height = 0;
+        // May, 15 2020 hard fork
+        consensus.may2020Height = 0;
         // Nov, 15 2019 12:00:00 UTC fork activation time
-        consensus.may2020ActivationTime = MAY2020_ACTIVATION_TIME;
+        consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
 
         vFixedSeeds.clear();
         vSeeds.clear();
@@ -354,8 +358,10 @@ public:
         consensus.may2019Height = 1303884;
         // Nov, 15 2019 har fork
         consensus.nov2019Height = 1341711;
-        // May 15, 2020 12:00:00 UTC protocol upgrade¶
-        consensus.may2020ActivationTime = MAY2020_ACTIVATION_TIME;
+        // May, 15 2020 hard fork
+        consensus.may2020Height = 1378461;
+        // Nov 15, 2020 12:00:00 UTC protocol upgrade¶
+        consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
 
 
         pchMessageStart[0] = 0x0b;
@@ -473,8 +479,10 @@ public:
         consensus.may2019Height = 0;
         // Nov, 15 2019 hard fork is always active on regtest
         consensus.nov2019Height = 0;
-        // May 15, 2020 12:00:00 UTC protocol upgrade¶
-        consensus.may2020ActivationTime = MAY2020_ACTIVATION_TIME;
+        // May, 15 2020 hard fork
+        consensus.may2020Height = 0;
+        // Nov 15, 2020 12:00:00 UTC protocol upgrade¶
+        consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;
