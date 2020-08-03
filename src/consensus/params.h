@@ -143,6 +143,10 @@ struct Params
     bool fPowNoRetargeting;
     int64_t nPowTargetSpacing;
     int64_t nPowTargetTimespan;
+    // The half life for the ASERT DAA. For every (nASERTHalfLife) seconds behind schedule the blockchain gets,
+    // difficulty is cut in half. Doubled if blocks are ahead of schedule.
+    int64_t nASERTHalfLife;
+
     int64_t DifficultyAdjustmentInterval() const { return nPowTargetTimespan / nPowTargetSpacing; }
     /** UAHF Aug 1st 2017 block height */
     int uahfHeight;
