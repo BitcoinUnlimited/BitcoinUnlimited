@@ -1920,7 +1920,7 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
         flags |= SCRIPT_VERIFY_MINIMALDATA;
     }
 
-    if (IsMay2020Enabled(consensusparams, pindex->pprev))
+    if (IsMay2020Activated(consensusparams, pindex->pprev))
     {
         flags |= SCRIPT_ENABLE_OP_REVERSEBYTES;
     }
@@ -2405,7 +2405,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     std::vector<std::pair<uint256, CDiskTxPos> > &vPos)
 {
     // Enabled returns true if the fork is enabled on the NEXT block, so we pass this block's parent
-    bool may2020Active = (pindex) ? IsMay2020Enabled(chainparams.GetConsensus(), pindex->pprev) : false;
+    bool may2020Active = (pindex) ? IsMay2020Activated(chainparams.GetConsensus(), pindex) : false;
     nFees = 0;
     int64_t nTime2 = GetStopwatchMicros();
     LOG(BLK, "Canonical ordering for %s MTP: %d\n", block.GetHash().ToString(), pindex->GetMedianTimePast());
@@ -3805,7 +3805,7 @@ bool ProcessNewBlock(CValidationState &state,
 
     // If the fork activates on the next block, we need to reevaluate all tx in the mempool because they may now break
     // the new sigops rule
-    if (IsMay2020Next(chainparams.GetConsensus(), chainActive.Tip()))
+    if (IsMay2020Activated(chainparams.GetConsensus(), chainActive.Tip()))
     {
         ResubmitTransactions();
     }

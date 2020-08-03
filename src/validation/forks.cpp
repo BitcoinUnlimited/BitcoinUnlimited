@@ -121,7 +121,7 @@ bool IsMay2020Activated(const Consensus::Params &consensusparams, const CBlockIn
     {
         return false;
     }
-    return IsMay202Activated(consensusparams, pindexTip->nHeight);
+    return IsMay2020Activated(consensusparams, pindexTip->nHeight);
 }
 
 bool IsNov2020Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)

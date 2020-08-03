@@ -232,7 +232,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     CBlockIndex *pindexPrev = chainActive.Tip();
     assert(pindexPrev); // can't make a new block if we don't even have the genesis block
 
-    may2020Enabled = IsMay2020Enabled(Params().GetConsensus(), pindexPrev);
+    may2020Enabled = IsMay2020Activated(Params().GetConsensus(), pindexPrev);
 
     if (may2020Enabled)
     {

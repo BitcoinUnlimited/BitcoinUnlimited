@@ -652,7 +652,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     CTxProperties *txProps)
 {
     const CChainParams &chainparams = Params();
-    bool may2020Enabled = IsMay2020Enabled(chainparams.GetConsensus(), chainActive.Tip());
+    bool may2020Enabled = IsMay2020Activated(chainparams.GetConsensus(), chainActive.Tip());
     if (isRespend)
         *isRespend = false;
     unsigned int nSigOps = 0;

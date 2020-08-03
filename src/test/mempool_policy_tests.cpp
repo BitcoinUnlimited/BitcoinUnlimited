@@ -25,12 +25,14 @@ static void SetMTP(std::array<CBlockIndex, 12> &blocks, int64_t mtp)
     BOOST_CHECK_EQUAL(blocks.back().GetMedianTimePast(), mtp);
 }
 
+const uint64_t MAY2020_ACTIVATION_TIME = 1589544000;
+
 BOOST_AUTO_TEST_CASE(mempool_policy_activation_tests)
 {
     CBlockIndex prev;
 
     const auto &params = Params(CBaseChainParams::REGTEST).GetConsensus();
-    const auto activation = params.may2020ActivationTime;
+    const auto activation = MAY2020_ACTIVATION_TIME;
 
     std::array<CBlockIndex, 12> blocks;
     for (size_t i = 1; i < blocks.size(); ++i)
@@ -39,15 +41,14 @@ BOOST_AUTO_TEST_CASE(mempool_policy_activation_tests)
     }
 
     SetMTP(blocks, activation - 1);
-    BOOST_CHECK(!IsMay2020Enabled(params, &blocks.back()));
+    BOOST_CHECK(!IsMay2020Activated(params, &blocks.back()));
     BOOST_CHECK_EQUAL(BCH_DEFAULT_ANCESTOR_LIMIT, GetBCHDefaultAncestorLimit(params, &blocks.back()));
     BOOST_CHECK_EQUAL(BCH_DEFAULT_DESCENDANT_LIMIT, GetBCHDefaultDescendantLimit(params, &blocks.back()));
 
     SetMTP(blocks, activation);
-    BOOST_CHECK(IsMay2020Enabled(params, &blocks.back()));
+    BOOST_CHECK(IsMay2020Activated(params, &blocks.back()));
     BOOST_CHECK_EQUAL(BCH_DEFAULT_ANCESTOR_LIMIT_LONGER, GetBCHDefaultAncestorLimit(params, &blocks.back()));
     BOOST_CHECK_EQUAL(BCH_DEFAULT_DESCENDANT_LIMIT_LONGER, GetBCHDefaultDescendantLimit(params, &blocks.back()));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
-

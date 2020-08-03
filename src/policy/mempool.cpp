@@ -8,12 +8,12 @@
 
 uint32_t GetBCHDefaultAncestorLimit(const Consensus::Params &params, const CBlockIndex *pindexPrev)
 {
-    return IsMay2020Enabled(params, pindexPrev) ? BCH_DEFAULT_ANCESTOR_LIMIT_LONGER
+    return IsMay2020Activated(params, pindexPrev) ? BCH_DEFAULT_ANCESTOR_LIMIT_LONGER
                                                 : BCH_DEFAULT_ANCESTOR_LIMIT;
 }
 
 uint32_t GetBCHDefaultDescendantLimit(const Consensus::Params &params, const CBlockIndex *pindexPrev)
 {
-    return IsMay2020Enabled(params, pindexPrev) ? BCH_DEFAULT_DESCENDANT_LIMIT_LONGER
+    return IsMay2020Activated(params, pindexPrev) ? BCH_DEFAULT_DESCENDANT_LIMIT_LONGER
                                                 : BCH_DEFAULT_DESCENDANT_LIMIT;
 }
