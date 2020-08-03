@@ -74,17 +74,22 @@ std::list<std::pair<int, int> > DoubleSpendProofStorage::findOrphans(const COutP
     for (auto proofId = q.begin(); proofId != q.end(); ++proofId)
     {
         auto proofIter = m_proofs.find(*proofId);
-        assert(proofIter != m_proofs.end());
-        if (proofIter->second.prevOutIndex() != int(prevOut.n))
-            continue;
-        if (proofIter->second.prevTxId() == prevOut.hash)
+        DbgAssert(proofIter != m_proofs.end(), );
+        if (proofIter != m_proofs.end())
         {
-            auto orphanIter = m_orphans.find(*proofId);
-            if (orphanIter != m_orphans.end())
+            if (proofIter->second.prevOutIndex() != int(prevOut.n))
+                continue;
+            if (proofIter->second.prevTxId() == prevOut.hash)
             {
-                answer.push_back(std::make_pair(*proofId, orphanIter->second.first));
+                auto orphanIter = m_orphans.find(*proofId);
+                if (orphanIter != m_orphans.end())
+                {
+                    answer.push_back(std::make_pair(*proofId, orphanIter->second.first));
+                }
             }
         }
+        else
+            LOG(DSPROOF, "ERROR: no dsproofs found in m_proofs\n");
     }
     return answer;
 }
@@ -131,7 +136,9 @@ void DoubleSpendProofStorage::remove(int proof)
             std::deque<int> &queue = orphanLookup->second;
             if (queue.size() == 1)
             {
-                assert(queue.front() == proof);
+                DbgAssert(queue.front() == proof, );
+                if (queue.front() != proof)
+                    LOG(DSPROOF, "ERROR: queue front did not equal dsproof\n");
                 m_prevTxIdLookupTable.erase(orphanLookup);
             }
             else
