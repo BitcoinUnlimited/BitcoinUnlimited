@@ -46,10 +46,14 @@ bool IsNov2018Activated(const Consensus::Params &consensusparams, const CBlockIn
 bool IsNov2019Activated(const Consensus::Params &consensusparams, const int32_t nHeight);
 bool IsNov2019Activated(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 
-/** Test if May 15th 2020 fork has activated */
-bool IsMay2020Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
+/** Check if May 15th, 2020 protocol upgrade is activated using block height */
+bool IsMay2020Activated(const Consensus::Params &consensusparams, const int32_t nHeight);
+bool IsMay2020Activated(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
+
+/** Test if Nov 15th 2020 fork has activated */
+bool IsNov2020Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 
 /** Check if the next will be the first block where the new set of rules will be enforced */
-bool IsMay2020Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
+bool IsNov2020Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 
 #endif
