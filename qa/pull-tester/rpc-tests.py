@@ -191,8 +191,6 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
-    'sigchecks_inputstandardness_activation',
-    'block_sigchecks_activation',
     'txindex',
     Disabled('schnorr-activation', 'Need to be updated to work with BU'),
     'schnorrsig',
@@ -268,7 +266,7 @@ testScripts = [ RpcTest(t) for t in [
     'minimaldata',
     'schnorrmultisig',
     'uptime',
-    'op_reversebytes_activation'
+    'op_reversebytes'
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
