@@ -165,6 +165,8 @@ test-debian-qa:
     extends: .cache-debian
     needs: ["build-debian"]
     script:
+        - mkdir -p $CI_PROJECT_DIR/cores
+        - echo $CI_PROJECT_DIR/cores/core.%e.%p.%h.%t | tee /proc/sys/kernel/core_pattern
         - apt-get install -y python3-zmq
         - cd build;
         - ./qa/pull-tester/rpc-tests.py --coverage --no-ipv6-rpc-listen --gitlab

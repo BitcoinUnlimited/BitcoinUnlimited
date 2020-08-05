@@ -604,7 +604,10 @@ class RPCTestHandler:
 
                     coreOutput = ""
                     try:
-                        coreDir = "/tmp/cores"
+                        if inGitLabCI():
+                            coreDir = os.path.join(os.environ.get("CI_PROJECT_DIR", None), "cores")
+                        else:
+                            coreDir = "/tmp/cores"
                         cores = os.listdir(coreDir)
                         for core in cores:
                             fullCoreFile = os.path.join(coreDir, core)
@@ -625,8 +628,9 @@ class RPCTestHandler:
                                 shutil.move(fullCoreFile, os.path.join(coreDest, core))
                             else:
                                 os.remove(fullCoreFile)
-                    except FileNotFoundError:
-                        print("No directory /tmp/cores")
+                    except FileNotFoundError as e:
+                        print("No files in " + coreDir)
+                        print(str(e))
                     except Exception as e:
                         print("Exception trying to show core:" + str(e))
 
