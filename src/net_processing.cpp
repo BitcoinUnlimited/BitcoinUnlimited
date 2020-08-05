@@ -299,6 +299,11 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         ssDSP << dsp;
                         pfrom->PushMessage(NetMsgType::DSPROOF, ssDSP);
                     }
+                    else
+                    {
+                        pfrom->PushMessage(NetMsgType::REJECT, std::string(NetMsgType::DSPROOF), REJECT_INVALID,
+                            std::string("dsproof requested was not found"));
+                    }
                 }
                 else
                 {
