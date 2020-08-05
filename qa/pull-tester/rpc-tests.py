@@ -49,7 +49,11 @@ from tests_config import *
 from test_classes import RpcTest, Disabled, Skip, WhenElectrumFound
 
 def inTravis():
-  return os.environ.get("TRAVIS", None) == "true"
+    return (os.environ.get("TRAVIS", None) == "true")
+
+def inGitLabCI():
+    # https://docs.gitlab.com/ee/ci/variables/
+    return (os.environ.get("CI_SERVER", None) == "yes")
 
 
 BOLD = ("","")
@@ -541,8 +545,8 @@ class RPCTestHandler:
             time.sleep(.5)
             for j in self.jobs:
                 (name, time0, proc, log_stdout, log_stderr, got_outputs) = j
-                if os.getenv('TRAVIS') == 'true' and int(time.time() - time0) > 20 * 60:
-                    # In travis, timeout individual tests after 20 minutes (to stop tests hanging and not
+                if ((inGitLabCI() or inTravis()) and int(time.time() - time0) > 20 * 60):
+                    # In external CI services, timeout individual tests after 20 minutes (to stop tests hanging and not
                     # providing useful output.
                     proc.send_signal(signal.SIGINT)
 
