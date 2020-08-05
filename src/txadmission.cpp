@@ -799,7 +799,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     respend::RespendDetector respend(pool, tx);
     *isRespend = respend.IsRespend();
 
-    if (false && respend.IsRespend() && !respend.IsInteresting())
+    if (respend.IsRespend() && !respend.IsInteresting())
     {
         if (debugger)
         {
