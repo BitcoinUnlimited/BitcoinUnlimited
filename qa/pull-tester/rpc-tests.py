@@ -628,11 +628,8 @@ class RPCTestHandler:
                                 shutil.move(fullCoreFile, os.path.join(coreDest, core))
                             else:
                                 os.remove(fullCoreFile)
-                    except FileNotFoundError as e:
-                        print("No files in " + coreDir)
-                        print(str(e))
                     except Exception as e:
-                        print("Exception trying to show core:" + str(e))
+                        print("Exception trying to show core files in " + coreDir + " :" + str(e))
 
                     returnCode = "Process %s return code: %d" % (" ".join(proc.args),retval)
                     log_stdout.seek(0), log_stderr.seek(0)
