@@ -90,27 +90,35 @@ void RespendRelayer::Trigger(CTxMemPool &pool)
     if (!valid || !interesting)
         return;
 
-    // no DS proof exists, lets make one.
-    WRITELOCK(pool.cs_txmempool);
-    assert(pool.mapTx.end() != originalTxIter);
-    if (originalTxIter->dsproof == -1)
-    {
-        try
-        {
-            auto item = *originalTxIter;
-            const auto dsp = DoubleSpendProof::create(originalTxIter->GetTx(), *pRespend);
-            item.dsproof = pool.doubleSpendProofStorage()->add(dsp);
-            LOG(DSPROOF, "Double spend found, creating double spend proof %d\n", item.dsproof);
-            pool.mapTx.replace(originalTxIter, item);
+    CTransactionRef ptx;
+    DoubleSpendProof dsp;
 
-            // send INV to all peers
-            broadcastDspInv(pool._get(originalTxIter->GetTx().GetHash()), dsp.createHash());
-        }
-        catch (const std::exception &e)
+    // no DS proof exists, lets make one.
+    {
+        WRITELOCK(pool.cs_txmempool);
+        assert(pool.mapTx.end() != originalTxIter);
+        if (originalTxIter->dsproof == -1)
         {
-            LOG(DSPROOF, "Double spend creation failed: %s\n", e.what());
+            try
+            {
+                auto item = *originalTxIter;
+                dsp = DoubleSpendProof::create(originalTxIter->GetTx(), *pRespend);
+                item.dsproof = pool.doubleSpendProofStorage()->add(dsp);
+                LOG(DSPROOF, "Double spend found, creating double spend proof %d\n", item.dsproof);
+                pool.mapTx.replace(originalTxIter, item);
+
+                ptx = pool._get(originalTxIter->GetTx().GetHash());
+            }
+            catch (const std::exception &e)
+            {
+                LOG(DSPROOF, "Double spend creation failed: %s\n", e.what());
+            }
         }
     }
+
+    // send INV to all peers
+    if (ptx != nullptr && !dsp.isEmpty())
+        broadcastDspInv(ptx, dsp.createHash());
 }
 
 } // ns respend
