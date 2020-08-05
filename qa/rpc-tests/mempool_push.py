@@ -19,7 +19,7 @@ from test_framework.util import *
 BCH_UNCONF_DEPTH = 25
 BCH_UNCONF_SIZE_KB = 101
 BCH_UNCONF_SIZE = BCH_UNCONF_SIZE_KB*1000
-DELAY_TIME = 45
+DELAY_TIME = 65
 
 class MyTest (BitcoinTestFramework):
 
