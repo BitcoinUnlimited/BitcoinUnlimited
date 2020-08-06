@@ -254,6 +254,9 @@ class MyTest (BitcoinTestFramework):
             gtx = zip(gtx2, gtx3)
             for g in gtx:
                 # send first tx
+                # if datadir is not provided, it assumes ~/.bitcoin so this code may sort of work if you
+                # happen to have a ~/.bitcoin since relevant parameters are overloaded.  But that's ugly,
+                # so supply datadir correctly.
                 p1 = subprocess.Popen([BitcoinCli, "-datadir=" + self.options.tmpdir + os.sep + "node0", "-rpcconnect=127.0.0.1", "-rpcport=" + str(rpc_port(0)), "-rpcuser=" + rpc_u, "-rpcpassword=" + rpc_p, "sendrawtransaction", g[0].toHex()], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 
                 # send double spend
