@@ -1,3 +1,7 @@
+echo info proc:\n
+info proc
+echo info proc cmdline:\n
+info proc cmdline
 echo info threads:\n
 info threads
 echo \nthread backtrace:\n
