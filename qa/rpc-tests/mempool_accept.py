@@ -20,6 +20,7 @@ import test_framework.cashlib as cashlib
 from test_framework.nodemessages import *
 from test_framework.script import *
 
+BitcoinCli = "bitcoin-cli"  # Will be amended with the path during initialization
 
 class PayDest:
     """A payment destination.  All the info you need to send a payment here and make a subsequent payment
@@ -253,10 +254,13 @@ class MyTest (BitcoinTestFramework):
             gtx = zip(gtx2, gtx3)
             for g in gtx:
                 # send first tx
-                p1 = subprocess.Popen([os.environ["BITCOINCLI"], "-rpcconnect=127.0.0.1", "-rpcport=" + str(rpc_port(0)), "-rpcuser=" + rpc_u, "-rpcpassword=" + rpc_p, "sendrawtransaction", g[0].toHex()], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                # if datadir is not provided, it assumes ~/.bitcoin so this code may sort of work if you
+                # happen to have a ~/.bitcoin since relevant parameters are overloaded.  But that's ugly,
+                # so supply datadir correctly.
+                p1 = subprocess.Popen([BitcoinCli, "-datadir=" + self.options.tmpdir + os.sep + "node0", "-rpcconnect=127.0.0.1", "-rpcport=" + str(rpc_port(0)), "-rpcuser=" + rpc_u, "-rpcpassword=" + rpc_p, "sendrawtransaction", g[0].toHex()], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 
                 # send double spend
-                p2 = subprocess.Popen([os.environ["BITCOINCLI"], "-rpcconnect=127.0.0.1", "-rpcport=" + str(rpc_port(0)), "-rpcuser=" + rpc_u, "-rpcpassword=" + rpc_p, "sendrawtransaction", g[1].toHex()], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                p2 = subprocess.Popen([BitcoinCli, "-datadir=" + self.options.tmpdir + os.sep + "node0", "-rpcconnect=127.0.0.1", "-rpcport=" + str(rpc_port(0)), "-rpcuser=" + rpc_u, "-rpcpassword=" + rpc_p, "sendrawtransaction", g[1].toHex()], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
                 stdout_data1, stderr_data1 = p1.communicate(timeout=5)
                 stdout_data2, stderr_data2 = p2.communicate(timeout=5)
@@ -431,8 +435,9 @@ class MyTest (BitcoinTestFramework):
             self.nodes[0].pushtx(destName)
             self.nodes[1].pushtx(destName)
             self.nodes[2].pushtx(destName)
-            mp = waitFor(120, lambda: [x.getmempoolinfo() for x in self.nodes]
-                         if NTX - self.nodes[3].getmempoolinfo()["size"] < 30 else None)
+            # Large mempool sync if running in debug mode (with periodic mempool checking) will be very slow
+            mp = waitFor(300, lambda: [x.getmempoolinfo() for x in self.nodes]
+                         if NTX - self.nodes[3].getmempoolinfo()["size"] < 30 else print ([x.getmempoolinfo()["size"] for x in self.nodes]))
             end = time.monotonic()
             logging.info("synced %d tx in %s seconds.  Speed %f tx/sec" % (NTX, end - start, float(NTX) / (end - start)))
 
@@ -454,6 +459,7 @@ if __name__ == '__main__':
 
     try:
         cashlib.init(path + os.sep + ".libs" + os.sep + "libbitcoincash.so")
+        BitcoinCli = os.getenv("BITCOINCLI", path + os.sep + "bitcoin-cli")
         MyTest().main()
     except OSError as e:
         print("Issue loading shared library.  This is expected during cross compilation since the native python will not load the .so: %s" % str(e))
@@ -461,6 +467,7 @@ if __name__ == '__main__':
 
 # Create a convenient function for an interactive python debugging session
 def Test():
+    global BitcoinCli
     t = MyTest(True)
     bitcoinConf = {
         "debug": ["blk", "mempool", "net", "req"],
@@ -483,5 +490,6 @@ def Test():
 
     # load the cashlib.so from our build directory
     cashlib.init(binpath + os.sep + ".libs" + os.sep + "libbitcoincash.so")
+    BitcoinCli = os.getenv("BITCOINCLI", binpath + os.sep + "bitcoin-cli")
     # start the test
     t.main(flags, bitcoinConf, None)
