@@ -610,7 +610,7 @@ class RPCTestHandler:
                             coreDir = "/tmp/cores"
                         cores = os.listdir(coreDir)
                         for core in cores:
-                            print("Tryng to analyze core file: " + str(core))
+                            print("Trying to analyze core file: " + str(core))
                             fullCoreFile = os.path.join(coreDir, core)
                             bitcoindBin = os.environ["BITCOIND"]
                             path, fil = os.path.split(bitcoindBin)

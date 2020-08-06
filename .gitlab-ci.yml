@@ -176,6 +176,8 @@ test-debian-qa:
         when: on_failure
         paths:
             - ./qa/qa_tests/
+            - $CI_PROJECT_DIR/cores/core.*.*.*.*
+            - ./build/src/bitcoind
 
 test-debian-benchmarks:
     stage: benchmark_tests
