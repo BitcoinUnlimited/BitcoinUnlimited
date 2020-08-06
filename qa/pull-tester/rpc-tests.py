@@ -624,9 +624,9 @@ class RPCTestHandler:
                             fold_end = ("\ntravis_fold:end:%s\n" % core) if inTravis() else ""
                             coreOutput = fold_start + out + "\n-------\n" + err + fold_end
                             # Now delete this file so we don't dump it repeatedly.  Better would be to move it somewhere for export out of the container.
-                            coreDest = os.environ.get("CORE_SAVE_DIR", None)
-                            if coreDest is not None:
-                                shutil.move(fullCoreFile, os.path.join(coreDest, core))
+                            if inGitLabCI():
+                                newPath = os.path.join(os.environ.get("CI_PROJECT_DIR", None), "saved-cores")
+                                shutil.move(fullCoreFile, os.path.join(newPath, str(core) + "-" + str(name)))
                             else:
                                 os.remove(fullCoreFile)
                     except Exception as e:
