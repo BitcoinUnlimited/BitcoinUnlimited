@@ -1553,7 +1553,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         vRecv >> inv >> filterMemPool;
 
         // Message consistency checking
-        if (inv.type != MSG_XTHINBLOCK || inv.hash.IsNull())
+        if (inv.hash.IsNull())
         {
             dosMan.Misbehaving(pfrom, 100);
             return error("invalid get_xthin type=%u hash=%s", inv.type, inv.hash.ToString());
@@ -1593,7 +1593,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         vRecv >> inv;
 
         // Message consistency checking
-        if (inv.type != MSG_THINBLOCK || inv.hash.IsNull())
+        if (inv.hash.IsNull())
         {
             dosMan.Misbehaving(pfrom, 100);
             return error("invalid get_thin type=%u hash=%s", inv.type, inv.hash.ToString());
