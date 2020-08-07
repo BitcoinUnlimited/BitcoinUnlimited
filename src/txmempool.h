@@ -655,7 +655,9 @@ public:
         std::vector<CTxChange> *txChange = nullptr);
     void clear();
     void _clear(); // lock free
+    /** Return the transaction ids for every transaction in the mempool */
     void queryHashes(std::vector<uint256> &vtxid) const;
+    /** Nonlocking: Return the transaction ids for every transaction in the mempool */
     void _queryHashes(std::vector<uint256> &vtxid) const;
     bool isSpent(const COutPoint &outpoint);
     unsigned int GetTransactionsUpdated() const;

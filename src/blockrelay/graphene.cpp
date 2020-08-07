@@ -499,7 +499,9 @@ void CGrapheneBlock::FillTxMapFromPools(std::map<uint64_t, CTransactionRef> &map
         for (auto &kv : *txCommitQ)
         {
             uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, kv.first, version);
-            mapTxFromPools.insert(std::make_pair(cheapHash, kv.second.entry.GetSharedTx()));
+            auto shTx = kv.second.entry.GetSharedTx();
+            if (shTx != nullptr)
+                mapTxFromPools.insert(std::make_pair(cheapHash, shTx));
         }
     }
 
@@ -508,7 +510,9 @@ void CGrapheneBlock::FillTxMapFromPools(std::map<uint64_t, CTransactionRef> &map
         for (auto &kv : orphanpool.mapOrphanTransactions)
         {
             uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, kv.first, version);
-            mapTxFromPools.insert(std::make_pair(cheapHash, kv.second.ptx));
+            auto shTx = kv.second.ptx;
+            if (shTx != nullptr)
+                mapTxFromPools.insert(std::make_pair(cheapHash, shTx));
         }
     }
 
@@ -518,7 +522,9 @@ void CGrapheneBlock::FillTxMapFromPools(std::map<uint64_t, CTransactionRef> &map
     for (const uint256 &hash : memPoolHashes)
     {
         uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, hash, version);
-        mapTxFromPools.insert(std::make_pair(cheapHash, mempool.get(hash)));
+        auto shTx = mempool.get(hash);
+        if (shTx != nullptr) // otherwise mempool got updated between the query and this iteration
+            mapTxFromPools.insert(std::make_pair(cheapHash, shTx));
     }
 }
 
@@ -571,7 +577,7 @@ std::set<uint64_t> CGrapheneBlock::UpdateResolvedTxsAndIdentifyMissing(
             mapHashOrderIndex[cheapHash] = i;
 
         const auto &elem = mapPartialTxHash.find(cheapHash);
-        if (elem != mapPartialTxHash.end())
+        if ((elem != mapPartialTxHash.end()) && (elem->second != nullptr))
         {
             const auto repeat = std::find(vTxHashes256.begin(), vTxHashes256.end(), elem->second->GetHash());
             if (repeat == vTxHashes256.end())
@@ -651,11 +657,19 @@ bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_p
             bool grSetComputeOpt = pGrapheneSet->GetComputeOptimized();
             for (const auto &entry : mapPartialTxHash)
             {
-                if ((grSetComputeOpt && pGrapheneSet->GetFastFilter()->contains(entry.second->GetHash())) ||
-                    (!grSetComputeOpt && pGrapheneSet->GetRegularFilter()->contains(entry.second->GetHash())))
+                auto txptr = entry.second;
+                if (entry.second == nullptr)
                 {
-                    setSenderFilterPositiveCheapHashes.insert(entry.first);
-                    vSenderFilterPositiveHahses.push_back(entry.second->GetHash());
+                    LOG(GRAPHENE, "Error: Empty transaction in mapPartialTxHash");
+                }
+                else
+                {
+                    if ((grSetComputeOpt && pGrapheneSet->GetFastFilter()->contains(entry.second->GetHash())) ||
+                        (!grSetComputeOpt && pGrapheneSet->GetRegularFilter()->contains(entry.second->GetHash())))
+                    {
+                        setSenderFilterPositiveCheapHashes.insert(entry.first);
+                        vSenderFilterPositiveHahses.push_back(entry.second->GetHash());
+                    }
                 }
             }
 
@@ -817,7 +831,7 @@ static bool ReconstructBlock(CNode *pfrom,
             pfrom->gr_shorttxidk0.load(), pfrom->gr_shorttxidk1.load(), hash, NegotiateGrapheneVersion(pfrom));
         const auto iter = mapTxFromPools.find(nShortId);
 
-        if (iter != mapTxFromPools.end())
+        if ((iter != mapTxFromPools.end()) && (iter->second != nullptr))
         {
             ptx = iter->second;
             pblock->vtx[idx] = ptx;
