@@ -33,10 +33,10 @@ class MyTest (BitcoinTestFramework):
              "-limitancestorsize=101", "-limitdescendantsize=101"],
             ["-blockprioritysize=2000000",
              "-maxmempool=8080",
-             "-limitancestorsize=%d" % (BCH_UNCONF_SIZE_KB*2),
-             "-limitdescendantsize=%d" % (BCH_UNCONF_SIZE_KB*2),
-             "-limitancestorcount=%d" % (BCH_UNCONF_DEPTH*2),
-             "-limitdescendantcount=%d" % (BCH_UNCONF_DEPTH*2),
+             "-limitancestorsize=%d" % (BCH_UNCONF_SIZE_KB*3),
+             "-limitdescendantsize=%d" % (BCH_UNCONF_SIZE_KB*3),
+             "-limitancestorcount=%d" % (BCH_UNCONF_DEPTH*3),
+             "-limitdescendantcount=%d" % (BCH_UNCONF_DEPTH*3),
              "-net.restrictInputs=0"],
             ["-blockprioritysize=2000000", "-limitdescendantcount=1000", "-limitancestorcount=1000",
              "-limitancestorsize=1000", "-limitdescendantsize=1000", "-net.restrictInputs=0"],
@@ -56,23 +56,45 @@ class MyTest (BitcoinTestFramework):
         addr = self.nodes[1].getnewaddress()
 
         txhex = []
-        for i in range(0,BCH_UNCONF_DEPTH*2):
+        for i in range(1,BCH_UNCONF_DEPTH*3 + 1):
           try:
-              txhex.append(self.nodes[1].sendtoaddress(addr, bal-1))  # enough so that it uses all UTXO, but has fee left over
+              txhex.append(self.nodes[1].sendtoaddress(addr, bal-(Decimal("0.01")*i)))  # enough so that it uses the one "big" UTXO, but has fee left over
               logging.info("tx depth %d" % i) # Keep travis from timing out
           except JSONRPCException as e: # an exception you don't catch is a testing error
               print(str(e))
               raise
+          if i > 20 and i <= 30:  # Bracket the unconf chain acceptance depth of this node for efficiency
+              # Test that every tx beyond the unconf limit is inserted into the orphan pool -- nothing is dropped
+              # but it won't be relayed to me from the other node so I need to manually inject
+              rawtx = self.nodes[1].getrawtransaction(txhex[-1])
+              self.nodes[0].enqueuerawtransaction(rawtx)
+              waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] + self.nodes[0].getorphanpoolinfo()["size"] == i)
+              mempool = self.nodes[0].getmempoolinfo()
+              orphs = self.nodes[0].getorphanpoolinfo()
+
         waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH)
-        waitFor(DELAY_TIME, lambda: self.nodes[1].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH*2)
+        waitFor(DELAY_TIME, lambda: self.nodes[1].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH*3)
         # Set small to commit just a few tx so we can see if the missing ones get pushed
-        self.nodes[0].set("mining.blockSize=6000")
+        # self.nodes[0].set("mining.blockSize=6000")
+
+        # disconnect to prove that the orphan queue gets pushed into the mempool when block generated
+        disconnect_all(self.nodes[0])
         blk = self.nodes[0].generate(1)[0]
+
+        # check that all orphans got pushed into the mempool once the block was mined
+        waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == 5)
+        waitFor(DELAY_TIME, lambda: self.nodes[0].getorphanpoolinfo()["size"] == 0)
+
+        connect_nodes(self.nodes[0], 1)
+        connect_nodes(self.nodes[0], 2)
+
         blkhex = self.nodes[0].getblock(blk)
         waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH)
         # generate the block somewhere else and see if the tx get pushed
-        self.nodes[2].set("mining.blockSize=4000")
+        waitFor(DELAY_TIME, lambda: self.nodes[2].getbestblockhash() == blk)  # we don't want a fork
+        self.nodes[2].set("mining.blockSize=6000")
         blk2 = self.nodes[2].generate(1)[0]
+        # after the block propagates, nodes will push 25 tx to this node.
         waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH)
 
         waitFor(DELAY_TIME, lambda: self.nodes[1].getbestblockhash() == blk2)  # make sure its settled so we can get a good leftover count for the next test.
@@ -163,7 +185,7 @@ class MyTest (BitcoinTestFramework):
             # these checks aren't going to work at the end when I run out of tx so check for that
             if self.nodes[2].getmempoolinfo()["size"] >= BCH_UNCONF_DEPTH*2:
                 waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH)
-                waitFor(DELAY_TIME, lambda: self.nodes[1].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH*2)
+                waitFor(DELAY_TIME, lambda: self.nodes[1].getmempoolinfo()["size"] >= BCH_UNCONF_DEPTH*2)
             logging.info("%d: sizes %d, %d, %d" % (count,self.nodes[0].getmempoolinfo()["size"],self.nodes[1].getmempoolinfo()["size"],self.nodes[2].getmempoolinfo()["size"]))
             blk = self.nodes[0].generate(1)[0]
             waitFor(DELAY_TIME, lambda: self.nodes[2].getbestblockhash() == blk)

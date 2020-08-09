@@ -1209,6 +1209,9 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 }
                 else
                 {
+                    // this is effectively "missing inputs" since they are not usable due to unconf depth, so set the
+                    // flag so that this tx gets on the orphan queue
+                    *pfMissingInputs = true;
                     // If the chain is not sync'd entirely then we'll defer this tx until the new block is processed.
                     if (!IsChainSyncd() && IsChainNearlySyncd())
                         return state.DoS(0, false, REJECT_WAITING, "too-long-mempool-chain");
@@ -1224,7 +1227,13 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             restrictInputs.Value() == true)
         {
             if (tx->vin.size() > 1)
+            {
+                // this is effectively "missing inputs" since they are not usable due to unconf depth, so set the
+                // flag so that this tx gets on the orphan queue
+                *pfMissingInputs = true;
+
                 return state.DoS(0, false, REJECT_NONSTANDARD, "bad-txn-too-many-inputs");
+            }
         }
 
         if (txProps) // This is inefficient since _CalculateMemPoolAncestors also calculates this
@@ -1355,7 +1364,6 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
     std::map<uint256, CTxInputData> mapEnqueue;
     {
         READLOCK(orphanpool.cs_orphanpool);
-        std::set<NodeId> setMisbehaving;
         for (unsigned int i = 0; i < vWorkQueue.size(); i++)
         {
             std::map<uint256, std::set<uint256> >::iterator itByPrev =
@@ -1376,13 +1384,6 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
                 if (!fOk)
                     continue;
 
-                // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan
-                // resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get
-                // anyone relaying LegitTxX banned)
-                CValidationState stateDummy;
-
-                if (setMisbehaving.count(iter->second.fromPeer))
-                    continue;
                 {
                     CTxInputData txd;
                     txd.tx = iter->second.ptx;
