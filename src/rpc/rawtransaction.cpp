@@ -1542,7 +1542,7 @@ UniValue validaterawtransaction(const UniValue &params, bool fHelp)
             "\nResult:\n"
             "{\n"
             "  \"txid\" : \"value\",           (string) The transaction hash\n"
-            "  \"isValid\" : true|false,   (boolean) If the transaction has a complete set of signatures\n"
+            "  \"isValid\" : true|false,   (boolean) Will the transaction be accepted into the memory pool\n"
             "  \"isMineable\" : true|false,   (boolean) If the transaction is mineable now\n"
             "  \"isFutureMineable\" : true|false,   (boolean) If the transaction is mineable in the future\n"
             "  \"isStandard\" : true|false,   (boolean) If the transaction is standard\n"
