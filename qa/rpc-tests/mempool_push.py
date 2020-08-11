@@ -50,7 +50,7 @@ class MyTest (BitcoinTestFramework):
         # kick us out of IBD mode since the cached blocks will be old time so it'll look like our blockchain isn't up to date
         # if we are in IBD mode, we don't request incoming tx.
         self.nodes[0].generate(1)
-
+        self.sync_blocks()
         logging.info("ancestor count test")
         bal = self.nodes[1].getbalance()
         addr = self.nodes[1].getnewaddress()
@@ -104,6 +104,7 @@ class MyTest (BitcoinTestFramework):
         self.nodes[0].set("mining.blockSize=8000000")
 
         waitFor(DELAY_TIME, lambda: len(self.nodes[0].getblocktemplate()["transactions"])>=BCH_UNCONF_DEPTH)
+        waitFor(DELAY_TIME, lambda: self.nodes[0].getbestblockhash() == blk2)
         blk3 = self.nodes[0].generate(1)[0]
         blk3data = self.nodes[0].getblock(blk3)
         # this would be ideal, but a particular block is not guaranteed to contain all tx in the mempool
@@ -175,20 +176,22 @@ class MyTest (BitcoinTestFramework):
         for i in range(0,51):
           try:
             txhex.append(self.nodes[2].sendtoaddress(addr, bal-1))  # enough so that it uses all UTXO, but has fee left over
-            logging.info("send depth %d" % i) # Keep travis from timing out
+            logging.info("%d: sizes %d, %d, %d" % (i,self.nodes[0].getmempoolinfo()["size"],self.nodes[1].getmempoolinfo()["size"],self.nodes[2].getmempoolinfo()["size"]))
           except JSONRPCException as e: # an exception you don't catch is a testing error
               print(str(e))
               raise
 
         count = 0
         while self.nodes[2].getmempoolinfo()["size"] != 0:
+            logging.info("%d: sizes %d, %d, %d" % (count,self.nodes[0].getmempoolinfo()["size"],self.nodes[1].getmempoolinfo()["size"],self.nodes[2].getmempoolinfo()["size"]))
             # these checks aren't going to work at the end when I run out of tx so check for that
             if self.nodes[2].getmempoolinfo()["size"] >= BCH_UNCONF_DEPTH*2:
                 waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH)
-                waitFor(DELAY_TIME, lambda: self.nodes[1].getmempoolinfo()["size"] >= BCH_UNCONF_DEPTH*2)
-            logging.info("%d: sizes %d, %d, %d" % (count,self.nodes[0].getmempoolinfo()["size"],self.nodes[1].getmempoolinfo()["size"],self.nodes[2].getmempoolinfo()["size"]))
+                waitFor(DELAY_TIME, lambda: True if self.nodes[1].getmempoolinfo()["size"] >= BCH_UNCONF_DEPTH*2 else print("%d: sizes %d, %d, %d" % (count,self.nodes[0].getmempoolinfo()["size"],self.nodes[1].getmempoolinfo()["size"],self.nodes[2].getmempoolinfo()["size"])) )
+
             blk = self.nodes[0].generate(1)[0]
             waitFor(DELAY_TIME, lambda: self.nodes[2].getbestblockhash() == blk)
+            waitFor(DELAY_TIME, lambda: self.nodes[1].getbestblockhash() == blk)
             count+=1
 
 if __name__ == '__main__':
