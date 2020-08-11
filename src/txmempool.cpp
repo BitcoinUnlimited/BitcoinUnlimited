@@ -9,6 +9,7 @@
 #include "consensus/consensus.h"
 #include "consensus/tx_verify.h"
 #include "consensus/validation.h"
+#include "core_io.h"
 #include "init.h"
 #include "main.h"
 #include "parallel.h"
@@ -1281,6 +1282,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
         setEntries setParentCheck;
         int64_t parentSizes = 0;
         unsigned int parentSigOpCount = 0;
+
         for (const CTxIn &txin : tx.vin)
         {
             // Check that every mempool transaction's inputs refer to available coins, or other mempool tx's.
@@ -1298,6 +1300,12 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
             }
             else
             {
+                if (!pcoins->HaveCoin(txin.prevout))
+                {
+                    LOGA("Mempool entry is missing input %d: (%s,%d)", i, txin.prevout.hash.ToString(), txin.prevout.n);
+                    LOGA("TX hex: %s", EncodeHexTx(tx));
+                    LOGA("TX: %s", tx.ToString());
+                }
                 assert(pcoins->HaveCoin(txin.prevout));
             }
             // Check whether its inputs are marked in mapNextTx.

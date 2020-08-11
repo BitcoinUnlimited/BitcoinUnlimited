@@ -400,12 +400,14 @@ void CParallelValidation::SetLocks(const bool fParallel)
 {
     if (fParallel)
     {
+        boost::thread::id this_id(boost::this_thread::get_id());
+        {
+            LOCK(cs_blockvalidationthread);
+            if (mapBlockValidationThreads.count(this_id))
+                mapBlockValidationThreads[this_id].pScriptQueue = nullptr;
+        }
         // cs_main must be re-locked before returning from ConnectBlock()
         ENTER_CRITICAL_SECTION(cs_main);
-        boost::thread::id this_id(boost::this_thread::get_id());
-        LOCK(cs_blockvalidationthread);
-        if (mapBlockValidationThreads.count(this_id))
-            mapBlockValidationThreads[this_id].pScriptQueue = nullptr;
     }
 }
 
@@ -550,12 +552,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
                     // Terminate the thread with the largest block.
                     else if (miLargestBlock != mapBlockValidationThreads.end())
                     {
-                        // terminate the script queue thread
-                        (*miLargestBlock).second.pScriptQueue->Quit();
-                        LOG(PARALLEL, "Sending Quit() to scriptcheckqueue\n");
-
-                        // terminate the PV thread which releases the semaphore grant
-                        (*miLargestBlock).second.fQuit = true;
+                        Quit(miLargestBlock); // terminate the script queue thread
                         LOG(PARALLEL, "Too many blocks being validated, interrupting thread with blockhash %s "
                                       "and previous blockhash %s\n",
                             (*miLargestBlock).second.hash.ToString(),
