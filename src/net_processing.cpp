@@ -2041,7 +2041,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (dsp.isEmpty())
                 throw std::runtime_error("Double spend proof is empty");
 
-            dspHash = dsp.createHash();
+            dspHash = dsp.GetHash();
             DoubleSpendProof::Validity validity;
             {
                 READLOCK(mempool.cs_txmempool);

@@ -251,7 +251,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     // Make sure dsproof is the same regardless of the order of txns
     const auto dsp_first = DoubleSpendProof::create(iter->GetTx(), spend2b);
     const auto dsp_second = DoubleSpendProof::create(spend2b, iter->GetTx());
-    BOOST_CHECK_EQUAL(dsp_first.createHash(), dsp_second.createHash());
+    BOOST_CHECK_EQUAL(dsp_first.GetHash(), dsp_second.GetHash());
 
     // The following tests will check for dsproof exceptions
 

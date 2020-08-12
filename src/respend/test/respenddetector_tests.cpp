@@ -330,7 +330,7 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
     pool.doubleSpendProofStorage()->addOrphan(dsp_first, peerId);
 
     // Check that the orphan is present and can be looked up correctly
-    BOOST_CHECK(pool.doubleSpendProofStorage()->exists(dsp_first.createHash()) == true);
+    BOOST_CHECK(pool.doubleSpendProofStorage()->exists(dsp_first.GetHash()) == true);
     std::list<std::pair<int, int> > dsp_list1 =
         pool.doubleSpendProofStorage()->findOrphans(COutPoint(tx1a.GetHash(), 0));
     BOOST_CHECK(dsp_list1.size() == 1);

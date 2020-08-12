@@ -105,12 +105,12 @@ void RespendDetector::CheckForRespend(const CTxMemPool &pool, const CTransaction
                     }
 
                     // Finally, send the dsp inventory message
-                    broadcastDspInv(ptx, dsp.createHash());
+                    broadcastDspInv(ptx, dsp.GetHash());
                     break;
                 }
                 else
                 {
-                    LOG(DSPROOF, "DoubleSpendProof did not validate %s", dsp.createHash().ToString());
+                    LOG(DSPROOF, "DoubleSpendProof did not validate %s", dsp.GetHash().ToString());
                     pool.doubleSpendProofStorage()->remove(proofId);
                     dosMan.Misbehaving(iter->second, 5);
                 }

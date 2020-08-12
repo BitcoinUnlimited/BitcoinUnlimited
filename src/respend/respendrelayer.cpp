@@ -118,7 +118,7 @@ void RespendRelayer::Trigger(CTxMemPool &pool)
 
     // send INV to all peers
     if (ptx != nullptr && !dsp.isEmpty())
-        broadcastDspInv(ptx, dsp.createHash());
+        broadcastDspInv(ptx, dsp.GetHash());
 }
 
 } // ns respend

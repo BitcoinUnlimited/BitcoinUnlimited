@@ -32,7 +32,7 @@ int DoubleSpendProofStorage::add(const DoubleSpendProof &proof)
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
 
-    uint256 hash = proof.createHash();
+    uint256 hash = proof.GetHash();
     auto lookupIter = m_dspIdLookupTable.find(hash);
     if (lookupIter != m_dspIdLookupTable.end())
         return lookupIter->second;
@@ -153,7 +153,7 @@ void DoubleSpendProofStorage::remove(int proof)
             }
         }
     }
-    auto hash = iter->second.createHash();
+    auto hash = iter->second.GetHash();
     m_dspIdLookupTable.erase(hash);
     m_proofs.erase(iter);
 }

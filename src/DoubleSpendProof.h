@@ -67,7 +67,7 @@ public:
         READWRITE(m_spender2.hashOutputs);
         READWRITE(m_spender2.pushData);
     }
-    uint256 createHash() const;
+    uint256 GetHash() const;
 
 private:
     uint256 m_prevTxId;

@@ -334,4 +334,4 @@ void broadcastDspInv(const CTransactionRef &dspTx, const uint256 &hash, CTxMemPo
 
 uint256 DoubleSpendProof::prevTxId() const { return m_prevTxId; }
 int DoubleSpendProof::prevOutIndex() const { return m_prevOutIndex; }
-uint256 DoubleSpendProof::createHash() const { return SerializeHash(*this); }
+uint256 DoubleSpendProof::GetHash() const { return SerializeHash(*this); }
