@@ -84,8 +84,8 @@ cause a reply with the following message. The name of the message is **`dsproof-
 | -----------|:-----------:| ----------:|---------:|
 | 32 | TxInPrevHash | sha256 | The txid being spent |
 | 4  | TxInPrevIndex | int | The output being spent |
-| | FirstSpender | spender | the first sorted spender |
-| | DoubleSpender | spender | the second spender |
+| | DoubleSpendA | spender | the first sorted spender |
+| | DoubleSpendB | spender | the second spender |
 
 A double-spend-proof essentially describes two inputs, both spending the
 same output. As such the prev-hash and prev-index point to the output and
