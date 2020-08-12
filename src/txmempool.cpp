@@ -13,8 +13,6 @@
 #include "consensus/tx_verify.h"
 #include "consensus/validation.h"
 #include "core_io.h"
-#include "DoubleSpendProof.h"
-#include "DoubleSpendProofStorage.h"
 #include "init.h"
 #include "main.h"
 #include "parallel.h"
