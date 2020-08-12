@@ -498,7 +498,7 @@ void CNode::CloseSocketDisconnect()
         CloseSocket(hSocket);
     }
 
-    // Purge any noderef's in the priority message queue relating to this peer. If we don't
+    // Purge any noderef's in the priority message queues relating to this peer. If we don't
     // remove the node references here then we won't be able to complete the disconnection.
     {
         LOCK(cs_prioritySendQ);
@@ -507,6 +507,17 @@ void CNode::CloseSocketDisconnect()
         {
             if (this == it->get())
                 it = vPrioritySendQ.erase(it);
+            else
+                it++;
+        }
+    }
+    {
+        LOCK(cs_priorityRecvQ);
+        auto it = vPriorityRecvQ.begin();
+        while (it != vPriorityRecvQ.end())
+        {
+            if (this == it->first.get())
+                it = vPriorityRecvQ.erase(it);
             else
                 it++;
         }
@@ -1508,9 +1519,10 @@ void ThreadSocketHandler()
                     // Send the first two messages in the send queue. We send two because
                     // the first message may be a partial message and as a result may not be
                     // a priority message; the priorty message may be the one behind this partial message.
+                    CNode *pfrom = noderef.get();
+                    if (pfrom != nullptr)
                     {
                         bool fEmpty = false;
-                        CNode *pfrom = noderef.get();
                         TRY_LOCK(pfrom->cs_vSend, lock_sendtwo);
                         if (lock_sendtwo)
                         {
