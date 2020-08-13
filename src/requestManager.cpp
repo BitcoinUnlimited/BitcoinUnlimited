@@ -769,8 +769,10 @@ void CRequestManager::SendRequests()
                 }
                 else
                 {
-                    // node should never be null... but if it is then there's nothing to do.
-                    LOG(REQ, "Block %s has no sources\n", item.obj.ToString());
+                    // We requested from all available sources so remove the source. This should not
+                    // happen and would indicate some other problem.
+                    LOG(REQ, "Block %s has no sources. Removing\n", item.obj.ToString());
+                    cleanup(itemIter);
                 }
             }
             else
@@ -831,18 +833,19 @@ void CRequestManager::SendRequests()
                 if (item.lastRequestTime)
                 {
                     LOG(REQ, "Request timeout for %s.  Retrying\n", item.obj.ToString().c_str());
-                    // Not reducing inFlight; it's still outstanding and will be cleaned up when item is removed from
-                    // map
-                    // note we can never be sure its really dropped verses just delayed for a long time so this is not
-                    // authoritative.
+                    // Not reducing inFlight; it's still outstanding and will be cleaned up when
+                    // item is removed from map.
+                    // Note we can never be sure its really dropped verses just delayed for a long
+                    // time so this is not authoritative.
                     droppedTxns += 1;
                 }
 
                 if (item.availableFrom.empty())
                 {
-                    // TODO: tell someone about this issue, look in a random node, or something.
-                    LOG(REQ, "No sources for %s.  Dropping\n", item.obj.ToString().c_str());
-                    cleanup(itemIter); // right now we give up requesting it if we have no other sources...
+                    // There can be no block sources because a node dropped out.  In this case, nothing can be done so
+                    // remove the item.
+                    LOG(REQ, "Tx has no sources for %s.  Removing\n", item.obj.ToString().c_str());
+                    cleanup(itemIter);
                 }
                 else // Ok, we have at least one source so request this item.
                 {
@@ -894,6 +897,13 @@ void CRequestManager::SendRequests()
 
                         inFlight++;
                         inFlightTxns << inFlight;
+                    }
+                    else
+                    {
+                        // We requested from all available sources so remove the source. This should not
+                        // happen and would indicate some other problem.
+                        LOG(REQ, "Tx has no sources for %s.  Removing\n", item.obj.ToString().c_str());
+                        cleanup(itemIter);
                     }
                 }
             }
