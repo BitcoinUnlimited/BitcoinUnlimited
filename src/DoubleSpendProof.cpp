@@ -257,12 +257,16 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
         if (tx.vin[i].prevout.n == (size_t)m_prevOutIndex && tx.vin[i].prevout.hash == m_prevTxId)
         {
             // Found the input script we need!
-
             CScript inScript = tx.vin[i].scriptSig;
+            if (inScript.IsPayToScriptHash())
+                return Invalid;
+
             auto scriptIter = inScript.begin();
             opcodetype type;
-            inScript.GetOp(scriptIter, type); // P2PKH: first signature
-            inScript.GetOp(scriptIter, type, pubkey); // then pubkey
+            if (!inScript.GetOp(scriptIter, type)) // P2PKH: first signature
+                return Invalid;
+            if (!inScript.GetOp(scriptIter, type, pubkey)) // then pubkey
+                return Invalid;
             break;
         }
     }
