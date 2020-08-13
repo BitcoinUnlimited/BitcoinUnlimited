@@ -48,9 +48,6 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, assert_raises_rpc_error, p2p_port, waitFor
 import logging
 
-# The upgrade activation time, which we artificially set far into the future.
-MAY2020_START_TIME = 2000000000
-
 # Blocks with invalid scripts give this error:
 BAD_INPUTS_ERROR = 'bad-blk-signatures'
 
@@ -68,10 +65,7 @@ class OpReversebytesActivationTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.block_heights = {}
-        self.extra_args = [[
-            "-consensus.forkMay2020Time={}".format(MAY2020_START_TIME),
-            "-debug=mempoolrej, mempool",
-        ]]
+        self.extra_args = [["-debug=mempoolrej, mempool",]]
 
     def bootstrap_p2p(self, *, num_connections=1):
         """Add a P2P connection to the node.
@@ -162,94 +156,32 @@ class OpReversebytesActivationTest(BitcoinTestFramework):
         # get uncompressed public key serialization
         public_key = private_key.get_pubkey()
 
-        def create_fund_and_spend_tx():
-            spend_from = spendable_outputs.pop()
-            value = spend_from.vout[0].nValue
-
-            # Reversed data
-            data = bytes.fromhex('0123456789abcdef')
-            rev_data = bytes(reversed(data))
-
-            # Lockscript: provide a bytestring that reverses to X
-            script = CScript([OP_REVERSEBYTES, rev_data, OP_EQUAL])
-
-            # Fund transaction: REVERSEBYTES <reversed(x)> EQUAL
-            tx_fund = create_tx_with_script(spend_from, 0, b'', value, script)
-            tx_fund.rehash()
-
-            # Spend transaction: <x>
-            tx_spend = CTransaction()
-            tx_spend.vout.append(CTxOut(value - 1000, CScript([b'x' * 100, OP_RETURN])))
-            tx_spend.vin.append(CTxIn(COutPoint(tx_fund.sha256, 0), b''))
-            tx_spend.vin[0].scriptSig = CScript([data])
-            tx_spend.rehash()
-
-            return tx_spend, tx_fund
-
         # Create funding/spending transaction pair
-        tx_reversebytes_spend, tx_reversebytes_fund = create_fund_and_spend_tx()
+        spend_from = spendable_outputs.pop()
+        value = spend_from.vout[0].nValue
+
+        # Reversed data
+        data = bytes.fromhex('0123456789abcdef')
+        rev_data = bytes(reversed(data))
+
+        # Lockscript: provide a bytestring that reverses to X
+        script = CScript([OP_REVERSEBYTES, rev_data, OP_EQUAL])
+
+        # Fund transaction: REVERSEBYTES <reversed(x)> EQUAL
+        tx_reversebytes_fund = create_tx_with_script(spend_from, 0, b'', value, script)
+        tx_reversebytes_fund.rehash()
+
+        # Spend transaction: <x>
+        tx_reversebytes_spend = CTransaction()
+        tx_reversebytes_spend.vout.append(CTxOut(value - 1000, CScript([b'x' * 100, OP_RETURN])))
+        tx_reversebytes_spend.vin.append(CTxIn(COutPoint(tx_reversebytes_fund.sha256, 0), b''))
+        tx_reversebytes_spend.vin[0].scriptSig = CScript([data])
+        tx_reversebytes_spend.rehash()
 
         # Mine funding transaction into block. Pre-upgrade output scripts can have
         # OP_REVERSEBYTES and still be fully valid, but they cannot spend it.
         tip = self.build_block(tip, [tx_reversebytes_fund])
         self.p2p.send_blocks_and_test([tip], node)
-
-        logging.info("Start pre-upgrade tests")
-        assert node.getblockheader(node.getbestblockhash())['mediantime'] < MAY2020_START_TIME
-
-        logging.info(
-            "Sending rejected transaction (bad opcode) via RPC (doesn't ban)")
-        assert_raises_rpc_error(-26, PRE_UPGRADE_BAD_OPCODE_ERROR,
-                                node.sendrawtransaction, ToHex(tx_reversebytes_spend))
-
-        logging.info(
-            "Sending rejected transaction (bad opcode) via net (no banning)")
-        self.check_for_no_ban_on_rejected_tx(
-            tx_reversebytes_spend, PRE_UPGRADE_BAD_OPCODE_ERROR)
-
-        logging.info(
-            "Sending invalid transactions in blocks (bad inputs, and get banned)")
-        self.check_for_ban_on_rejected_block(self.build_block(tip, [tx_reversebytes_spend]),
-                                             BAD_INPUTS_ERROR)
-
-        logging.info("Start activation tests")
-
-        logging.info("Approach to just before upgrade activation")
-        # Move our clock to the upgrade time so we will accept such
-        # future-timestamped blocks.
-        node.setmocktime(MAY2020_START_TIME)
-
-        # Mine six blocks with timestamp starting at MAY2020_START_TIME-1
-        blocks = []
-        for i in range(-1, 5):
-            tip = self.build_block(tip, n_time=MAY2020_START_TIME + i)
-            blocks.append(tip)
-        self.p2p.send_blocks_and_test(blocks, node)
-
-        # Ensure our MTP is MAY2020_START_TIME-1, just before activation
-        waitFor(10, lambda: node.getblockchaininfo()['mediantime'],
-                     MAY2020_START_TIME - 1)
-
-        logging.info(
-            "The next block will activate, but the activation block itself must follow old rules")
-        self.check_for_ban_on_rejected_block(
-            self.build_block(tip, [tx_reversebytes_spend]), BAD_INPUTS_ERROR)
-
-        # Save pre-upgrade block, we will reorg based on this block later
-        pre_upgrade_block = tip
-
-        logging.info("Mine the activation block itself")
-        tip = self.build_block(tip, [])
-        self.p2p.send_blocks_and_test([tip], node)
-
-        logging.info("We have activated!")
-        # Ensure our MTP is MAY2020_START_TIME, exactly at activation
-        waitFor(10, lambda: node.getblockchaininfo()['mediantime'] == MAY2020_START_TIME)
-        # Ensure empty mempool
-        waitFor(10, lambda: node.getrawmempool() == [])
-
-        # Save upgrade block, will invalidate and reconsider this later
-        upgrade_block = tip
 
         logging.info(
             "Submitting a new OP_REVERSEBYTES tx via net, and mining it in a block")
@@ -262,56 +194,6 @@ class OpReversebytesActivationTest(BitcoinTestFramework):
         # Mine OP_REVERSEBYTES tx into block
         tip = self.build_block(tip, [tx_reversebytes_spend])
         self.p2p.send_blocks_and_test([tip], node)
-
-        # Save post-upgrade block, will invalidate and reconsider this later
-        post_upgrade_block = tip
-
-        logging.info("Start deactivation tests")
-
-        logging.info(
-            "Invalidating the post-upgrade blocks returns OP_REVERSEBYTES transaction to mempool")
-        node.invalidateblock(post_upgrade_block.hash)
-        waitFor(5, lambda: node.getbestblockhash() == upgrade_block.hash)
-        waitFor(5, lambda: len(node.getrawmempool()) > 0)
-        assert_equal(set(node.getrawmempool()), {
-                     tx_reversebytes_spend.hash})
-
-        logging.info(
-            "Invalidating the upgrade block evicts the OP_REVERSEBYTES transaction")
-        node.invalidateblock(upgrade_block.hash)
-        assert_equal(set(node.getrawmempool()), set())
-
-        logging.info("Return to our tip")
-        try:
-            node.reconsiderblock(upgrade_block.hash)
-            node.reconsiderblock(post_upgrade_block.hash)
-        except Exception as e:
-            # Workaround for reconsiderblock bug;
-            # Even though the block reconsidered was valid, if another block
-            # is also reconsidered and fails, the call will return failure.
-            pass
-
-        waitFor(10, lambda: node.getbestblockhash() == tip.hash)
-        waitFor(10, lambda: node.getrawmempool() == [])
-
-        logging.info(
-            "Create an empty-block reorg that forks from pre-upgrade")
-        tip = pre_upgrade_block
-        blocks = []
-        for _ in range(10):
-            tip = self.build_block(tip)
-            blocks.append(tip)
-        self.p2p.send_blocks_and_test(blocks, node)
-
-        logging.info(
-            "Transactions from orphaned blocks are sent into mempool ready to be mined again, "
-            "including upgrade-dependent ones even though the fork deactivated and reactivated "
-            "the upgrade.")
-        waitFor(10, lambda: set(node.getrawmempool()) == {tx_reversebytes_spend.hash})
-        node.generate(1)
-        tip = self.get_best_block(node)
-        assert (set(tx.rehash() for tx in tip.vtx) >=
-                {tx_reversebytes_spend.hash})
 
 
 if __name__ == '__main__':

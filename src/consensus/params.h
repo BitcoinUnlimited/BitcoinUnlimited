@@ -156,8 +156,10 @@ struct Params
     int may2019Height;
     /** Nov 15, 2019 actication height */
     int nov2019Height;
-    /** May 15, 2020 MTP activation time will be 12:00:00 UTC */
-    uint64_t may2020ActivationTime;
+    /** May 15, 2020 actication height */
+    int may2020Height;
+    /** Nov 15, 2020 MTP activation time will be 12:00:00 UTC */
+    uint64_t nov2020ActivationTime;
 };
 } // namespace Consensus
 

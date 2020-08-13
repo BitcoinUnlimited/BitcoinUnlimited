@@ -49,7 +49,11 @@ from tests_config import *
 from test_classes import RpcTest, Disabled, Skip, WhenElectrumFound
 
 def inTravis():
-  return os.environ.get("TRAVIS", None) == "true"
+    return (os.environ.get("TRAVIS", None) == "true")
+
+def inGitLabCI():
+    # https://docs.gitlab.com/ee/ci/variables/
+    return (os.environ.get("CI_SERVER", None) == "yes")
 
 
 BOLD = ("","")
@@ -191,8 +195,6 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
-    'sigchecks_inputstandardness_activation',
-    'block_sigchecks_activation',
     'txindex',
     Disabled('schnorr-activation', 'Need to be updated to work with BU'),
     'schnorrsig',
@@ -268,7 +270,7 @@ testScripts = [ RpcTest(t) for t in [
     'minimaldata',
     'schnorrmultisig',
     'uptime',
-    'op_reversebytes_activation'
+    'op_reversebytes'
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
@@ -543,8 +545,8 @@ class RPCTestHandler:
             time.sleep(.5)
             for j in self.jobs:
                 (name, time0, proc, log_stdout, log_stderr, got_outputs) = j
-                if os.getenv('TRAVIS') == 'true' and int(time.time() - time0) > 20 * 60:
-                    # In travis, timeout individual tests after 20 minutes (to stop tests hanging and not
+                if ((inGitLabCI() or inTravis()) and int(time.time() - time0) > 20 * 60):
+                    # In external CI services, timeout individual tests after 20 minutes (to stop tests hanging and not
                     # providing useful output.
                     proc.send_signal(signal.SIGINT)
 
@@ -602,9 +604,13 @@ class RPCTestHandler:
 
                     coreOutput = ""
                     try:
-                        coreDir = "/tmp/cores"
+                        if inGitLabCI():
+                            coreDir = os.path.join(os.environ.get("CI_PROJECT_DIR", None), "cores")
+                        else:
+                            coreDir = "/tmp/cores"
                         cores = os.listdir(coreDir)
                         for core in cores:
+                            print("Trying to analyze core file: " + str(core))
                             fullCoreFile = os.path.join(coreDir, core)
                             bitcoindBin = os.environ["BITCOIND"]
                             path, fil = os.path.split(bitcoindBin)
@@ -618,15 +624,13 @@ class RPCTestHandler:
                             fold_end = ("\ntravis_fold:end:%s\n" % core) if inTravis() else ""
                             coreOutput = fold_start + out + "\n-------\n" + err + fold_end
                             # Now delete this file so we don't dump it repeatedly.  Better would be to move it somewhere for export out of the container.
-                            coreDest = os.environ.get("CORE_SAVE_DIR", None)
-                            if coreDest is not None:
-                                shutil.move(fullCoreFile, os.path.join(coreDest, core))
+                            if inGitLabCI():
+                                newPath = os.path.join(os.environ.get("CI_PROJECT_DIR", None), "saved-cores")
+                                shutil.move(fullCoreFile, os.path.join(newPath, str(core) + "-" + str(name)))
                             else:
                                 os.remove(fullCoreFile)
-                    except FileNotFoundError:
-                        print("No directory /tmp/cores")
                     except Exception as e:
-                        print("Exception trying to show core:" + str(e))
+                        print("Exception trying to show core files in " + coreDir + " :" + str(e))
 
                     returnCode = "Process %s return code: %d" % (" ".join(proc.args),retval)
                     log_stdout.seek(0), log_stderr.seek(0)

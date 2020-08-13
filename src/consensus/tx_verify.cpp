@@ -164,9 +164,8 @@ bool ContextualCheckTransaction(const CTransactionRef tx,
 {
     const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
     auto consensusParams = params.GetConsensus();
-    bool may2020Enabled = IsMay2020Enabled(consensusParams, pindexPrev);
 
-    if (!may2020Enabled)
+    if (IsMay2020Activated(consensusParams, nHeight) == false)
     {
         // Check that the transaction doesn't have an excessive number of sigops
         unsigned int nSigOps = GetLegacySigOpCount(tx, STANDARD_SCRIPT_VERIFY_FLAGS);

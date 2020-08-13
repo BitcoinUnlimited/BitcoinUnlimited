@@ -335,13 +335,13 @@ class CNode
 public:
     /** This node's max acceptable number ancestor transactions.  Used to decide whether this node will accept a
      * particular transaction. */
-    size_t nLimitAncestorCount = GetBCHDefaultAncestorLimit(Params().GetConsensus(), chainActive.Tip());
+    size_t nLimitAncestorCount = BCH_DEFAULT_ANCESTOR_LIMIT;
     /** This node's max acceptable sum of all ancestor transaction sizes.  Used to decide whether this node will accept
      * a particular transaction. */
     size_t nLimitAncestorSize = BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000;
     /** This node's max acceptable number of descendants.  Used to decide whether this node will accept a particular
      * transaction. */
-    size_t nLimitDescendantCount = GetBCHDefaultDescendantLimit(Params().GetConsensus(), chainActive.Tip());
+    size_t nLimitDescendantCount = BCH_DEFAULT_DESCENDANT_LIMIT;
     /** This node's max acceptable sum of all descendant transaction sizes.  Used to decide whether this node will
      * accept a particular transaction. */
     size_t nLimitDescendantSize = BCH_DEFAULT_DESCENDANT_SIZE_LIMIT * 1000;
@@ -598,8 +598,7 @@ public:
         // Checking the descendants makes no sense -- the target node can't have descendants in its mempool if it
         // doesn't have this transaction!
         if ((xVersionEnabled && props.countWithAncestors > nLimitAncestorCount) ||
-            (!xVersionEnabled &&
-                props.countWithAncestors > GetBCHDefaultDescendantLimit(Params().GetConsensus(), chainActive.Tip())))
+            (!xVersionEnabled && props.countWithAncestors > BCH_DEFAULT_DESCENDANT_LIMIT))
             return false;
         if (props.sizeWithAncestors > nLimitAncestorSize)
             return false;

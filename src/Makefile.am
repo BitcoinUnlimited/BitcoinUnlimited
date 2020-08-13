@@ -303,7 +303,6 @@ libbitcoin_server_a_SOURCES = \
   parallel.cpp \
   policy/fees.cpp \
   policy/policy.cpp \
-  policy/mempool.cpp \
   pow.cpp \
   rest.cpp \
   rpc/blockchain.cpp \

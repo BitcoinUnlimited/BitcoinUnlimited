@@ -165,7 +165,10 @@ test-debian-qa:
     extends: .cache-debian
     needs: ["build-debian"]
     script:
-        - apt-get install -y python3-zmq
+        - mkdir -p $CI_PROJECT_DIR/cores
+        - mkdir -p $CI_PROJECT_DIR/saved-cores
+        - echo $CI_PROJECT_DIR/cores/core.%e.%p.%h.%t | tee /proc/sys/kernel/core_pattern
+        - apt-get install -y python3-zmq gdb
         - cd build;
         - ./qa/pull-tester/rpc-tests.py --coverage --no-ipv6-rpc-listen --gitlab
     dependencies:
@@ -174,6 +177,8 @@ test-debian-qa:
         when: on_failure
         paths:
             - ./qa/qa_tests/
+            - $CI_PROJECT_DIR/saved-cores
+            - ./build/src/bitcoind
 
 test-debian-benchmarks:
     stage: benchmark_tests
