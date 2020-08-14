@@ -100,7 +100,7 @@ void RespendDetector::CheckForRespend(const CTxMemPool &pool, const CTransaction
                     // remove all other orphans since we only need one
                     while (++iter != orphans.end())
                     {
-                        pool.doubleSpendProofStorage()->remove(proofId);
+                        pool.doubleSpendProofStorage()->remove(iter->first);
                         LOG(DSPROOF, "Removing DoubleSpendProof orphan, we only need one %d", proofId);
                     }
 
