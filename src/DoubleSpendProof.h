@@ -14,25 +14,39 @@
 class DoubleSpendProof
 {
 public:
+    /** Creates an empty, invalid object */
     DoubleSpendProof();
 
+    /** Create a proof object, given two conflicting transactions */
     static DoubleSpendProof create(const CTransaction &tx1, const CTransaction &tx2);
 
+    /** Returns true if this object is invalid, i.e. does not represent a double spend proof */
     bool isEmpty() const;
 
+    /** Return codes for the 'validate' function */
     enum Validity
     {
-        Valid,
-        MissingTransaction,
-        MissingUTXO,
-        Invalid
+        Valid, //? Double spend proof is valid
+        MissingTransaction, //? We cannot determine the validity of this proof because we don't have one of the spends
+        MissingUTXO, //? We cannot determine the validity of this proof because the prevout is not available
+        Invalid //? This object does not contain a valid doublespend proof
     };
 
+    /** Returns whether this doublespend proof is valid, or why its validity cannot be determined.
+     *  pool.cs_txmempool must be held.
+     */
     Validity validate(const CTxMemPool &pool, const CTransactionRef ptx = nullptr) const;
 
+    /** Returns the hash of the input transaction (UTXO) that is being doublespent */
     uint256 prevTxId() const;
+
+    /** Returns the index of the output that is being doublespent */
     int prevOutIndex() const;
 
+    /** get the hash of this doublespend proof */
+    uint256 GetHash() const;
+
+    /** This struction tracks information about each doublespend transaction */
     struct Spender
     {
         uint32_t txVersion = 0, outSequence = 0, lockTime = 0;
@@ -65,7 +79,6 @@ public:
         READWRITE(m_spender2.hashOutputs);
         READWRITE(m_spender2.pushData);
     }
-    uint256 GetHash() const;
 
 private:
     uint256 m_prevTxId;
@@ -74,6 +87,7 @@ private:
     Spender m_spender1, m_spender2;
 };
 
+/** Send notifcation of the availability of a doublespend to all connected nodes */
 void broadcastDspInv(const CTransactionRef &dspTx,
     const uint256 &hash,
     CTxMemPool::setEntries *setDescendants = nullptr);

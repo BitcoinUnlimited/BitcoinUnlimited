@@ -280,7 +280,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     }
     catch (const std::runtime_error &e)
     {
-        BOOST_CHECK_EQUAL(e.what(), "Tx2 Not a Bitcoin Cash transaction");
+        BOOST_CHECK_EQUAL(e.what(), "Tx2 is not a Bitcoin Cash transaction");
     }
 
     try
@@ -290,7 +290,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     }
     catch (const std::runtime_error &e)
     {
-        BOOST_CHECK_EQUAL(e.what(), "Tx1 Not a Bitcoin Cash transaction");
+        BOOST_CHECK_EQUAL(e.what(), "Tx1 is not a Bitcoin Cash transaction");
     }
 
     // 2) Create a dsproof that where the transactions do not double spend each other

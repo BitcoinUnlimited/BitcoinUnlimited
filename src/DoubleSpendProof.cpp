@@ -146,11 +146,11 @@ DoubleSpendProof DoubleSpendProof::create(const CTransaction &t1, const CTransac
                     throw std::runtime_error("scriptSig has no signature");
                 auto hashType = s1.pushData.front().back();
                 if (!(hashType & SIGHASH_FORKID))
-                    throw std::runtime_error("Tx1 Not a Bitcoin Cash transaction");
+                    throw std::runtime_error("Tx1 is not a Bitcoin Cash transaction");
 
                 hashType = s2.pushData.front().back();
                 if (!(hashType & SIGHASH_FORKID))
-                    throw std::runtime_error("Tx2 Not a Bitcoin Cash transaction");
+                    throw std::runtime_error("Tx2 is not a Bitcoin Cash transaction");
 
                 break;
             }
@@ -190,7 +190,7 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
         m_spender2.pushData.front().empty())
         return Invalid;
 
-    // check if ordering is proper
+    // check if ordering is proper. By convention, the first tx must have the smaller hash.
     int diff = m_spender1.hashOutputs.Compare(m_spender2.hashOutputs);
     if (diff == 0)
         diff = m_spender1.hashPrevOutputs.Compare(m_spender2.hashPrevOutputs);
@@ -210,7 +210,7 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
         amount = output.nValue;
         prevOutScript = output.scriptPubKey;
     }
-    else
+    else // tx is not found in our mempool, look in the UTXO.
     {
         Coin coin;
         if (!pcoinsTip->GetCoin({m_prevTxId, (uint32_t)m_prevOutIndex}, coin))
