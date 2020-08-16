@@ -604,6 +604,7 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     // other threads running txadmission and to ensure that the mempool state is current.
     CORRAL(txProcessingCorral, CORRAL_TX_PAUSE);
     CommitTxToMempool();
+    txHandlerSnap.Load();
 
     bool isRespend = false;
     bool missingInputs = false;
@@ -1538,7 +1539,7 @@ bool CheckFinalTx(const CTransactionRef tx, int flags, const Snapshot *ss)
     // evaluated is what is used. Thus if we want to know if a
     // transaction can be part of the *next* block, we need to call
     // IsFinalTx() with one more than chainActive.Height().
-    const int nBlockHeight = (ss != nullptr) ? ss->tipHeight + 1 : chainActive.Height() + 1;
+    const int nBlockHeight = max((int)((ss != nullptr) ? ss->tipHeight + 1 : 0), chainActive.Height() + 1);
 
     // BIP113 will require that time-locked transactions have nLockTime set to
     // less than the median time of the previous block they're contained in.

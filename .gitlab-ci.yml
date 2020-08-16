@@ -168,7 +168,8 @@ test-debian-qa:
         - mkdir -p $CI_PROJECT_DIR/cores
         - mkdir -p $CI_PROJECT_DIR/saved-cores
         - echo $CI_PROJECT_DIR/cores/core.%e.%p.%h.%t | tee /proc/sys/kernel/core_pattern
-        - apt-get install -y python3-zmq gdb
+        - apt-get install -y python3-zmq gdb python3-pip
+        - pip3 install psutil
         - cd build;
         - ./qa/pull-tester/rpc-tests.py --coverage --no-ipv6-rpc-listen --gitlab
     dependencies:

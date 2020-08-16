@@ -2385,16 +2385,24 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
     // enough, that fee sniping isn't a problem yet, but by implementing a fix
     // now we ensure code won't be written that makes assumptions about
     // nLockTime that preclude a fix later.
-    txNew.nLockTime = chainActive.Height();
+    auto height = chainActive.Height();
+    if (height == -1) // If chainActive height is unavailable, skip the fee sniping fix.
+    {
+        txNew.nLockTime = 0;
+    }
+    else
+    {
+        txNew.nLockTime = height;
 
-    // Secondly occasionally randomly pick a nLockTime even further back, so
-    // that transactions that are delayed after signing for whatever reason,
-    // e.g. high-latency mix networks and some CoinJoin implementations, have
-    // better privacy.
-    if (GetRandInt(10) == 0)
-        txNew.nLockTime = std::max(0, (int)txNew.nLockTime - GetRandInt(100));
+        // Secondly occasionally randomly pick a nLockTime even further back, so
+        // that transactions that are delayed after signing for whatever reason,
+        // e.g. high-latency mix networks and some CoinJoin implementations, have
+        // better privacy.
+        if (GetRandInt(10) == 0)
+            txNew.nLockTime = std::max(0, (int)txNew.nLockTime - GetRandInt(100));
+    }
 
-    assert(txNew.nLockTime <= (unsigned int)chainActive.Height());
+    DbgAssert(txNew.nLockTime <= (unsigned int)chainActive.Height(), txNew.nLockTime = 0);
     assert(txNew.nLockTime < LOCKTIME_THRESHOLD);
 
     {
@@ -3836,7 +3844,8 @@ bool CMerkleTx::AcceptToMemoryPool(bool fLimitFree, bool fRejectAbsurdFee)
         fRejectAbsurdFee, TransactionClass::DEFAULT);
     if (!ret)
     {
-        LOGA("ERROR: Transaction not sent - %s\n", state.GetRejectReason());
+        LOGA("ERROR: Transaction not sent - %s: %s\n", state.GetRejectReason(), EncodeHexTx(*this));
+        LOGA("%s", this->ToString());
     }
     return ret;
 }

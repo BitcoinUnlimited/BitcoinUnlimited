@@ -3,10 +3,14 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-
+import sys
+if sys.version_info[0] < 3:
+    raise "Use Python 3"
+import logging
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 
+logging.getLogger().setLevel(logging.INFO)
 
 class GrapheneStage2Test(BitcoinTestFramework):
     expected_stats = {'enabled', 
@@ -30,9 +34,10 @@ class GrapheneStage2Test(BitcoinTestFramework):
         else:
             self.test_assertion = self.assert_failure
 
-    def setup_chain(self):
+    def setup_chain(self, bitcoinConfDict=None, wallets=None):
         print ("Initializing test directory " + self.options.tmpdir)
-        initialize_chain_clean(self.options.tmpdir, 2)
+        # initialize_chain_clean(self.options.tmpdir, 2)
+        initialize_chain(self.options.tmpdir, bitcoinConfDict, wallets)
 
     def setup_network(self, split=False):
         node_opts = [
@@ -67,17 +72,18 @@ class GrapheneStage2Test(BitcoinTestFramework):
 
     def assert_success(self):
         # Nodes 1 should have received one block from node 0 and have experienced on decode failure.
-        assert '1 inbound and 0 outbound graphene blocks' in self.extract_stats_fields(self.nodes[1])['summary']
-        assert 'bandwidth with 1 local decode failure' in self.extract_stats_fields(self.nodes[1])['summary']
-
+        tmp = self.extract_stats_fields(self.nodes[1])['summary']
+        logging.info("graphene summary: %s" % tmp)
+        assert '1 inbound and 0 outbound graphene blocks' in tmp
+        assert 'bandwidth with 1 local decode failure' in tmp
         # Node 1 should have experienced only one decode failure
-        assert 'bandwidth with 2 local decode failure' not in self.extract_stats_fields(self.nodes[1])['summary']
+        assert 'bandwidth with 2 local decode failure' not in tmp
 
     def run_test(self):
         # Generate blocks so we can send a few transactions.  We need some transactions in a block
         # before a graphene block can be sent and created, otherwise we'll just end up sending a regular
         # block.
-        self.nodes[0].generate(105)
+        self.nodes[0].generate(1)
         self.sync_blocks()
 
         logging.info("Send 5 transactions from node0 (to its own address)")
