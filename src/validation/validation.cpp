@@ -23,6 +23,7 @@
 #include "txadmission.h"
 #include "txorphanpool.h"
 #include "ui_interface.h"
+#include "util.h"
 #include "validationinterface.h"
 
 #include <boost/scope_exit.hpp>
@@ -3032,6 +3033,7 @@ void CheckAndAlertUnknownVersionbits(const CChainParams &chainParams, const CBlo
 /** Update chainActive and related internal data structures. */
 void UpdateTip(CBlockIndex *pindexNew)
 {
+    DbgAssert(txProcessingCorral.region() == CORRAL_TX_PAUSE, LOGA("Updating tip during tx processing"));
     const CChainParams &chainParams = Params();
     chainActive.SetTip(pindexNew);
 
@@ -3085,6 +3087,8 @@ static void ResubmitTransactions(CBlock *block = nullptr)
     // We must hold the mempool lock throughout otherwise it would be possible for some txns to slip back into
     // the mempool from the csCommitQFinal.
     WRITELOCK(mempool.cs_txmempool);
+    // If tx admission is not paused, the commitment thread will be modifying what this function is clearing
+    DbgAssert(txProcessingCorral.region() != CORRAL_TX_COMMITMENT, LOGA("Resubmit transactions during tx commitment"));
     LOG(MEMPOOL, "Clearing mempool and resubmitting transactions");
     {
         if (block)
@@ -3161,7 +3165,8 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     // they will likely be invalid or already confirmed on the other fork.
     if (fRollBack)
     {
-        mempool.clear();
+        WRITELOCK(mempool.cs_txmempool);
+        mempool._clear();
         boost::unique_lock<boost::mutex> lock(csCommitQ);
         txCommitQ->clear();
     }
@@ -3814,13 +3819,6 @@ bool ProcessNewBlock(CValidationState &state,
             return error("%s: ActivateBestChain failed", __func__);
         else
             return false;
-    }
-
-    // If the fork activates on the next block, we need to reevaluate all tx in the mempool because they may now break
-    // the new sigops rule
-    if (IsMay2020Activated(chainparams.GetConsensus(), chainActive.Tip()))
-    {
-        ResubmitTransactions();
     }
 
     int64_t end = GetStopwatchMicros();

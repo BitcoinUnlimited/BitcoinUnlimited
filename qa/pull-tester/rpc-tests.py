@@ -31,6 +31,7 @@ import pdb
 import os
 import time
 import shutil
+import psutil
 import signal
 import sys
 import subprocess
@@ -195,6 +196,7 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
+    Disabled('sigchecks_inputstandardness_activation', 'Already activated, and mempool bad sigcheck mempool cleanup removed so test will fail'),
     'txindex',
     Disabled('schnorr-activation', 'Need to be updated to work with BU'),
     'schnorrsig',
@@ -535,8 +537,12 @@ class RPCTestHandler:
                               time.time(),
                               subprocess.Popen((RPC_TESTS_DIR + t).split() + self.flags.split() + port_seed,
                                                universal_newlines=True,
+                                               stdin=subprocess.DEVNULL,
                                                stdout=subprocess.PIPE,
-                                               stderr=subprocess.PIPE),
+                                               stderr=subprocess.PIPE,
+                                               close_fds=True,
+                                               restore_signals=True,
+                                               start_new_session=True),
                               log_stdout, log_stderr, got_outputs))
         if not self.jobs:
             raise IndexError('pop from empty list')
@@ -583,24 +589,23 @@ class RPCTestHandler:
                     # see: https://bugs.python.org/issue35182
                     pass
 
-                retval = proc.poll()
-                if not retval is None:
-                    if not got_outputs[0]:
-                        try:
-                            comms(0.1)
-                        except subprocess.TimeoutExpired as e:
-                            # communicate timed out, but process should have been killed already!
-                            proc.terminate()
-                            try:
-                                comms(1)
-                            except subprocess.TimeoutExpired as e:
-                                # terminate didn't work as expected
-                                proc.kill()
-                                try:
-                                    comms(5)
-                                except subprocess.TimeoutExpired as e:
-                                     print("%s: Expect a core dump" % proc.args[0])
-                                     dumpLogs = True
+                # it won't ever communicate() fully because child didn't close sockets
+                try:
+                    psproc = psutil.Process(proc.pid)
+                    if psproc.status() == psutil.STATUS_ZOMBIE:
+                        got_outputs[0] = True
+                except AttributeError:
+                    pass
+                except FileNotFoundError:
+                    pass # its ok means process exited cleanly
+                except psutil.NoSuchProcess:
+                    pass
+
+                if got_outputs[0]:
+                    retval = proc.returncode if proc.returncode != None else proc.poll()
+                    if retval is None:
+                        print("%s: should be impossible, got output from communicate but process is alive" % proc.args[0])
+                        dumpLogs = True
 
                     coreOutput = ""
                     try:
