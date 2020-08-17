@@ -130,9 +130,9 @@ AC_ARG_ENABLE(tests,
     [use_tests=yes])
 
 AC_ARG_ENABLE(gui-tests,
-    AS_HELP_STRING([--disable-gui-tests],[do not compile GUI tests (default is to compile if GUI and tests enabled)]),
+    AS_HELP_STRING([--disable-gui-tests],[do not compile GUI tests (default is to compile if GUI enabled)]),
     [use_gui_tests=$enableval],
-    [use_gui_tests=$use_tests])
+    [use_gui_tests=yes])
 
 AC_ARG_ENABLE(bench,
     AS_HELP_STRING([--disable-bench],[do not compile benchmarks (default is to compile)]),
