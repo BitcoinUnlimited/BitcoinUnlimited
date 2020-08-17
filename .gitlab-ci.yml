@@ -83,7 +83,7 @@ build-debian-nodeps:
         - apt-get install -y libminiupnpc-dev libzmq3-dev libprotobuf-dev protobuf-compiler libqrencode-dev
         - ./autogen.sh
         - mkdir build; cd build
-        - ../configure --cache-file=config.cache --with-incompatible-bdb --with-gui=qt5 --enable-glibc-back-compat --enable-reduce-exports
+        - ../configure --cache-file=config.cache --with-incompatible-bdb --with-gui=no --enable-glibc-back-compat --enable-reduce-exports
         - make -j `nproc`
         - ccache --show-stats
     artifacts:
@@ -94,6 +94,26 @@ build-debian-nodeps:
             - ./build/src/bitcoin-tx
             - ./build/src/test/test_bitcoin
             - ./build/src/bench/bench_bitcoin
+
+build-debian-nodeps-qt:
+    stage: build
+    extends: .cache-debian-nodeps
+    needs: []
+    script:
+        - set -o errexit; source .gitlab-ci/install.sh
+        - apt-get install -y qttools5-dev-tools qttools5-dev
+        - apt-get install -y libminiupnpc-dev libzmq3-dev libprotobuf-dev protobuf-compiler libqrencode-dev
+        - ./autogen.sh
+        - mkdir build; cd build
+        - ../configure --cache-file=config.cache --with-incompatible-bdb --with-gui=qt5 --enable-glibc-back-compat --enable-reduce-exports --disable-bench --disable-tests
+        - make -j `nproc`
+        - ccache --show-stats
+    artifacts:
+        paths:
+            - ./build/src/bitcoind
+            - ./build/src/bitcoin-cli
+            - ./build/src/bitcoin-miner
+            - ./build/src/bitcoin-tx
 
 build-debian-tests-nodeps:
     stage: build_tests
