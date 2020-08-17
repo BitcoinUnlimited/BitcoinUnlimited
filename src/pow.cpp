@@ -184,7 +184,7 @@ arith_uint256 CalculateASERT(const arith_uint256 &refTarget,
 
     // First decompose exponent into 'integer' and 'fractional' parts:
     int64_t shifts = exponent >> 16;
-    const auto frac = uint16_t(exponent);
+    const uint16_t frac = uint16_t(exponent);
     assert(exponent == (shifts * 65536) + frac);
 
     // multiply target by 65536 * 2^(fractional part)
