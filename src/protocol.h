@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (C) 2020 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -344,6 +345,11 @@ extern const char *GETBLOCKTXN;
  * @since protocol version 70014 as described by BIP 152
  */
 extern const char *BLOCKTXN;
+
+/**
+ * Double spend proof
+ */
+extern const char *DSPROOF;
 };
 
 
@@ -494,6 +500,8 @@ enum
     // With the introduction of compact block, this is being deprecated in favor of using the get_thin p2p
     // message, which solves the conflict with MSG_THINBLOCK and MSG_CMPCT_BLOCK.
     MSG_THINBLOCK = MSG_CMPCT_BLOCK,
+
+    MSG_DOUBLESPENDPROOF = 0x94a0
 };
 
 #endif // BITCOIN_PROTOCOL_H

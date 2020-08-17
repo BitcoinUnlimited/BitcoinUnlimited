@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (C) 2020 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -70,6 +71,8 @@ const char *SENDCMPCT = "sendcmpct";
 const char *CMPCTBLOCK = "cmpctblock";
 const char *GETBLOCKTXN = "getblocktxn";
 const char *BLOCKTXN = "blocktxn";
+
+const char *DSPROOF = "dsproof-beta";
 };
 
 static const char *ppszTypeName[] = {
@@ -91,11 +94,11 @@ const static std::string allNetMessageTypes[] = {
     NetMsgType::FILTERSIZEXTHIN, NetMsgType::REJECT, NetMsgType::SENDHEADERS, NetMsgType::THINBLOCK,
     NetMsgType::XTHINBLOCK, NetMsgType::XBLOCKTX, NetMsgType::GET_XBLOCKTX, NetMsgType::GET_XTHIN, NetMsgType::GET_THIN,
     NetMsgType::GRAPHENEBLOCK, NetMsgType::GRAPHENETX, NetMsgType::GET_GRAPHENETX, NetMsgType::GET_GRAPHENE,
-    NetMsgType::MEMPOOLSYNC, NetMsgType::MEMPOOLSYNCTX, NetMsgType::GET_MEMPOOLSYNC, NetMsgType::GET_MEMPOOLSYNCTX,
-    NetMsgType::XPEDITEDREQUEST, NetMsgType::XPEDITEDBLK, NetMsgType::XPEDITEDTXN, NetMsgType::XVERSION_OLD,
-    NetMsgType::XVERACK_OLD, NetMsgType::XVERSION, NetMsgType::XUPDATE, NetMsgType::SENDCMPCT, NetMsgType::SENDCMPCT,
-    NetMsgType::CMPCTBLOCK, NetMsgType::GETBLOCKTXN, NetMsgType::BLOCKTXN, NetMsgType::GET_GRAPHENE_RECOVERY,
-    NetMsgType::GRAPHENE_RECOVERY,
+    NetMsgType::GET_GRAPHENE_RECOVERY, NetMsgType::GRAPHENE_RECOVERY, NetMsgType::MEMPOOLSYNC,
+    NetMsgType::MEMPOOLSYNCTX, NetMsgType::GET_MEMPOOLSYNC, NetMsgType::GET_MEMPOOLSYNCTX, NetMsgType::XPEDITEDREQUEST,
+    NetMsgType::XPEDITEDBLK, NetMsgType::XPEDITEDTXN, NetMsgType::XVERSION_OLD, NetMsgType::XVERACK_OLD,
+    NetMsgType::XVERSION, NetMsgType::XUPDATE, NetMsgType::SENDCMPCT, NetMsgType::CMPCTBLOCK, NetMsgType::GETBLOCKTXN,
+    NetMsgType::BLOCKTXN, NetMsgType::DSPROOF,
 
 };
 const static std::vector<std::string> allNetMessageTypesVec(allNetMessageTypes,
@@ -198,11 +201,13 @@ CInv::CInv(const std::string &strType, const uint256 &hashIn)
 }
 
 bool operator<(const CInv &a, const CInv &b) { return (a.type < b.type || (a.type == b.type && a.hash < b.hash)); }
-bool CInv::IsKnownType() const { return (type >= 1 && type < (int)ARRAYLEN(ppszTypeName)); }
+bool CInv::IsKnownType() const { return (type >= 1 && type < 8) || type == MSG_DOUBLESPENDPROOF; }
 const char *CInv::GetCommand() const
 {
     if (!IsKnownType())
         throw std::out_of_range(strprintf("CInv::GetCommand(): type=%d unknown type", type));
+    if (type == MSG_DOUBLESPENDPROOF)
+        return NetMsgType::DSPROOF;
     return ppszTypeName[type];
 }
 

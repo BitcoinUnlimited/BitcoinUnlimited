@@ -234,7 +234,7 @@ class CtorTest (BitcoinTestFramework):
         for i in range(0,30):
             self.nodes[0].sendtoaddress(addr[0], 1)
             blk = self.nodes[0].generate(1)[0]
-            logging.info("Node 0 generated %s" % blk)
+            logging.info("(DTOR) Node 0 generated %s" % blk)
         sync_blocks(self.nodes[0:2])
         logging.info("Nodes 0,1 at block: %d " % self.nodes[0].getblockcount())
 
@@ -258,12 +258,15 @@ class CtorTest (BitcoinTestFramework):
         for i in range(5):
             connect_nodes_bi(self.nodes,5,i)
 
-        waitFor(15, lambda: self.nodes[4].getblockcount() == ctorTipHeight)
+        logging.info("CTOR tip height is: %d,  DTOR is: %d" % (ctorTipHeight, dtorTipHeight))
+
+        waitFor(120, lambda: True if self.nodes[4].getblockcount() == ctorTipHeight else logging.info("Syncing %d of %d (%s)" % (self.nodes[4].getblockcount(), ctorTipHeight, self.nodes[4].getbestblockhash())))
         assert_equal(self.nodes[4].getbestblockhash(), ctorTip)
-        waitFor(15, lambda: self.nodes[5].getblockcount() == dtorTipHeight)
+        waitFor(120, lambda: True if self.nodes[5].getblockcount() == dtorTipHeight else logging.info("Syncing %d of %d (%s)" % (self.nodes[5].getblockcount(), ctorTipHeight, self.nodes[5].getbestblockhash())))
         assert_equal(self.nodes[5].getbestblockhash(), dtorTip)
 
         # Now run the rollback across fork test
+        logging.info("Rollback across fork test")
 
         # first generate a competing ctor fork on our isolated node that is longer than the current fork
         rollbackNode.set("consensus.enableCanonicalTxOrder=1")
@@ -272,7 +275,8 @@ class CtorTest (BitcoinTestFramework):
         # make the new fork longer than current
         for n in range(10):
             time.sleep(.1)
-            rollbackNode.generate(1)
+            blk = rollbackNode.generate(1)[0]
+            logging.info("Rollback node generated block %s" % blk)
 
         preFork = rollbackNode.generate(1)[0] # will be a dtor block
         preForkBlock = rollbackNode.getblock(preFork)
@@ -280,9 +284,12 @@ class CtorTest (BitcoinTestFramework):
         # now send tx to myself that will reuse coins.  This creates an block incompatible with dtor
         bal = rollbackNode.getbalance()
         for i in range(1,20):
-            rollbackNode.sendtoaddress(rollbackAddr, bal-Decimal(i*.01)) # a little less each time to account for fees
+            txh = rollbackNode.sendtoaddress(rollbackAddr, bal-Decimal(i*.01)) # a little less each time to account for fees
+            logging.info("Rollback node generated tx %s" % txh)
+        
         ctorForkHash = rollbackNode.generate(1)[0]
-        rollbackNode.generate(5)
+        blks = rollbackNode.generate(5)
+        logging.info("(CTOR) generated: %s" % str(blks))
         time.sleep(3)
         ctorForkTipHash = rollbackNode.getbestblockhash()
         ctorForkTipCount = rollbackNode.getblockcount()
@@ -295,12 +302,14 @@ class CtorTest (BitcoinTestFramework):
         self.nodes[3].set("consensus.enableCanonicalTxOrder=1")
         waitFor(5, lambda: "True" in str(self.nodes[2].get("consensus.enableCanonicalTxOrder")))
         waitFor(5, lambda: "True" in str(self.nodes[3].get("consensus.enableCanonicalTxOrder")))
+        logging.info("enable ctor")
 
         connect_nodes(rollbackNode,2)
         connect_nodes(rollbackNode,3)
-        waitFor(15, lambda: self.nodes[2].getblockcount() == ctorForkTipCount)
-        waitFor(15, lambda: self.nodes[3].getblockcount() == ctorForkTipCount)
+        waitFor(120, lambda: True if self.nodes[2].getblockcount() == ctorForkTipCount else logging.info("node 2 syncing %d of %d" % (self.nodes[2].getblockcount(), ctorForkTipCount )))
+        waitFor(120, lambda: True if self.nodes[3].getblockcount() == ctorForkTipCount else logging.info("node 3 syncing %d of %d" % (self.nodes[3].getblockcount(), ctorForkTipCount )))
 
+        logging.info("done!  Stopping nodes")
         # done, clean up
         stop_nodes([rollbackNode])
 

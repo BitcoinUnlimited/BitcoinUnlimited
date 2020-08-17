@@ -4,6 +4,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "respend/respendrelayer.h"
+#include "DoubleSpendProof.h"
+#include "DoubleSpendProofStorage.h"
 #include "net.h" // RelayTransaction
 #include "primitives/transaction.h"
 #include "protocol.h"
@@ -58,7 +60,7 @@ private:
 
 RespendRelayer::RespendRelayer() : interesting(false), valid(false) {}
 bool RespendRelayer::AddOutpointConflict(const COutPoint &,
-    const CTxMemPool::txiter,
+    const uint256 hash,
     const CTransactionRef pRespendTx,
     bool seenBefore,
     bool isEquivalent)
@@ -75,6 +77,7 @@ bool RespendRelayer::AddOutpointConflict(const COutPoint &,
         return false;
     }
 
+    spendhash = hash;
     pRespend = pRespendTx;
     interesting = true;
     return false;
@@ -82,12 +85,43 @@ bool RespendRelayer::AddOutpointConflict(const COutPoint &,
 
 bool RespendRelayer::IsInteresting() const { return interesting; }
 void RespendRelayer::SetValid(bool v) { valid = v; }
-void RespendRelayer::Trigger()
+void RespendRelayer::Trigger(CTxMemPool &pool)
 {
     if (!valid || !interesting)
         return;
 
-    RelayTransaction(pRespend, true);
+    CTransactionRef ptx;
+    DoubleSpendProof dsp;
+
+    // no DS proof exists, lets make one.
+    {
+        WRITELOCK(pool.cs_txmempool);
+        auto originalTxIter = pool.mapTx.find(spendhash);
+        if (originalTxIter == pool.mapTx.end())
+            return; // if original tx is no longer in mempool then there is nothing to do.
+
+        if (originalTxIter->dsproof == -1)
+        {
+            try
+            {
+                auto item = *originalTxIter;
+                dsp = DoubleSpendProof::create(originalTxIter->GetTx(), *pRespend);
+                item.dsproof = pool.doubleSpendProofStorage()->add(dsp);
+                LOG(DSPROOF, "Double spend found, creating double spend proof %d\n", item.dsproof);
+                pool.mapTx.replace(originalTxIter, item);
+
+                ptx = pool._get(originalTxIter->GetTx().GetHash());
+            }
+            catch (const std::exception &e)
+            {
+                LOG(DSPROOF, "Double spend creation failed: %s\n", e.what());
+            }
+        }
+    }
+
+    // send INV to all peers
+    if (ptx != nullptr && !dsp.isEmpty())
+        broadcastDspInv(ptx, dsp.GetHash());
 }
 
 } // ns respend

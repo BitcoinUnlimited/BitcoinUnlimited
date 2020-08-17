@@ -16,14 +16,14 @@ public:
     RespendLogger();
 
     bool AddOutpointConflict(const COutPoint &,
-        const CTxMemPool::txiter mempoolEntry,
+        const uint256 hash,
         const CTransactionRef pRespendTx,
         bool seen,
         bool isEquivalent) override;
 
     virtual bool IsInteresting() const override;
 
-    void Trigger() override;
+    void Trigger(CTxMemPool &pool) override;
 
     void SetValid(bool v) override { valid = v ? "yes" : "no"; }
 private:

@@ -22,7 +22,7 @@ public:
         // conflicting outpoint
         const COutPoint &out,
         // Existing mempool entry
-        const CTxMemPool::txiter mempoolEntry,
+        const uint256 hash,
         // Current TX that is respending
         const CTransactionRef pRespendTx,
         // If we've seen a valid tx respending this output before
@@ -36,7 +36,7 @@ public:
     // Called after tx is validated and only if it's validated.
     virtual void SetValid(bool) = 0;
     // Action should do its thing now.
-    virtual void Trigger() = 0;
+    virtual void Trigger(CTxMemPool &pool) = 0;
 };
 inline RespendAction::~RespendAction() {}
 // shared_ptr, instead of unique_ptr, for unit testing

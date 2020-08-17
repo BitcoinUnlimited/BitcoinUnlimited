@@ -1,11 +1,14 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2018-2019 The Bitcoin Unlimited developers
+// Copyright (C) 2019-2020 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "net_processing.h"
 
+#include "DoubleSpendProof.h"
+#include "DoubleSpendProofStorage.h"
 #include "addrman.h"
 #include "blockrelay/blockrelay_common.h"
 #include "blockrelay/compactblock.h"
@@ -284,6 +287,22 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     {
                         pfrom->PushMessage(NetMsgType::TX, ss);
                         ss.clear();
+                    }
+                }
+                else if (inv.type == MSG_DOUBLESPENDPROOF)
+                {
+                    DoubleSpendProof dsp = mempool.doubleSpendProofStorage()->lookup(inv.hash);
+                    if (!dsp.isEmpty())
+                    {
+                        CDataStream ssDSP(SER_NETWORK, PROTOCOL_VERSION);
+                        ssDSP.reserve(600);
+                        ssDSP << dsp;
+                        pfrom->PushMessage(NetMsgType::DSPROOF, ssDSP);
+                    }
+                    else
+                    {
+                        pfrom->PushMessage(NetMsgType::REJECT, std::string(NetMsgType::DSPROOF), REJECT_INVALID,
+                            std::string("dsproof requested was not found"));
                     }
                 }
                 else
@@ -970,7 +989,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 return false;
 
             const CInv &inv = vInv[nInv];
-            if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK)))
+            if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK) || inv.type == MSG_DOUBLESPENDPROOF))
             {
                 LOG(NET, "message inv invalid type = %u hash %s", inv.type, inv.hash.ToString());
                 return false;
@@ -1012,7 +1031,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                         inv.hash.ToString(), fAlreadyHaveBlock, fImporting, fReindex, IsChainNearlySyncd());
                 }
             }
-            else // If we get here then inv.type must == MSG_TX.
+            else if (inv.type == MSG_TX)
             {
                 bool fAlreadyHaveTx = TxAlreadyHave(inv);
                 // LOG(NET, "got inv: %s  %d peer=%s\n", inv.ToString(), fAlreadyHaveTx ? "have" : "new",
@@ -1029,7 +1048,15 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 // likely be included in blocks that we IBD download anyway.  This is especially important as
                 // transaction volumes increase.
                 else if (!fAlreadyHaveTx && !IsInitialBlockDownload())
+                {
                     requester.AskFor(inv, pfrom);
+                }
+            }
+            else if (inv.type == MSG_DOUBLESPENDPROOF)
+            {
+                std::vector<CInv> vGetData;
+                vGetData.push_back(inv);
+                pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
             }
 
             // Track requests for our stuff.
@@ -1067,7 +1094,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         {
             const CInv &inv = vInv[nInv];
             if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK) || (inv.type == MSG_FILTERED_BLOCK) ||
-                    (inv.type == MSG_CMPCT_BLOCK)))
+                    (inv.type == MSG_CMPCT_BLOCK) || inv.type == MSG_DOUBLESPENDPROOF))
             {
                 dosMan.Misbehaving(pfrom, 20, BanReasonInvalidInventory);
                 return error("message inv invalid type = %u", inv.type);
@@ -2003,6 +2030,73 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->fRelayTxes = true;
     }
 
+    if (strCommand == NetMsgType::DSPROOF)
+    {
+        LOG(DSPROOF, "Received a double spend proof from peer:%d\n", pfrom->GetId());
+        uint256 dspHash;
+        try
+        {
+            DoubleSpendProof dsp;
+            vRecv >> dsp;
+            if (dsp.isEmpty())
+                throw std::runtime_error("Double spend proof is empty");
+
+            dspHash = dsp.GetHash();
+            DoubleSpendProof::Validity validity;
+            {
+                READLOCK(mempool.cs_txmempool);
+                validity = dsp.validate(mempool);
+            }
+            switch (validity)
+            {
+            case DoubleSpendProof::Valid:
+            {
+                LOG(DSPROOF, "Double spend proof is valid from peer:%d\n", pfrom->GetId());
+                const auto ptx = mempool.addDoubleSpendProof(dsp);
+                if (ptx.get())
+                {
+                    // find any descendants of this double spent transaction. If there are any
+                    // then we must also forward this double spend proof to any SPV peers that
+                    // want to know about this tx or its descendants.
+                    CTxMemPool::setEntries setDescendants;
+                    {
+                        READLOCK(mempool.cs_txmempool);
+                        CTxMemPool::indexed_transaction_set::const_iterator iter = mempool.mapTx.find(ptx->GetHash());
+                        if (iter == mempool.mapTx.end())
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            mempool._CalculateDescendants(iter, setDescendants);
+                        }
+                    }
+
+                    // added to mempool correctly, then forward to nodes.
+                    broadcastDspInv(ptx, dspHash, &setDescendants);
+                }
+                break;
+            }
+            case DoubleSpendProof::MissingUTXO:
+            case DoubleSpendProof::MissingTransaction:
+                LOG(DSPROOF, "Double spend proof is orphan: postponed\n");
+                mempool.doubleSpendProofStorage()->addOrphan(dsp, pfrom->GetId());
+                break;
+            case DoubleSpendProof::Invalid:
+                throw std::runtime_error("Double spend proof didn't validate");
+            default:
+                return false;
+            }
+        }
+        catch (const std::exception &e)
+        {
+            LOG(DSPROOF, "Failure handling double spend proof. Peer: %d Reason: %s\n", pfrom->GetId(), e.what());
+            if (!dspHash.IsNull())
+                mempool.doubleSpendProofStorage()->markProofRejected(dspHash);
+            dosMan.Misbehaving(pfrom->GetId(), 10);
+            return false;
+        }
+    }
 
     else if (strCommand == NetMsgType::REJECT)
     {

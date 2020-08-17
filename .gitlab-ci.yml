@@ -200,6 +200,7 @@ test-debian-qa:
             - ./qa/qa_tests/
             - $CI_PROJECT_DIR/saved-cores
             - ./build/src/bitcoind
+            - ./build/ctorout.txt
 
 test-debian-benchmarks:
     stage: benchmark_tests

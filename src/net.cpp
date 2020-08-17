@@ -2916,7 +2916,7 @@ void NetCleanup()
 }
 
 
-void RelayTransaction(const CTransactionRef ptx, const bool fRespend, const CTxProperties *txProperties)
+void RelayTransaction(const CTransactionRef ptx, const CTxProperties *txProperties)
 {
     if (ptx->GetTxSize() > maxTxSize.Value())
     {
@@ -2959,9 +2959,7 @@ void RelayTransaction(const CTransactionRef ptx, const bool fRespend, const CTxP
         // and we can assume this node is an SPV node.
         if (pnode->pfilter && !pnode->pfilter->IsEmpty())
         {
-            // Relaying double spends to SPV clients is an easy attack vector,
-            // and therefore only relay txns that are not potential double spends.
-            if (!fRespend && pnode->pfilter->IsRelevantAndUpdate(ptx))
+            if (pnode->pfilter->IsRelevantAndUpdate(ptx))
             {
                 pnode->PushInventory(inv);
             }

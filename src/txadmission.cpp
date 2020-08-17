@@ -1,8 +1,11 @@
 // Copyright (c) 2018-2019 The Bitcoin Unlimited developers
+// Copyright (C) 2019-2020 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "txadmission.h"
+#include "DoubleSpendProof.h"
+#include "DoubleSpendProofStorage.h"
 #include "blockstorage/blockstorage.h"
 #include "connmgr.h"
 #include "consensus/tx_verify.h"
@@ -206,6 +209,9 @@ unsigned int TxAlreadyHave(const CInv &inv)
             return 4;
         return 0;
     }
+    case MSG_DOUBLESPENDPROOF:
+        return mempool.doubleSpendProofStorage()->exists(inv.hash) ||
+               mempool.doubleSpendProofStorage()->isRecentlyRejectedProof(inv.hash);
     }
     DbgAssert(0, return false); // this fn should only be called if CInv is a tx
 }
@@ -300,13 +306,13 @@ void CommitTxToMempool()
             requester.Received(CInv(MSG_TX, data.hash), nullptr);
         }
     }
-#ifdef ENABLE_WALLET
     for (auto &it : *txCommitQFinal)
     {
         CTxCommitData &data = it.second;
+#ifdef ENABLE_WALLET
         SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
-    }
 #endif
+    }
     txCommitQFinal->clear();
     delete txCommitQFinal;
 
@@ -474,7 +480,7 @@ void ThreadTxAdmission()
                             false, TransactionClass::DEFAULT, vCoinsToUncache, &isRespend, nullptr, txProps))
                     {
                         acceptedSomething = true;
-                        RelayTransaction(tx, false, txProps);
+                        RelayTransaction(tx, txProps);
 
                         // LOG(MEMPOOL, "Accepted tx: peer=%s: accepted %s onto Q\n", txd.nodeName,
                         //     tx->GetHash().ToString());
@@ -616,7 +622,7 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
         fRejectAbsurdFee, allowedTx, vCoinsToUncache, &isRespend, nullptr, txProps);
     if (res)
     {
-        RelayTransaction(tx, false, txProps);
+        RelayTransaction(tx, txProps);
     }
 
     // Uncache any coins for txns that failed to enter the mempool but were NOT orphan txns
@@ -1296,6 +1302,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
         }
 
+        // Check for repend before committing the tx to the mempool
         respend.SetValid(true);
         if (respend.IsRespend())
         {
@@ -1308,10 +1315,12 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 return state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
             }
         }
-
-        // Add entry to the commit queue
-        if (debugger == nullptr)
+        else if (debugger == nullptr)
         {
+            // If it's not a respend it may have a reclaimed orphan associated with it
+            entry.dsproof = respend.GetDsproof();
+
+            // Add entry to the commit queue
             CTxCommitData eData;
             eData.entry = std::move(entry);
             eData.hash = hash;
