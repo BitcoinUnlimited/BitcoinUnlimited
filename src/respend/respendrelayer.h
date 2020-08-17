@@ -21,7 +21,7 @@ public:
     RespendRelayer();
 
     bool AddOutpointConflict(const COutPoint &,
-        const CTxMemPool::txiter iter,
+        const uint256 hash,
         const CTransactionRef pRespendTx,
         bool seenBefore,
         bool isEquivalent) override;
@@ -34,7 +34,7 @@ public:
 private:
     bool interesting;
     bool valid;
-    CTxMemPool::txiter originalTxIter;
+    uint256 spendhash;
     CTransactionRef pRespend;
 };
 

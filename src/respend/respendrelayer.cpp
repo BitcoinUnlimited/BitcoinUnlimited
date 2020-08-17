@@ -60,7 +60,7 @@ private:
 
 RespendRelayer::RespendRelayer() : interesting(false), valid(false) {}
 bool RespendRelayer::AddOutpointConflict(const COutPoint &,
-    const CTxMemPool::txiter iter,
+    const uint256 hash,
     const CTransactionRef pRespendTx,
     bool seenBefore,
     bool isEquivalent)
@@ -77,7 +77,7 @@ bool RespendRelayer::AddOutpointConflict(const COutPoint &,
         return false;
     }
 
-    originalTxIter = iter;
+    spendhash = hash;
     pRespend = pRespendTx;
     interesting = true;
     return false;
@@ -96,7 +96,10 @@ void RespendRelayer::Trigger(CTxMemPool &pool)
     // no DS proof exists, lets make one.
     {
         WRITELOCK(pool.cs_txmempool);
-        assert(pool.mapTx.end() != originalTxIter);
+        auto originalTxIter = pool.mapTx.find(spendhash);
+        if (originalTxIter == pool.mapTx.end())
+            return; // if original tx is no longer in mempool then there is nothing to do.
+
         if (originalTxIter->dsproof == -1)
         {
             try

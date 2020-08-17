@@ -16,7 +16,7 @@ public:
     RespendLogger();
 
     bool AddOutpointConflict(const COutPoint &,
-        const CTxMemPool::txiter mempoolEntry,
+        const uint256 hash,
         const CTransactionRef pRespendTx,
         bool seen,
         bool isEquivalent) override;

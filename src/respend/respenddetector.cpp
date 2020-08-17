@@ -139,7 +139,8 @@ void RespendDetector::CheckForRespend(const CTxMemPool &pool, const CTransaction
         {
             // Actions can return true if they want to check more
             // outpoints for conflicts.
-            bool m = a->AddOutpointConflict(outpoint, poolIter, ptx, seen, ptx->IsEquivalentTo(poolIter->GetTx()));
+            bool m = a->AddOutpointConflict(
+                outpoint, poolIter->GetSharedTx()->GetHash(), ptx, seen, ptx->IsEquivalentTo(poolIter->GetTx()));
             collectMore = collectMore || m;
         }
         if (!collectMore)

@@ -67,7 +67,7 @@ BOOST_AUTO_TEST_CASE(not_interesting)
 {
     RespendRelayer r;
     BOOST_CHECK(!r.IsInteresting());
-    CTxMemPool::txiter dummy;
+    uint256 dummy;
     bool lookAtMore;
 
     lookAtMore =
@@ -84,7 +84,7 @@ BOOST_AUTO_TEST_CASE(not_interesting)
 BOOST_AUTO_TEST_CASE(is_interesting)
 {
     RespendRelayer r;
-    CTxMemPool::txiter dummy;
+    uint256 dummy;
     bool lookAtMore;
 
     lookAtMore = r.AddOutpointConflict(COutPoint{}, dummy, MakeTransactionRef(CTransaction{}), false, false);
@@ -205,7 +205,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     // Create a "not interesting" respend
     RespendRelayer r;
     ClearInventory(&node);
-    r.AddOutpointConflict(COutPoint{}, iter, MakeTransactionRef(spend2a), true, false);
+    r.AddOutpointConflict(COutPoint{}, iter->GetSharedTx()->GetHash(), MakeTransactionRef(spend2a), true, false);
     r.Trigger(pool);
     BOOST_CHECK_EQUAL(size_t(0), node.GetInventoryToSendSize());
     r.SetValid(true);
@@ -215,7 +215,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
 
     // Create an interesting, but invalid respend
     ClearInventory(&node);
-    r.AddOutpointConflict(COutPoint{}, iter, MakeTransactionRef(spend2a), false, false);
+    r.AddOutpointConflict(COutPoint{}, iter->GetSharedTx()->GetHash(), MakeTransactionRef(spend2a), false, false);
     BOOST_CHECK(r.IsInteresting());
     r.SetValid(false);
     r.Trigger(pool);
@@ -241,7 +241,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly)
     }
     CTransaction spend2b(s2);
     ClearInventory(&node);
-    r.AddOutpointConflict(COutPoint{}, iter, MakeTransactionRef(spend2b), false, false);
+    r.AddOutpointConflict(COutPoint{}, iter->GetSharedTx()->GetHash(), MakeTransactionRef(spend2b), false, false);
     // make valid
     r.SetValid(true);
     r.Trigger(pool);
