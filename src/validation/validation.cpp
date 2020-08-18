@@ -608,6 +608,7 @@ void UnloadBlockIndex()
         chainActive.SetTip(nullptr);
         pindexBestInvalid = nullptr;
         pindexBestHeader = nullptr;
+        ResetASERTAnchorBlockCache();
         mapBlocksUnlinked.clear();
         vinfoBlockFile.clear();
         mapBlockSource.clear();
