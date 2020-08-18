@@ -60,7 +60,7 @@ static const CBlockIndex *GetASERTAnchorBlock(const CBlockIndex *const pindex, c
     {
         // first, skip backwards testing IsNov2020Enabled
         // The below code leverages CBlockIndex::pskip to walk back efficiently.
-        if (IsNov2020Enabled(params, anchor->pskip))
+        if ((anchor->pskip != nullptr) && IsNov2020Enabled(params, anchor->pskip))
         {
             // skip backward
             anchor = anchor->pskip;
@@ -184,8 +184,8 @@ arith_uint256 CalculateASERT(const arith_uint256 &refTarget,
 
     // First decompose exponent into 'integer' and 'fractional' parts:
     int64_t shifts = exponent >> 16;
-    const uint16_t frac = uint16_t(exponent);
-    assert(exponent == (shifts * 65536) + frac);
+    const uint64_t frac = uint16_t(exponent);
+    assert(exponent == (shifts * 65536) + (int64_t) frac);
 
     // multiply target by 65536 * 2^(fractional part)
     // 2^x ~= (1 + 0.695502049*x + 0.2262698*x**2 + 0.0782318*x**3) for 0 <= x < 1
