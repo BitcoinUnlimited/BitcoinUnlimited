@@ -74,7 +74,7 @@ bool IsStandardTx(const CTransactionRef tx, std::string &reason)
     // almost as much to process as they cost the sender in fees, because
     // computing signature hashes is O(ninputs*txsize). Limiting transactions
     // to MAX_STANDARD_TX_SIZE mitigates CPU exhaustion attacks.
-    if (tx->GetTxSize() >= MAX_STANDARD_TX_SIZE)
+    if (tx->GetTxSize() > MAX_STANDARD_TX_SIZE)
     {
         reason = "tx-size";
         return false;
