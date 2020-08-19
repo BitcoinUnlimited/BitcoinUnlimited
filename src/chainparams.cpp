@@ -534,6 +534,98 @@ public:
 };
 static CRegTestParams regTestParams;
 
+/**
+ * Testnet (v4)
+ */
+class CTestNet4Params : public CChainParams
+{
+public:
+    CTestNet4Params()
+    {
+        strNetworkID = "test4";
+        consensus.nSubsidyHalvingInterval = 210000;
+        consensus.BIP16Height = 1;
+        consensus.BIP34Height = 2;
+        consensus.BIP34Hash = uint256S("00000000b0c65b1e03baace7d5c093db0d6aac224df01484985ffd5e86a1a20c");
+        consensus.BIP65Height = 3;
+        consensus.BIP66Height = 4;
+        consensus.BIP68Height = 5;
+        consensus.powLimit = uint256S("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+
+        // One hour
+        consensus.nPowTargetTimespan = 1 * 60 * 60;
+        consensus.nPowTargetSpacing = 10 * 60;
+        consensus.fPowAllowMinDifficultyBlocks = true;
+        consensus.fPowNoRetargeting = false;
+        // The half life for the ASERT DAA. For every (nASERTHalfLife) seconds behind schedule the blockchain gets,
+        // difficulty is cut in half. Doubled if blocks are ahead of schedule.
+        // One hour
+        consensus.nASERTHalfLife = 60 * 60;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].windowsize = 2016;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].threshold = 1512; // 75% of 2016
+
+        // August 1, 2017 hard fork
+        consensus.uahfHeight = 6;
+
+        // November 13, 2017 hard fork
+        consensus.daaHeight = 3000;
+
+        // November 15, 2018 hard fork
+        consensus.may2018Height = 4000;
+
+        // November 15, 2019 protocol upgrade
+        consensus.nov2018Height = 5000;
+
+        // May 15, 2020 12:00:00 UTC protocol upgrade
+        consensus.may2020Height = 6000;
+
+        // Nov 15, 2020 12:00:00 UTC protocol upgrade
+        consensus.nov2020ActivationTime = 1605441600;
+
+        pchMessageStart[0] = 0xcd;
+        pchMessageStart[1] = 0x22;
+        pchMessageStart[2] = 0xa7;
+        pchMessageStart[3] = 0x92;
+        pchCashMessageStart[0] = 0xe2;
+        pchCashMessageStart[1] = 0xb7;
+        pchCashMessageStart[2] = 0xda;
+        pchCashMessageStart[3] = 0xaf;
+        nDefaultPort = DEFAULT_TESTNET4_PORT;
+        nPruneAfterHeight = 1000;
+
+        genesis = CreateGenesisBlock(1597811185, 114152193, 0x1d00ffff, 1, 50 * COIN);
+        consensus.hashGenesisBlock = genesis.GetHash();
+
+        vFixedSeeds.clear();
+        vSeeds.clear();
+        // nodes with support for servicebits filtering should be at the top
+        // vSeeds.emplace_back("");
+
+        base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
+        base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 196);
+        base58Prefixes[SECRET_KEY] = std::vector<uint8_t>(1, 239);
+        base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
+        base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
+        cashaddrPrefix = "bchtest4";
+        vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
+
+        fMiningRequiresPeers = true;
+        fDefaultConsistencyChecks = false;
+        fRequireStandard = false;
+        fMineBlocksOnDemand = false;
+        fTestnetToBeDeprecatedFieldRPC = true;
+
+        checkpointData = (CCheckpointData){};
+
+        // chainTxData = ChainTxData{1522608381, 15052068, 0.15};
+    }
+};
+
+static CTestNet4Params testNet4Params;
+
 CChainParams *pCurrentParams = 0;
 
 const CChainParams &Params()
@@ -548,6 +640,8 @@ CChainParams &Params(const std::string &chain)
         return mainParams;
     else if (chain == CBaseChainParams::TESTNET)
         return testNetParams;
+    else if (chain == CBaseChainParams::TESTNET4)
+        return testNet4Params;
     else if (chain == CBaseChainParams::REGTEST)
         return regTestParams;
     else if (chain == CBaseChainParams::UNL)

@@ -14,6 +14,7 @@
 const std::string CBaseChainParams::MAIN = "main";
 const std::string CBaseChainParams::UNL = "nol";
 const std::string CBaseChainParams::TESTNET = "test";
+const std::string CBaseChainParams::TESTNET4 = "test4";
 const std::string CBaseChainParams::REGTEST = "regtest";
 
 /**
@@ -54,6 +55,17 @@ public:
 };
 static CBaseTestNetParams testNetParams;
 
+class CBaseTestNet4Params : public CBaseChainParams
+{
+public:
+    CBaseTestNet4Params()
+    {
+        nRPCPort = 28333;
+        strDataDir = "testnet4";
+    }
+};
+static CBaseTestNet4Params testNet4Params;
+
 /*
  * Regression test
  */
@@ -84,6 +96,8 @@ CBaseChainParams &BaseParams(const std::string &chain)
         return unlParams;
     else if (chain == CBaseChainParams::TESTNET)
         return testNetParams;
+    else if (chain == CBaseChainParams::TESTNET4)
+        return testNet4Params;
     else if (chain == CBaseChainParams::REGTEST)
         return regTestParams;
     else
@@ -93,16 +107,24 @@ CBaseChainParams &BaseParams(const std::string &chain)
 void SelectBaseParams(const std::string &chain) { pCurrentBaseParams = &BaseParams(chain); }
 std::string ChainNameFromCommandLine()
 {
+    uint64_t num_selected = 0;
     bool fRegTest = GetBoolArg("-regtest", false);
+    num_selected += fRegTest;
     bool fTestNet = GetBoolArg("-testnet", false);
+    num_selected += fTestNet;
+    bool fTestNet4 = GetBoolArg("-testnet4", false);
+    num_selected += fTestNet4;
     bool fUnl = GetBoolArg("-chain_nol", false);
+    num_selected += fUnl;
 
-    if (fTestNet && fRegTest)
-        throw std::runtime_error("Invalid combination of -regtest and -testnet.");
+    if (num_selected > 1)
+        throw std::runtime_error("Invalid combination of -regtest, -testnet, and -testnet4.");
     if (fRegTest)
         return CBaseChainParams::REGTEST;
     if (fTestNet)
         return CBaseChainParams::TESTNET;
+    if (fTestNet4)
+        return CBaseChainParams::TESTNET4;
     if (fUnl)
         return CBaseChainParams::UNL;
     return CBaseChainParams::MAIN;
