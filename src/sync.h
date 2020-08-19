@@ -637,6 +637,9 @@ protected:
 
 public:
     CThreadCorral() : curRegion(0), curCount(0), maxRequestedRegion(0) {}
+    /** Return the region this thread corral is in */
+    int region() { return curRegion; }
+    /** Enter a region.  Block until it is possible */
     void Enter(int region)
     {
         LOCK(mutex);
@@ -665,6 +668,7 @@ public:
         }
     }
 
+    /* Exit a region */
     void Exit(int region)
     {
         LOCK(mutex);

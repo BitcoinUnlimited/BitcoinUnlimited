@@ -3,6 +3,7 @@
 """
 Tests the electrum call 'blockchain.transaction.get'
 """
+import asyncio
 from test_framework.util import assert_equal, p2p_port
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.loginit import logging
@@ -75,28 +76,32 @@ class ElectrumTransactionGet(BitcoinTestFramework):
 
         coinbases = self.mine_blocks(n, 5)
 
-        self.client = create_electrum_connection()
+        async def async_tests():
+            cli = ElectrumConnection()
+            await cli.connect()
 
-        # Test raw
-        for tx in coinbases:
-            assert_equal(ToHex(tx), self.client.call(TX_GET, tx.hash))
+            # Test raw
+            for tx in coinbases:
+                assert_equal(ToHex(tx), await cli.call(TX_GET, tx.hash))
 
-        # Test verbose.
-        # The spec is unclear. It states:
-        #
-        # "whatever the coin daemon returns when asked for a
-        #  verbose form of the raw transaction"
-        #
-        # Just check the basics.
-        for tx in coinbases:
-            electrum = self.client.call(TX_GET, tx.hash, True)
-            bitcoind = n.getrawtransaction(tx.hash, True)
-            assert_equal(bitcoind['txid'], electrum['txid'])
-            assert_equal(bitcoind['locktime'], electrum['locktime'])
-            assert_equal(bitcoind['size'], electrum['size'])
-            assert_equal(bitcoind['hex'], electrum['hex'])
-            assert_equal(len(bitcoind['vin']), len(bitcoind['vin']))
-            assert_equal(len(bitcoind['vout']), len(bitcoind['vout']))
+            # Test verbose.
+            # The spec is unclear. It states:
+            #
+            # "whatever the coin daemon returns when asked for a
+            #  verbose form of the raw transaction"
+            #
+            # Just check the basics.
+            for tx in coinbases:
+                electrum = await cli.call(TX_GET, tx.hash, True)
+                bitcoind = n.getrawtransaction(tx.hash, True)
+                assert_equal(bitcoind['txid'], electrum['txid'])
+                assert_equal(bitcoind['locktime'], electrum['locktime'])
+                assert_equal(bitcoind['size'], electrum['size'])
+                assert_equal(bitcoind['hex'], electrum['hex'])
+                assert_equal(len(bitcoind['vin']), len(bitcoind['vin']))
+                assert_equal(len(bitcoind['vout']), len(bitcoind['vout']))
 
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(async_tests())
 if __name__ == '__main__':
     ElectrumTransactionGet().main()

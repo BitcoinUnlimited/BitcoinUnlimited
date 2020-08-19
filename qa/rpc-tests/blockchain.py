@@ -24,6 +24,7 @@ class BlockchainTest(BitcoinTestFramework):
 
         - gettxoutsetinfo
         - getblockheader
+        - getblock
         - rollbackchain
         - reconsidermostworkchain
         - getmempoolinfo
@@ -40,6 +41,7 @@ class BlockchainTest(BitcoinTestFramework):
         self.nodes = []
         self.nodes.append(start_node(0, self.options.tmpdir, ["-debug=net"]))
         self.nodes.append(start_node(1, self.options.tmpdir, ["-debug=net"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug=net", "-prune=1550"]))
         connect_nodes_bi(self.nodes, 0, 1)
         self.is_network_split = False
         self.sync_all()
@@ -48,6 +50,7 @@ class BlockchainTest(BitcoinTestFramework):
         self._test_getblockchaininfo()
         self._test_gettxoutsetinfo()
         self._test_getblockheader()
+        self._test_getblock()
         self._test_rollbackchain_and_reconsidermostworkchain()
         self._test_transaction_pools()
         self.nodes[0].verifychain(4, 0)
@@ -68,11 +71,28 @@ class BlockchainTest(BitcoinTestFramework):
             'mediantime',
             'pruned',
             'softforks',
+            'size_on_disk',
             'verificationprogress',
         ]
-        res = self.nodes[0].getblockchaininfo()
 
-        assert_equal(sorted(res.keys()), keys)
+        res = self.nodes[2].getblockchaininfo()
+        # result should have pruneheight and default keys if pruning is enabled
+        assert_equal(sorted(res.keys()), sorted(keys + ['pruneheight', 'prune_target_size']))
+        # pruneheight should be greater or equal to 0
+        assert res['pruneheight'] >= 0
+
+        # size_on_disk should be > 0
+        assert res['size_on_disk'] > 0
+
+        # check other pruning fields given that prune=1
+        assert res['pruned']
+
+        assert_equal(res['prune_target_size'], 1625292800)
+
+        stop_node(self.nodes[2], 2)
+        del(self.nodes[-1])
+        res = self.nodes[0].getblockchaininfo()
+        assert_equal(sorted(res.keys()), sorted(keys))
 
     def _test_gettxoutsetinfo(self):
         node = self.nodes[0]
@@ -137,6 +157,25 @@ class BlockchainTest(BitcoinTestFramework):
         assert isinstance(header['version'], int)
         assert isinstance(int(header['versionHex'], 16), int)
         assert isinstance(header['difficulty'], Decimal)
+
+        header_by_height = node.getblockheader(header['height'])
+        assert_equal (header_by_height, header)
+
+        header_by_height = node.getblockheader("200")
+        assert_equal (header_by_height, header)
+
+    def _test_getblock(self):
+        node = self.nodes[0]
+
+        assert_raises(
+            JSONRPCException, lambda: node.getblock('nonsense'))
+
+        besthash = node.getbestblockhash()
+
+        block_by_hash = node.getblock(besthash)
+        block_by_height = node.getblock(200)
+
+        assert_equal (block_by_height, block_by_hash)
 
     def _test_rollbackchain_and_reconsidermostworkchain(self):
         # Save the hash of the current chaintip and then mine 10 blocks
@@ -280,6 +319,12 @@ class BlockchainTest(BitcoinTestFramework):
         self.nodes[0].reconsidermostworkchain(True)
         assert_equal(self.nodes[0].getbestblockhash(), bestblockhashfork3);
 
+        # check that we are already on the correct chain by issuing another reconsider
+        try:
+            self.nodes[0].reconsidermostworkchain()
+        except JSONRPCException as e:
+            logging.info (e.error['message'])
+            assert("Nothing to do. Already on the correct chain." in e.error['message'])
 
         # check that we can run reconsidermostworkchain when we're already on the correct chain
         try:

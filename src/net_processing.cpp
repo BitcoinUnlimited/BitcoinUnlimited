@@ -1,11 +1,14 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2018-2019 The Bitcoin Unlimited developers
+// Copyright (C) 2019-2020 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "net_processing.h"
 
+#include "DoubleSpendProof.h"
+#include "DoubleSpendProofStorage.h"
 #include "addrman.h"
 #include "blockrelay/blockrelay_common.h"
 #include "blockrelay/compactblock.h"
@@ -44,6 +47,8 @@ extern CTweak<uint32_t> randomlyDontInv;
 
 /** How many inbound connections will we track before pruning entries */
 const uint32_t MAX_INBOUND_CONNECTIONS_TRACKED = 10000;
+/** maximum size (in bytes) of a batched set of transactions */
+static const uint32_t MAX_TXN_BATCH_SIZE = 10000;
 
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
@@ -84,226 +89,253 @@ bool PeerHasHeader(const CNodeState *state, CBlockIndex *pindex)
 void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParams, std::deque<CInv> &vInv)
 {
     std::vector<CInv> vNotFound;
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
 
-    while (!vInv.empty())
+    std::deque<CInv>::iterator it = vInv.begin();
+    while (it != vInv.end())
     {
         // Don't bother if send buffer is too full to respond anyway
-        if (pfrom->nSendSize >= SendBufferSize())
+        if (pfrom->nSendSize >= SendBufferSize() + ss.size())
         {
-            LOG(REQ, "Dropping %d getdata requests.  Send buffer is too large: %d\n", vInv.size(), pfrom->nSendSize);
+            LOG(REQ, "Postponing %d getdata requests.  Send buffer is too large: %d\n", vInv.size(), pfrom->nSendSize);
             break;
         }
-
-        const CInv inv = vInv.front();
-        vInv.pop_front();
+        if (shutdown_threads.load() == true)
         {
-            if (shutdown_threads.load() == true)
+            return;
+        }
+
+        // start processing inventory here
+        const CInv &inv = *it;
+        it++;
+
+        if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
+        {
+            auto *mi = LookupBlockIndex(inv.hash);
+            if (mi)
             {
-                return;
-            }
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
-            {
-                auto *mi = LookupBlockIndex(inv.hash);
-                if (mi)
+                bool fSend = false;
                 {
-                    bool fSend = false;
+                    LOCK(cs_main);
+                    if (chainActive.Contains(mi))
                     {
-                        LOCK(cs_main);
-                        if (chainActive.Contains(mi))
+                        fSend = true;
+                    }
+                    else
+                    {
+                        static const int nOneMonth = 30 * 24 * 60 * 60;
+                        // To prevent fingerprinting attacks, only send blocks outside of the active
+                        // chain if they are valid, and no more than a month older (both in time, and in
+                        // best equivalent proof of work) than the best header chain we know about.
                         {
-                            fSend = true;
+                            READLOCK(cs_mapBlockIndex);
+                            fSend = mi->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != NULL) &&
+                                    (pindexBestHeader.load()->GetBlockTime() - mi->GetBlockTime() < nOneMonth) &&
+                                    (GetBlockProofEquivalentTime(
+                                         *pindexBestHeader, *mi, *pindexBestHeader, consensusParams) < nOneMonth);
+                        }
+                        if (!fSend)
+                        {
+                            LOG(NET, "%s: ignoring request from peer=%s for old block that isn't in the main chain\n",
+                                __func__, pfrom->GetLogName());
                         }
                         else
                         {
-                            static const int nOneMonth = 30 * 24 * 60 * 60;
-                            // To prevent fingerprinting attacks, only send blocks outside of the active
-                            // chain if they are valid, and no more than a month older (both in time, and in
-                            // best equivalent proof of work) than the best header chain we know about.
-                            {
-                                READLOCK(cs_mapBlockIndex);
-                                fSend = mi->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != nullptr) &&
-                                        (pindexBestHeader.load()->GetBlockTime() - mi->GetBlockTime() < nOneMonth) &&
-                                        (GetBlockProofEquivalentTime(
-                                             *pindexBestHeader, *mi, *pindexBestHeader, consensusParams) < nOneMonth);
-                            }
+                            // Don't relay excessive blocks that are not on the active chain
+                            if (mi->nStatus & BLOCK_EXCESSIVE)
+                                fSend = false;
                             if (!fSend)
-                            {
-                                LOG(NET,
-                                    "%s: ignoring request from peer=%s for old block that isn't in the main chain\n",
-                                    __func__, pfrom->GetLogName());
-                            }
-                            else
-                            {
-                                // BU: don't relay excessive blocks that are not on the active chain
-                                if (mi->nStatus & BLOCK_EXCESSIVE)
-                                    fSend = false;
-                                if (!fSend)
-                                    LOG(NET,
-                                        "%s: ignoring request from peer=%s for excessive block of height %d not on "
-                                        "the main chain\n",
-                                        __func__, pfrom->GetLogName(), mi->nHeight);
-                            }
-                            // BU: in the future we can throttle old block requests by setting send=false if we are out
-                            // of
-                            // bandwidth
+                                LOG(NET, "%s: ignoring request from peer=%s for excessive block of height %d not on "
+                                         "the main chain\n",
+                                    __func__, pfrom->GetLogName(), mi->nHeight);
                         }
+                        // TODO: in the future we can throttle old block requests by setting send=false if we are out
+                        // of bandwidth
                     }
-                    // disconnect node in case we have reached the outbound limit for serving historical blocks
-                    // never disconnect whitelisted nodes
-                    static const int nOneWeek = 7 * 24 * 60 * 60; // assume > 1 week = historical
-                    if (fSend && CNode::OutboundTargetReached(true) &&
-                        (((pindexBestHeader != nullptr) &&
-                             (pindexBestHeader.load()->GetBlockTime() - mi->GetBlockTime() > nOneWeek)) ||
-                            inv.type == MSG_FILTERED_BLOCK) &&
-                        !pfrom->fWhitelisted)
-                    {
-                        LOG(NET, "historical block serving limit reached, disconnect peer %s\n", pfrom->GetLogName());
+                }
+                // disconnect node in case we have reached the outbound limit for serving historical blocks
+                // never disconnect whitelisted nodes
+                static const int nOneWeek = 7 * 24 * 60 * 60; // assume > 1 week = historical
+                if (fSend && CNode::OutboundTargetReached(true) &&
+                    (((pindexBestHeader != nullptr) &&
+                         (pindexBestHeader.load()->GetBlockTime() - mi->GetBlockTime() > nOneWeek)) ||
+                        inv.type == MSG_FILTERED_BLOCK) &&
+                    !pfrom->fWhitelisted)
+                {
+                    LOG(NET, "historical block serving limit reached, disconnect peer %s\n", pfrom->GetLogName());
 
-                        // disconnect node
-                        pfrom->fDisconnect = true;
-                        fSend = false;
-                    }
-                    // Avoid leaking prune-height by never sending blocks below the
-                    // NODE_NETWORK_LIMITED threshold.
-                    // Add two blocks buffer extension for possible races
-                    if (fSend && !pfrom->fWhitelisted &&
-                        ((((nLocalServices & NODE_NETWORK_LIMITED) == NODE_NETWORK_LIMITED) &&
-                            ((nLocalServices & NODE_NETWORK) != NODE_NETWORK) &&
-                            (chainActive.Tip()->nHeight - mi->nHeight > (int)NODE_NETWORK_LIMITED_MIN_BLOCKS + 2))))
+                    // disconnect node
+                    pfrom->fDisconnect = true;
+                    fSend = false;
+                }
+                // Avoid leaking prune-height by never sending blocks below the
+                // NODE_NETWORK_LIMITED threshold.
+                // Add two blocks buffer extension for possible races
+                if (fSend && !pfrom->fWhitelisted &&
+                    ((((nLocalServices & NODE_NETWORK_LIMITED) == NODE_NETWORK_LIMITED) &&
+                        ((nLocalServices & NODE_NETWORK) != NODE_NETWORK) &&
+                        (chainActive.Tip()->nHeight - mi->nHeight > (int)NODE_NETWORK_LIMITED_MIN_BLOCKS + 2))))
+                {
+                    LOG(NET, "Ignore block request below NODE_NETWORK_LIMITED threshold from peer=%d\n",
+                        pfrom->GetId());
+                    // disconnect node and prevent it from stalling (would
+                    // otherwise wait for the missing block)
+                    pfrom->fDisconnect = true;
+                    fSend = false;
+                }
+                // Pruned nodes may have deleted the block, so check whether
+                // it's available before trying to send.
+                if (fSend && mi->nStatus & BLOCK_HAVE_DATA)
+                {
+                    // Send block from disk
+                    CBlock block;
+                    if (!ReadBlockFromDisk(block, mi, consensusParams))
                     {
-                        LOG(NET, "Ignore block request below NODE_NETWORK_LIMITED threshold from peer=%d\n",
-                            pfrom->GetId());
-                        // disconnect node and prevent it from stalling (would
-                        // otherwise wait for the missing block)
-                        pfrom->fDisconnect = true;
-                        fSend = false;
+                        // its possible that I know about it but haven't stored it yet
+                        LOG(THIN, "unable to load block %s from disk\n",
+                            mi->phashBlock ? mi->phashBlock->ToString() : "");
+                        // no response
                     }
-                    // Pruned nodes may have deleted the block, so check whether
-                    // it's available before trying to send.
-                    if (fSend && mi->nStatus & BLOCK_HAVE_DATA)
+                    else
                     {
-                        // Send block from disk
-                        CBlock block;
-                        if (!ReadBlockFromDisk(block, mi, consensusParams))
+                        if (inv.type == MSG_BLOCK)
                         {
-                            // its possible that I know about it but haven't stored it yet
-                            LOG(THIN, "unable to load block %s from disk\n",
-                                mi->phashBlock ? mi->phashBlock->ToString() : "");
+                            pfrom->blocksSent += 1;
+                            pfrom->PushMessage(NetMsgType::BLOCK, block);
+                        }
+                        else if (inv.type == MSG_CMPCT_BLOCK)
+                        {
+                            LOG(CMPCT, "Sending compactblock via getdata message\n");
+                            SendCompactBlock(MakeBlockRef(block), pfrom, inv);
+                        }
+                        else // MSG_FILTERED_BLOCK)
+                        {
+                            LOCK(pfrom->cs_filter);
+                            if (pfrom->pfilter)
+                            {
+                                CMerkleBlock merkleBlock(block, *pfrom->pfilter);
+                                pfrom->PushMessage(NetMsgType::MERKLEBLOCK, merkleBlock);
+                                pfrom->blocksSent += 1;
+                                // CMerkleBlock just contains hashes, so also push any transactions in the block the
+                                // client did not see. This avoids hurting performance by pointlessly requiring a
+                                // round-trip.
+                                //
+                                // Note that there is currently no way for a node to request any single transactions
+                                // we didn't send here - they must either disconnect and retry or request the full
+                                // block. Thus, the protocol spec specified allows for us to provide duplicate txn
+                                // here, however we MUST always provide at least what the remote peer needs
+                                typedef std::pair<unsigned int, uint256> PairType;
+                                for (PairType &pair : merkleBlock.vMatchedTxn)
+                                {
+                                    pfrom->txsSent += 1;
+                                    pfrom->PushMessage(NetMsgType::TX, block.vtx[pair.first]);
+                                }
+                            }
+                            // else
                             // no response
                         }
-                        else
-                        {
-                            if (inv.type == MSG_BLOCK)
-                            {
-                                pfrom->blocksSent += 1;
-                                pfrom->PushMessage(NetMsgType::BLOCK, block);
-                            }
-                            else if (inv.type == MSG_CMPCT_BLOCK)
-                            {
-                                LOG(CMPCT, "Sending compactblock via getdata message\n");
-                                SendCompactBlock(MakeBlockRef(block), pfrom, inv);
-                            }
-                            else // MSG_FILTERED_BLOCK)
-                            {
-                                LOCK(pfrom->cs_filter);
-                                if (pfrom->pfilter)
-                                {
-                                    CMerkleBlock merkleBlock(block, *pfrom->pfilter);
-                                    pfrom->PushMessage(NetMsgType::MERKLEBLOCK, merkleBlock);
-                                    pfrom->blocksSent += 1;
-                                    // CMerkleBlock just contains hashes, so also push any transactions in the block the
-                                    // client did not see
-                                    // This avoids hurting performance by pointlessly requiring a round-trip
-                                    // Note that there is currently no way for a node to request any single transactions
-                                    // we
-                                    // didn't send here -
-                                    // they must either disconnect and retry or request the full block.
-                                    // Thus, the protocol spec specified allows for us to provide duplicate txn here,
-                                    // however we MUST always provide at least what the remote peer needs
-                                    typedef std::pair<unsigned int, uint256> PairType;
-                                    for (PairType &pair : merkleBlock.vMatchedTxn)
-                                    {
-                                        pfrom->txsSent += 1;
-                                        pfrom->PushMessage(NetMsgType::TX, block.vtx[pair.first]);
-                                    }
-                                }
-                                // else
-                                // no response
-                            }
 
-                            // Trigger the peer node to send a getblocks request for the next batch of inventory
-                            if (inv.hash == pfrom->hashContinue)
-                            {
-                                // Bypass PushInventory, this must send even if redundant,
-                                // and we want it right after the last block so they don't
-                                // wait for other stuff first.
-                                std::vector<CInv> oneInv;
-                                oneInv.push_back(CInv(MSG_BLOCK, chainActive.Tip()->GetBlockHash()));
-                                pfrom->PushMessage(NetMsgType::INV, oneInv);
-                                pfrom->hashContinue.SetNull();
-                            }
+                        // Trigger the peer node to send a getblocks request for the next batch of inventory
+                        if (inv.hash == pfrom->hashContinue)
+                        {
+                            // Bypass PushInventory, this must send even if redundant,
+                            // and we want it right after the last block so they don't
+                            // wait for other stuff first.
+                            std::vector<CInv> oneInv;
+                            oneInv.push_back(CInv(MSG_BLOCK, chainActive.Tip()->GetBlockHash()));
+                            pfrom->PushMessage(NetMsgType::INV, oneInv);
+                            pfrom->hashContinue.SetNull();
                         }
                     }
                 }
             }
-            else if (inv.IsKnownType())
-            {
-                // Send stream from relay memory
-                bool fPushed = false;
-                {
-                    CTransactionRef ptx;
-
-                    // We need to release this lock before push message. There is a potential deadlock because
-                    // cs_vSend is often taken before cs_mapRelay
-                    {
-                        LOCK(cs_mapRelay);
-                        std::map<CInv, CTransactionRef>::iterator mi = mapRelay.find(inv);
-                        if (mi != mapRelay.end())
-                        {
-                            // Copy shared ptr to second because it may be deleted once lock is released
-                            ptx = (*mi).second;
-                            fPushed = true;
-                        }
-                    }
-
-                    if (fPushed)
-                    {
-                        pfrom->PushMessage(inv.GetCommand(), ptx);
-                        pfrom->txsSent += 1;
-                    }
-                }
-                if (!fPushed && inv.type == MSG_TX)
-                {
-                    CTransactionRef ptx = nullptr;
-                    ptx = CommitQGet(inv.hash);
-                    if (!ptx)
-                    {
-                        ptx = mempool.get(inv.hash);
-                    }
-                    if (ptx)
-                    {
-                        pfrom->PushMessage(NetMsgType::TX, ptx);
-                        fPushed = true;
-                        pfrom->txsSent += 1;
-                    }
-                }
-                if (!fPushed)
-                {
-                    vNotFound.push_back(inv);
-                }
-            }
-
-            // Track requests for our stuff.
-            GetMainSignals().Inventory(inv.hash);
-
-            // We only want to process one of these message types before returning. These are high
-            // priority messages and we don't want to sit here processing a large number of messages
-            // while we hold the cs_main lock, but rather allow these messages to be sent first and
-            // process the return message before potentially reading from the queue again.
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
-                break;
         }
+        else if (inv.IsKnownType())
+        {
+            CTransactionRef ptx = nullptr;
+
+            // Send stream from relay memory
+            {
+                // We need to release this lock before push message. There is a potential deadlock because
+                // cs_vSend is often taken before cs_mapRelay
+                LOCK(cs_mapRelay);
+                std::map<CInv, CTransactionRef>::iterator mi = mapRelay.find(inv);
+                if (mi != mapRelay.end())
+                {
+                    ptx = (*mi).second;
+                }
+            }
+            if (!ptx)
+            {
+                ptx = CommitQGet(inv.hash);
+                if (!ptx)
+                {
+                    ptx = mempool.get(inv.hash);
+                }
+            }
+
+            // If we found a txn then push it
+            if (ptx)
+            {
+                if (pfrom->xVersion.as_u64c(XVer::BU_TXN_CONCATENATION))
+                {
+                    ss << *ptx;
+
+                    // Send the concatenated txns if we're over the limit. We don't want to batch
+                    // too many and end up delaying the send.
+                    if (ss.size() > MAX_TXN_BATCH_SIZE)
+                    {
+                        pfrom->PushMessage(NetMsgType::TX, ss);
+                        ss.clear();
+                    }
+                }
+                else if (inv.type == MSG_DOUBLESPENDPROOF)
+                {
+                    DoubleSpendProof dsp = mempool.doubleSpendProofStorage()->lookup(inv.hash);
+                    if (!dsp.isEmpty())
+                    {
+                        CDataStream ssDSP(SER_NETWORK, PROTOCOL_VERSION);
+                        ssDSP.reserve(600);
+                        ssDSP << dsp;
+                        pfrom->PushMessage(NetMsgType::DSPROOF, ssDSP);
+                    }
+                    else
+                    {
+                        pfrom->PushMessage(NetMsgType::REJECT, std::string(NetMsgType::DSPROOF), REJECT_INVALID,
+                            std::string("dsproof requested was not found"));
+                    }
+                }
+                else
+                {
+                    // Or if this is not a peer that supports
+                    // concatenation then send the transaction right away.
+                    pfrom->PushMessage(NetMsgType::TX, ptx);
+                }
+                pfrom->txsSent += 1;
+            }
+            else
+            {
+                vNotFound.push_back(inv);
+            }
+        }
+
+        // Track requests for our stuff.
+        GetMainSignals().Inventory(inv.hash);
+
+        // Send only one of these message type before breaking. These type of requests use more
+        // resources to process and send, therefore we don't want some a peer to, intentionlally or
+        // unintentionally, dominate our network layer.
+        if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK || inv.type == MSG_CMPCT_BLOCK)
+            break;
     }
+    // Send the batched transactions if any to send.
+    if (!ss.empty())
+    {
+        pfrom->PushMessage(NetMsgType::TX, ss);
+    }
+
+    // Erase all messages inv's we processed
+    vInv.erase(vInv.begin(), it);
 
     if (!vNotFound.empty())
     {
@@ -316,25 +348,6 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
         // having to download the entire memory pool.
         pfrom->PushMessage(NetMsgType::NOTFOUND, vNotFound);
     }
-}
-
-static bool ensureConnectionState(const std::string msg,
-    const ConnectionStateIncoming &expected_incoming,
-    const ConnectionStateOutgoing &expected_outgoing,
-    CNode *peer)
-{
-    if (!((uint64_t)expected_incoming & (uint64_t)peer->state_incoming) ||
-        !((uint64_t)expected_outgoing & (uint64_t)peer->state_outgoing))
-    {
-        // FIXME: note review ban always now
-        dosMan.Misbehaving(peer, 100);
-        peer->fDisconnect = true;
-
-        return error("%s message received unexpectedly from peer=%s version=%s state_incoming=%s state_outgoing=%s",
-            msg, peer->GetLogName(), peer->cleanSubVer, toString(peer->state_incoming), toString(peer->state_outgoing));
-    }
-    else
-        return true;
 }
 
 static void handleAddressAfterInit(CNode *pfrom)
@@ -434,31 +447,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     {
         grapheneVersionCompatible = false;
     }
-
-    /* Special handling for xversion messages, as they are optional but still
-     have to be properly sequenced to be at the beginning of a connection. So
-     if anything but an xversion comes in whilst in
-     SENT_VERACK_READY_FOR_POTENTIAL_XVERSION, transition to READY state and
-     thus disallow any further incoming xversions. */
-    if (pfrom->state_incoming == ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION &&
-        strCommand != NetMsgType::XVERSION && strCommand != NetMsgType::VERACK)
-    {
-        LOG(NET, "This node does not support XVERSION as it did not send it at the right time but answered with %s "
-                 "instead. peer=%s version=%s\n",
-            strCommand, pfrom->GetLogName(), pfrom->cleanSubVer);
-
-        pfrom->state_incoming = ConnectionStateIncoming::READY;
-        handleAddressAfterInit(pfrom);
-        enableSendHeaders(pfrom);
-        enableCompactBlocks(pfrom);
-    }
     // ------------------------- BEGIN INITIAL COMMAND SET PROCESSING
     if (strCommand == NetMsgType::VERSION)
     {
-        if (!ensureConnectionState(
-                strCommand, ConnectionStateIncoming::CONNECTED_WAIT_VERSION, ConnectionStateOutgoing::ANY, pfrom))
-            return false;
-
         int64_t nTime;
         CAddress addrMe;
         uint64_t nNonce = 1;
@@ -543,8 +534,45 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // Potentially mark this peer as a preferred download peer.
         UpdatePreferredDownload(pfrom);
 
-        // Send VERACK handshake message
-        pfrom->PushMessage(NetMsgType::VERACK);
+        if (pfrom->nServices & NODE_XVERSION)
+        {
+            // BU expedited procecessing requires the exchange of the listening port id
+            // The former BUVERSION message has now been integrated into the xmap field in CXVersionMessage.
+
+            // prepare xversion message. This must be sent before we send a verack message in the new xversion spec
+            CXVersionMessage xver;
+            xver.set_u64c(XVer::XVERSION_VERSION_KEY, XVERSION_VERSION_VALUE);
+            xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
+            xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
+            xver.set_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED, grapheneMaxVersionSupported.Value());
+            xver.set_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED, grapheneMinVersionSupported.Value());
+            xver.set_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF, grapheneFastFilterCompatibility.Value());
+            xver.set_u64c(XVer::BU_MEMPOOL_SYNC, syncMempoolWithPeers.Value());
+            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED, mempoolSyncMaxVersionSupported.Value());
+            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED, mempoolSyncMinVersionSupported.Value());
+            xver.set_u64c(XVer::BU_XTHIN_VERSION, 2); // xthin version
+
+            size_t nLimitAncestors = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
+            size_t nLimitAncestorSize = GetArg("-limitancestorsize", BU_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
+            size_t nLimitDescendants = GetArg("-limitdescendantcount", BU_DEFAULT_DESCENDANT_LIMIT);
+            size_t nLimitDescendantSize = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
+
+            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT, nLimitAncestors);
+            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT, nLimitAncestorSize);
+            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT, nLimitDescendants);
+            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT, nLimitDescendantSize);
+            xver.set_u64c(XVer::BU_TXN_CONCATENATION, 1);
+
+            electrum::set_xversion_flags(xver, chainparams.NetworkIDString());
+
+            pfrom->xVersionExpected = true;
+            pfrom->PushMessage(NetMsgType::XVERSION, xver);
+        }
+        else
+        {
+            // Send VERACK handshake message
+            pfrom->PushMessage(NetMsgType::VERACK);
+        }
 
         // Change version
         {
@@ -571,75 +599,42 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 pfrom->fDisconnect = true;
             }
         }
-        pfrom->state_incoming = ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION;
     }
 
-    /* Since we are processing messages in multiple threads, we may process them out of order.  Does enforcing this
-       order actually matter?  Note we allow mis-order (or no version message at all) if whitelisted...
-        else if (pfrom->nVersion == 0 && !pfrom->fWhitelisted)
-        {
-            // Must have version message before anything else (Although we may send our VERSION before
-            // we receive theirs, it would not be possible to receive their VERACK before their VERSION).
-            pfrom->fDisconnect = true;
-            return error("%s receieved before VERSION message - disconnecting peer=%s", strCommand,
-       pfrom->GetLogName());
-        }
-    */
-
-    else if (strCommand == NetMsgType::VERACK)
+    else if ((pfrom->nVersion == 0 || pfrom->tVersionSent < 0) && !pfrom->fWhitelisted)
     {
-        if (!ensureConnectionState(
-                strCommand, ConnectionStateIncoming::ANY, ConnectionStateOutgoing::SENT_VERSION, pfrom))
-            return false;
-
-        pfrom->SetRecvVersion(std::min(pfrom->nVersion, PROTOCOL_VERSION));
-
-        // BU expedited procecessing requires the exchange of the listening port id
-        // The former BUVERSION message has now been integrated into the xmap field in CXVersionMessage.
-
-        // prepare xversion message. This *must* be the next message after the verack has been received,
-        // if it comes at all.
-        CXVersionMessage xver;
-        xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
-        xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
-        xver.set_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED, grapheneMaxVersionSupported.Value());
-        xver.set_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED, grapheneMinVersionSupported.Value());
-        xver.set_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF, grapheneFastFilterCompatibility.Value());
-        xver.set_u64c(XVer::BU_MEMPOOL_SYNC, syncMempoolWithPeers.Value());
-        xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED, mempoolSyncMaxVersionSupported.Value());
-        xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED, mempoolSyncMinVersionSupported.Value());
-        xver.set_u64c(XVer::BU_XTHIN_VERSION, 2); // xthin version
-
-        size_t nLimitAncestors = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
-        size_t nLimitAncestorSize = GetArg("-limitancestorsize", BU_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
-        size_t nLimitDescendants = GetArg("-limitdescendantcount", BU_DEFAULT_DESCENDANT_LIMIT);
-        size_t nLimitDescendantSize = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
-
-        xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT, nLimitAncestors);
-        xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT, nLimitAncestorSize);
-        xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT, nLimitDescendants);
-        xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT, nLimitDescendantSize);
-
-        electrum::set_xversion_flags(xver, chainparams.NetworkIDString());
-
-        pfrom->PushMessage(NetMsgType::XVERSION, xver);
-
-
-        if (pfrom->nVersion >= EXPEDITED_VERSION)
-            // also send legacy message (at least for now)
-            pfrom->PushMessage(NetMsgType::BUVERSION, GetListenPort());
-        pfrom->state_outgoing = ConnectionStateOutgoing::READY;
-
-        // Tell the peer what maximum xthin bloom filter size we will consider acceptable.
-        // FIXME: integrate into xversion as well
-        if (pfrom->ThinBlockCapable() && IsThinBlocksEnabled())
-        {
-            pfrom->PushMessage(NetMsgType::FILTERSIZEXTHIN, nXthinBloomFilterSize);
-        }
+        // Must have a version message before anything else
+        dosMan.Misbehaving(pfrom, 1);
+        pfrom->fDisconnect = true;
+        return error("%s receieved before VERSION message - disconnecting peer=%s", strCommand, pfrom->GetLogName());
     }
 
+    else if (strCommand == NetMsgType::XVERSION)
+    {
+        // set expected to false, we got the message
+        pfrom->xVersionExpected = false;
+        if (pfrom->fSuccessfullyConnected == true)
+        {
+            dosMan.Misbehaving(pfrom, 1);
+            pfrom->fDisconnect = true;
+            return error("odd peer behavior: received verack message before xversion, disconnecting \n");
+        }
 
-    else if (!pfrom->successfullyConnected() && GetTime() - pfrom->tVersionSent > VERACK_TIMEOUT &&
+        vRecv >> pfrom->xVersion;
+
+        if (pfrom->addrFromPort != 0)
+        {
+            LOG(NET, "Encountered odd node that sent BUVERSION before XVERSION. Ignoring duplicate addrFromPort "
+                     "setting. peer=%s version=%s\n",
+                pfrom->GetLogName(), pfrom->cleanSubVer);
+        }
+
+        pfrom->ReadConfigFromXVersion();
+
+        pfrom->PushMessage(NetMsgType::VERACK);
+    }
+
+    else if (!pfrom->fSuccessfullyConnected && GetTime() - pfrom->tVersionSent > VERACK_TIMEOUT &&
              pfrom->tVersionSent >= 0)
     {
         // If verack is not received within timeout then disconnect.
@@ -659,46 +654,76 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         return true; // return true so we don't get any process message failures in the log.
     }
-    // BUVERSION is used to pass BU specific version information similar to NetMsgType::VERSION
-    // and is exchanged after the VERSION and VERACK are both sent and received.
-    else if (strCommand == NetMsgType::BUVERSION)
-    {
-        if (!ensureConnectionState(strCommand,
-                ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION | ConnectionStateIncoming::READY,
-                ConnectionStateOutgoing::READY | ConnectionStateOutgoing::SENT_VERSION, pfrom))
-            return false;
 
-        // Each connection can only send one version message
-        if (pfrom->addrFromPort != 0)
-        {
-            LOG(NET, "Ignoring duplicate BUVERSION or extra addrFromPort setting. peer=%s version=%s\n",
-                pfrom->GetLogName(), pfrom->cleanSubVer);
-            unsigned short dummy;
-            vRecv >> dummy;
-        }
-        else
-        {
-            // addrFromPort is needed for connecting and initializing Xpedited forwarding.
-            vRecv >> pfrom->addrFromPort;
-            pfrom->PushMessage(NetMsgType::BUVERACK);
-        }
-    }
-    // Final handshake for BU specific version information similar to NetMsgType::VERACK
-    else if (strCommand == NetMsgType::BUVERACK)
+    else if (strCommand == NetMsgType::VERACK)
     {
-        if (!ensureConnectionState(strCommand,
-                ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION | ConnectionStateIncoming::READY,
-                ConnectionStateOutgoing::READY, pfrom))
-            return false;
+        if (pfrom->fSuccessfullyConnected == true)
+        {
+            dosMan.Misbehaving(pfrom, 1);
+            pfrom->fDisconnect = true;
+            return error("duplicate verack messages");
+        }
+        pfrom->SetRecvVersion(std::min(pfrom->nVersion, PROTOCOL_VERSION));
+
+        if (pfrom->xVersionExpected.load() == true)
+        {
+            // if we expected xversion but got a verack it is possible there is a service bit
+            // mismatch so we should send a verack response because the peer might not
+            // support xversion
+            pfrom->PushMessage(NetMsgType::VERACK);
+        }
+
+        /// LEGACY xversion code (old spec)
+        if (!(pfrom->nServices & NODE_XVERSION))
+        {
+            // prepare xversion message. This *must* be the next message after the verack has been received,
+            // if it comes at all in the old xversion spec.
+            CXVersionMessage xver;
+            xver.set_u64c(XVer::BU_LISTEN_PORT_OLD, GetListenPort());
+            xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM_OLD, 1); // we will ignore 0 value msg checksums
+            xver.set_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED_OLD, grapheneMaxVersionSupported.Value());
+            xver.set_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED_OLD, grapheneMinVersionSupported.Value());
+            xver.set_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF_OLD, grapheneFastFilterCompatibility.Value());
+            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_OLD, syncMempoolWithPeers.Value());
+            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED_OLD, mempoolSyncMaxVersionSupported.Value());
+            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED_OLD, mempoolSyncMinVersionSupported.Value());
+            xver.set_u64c(XVer::BU_XTHIN_VERSION_OLD, 2); // xthin version
+
+            size_t nLimitAncestors = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
+            size_t nLimitAncestorSize = GetArg("-limitancestorsize", BU_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
+            size_t nLimitDescendants = GetArg("-limitdescendantcount", BU_DEFAULT_DESCENDANT_LIMIT);
+            size_t nLimitDescendantSize = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
+
+            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT_OLD, nLimitAncestors);
+            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT_OLD, nLimitAncestorSize);
+            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT_OLD, nLimitDescendants);
+            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT_OLD, nLimitDescendantSize);
+            xver.set_u64c(XVer::BU_TXN_CONCATENATION_OLD, 1);
+
+            electrum::set_xversion_flags(xver, chainparams.NetworkIDString());
+
+            pfrom->PushMessage(NetMsgType::XVERSION_OLD, xver);
+        }
+
+        handleAddressAfterInit(pfrom);
+        enableSendHeaders(pfrom);
+        enableCompactBlocks(pfrom);
+
+        // Tell the peer what maximum xthin bloom filter size we will consider acceptable.
+        // FIXME: integrate into xversion as well
+        if (pfrom->ThinBlockCapable() && IsThinBlocksEnabled())
+        {
+            pfrom->PushMessage(NetMsgType::FILTERSIZEXTHIN, nXthinBloomFilterSize);
+        }
 
         // This step done after final handshake
         CheckAndRequestExpeditedBlocks(pfrom);
+
+        pfrom->fSuccessfullyConnected = true;
     }
-    else if (strCommand == NetMsgType::XVERSION)
+
+    else if (strCommand == NetMsgType::XVERSION_OLD)
     {
-        if (!ensureConnectionState(strCommand, ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION,
-                ConnectionStateOutgoing::ANY, pfrom))
-            return false;
         vRecv >> pfrom->xVersion;
 
         if (pfrom->addrFromPort != 0)
@@ -708,22 +733,19 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 pfrom->GetLogName(), pfrom->cleanSubVer);
         }
 
-        pfrom->ReadConfigFromXVersion();
+        pfrom->ReadConfigFromXVersion_OLD();
 
-        pfrom->PushMessage(NetMsgType::XVERACK);
-        pfrom->state_incoming = ConnectionStateIncoming::READY;
-        handleAddressAfterInit(pfrom);
-        enableSendHeaders(pfrom);
-        enableCompactBlocks(pfrom);
+        pfrom->PushMessage(NetMsgType::XVERACK_OLD);
+        // handleAddressAfterInit(pfrom);
+        // enableSendHeaders(pfrom);
+        // enableCompactBlocks(pfrom);
     }
-    else if (strCommand == NetMsgType::XVERACK)
+    else if (strCommand == NetMsgType::XVERACK_OLD)
     {
-        if (!ensureConnectionState(strCommand, ConnectionStateIncoming::ANY, ConnectionStateOutgoing::READY, pfrom))
-            return false;
-
         // This step done after final handshake
-        CheckAndRequestExpeditedBlocks(pfrom);
+        // CheckAndRequestExpeditedBlocks(pfrom);
     }
+
     else if (strCommand == NetMsgType::XUPDATE)
     {
         CXVersionMessage xUpdate;
@@ -731,12 +753,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // check for peer trying to change non-changeable key
         for (auto entry : xUpdate.xmap)
         {
-            auto iter = XVer::mapKeyType.find(entry.first);
-            if (iter == XVer::mapKeyType.end())
-            {
-                continue;
-            }
-            else if (iter->second == XVer::keyType::changeable)
+            if (XVer::IsChangableKey(entry.first))
             {
                 LOCK(pfrom->cs_xversion);
                 pfrom->xVersion.xmap[entry.first] = xUpdate.xmap[entry.first];
@@ -815,7 +832,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     }
 
     // ------------------------- END INITIAL COMMAND SET PROCESSING
-    else if (!pfrom->successfullyConnected())
+    else if (!pfrom->fSuccessfullyConnected)
     {
         LOG(NET, "Ignoring command %s that comes in before initial handshake is finished. peer=%s version=%s\n",
             strCommand, pfrom->GetLogName(), pfrom->cleanSubVer);
@@ -972,7 +989,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 return false;
 
             const CInv &inv = vInv[nInv];
-            if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK)))
+            if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK) || inv.type == MSG_DOUBLESPENDPROOF))
             {
                 LOG(NET, "message inv invalid type = %u hash %s", inv.type, inv.hash.ToString());
                 return false;
@@ -1014,7 +1031,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                         inv.hash.ToString(), fAlreadyHaveBlock, fImporting, fReindex, IsChainNearlySyncd());
                 }
             }
-            else // If we get here then inv.type must == MSG_TX.
+            else if (inv.type == MSG_TX)
             {
                 bool fAlreadyHaveTx = TxAlreadyHave(inv);
                 // LOG(NET, "got inv: %s  %d peer=%s\n", inv.ToString(), fAlreadyHaveTx ? "have" : "new",
@@ -1031,7 +1048,15 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 // likely be included in blocks that we IBD download anyway.  This is especially important as
                 // transaction volumes increase.
                 else if (!fAlreadyHaveTx && !IsInitialBlockDownload())
+                {
                     requester.AskFor(inv, pfrom);
+                }
+            }
+            else if (inv.type == MSG_DOUBLESPENDPROOF)
+            {
+                std::vector<CInv> vGetData;
+                vGetData.push_back(inv);
+                pfrom->PushMessage(NetMsgType::GETDATA, vGetData);
             }
 
             // Track requests for our stuff.
@@ -1069,7 +1094,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         {
             const CInv &inv = vInv[nInv];
             if (!((inv.type == MSG_TX) || (inv.type == MSG_BLOCK) || (inv.type == MSG_FILTERED_BLOCK) ||
-                    (inv.type == MSG_CMPCT_BLOCK)))
+                    (inv.type == MSG_CMPCT_BLOCK) || inv.type == MSG_DOUBLESPENDPROOF))
             {
                 dosMan.Misbehaving(pfrom, 20, BanReasonInvalidInventory);
                 return error("message inv invalid type = %u", inv.type);
@@ -1215,23 +1240,27 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             return true;
         }
 
-        // Put the tx on the tx admission queue for processing
-        CTxInputData txd;
-        vRecv >> txd.tx;
+        // Process as many concatenated txns as there may be in this message
+        while (!vRecv.empty())
+        {
+            // Put the tx on the tx admission queue for processing
+            CTxInputData txd;
+            vRecv >> txd.tx;
 
-        // Indicate that the tx was received and is about to be processed. Setting the processing flag
-        // prevents us from re-requesting the txn during the time of processing and before mempool acceptance.
-        requester.ProcessingTxn(txd.tx->GetHash(), pfrom);
+            // Indicate that the tx was received and is about to be processed. Setting the processing flag
+            // prevents us from re-requesting the txn during the time of processing and before mempool acceptance.
+            requester.ProcessingTxn(txd.tx->GetHash(), pfrom);
 
-        // Processing begins here where we enqueue the transaction.
-        txd.nodeId = pfrom->id;
-        txd.nodeName = pfrom->GetLogName();
-        txd.whitelisted = pfrom->fWhitelisted;
-        EnqueueTxForAdmission(txd);
+            // Processing begins here where we enqueue the transaction.
+            txd.nodeId = pfrom->id;
+            txd.nodeName = pfrom->GetLogName();
+            txd.whitelisted = pfrom->fWhitelisted;
+            EnqueueTxForAdmission(txd);
 
-        CInv inv(MSG_TX, txd.tx->GetHash());
-        pfrom->AddInventoryKnown(inv);
-        requester.UpdateTxnResponseTime(inv, pfrom);
+            CInv inv(MSG_TX, txd.tx->GetHash());
+            pfrom->AddInventoryKnown(inv);
+            requester.UpdateTxnResponseTime(inv, pfrom);
+        }
     }
 
 
@@ -1551,7 +1580,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         vRecv >> inv >> filterMemPool;
 
         // Message consistency checking
-        if (inv.type != MSG_XTHINBLOCK || inv.hash.IsNull())
+        if (inv.hash.IsNull())
         {
             dosMan.Misbehaving(pfrom, 100);
             return error("invalid get_xthin type=%u hash=%s", inv.type, inv.hash.ToString());
@@ -1591,7 +1620,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         vRecv >> inv;
 
         // Message consistency checking
-        if (inv.type != MSG_THINBLOCK || inv.hash.IsNull())
+        if (inv.hash.IsNull())
         {
             dosMan.Misbehaving(pfrom, 100);
             return error("invalid get_thin type=%u hash=%s", inv.type, inv.hash.ToString());
@@ -2001,6 +2030,73 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->fRelayTxes = true;
     }
 
+    if (strCommand == NetMsgType::DSPROOF)
+    {
+        LOG(DSPROOF, "Received a double spend proof from peer:%d\n", pfrom->GetId());
+        uint256 dspHash;
+        try
+        {
+            DoubleSpendProof dsp;
+            vRecv >> dsp;
+            if (dsp.isEmpty())
+                throw std::runtime_error("Double spend proof is empty");
+
+            dspHash = dsp.GetHash();
+            DoubleSpendProof::Validity validity;
+            {
+                READLOCK(mempool.cs_txmempool);
+                validity = dsp.validate(mempool);
+            }
+            switch (validity)
+            {
+            case DoubleSpendProof::Valid:
+            {
+                LOG(DSPROOF, "Double spend proof is valid from peer:%d\n", pfrom->GetId());
+                const auto ptx = mempool.addDoubleSpendProof(dsp);
+                if (ptx.get())
+                {
+                    // find any descendants of this double spent transaction. If there are any
+                    // then we must also forward this double spend proof to any SPV peers that
+                    // want to know about this tx or its descendants.
+                    CTxMemPool::setEntries setDescendants;
+                    {
+                        READLOCK(mempool.cs_txmempool);
+                        CTxMemPool::indexed_transaction_set::const_iterator iter = mempool.mapTx.find(ptx->GetHash());
+                        if (iter == mempool.mapTx.end())
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            mempool._CalculateDescendants(iter, setDescendants);
+                        }
+                    }
+
+                    // added to mempool correctly, then forward to nodes.
+                    broadcastDspInv(ptx, dspHash, &setDescendants);
+                }
+                break;
+            }
+            case DoubleSpendProof::MissingUTXO:
+            case DoubleSpendProof::MissingTransaction:
+                LOG(DSPROOF, "Double spend proof is orphan: postponed\n");
+                mempool.doubleSpendProofStorage()->addOrphan(dsp, pfrom->GetId());
+                break;
+            case DoubleSpendProof::Invalid:
+                throw std::runtime_error("Double spend proof didn't validate");
+            default:
+                return false;
+            }
+        }
+        catch (const std::exception &e)
+        {
+            LOG(DSPROOF, "Failure handling double spend proof. Peer: %d Reason: %s\n", pfrom->GetId(), e.what());
+            if (!dspHash.IsNull())
+                mempool.doubleSpendProofStorage()->markProofRejected(dspHash);
+            dosMan.Misbehaving(pfrom->GetId(), 10);
+            return false;
+        }
+    }
 
     else if (strCommand == NetMsgType::REJECT)
     {
@@ -2093,6 +2189,7 @@ bool ProcessMessages(CNode *pfrom)
     int msgsProcessed = 0;
     // Don't bother if send buffer is too full to respond anyway
     CNode *pfrom_original = pfrom;
+    std::deque<std::pair<CNodeRef, CNetMessage> > vPriorityRecvQ_delay;
     while ((!pfrom->fDisconnect) && (pfrom->nSendSize < SendBufferSize()) && (shutdown_threads.load() == false))
     {
         CNodeRef noderef;
@@ -2100,13 +2197,59 @@ bool ProcessMessages(CNode *pfrom)
         READLOCK(pfrom->csMsgSerializer);
         CNetMessage msg;
         bool fUseLowPriorityMsg = true;
+        bool fUsePriorityMsg = true;
+        // try to complete the handshake before handling messages that require us to be fSuccessfullyConnected
+        if (pfrom->fSuccessfullyConnected == false)
         {
+            TRY_LOCK(pfrom->cs_vRecvMsg, lockRecv);
+            if (!lockRecv)
+                break;
+            if (pfrom->vRecvMsg_handshake.empty())
+                break;
+
+            // get the message from the queue
+            // simply getting the front message should be sufficient, the only time a xversion or verack is sent is
+            // once the previous has been processed so tracking which stage of the handshake we are on is overkill
+            std::swap(msg, pfrom->vRecvMsg_handshake.front());
+            pfrom->vRecvMsg_handshake.pop_front();
+            pfrom->currentRecvMsgSize -= msg.size();
+            msgsProcessed++;
+        }
+        else
+        {
+            {
+                TRY_LOCK(pfrom->cs_vRecvMsg, lockRecv);
+                if (!lockRecv)
+                    break;
+                if (pfrom->vRecvMsg_handshake.empty() == false)
+                {
+                    std::string frontCommand = pfrom->vRecvMsg_handshake.front().hdr.GetCommand();
+                    if (frontCommand == NetMsgType::VERSION || frontCommand == NetMsgType::VERACK ||
+                        frontCommand == NetMsgType::XVERSION)
+                    {
+                        pfrom->vRecvMsg_handshake.clear();
+                        pfrom->fDisconnect = true;
+                        dosMan.Misbehaving(pfrom, 1);
+                        return error(
+                            "recieved early handshake message after successfully connected, disconnecting peer=%s",
+                            pfrom->GetLogName());
+                    }
+
+                    // this code should only handle XVERSION_OLD and XVERACK_OLD messages
+                    std::swap(msg, pfrom->vRecvMsg_handshake.front());
+                    pfrom->vRecvMsg_handshake.pop_front();
+                    pfrom->currentRecvMsgSize -= msg.size();
+                    msgsProcessed++;
+                    fUsePriorityMsg = false;
+                    fUseLowPriorityMsg = false;
+                }
+            }
             // Get next message to process checking whether it is a priority messasge and if so then
             // process it right away. It doesn't matter that the peer where the message came from is
             // different than the one we are currently procesing as we will switch to the correct peer
             // automatically. Furthermore by using and holding the CNodeRef we automatically maintain
             // a node reference to the priority peer.
-            if (fPriorityRecvMsg.load())
+            if (fUsePriorityMsg && fPriorityRecvMsg.load())
             {
                 TRY_LOCK(cs_priorityRecvQ, locked);
                 if (locked && !vPriorityRecvQ.empty())
@@ -2121,8 +2264,16 @@ bool ProcessMessages(CNode *pfrom)
 
                     // check if we should process the message.
                     CNode *pnode = noderef.get();
-                    if (pnode->fDisconnect || pnode->nSendSize > SendBufferSize())
+                    if (pnode->fDisconnect)
                     {
+                        // if the node is to be disconnected dont bother responding
+                        continue;
+                    }
+                    if (pnode->nSendSize > SendBufferSize())
+                    {
+                        // if the nodes send is full, delay the processing of this message until a time when
+                        // send is not full
+                        vPriorityRecvQ_delay.emplace_back(std::move(noderef), std::move(msg));
                         continue;
                     }
 
@@ -2273,6 +2424,14 @@ bool ProcessMessages(CNode *pfrom)
             pfrom = pfrom_original;
     }
 
+    {
+        LOCK(cs_priorityRecvQ);
+        // re-add the priority messages we delayed back to the queue so that we can try them again later
+        vPriorityRecvQ.insert(vPriorityRecvQ.end(), vPriorityRecvQ_delay.begin(), vPriorityRecvQ_delay.end());
+        if (!vPriorityRecvQ.empty())
+            fPriorityRecvMsg.store(true);
+    }
+
     return fOk;
 }
 
@@ -2300,7 +2459,7 @@ bool SendMessages(CNode *pto)
 
         // Now exit early if disconnecting or the version handshake is not complete.  We must not send PING or other
         // connection maintenance messages before the handshake is done.
-        if (pto->fDisconnect || !pto->successfullyConnected())
+        if (pto->fDisconnect || !pto->fSuccessfullyConnected)
             return true;
 
         //
@@ -2609,10 +2768,10 @@ bool SendMessages(CNode *pto)
             LOCK(pto->cs_inventory);
             haveInv2Send = !pto->vInventoryToSend.empty();
         }
-        std::vector<CInv> vInvSend;
-        FastRandomContext rnd;
         if (haveInv2Send)
         {
+            std::vector<CInv> vInvSend;
+            FastRandomContext rnd;
             while (1)
             {
                 // Send message INV up to the MAX_INV_TO_SEND. Once we reach the max then send the INV message
@@ -2639,7 +2798,8 @@ bool SendMessages(CNode *pto)
                         {
                             if (fChokeTxInv)
                                 continue;
-                            if ((rnd.rand32() % 100) < randomlyDontInv.Value())
+                            // randomly don't inv but always send inventory to spv clients
+                            if (((rnd.rand32() % 100) < randomlyDontInv.Value()) && !pto->fClient)
                                 continue;
                             // skip if we already know about this one
                             if (pto->filterInventoryKnown.contains(inv.hash))

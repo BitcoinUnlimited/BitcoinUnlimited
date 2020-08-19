@@ -175,7 +175,7 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
     LOCK(cs_main);
     FlushStateToDisk(state, FLUSH_STATE_ALWAYS); // we made lots of blocks
     CBlockIndex *pindexNewTip = chainActive.Tip();
-    uiInterface.NotifyBlockTip(false, pindexNewTip);
+    uiInterface.NotifyBlockTip(false, pindexNewTip, false);
     return blockHashes;
 }
 
@@ -431,7 +431,7 @@ static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
     const int nMaxVersionPreVB,
     const unsigned int nTransactionsUpdatedLast)
 {
-    bool may2020Enabled = IsMay2020Enabled(Params().GetConsensus(), pindexPrev);
+    bool may2020Enabled = IsMay2020Activated(Params().GetConsensus(), pindexPrev);
     CBlock *pblock = &pblocktemplate->block; // pointer for convenience
     UniValue aCaps(UniValue::VARR);
     aCaps.push_back("proposal");

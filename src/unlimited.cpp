@@ -53,6 +53,7 @@
 #include <iomanip>
 #include <limits>
 #include <queue>
+#include <stack>
 #include <thread>
 
 using namespace std;
@@ -232,7 +233,7 @@ std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool valida
     {
         if (*item == 1)
         {
-            *item = Params().GetConsensus().may2020ActivationTime;
+            *item = Params().GetConsensus().nov2020ActivationTime;
         }
         settingsToUserAgentString();
     }
@@ -446,7 +447,7 @@ void UnlimitedSetup(void)
 
     // If the user configures it to 1, assume this means default
     if (miningForkTime.Value() == 1)
-        miningForkTime = Params().GetConsensus().may2020ActivationTime;
+        miningForkTime = Params().GetConsensus().nov2020ActivationTime;
 
     if (maxGeneratedBlock > excessiveBlockSize)
     {
@@ -485,21 +486,6 @@ void UnlimitedSetup(void)
     {
         mallocedStats.push_front(new CStatHistory<uint64_t>("net/recv/msg/" + *i));
         mallocedStats.push_front(new CStatHistory<uint64_t>("net/send/msg/" + *i));
-    }
-
-    // make outbound conns modifiable by the user
-    int nUserMaxOutConnections = GetArg("-maxoutconnections", DEFAULT_MAX_OUTBOUND_CONNECTIONS);
-    nMaxOutConnections = std::max(nUserMaxOutConnections, 0);
-
-    if (nMaxConnections < nMaxOutConnections)
-    {
-        // uiInterface.ThreadSafeMessageBox((strprintf(_("Reducing -maxoutconnections from %d to %d, because this value
-        // is higher than max available connections."), nUserMaxOutConnections, nMaxConnections)),"",
-        // CClientUIInterface::MSG_WARNING);
-        LOGA(
-            "Reducing -maxoutconnections from %d to %d, because this value is higher than max available connections.\n",
-            nUserMaxOutConnections, nMaxConnections);
-        nMaxOutConnections = nMaxConnections;
     }
 
     // Start Internal CPU miner
@@ -1428,39 +1414,6 @@ void LoadFilter(CNode *pfrom, CBloomFilter *filter)
     }
 }
 
-// Similar to TestBlockValidity but is very conservative in parameters (used in mining)
-bool TestConservativeBlockValidity(CValidationState &state,
-    const CChainParams &chainparams,
-    const CBlock &block,
-    CBlockIndex *pindexPrev,
-    bool fCheckPOW,
-    bool fCheckMerkleRoot)
-{
-    AssertLockHeld(cs_main);
-    assert(pindexPrev && pindexPrev == chainActive.Tip());
-    // Ensure that if there is a checkpoint on this height, that this block is the one.
-    if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindexPrev->nHeight + 1, block.GetHash(), chainparams))
-        return error("%s: CheckAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
-
-    CCoinsViewCache viewNew(pcoinsTip);
-    CBlockIndex indexDummy(block);
-    indexDummy.pprev = pindexPrev;
-    indexDummy.nHeight = pindexPrev->nHeight + 1;
-
-    // NOTE: CheckBlockHeader is called by CheckBlock
-    if (!ContextualCheckBlockHeader(block, state, pindexPrev))
-        return false;
-    if (!CheckBlock(block, state, fCheckPOW, fCheckMerkleRoot))
-        return false;
-    if (!ContextualCheckBlock(block, state, pindexPrev, true))
-        return false;
-    if (!ConnectBlock(block, state, &indexDummy, viewNew, chainparams, true))
-        return false;
-    assert(state.IsValid());
-
-    return true;
-}
-
 // Statistics:
 
 CStatBase *FindStatistic(const char *name)
@@ -2231,7 +2184,7 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 
         node.pushKV("vSendMsg", (int64_t)inode.vSendMsg.size());
         node.pushKV("vRecvGetData", (int64_t)inode.vRecvGetData.size());
-        node.pushKV("vRecvMsg", (int64_t)inode.vRecvMsg.size());
+        node.pushKV("vRecvMsg", (int64_t)inode.vRecvMsg.size() + (int64_t)inode.vRecvMsg_handshake.size());
         {
             LOCK(inode.cs_filter);
             if (inode.pfilter)

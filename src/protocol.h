@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (C) 2020 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -305,19 +306,6 @@ extern const char *XPEDITEDBLK;
 extern const char *XPEDITEDTXN;
 
 /**
- * BU specific version information similar to NetMsgType::VERSION
- * @since protocol version 80002.
- */
-extern const char *BUVERSION;
-
-
-/**
- * BU specific version information similar to NetMsgType::VERACK
- * @since protocol version 80002.
- */
-extern const char *BUVERACK;
-
-/**
  * Indicates that a node accepts Compact Blocks and provides version and
  * configuration information.
  * @since protocol version 70014.
@@ -332,13 +320,10 @@ extern const char *SENDCMPCT;
  * Cash specific version information extending NetMsgType::VERSION
  * @since protocol version FIXME.
  */
-extern const char *XVERSION;
 
-/**
- * Cash specific acknowledgement of xversion
- * @since protocol version FIXME.
- */
-extern const char *XVERACK;
+extern const char *XVERSION_OLD;
+extern const char *XVERACK_OLD;
+extern const char *XVERSION;
 
 extern const char *XUPDATE;
 
@@ -360,6 +345,11 @@ extern const char *GETBLOCKTXN;
  * @since protocol version 70014 as described by BIP 152
  */
 extern const char *BLOCKTXN;
+
+/**
+ * Double spend proof
+ */
+extern const char *DSPROOF;
 };
 
 
@@ -419,6 +409,9 @@ enum
     // of only serving a small subset of the blockchain
     // See BIP159 for details on how this is implemented.
     NODE_NETWORK_LIMITED = (1 << 10),
+
+    // indicates if node is using xversion
+    NODE_XVERSION = (1 << 11),
 };
 
 /** A CService with information about it as peer */
@@ -507,8 +500,8 @@ enum
     // With the introduction of compact block, this is being deprecated in favor of using the get_thin p2p
     // message, which solves the conflict with MSG_THINBLOCK and MSG_CMPCT_BLOCK.
     MSG_THINBLOCK = MSG_CMPCT_BLOCK,
-    // Uses Graphene set reconciliation to syncronize mempools between two peers.
-    MSG_MEMPOOLSYNC,
+
+    MSG_DOUBLESPENDPROOF = 0x94a0
 };
 
 #endif // BITCOIN_PROTOCOL_H

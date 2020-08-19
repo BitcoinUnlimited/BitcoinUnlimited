@@ -5,8 +5,10 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "rpc/blockchain.h"
+
 #include "amount.h"
 #include "blockstorage/blockstorage.h"
+#include "blockstorage/sequential_files.h"
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "coins.h"
@@ -42,7 +44,6 @@ static uint32_t nDefaultRollbackLimit = 100;
 
 using namespace std;
 
-extern void TxToJSON(const CTransaction &tx, const uint256 hashBlock, UniValue &entry);
 void ScriptPubKeyToJSON(const CScript &scriptPubKey, UniValue &out, bool fIncludeHex);
 
 double GetDifficulty(const CBlockIndex *blockindex)
@@ -103,7 +104,10 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex)
     return result;
 }
 
-UniValue blockToJSON(const CBlock &block, const CBlockIndex *blockindex, bool txDetails = false, bool listTxns = true)
+UniValue blockToJSON(const CBlock &block,
+    const CBlockIndex *blockindex,
+    bool txDetails /* = false */,
+    bool listTxns /* = true */)
 {
     UniValue result(UniValue::VOBJ);
     result.pushKV("hash", blockindex->GetBlockHash().GetHex());
@@ -120,12 +124,13 @@ UniValue blockToJSON(const CBlock &block, const CBlockIndex *blockindex, bool tx
     UniValue txs(UniValue::VARR);
     if (listTxns)
     {
+        int64_t txTime = -1; // Don't display the time in the tx because its in the block data.
         for (const auto &tx : block.vtx)
         {
             if (txDetails)
             {
                 UniValue objTx(UniValue::VOBJ);
-                TxToJSON(*tx, uint256(), objTx);
+                TxToJSON(*tx, txTime, uint256(), objTx);
                 txs.push_back(objTx);
             }
             else
@@ -264,7 +269,7 @@ void entryToJSON(UniValue &info, const CTxMemPoolEntry &e)
     info.pushKV("spentby", spent);
 }
 
-UniValue mempoolToJSON(bool fVerbose = false)
+UniValue mempoolToJSON(bool fVerbose /* = false */)
 {
     if (fVerbose)
     {
@@ -546,12 +551,12 @@ UniValue getblockhash(const UniValue &params, bool fHelp)
 UniValue getblockheader(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
-        throw runtime_error(
-            "getblockheader \"hash\" ( verbose )\n"
+        throw std::runtime_error(
+            "getblockheader hash_or_height ( verbose )\n"
             "\nIf verbose is false, returns a string that is serialized, hex-encoded data for blockheader 'hash'.\n"
             "If verbose is true, returns an Object with information about blockheader <hash>.\n"
             "\nArguments:\n"
-            "1. \"hash\"          (string, required) The block hash\n"
+            "1. \"hash_or_height\"          (string|numeric, required) The block hash\n"
             "2. verbose           (boolean, optional, default=true) true for a json object, false for the hex encoded "
             "data\n"
             "\nResult (for verbose = true):\n"
@@ -579,26 +584,80 @@ UniValue getblockheader(const UniValue &params, bool fHelp)
             HelpExampleCli("getblockheader", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\"") +
             HelpExampleRpc("getblockheader", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\""));
 
-    std::string strHash = params[0].get_str();
-    uint256 hash(uint256S(strHash));
+    CBlockIndex *pindex = nullptr;
+    bool isNumber = true;
+    int height = -1;
+    if (!params[0].isNum())
+    {
+        // determine if string is the height or block hash
+        const std::string param0 = params[0].get_str();
+        isNumber = (param0.size() <= 20);
+        if (isNumber)
+        {
+            // if it was a number as a string, try to convert it to an int
+            try
+            {
+                height = std::stoi(param0);
+            }
+            catch (const std::invalid_argument &ia)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    strprintf("Invalid argument: %s. Block height %s is not a valid value", ia.what(), param0.c_str()));
+            }
+        }
+        else
+        {
+            // if not grab the block by hash
+            const uint256 hash(uint256S(param0));
+            pindex = LookupBlockIndex(hash);
+            if (!pindex)
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found by block hash");
+            }
+            if (!chainActive.Contains(pindex))
+            {
+                throw JSONRPCError(
+                    RPC_INVALID_PARAMETER, strprintf("Block is not in chain %s", Params().NetworkIDString()));
+            }
+        }
+    }
+    else
+    {
+        height = params[0].get_int();
+    }
+    if (isNumber)
+    {
+        const int current_tip = chainActive.Height();
+        if (height < 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Target block height %d is negative", height));
+        }
+        if (height > current_tip)
+        {
+            throw JSONRPCError(
+                RPC_INVALID_PARAMETER, strprintf("Target block height %d after current tip %d", height, current_tip));
+        }
+        LOG(RPC, "%s for height %d (tip is at %d)", __func__, height, current_tip);
+        pindex = chainActive[height];
+        DbgAssert(pindex && pindex->nHeight == height, throw std::runtime_error(__func__));
+    }
+
+    DbgAssert(pindex != nullptr, throw std::runtime_error(__func__));
 
     bool fVerbose = true;
     if (params.size() > 1)
         fVerbose = params[1].get_bool();
 
-    CBlockIndex *pblockindex = LookupBlockIndex(hash);
-    if (!pblockindex)
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
 
     if (!fVerbose)
     {
         CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
-        ssBlock << pblockindex->GetBlockHeader();
+        ssBlock << pindex->GetBlockHeader();
         std::string strHex = HexStr(ssBlock.begin(), ssBlock.end());
         return strHex;
     }
 
-    return blockheaderToJSON(pblockindex);
+    return blockheaderToJSON(pindex);
 }
 
 // Allows passing int instead of bool
@@ -652,16 +711,16 @@ static UniValue getblock(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 3)
         throw runtime_error(
-            "getblock \"hash\" ( verbose ) ( listtransactions )\n"
+            "getblock hash_or_height ( verbose ) ( listtransactions )\n"
             "\nIf verbose is false, returns a string that is serialized, hex-encoded data for block 'hash'.\n"
             "If verbose is true, returns an Object with information about block <hash>.\n"
             "If listtransactions is true, a list of the IDs of all the transactions included in the block will be "
             "shown.\n"
             "\nArguments:\n"
-            "1. \"hash\"          (string, required) The block hash or height\n"
-            "2. verbose           (boolean, optional, default=true) true for a json object, false for the hex encoded "
+            "1. \"hash_or_height\" (string|numeric, required) The block hash or height\n"
+            "2. verbose            (boolean, optional, default=true) true for a json object, false for the hex encoded "
             "data\n"
-            "3. listtransactions  (boolean, optional, default=true) true to get a list of all txns, false to get just "
+            "3. listtransactions   (boolean, optional, default=true) true to get a list of all txns, false to get just "
             "txns count\n"
             "\nResult (for verbose = true, listtransactions = true):\n"
             "{\n"
@@ -693,9 +752,66 @@ static UniValue getblock(const UniValue &params, bool fHelp)
             HelpExampleCli("getblock", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\"") +
             HelpExampleRpc("getblock", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\""));
 
+    CBlockIndex *pindex = nullptr;
+    bool isNumber = true;
+    int height = -1;
+    if (!params[0].isNum())
+    {
+        // determine if string is the height or block hash
+        const std::string param0 = params[0].get_str();
+        isNumber = (param0.size() <= 20);
+        if (isNumber)
+        {
+            // if it was a number as a string, try to convert it to an int
+            try
+            {
+                height = std::stoi(param0);
+            }
+            catch (const std::invalid_argument &ia)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    strprintf("Invalid argument: %s. Block height %s is not a valid value", ia.what(), param0.c_str()));
+            }
+        }
+        else
+        {
+            // if not grab the block by hash
+            const uint256 hash(uint256S(param0));
+            pindex = LookupBlockIndex(hash);
+            if (!pindex)
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found by block hash");
+            }
+            if (!chainActive.Contains(pindex))
+            {
+                throw JSONRPCError(
+                    RPC_INVALID_PARAMETER, strprintf("Block is not in chain %s", Params().NetworkIDString()));
+            }
+        }
+    }
+    else
+    {
+        height = params[0].get_int();
+    }
+    if (isNumber)
+    {
+        const int current_tip = chainActive.Height();
+        if (height < 0)
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Target block height %d is negative", height));
+        }
+        if (height > current_tip)
+        {
+            throw JSONRPCError(
+                RPC_INVALID_PARAMETER, strprintf("Target block height %d after current tip %d", height, current_tip));
+        }
+        LOG(RPC, "%s for height %d (tip is at %d)", __func__, height, current_tip);
+        pindex = chainActive[height];
+        DbgAssert(pindex && pindex->nHeight == height, throw std::runtime_error(__func__));
+    }
 
-    std::string strHash = params[0].get_str();
-    uint256 hash(uint256S(strHash));
+    DbgAssert(pindex != nullptr, throw std::runtime_error(__func__));
+
     bool fVerbose = true;
     bool fListTxns = true;
     if (params.size() > 1)
@@ -707,23 +823,7 @@ static UniValue getblock(const UniValue &params, bool fHelp)
         fListTxns = is_param_trueish(params[2]);
     }
 
-    CBlockIndex *pblockindex = LookupBlockIndex(hash);
-    if (!pblockindex)
-    {
-        arith_uint256 h = UintToArith256(hash);
-        if (h.bits() < 65)
-        {
-            LOCK(cs_main);
-            uint64_t height = std::stoull(strHash);
-            if (height > (uint64_t)chainActive.Height())
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block index out of range");
-            pblockindex = chainActive[height];
-        }
-        else
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-    }
-
-    const CBlock block = GetBlockChecked(pblockindex);
+    const CBlock block = GetBlockChecked(pindex);
 
     if (!fVerbose)
     {
@@ -733,7 +833,7 @@ static UniValue getblock(const UniValue &params, bool fHelp)
         return strHex;
     }
 
-    return blockToJSON(block, pblockindex, false, fListTxns);
+    return blockToJSON(block, pindex, false, fListTxns);
 }
 
 static void ApplyStats(CCoinsStats &stats,
@@ -1079,8 +1179,12 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
             "  \"initialblockdownload\": xxxx, (bool) (debug information) estimate of whether this node is in Initial "
             "Block Download mode.\n"
             "  \"chainwork\": \"xxxx\"     (string) total amount of work in active chain, in hexadecimal\n"
+            "  \"size_on_disk\": xxxxxx,   (numeric) the estimated size of the block and undo files on disk\n"
             "  \"pruned\": xx,             (boolean) if the blocks are subject to pruning\n"
-            "  \"pruneheight\": xxxxxx,    (numeric) lowest-height complete block stored\n"
+            "  \"pruneheight\": xxxxxx,    (numeric) lowest-height complete block stored (only present if pruning is "
+            "enabled)\n"
+            "  \"prune_target_size\": xxxxxx,  (numeric) the target size used by pruning (only present if automatic "
+            "pruning is enabled)\n"
             "  \"softforks\": [            (array) status of softforks in progress\n"
             "     {\n"
             "        \"id\": \"xxxx\",        (string) name of softfork\n"
@@ -1138,7 +1242,31 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
         "verificationprogress", Checkpoints::GuessVerificationProgress(Params().Checkpoints(), chainActive.Tip()));
     obj.pushKV("initialblockdownload", IsInitialBlockDownload());
     obj.pushKV("chainwork", chainActive.Tip()->nChainWork.GetHex());
+    obj.pushKV("size_on_disk", CalculateCurrentUsage());
     obj.pushKV("pruned", fPruneMode);
+    if (fPruneMode)
+    {
+        CBlockIndex *block = chainActive.Tip();
+        assert(block);
+        {
+            READLOCK(cs_mapBlockIndex);
+            while (block && block->pprev && (block->pprev->nStatus & BLOCK_HAVE_DATA))
+            {
+                block = block->pprev;
+            }
+        }
+
+        if (block != nullptr)
+        {
+            obj.pushKV("pruneheight", block->nHeight);
+        }
+        else
+        {
+            obj.pushKV("pruneheight", 0);
+        }
+
+        obj.pushKV("prune_target_size", nPruneTarget);
+    }
 
     const Consensus::Params &consensusParams = Params().GetConsensus();
     CBlockIndex *tip = chainActive.Tip();
@@ -1166,18 +1294,6 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
     obj.pushKV("bip135_forks", bip135_forks);
     // bip135 end
 
-    if (fPruneMode)
-    {
-        CBlockIndex *block = chainActive.Tip();
-        {
-            READLOCK(cs_mapBlockIndex);
-            while (block && block->pprev && (block->pprev->nStatus & BLOCK_HAVE_DATA))
-                block = block->pprev;
-        }
-
-        if (block != nullptr)
-            obj.pushKV("pruneheight", block->nHeight);
-    }
     return obj;
 }
 
@@ -1465,9 +1581,54 @@ UniValue reconsiderblock(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
     }
 
-    uiInterface.NotifyBlockTip(false, chainActive.Tip());
+    uiInterface.NotifyBlockTip(false, chainActive.Tip(), false);
 
     return NullUniValue;
+}
+
+std::string RollBackChain(int nRollBackHeight, bool fOverride)
+{
+    LOCK(cs_main);
+    uint32_t nRollBack = chainActive.Height() - nRollBackHeight;
+    if (nRollBack > nDefaultRollbackLimit && !fOverride)
+        return "You are attempting to rollback the chain by " + std::to_string(nRollBack) +
+               " blocks, however the limit is " + std::to_string(nDefaultRollbackLimit) + " blocks. Set " +
+               "the override to true if you want rollback more than the default";
+
+    // Lock block validation threads to make sure no new inbound block announcements
+    // cause any block validation state to change while we're unwinding the chain.
+    LOCK(PV->cs_blockvalidationthread);
+
+    while (chainActive.Height() > nRollBackHeight)
+    {
+        // save the current tip
+        CBlockIndex *pindex = chainActive.Tip();
+
+        CValidationState state;
+        // Disconnect the tip and by setting the third param (fRollBack) to true we avoid having to resurrect
+        // the transactions from the block back into the mempool, which saves a great deal of time.
+        if (!DisconnectTip(state, Params().GetConsensus(), true))
+        {
+            return "RPC_DATABASE_ERROR: " + state.GetRejectReason();
+        }
+
+        if (!state.IsValid())
+        {
+            return "RPC_DATABASE_ERROR: " + state.GetRejectReason();
+        }
+
+        // Invalidate the now previous block tip after it was diconnected so that the chain will not reconnect
+        // if another block arrives.
+        InvalidateBlock(state, Params().GetConsensus(), pindex);
+        if (!state.IsValid())
+        {
+            return "RPC_DATABASE_ERROR: " + state.GetRejectReason();
+        }
+
+        uiInterface.NotifyBlockTip(false, chainActive.Tip(), false);
+    }
+
+    return "";
 }
 
 UniValue rollbackchain(const UniValue &params, bool fHelp)
@@ -1489,48 +1650,93 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
                             HelpExampleCli("rollbackchain", "\"495623 true\"") +
                             HelpExampleRpc("rollbackchain", "\"blockheight\""));
 
+    std::string error;
     int nRollBackHeight = params[0].get_int();
     bool fOverride = false;
     if (params.size() > 1)
         fOverride = params[1].get_bool();
 
+    error = RollBackChain(nRollBackHeight, fOverride);
+
+    if (error.size() > 0)
+        throw runtime_error(error.c_str());
+
+    return NullUniValue;
+}
+
+std::string ReconsiderMostWorkChain(bool fOverride)
+{
+    // Error message to return;
+    std::string error;
+
+    // Find pindex of most work chain regardless of whether is is valid or not.
     LOCK(cs_main);
-    uint32_t nRollBack = chainActive.Height() - nRollBackHeight;
-    if (nRollBack > nDefaultRollbackLimit && !fOverride)
-        throw runtime_error("You are attempting to rollback the chain by " + std::to_string(nRollBack) +
-                            " blocks, however the limit is " + std::to_string(nDefaultRollbackLimit) +
-                            " blocks. Set "
-                            "the override to true if you want rollback more than the default");
 
-    // Lock block validation threads to make sure no new inbound block announcements
-    // cause any block validation state to change while we're unwinding the chain.
-    LOCK(PV->cs_blockvalidationthread);
+    // Get the set of chaintips
+    std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
+    setTips = GetChainTips();
 
-    while (chainActive.Height() > nRollBackHeight)
+    // Find the longest chaintip regardless if it is currently the active one.
+    CBlockIndex *pMostWork = chainActive.Tip();
+    for (CBlockIndex *pTip : setTips)
     {
-        // save the current tip
-        CBlockIndex *pindex = chainActive.Tip();
+        if (pMostWork->nChainWork < pTip->nChainWork)
+            pMostWork = pTip;
+    }
+    std::set<CBlockIndex *, CompareBlocksByHeight> setTipsToVerify;
+    setTipsToVerify.insert(pMostWork);
 
-        CValidationState state;
-        // Disconnect the tip and by setting the third param (fRollBack) to true we avoid having to resurrect
-        // the transactions from the block back into the mempool, which saves a great deal of time.
-        if (!DisconnectTip(state, Params().GetConsensus(), true))
-            throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
-
-        if (!state.IsValid())
-            throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
-
-        // Invalidate the now previous block tip after it was diconnected so that the chain will not reconnect
-        // if another block arrives.
-        InvalidateBlock(state, Params().GetConsensus(), pindex);
-        if (!state.IsValid())
+    // We need to check if there are duplicate chaintips that have the most work
+    // as could happen during a fork. If there are duplicates then we need to test each tip
+    // to find out which is the correct fork.
+    {
+        // parse though chaintips again to find if there are duplicates
+        for (CBlockIndex *pTip : setTips)
         {
-            throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
+            if (pMostWork->nChainWork == pTip->nChainWork)
+                setTipsToVerify.insert(pTip);
+        }
+    }
+
+    for (CBlockIndex *pTipToVerify : setTipsToVerify)
+    {
+        // if no duplicates then return since there is nothing to do. We are already on the correct chain
+        if (pTipToVerify->nChainWork == chainActive.Tip()->nChainWork)
+        {
+            LOGA("Nothing to do. Already on the correct chain.");
+            return "Nothing to do. Already on the correct chain.";
         }
 
-        uiInterface.NotifyBlockTip(false, chainActive.Tip());
+        // Find where chainActive meets the most work chaintip
+        const CBlockIndex *pFork;
+        pFork = chainActive.FindFork(pTipToVerify);
+
+        // Rollback to the common forkheight so that both chains will be invalidated.
+        error = RollBackChain(pFork->nHeight, fOverride);
+        if (error.size() > 0)
+            return error;
+
+        // If we got here then rollbackchain() was sucessful and we didn't throw an exception.
+        // Now reconsider the new chain.
+        LOGA("reconsider block: %s\n", pTipToVerify->GetBlockHash().ToString().c_str());
+        CValidationState state;
+        ReconsiderBlock(state, pTipToVerify);
+        if (state.IsValid())
+        {
+            ActivateBestChain(state, Params());
+        }
+        if (!state.IsValid())
+        {
+            return "RPC_DATABASE_ERROR: " + state.GetRejectReason();
+        }
+
+        if (pTipToVerify->nChainWork == chainActive.Tip()->nChainWork)
+        {
+            LOGA("Active chain has been successfully moved to a new chaintip.");
+        }
     }
-    return NullUniValue;
+
+    return "";
 }
 
 UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
@@ -1549,44 +1755,15 @@ UniValue reconsidermostworkchain(const UniValue &params, bool fHelp)
                             HelpExampleCli("reconsidermostworkchain", "\"true\"") +
                             HelpExampleRpc("reconsidermostworkchain", "\"true\""));
 
-    // Find pindex of most work chain regardless of whether is is valid or not.
-    LOCK(cs_main);
-
-    // Get the set of chaintips
-    std::set<CBlockIndex *, CompareBlocksByHeight> setTips;
-    setTips = GetChainTips();
-
-    // Find the longest chaintip regardless if it is currently the active one.
-    CBlockIndex *pMostWork = chainActive.Tip();
-    for (CBlockIndex *pTip : setTips)
-    {
-        if (pMostWork->nChainWork < pTip->nChainWork)
-            pMostWork = pTip;
-    }
-
-    // If already on the longest chain then return
-    if (pMostWork == chainActive.Tip())
-        throw runtime_error("Nothing to do. Already on the correct chain.");
-
-    // Find where chainActive meets the most work chaintip
-    const CBlockIndex *pFork;
-    pFork = chainActive.FindFork(pMostWork);
-
-    // Rollback to the common forkheight so that both chains will be invalidated.
-    UniValue obj(UniValue::VARR);
-    obj.push_back(pFork->nHeight);
+    std::string error;
+    bool fOverride = false;
     if (params.size() > 0)
-    {
-        // Set the rollbackchain override flag if there was one provided.
-        obj.push_back(params[0]);
-    }
-    rollbackchain(obj, false);
+        fOverride = params[0].get_bool();
 
-    // If we got here then rollbackchain() was sucessful and we didn't throw an exception.
-    // Now reconsider the most work chain.
-    UniValue obj_hash(UniValue::VARR);
-    obj_hash.push_back(pMostWork->GetBlockHash().ToString());
-    reconsiderblock(obj_hash, false);
+    error = ReconsiderMostWorkChain(fOverride);
+
+    if (error.size() > 0)
+        throw runtime_error(error.c_str());
 
     return NullUniValue;
 }
@@ -1791,7 +1968,7 @@ static UniValue getblockstats(const UniValue &params, bool fHelp)
     }
 
     const CBlock block = GetBlockChecked(pindex);
-    const CBlockUndo blockUndo = GetUndoChecked(pindex);
+    const CBlockUndo blockUndo = pindex->pprev ? GetUndoChecked(pindex) : CBlockUndo();
     // This property is required in the for loop below (and ofc every tx should have undo data)
     DbgAssert(blockUndo.vtxundo.size() >= block.vtx.size() - 1,
         throw JSONRPCError(RPC_DATABASE_ERROR, "Block undo data is corrupt"));

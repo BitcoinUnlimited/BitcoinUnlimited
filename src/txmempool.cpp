@@ -1,14 +1,18 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
 // Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (C) 2019-2020 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "txmempool.h"
 
+#include "DoubleSpendProof.h"
+#include "DoubleSpendProofStorage.h"
 #include "consensus/consensus.h"
 #include "consensus/tx_verify.h"
 #include "consensus/validation.h"
+#include "core_io.h"
 #include "init.h"
 #include "main.h"
 #include "parallel.h"
@@ -670,7 +674,8 @@ void CTxMemPoolEntry::ReplaceAncestorState(int64_t modifySize, CAmount modifyFee
     assert(int(nSigOpCountWithAncestors) >= 0);
 }
 
-CTxMemPool::CTxMemPool(const CFeeRate &_minReasonableRelayFee) : nTransactionsUpdated(0)
+CTxMemPool::CTxMemPool(const CFeeRate &_minReasonableRelayFee)
+    : nTransactionsUpdated(0), m_dspStorage(new DoubleSpendProofStorage())
 {
     _clear(); // lock free clear
 
@@ -691,7 +696,12 @@ CTxMemPool::CTxMemPool(const CFeeRate &_minReasonableRelayFee) : nTransactionsUp
     nPeakRate = 0;
 }
 
-CTxMemPool::~CTxMemPool() { delete minerPolicyEstimator; }
+CTxMemPool::~CTxMemPool()
+{
+    delete minerPolicyEstimator;
+    delete m_dspStorage;
+}
+
 bool CTxMemPool::isSpent(const COutPoint &outpoint)
 {
     AssertWriteLockHeld(cs_txmempool);
@@ -783,6 +793,8 @@ bool CTxMemPool::addUnchecked(const uint256 &hash,
 void CTxMemPool::removeUnchecked(txiter it)
 {
     AssertWriteLockHeld(cs_txmempool);
+    if (it->dsproof != -1)
+        m_dspStorage->remove(it->dsproof);
     const uint256 hash = it->GetTx().GetHash();
     for (const CTxIn &txin : it->GetTx().vin)
         mapNextTx.erase(txin.prevout);
@@ -1281,6 +1293,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
         setEntries setParentCheck;
         int64_t parentSizes = 0;
         unsigned int parentSigOpCount = 0;
+
         for (const CTxIn &txin : tx.vin)
         {
             // Check that every mempool transaction's inputs refer to available coins, or other mempool tx's.
@@ -1298,6 +1311,12 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
             }
             else
             {
+                if (!pcoins->HaveCoin(txin.prevout))
+                {
+                    LOGA("Mempool entry is missing input %d: (%s,%d)", i, txin.prevout.hash.ToString(), txin.prevout.n);
+                    LOGA("TX hex: %s", EncodeHexTx(tx));
+                    LOGA("TX: %s", tx.ToString());
+                }
                 assert(pcoins->HaveCoin(txin.prevout));
             }
             // Check whether its inputs are marked in mapNextTx.
@@ -1538,10 +1557,10 @@ void CTxMemPool::ClearPrioritisation(const uint256 hash)
     mapDeltas.erase(hash);
 }
 void CTxMemPool::_ClearPrioritisation(const uint256 hash) { mapDeltas.erase(hash); }
-bool CTxMemPool::HasNoInputsOf(const CTransaction &tx) const
+bool CTxMemPool::HasNoInputsOf(const CTransactionRef &tx) const
 {
-    for (unsigned int i = 0; i < tx.vin.size(); i++)
-        if (exists(tx.vin[i].prevout.hash))
+    for (unsigned int i = 0; i < tx->vin.size(); i++)
+        if (exists(tx->vin[i].prevout.hash))
             return false;
     return true;
 }
@@ -1715,6 +1734,25 @@ const CTxMemPool::setEntries &CTxMemPool::GetMemPoolChildren(txiter entry) const
     return it->second.children;
 }
 
+CTransactionRef CTxMemPool::addDoubleSpendProof(const DoubleSpendProof &proof)
+{
+    WRITELOCK(cs_txmempool);
+    auto oldTx = mapNextTx.find(COutPoint(proof.prevTxId(), proof.prevOutIndex()));
+    if (oldTx == mapNextTx.end())
+        return CTransactionRef();
+
+    auto iter = mapTx.find(oldTx->second.ptx->GetHash());
+    assert(mapTx.end() != iter);
+    if (iter->dsproof != -1) // A DSProof already exists for this tx.
+        return CTransactionRef(); // don't propagate new one.
+
+    auto item = *iter;
+    item.dsproof = m_dspStorage->add(proof);
+    mapTx.replace(iter, item);
+    return _get(oldTx->second.ptx->GetHash());
+}
+
+DoubleSpendProofStorage *CTxMemPool::doubleSpendProofStorage() const { return m_dspStorage; }
 CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const
 {
     READLOCK(cs_txmempool);

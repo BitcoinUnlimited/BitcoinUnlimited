@@ -23,12 +23,14 @@
 #include "txadmission.h"
 #include "txorphanpool.h"
 #include "ui_interface.h"
+#include "util.h"
 #include "validationinterface.h"
 
 #include <boost/scope_exit.hpp>
 #include <unordered_set>
 
 extern CTweak<unsigned int> unconfPushAction;
+void ProcessOrphans(std::vector<uint256> &vWorkQueue);
 
 class Hasher
 {
@@ -186,6 +188,21 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &sta
     return true;
 }
 
+static void NotifyHeaderTip()
+{
+    if (!pindexBestHeader.load())
+        return;
+
+    static std::atomic<CBlockIndex *> pindexHeaderOld{pindexBestHeader.load()};
+    static std::atomic<int64_t> nLastTime{0};
+    if (pindexBestHeader.load()->nChainWork > pindexHeaderOld.load()->nChainWork &&
+        (GetTime() - nLastTime > 1 || !IsInitialBlockDownload()))
+    {
+        uiInterface.NotifyHeaderTip(false, pindexBestHeader.load(), true);
+        pindexHeaderOld.store(pindexBestHeader.load());
+        nLastTime = GetTime();
+    }
+}
 bool AcceptBlockHeader(const CBlockHeader &block,
     CValidationState &state,
     const CChainParams &chainparams,
@@ -311,7 +328,12 @@ CBlockIndex *AddToBlockIndex(const CBlockHeader &block)
     CBlockIndex *pBestHeader = pindexBestHeader.load();
     if ((!(pindexNew->nStatus & BLOCK_FAILED_MASK)) &&
         (pBestHeader == nullptr || pBestHeader->nChainWork < pindexNew->nChainWork))
-        pindexBestHeader = pindexNew;
+    {
+        pindexBestHeader.store(pindexNew);
+    }
+
+    // Update the ui if the best header has changed.
+    NotifyHeaderTip();
 
     setDirtyBlockIndex.insert(pindexNew);
 
@@ -586,6 +608,7 @@ void UnloadBlockIndex()
         chainActive.SetTip(nullptr);
         pindexBestInvalid = nullptr;
         pindexBestHeader = nullptr;
+        ResetASERTAnchorBlockCache();
         mapBlocksUnlinked.clear();
         vinfoBlockFile.clear();
         mapBlockSource.clear();
@@ -1194,7 +1217,8 @@ bool TestBlockValidity(CValidationState &state,
     const CBlock &block,
     CBlockIndex *pindexPrev,
     bool fCheckPOW,
-    bool fCheckMerkleRoot)
+    bool fCheckMerkleRoot,
+    bool fConservative)
 {
     AssertLockHeld(cs_main);
     assert(pindexPrev && pindexPrev == chainActive.Tip());
@@ -1212,13 +1236,24 @@ bool TestBlockValidity(CValidationState &state,
         return false;
     if (!CheckBlock(block, state, fCheckPOW, fCheckMerkleRoot))
         return false;
-    if (!ContextualCheckBlock(block, state, pindexPrev))
+    if (!ContextualCheckBlock(block, state, pindexPrev, fConservative))
         return false;
     if (!ConnectBlock(block, state, &indexDummy, viewNew, chainparams, true))
         return false;
     assert(state.IsValid());
 
     return true;
+}
+
+// Similar to TestBlockValidity but is very conservative in parameters (used in mining)
+bool TestConservativeBlockValidity(CValidationState &state,
+    const CChainParams &chainparams,
+    const CBlock &block,
+    CBlockIndex *pindexPrev,
+    bool fCheckPOW,
+    bool fCheckMerkleRoot)
+{
+    return TestBlockValidity(state, chainparams, block, pindexPrev, fCheckPOW, fCheckMerkleRoot, true);
 }
 
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams)
@@ -1459,7 +1494,7 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
         pindexBestHeader = mostWork;
     }
 
-    uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev);
+    uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev, false);
     return true;
 }
 
@@ -1888,7 +1923,7 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
         flags |= SCRIPT_VERIFY_MINIMALDATA;
     }
 
-    if (IsMay2020Enabled(consensusparams, pindex->pprev))
+    if (IsMay2020Activated(consensusparams, pindex->pprev))
     {
         flags |= SCRIPT_ENABLE_OP_REVERSEBYTES;
     }
@@ -2196,14 +2231,6 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
     // Section for boost scoped lock on the scriptcheck_mutex
     boost::thread::id this_id(boost::this_thread::get_id());
 
-    // Get the next available mutex and the associated scriptcheckqueue. Then lock this thread
-    // with the mutex so that the checking of inputs can be done with the chosen scriptcheckqueue.
-    CCheckQueue<CScriptCheck> *pScriptQueue(PV->GetScriptCheckQueue());
-
-    // Aquire the control that is used to wait for the script threads to finish. Do this after aquiring the
-    // scoped lock to ensure the scriptqueue is free and available.
-    CCheckQueueControl<CScriptCheck> control(fScriptChecks && PV->ThreadCount() ? pScriptQueue : nullptr);
-
     // Initialize a PV session.
     if (!PV->Initialize(this_id, pindex, fParallel))
         return false;
@@ -2213,6 +2240,14 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
      *********************************************************************************************/
     if (fParallel)
         LEAVE_CRITICAL_SECTION(cs_main);
+
+    // Get the next available mutex and the associated scriptcheckqueue. Then lock this thread
+    // with the mutex so that the checking of inputs can be done with the chosen scriptcheckqueue.
+    CCheckQueue<CScriptCheck> *pScriptQueue(PV->GetScriptCheckQueue());
+
+    // Aquire the control that is used to wait for the script threads to finish. Do this after aquiring the
+    // scoped lock to ensure the scriptqueue is free and available.
+    CCheckQueueControl<CScriptCheck> control(fScriptChecks && PV->ThreadCount() ? pScriptQueue : nullptr);
 
     // Begin Section for Boost Scope Guard
     {
@@ -2329,8 +2364,7 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
             if (GetArg("-pvtest", false))
                 MilliSleep(1000);
         }
-        LOG(THIN, "Number of CheckInputs() performed: %d  Unverified count: %d\n", nChecked, nUnVerifiedChecked);
-
+        LOG(BENCH, "Number of CheckInputs() performed: %d  Unverified count: %d\n", nChecked, nUnVerifiedChecked);
 
         // Wait for all sig check threads to finish before updating utxo
         LOG(PARALLEL, "Waiting for script threads to finish\n");
@@ -2374,7 +2408,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
     std::vector<std::pair<uint256, CDiskTxPos> > &vPos)
 {
     // Enabled returns true if the fork is enabled on the NEXT block, so we pass this block's parent
-    bool may2020Active = (pindex) ? IsMay2020Enabled(chainparams.GetConsensus(), pindex->pprev) : false;
+    bool may2020Active = (pindex) ? IsMay2020Activated(chainparams.GetConsensus(), pindex) : false;
     nFees = 0;
     int64_t nTime2 = GetStopwatchMicros();
     LOG(BLK, "Canonical ordering for %s MTP: %d\n", block.GetHash().ToString(), pindex->GetMedianTimePast());
@@ -2577,7 +2611,6 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                 MilliSleep(1000);
         }
         LOG(BENCH, "Number of CheckInputs() performed: %d  Unverified count: %d\n", nChecked, nUnVerifiedChecked);
-
 
         // Wait for all sig check threads to finish before updating utxo
         LOG(PARALLEL, "Waiting for script threads to finish\n");
@@ -3001,6 +3034,7 @@ void CheckAndAlertUnknownVersionbits(const CChainParams &chainParams, const CBlo
 /** Update chainActive and related internal data structures. */
 void UpdateTip(CBlockIndex *pindexNew)
 {
+    DbgAssert(txProcessingCorral.region() == CORRAL_TX_PAUSE, LOGA("Updating tip during tx processing"));
     const CChainParams &chainParams = Params();
     chainActive.SetTip(pindexNew);
 
@@ -3054,6 +3088,8 @@ static void ResubmitTransactions(CBlock *block = nullptr)
     // We must hold the mempool lock throughout otherwise it would be possible for some txns to slip back into
     // the mempool from the csCommitQFinal.
     WRITELOCK(mempool.cs_txmempool);
+    // If tx admission is not paused, the commitment thread will be modifying what this function is clearing
+    DbgAssert(txProcessingCorral.region() != CORRAL_TX_COMMITMENT, LOGA("Resubmit transactions during tx commitment"));
     LOG(MEMPOOL, "Clearing mempool and resubmitting transactions");
     {
         if (block)
@@ -3130,7 +3166,8 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     // they will likely be invalid or already confirmed on the other fork.
     if (fRollBack)
     {
-        mempool.clear();
+        WRITELOCK(mempool.cs_txmempool);
+        mempool._clear();
         boost::unique_lock<boost::mutex> lock(csCommitQ);
         txCommitQ->clear();
     }
@@ -3206,6 +3243,18 @@ bool ConnectTip(CValidationState &state,
         nTime3 = GetStopwatchMicros();
         nTimeConnectTotal += nTime3 - nTime2;
         LOG(BENCH, "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
+
+        // Search orphan queue for anything that is no longer an orphan due to tx in this block
+        // or any tx that has a parent in the mempool, since commited tx may now make that tx available
+        // for mempool admission based on a reduction of mempool ancestors.
+        std::vector<uint256> vWhatChanged;
+        mempool.queryHashes(vWhatChanged);
+        vWhatChanged.reserve(vWhatChanged.size() + pblock->vtx.size());
+        for (unsigned int j = 0; j < pblock->vtx.size(); j++)
+        {
+            vWhatChanged.push_back(pblock->vtx[j]->GetHash());
+        }
+        ProcessOrphans(vWhatChanged);
     }
 
     int64_t nTime4 = GetStopwatchMicros();
@@ -3437,7 +3486,7 @@ bool ActivateBestChainStep(CValidationState &state,
                 static std::atomic<int64_t> nLastUpdate = {GetTime()};
                 if (nLastUpdate.load() < GetTime() - 5)
                 {
-                    uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindexNewTip);
+                    uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindexNewTip, false);
                     pindexLastNotify = pindexNewTip;
                     nLastUpdate.store(GetTime());
                 }
@@ -3462,7 +3511,7 @@ bool ActivateBestChainStep(CValidationState &state,
 
         // Notify the UI with the new block tip information.
         if (pindexMostWork->nHeight >= nHeight && pindexNewTip != nullptr && pindexLastNotify != pindexNewTip)
-            uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindexNewTip);
+            uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindexNewTip, false);
 
         if (fContinue)
         {
@@ -3706,7 +3755,7 @@ bool ProcessNewBlock(CValidationState &state,
         // demerit the sender
         return error("%s: CheckBlockHeader FAILED", __func__);
     }
-    if (IsChainNearlySyncd() && !fImporting && !fReindex)
+    if (IsChainNearlySyncd() && !fImporting && !fReindex && connmgr->ExpeditedBlockNodes().size())
         SendExpeditedBlock(*pblock, pfrom);
 
     bool checked = CheckBlock(*pblock, state);
@@ -3771,13 +3820,6 @@ bool ProcessNewBlock(CValidationState &state,
             return error("%s: ActivateBestChain failed", __func__);
         else
             return false;
-    }
-
-    // If the fork activates on the next block, we need to reevaluate all tx in the mempool because they may now break
-    // the new sigops rule
-    if (IsMay2020Next(chainparams.GetConsensus(), chainActive.Tip()))
-    {
-        ResubmitTransactions();
     }
 
     int64_t end = GetStopwatchMicros();

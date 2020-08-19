@@ -4,8 +4,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef BITCOIN_RPCPROTOCOL_H
-#define BITCOIN_RPCPROTOCOL_H
+#ifndef BITCOIN_RPC_PROTOCOL_H
+#define BITCOIN_RPC_PROTOCOL_H
 
 #include "fs.h"
 
@@ -14,7 +14,10 @@
 #include <stdint.h>
 #include <string>
 
+#include "uint256.h"
 #include "univalue/include/univalue.h"
+
+class CTransaction;
 
 //! HTTP status codes
 enum HTTPStatusCode
@@ -84,6 +87,11 @@ UniValue JSONRPCReplyObj(const UniValue &result, const UniValue &error, const Un
 std::string JSONRPCReply(const UniValue &result, const UniValue &error, const UniValue &id);
 UniValue JSONRPCError(int code, const std::string &message);
 
+// rawtransaction.cpp
+/** This function supplies transaction JSON data for different interfaces (REST and RPC).
+Pass -1 to txTime to not include (used to avoid redundancy when tx are being shown within a block) */
+void TxToJSON(const CTransaction &tx, const int64_t txTime, const uint256 hashBlock, UniValue &entry);
+
 /** Get name of RPC authentication cookie file */
 fs::path GetAuthCookieFile();
 /** Generate a new RPC authentication cookie and write it to disk */
@@ -93,4 +101,4 @@ bool GetAuthCookie(std::string *cookie_out);
 /** Delete RPC authentication cookie from disk */
 void DeleteAuthCookie();
 
-#endif // BITCOIN_RPCPROTOCOL_H
+#endif // BITCOIN_RPC_PROTOCOL_H

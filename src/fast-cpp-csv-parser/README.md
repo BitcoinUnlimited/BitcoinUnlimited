@@ -72,7 +72,7 @@ public:
 
   // File Location
   void set_file_line(unsigned);
-  unsigned get_file_line(unsigned)const;
+  unsigned get_file_line()const;
   void set_file_name(some_string_type file_name);
   const char*get_truncated_file_name()const;
 };
@@ -169,6 +169,8 @@ The quote policy indicates how string should be escaped. It also specifies the c
 
 **Important**: Quoting can be quite expensive. Disable it if you do not need it.
 
+**Important**: Quoted strings may not contain unescaped newlines. This is currently not supported.
+
 The overflow policy indicates what should be done if the integers in the input are too large to fit into the variables. There following policies are predefined:
 
   * `throw_on_overflow` : Throw an `error::integer_overflow` or `error::integer_underflow` exception.
@@ -185,7 +187,7 @@ The comment policy allows to skip lines based on some criteria. Valid predefined
 Examples:
 
   * `CSVReader<4, trim_chars<' '>, double_quote_escape<',','\"'> >` reads 4 columns from a normal CSV file with string escaping enabled.
-  * `CSVReader<3, trim_chars<' '>, no_quote_escape<'\t'>, single_line_comment<'#'> >` reads 3 columns from a tab separated file with string escaping disabled. Lines starting with a # are ignored.
+  * `CSVReader<3, trim_chars<' '>, no_quote_escape<'\t'>, throw_on_overflow, single_line_comment<'#'> >` reads 3 columns from a tab separated file with string escaping disabled. Lines starting with a # are ignored.
 
 The constructors and the file location functions are exactly the same as for `LineReader`. See its documentation for details.
 
@@ -266,3 +268,8 @@ A: When using GCC have you linked against -lpthread? Read the installation secti
 Q: Does the library support UTF?
 
 A: The library has basic UTF-8 support, or to be more precise it does not break when passing UTF-8 strings through it. If you read a `char*` then you get a pointer to the UTF-8 string. You will have to decode the string on your own. The separator, quoting, and commenting characters used by the library can only be ASCII characters.
+
+
+Q: Does the library support string fields that span multiple lines?
+
+A: No. This feature has been often requested in the past, however, it is difficult to make it work with the current design without breaking something else.

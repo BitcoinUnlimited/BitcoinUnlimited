@@ -100,7 +100,10 @@ public:
     boost::signals2::signal<void(const std::string &title, int nProgress)> ShowProgress;
 
     /** New block has been accepted */
-    boost::signals2::signal<void(bool, const CBlockIndex *)> NotifyBlockTip;
+    boost::signals2::signal<void(bool initialSync, const CBlockIndex *pIndex, bool fHeader)> NotifyBlockTip;
+
+    /** New header has been accepted */
+    boost::signals2::signal<void(bool initialSync, const CBlockIndex *pIndex, bool fHeader)> NotifyHeaderTip;
 
     /** Banlist did change. */
     boost::signals2::signal<void(void)> BannedListChanged;

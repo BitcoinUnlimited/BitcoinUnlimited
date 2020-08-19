@@ -510,7 +510,7 @@ std::string formatInfoUnit(double value)
 static const std::set<std::string> affirmativeStrings{"", "1", "t", "y", "true", "yes"};
 
 /** Interpret string as boolean, for argument parsing */
-static bool InterpretBool(const std::string &strValue) { return (affirmativeStrings.count(strValue) != 0); }
+bool InterpretBool(const std::string &strValue) { return (affirmativeStrings.count(strValue) != 0); }
 /** Turn -noX into -X=0 */
 static void InterpretNegativeSetting(std::string &strKey, std::string &strValue)
 {

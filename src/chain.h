@@ -505,7 +505,14 @@ public:
     }
 
     /** Return the maximal height in the chain.  Does not require cs_main */
-    int Height() const { return tip.load() ? tip.load()->nHeight : -1; }
+    int Height() const
+    {
+        auto tmp = tip.load();
+        if (tmp)
+            return tmp->nHeight;
+        else
+            return -1;
+    }
     /** Set/initialize a chain with a given tip. */
     void SetTip(CBlockIndex *pindex);
 

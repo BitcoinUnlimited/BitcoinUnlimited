@@ -151,6 +151,8 @@ BITCOIN_CORE_H = \
   core_io.h \
   core_memusage.h \
   cuckoocache.h \
+  DoubleSpendProof.h \
+  DoubleSpendProofStorage.h \
   deadlock-detection/locklocation.h \
   deadlock-detection/lockorder.h \
   deadlock-detection/threaddeadlock.h \
@@ -258,11 +260,6 @@ obj/build.h: FORCE
 	  $(abs_top_srcdir)
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
-xversionkeys.h: $(top_srcdir)/contrib/devtools/xversionkeys.py $(top_srcdir)/src/xversionkeys.dat
-	$(PYTHON) $(top_srcdir)/contrib/devtools/xversionkeys.py > $(abs_top_builddir)/src/xversionkeys.h < $(srcdir)/xversionkeys.dat
-
-BUILT_SOURCES= xversionkeys.h
-
 # server: shared between bitcoind and bitcoin-qt
 libbitcoin_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
@@ -286,6 +283,8 @@ libbitcoin_server_a_SOURCES = \
   checkpoints.cpp \
   connmgr.cpp \
   consensus/tx_verify.cpp \
+  DoubleSpendProof.cpp \
+  DoubleSpendProofStorage.cpp \
   dosman.cpp \
   expedited.cpp \
   electrum/electrs.cpp \
@@ -308,7 +307,6 @@ libbitcoin_server_a_SOURCES = \
   parallel.cpp \
   policy/fees.cpp \
   policy/policy.cpp \
-  policy/mempool.cpp \
   pow.cpp \
   rest.cpp \
   rpc/blockchain.cpp \
@@ -605,6 +603,7 @@ bitcoind_LDADD = \
   $(LIBRSM) \
   $(LIBSECP256K1)
 
+
 bitcoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
 
 # bitcoin-cli binary #
@@ -733,10 +732,9 @@ CLEANFILES += univalue/*.gcda univalue/*.gcno
 CLEANFILES += wallet/*.gcda wallet/*.gcno
 CLEANFILES += wallet/test/*.gcda wallet/test/*.gcno
 CLEANFILES += zmq/*.gcda zmq/*.gcno
+CLEANFILES += obj/build.h
 
-DISTCLEANFILES = obj/build.h xversionkeys.h
-
-EXTRA_DIST = leveldb $(CTAES_DIST) $(srcdir)/xversionkeys.dat $(top_srcdir)/contrib/devtools/xversionkeys.py
+EXTRA_DIST = leveldb $(CTAES_DIST)
 
 clean-local:
 	-$(MAKE) -C rsm clean

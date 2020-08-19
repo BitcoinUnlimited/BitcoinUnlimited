@@ -344,7 +344,7 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
         hexblk = ToHex(block)
         for n in self.nodes:
             expectException(lambda: n.validateblocktemplate(hexblk), JSONRPCException,
-                            "invalid block: bad-blk-sigops")
+                            "-1: invalid block: bad-txns-premature-spend-of-coinbase")
 
 def Test():
     t = ValidateblocktemplateTest()

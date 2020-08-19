@@ -27,15 +27,14 @@ def bitcoind_electrum_args():
     global ELECTRUM_PORT
     ELECTRUM_PORT = random.randint(40000, 60000)
     return ["-electrum=1", "-debug=electrum", "-debug=rpc",
+            "-electrum.blocknotify=1",
             "-electrum.port=" + str(ELECTRUM_PORT),
             "-electrum.monitoring.port=" + str(random.randint(40000, 60000)),
             "-electrum.rawarg=--cashaccount-activation-height=1"]
 
 class ElectrumConnection:
-    def __init__(self):
+    def __init__(self,):
         self.cli = StratumClient()
-        self.loop = asyncio.get_event_loop()
-        self.loop.run_until_complete(self.connect())
 
     async def connect(self):
         connect_timeout = 30
@@ -54,16 +53,13 @@ class ElectrumConnection:
             time.sleep(1)
 
 
-    def call(self, method, *args):
-        return self.loop.run_until_complete(self.cli.RPC(method, *args))
+    async def call(self, method, *args):
+        return await self.cli.RPC(method, *args)
 
-    def subscribe(self, method, *args):
+    async def subscribe(self, method, *args):
         future, queue = self.cli.subscribe(method, *args)
-        result = self.loop.run_until_complete(future)
+        result = await future
         return result, queue
-
-def create_electrum_connection():
-    return ElectrumConnection()
 
 def script_to_scripthash(script):
     import hashlib

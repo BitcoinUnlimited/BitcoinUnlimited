@@ -143,6 +143,10 @@ struct Params
     bool fPowNoRetargeting;
     int64_t nPowTargetSpacing;
     int64_t nPowTargetTimespan;
+    // The half life for the ASERT DAA. For every (nASERTHalfLife) seconds behind schedule the blockchain gets,
+    // difficulty is cut in half. Doubled if blocks are ahead of schedule.
+    int64_t nASERTHalfLife;
+
     int64_t DifficultyAdjustmentInterval() const { return nPowTargetTimespan / nPowTargetSpacing; }
     /** UAHF Aug 1st 2017 block height */
     int uahfHeight;
@@ -156,8 +160,10 @@ struct Params
     int may2019Height;
     /** Nov 15, 2019 actication height */
     int nov2019Height;
-    /** May 15, 2020 MTP activation time will be 12:00:00 UTC */
-    uint64_t may2020ActivationTime;
+    /** May 15, 2020 actication height */
+    int may2020Height;
+    /** Nov 15, 2020 MTP activation time will be 12:00:00 UTC */
+    uint64_t nov2020ActivationTime;
 };
 } // namespace Consensus
 

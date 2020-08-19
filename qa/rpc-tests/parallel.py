@@ -1099,7 +1099,7 @@ class ParallelTest (BitcoinTestFramework):
             sync_blocks(self.nodes)
 
             # Mine another block which will cause some nodes to reorg and sync to the same chain.
-            print ("Mine another block...")
+            print ("%d: Mine another block..." % i)
             self.nodes[0].generate(1)
             sync_blocks(self.nodes)
 
@@ -1112,12 +1112,12 @@ class ParallelTest (BitcoinTestFramework):
 
 def Test():
     t = ParallelTest()
+    t.drop_to_pdb = True
     # t.rep = True
     t.longTest = False
     bitcoinConf = {
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
     }
-
     flags = standardFlags()
     t.main(flags, bitcoinConf, None)
 

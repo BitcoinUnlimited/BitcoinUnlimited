@@ -31,6 +31,7 @@ import pdb
 import os
 import time
 import shutil
+import psutil
 import signal
 import sys
 import subprocess
@@ -49,7 +50,11 @@ from tests_config import *
 from test_classes import RpcTest, Disabled, Skip, WhenElectrumFound
 
 def inTravis():
-  return os.environ.get("TRAVIS", None) == "true"
+    return (os.environ.get("TRAVIS", None) == "true")
+
+def inGitLabCI():
+    # https://docs.gitlab.com/ee/ci/variables/
+    return (os.environ.get("CI_SERVER", None) == "yes")
 
 
 BOLD = ("","")
@@ -110,6 +115,7 @@ framework_opts = ('--tracerpc',
                   '--noshutdown',
                   '--nocleanup',
                   '--no-ipv6-rpc-listen',
+                  '--gitlab',
                   '--srcdir',
                   '--tmppfx',
                   '--coveragedir',
@@ -190,8 +196,7 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
-    'sigchecks_inputstandardness_activation',
-    'block_sigchecks_activation',
+    Disabled('sigchecks_inputstandardness_activation', 'Already activated, and mempool bad sigcheck mempool cleanup removed so test will fail'),
     'txindex',
     Disabled('schnorr-activation', 'Need to be updated to work with BU'),
     'schnorrsig',
@@ -258,6 +263,7 @@ testScripts = [ RpcTest(t) for t in [
     'graphene_stage2',
     'thinblocks',
     Disabled('checkdatasig_activation', "CDSV has been already succesfully activated, keep test around as a template for other OP activation"),
+    'xversion_old',
     'xversion',
     'sighashmatch',
     'getlogcategories',
@@ -266,7 +272,7 @@ testScripts = [ RpcTest(t) for t in [
     'minimaldata',
     'schnorrmultisig',
     'uptime',
-    'op_reversebytes_activation'
+    'op_reversebytes'
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
@@ -300,13 +306,14 @@ testScriptsExt = [ RpcTest(t) for t in [
 
 testScriptsElectrum = [ RpcTest(WhenElectrumFound(t)) for t in [
     'electrum_basics',
-    'electrum_reorg',
-    'electrum_shutdownonerror',
+    'electrum_blockchain_address',
     'electrum_cashaccount',
-    'electrum_subscriptions',
+    'electrum_reorg',
     'electrum_scripthash_gethistory',
-    'electrum_transaction_get',
     'electrum_server_features',
+    'electrum_shutdownonerror',
+    'electrum_subscriptions',
+    'electrum_transaction_get',
 ] ]
 
 #Enable ZMQ tests
@@ -530,8 +537,12 @@ class RPCTestHandler:
                               time.time(),
                               subprocess.Popen((RPC_TESTS_DIR + t).split() + self.flags.split() + port_seed,
                                                universal_newlines=True,
+                                               stdin=subprocess.DEVNULL,
                                                stdout=subprocess.PIPE,
-                                               stderr=subprocess.PIPE),
+                                               stderr=subprocess.PIPE,
+                                               close_fds=True,
+                                               restore_signals=True,
+                                               start_new_session=True),
                               log_stdout, log_stderr, got_outputs))
         if not self.jobs:
             raise IndexError('pop from empty list')
@@ -540,8 +551,8 @@ class RPCTestHandler:
             time.sleep(.5)
             for j in self.jobs:
                 (name, time0, proc, log_stdout, log_stderr, got_outputs) = j
-                if os.getenv('TRAVIS') == 'true' and int(time.time() - time0) > 20 * 60:
-                    # In travis, timeout individual tests after 20 minutes (to stop tests hanging and not
+                if ((inGitLabCI() or inTravis()) and int(time.time() - time0) > 20 * 60):
+                    # In external CI services, timeout individual tests after 20 minutes (to stop tests hanging and not
                     # providing useful output.
                     proc.send_signal(signal.SIGINT)
 
@@ -578,30 +589,33 @@ class RPCTestHandler:
                     # see: https://bugs.python.org/issue35182
                     pass
 
-                retval = proc.poll()
-                if not retval is None:
-                    if not got_outputs[0]:
-                        try:
-                            comms(0.1)
-                        except subprocess.TimeoutExpired as e:
-                            # communicate timed out, but process should have been killed already!
-                            proc.terminate()
-                            try:
-                                comms(1)
-                            except subprocess.TimeoutExpired as e:
-                                # terminate didn't work as expected
-                                proc.kill()
-                                try:
-                                    comms(5)
-                                except subprocess.TimeoutExpired as e:
-                                     print("%s: Expect a core dump" % proc.args[0])
-                                     dumpLogs = True
+                # it won't ever communicate() fully because child didn't close sockets
+                try:
+                    psproc = psutil.Process(proc.pid)
+                    if psproc.status() == psutil.STATUS_ZOMBIE:
+                        got_outputs[0] = True
+                except AttributeError:
+                    pass
+                except FileNotFoundError:
+                    pass # its ok means process exited cleanly
+                except psutil.NoSuchProcess:
+                    pass
+
+                if got_outputs[0]:
+                    retval = proc.returncode if proc.returncode != None else proc.poll()
+                    if retval is None:
+                        print("%s: should be impossible, got output from communicate but process is alive" % proc.args[0])
+                        dumpLogs = True
 
                     coreOutput = ""
                     try:
-                        coreDir = "/tmp/cores"
+                        if inGitLabCI():
+                            coreDir = os.path.join(os.environ.get("CI_PROJECT_DIR", None), "cores")
+                        else:
+                            coreDir = "/tmp/cores"
                         cores = os.listdir(coreDir)
                         for core in cores:
+                            print("Trying to analyze core file: " + str(core))
                             fullCoreFile = os.path.join(coreDir, core)
                             bitcoindBin = os.environ["BITCOIND"]
                             path, fil = os.path.split(bitcoindBin)
@@ -615,15 +629,13 @@ class RPCTestHandler:
                             fold_end = ("\ntravis_fold:end:%s\n" % core) if inTravis() else ""
                             coreOutput = fold_start + out + "\n-------\n" + err + fold_end
                             # Now delete this file so we don't dump it repeatedly.  Better would be to move it somewhere for export out of the container.
-                            coreDest = os.environ.get("CORE_SAVE_DIR", None)
-                            if coreDest is not None:
-                                shutil.move(fullCoreFile, os.path.join(coreDest, core))
+                            if inGitLabCI():
+                                newPath = os.path.join(os.environ.get("CI_PROJECT_DIR", None), "saved-cores")
+                                shutil.move(fullCoreFile, os.path.join(newPath, str(core) + "-" + str(name)))
                             else:
                                 os.remove(fullCoreFile)
-                    except FileNotFoundError:
-                        print("No directory /tmp/cores")
                     except Exception as e:
-                        print("Exception trying to show core:" + str(e))
+                        print("Exception trying to show core files in " + coreDir + " :" + str(e))
 
                     returnCode = "Process %s return code: %d" % (" ".join(proc.args),retval)
                     log_stdout.seek(0), log_stderr.seek(0)

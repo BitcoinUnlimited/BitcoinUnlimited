@@ -17,13 +17,13 @@ class CWallet;
 void StartShutdown();
 bool ShutdownRequested();
 /** Interrupt threads */
-void Interrupt(thread_group &threadGroup);
+void Interrupt();
 void Shutdown();
 //! Initialize the logging infrastructure
 void InitLogging();
 //! Parameter interaction: change current parameters depending on various rules
 void InitParameterInteraction();
-bool AppInit2(Config &config, thread_group &threadGroup);
+bool AppInit2(Config &config);
 
 void MainCleanup();
 void NetCleanup();
@@ -36,6 +36,7 @@ static const bool DEFAULT_PV_TESTMODE = false;
 
 extern CTweak<double> dMinLimiterTxFee;
 extern CTweak<double> dMaxLimiterTxFee;
+extern CTweak<bool> avoidReconsiderMostWorkChain;
 
 /** Returns licensing information (for -version) */
 std::string LicenseInfo();

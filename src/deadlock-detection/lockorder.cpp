@@ -160,6 +160,7 @@ void CLockOrderTracker::TrackLockOrderHistory(const CLockLocation &locklocation,
 
 void CLockOrderTracker::DeleteCritical(void *cs)
 {
+    std::lock_guard<std::mutex> lock(lot_mutex);
     std::map<void *, std::set<void *> >::iterator iter;
     iter = seenLockOrders.find(cs);
     if (iter != seenLockOrders.end())

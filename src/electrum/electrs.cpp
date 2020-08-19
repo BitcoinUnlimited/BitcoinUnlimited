@@ -77,7 +77,19 @@ static void remove_conflicting_arg(std::vector<std::string> &args, const std::st
     auto separator = override_arg.find_first_of("=");
     if (separator == std::string::npos)
     {
-        throw std::invalid_argument("Invalid format for argument '" + override_arg + "'");
+        // switch flag, for example "--disable-full-compaction".
+        auto it = begin(args);
+        while (it != end(args))
+        {
+            if (*it != override_arg)
+            {
+                ++it;
+                continue;
+            }
+            // Remove duplicate.
+            it = args.erase(it);
+        }
+        return;
     }
     separator++; // include '=' when matching argument names below
 
@@ -225,9 +237,10 @@ void set_xversion_flags(CXVersionMessage &xver, const std::string &network)
         return;
     }
 
-    constexpr double PROTOCOL_VERSION = 1.4;
+    constexpr double ELECTRUM_PROTOCOL_VERSION = 1.4;
 
     xver.set_u64c(XVer::BU_ELECTRUM_SERVER_PORT_TCP, std::stoul(rpc_port(network)));
-    xver.set_u64c(XVer::BU_ELECTRUM_SERVER_PROTOCOL_VERSION, static_cast<uint64_t>(PROTOCOL_VERSION * 1000000));
+    xver.set_u64c(
+        XVer::BU_ELECTRUM_SERVER_PROTOCOL_VERSION, static_cast<uint64_t>(ELECTRUM_PROTOCOL_VERSION * 1000000));
 }
 } // ns electrum

@@ -27,6 +27,10 @@ public:
 
     void Stop();
     bool IsRunning() const;
+
+    // signal to the electrum server that a new block is avaialable.
+    void NotifyNewBlock();
+
     ~ElectrumServer();
 
 private:

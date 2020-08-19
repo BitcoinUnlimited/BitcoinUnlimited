@@ -580,7 +580,6 @@ class CompactBlocksTest(BitcoinTestFramework):
     # failed but will cause the node to be disconected due to a merkle root check failure.
     def test_incorrect_blocktxn_response(self):
         print("Testing handling of incorrect blocktxn responses...")
-
         if (len(self.utxos) == 0):
             self.make_utxos()
         utxo = self.utxos.pop(0)
@@ -643,9 +642,8 @@ class CompactBlocksTest(BitcoinTestFramework):
         NetworkThread().start()  # Start up network handling in another thread
 
         # Test logic begins here
-        self.test_node.wait_for_verack()
         self.test_node.send_message(msg_xversion(), True)
-        self.test_node.wait_for_xverack()
+        self.test_node.wait_for_verack()
 
         # We will need UTXOs to construct transactions in later tests.
         self.make_utxos()
@@ -656,7 +654,8 @@ class CompactBlocksTest(BitcoinTestFramework):
         self.test_getblocktxn_requests()
         self.test_invalid_cmpctblock_message()
         self.test_incorrect_blocktxn_response()
- 
+        print("Expect this error to be written to stderr: 'EXCEPTION: St16invalid_argument'")
+
 
 if __name__ == '__main__':
     CompactBlocksTest().main()

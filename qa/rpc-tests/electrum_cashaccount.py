@@ -5,11 +5,12 @@ Tests the cashaccount features of the Electrum server.
 """
 from test_framework.util import waitFor, assert_equal
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.electrumutil import compare, bitcoind_electrum_args, create_electrum_connection
+from test_framework.electrumutil import compare, bitcoind_electrum_args, ElectrumConnection
 from test_framework.nodemessages import FromHex, CTransaction, CTxOut, ToHex
 from test_framework.blocktools import create_transaction
 from test_framework.cashaddr import decode as decode_addr
 from test_framework.script import *
+import asyncio
 
 CASHACCONT_PREFIX = bytes.fromhex("01010101")
 DATATYPE_KEYHASH = bytes.fromhex("01")
@@ -42,7 +43,7 @@ class ElectrumCashaccountTests(BitcoinTestFramework):
     def sync_electrs(self, n):
         waitFor(10, lambda: compare(n, "index_height", n.getblockcount()))
 
-    def test_basic(self, n, spends):
+    async def test_basic(self, n, spends, cli):
         # Tests adding one cashaccount registration
         tx = self.create_cashaccount_tx(n, spends.pop(), "satoshi", n.getnewaddress())
         n.sendrawtransaction(tx)
@@ -50,14 +51,14 @@ class ElectrumCashaccountTests(BitcoinTestFramework):
         n.generate(1)
         self.sync_electrs(n)
 
-        res = self.electrum.call("cashaccount.query.name", "satoshi", n.getblockcount())
+        res = await cli.call("cashaccount.query.name", "satoshi", n.getblockcount())
         assert_equal(1, len(res))
         account = res[0]
         assert_equal(tx, account['tx'])
         assert_equal(n.getblockcount(), account['height'])
         assert_equal(n.getbestblockhash(), account['blockhash'])
 
-    def test_duplicate_registration(self, n, spends):
+    async def test_duplicate_registration(self, n, spends, cli):
         # If a block has multiple transactions registering the same name, all
         # should be returned
         tx1 = self.create_cashaccount_tx(n, spends.pop(), "nakamoto", n.getnewaddress())
@@ -69,7 +70,7 @@ class ElectrumCashaccountTests(BitcoinTestFramework):
         n.generate(1)
         self.sync_electrs(n)
 
-        res = self.electrum.call("cashaccount.query.name",
+        res = await cli.call("cashaccount.query.name",
                 "nakamoto",
                 n.getblockcount())
 
@@ -86,11 +87,16 @@ class ElectrumCashaccountTests(BitcoinTestFramework):
     def run_test(self):
         n = self.nodes[0]
         n.generate(200)
-        self.electrum = create_electrum_connection()
 
-        spends = n.listunspent()
-        self.test_basic(n, spends)
-        self.test_duplicate_registration(n, spends)
+        async def async_tests():
+            cli = ElectrumConnection()
+            await cli.connect()
+
+            spends = n.listunspent()
+            await self.test_basic(n, spends, cli)
+            await self.test_duplicate_registration(n, spends, cli)
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(async_tests())
 
 if __name__ == '__main__':
     ElectrumCashaccountTests().main()

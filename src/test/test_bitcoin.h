@@ -18,6 +18,13 @@
 
 extern FastRandomContext insecure_rand_ctx;
 
+static inline void SetConnected(CNode &dummyNode)
+{
+    dummyNode.nVersion = MIN_PEER_PROTO_VERSION;
+    dummyNode.tVersionSent = GetTime();
+    dummyNode.fSuccessfullyConnected = true;
+}
+
 static inline void SeedInsecureRand(bool deterministic = false)
 {
     insecure_rand_ctx = FastRandomContext(deterministic);

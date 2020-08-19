@@ -101,6 +101,8 @@ static const unsigned int MAX_DISCONNECTS = 200;
 static const uint64_t DEFAULT_MAX_UPLOAD_TARGET = 0;
 /** Default for blocks only*/
 static const bool DEFAULT_BLOCKSONLY = false;
+/** Default for XVersion */
+static const bool DEFAULT_USE_XVERSION = true;
 
 // BITCOINUNLIMITED START
 static const bool DEFAULT_FORCEBITNODES = false;
@@ -134,7 +136,7 @@ bool OpenNetworkConnection(const CAddress &addrConnect,
 void MapPort(bool fUseUPnP);
 unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string &strError, bool fWhitelisted = false);
-void StartNode(thread_group &threadGroup);
+void StartNode();
 bool StopNode();
 
 struct CombinerAll
@@ -323,45 +325,6 @@ public:
 };
 #endif
 
-
-// clang-format off
-
-
-/*! Corresponding ConnectionStateOutgoing, this is used to track incoming versioning information from a peer. */
-enum class ConnectionStateIncoming : uint8_t {
-    //! initial state after TCP connection is up - waiting for version message
-    CONNECTED_WAIT_VERSION                       = 0x01,
-    //! Sent verack message - ready for xversion (or any other message, aborting the xversion-handling process)
-    SENT_VERACK_READY_FOR_POTENTIAL_XVERSION     = 0x02,
-    //! Sent xverack and am thus ready for general data transfer
-    READY                                        = 0x04,
-    //! placeholder value to allow any when checking for a particular state
-    ANY                                          = 0xff
-};
-ConnectionStateIncoming operator|(const ConnectionStateIncoming& a, const ConnectionStateIncoming& b);
-/** This is enum is used to track the state of the versioning information
-    that has been sent to the remote node. */
-enum class ConnectionStateOutgoing : uint8_t {
-    //! initial state after TCP connection is up
-    CONNECTED     = 0x01,
-    //! the VERSION message has been sent
-    SENT_VERSION  = 0x02,
-    //! Connection is ready for general data transfer into peer's direction (and the xversion as well as BU version has been sent)
-    READY         = 0x04,
-    //! placeholder value to allow any when checking for a particular state
-    ANY           = 0xff
-};
-ConnectionStateOutgoing operator|(const ConnectionStateOutgoing& a, const ConnectionStateOutgoing& b);
-// clang-format on
-
-//! ConnectionStateIncoming enum to string
-std::string toString(const ConnectionStateIncoming &state) PURE_FUNCTION;
-std::ostream &operator<<(std::ostream &os, const ConnectionStateIncoming &state);
-
-//! ConnectionStateOutgoing enum to string
-std::string toString(const ConnectionStateOutgoing &state) PURE_FUNCTION;
-std::ostream &operator<<(std::ostream &os, const ConnectionStateOutgoing &state);
-
 /** Information about a peer */
 class CNode
 {
@@ -372,13 +335,13 @@ class CNode
 public:
     /** This node's max acceptable number ancestor transactions.  Used to decide whether this node will accept a
      * particular transaction. */
-    size_t nLimitAncestorCount = GetBCHDefaultAncestorLimit(Params().GetConsensus(), chainActive.Tip());
+    size_t nLimitAncestorCount = BCH_DEFAULT_ANCESTOR_LIMIT;
     /** This node's max acceptable sum of all ancestor transaction sizes.  Used to decide whether this node will accept
      * a particular transaction. */
     size_t nLimitAncestorSize = BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000;
     /** This node's max acceptable number of descendants.  Used to decide whether this node will accept a particular
      * transaction. */
-    size_t nLimitDescendantCount = GetBCHDefaultDescendantLimit(Params().GetConsensus(), chainActive.Tip());
+    size_t nLimitDescendantCount = BCH_DEFAULT_DESCENDANT_LIMIT;
     /** This node's max acceptable sum of all descendant transaction sizes.  Used to decide whether this node will
      * accept a particular transaction. */
     size_t nLimitDescendantSize = BCH_DEFAULT_DESCENDANT_SIZE_LIMIT * 1000;
@@ -389,7 +352,9 @@ public:
     /** Maximum supported mempool synchronization version */
     uint64_t nMempoolSyncMaxVersionSupported = 0;
     /** set to true if this node support xVersion */
-    bool xVersionEnabled;
+    std::atomic<bool> xVersionEnabled{false};
+    /** set to true if the next expected message is xVersion */
+    std::atomic<bool> xVersionExpected{false};
     /** set to true if this node is ok with no message checksum */
     bool skipChecksum;
 
@@ -415,6 +380,7 @@ public:
     CCriticalSection cs_vRecvMsg;
     uint64_t nRecvBytes GUARDED_BY(cs_vRecvMsg);
     std::deque<CNetMessage> vRecvMsg GUARDED_BY(cs_vRecvMsg);
+    std::deque<CNetMessage> vRecvMsg_handshake GUARDED_BY(cs_vRecvMsg);
     // the next message we receive from the socket
     CNetMessage msg GUARDED_BY(cs_vRecvMsg);
     CStatHistory<uint64_t> currentRecvMsgSize;
@@ -446,12 +412,6 @@ public:
     /** The the remote peer sees us as this address (may be different than our IP due to NAT) */
     CService addrLocal;
     int nVersion;
-
-    /** The state of informing the remote peer of our version information */
-    ConnectionStateOutgoing state_outgoing;
-
-    /** The state of being informed by the remote peer of his version information */
-    ConnectionStateIncoming state_incoming;
 
     /** used to make processing serial when version handshake is taking place */
     CCriticalSection csSerialPhase;
@@ -488,11 +448,6 @@ public:
     bool fAutoOutbound; // any outbound node not connected with -addnode, connect-thinblock or -connect
     bool fNetworkNode; // any outbound node
     int64_t tVersionSent;
-
-    bool successfullyConnected() const
-    {
-        return (state_outgoing == ConnectionStateOutgoing::READY && state_incoming == ConnectionStateIncoming::READY);
-    }
 
     std::atomic<bool> fDisconnect;
     std::atomic<bool> fDisconnectRequest;
@@ -547,6 +502,8 @@ public:
     std::atomic<int64_t> nMaxBlocksInTransit;
 
     unsigned short addrFromPort;
+
+    std::atomic<bool> fSuccessfullyConnected;
 
 protected:
     // Basic fuzz-testing
@@ -641,8 +598,7 @@ public:
         // Checking the descendants makes no sense -- the target node can't have descendants in its mempool if it
         // doesn't have this transaction!
         if ((xVersionEnabled && props.countWithAncestors > nLimitAncestorCount) ||
-            (!xVersionEnabled &&
-                props.countWithAncestors > GetBCHDefaultDescendantLimit(Params().GetConsensus(), chainActive.Tip())))
+            (!xVersionEnabled && props.countWithAncestors > BCH_DEFAULT_DESCENDANT_LIMIT))
             return false;
         if (props.sizeWithAncestors > nLimitAncestorSize)
             return false;
@@ -650,6 +606,7 @@ public:
     }
 
     /** Updates node configuration variables based on XVERSION data in the xVersion member variable */
+    void ReadConfigFromXVersion_OLD();
     void ReadConfigFromXVersion();
 
     // requires LOCK(cs_vRecvMsg)
@@ -1105,9 +1062,7 @@ private:
 typedef std::vector<CNodeRef> VNodeRefs;
 
 class CTransaction;
-void RelayTransaction(const CTransactionRef ptx,
-    const bool fRespend = false,
-    const CTxProperties *txproperties = nullptr);
+void RelayTransaction(const CTransactionRef ptx, const CTxProperties *txproperties = nullptr);
 
 /** Access to the (IP) address database (peers.dat) */
 class CAddrDB

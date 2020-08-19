@@ -1,45 +1,5 @@
 from .nodemessages import *
 
-
-class msg_buversion(object):
-    command = b"buversion"
-
-    def __init__(self, addrFromPort=None):
-        self.addrFromPort = addrFromPort
-
-    def deserialize(self, f):
-        self.addrFromPort = struct.unpack("<H", f.read(2))[0]
-        return self
-
-    def serialize(self):
-        r = b""
-        r += struct.pack("<H", self.addrFromPort)
-        return r
-
-    def __repr__(self):
-        if self.addrFromPort is not None:
-            return "msg_buversion(addrFromPort=%d)" % (self.addrFromPort)
-        else:
-            return "msg_buversion(addrFromPort=None)"
-
-
-class msg_buverack(object):
-    command = b"buverack"
-
-    def __init__(self):
-        pass
-
-    def deserialize(self, f):
-        return self
-
-    def serialize(self):
-        r = b""
-        return r
-
-    def __repr__(self):
-        return "msg_buverack()"
-
-
 class QHash(object):
     """quarter hash"""
 
@@ -449,8 +409,6 @@ class msg_req_xpedited(object):
 
 
 bumessagemap = {
-    msg_buversion.command: msg_buversion,
-    msg_buverack.command: msg_buverack,
     msg_xthinblock.command: msg_xthinblock,
     msg_thinblock.command: msg_thinblock,
     msg_get_xthin.command: msg_get_xthin,
@@ -461,9 +419,3 @@ bumessagemap = {
     msg_Xb.command: msg_Xb,
     msg_req_xpedited.command: msg_req_xpedited,
 }
-
-# py.test
-
-def testRepr():
-    assert "=None" in repr(msg_buversion())
-    assert "=12345" in repr(msg_buversion(12345))

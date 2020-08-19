@@ -70,7 +70,8 @@ void ScriptPubKeyToJSON(const CScript &scriptPubKey, UniValue &out, bool fInclud
     out.pushKV("addresses", a);
 }
 
-void TxToJSON(const CTransaction &tx, const uint256 hashBlock, UniValue &entry)
+
+void TxToJSON(const CTransaction &tx, const int64_t txTime, const uint256 hashBlock, UniValue &entry)
 {
     entry.pushKV("txid", tx.GetHash().GetHex());
     entry.pushKV("size", (int)tx.GetTxSize());
@@ -109,6 +110,7 @@ void TxToJSON(const CTransaction &tx, const uint256 hashBlock, UniValue &entry)
     }
     entry.pushKV("vout", vout);
 
+    bool confs = false;
     if (!hashBlock.IsNull())
     {
         entry.pushKV("blockhash", hashBlock.GetHex());
@@ -120,11 +122,18 @@ void TxToJSON(const CTransaction &tx, const uint256 hashBlock, UniValue &entry)
                 entry.pushKV("confirmations", 1 + chainActive.Height() - pindex->nHeight);
                 entry.pushKV("time", pindex->GetBlockTime());
                 entry.pushKV("blocktime", pindex->GetBlockTime());
+                confs = true;
             }
-            else
-                entry.pushKV("confirmations", 0);
         }
     }
+    // If the confirmations wasn't written with a valid block, then we have 0 confirmations.
+    if (!confs)
+    {
+        entry.pushKV("confirmations", 0);
+        if (txTime != -1)
+            entry.pushKV("time", txTime);
+    }
+
     entry.pushKV("hex", EncodeHexTx(tx));
 }
 
@@ -232,8 +241,9 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
     }
 
     CTransactionRef tx;
+    int64_t txTime = GetTime(); // Will be overwritten by GetTransaction if we have a better value
     uint256 hash_block;
-    if (!GetTransaction(hash, tx, Params().GetConsensus(), hash_block, true, blockindex))
+    if (!GetTransaction(hash, tx, txTime, Params().GetConsensus(), hash_block, true, blockindex))
     {
         std::string errmsg;
         if (blockindex)
@@ -268,7 +278,7 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
     UniValue result(UniValue::VOBJ);
     if (blockindex)
         result.pushKV("in_active_chain", in_active_chain);
-    TxToJSON(*tx, hash_block, result);
+    TxToJSON(*tx, txTime, hash_block, result);
     return result;
 }
 
@@ -415,7 +425,7 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
 
         UniValue result(UniValue::VOBJ);
         result.pushKV("hex", strHex);
-        TxToJSON(*tx, block.GetHash(), result);
+        TxToJSON(*tx, 0, block.GetHash(), result); // txTime is 0 because block time will used
         resultSet.pushKV(tx->GetHash().ToString(), result);
     }
     return resultSet;
@@ -592,7 +602,7 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
             }
             UniValue txDetails(UniValue::VOBJ);
             txDetails.pushKV("hex", strHex);
-            TxToJSON(*tx, block.GetHash(), txDetails);
+            TxToJSON(*tx, 0, block.GetHash(), txDetails); // txTime can be 0 because block time overrides
             blockResults.pushKV(tx->GetHash().ToString(), txDetails);
         }
         resultSet.pushKV(block.GetHash().GetHex(), blockResults);
@@ -661,7 +671,8 @@ UniValue gettxoutproof(const UniValue &params, bool fHelp)
     if (pblockindex == nullptr)
     {
         CTransactionRef tx;
-        if (!GetTransaction(oneTxid, tx, Params().GetConsensus(), hashBlock, false) || hashBlock.IsNull())
+        int64_t txTime = 0; // This data is not needed for this function
+        if (!GetTransaction(oneTxid, tx, txTime, Params().GetConsensus(), hashBlock, false) || hashBlock.IsNull())
         {
             std::string errmsg;
             if (!fTxIndex)
@@ -1014,7 +1025,7 @@ UniValue decoderawtransaction(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
 
     UniValue result(UniValue::VOBJ);
-    TxToJSON(tx, uint256(), result);
+    TxToJSON(tx, -1, uint256(), result); // don't show the time since its not part of the tx serialized data
 
     return result;
 }
@@ -1531,7 +1542,7 @@ UniValue validaterawtransaction(const UniValue &params, bool fHelp)
             "\nResult:\n"
             "{\n"
             "  \"txid\" : \"value\",           (string) The transaction hash\n"
-            "  \"isValid\" : true|false,   (boolean) If the transaction has a complete set of signatures\n"
+            "  \"isValid\" : true|false,   (boolean) Will the transaction be accepted into the memory pool\n"
             "  \"isMineable\" : true|false,   (boolean) If the transaction is mineable now\n"
             "  \"isFutureMineable\" : true|false,   (boolean) If the transaction is mineable in the future\n"
             "  \"isStandard\" : true|false,   (boolean) If the transaction is standard\n"
