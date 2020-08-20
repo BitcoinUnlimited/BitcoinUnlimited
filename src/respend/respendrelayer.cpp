@@ -13,6 +13,8 @@
 #include "util.h"
 #include <mutex>
 
+extern CTweak<uint32_t> doubleSpendProofs;
+
 namespace respend
 {
 namespace
@@ -88,6 +90,9 @@ void RespendRelayer::SetValid(bool v) { valid = v; }
 void RespendRelayer::Trigger(CTxMemPool &pool)
 {
     if (!valid || !interesting)
+        return;
+
+    if (!doubleSpendProofs.Value())
         return;
 
     CTransactionRef ptx;

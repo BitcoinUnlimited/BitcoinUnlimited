@@ -42,8 +42,8 @@ extern CTweak<uint64_t> grapheneFastFilterCompatibility;
 extern CTweak<uint64_t> mempoolSyncMinVersionSupported;
 extern CTweak<uint64_t> mempoolSyncMaxVersionSupported;
 extern CTweak<uint64_t> syncMempoolWithPeers;
-
 extern CTweak<uint32_t> randomlyDontInv;
+extern CTweak<uint32_t> doubleSpendProofs;
 
 /** How many inbound connections will we track before pruning entries */
 const uint32_t MAX_INBOUND_CONNECTIONS_TRACKED = 10000;
@@ -289,7 +289,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         ss.clear();
                     }
                 }
-                else if (inv.type == MSG_DOUBLESPENDPROOF)
+                else if (inv.type == MSG_DOUBLESPENDPROOF && doubleSpendProofs.Value() == true)
                 {
                     DoubleSpendProof dsp = mempool.doubleSpendProofStorage()->lookup(inv.hash);
                     if (!dsp.isEmpty())
@@ -1052,7 +1052,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     requester.AskFor(inv, pfrom);
                 }
             }
-            else if (inv.type == MSG_DOUBLESPENDPROOF)
+            else if (inv.type == MSG_DOUBLESPENDPROOF && doubleSpendProofs.Value() == true)
             {
                 std::vector<CInv> vGetData;
                 vGetData.push_back(inv);
@@ -2030,7 +2030,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->fRelayTxes = true;
     }
 
-    if (strCommand == NetMsgType::DSPROOF)
+    if (strCommand == NetMsgType::DSPROOF && doubleSpendProofs.Value() == true)
     {
         LOG(DSPROOF, "Received a double spend proof from peer:%d\n", pfrom->GetId());
         uint256 dspHash;
