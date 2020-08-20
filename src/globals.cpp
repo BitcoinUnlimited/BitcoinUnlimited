@@ -284,6 +284,10 @@ CTweakRef<bool> displayArchInSubver("net.displayArchInSubver",
     "Show box architecture, 32/64bit, in node user agent string (subver)",
     &fDisplayArchInSubver);
 
+CTweak<bool> doubleSpendProofs("net.doubleSpendProofs",
+    "Process and forward double spend proofs (default: true)",
+    true);
+
 CTweak<bool> miningCPFP("mining.childPaysForParent",
     "If enabled then we will mine ancestor packages and allow child pays for parent.",
     true);
