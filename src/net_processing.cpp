@@ -277,7 +277,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             // If we found a txn then push it
             if (ptx)
             {
-                if (pfrom->xVersion.as_u64c(XVer::BU_TXN_CONCATENATION))
+                if (pfrom->txConcat != 0)
                 {
                     ss << *ptx;
 

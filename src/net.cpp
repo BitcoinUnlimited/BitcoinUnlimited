@@ -3503,6 +3503,7 @@ void CNode::ReadConfigFromXVersion_OLD()
     canSyncMempoolWithPeers = (xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_OLD) == 1);
     nMempoolSyncMinVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED_OLD);
     nMempoolSyncMaxVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED_OLD);
+    txConcat = xVersion.as_u64c(XVer::BU_TXN_CONCATENATION_OLD);
 }
 
 void CNode::ReadConfigFromXVersion()
@@ -3532,6 +3533,7 @@ void CNode::ReadConfigFromXVersion()
     canSyncMempoolWithPeers = (xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC) == 1);
     nMempoolSyncMinVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED);
     nMempoolSyncMaxVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED);
+    txConcat = xVersion.as_u64c(XVer::BU_TXN_CONCATENATION);
 }
 
 
