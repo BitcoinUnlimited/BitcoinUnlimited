@@ -351,6 +351,8 @@ public:
     uint64_t nMempoolSyncMinVersionSupported = 0;
     /** Maximum supported mempool synchronization version */
     uint64_t nMempoolSyncMaxVersionSupported = 0;
+    /** Tx concatenation supported (set by xversion) */
+    uint64_t txConcat = 0;
     /** set to true if this node support xVersion */
     std::atomic<bool> xVersionEnabled{false};
     /** set to true if the next expected message is xVersion */
