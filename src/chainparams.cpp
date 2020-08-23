@@ -141,7 +141,7 @@ public:
         // Noc, 15 2019 hard fork
         consensus.nov2019Height = 609135;
         // May, 15 2020 hard fork
-        consensus.may2020Height = 635259;
+        consensus.may2020Height = 635258;
         // Nov 15, 2020 12:00:00 UTC protocol upgrade¶
         consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
 
