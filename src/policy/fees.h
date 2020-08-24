@@ -3,8 +3,8 @@
 // Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#ifndef BITCOIN_POLICYESTIMATOR_H
-#define BITCOIN_POLICYESTIMATOR_H
+#ifndef BITCOIN_POLICY_FEES_H
+#define BITCOIN_POLICY_FEES_H
 
 #include "amount.h"
 #include "random.h"
@@ -254,4 +254,4 @@ private:
     /** Breakpoints to help determine whether a transaction was confirmed by Fee */
     CFeeRate feeLikely, feeUnlikely;
 };
-#endif /*BITCOIN_POLICYESTIMATOR_H */
+#endif /*BITCOIN_POLICY_FEES_H */

@@ -28,7 +28,6 @@ extern CCriticalSection cs_coinbaseFlags;
 extern std::atomic<int64_t> nTotalPackage;
 extern std::atomic<int64_t> nTotalScore;
 extern CTweak<bool> miningCPFP;
-extern CTweak<uint64_t> miningSigChecks;
 
 namespace Consensus
 {

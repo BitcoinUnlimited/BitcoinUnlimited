@@ -6,6 +6,7 @@
 #define BITCOIN_THREAD_GROUP_H
 
 #include <atomic>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -15,6 +16,7 @@ extern std::atomic<bool> shutdown_threads;
 class thread_group
 {
 private:
+    std::mutex cs_threads;
     std::vector<std::thread> threads;
 
 public:
@@ -22,12 +24,25 @@ public:
     template <class Fn, class... Args>
     void create_thread(Fn &&f, Args &&... args)
     {
+        std::lock_guard<std::mutex> lock(cs_threads);
         threads.push_back(std::thread(f, args...));
     }
 
-    bool empty() { return threads.size() == 0; }
+    uint32_t size()
+    {
+        std::lock_guard<std::mutex> lock(cs_threads);
+        return threads.size();
+    }
+
+    bool empty()
+    {
+        std::lock_guard<std::mutex> lock(cs_threads);
+        return threads.size() == 0;
+    }
+
     void join_all()
     {
+        std::lock_guard<std::mutex> lock(cs_threads);
         for (size_t i = 0; i < threads.size(); i++)
         {
             if (threads[i].joinable())
@@ -44,5 +59,5 @@ public:
         join_all();
     }
 };
-
+extern thread_group threadGroup;
 #endif

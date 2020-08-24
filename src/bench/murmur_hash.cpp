@@ -11,9 +11,8 @@ static void Murmur3(benchmark::State &state)
     unsigned int x = 0;
     while (state.KeepRunning())
     {
-        for (int i = 0; i < 1000000; i++)
-            x += MurmurHash3(5 * 0xfba4c795, in);
+        x += MurmurHash3(5 * 0xfba4c795, in);
     }
 }
 
-BENCHMARK(Murmur3);
+BENCHMARK(Murmur3, 500000);

@@ -140,7 +140,7 @@ extern CCriticalSection cs_vUseDNSSeeds;
 
 extern CSemaphore *semOutbound;
 extern CSemaphore *semOutboundAddNode; // BU: separate semaphore for -addnodes
-boost::condition_variable messageHandlerCondition;
+std::condition_variable messageHandlerCondition;
 
 // BU  Connection Slot mitigation - used to determine how many connection attempts over time
 extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
@@ -242,7 +242,7 @@ bool IsPeerAddrLocalGood(CNode *pnode)
 // pushes our own address to a peer
 void AdvertiseLocal(CNode *pnode)
 {
-    if (fListen && pnode->successfullyConnected())
+    if (fListen && pnode->fSuccessfullyConnected)
     {
         CAddress addrLocal = GetLocalAddress(&pnode->addr);
         // If discovery is enabled, sometimes give our peer the address it
@@ -350,38 +350,6 @@ bool IsReachable(const CNetAddr &addr)
     return IsReachable(net);
 }
 
-// clang-format off
-static const std::map<uint64_t, std::string> bitMeaningsCSI(
-{
-    {(uint64_t)ConnectionStateIncoming::CONNECTED_WAIT_VERSION, "CONNECTED_WAIT_VERSION"},
-    {(uint64_t)ConnectionStateIncoming::SENT_VERACK_READY_FOR_POTENTIAL_XVERSION, "SENT_VERACK_READY_FOR_POTENTIAL_XVERSION"},
-    {(uint64_t)ConnectionStateIncoming::READY, "READY"},
-    {(uint64_t)ConnectionStateIncoming::ANY, "ALL"}
-});
-
-static const std::map<uint64_t, std::string> bitMeaningsCSO(
-{
-    {(uint64_t)ConnectionStateOutgoing::CONNECTED, "CONNECTED"},
-    {(uint64_t)ConnectionStateOutgoing::SENT_VERSION, "SENT_VERSION"},
-    {(uint64_t)ConnectionStateOutgoing::READY, "READY"},
-    {(uint64_t)ConnectionStateOutgoing::ANY, "ALL"}
-});
-// clang-format on
-
-ConnectionStateIncoming operator|(const ConnectionStateIncoming &a, const ConnectionStateIncoming &b)
-{
-    return (ConnectionStateIncoming)((uint64_t)a | (uint64_t)b);
-}
-
-ConnectionStateOutgoing operator|(const ConnectionStateOutgoing &a, const ConnectionStateOutgoing &b)
-{
-    return (ConnectionStateOutgoing)((uint64_t)a | (uint64_t)b);
-}
-
-std::string toString(const ConnectionStateIncoming &state) { return toString((uint64_t)state, bitMeaningsCSI); }
-std::ostream &operator<<(std::ostream &os, const ConnectionStateIncoming &state) { return (os << toString(state)); }
-std::string toString(const ConnectionStateOutgoing &state) { return toString((uint64_t)state, bitMeaningsCSO); }
-std::ostream &operator<<(std::ostream &os, const ConnectionStateOutgoing &state) { return (os << toString(state)); }
 // Initialize static CNode variables used in static CNode functions.
 std::atomic<uint64_t> CNode::nTotalBytesRecv{0};
 std::atomic<uint64_t> CNode::nTotalBytesSent{0};
@@ -530,7 +498,7 @@ void CNode::CloseSocketDisconnect()
         CloseSocket(hSocket);
     }
 
-    // Purge any noderef's in the priority message queue relating to this peer. If we don't
+    // Purge any noderef's in the priority message queues relating to this peer. If we don't
     // remove the node references here then we won't be able to complete the disconnection.
     {
         LOCK(cs_prioritySendQ);
@@ -543,11 +511,25 @@ void CNode::CloseSocketDisconnect()
                 it++;
         }
     }
+    {
+        LOCK(cs_priorityRecvQ);
+        auto it = vPriorityRecvQ.begin();
+        while (it != vPriorityRecvQ.end())
+        {
+            if (this == it->first.get())
+                it = vPriorityRecvQ.erase(it);
+            else
+                it++;
+        }
+    }
 
     // in case this fails, we'll empty the recv buffer when the CNode is deleted
     TRY_LOCK(cs_vRecvMsg, lockRecv);
     if (lockRecv)
+    {
         vRecvMsg.clear();
+        vRecvMsg_handshake.clear();
+    }
 }
 
 void CNode::PushVersion()
@@ -574,8 +556,6 @@ void CNode::PushVersion()
         FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, BUComments), nBestHeight,
         !GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY));
     tVersionSent = GetTime();
-    DbgAssert(state_outgoing == ConnectionStateOutgoing::CONNECTED, {});
-    state_outgoing = ConnectionStateOutgoing::SENT_VERSION;
 }
 
 
@@ -666,7 +646,7 @@ static bool IsPriorityMsg(std::string strCommand)
         strCommand == NetMsgType::GET_XBLOCKTX || strCommand == NetMsgType::XPEDITEDREQUEST ||
         strCommand == NetMsgType::XPEDITEDBLK || strCommand == NetMsgType::XPEDITEDTXN ||
         strCommand == NetMsgType::CMPCTBLOCK || strCommand == NetMsgType::GETBLOCKTXN ||
-        strCommand == NetMsgType::BLOCKTXN)
+        strCommand == NetMsgType::BLOCKTXN || strCommand == NetMsgType::BLOCK)
     {
         return true;
     }
@@ -730,9 +710,8 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                         vPriorityRecvQ.push_back(std::make_pair<CNodeRef, CNetMessage>(CNodeRef(this), std::move(msg)));
                         msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
 
-                        LOG(THIN | GRAPHENE | CMPCT,
-                            "Receive Queue: pushed %s to the priority queue, %d bytes, peer(%d)\n", strCommand,
-                            vPriorityRecvQ.back().second.hdr.nMessageSize, this->GetId());
+                        LOG(PRIORITYQ, "Receive Queue: pushed %s to the priority queue, %d bytes, peer(%d)\n",
+                            strCommand, vPriorityRecvQ.back().second.hdr.nMessageSize, this->GetId());
                         // Indicate we have a priority message to process
                         fPriorityRecvMsg.store(true);
                         fSendLowPriority = false;
@@ -742,7 +721,16 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 
             if (fSendLowPriority)
             {
-                vRecvMsg.push_back(std::move(msg));
+                if (strCommand == NetMsgType::VERSION || strCommand == NetMsgType::XVERSION ||
+                    strCommand == NetMsgType::XVERSION_OLD || strCommand == NetMsgType::XVERACK_OLD ||
+                    strCommand == NetMsgType::VERACK)
+                {
+                    vRecvMsg_handshake.push_back(std::move(msg));
+                }
+                else
+                {
+                    vRecvMsg.push_back(std::move(msg));
+                }
                 msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
             }
             messageHandlerCondition.notify_one();
@@ -1531,9 +1519,10 @@ void ThreadSocketHandler()
                     // Send the first two messages in the send queue. We send two because
                     // the first message may be a partial message and as a result may not be
                     // a priority message; the priorty message may be the one behind this partial message.
+                    CNode *pfrom = noderef.get();
+                    if (pfrom != nullptr)
                     {
                         bool fEmpty = false;
-                        CNode *pfrom = noderef.get();
                         TRY_LOCK(pfrom->cs_vSend, lock_sendtwo);
                         if (lock_sendtwo)
                         {
@@ -2468,11 +2457,33 @@ static bool threadProcessMessages(CNode *pnode)
 
 void ThreadMessageHandler()
 {
-    boost::mutex condition_mutex;
-    boost::unique_lock<boost::mutex> lock(condition_mutex);
+    std::mutex condition_mutex;
+    std::unique_lock<std::mutex> lock(condition_mutex);
 
     while (shutdown_threads.load() == false)
     {
+        // Start or Stop threads as determined by the numMsgHandlerThreads tweak
+        {
+            static CCriticalSection cs_threads;
+            static uint32_t numThreads GUARDED_BY(cs_threads) = numMsgHandlerThreads.Value();
+            LOCK(cs_threads);
+            if (numMsgHandlerThreads.Value() >= 1 && numThreads > numMsgHandlerThreads.Value())
+            {
+                // Kill this thread
+                numThreads--;
+                LOGA("Stopping a message handler thread: Current handler threads are %d\n", numThreads);
+
+                return;
+            }
+            else if (numThreads < numMsgHandlerThreads.Value())
+            {
+                // Launch another thread
+                numThreads++;
+                threadGroup.create_thread(&ThreadMessageHandler);
+                LOGA("Starting a new message handler thread: Current handler threads are %d\n", numThreads);
+            }
+        }
+
         vector<CNode *> vNodesCopy;
         {
             // We require the vNodes lock here, throughout, even though we are only incrementing
@@ -2513,7 +2524,7 @@ void ThreadMessageHandler()
             if (pnode->fDisconnect)
                 continue;
 
-            if (pnode->successfullyConnected())
+            if (pnode->fSuccessfullyConnected)
             {
                 // parallel processing
                 fSleep &= threadProcessMessages(pnode);
@@ -2532,7 +2543,7 @@ void ThreadMessageHandler()
 
             // Put transaction and block requests into the request manager
             // and all other requests into the send queue.
-            if (pnode->successfullyConnected())
+            if (pnode->fSuccessfullyConnected)
             {
                 // parallel processing
                 g_signals.SendMessages(pnode);
@@ -2565,8 +2576,7 @@ void ThreadMessageHandler()
 
         if (fSleep)
         {
-            messageHandlerCondition.timed_wait(
-                lock, boost::posix_time::microsec_clock::universal_time() + boost::posix_time::milliseconds(50));
+            messageHandlerCondition.wait_until(lock, std::chrono::steady_clock::now() + std::chrono::milliseconds(10));
         }
     }
 }
@@ -2677,7 +2687,7 @@ bool BindListenPort(const CService &addrBind, string &strError, bool fWhiteliste
     return true;
 }
 
-void static Discover(thread_group &threadGroup)
+void static Discover()
 {
     if (!fDiscover)
         return;
@@ -2732,7 +2742,7 @@ void static Discover(thread_group &threadGroup)
 #endif
 }
 
-void StartNode(thread_group &threadGroup)
+void StartNode()
 {
     uiInterface.InitMessage(_("Loading addresses..."));
     // Load addresses from peers.dat
@@ -2777,7 +2787,7 @@ void StartNode(thread_group &threadGroup)
     if (pnodeLocalHost == nullptr)
         pnodeLocalHost = new CNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), nLocalServices));
 
-    Discover(threadGroup);
+    Discover();
 
     //
     // Start threads
@@ -2841,6 +2851,7 @@ void NetCleanup()
             {
                 LOCK(pnode->cs_vRecvMsg);
                 pnode->vRecvMsg.clear();
+                pnode->vRecvMsg_handshake.clear();
             }
             {
                 LOCK(pnode->cs_vSend);
@@ -2905,7 +2916,7 @@ void NetCleanup()
 }
 
 
-void RelayTransaction(const CTransactionRef ptx, const bool fRespend, const CTxProperties *txProperties)
+void RelayTransaction(const CTransactionRef ptx, const CTxProperties *txProperties)
 {
     if (ptx->GetTxSize() > maxTxSize.Value())
     {
@@ -2948,9 +2959,7 @@ void RelayTransaction(const CTransactionRef ptx, const bool fRespend, const CTxP
         // and we can assume this node is an SPV node.
         if (pnode->pfilter && !pnode->pfilter->IsEmpty())
         {
-            // Relaying double spends to SPV clients is an easy attack vector,
-            // and therefore only relay txns that are not potential double spends.
-            if (!fRespend && pnode->pfilter->IsRelevantAndUpdate(ptx))
+            if (pnode->pfilter->IsRelevantAndUpdate(ptx))
             {
                 pnode->PushInventory(inv);
             }
@@ -3048,7 +3057,7 @@ uint64_t CNode::GetTotalBytesSent() { return nTotalBytesSent; }
 void CNode::Fuzz(int nChance)
 {
     AssertLockHeld(cs_vSend);
-    if (!successfullyConnected())
+    if (!fSuccessfullyConnected)
         return; // Don't fuzz initial handshake
     if (GetRand(nChance) != 0)
         return; // Fuzz 1 of every nChance messages
@@ -3212,8 +3221,6 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     addr = addrIn;
     addrName = addrNameIn == "" ? addr.ToStringIPPort() : addrNameIn;
     nVersion = 0;
-    state_incoming = ConnectionStateIncoming::CONNECTED_WAIT_VERSION;
-    state_outgoing = ConnectionStateOutgoing::CONNECTED;
     strSubVer = "";
     fWhitelisted = false;
     fOneShot = false;
@@ -3224,6 +3231,7 @@ CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNa
     fAutoOutbound = false;
     fNetworkNode = false;
     tVersionSent = -1;
+    fSuccessfullyConnected = false;
     fDisconnect = false;
     fDisconnectRequest = false;
     nRefCount = 0;
@@ -3329,7 +3337,7 @@ CNode::~CNode()
     addrFromPort = 0;
 
     // Update addrman timestamp
-    if (nMisbehavior == 0 && successfullyConnected())
+    if (nMisbehavior == 0 && fSuccessfullyConnected)
         addrman.Connected(addr);
 
     // Decrement thintype peer counters
@@ -3411,8 +3419,7 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
         it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
         ssSend.GetAndClear(*it);
         nSendSize.fetch_add((*it).size());
-        LOG(THIN | GRAPHENE | CMPCT, "Send Queue: pushed %s to the priority queue, peer(%d)\n", strCommand,
-            this->GetId());
+        LOG(PRIORITYQ, "Send Queue: pushed %s to the priority queue, peer(%d)\n", strCommand, this->GetId());
 
         LOCK(cs_prioritySendQ);
         vPrioritySendQ.push_back(CNodeRef(this));
@@ -3469,6 +3476,36 @@ void CNode::DisconnectIfBanned()
     }
 }
 
+void CNode::ReadConfigFromXVersion_OLD()
+{
+    xVersionEnabled = true;
+    LOCK(cs_xversion);
+    skipChecksum = (xVersion.as_u64c(XVer::BU_MSG_IGNORE_CHECKSUM_OLD) == 1);
+    if (addrFromPort == 0)
+    {
+        addrFromPort = xVersion.as_u64c(XVer::BU_LISTEN_PORT_OLD) & 0xffff;
+    }
+
+    uint64_t num = xVersion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT_OLD);
+    if (num)
+        nLimitAncestorCount = num; // num == 0 means the field was not provided.
+    num = xVersion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT_OLD);
+    if (num)
+        nLimitAncestorSize = num;
+
+    num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT_OLD);
+    if (num)
+        nLimitDescendantCount = num;
+    num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT_OLD);
+    if (num)
+        nLimitDescendantSize = num;
+
+    canSyncMempoolWithPeers = (xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_OLD) == 1);
+    nMempoolSyncMinVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED_OLD);
+    nMempoolSyncMaxVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED_OLD);
+    txConcat = xVersion.as_u64c(XVer::BU_TXN_CONCATENATION_OLD);
+}
+
 void CNode::ReadConfigFromXVersion()
 {
     xVersionEnabled = true;
@@ -3496,6 +3533,7 @@ void CNode::ReadConfigFromXVersion()
     canSyncMempoolWithPeers = (xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC) == 1);
     nMempoolSyncMinVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED);
     nMempoolSyncMaxVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED);
+    txConcat = xVersion.as_u64c(XVer::BU_TXN_CONCATENATION);
 }
 
 

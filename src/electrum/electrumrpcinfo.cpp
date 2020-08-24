@@ -23,7 +23,15 @@ static int64_t get_index_height(const std::map<std::string, int64_t> &info)
 
 UniValue ElectrumRPCInfo::GetElectrumInfo() const
 {
-    auto electrsinfo = FetchElectrsInfo();
+    std::map<std::string, int64_t> electrsinfo;
+    try
+    {
+        electrsinfo = FetchElectrsInfo();
+    }
+    catch (const std::runtime_error &e)
+    {
+        LOGA("Electrum: %s: Failed to fetch electrs info %s", __func__, e.what());
+    }
     int64_t index_height = get_index_height(electrsinfo);
 
     UniValue info(UniValue::VOBJ);

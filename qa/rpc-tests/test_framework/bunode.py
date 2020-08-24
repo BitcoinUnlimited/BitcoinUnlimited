@@ -41,18 +41,6 @@ class BUProtocolHandler(NodeConnCB):
     def show_debug_msg(self, msg):
         print(msg)
 
-    # Spin until verack message is received from the node.
-    # Tests may want to use this as a signal that the test can begin.
-    # This can be called from the testing thread, so it needs to acquire the
-    # global lock.
-    def wait_for_buverack(self):
-        while True:
-            if self.disconnected:
-                raise DisconnectedError()
-            with mininode_lock:
-                if self.buverack_received:
-                    return
-            time.sleep(0.05)
 
     def clear_last_announcement(self):
         with mininode_lock:
@@ -71,19 +59,16 @@ class BUProtocolHandler(NodeConnCB):
     def on_verack(self, conn, message):
         conn.ver_recv = conn.ver_send
         self.verack_received = True
-        if self.remoteVersion >= EXPEDITED_VERSION:
-            msg = msg_buversion(conn.socket.getsockname()[1])
-            self.connection.send_message(msg)
 
-    def on_buverack(self, conn, message):
-        self.show_debug_msg("BU version ACK\n")
-        self.buverack_received = True
+    def on_xversion(self, conn, message):
+        self.show_debug_msg("extversion received\n")
+        self.remote_xversion = message
 
-    def on_xverack(self, conn, message):
+    def on_xverack_old(self, conn, message):
         self.show_debug_msg("xverack received\n")
         self.xverack_received = True
 
-    def on_xversion(self, conn, message):
+    def on_xversion_old(self, conn, message):
         self.show_debug_msg("xversion received\n")
         self.remote_xversion = message
 
@@ -298,9 +283,21 @@ version messages. Useful for testing that part of the P2P handshake. """
         self.show_debug_msg("version received\n")
         self.remoteVersion = message.nVersion
 
+    def on_extversion(self, conn, message):
+        self.show_debug_msg("extversion received\n")
+        self.remote_xversion = message
+
+    def on_xversion(self, conn, message):
+        self.show_debug_msg("xversion (old) received\n")
+        self.remote_xversion = message
+
     def on_verack(self, conn, message):
         self.show_debug_msg("verack received\n")
         self.verack_received = True
+
+    def on_xverack(self, conn, message):
+        self.show_debug_msg("xverack received\n")
+        self.xverack_received = True
 
 class BasicBUCashNode():
     def __init__(self):
@@ -309,10 +306,10 @@ class BasicBUCashNode():
         self.nthin = 0
         self.nxthin = 0
 
-    def connect(self, id, ip, port, rpc=None, protohandler=None, send_initial_version = True):
+    def connect(self, id, ip, port, rpc=None, protohandler=None, send_initial_version = True, send_xversion = False):
         if not protohandler:
             protohandler = BUProtocolHandler()
-        conn = NodeConn(ip, port, rpc, protohandler, bitcoinCash=True, send_initial_version = send_initial_version)
+        conn = NodeConn(ip, port, rpc, protohandler, bitcoinCash=True, send_initial_version = send_initial_version, send_xversion = send_xversion)
         protohandler.add_connection(conn)
         protohandler.add_parent(self)
         self.cnxns[id] = protohandler

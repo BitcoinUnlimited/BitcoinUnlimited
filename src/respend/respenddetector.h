@@ -30,6 +30,7 @@ public:
     void CheckForRespend(const CTxMemPool &pool, const CTransactionRef ptx);
     void SetValid(bool valid);
     bool IsRespend() const;
+    int GetDsproof() const;
 
     // Respend is interesting enough to trigger full tx validation.
     bool IsInteresting() const;
@@ -41,6 +42,9 @@ private:
     static std::unique_ptr<CRollingBloomFilter> respentBefore;
     static std::mutex respentBeforeMutex;
     std::vector<RespendActionPtr> actions;
+
+    // Does this tx have a dsproof associated with it
+    int dsproof = -1;
 };
 
 } // ns respend

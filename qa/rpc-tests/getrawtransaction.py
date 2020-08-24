@@ -44,9 +44,20 @@ class GetRawTransactionTest (BitcoinTestFramework):
             txids = []
             if blocks == 0:
                 self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 0.001)
+            oneTxHash = self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
+            txids.append(oneTxHash)
+            timeIssued = time.time()
             txids.append(self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1))
             txids.append(self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1))
-            txids.append(self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1))
+
+            # Test some fields of rawtransaction get getrawtransaction while the tx is unconfirmed
+            grt = self.nodes[0].getrawtransaction(oneTxHash, 1);
+            assert_equal(grt["confirmations"], 0)  # An unconfirmed tx should have 0 confirms
+            assert grt["time"] > 0
+            assert grt["time"] <= timeIssued  # Make sure the reported time is near the time issued, not now.
+            gt = self.nodes[0].gettransaction(oneTxHash)
+            assert_equal(gt["confirmations"], 0)  # An unconfirmed tx should have 0 confirms
+
             blockhash = self.nodes[0].generate(1)[0]
             blockTxids[blockhash] = txids
             blocks = blocks + 1
@@ -96,8 +107,9 @@ if __name__ == '__main__':
     GetRawTransactionTest ().main ()
 
 # Create a convenient function for an interactive python debugging session
-def GetRawTransactionTest():
+def Test():
     t = GetRawTransactionTest()
+    t.drop_to_pdb=True
     bitcoinConf = {
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
@@ -106,3 +118,4 @@ def GetRawTransactionTest():
 
     flags = standardFlags()
     t.main(flags, bitcoinConf, None)
+

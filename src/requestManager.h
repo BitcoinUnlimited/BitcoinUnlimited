@@ -60,14 +60,14 @@ class CNodeRequestData
 public:
     int requestCount;
     int desirability;
-    CNode *node;
-    CNodeRequestData(CNode *);
+    CNodeRef noderef;
+    CNodeRequestData(CNodeRef n);
 
-    CNodeRequestData() : requestCount(0), desirability(0), node(nullptr) {}
+    CNodeRequestData() : requestCount(0), desirability(0) {}
     void clear(void)
     {
         requestCount = 0;
-        node = nullptr;
+        noderef.~CNodeRef();
         desirability = 0;
     }
     bool operator<(const CNodeRequestData &rhs) const { return desirability < rhs.desirability; }
@@ -76,9 +76,9 @@ public:
 // Compare a CNodeRequestData object to a node
 struct MatchCNodeRequestData
 {
-    CNode *node;
-    MatchCNodeRequestData(CNode *n) : node(n){};
-    inline bool operator()(const CNodeRequestData &nd) const { return nd.node == node; }
+    CNode *pnode;
+    MatchCNodeRequestData(CNode *n) : pnode(n){};
+    inline bool operator()(const CNodeRequestData &nd) const { return nd.noderef.get() == pnode; }
 };
 
 class CUnknownObj

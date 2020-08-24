@@ -142,6 +142,21 @@ def waitFor(timeout, fn, onError="timeout in waitFor", sleepAmt=1.0):
         time.sleep(sleepAmt)
         timeout -= sleepAmt
 
+async def waitForAsync(timeout, fn, onError="timeout in waitFor", sleepAmt=1.0):
+    """  Repeatedly calls fn while it returns None, raising an assert after timeout.  If fn returns non None, return that result
+    """
+    timeout = float(timeout)
+    while 1:
+        result = await fn()
+        if not (result is None or result is False):
+            return result
+        if timeout <= 0:
+            if callable(onError):
+                onError = onError()
+            raise TimeoutException(onError)
+        time.sleep(sleepAmt)
+        timeout -= sleepAmt
+
 def expectException(fn, ExcType, comparison=None):
     try:
         fn()
@@ -980,8 +995,12 @@ def assert_not_equal(thing1, thing2):
     if thing1 == thing2:
         raise AssertionError("%s != %s"%(str(thing1),str(thing2)))
 
-def assert_equal(thing1, thing2):
+def assert_equal(thing1, thing2, doit=None):
     if thing1 != thing2:
+        if doit != None:
+            doit()
+        logging.error("assert_equal failed: %s != %s"%(str(thing1),str(thing2)))
+        logging.error(traceback.format_exc())
         raise AssertionError("%s != %s"%(str(thing1),str(thing2)))
 
 def assert_greater_than(thing1, thing2):
@@ -991,6 +1010,16 @@ def assert_greater_than(thing1, thing2):
 def assert_raises(exc, fun, *args, **kwds):
     try:
         fun(*args, **kwds)
+    except exc:
+        pass
+    except Exception as e:
+        raise AssertionError("Unexpected exception raised: "+type(e).__name__)
+    else:
+        raise AssertionError("No exception raised")
+
+async def assert_raises_async(exc, fun, *args, **kwds):
+    try:
+        await fun(*args, **kwds)
     except exc:
         pass
     except Exception as e:

@@ -20,8 +20,8 @@
 #include "chainparamsseeds.h"
 
 // Next protocol upgrade will be activated once MTP >= Nov 15 12:00:00 UTC 2020
-const uint64_t MAY2020_ACTIVATION_TIME = 1589544000;
-uint64_t nMiningForkTime = MAY2020_ACTIVATION_TIME;
+const uint64_t NOV2020_ACTIVATION_TIME = 1605441600;
+uint64_t nMiningForkTime = NOV2020_ACTIVATION_TIME;
 
 CBlock CreateGenesisBlock(CScript prefix,
     const std::string &comment,
@@ -119,7 +119,10 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.fPowNoRetargeting = false;
-
+        // The half life for the ASERT DAA. For every (nASERTHalfLife) seconds behind schedule the blockchain gets,
+        // difficulty is cut in half. Doubled if blocks are ahead of schedule.
+        // Two days
+        consensus.nASERTHalfLife = 2 * 24 * 60 * 60;
         // testing bit
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601LL; // January 1, 2008
@@ -137,8 +140,10 @@ public:
         consensus.nov2018Height = 556766;
         // Noc, 15 2019 hard fork
         consensus.nov2019Height = 609135;
-        // May 15, 2020 12:00:00 UTC protocol upgrade¶
-        consensus.may2020ActivationTime = MAY2020_ACTIVATION_TIME;
+        // May, 15 2020 hard fork
+        consensus.may2020Height = 635258;
+        // Nov 15, 2020 12:00:00 UTC protocol upgrade¶
+        consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -215,7 +220,8 @@ public:
         checkpoints[582680] = uint256S("0x000000000000000001b4b8e36aec7d4f9671a47872cb9a74dc16ca398c7dcc18");
         // Nov 15th 2019 activate Schnorr Multisig, minimal data
         checkpoints[609136] = uint256S("0x000000000000000000b48bb207faac5ac655c313e41ac909322eaa694f5bc5b1");
-
+        // May 15th 2020 activate op_reverse, SigChecks
+        checkpoints[635259] = uint256S("0x00000000000000000033dfef1fc2d6a5d5520b078c55193a9bf498c5b27530f7");
 
         // clang-format on
         // * UNIX timestamp of last checkpoint block
@@ -282,8 +288,10 @@ public:
         consensus.may2019Height = 0;
         // May 15, 2020 12:00:00 UTC protocol upgrade¶
         consensus.nov2019Height = 0;
+        // May, 15 2020 hard fork
+        consensus.may2020Height = 0;
         // Nov, 15 2019 12:00:00 UTC fork activation time
-        consensus.may2020ActivationTime = MAY2020_ACTIVATION_TIME;
+        consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
 
         vFixedSeeds.clear();
         vSeeds.clear();
@@ -335,6 +343,10 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = false;
+        // The half life for the ASERT DAA. For every (nASERTHalfLife) seconds behind schedule the blockchain gets,
+        // difficulty is cut in half. Doubled if blocks are ahead of schedule.
+        // One hour
+        consensus.nASERTHalfLife = 60 * 60;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
@@ -353,8 +365,10 @@ public:
         consensus.may2019Height = 1303884;
         // Nov, 15 2019 har fork
         consensus.nov2019Height = 1341711;
-        // May 15, 2020 12:00:00 UTC protocol upgrade¶
-        consensus.may2020ActivationTime = MAY2020_ACTIVATION_TIME;
+        // May, 15 2020 hard fork
+        consensus.may2020Height = 1378461;
+        // Nov 15, 2020 12:00:00 UTC protocol upgrade¶
+        consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
 
 
         pchMessageStart[0] = 0x0b;
@@ -418,6 +432,8 @@ public:
         checkpoints[1303885] = uint256S("0x00000000000000479138892ef0e4fa478ccc938fb94df862ef5bde7e8dee23d3");
         // Nov 15th 2019 activate Schnorr Multisig, minimal data
         checkpoints[1341712] = uint256S("0x00000000fffc44ea2e202bd905a9fbbb9491ef9e9d5a9eed4039079229afa35b");
+        // May 15th 2020 activate op_reverse, SigCheck
+        checkpoints[1378461] = uint256S("0x0000000099f5509b5f36b1926bcf82b21d936ebeadee811030dfbbb7fae915d7");
 
         // clang-format on
         // Data as of block
@@ -451,7 +467,10 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = true;
-
+        // The half life for the ASERT DAA. For every (nASERTHalfLife) seconds behind schedule the blockchain gets,
+        // difficulty is cut in half. Doubled if blocks are ahead of schedule.
+        // Two days
+        consensus.nASERTHalfLife = 2 * 24 * 60 * 60;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 0;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 999999999999LL;
@@ -470,8 +489,10 @@ public:
         consensus.may2019Height = 0;
         // Nov, 15 2019 hard fork is always active on regtest
         consensus.nov2019Height = 0;
-        // May 15, 2020 12:00:00 UTC protocol upgrade¶
-        consensus.may2020ActivationTime = MAY2020_ACTIVATION_TIME;
+        // May, 15 2020 hard fork
+        consensus.may2020Height = 0;
+        // Nov 15, 2020 12:00:00 UTC protocol upgrade¶
+        consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;

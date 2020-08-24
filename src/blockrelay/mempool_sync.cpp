@@ -17,7 +17,7 @@
 #include <random>
 
 extern CTxMemPool mempool;
-extern CTweak<uint64_t> syncMempoolWithPeers;
+extern CTweak<bool> syncMempoolWithPeers;
 extern CTweak<uint64_t> mempoolSyncMinVersionSupported;
 extern CTweak<uint64_t> mempoolSyncMaxVersionSupported;
 extern CCriticalSection cs_mempoolsync;
@@ -61,20 +61,8 @@ bool HandleMempoolSyncRequest(CDataStream &vRecv, CNode *pfrom)
 {
     LOG(MPOOLSYNC, "Handling mempool sync request from peer %s\n", pfrom->GetLogName());
     CMempoolSyncInfo mempoolinfo;
-    if (NegotiateMempoolSyncVersion(pfrom) > 0)
-        vRecv >> mempoolinfo;
-    else
-    {
-        CInv inv;
-        vRecv >> inv >> mempoolinfo;
+    vRecv >> mempoolinfo;
 
-        // Message consistency checking
-        if (!(inv.type == MSG_MEMPOOLSYNC))
-        {
-            dosMan.Misbehaving(pfrom, 100);
-            return error("invalid GET_MEMPOOLSYNC message type=%u\n", inv.type);
-        }
-    }
     NodeId nodeId = pfrom->GetId();
 
     // Requester should only contact peers that support mempool sync

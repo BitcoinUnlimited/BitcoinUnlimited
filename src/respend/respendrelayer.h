@@ -6,6 +6,9 @@
 #define BITCOIN_RESPEND_RESPENDRELAYER_H
 
 #include "respend/respendaction.h"
+#include "txmempool.h"
+
+extern CTxMemPool mempool;
 
 namespace respend
 {
@@ -18,7 +21,7 @@ public:
     RespendRelayer();
 
     bool AddOutpointConflict(const COutPoint &,
-        const CTxMemPool::txiter,
+        const uint256 hash,
         const CTransactionRef pRespendTx,
         bool seenBefore,
         bool isEquivalent) override;
@@ -26,11 +29,12 @@ public:
     bool IsInteresting() const override;
     void SetValid(bool v) override;
 
-    void Trigger() override;
+    void Trigger(CTxMemPool &pool) override;
 
 private:
     bool interesting;
     bool valid;
+    uint256 spendhash;
     CTransactionRef pRespend;
 };
 

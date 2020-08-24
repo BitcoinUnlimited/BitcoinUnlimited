@@ -1,13 +1,12 @@
 ACLOCAL_AMFLAGS = -I build-aux/m4
 
-lib_LTLIBRARIES = libsecp256k1.la
+SECP256K1_LIB = libsecp256k1.la
+lib_LTLIBRARIES = $(SECP256K1_LIB)
 if USE_JNI
-JNI_LIB = libsecp256k1_jni.la
-noinst_LTLIBRARIES = $(JNI_LIB)
-else
-JNI_LIB =
+lib_LTLIBRARIES += libsecp256k1_jni.la
 endif
 include_HEADERS = include/secp256k1.h
+include_HEADERS += include/secp256k1_preallocated.h
 noinst_HEADERS =
 noinst_HEADERS += src/scalar.h
 noinst_HEADERS += src/scalar_4x64.h
@@ -74,10 +73,11 @@ endif
 
 libsecp256k1_la_SOURCES = src/secp256k1.c
 libsecp256k1_la_CPPFLAGS = -DSECP256K1_BUILD -I$(top_srcdir)/include -I$(top_srcdir)/src $(SECP_INCLUDES)
-libsecp256k1_la_LIBADD = $(JNI_LIB) $(SECP_LIBS) $(COMMON_LIB)
+libsecp256k1_la_LIBADD = $(SECP_LIBS) $(COMMON_LIB)
 
 libsecp256k1_jni_la_SOURCES  = src/java/org_bitcoin_NativeSecp256k1.c src/java/org_bitcoin_Secp256k1Context.c
 libsecp256k1_jni_la_CPPFLAGS = -DSECP256K1_BUILD $(JNI_INCLUDES)
+libsecp256k1_jni_la_LIBADD = $(SECP256K1_LIB)
 
 noinst_PROGRAMS =
 if USE_BENCHMARK
@@ -114,52 +114,47 @@ exhaustive_tests_CPPFLAGS = -DSECP256K1_BUILD -I$(top_srcdir)/src $(SECP_INCLUDE
 if !ENABLE_COVERAGE
 exhaustive_tests_CPPFLAGS += -DVERIFY
 endif
-exhaustive_tests_LDADD = $(SECP_LIBS)
+exhaustive_tests_LDADD = $(SECP_LIBS) $(COMMON_LIB)
 exhaustive_tests_LDFLAGS = -static
 TESTS += exhaustive_tests
 endif
 
-JAVAROOT=src/java
-JAVAORG=org/bitcoin
-JAVA_GUAVA=$(srcdir)/$(JAVAROOT)/guava/guava-18.0.jar
-CLASSPATH_ENV=CLASSPATH=$(JAVA_GUAVA)
+JAVA_ROOT=src/java
+JAVA_ORG=org/bitcoin
+JAVA_SRC=$(top_srcdir)/$(JAVA_ROOT)/$(JAVA_ORG)
+JAVA_BUILD=$(top_builddir)/$(JAVA_ROOT)
+
 JAVA_FILES= \
-  $(JAVAROOT)/$(JAVAORG)/NativeSecp256k1.java \
-  $(JAVAROOT)/$(JAVAORG)/NativeSecp256k1Test.java \
-  $(JAVAROOT)/$(JAVAORG)/NativeSecp256k1Util.java \
-  $(JAVAROOT)/$(JAVAORG)/Secp256k1Context.java
+  $(JAVA_SRC)/NativeSecp256k1.java \
+  $(JAVA_SRC)/NativeSecp256k1Test.java \
+  $(JAVA_SRC)/NativeSecp256k1Util.java \
+  $(JAVA_SRC)/Secp256k1Context.java
 
 if USE_JNI
 
-$(JAVA_GUAVA):
-	@echo Guava is missing. Fetch it via: \
-	wget https://search.maven.org/remotecontent?filepath=com/google/guava/guava/18.0/guava-18.0.jar -O $(@)
-	@false
-
 .stamp-java: $(JAVA_FILES)
 	@echo   Compiling $^
-	$(AM_V_at)$(CLASSPATH_ENV) javac $^
+	$(AM_V_at)javac -d "$(JAVA_BUILD)" $^
 	@touch $@
 
 if USE_TESTS
 
-check-java: libsecp256k1.la $(JAVA_GUAVA) .stamp-java
-	$(AM_V_at)java -Djava.library.path="./:./src:./src/.libs:.libs/" -cp "$(JAVA_GUAVA):$(JAVAROOT)" $(JAVAORG)/NativeSecp256k1Test
+check-java: libsecp256k1_jni.la .stamp-java
+	$(AM_V_at)java -Djava.library.path="./:./src:./src/.libs:.libs/" -enableassertions -cp "$(JAVA_BUILD)" $(JAVA_ORG)/NativeSecp256k1Test
 
 endif
 endif
 
 if USE_ECMULT_STATIC_PRECOMPUTATION
-CPPFLAGS_FOR_BUILD +=-I$(top_srcdir) -I$(top_srcdir)/src
-CFLAGS_FOR_BUILD += -Wall -Wextra -Wno-unused-function
+CPPFLAGS_FOR_BUILD +=-I$(top_srcdir) -I$(top_srcdir)/src -I$(builddir)/src
 
 gen_context_OBJECTS = gen_context.o
 gen_context_BIN = gen_context$(BUILD_EXEEXT)
-gen_%.o: src/gen_%.c
+gen_%.o: src/gen_%.c src/libsecp256k1-config.h
 	$(CC_FOR_BUILD) $(CPPFLAGS_FOR_BUILD) $(CFLAGS_FOR_BUILD) -c $< -o $@
 
 $(gen_context_BIN): $(gen_context_OBJECTS)
-	$(CC_FOR_BUILD) $^ -o $@
+	$(CC_FOR_BUILD) $(CFLAGS_FOR_BUILD) $(LDFLAGS_FOR_BUILD) $^ -o $@
 
 $(libsecp256k1_la_OBJECTS): src/ecmult_static_context.h
 $(tests_OBJECTS): src/ecmult_static_context.h
@@ -169,13 +164,17 @@ $(bench_ecmult_OBJECTS): src/ecmult_static_context.h
 src/ecmult_static_context.h: $(gen_context_BIN)
 	./$(gen_context_BIN)
 
-CLEANFILES = $(gen_context_BIN) src/ecmult_static_context.h $(JAVAROOT)/$(JAVAORG)/*.class .stamp-java
+CLEANFILES = $(gen_context_BIN) src/ecmult_static_context.h $(JAVA_BUILD)/$(JAVA_ORG)/*.class .stamp-java
 endif
 
 EXTRA_DIST = autogen.sh src/gen_context.c src/basic-config.h $(JAVA_FILES)
 
 if ENABLE_MODULE_ECDH
 include src/modules/ecdh/Makefile.am.include
+endif
+
+if ENABLE_MODULE_MULTISET
+include src/modules/multiset/Makefile.am.include
 endif
 
 if ENABLE_MODULE_RECOVERY

@@ -6,6 +6,7 @@
 #include <set>
 
 #include "allowed_args.h"
+#include "bench/bench_constants.h"
 #include "blockstorage/blockstorage.h"
 #include "chainparams.h"
 #include "dosman.h"
@@ -663,6 +664,9 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
         .addArg("use-compactblocks", optionalBool,
             strprintf(_("Enable compact blocks to speed up the relay of blocks (default: %d)"),
                     DEFAULT_USE_COMPACT_BLOCKS))
+        .addArg("use-xversion", optionalBool,
+            strprintf(_("Enable extended versioning during node handshake (xversion) (default: %d)"),
+                    DEFAULT_USE_XVERSION))
         .addArg("preferential-timer=<millisec>", requiredInt,
             strprintf(_("Set graphene, thinblock and compactblock preferential timer duration (default: %u). Use 0 to "
                         "disable it."),
@@ -726,6 +730,8 @@ static void addElectrumOptions(AllowedArgs &allowedArgs)
             "(example: -electrum.rawarg=\"--server-banner=\\\"Welcome to my server!\\\"\"). "
             "This option can be specified multiple times.")
         .addArg("electrum.shutdownonerror", optionalBool, "Shutdown if the electrum server exits unexpectedly")
+        .addArg("electrum.blocknotify", optionalBool, "Instantly notify electrum server of new blocks. "
+                                                      "Must only be used with ElectrsCash 2.0.0 or later")
         .addDebugArg("electrum.exec", requiredStr, "Path to electrum daemon executable")
         .addDebugArg("electrum.monitoring.port", requiredStr, "Port to bind monitoring service")
         .addDebugArg("electrum.monitoring.host", requiredStr, "Host to bind monitoring service")
@@ -820,6 +826,31 @@ BitcoinCli::BitcoinCli() : AllowedArgs(true)
         .addArg("stdin", optionalBool, _("Read extra arguments from standard input, one per line until EOF/Ctrl-D "
                                          "(recommended for sensitive information such as passphrases)"));
 }
+
+BitcoinBench::BitcoinBench() : AllowedArgs(true)
+{
+    addHelpOptions(*this);
+
+    addHeader("Bitcoin Bench options:")
+        .addArg("-list", ::AllowedArgs::optionalStr,
+            "List benchmarks without executing them. Can be combined with -scaling and -filter")
+        .addArg("-evals=<n>", ::AllowedArgs::requiredInt,
+            strprintf("Number of measurement evaluations to perform. (default: %u)", DEFAULT_BENCH_EVALUATIONS))
+        .addArg("-filter=<regex>", ::AllowedArgs::requiredInt,
+            strprintf("Regular expression filter to select benchmark by name (default: %s)", DEFAULT_BENCH_FILTER))
+        .addArg("-scaling=<n>", ::AllowedArgs::requiredInt,
+            strprintf("Scaling factor for benchmark's runtime (default: %u)", DEFAULT_BENCH_SCALING))
+        .addArg("-printer=(console|plot)", ::AllowedArgs::requiredStr,
+            strprintf("Choose printer format. console: print data to console. plot: Print results as HTML graph "
+                      "(default: %s)",
+                    DEFAULT_BENCH_PRINTER))
+        .addArg("-plot-plotlyurl=<uri>", ::AllowedArgs::requiredInt,
+            strprintf("URL to use for plotly.js (default: %s)", DEFAULT_PLOT_PLOTLYURL))
+        .addArg("-plot-width=<x>", ::AllowedArgs::requiredInt,
+            strprintf("Plot width in pixel (default: %u)", DEFAULT_PLOT_WIDTH))
+        .addArg("-plot-height=<x>", ::AllowedArgs::requiredInt,
+            strprintf("Plot height in pixel (default: %u)", DEFAULT_PLOT_HEIGHT));
+};
 
 Bitcoind::Bitcoind(CTweakMap *pTweaks) : AllowedArgs(false) { addAllNodeOptions(*this, HMM_BITCOIND, pTweaks); }
 BitcoinQt::BitcoinQt(CTweakMap *pTweaks) : AllowedArgs(false) { addAllNodeOptions(*this, HMM_BITCOIN_QT, pTweaks); }

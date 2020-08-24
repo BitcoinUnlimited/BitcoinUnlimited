@@ -87,25 +87,35 @@ CParallelValidation::CParallelValidation() : nThreads(0), semThreadCount(nScript
     //-par=0 means autodetect number of cores.
     nThreads = GetArg("-par", DEFAULT_SCRIPTCHECK_THREADS);
     if (nThreads <= 0)
+    {
         nThreads += GetNumCores();
-    // A single thread has no parallelism so just use the main thread
-    // (Equivalent to parallel being turned off).
-    if (nThreads <= 1)
-        nThreads = 0;
+    }
+
+    // Must always assign at least one thread in case GetNumCores() fails.
+    if (nThreads <= 0)
+    {
+        nThreads = 1;
+    }
     else if (nThreads > MAX_SCRIPTCHECK_THREADS)
+    {
         nThreads = MAX_SCRIPTCHECK_THREADS;
+    }
 
     // Create each script check queue with all associated threads.
     LOGA("Launching %d ScriptQueues each using %d threads for script verification\n", nScriptCheckQueues, nThreads);
     while (QueueCount() < nScriptCheckQueues)
     {
         auto queue = new CCheckQueue<CScriptCheck>(128);
-        for (unsigned int i = 0; i < nThreads; i++)
+        for (unsigned int i = 1; i <= nThreads; i++)
         {
             threadGroup.create_thread(boost::bind(&AddScriptCheckThreads, i + 1, queue));
         }
         vQueues.push_back(queue);
     }
+
+    // Must always have at least one scriptcheck thread running or we'll
+    // end up not validating signatures when new blocks are mined.
+    DbgAssert(nThreads >= 1, nThreads = 1);
 }
 
 CParallelValidation::~CParallelValidation()
@@ -390,12 +400,14 @@ void CParallelValidation::SetLocks(const bool fParallel)
 {
     if (fParallel)
     {
+        boost::thread::id this_id(boost::this_thread::get_id());
+        {
+            LOCK(cs_blockvalidationthread);
+            if (mapBlockValidationThreads.count(this_id))
+                mapBlockValidationThreads[this_id].pScriptQueue = nullptr;
+        }
         // cs_main must be re-locked before returning from ConnectBlock()
         ENTER_CRITICAL_SECTION(cs_main);
-        boost::thread::id this_id(boost::this_thread::get_id());
-        LOCK(cs_blockvalidationthread);
-        if (mapBlockValidationThreads.count(this_id))
-            mapBlockValidationThreads[this_id].pScriptQueue = nullptr;
     }
 }
 
@@ -540,12 +552,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
                     // Terminate the thread with the largest block.
                     else if (miLargestBlock != mapBlockValidationThreads.end())
                     {
-                        // terminate the script queue thread
-                        (*miLargestBlock).second.pScriptQueue->Quit();
-                        LOG(PARALLEL, "Sending Quit() to scriptcheckqueue\n");
-
-                        // terminate the PV thread which releases the semaphore grant
-                        (*miLargestBlock).second.fQuit = true;
+                        Quit(miLargestBlock); // terminate the script queue thread
                         LOG(PARALLEL, "Too many blocks being validated, interrupting thread with blockhash %s "
                                       "and previous blockhash %s\n",
                             (*miLargestBlock).second.hash.ToString(),

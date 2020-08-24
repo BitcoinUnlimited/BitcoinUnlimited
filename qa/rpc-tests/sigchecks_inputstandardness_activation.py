@@ -7,6 +7,7 @@
 Test activation of per-input sigchecks limit standardness rule
 """
 import logging
+logging.getLogger().setLevel(logging.INFO)
 
 from test_framework.blocktools import (
     create_block,
@@ -293,7 +294,7 @@ class InputSigChecksActivationTest(BitcoinTestFramework):
         assert_equal(node.getblockchaininfo()['mediantime'], MAY2020_START_TIME)
 
         logging.info("The high-sigchecks transactions got evicted but the good ones are still around")
-        waitFor(10, lambda: set(node.getrawmempool()) == goodtxids)
+        waitFor(20, lambda: True if set(node.getrawmempool()) == goodtxids else logging.info(node.getrawmempool()))
 
         logging.info("Now the high-sigchecks transactions are rejected from mempool.")
         # try sending some of the bad txes again after the upgrade

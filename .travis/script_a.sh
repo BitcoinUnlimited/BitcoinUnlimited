@@ -33,9 +33,6 @@ echo "GOAL=$GOAL"
 
 BEGIN_FOLD configure
 DOCKER_EXEC ../configure --cache-file=config.cache $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG || ( cat config.log && false)
-if [ "$HOST" = "x86_64-apple-darwin11" ]; then
-  docker exec $DOCKER_ID bash -c "$TRAVIS_BUILD_DIR/contrib/devtools/xversionkeys.py > $TRAVIS_BUILD_DIR/src/xversionkeys.h < $TRAVIS_BUILD_DIR/src/xversionkeys.dat" ;
-fi
 END_FOLD
 
 BEGIN_FOLD formatting-check

@@ -34,6 +34,7 @@
 #include "script/standard.h"
 #include "stat.h"
 #include "sync.h"
+#include "threadgroup.h"
 #include "timedata.h"
 #include "tinyformat.h"
 #include "tweak.h"
@@ -198,11 +199,11 @@ const char *sampleNames[] = {"sec10", "min5", "hourly", "daily", "monthly"};
 int operateSampleCount[] = {30, 12, 24, 30};
 int interruptIntervals[] = {30, 30 * 12, 30 * 12 * 24, 30 * 12 * 24 * 30};
 
-CTxMemPool mempool(::minRelayTxFee);
-CTxOrphanPool orphanpool;
-
 std::chrono::milliseconds statMinInterval(10000);
 boost::asio::io_service stat_io_service;
+
+CTxMemPool mempool(::minRelayTxFee);
+CTxOrphanPool orphanpool;
 
 std::list<CStatBase *> mallocedStats;
 CStatMap statistics;
@@ -283,6 +284,10 @@ CTweakRef<bool> displayArchInSubver("net.displayArchInSubver",
     "Show box architecture, 32/64bit, in node user agent string (subver)",
     &fDisplayArchInSubver);
 
+CTweak<bool> doubleSpendProofs("net.doubleSpendProofs",
+    "Process and forward double spend proofs (default: true)",
+    true);
+
 CTweak<bool> miningCPFP("mining.childPaysForParent",
     "If enabled then we will mine ancestor packages and allow child pays for parent.",
     true);
@@ -301,13 +306,13 @@ CTweakRef<unsigned int> maxDataCarrierTweak("mining.dataCarrierSize",
     &nMaxDatacarrierBytes,
     &MaxDataCarrierValidator);
 
-CTweakRef<uint64_t> miningForkTime("consensus.forkMay2020Time",
+CTweakRef<uint64_t> miningForkTime("consensus.forkNov2020Time",
     "Time in seconds since the epoch to initiate the Bitcoin Cash protocol upgraded scheduled on 15th May 2020.  A "
     "setting of "
     "1 "
     "will turn on the fork at the appropriate time.",
     &nMiningForkTime,
-    &ForkTimeValidator); // Fri May 15 12:00:00 UTC 2020
+    &ForkTimeValidator); // Sunday Nov 15 12:00:00 UTC 2020
 
 CTweak<uint64_t> maxScriptOps("consensus.maxScriptOps",
     "Maximum number of script operations allowed.  Stack pushes are excepted.",
@@ -320,6 +325,8 @@ CTweak<uint64_t> maxSigChecks("consensus.maxBlockSigChecks",
 CTweak<bool> unsafeGetBlockTemplate("mining.unsafeGetBlockTemplate",
     "Allow getblocktemplate to succeed even if the chain tip is old or this node is not connected to other nodes",
     false);
+
+CTweak<bool> xvalTweak("mining.xval", "Turn on/off Xpress Validation (default: false)", false);
 
 CTweak<unsigned int> maxTxSize("net.excessiveTx", "Largest transaction size in bytes", DEFAULT_LARGEST_TRANSACTION);
 CTweakRef<unsigned int> eadTweak("net.excessiveAcceptDepth",
@@ -508,8 +515,21 @@ CTweak<double> dMinLimiterTxFee("minlimitertxfee",
                                     DEFAULT_MINLIMITERTXFEE),
     DEFAULT_MINLIMITERTXFEE);
 
+/** Disable reconsidermostworkchain during initial bootstrap when chain is not synced.
+  * This is for testing purpose only and hence it is disabled by default.
+  * This tweak will be useful during multiple clients interop network upgrade tests.
+  * During this tests  official testnet is forked via invalidate block, that means that
+  * if for what ever reason you need to restart your client during the test, you need to
+  * rollbackchain and then reconsiderblock the first block of the forked testnet. This is because
+  * if more than 1 block at time have to be invalidated so that the utxo may get undone correctly.
+  */
+CTweak<bool> avoidReconsiderMostWorkChain("test.avoidReconsiderMostWorkChain",
+    "Disable reconsidermostworkchain during initial bootstrap when chain is not synced",
+    false);
+
 CRequestManager requester; // after the maps nodes and tweaks
 CState nodestate;
+thread_group threadGroup;
 
 CStatHistory<unsigned int> txAdded; //"memPool/txAdded");
 CStatHistory<uint64_t, MinValMax<uint64_t> > poolSize; // "memPool/size",STAT_OP_AVE);

@@ -517,6 +517,8 @@ bool WriteUndoToDisk(const CBlockUndo &blockundo,
  */
 bool ReadUndoFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos, const CBlockIndex *pindex)
 {
+    if (pindex == nullptr)
+        return error("Null block has no undo information");
     if (!pblockdb)
     {
         return ReadUndoFromDiskSequential(blockundo, pos, pindex->GetBlockHash());

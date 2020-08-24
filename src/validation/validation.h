@@ -83,7 +83,16 @@ bool TestBlockValidity(CValidationState &state,
     const CBlock &block,
     CBlockIndex *pindexPrev,
     bool fCheckPOW = true,
-    bool fCheckMerkleRoot = true);
+    bool fCheckMerkleRoot = true,
+    bool fConservative = false);
+
+// used during mining
+bool TestConservativeBlockValidity(CValidationState &state,
+    const CChainParams &chainparams,
+    const CBlock &block,
+    CBlockIndex *pindexPrev,
+    bool fCheckPOW,
+    bool fCheckMerkleRoot);
 
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
 

@@ -62,7 +62,6 @@ struct CCoin
     }
 };
 
-extern void TxToJSON(const CTransaction &tx, const uint256 hashBlock, UniValue &entry);
 extern UniValue blockToJSON(const CBlock &block,
     const CBlockIndex *blockindex,
     bool txDetails = false,
@@ -387,7 +386,8 @@ static bool rest_tx(HTTPRequest *req, const std::string &strURIPart)
 
     CTransactionRef tx;
     uint256 hashBlock = uint256();
-    if (!GetTransaction(hash, tx, Params().GetConsensus(), hashBlock, true))
+    int64_t txTime = GetTime();
+    if (!GetTransaction(hash, tx, txTime, Params().GetConsensus(), hashBlock, true))
         return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
 
     CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
@@ -414,7 +414,7 @@ static bool rest_tx(HTTPRequest *req, const std::string &strURIPart)
     case RF_JSON:
     {
         UniValue objTx(UniValue::VOBJ);
-        TxToJSON(*tx, hashBlock, objTx);
+        TxToJSON(*tx, txTime, hashBlock, objTx);
         string strJSON = objTx.write() + "\n";
         req->WriteHeader("Content-Type", "application/json");
         req->WriteReply(HTTP_OK, strJSON);

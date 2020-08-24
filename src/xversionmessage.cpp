@@ -55,7 +55,8 @@ void CXVersionMessage::set_u64c(const uint64_t key, const uint64_t val)
 
     std::vector<uint8_t> vec;
     vec.insert(vec.begin(), s.begin(), s.end());
-    xmap[key] = vec;
+
     LOCK(cacheProtector);
+    xmap[key] = vec;
     cache_u64c[key] = val;
 }

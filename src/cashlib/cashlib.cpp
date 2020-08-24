@@ -158,7 +158,7 @@ SLAPI int GetPubKey(unsigned char *keyData, unsigned char *result, unsigned int 
 /** Sign data (compatible with OP_CHECKDATASIG) */
 SLAPI int SignData(unsigned char *data,
     int datalen,
-    unsigned char *keyData,
+    unsigned char *secret,
     unsigned char *result,
     unsigned int resultLen)
 {
@@ -169,11 +169,11 @@ SLAPI int SignData(unsigned char *data,
         verifyContext = new ECCVerifyHandle();
     }
 
-    CKey key = LoadKey(keyData);
+    CKey key = LoadKey(secret);
     uint256 hash;
     CSHA256().Write(data, datalen).Finalize(hash.begin());
     std::vector<uint8_t> sig;
-    if (!key.SignECDSA(hash, sig))
+    if (!key.SignSchnorr(hash, sig))
     {
         return 0;
     }
@@ -840,7 +840,11 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Pay
 
     if (len != 32)
     {
-        __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "secret has incorrect length\n");
+        std::stringstream err;
+        err << "GetPubKey: Incorrect length for argument 'secret'. "
+            << "Expected 32, got " << len << ".";
+        triggerJavaIllegalStateException(env, err.str().c_str());
+        return nullptr;
     }
     assert(len == 32);
 
@@ -854,6 +858,40 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Pay
     env->ReleaseByteArrayElements(bArray, dest, 0);
     return bArray;
 }
+
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Key_signDataUsingSchnorr(JNIEnv *env,
+    jobject ths,
+    jbyteArray message,
+    jbyteArray secret)
+{
+    ByteArrayAccessor data(env, message);
+    ByteArrayAccessor privkey(env, secret);
+    if (privkey.size != 32)
+    {
+        std::stringstream err;
+        err << "signDataUsingSchnorr: Incorrect length for argument 'secret'. "
+            << "Expected 32, got " << privkey.size << ".";
+        triggerJavaIllegalStateException(env, err.str().c_str());
+        return nullptr;
+    }
+
+    if (data.size == 0)
+    {
+        triggerJavaIllegalStateException(env, "signDataUsingSchnorr: Cannot sign data of 0 length.");
+        return nullptr;
+    }
+
+    unsigned char result[MAX_SIG_LEN];
+    uint32_t resultLen = SignData(data.data, data.size, privkey.data, result, MAX_SIG_LEN);
+
+    if (resultLen == 0)
+    {
+        triggerJavaIllegalStateException(env, "signDataUsingSchnorr: Failed to sign data.");
+        return nullptr;
+    }
+    return makeJByteArray(env, result, resultLen);
+}
+
 
 extern "C" JNIEXPORT jstring JNICALL Java_bitcoinunlimited_libbitcoincash_PayAddress_EncodeCashAddr(JNIEnv *env,
     jobject ths,
@@ -870,7 +908,22 @@ extern "C" JNIEXPORT jstring JNICALL Java_bitcoinunlimited_libbitcoincash_PayAdd
     jbyte *data = env->GetByteArrayElements(arg, 0);
 
     uint160 tmp((const uint8_t *)data);
-    CTxDestination dst = CKeyID(tmp);
+
+    CTxDestination dst = CNoDestination();
+    if (typ == 2 /* P2PKH */)
+    {
+        dst = CKeyID(tmp);
+    }
+    else if (typ == 3 /* P2PSH */)
+    {
+        dst = CScriptID(tmp);
+    }
+    else
+    {
+        triggerJavaIllegalStateException(env, "Address type cannot be encoded to cashaddr");
+        return nullptr;
+    }
+
 
     env->ReleaseByteArrayElements(arg, data, 0);
 
@@ -1142,8 +1195,9 @@ SLAPI int RandomBytes(unsigned char *buf, int num)
     javaEnv->DeleteLocalRef(bArray);
     return num;
 }
-// Implement API normally provided by random.cpp calling openssl
+// Implement APIs normally provided by random.cpp calling openssl
 void GetRandBytes(unsigned char *buf, int num) { RandomBytes(buf, num); }
+void GetStrongRandBytes(unsigned char *buf, int num) { RandomBytes(buf, num); }
 #define JAVA_ANDROID
 
 #endif

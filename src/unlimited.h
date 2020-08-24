@@ -141,14 +141,6 @@ extern void UnlimitedAcceptBlock(const CBlock &block,
 
 extern void UnlimitedLogBlock(const CBlock &block, const std::string &hash, uint64_t receiptTime);
 
-// used during mining
-extern bool TestConservativeBlockValidity(CValidationState &state,
-    const CChainParams &chainparams,
-    const CBlock &block,
-    CBlockIndex *pindexPrev,
-    bool fCheckPOW,
-    bool fCheckMerkleRoot);
-
 // Check whether this block is bigger in some metric than we really want to accept
 extern bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nTx, uint64_t largestTx);
 
@@ -288,9 +280,7 @@ std::string Bip135VoteValidator(const std::string &value, std::string *item, boo
 std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool validate);
 
 extern CTweak<unsigned int> maxTxSize;
-extern CTweak<uint64_t> blockSigopsPerMb;
 extern CTweak<uint64_t> coinbaseReserve;
-extern CTweak<uint64_t> blockMiningSigopsPerMb;
 extern CTweak<unsigned int> unconfPushAction;
 
 extern std::list<CStatBase *> mallocedStats;

@@ -34,7 +34,8 @@
 #include <boost/test/unit_test.hpp>
 #include <thread>
 
-FastRandomContext insecure_rand_ctx;
+uint256 insecure_rand_seed = GetRandHash();
+FastRandomContext insecure_rand_ctx(insecure_rand_seed);
 
 extern bool fPrintToConsole;
 extern void noui_connect();
@@ -166,7 +167,7 @@ CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CMutableTransaction &tx, CT
 
 CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransaction &txn, CTxMemPool *pool)
 {
-    bool hasNoDependencies = pool ? pool->HasNoInputsOf(txn) : hadNoDependencies;
+    bool hasNoDependencies = pool ? pool->HasNoInputsOf(MakeTransactionRef(txn)) : hadNoDependencies;
     // Hack to assume either its completely dependent on other mempool txs or not at all
     CAmount inChainValue = hasNoDependencies ? txn.GetValueOut() : 0;
 

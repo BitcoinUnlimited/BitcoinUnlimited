@@ -10,6 +10,10 @@
 #include <chrono>
 #include <string>
 
+#if BOOST_OS_LINUX
+#include <signal.h>
+#endif
+
 //! give the program a second to complain about startup issues, such as invalid
 //! parameters.
 static bool startup_check(const SubProcess &p)
@@ -170,6 +174,18 @@ bool ElectrumServer::IsRunning() const
         return false;
     }
     return process->IsRunning();
+}
+
+void ElectrumServer::NotifyNewBlock()
+{
+    std::unique_lock<std::mutex> lock(process_cs);
+    if (!bool(process))
+    {
+        return;
+    }
+#if BOOST_OS_LINUX
+    process->SendSignal(SIGUSR1);
+#endif
 }
 
 ElectrumServer &ElectrumServer::Instance()
