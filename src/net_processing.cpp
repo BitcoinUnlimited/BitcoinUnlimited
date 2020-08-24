@@ -42,8 +42,8 @@ extern CTweak<uint64_t> grapheneFastFilterCompatibility;
 extern CTweak<uint64_t> mempoolSyncMinVersionSupported;
 extern CTweak<uint64_t> mempoolSyncMaxVersionSupported;
 extern CTweak<uint64_t> syncMempoolWithPeers;
-
 extern CTweak<uint32_t> randomlyDontInv;
+extern CTweak<uint32_t> doubleSpendProofs;
 
 /** How many inbound connections will we track before pruning entries */
 const uint32_t MAX_INBOUND_CONNECTIONS_TRACKED = 10000;
@@ -277,7 +277,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             // If we found a txn then push it
             if (ptx)
             {
-                if (pfrom->xVersion.as_u64c(XVer::BU_TXN_CONCATENATION))
+                if (pfrom->txConcat != 0)
                 {
                     ss << *ptx;
 
@@ -289,7 +289,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         ss.clear();
                     }
                 }
-                else if (inv.type == MSG_DOUBLESPENDPROOF)
+                else if (inv.type == MSG_DOUBLESPENDPROOF && doubleSpendProofs.Value() == true)
                 {
                     DoubleSpendProof dsp = mempool.doubleSpendProofStorage()->lookup(inv.hash);
                     if (!dsp.isEmpty())
@@ -1052,7 +1052,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     requester.AskFor(inv, pfrom);
                 }
             }
-            else if (inv.type == MSG_DOUBLESPENDPROOF)
+            else if (inv.type == MSG_DOUBLESPENDPROOF && doubleSpendProofs.Value() == true)
             {
                 std::vector<CInv> vGetData;
                 vGetData.push_back(inv);
@@ -2030,71 +2030,75 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->fRelayTxes = true;
     }
 
-    if (strCommand == NetMsgType::DSPROOF)
+    else if (strCommand == NetMsgType::DSPROOF)
     {
-        LOG(DSPROOF, "Received a double spend proof from peer:%d\n", pfrom->GetId());
-        uint256 dspHash;
-        try
+        if (doubleSpendProofs.Value() == true)
         {
-            DoubleSpendProof dsp;
-            vRecv >> dsp;
-            if (dsp.isEmpty())
-                throw std::runtime_error("Double spend proof is empty");
+            LOG(DSPROOF, "Received a double spend proof from peer:%d\n", pfrom->GetId());
+            uint256 dspHash;
+            try
+            {
+                DoubleSpendProof dsp;
+                vRecv >> dsp;
+                if (dsp.isEmpty())
+                    throw std::runtime_error("Double spend proof is empty");
 
-            dspHash = dsp.GetHash();
-            DoubleSpendProof::Validity validity;
-            {
-                READLOCK(mempool.cs_txmempool);
-                validity = dsp.validate(mempool);
-            }
-            switch (validity)
-            {
-            case DoubleSpendProof::Valid:
-            {
-                LOG(DSPROOF, "Double spend proof is valid from peer:%d\n", pfrom->GetId());
-                const auto ptx = mempool.addDoubleSpendProof(dsp);
-                if (ptx.get())
+                dspHash = dsp.GetHash();
+                DoubleSpendProof::Validity validity;
                 {
-                    // find any descendants of this double spent transaction. If there are any
-                    // then we must also forward this double spend proof to any SPV peers that
-                    // want to know about this tx or its descendants.
-                    CTxMemPool::setEntries setDescendants;
-                    {
-                        READLOCK(mempool.cs_txmempool);
-                        CTxMemPool::indexed_transaction_set::const_iterator iter = mempool.mapTx.find(ptx->GetHash());
-                        if (iter == mempool.mapTx.end())
-                        {
-                            break;
-                        }
-                        else
-                        {
-                            mempool._CalculateDescendants(iter, setDescendants);
-                        }
-                    }
-
-                    // added to mempool correctly, then forward to nodes.
-                    broadcastDspInv(ptx, dspHash, &setDescendants);
+                    READLOCK(mempool.cs_txmempool);
+                    validity = dsp.validate(mempool);
                 }
-                break;
+                switch (validity)
+                {
+                case DoubleSpendProof::Valid:
+                {
+                    LOG(DSPROOF, "Double spend proof is valid from peer:%d\n", pfrom->GetId());
+                    const auto ptx = mempool.addDoubleSpendProof(dsp);
+                    if (ptx.get())
+                    {
+                        // find any descendants of this double spent transaction. If there are any
+                        // then we must also forward this double spend proof to any SPV peers that
+                        // want to know about this tx or its descendants.
+                        CTxMemPool::setEntries setDescendants;
+                        {
+                            READLOCK(mempool.cs_txmempool);
+                            CTxMemPool::indexed_transaction_set::const_iterator iter =
+                                mempool.mapTx.find(ptx->GetHash());
+                            if (iter == mempool.mapTx.end())
+                            {
+                                break;
+                            }
+                            else
+                            {
+                                mempool._CalculateDescendants(iter, setDescendants);
+                            }
+                        }
+
+                        // added to mempool correctly, then forward to nodes.
+                        broadcastDspInv(ptx, dspHash, &setDescendants);
+                    }
+                    break;
+                }
+                case DoubleSpendProof::MissingUTXO:
+                case DoubleSpendProof::MissingTransaction:
+                    LOG(DSPROOF, "Double spend proof is orphan: postponed\n");
+                    mempool.doubleSpendProofStorage()->addOrphan(dsp, pfrom->GetId());
+                    break;
+                case DoubleSpendProof::Invalid:
+                    throw std::runtime_error("Double spend proof didn't validate");
+                default:
+                    return false;
+                }
             }
-            case DoubleSpendProof::MissingUTXO:
-            case DoubleSpendProof::MissingTransaction:
-                LOG(DSPROOF, "Double spend proof is orphan: postponed\n");
-                mempool.doubleSpendProofStorage()->addOrphan(dsp, pfrom->GetId());
-                break;
-            case DoubleSpendProof::Invalid:
-                throw std::runtime_error("Double spend proof didn't validate");
-            default:
+            catch (const std::exception &e)
+            {
+                LOG(DSPROOF, "Failure handling double spend proof. Peer: %d Reason: %s\n", pfrom->GetId(), e.what());
+                if (!dspHash.IsNull())
+                    mempool.doubleSpendProofStorage()->markProofRejected(dspHash);
+                dosMan.Misbehaving(pfrom->GetId(), 10);
                 return false;
             }
-        }
-        catch (const std::exception &e)
-        {
-            LOG(DSPROOF, "Failure handling double spend proof. Peer: %d Reason: %s\n", pfrom->GetId(), e.what());
-            if (!dspHash.IsNull())
-                mempool.doubleSpendProofStorage()->markProofRejected(dspHash);
-            dosMan.Misbehaving(pfrom->GetId(), 10);
-            return false;
         }
     }
 

@@ -16,6 +16,8 @@
 
 #include <algorithm>
 
+extern CTweak<uint32_t> doubleSpendProofs;
+
 namespace respend
 {
 static const unsigned int MAX_RESPEND_BLOOM = 100000;
@@ -74,48 +76,50 @@ void RespendDetector::CheckForRespend(const CTxMemPool &pool, const CTransaction
     {
         const COutPoint outpoint = in.prevout;
 
-        // Check first if there are already double spend orphans. If there are
-        // then we can broadcast them here and continue without needing to check
-        // further for conflicts for this outpoint.
-        auto orphans = pool.doubleSpendProofStorage()->findOrphans(outpoint);
-        if (!orphans.empty())
+        if (doubleSpendProofs.Value())
         {
-            for (auto iter = orphans.begin(); iter != orphans.end(); iter++)
+            // Check first if there are already double spend orphans. If there are
+            // then we can broadcast them here and continue without needing to check
+            // further for conflicts for this outpoint.
+            auto orphans = pool.doubleSpendProofStorage()->findOrphans(outpoint);
+            if (!orphans.empty())
             {
-                const int proofId = iter->first;
-                auto dsp = pool.doubleSpendProofStorage()->proof(proofId);
-                LOG(DSPROOF, "Rescued a DoubleSpendProof orphan %d", proofId);
-                auto rc = dsp.validate(pool, ptx);
-                DbgAssert(rc == DoubleSpendProof::Valid || rc == DoubleSpendProof::Invalid, );
-
-                if (rc == DoubleSpendProof::Valid)
+                for (auto iter = orphans.begin(); iter != orphans.end(); iter++)
                 {
-                    LOG(DSPROOF, "DoubleSpendProof for orphan validated correctly %d", proofId);
-                    pool.doubleSpendProofStorage()->claimOrphan(proofId);
-                    {
-                        std::lock_guard<std::mutex> lock(respentBeforeMutex);
-                        dsproof = proofId;
-                    }
+                    const int proofId = iter->first;
+                    auto dsp = pool.doubleSpendProofStorage()->proof(proofId);
+                    LOG(DSPROOF, "Rescued a DoubleSpendProof orphan %d", proofId);
+                    auto rc = dsp.validate(pool, ptx);
+                    DbgAssert(rc == DoubleSpendProof::Valid || rc == DoubleSpendProof::Invalid, );
 
-                    // remove all other orphans since we only need one
-                    while (++iter != orphans.end())
+                    if (rc == DoubleSpendProof::Valid)
                     {
-                        pool.doubleSpendProofStorage()->remove(iter->first);
-                        LOG(DSPROOF, "Removing DoubleSpendProof orphan, we only need one %d", proofId);
-                    }
+                        LOG(DSPROOF, "DoubleSpendProof for orphan validated correctly %d", proofId);
+                        pool.doubleSpendProofStorage()->claimOrphan(proofId);
+                        {
+                            std::lock_guard<std::mutex> lock(respentBeforeMutex);
+                            dsproof = proofId;
+                        }
 
-                    // Finally, send the dsp inventory message
-                    broadcastDspInv(ptx, dsp.GetHash());
-                    break;
-                }
-                else
-                {
-                    LOG(DSPROOF, "DoubleSpendProof did not validate %s", dsp.GetHash().ToString());
-                    pool.doubleSpendProofStorage()->remove(proofId);
-                    dosMan.Misbehaving(iter->second, 5);
+                        // remove all other orphans since we only need one
+                        while (++iter != orphans.end())
+                        {
+                            pool.doubleSpendProofStorage()->remove(iter->first);
+                            LOG(DSPROOF, "Removing DoubleSpendProof orphan, we only need one %d", proofId);
+                        }
+
+                        // Finally, send the dsp inventory message
+                        broadcastDspInv(ptx, dsp.GetHash());
+                        break;
+                    }
+                    else
+                    {
+                        LOG(DSPROOF, "DoubleSpendProof did not validate %s", dsp.GetHash().ToString());
+                        pool.doubleSpendProofStorage()->remove(proofId);
+                        dosMan.Misbehaving(iter->second, 5);
+                    }
                 }
             }
-            continue;
         }
 
         // Is there a conflicting spend?
