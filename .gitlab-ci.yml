@@ -28,6 +28,7 @@ stages:
     - static_checks
     - build_depends
     - build
+    - build_extras
     - build_tests
     - qa_tests
     - benchmark_tests
@@ -134,7 +135,7 @@ build-debian-deps:
     needs: []
     script:
         - cd depends
-        - make HOST=x86_64-unknown-linux-gnu -j `nproc` NO_RUST=1
+        - make HOST=x86_64-unknown-linux-gnu -j `nproc`
     artifacts:
         paths:
             - depends/x86_64-unknown-linux-gnu
@@ -162,6 +163,7 @@ build-debian:
             - ./build/qa/*
             - ./qa/*
 
+
 build-debian-tests:
     stage: build_tests
     extends: .cache-debian
@@ -170,6 +172,26 @@ build-debian-tests:
         - (cd build/src; ./test/test_bitcoin)
     dependencies:
         - build-debian
+
+build-debian-electrscash:
+    stage: build_extras
+    extends: .cache-debian
+    needs: ["build-debian"]
+    script:
+        - export PATH=$PATH:`pwd`/depends/x86_64-unknown-linux-gnu/native/bin # for cargo
+        - apt-get install -y python3-git clang cmake > /dev/null
+        - ./autogen.sh > /dev/null
+        - cd build
+        - ../configure --cache-file=config.cache --prefix=$PWD/../depends/x86_64-unknown-linux-gnu > /dev/null
+        - make electrscash
+    dependencies:
+        - build-debian
+    artifacts:
+        paths:
+            - ./build/src/bitcoind
+            - ./build/src/electrscash
+            - ./build/qa/*
+            - ./qa/*
 
 test-debian-qa:
     stage: qa_tests
@@ -200,6 +222,28 @@ test-debian-benchmarks:
     dependencies:
         - build-debian-nodeps
 
+test-debian-qa-electrscash:
+    stage: qa_tests
+    extends: .cache-debian
+    needs: ["build-debian-electrscash"]
+    script:
+        - mkdir -p $CI_PROJECT_DIR/cores
+        - mkdir -p $CI_PROJECT_DIR/saved-cores
+        - echo $CI_PROJECT_DIR/cores/core.%e.%p.%h.%t | tee /proc/sys/kernel/core_pattern
+        - apt-get install -y python3-zmq gdb python3-pip > /dev/null
+        - pip3 install psutil > /dev/null
+        - (cd build;
+            ./qa/pull-tester/rpc-tests.py
+            --electrum-only --coverage --no-ipv6-rpc-listen --gitlab)
+    dependencies:
+        - build-debian-electrscash
+    artifacts:
+        when: on_failure
+        paths:
+            - ./qa/qa_tests/
+            - $CI_PROJECT_DIR/saved-cores
+            - ./build/src/bitcoind
+            - ./build/ctorout.txt
 # TODO: Use Junit as a logger
 #test-debian-unittests:
 #    stage: test
