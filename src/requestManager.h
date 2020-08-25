@@ -141,6 +141,8 @@ protected:
 #endif
     friend class CState;
 
+    friend class CRequestManagerTest;
+
     // maps and iterators all GUARDED_BY cs_objDownloader
     typedef std::map<uint256, CUnknownObj> OdMap;
     OdMap mapTxnInfo;

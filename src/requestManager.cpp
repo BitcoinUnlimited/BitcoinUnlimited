@@ -192,8 +192,12 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
         // else the txn already existed so nothing to do
 
         data.priority = max(priority, data.priority);
-        // Got the data, now add the node as a source
-        data.AddSource(from);
+
+        // Got the data, now add the node as a source if we're not already processing
+        // this txn. If we add more sources here while processing a txn then we could
+        // end up with dangling noderefs when the peer tries to disconnect.
+        if (!data.fProcessing)
+            data.AddSource(from);
     }
     else if (IsBlockType(obj))
     {
@@ -316,6 +320,17 @@ void CRequestManager::ProcessingTxn(const uint256 &hash, CNode *pfrom)
     item->second.fProcessing = true;
     LOG(REQ, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
         pfrom ? pfrom->GetLogName() : "unknown");
+
+    // As a last step we must clear all sources to release the noderef's. If we don't do this
+    // then if the transaction ends up being a double spend, an orphan that is never reclaimed, or
+    // perhaps some other validation failure, it would result in having dangling noderef's which then
+    // prevent a node from fully disconnecting and thus preventing the CNode from calling it's destructor.
+    //
+    // However in the case of blocks we don't do this because if a block fails to validate we
+    // reset the fProcessing flag to false so that we can get another block and check its validity.
+    // This is so that we can prevent a DOS attack where a corrupted block is fed to us in order
+    // to prevent us from downloading the good block.
+    item->second.availableFrom.clear();
 }
 
 void CRequestManager::ProcessingBlock(const uint256 &hash, CNode *pfrom)
