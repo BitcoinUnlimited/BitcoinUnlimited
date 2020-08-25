@@ -28,6 +28,7 @@ parser.add_argument('--dst', help='Where to copy produced binary',
 parser.add_argument('--target', help='Target platform (e.g. x86_64-pc-linux-gnu)',
     default="x86_64-unknown-linux-gnu")
 parser.add_argument('--debug', help="Do a debug build", action = "store_true")
+parser.add_argument('--builddir', help="Out of source build directory", default=None)
 args = parser.parse_args()
 
 level = logging.DEBUG if args.verbose else logging.INFO
@@ -153,21 +154,30 @@ if not os.path.exists(ELECTRS_DIR):
     clone_repo()
 verify_repo(args.allow_modified)
 
-def build_flags(debug, target):
+def build_flags(debug, target, builddir):
     flags = ["--target={}".format(get_target(target))]
+    if builddir is not None:
+        flags.append("--target-dir={}".format(os.path.abspath(builddir)))
     if debug:
         return flags
     return flags + ["--release"]
 
-cargo_run(["build", "--verbose", "--locked"] + build_flags(args.debug, args.target))
-cargo_run(["test", "--verbose", "--locked"] + build_flags(args.debug, args.target))
+cargo_run(["build", "--verbose", "--locked"] + build_flags(args.debug, args.target, args.builddir))
+cargo_run(["test", "--verbose", "--locked"] + build_flags(args.debug, args.target, args.builddir))
 
-def build_dir(debug):
+def build_type_dir(debug):
     if debug:
         return "debug"
     return "release"
 
-src = os.path.join(ELECTRS_DIR, "target", get_target(args.target), build_dir(args.debug), ELECTRS_BIN)
+def binary_dir(target, debug, builddir):
+    """
+    The directory where the electrscash binaries are built.
+    """
+    root = builddir if builddir is not None else os.path.join(ELECTRS_DIR, "target")
+    return os.path.join(root, get_target(target), build_type_dir(debug))
+
+src = os.path.join(binary_dir(args.target, args.debug, args.builddir), ELECTRS_BIN)
 logging.info("Copying %s to %s", src, args.dst)
 shutil.copy(src, args.dst)
 
