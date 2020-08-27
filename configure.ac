@@ -1111,6 +1111,18 @@ else
   BUILD_TEST=""
 fi
 
+AC_MSG_CHECKING([whether to build bench])
+if test x$use_tests = xyes; then
+  if test x$use_bench = xyes; then
+    AC_MSG_RESULT([yes])
+  else
+    AC_MSG_RESULT([no])
+  fi
+else
+  AC_MSG_RESULT([no])
+  use_bench=no
+fi
+
 AC_MSG_CHECKING([whether to reduce exports])
 if test x$use_reduce_exports = xyes; then
   AC_MSG_RESULT([yes])
