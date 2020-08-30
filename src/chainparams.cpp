@@ -552,8 +552,8 @@ public:
         consensus.BIP68Height = 5;
         consensus.powLimit = uint256S("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 
-        // One hour
-        consensus.nPowTargetTimespan = 1 * 60 * 60;
+        // two weeks
+        consensus.nPowTargetTimespan = 14 * 24 * 60 * 60;
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = false;
@@ -573,13 +573,13 @@ public:
         // November 13, 2017 hard fork
         consensus.daaHeight = 3000;
 
-        // November 15, 2018 hard fork
-        consensus.may2018Height = 4000;
-
         // November 15, 2019 protocol upgrade
-        consensus.nov2018Height = 5000;
+        consensus.nov2018Height = 4000;
 
-        // May 15, 2020 12:00:00 UTC protocol upgrade
+        // Nov, 15 2019 hard fork
+        consensus.nov2019Height = 5000;
+
+        // May, 15 2020 hard fork
         consensus.may2020Height = 6000;
 
         // Nov 15, 2020 12:00:00 UTC protocol upgrade
@@ -598,18 +598,20 @@ public:
 
         genesis = CreateGenesisBlock(1597811185, 114152193, 0x1d00ffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
+        assert(consensus.hashGenesisBlock ==
+               uint256S("0x000000001dd410c49a788668ce26751718cc797474d3152a5fc073dd44fd9f7b"));
 
         vFixedSeeds.clear();
         vSeeds.clear();
         // nodes with support for servicebits filtering should be at the top
-        // vSeeds.emplace_back("");
+        vSeeds.emplace_back(CDNSSeedData("bitcoinforks.org", "testnet4-seed-bch.bitcoinforks.org", true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 196);
         base58Prefixes[SECRET_KEY] = std::vector<uint8_t>(1, 239);
         base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
         base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
-        cashaddrPrefix = "bchtest4";
+        cashaddrPrefix = "bchtest";
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
 
         fMiningRequiresPeers = true;
