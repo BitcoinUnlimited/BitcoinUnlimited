@@ -233,8 +233,7 @@ test-debian-qa-electrscash:
         - apt-get install -y python3-zmq gdb python3-pip > /dev/null
         - pip3 install psutil > /dev/null
         - (cd build;
-            ./qa/pull-tester/rpc-tests.py
-            --electrum-only --coverage --no-ipv6-rpc-listen --gitlab)
+            ./qa/pull-tester/rpc-tests.py --electrum-only --no-ipv6-rpc-listen --gitlab)
     dependencies:
         - build-debian-electrscash
     artifacts:
