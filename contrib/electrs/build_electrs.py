@@ -49,13 +49,14 @@ def check_dependencies():
         import git
     except Exception as e:
         logging.error("Failed to 'import git'")
-        logging.error("Tip: On Debian/Ubuntu you need to install python3-git")
+        logging.error("Tip: Install with: python3 -m pip install gitpython")
+        logging.error("Tip: On Debian/Ubuntu you can install python3-git")
         bail(str(e))
 
     import shutil
     if shutil.which("cargo") is None:
         logging.error("Cannot find 'cargo', will not be able to build {}".format(PROJECT_NAME))
-        logging.error("You need to install rust (1.34+) https://rustup.rs/")
+        logging.error("You need to install rust (1.38+) https://rustup.rs/")
         logging.error("Tip: On Debian/Ubuntu you need to install cargo")
         bail("rust not found")
 
@@ -124,9 +125,15 @@ def cargo_run(args):
 def get_target(makefile_target):
     # Try to map target passed from makefile to the equalent in rust
     # To see supported targets, run: rustc --print target-list
+
+    # Trim away darwin version number
+    if makefile_target.startswith('x86_64-apple-darwin'):
+        makefile_target = 'x86_64-apple-darwin'
+
     target_map = {
             'x86_64-pc-linux-gnu' : 'x86_64-unknown-linux-gnu',
-            'i686-pc-linux-gnu' : 'i686-unknown-linux-gnu'
+            'i686-pc-linux-gnu' : 'i686-unknown-linux-gnu',
+            'x86_64-apple-darwin': 'x86_64-apple-darwin'
     }
 
     if makefile_target in target_map:
