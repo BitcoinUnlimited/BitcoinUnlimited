@@ -141,6 +141,7 @@ extern CCriticalSection cs_vUseDNSSeeds;
 extern CSemaphore *semOutbound;
 extern CSemaphore *semOutboundAddNode; // BU: separate semaphore for -addnodes
 std::condition_variable messageHandlerCondition;
+std::mutex wakeableDelayMutex;
 
 // BU  Connection Slot mitigation - used to determine how many connection attempts over time
 extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
@@ -2457,9 +2458,6 @@ static bool threadProcessMessages(CNode *pnode)
 
 void ThreadMessageHandler()
 {
-    std::mutex condition_mutex;
-    std::unique_lock<std::mutex> lock(condition_mutex);
-
     while (shutdown_threads.load() == false)
     {
         // Start or Stop threads as determined by the numMsgHandlerThreads tweak
@@ -2576,6 +2574,7 @@ void ThreadMessageHandler()
 
         if (fSleep)
         {
+            std::unique_lock<std::mutex> lock(wakeableDelayMutex);
             messageHandlerCondition.wait_until(lock, std::chrono::steady_clock::now() + std::chrono::milliseconds(10));
         }
     }
