@@ -2147,8 +2147,15 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     ret.pushKV("tweaks", (int64_t)tweaks.size());
     ret.pushKV("mapRelay", (int64_t)mapRelay.size());
     ret.pushKV("vRelayExpiration", (int64_t)vRelayExpiration.size());
-    ret.pushKV("vNodes", (int64_t)vNodes.size());
-    ret.pushKV("vNodesDisconnected", (int64_t)vNodesDisconnected.size());
+
+    {
+        LOCK(cs_vNodes);
+        ret.pushKV("vNodes", (int64_t)vNodes.size());
+    }
+    {
+        LOCK(cs_vNodesDisconnected);
+        ret.pushKV("vNodesDisconnected", (int64_t)vNodesDisconnected.size());
+    }
     {
         READLOCK(orphanpool.cs_orphanpool);
         ret.pushKV("mapOrphanTransactions", (int64_t)orphanpool.mapOrphanTransactions.size());

@@ -160,7 +160,6 @@ proxyType proxyInfo[NET_MAX];
 proxyType nameProxy;
 CCriticalSection cs_proxyInfos;
 
-CCriticalSection cs_vNodes;
 CCriticalSection cs_mapLocalHost;
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
 
@@ -213,8 +212,12 @@ map<CInv, CTransactionRef> mapRelay;
 deque<pair<int64_t, CInv> > vRelayExpiration;
 CCriticalSection cs_mapRelay;
 
-vector<CNode *> vNodes;
-list<CNode *> vNodesDisconnected;
+CCriticalSection cs_vNodes;
+vector<CNode *> vNodes GUARDED_BY(cs_vNodes);
+
+CCriticalSection cs_vNodesDisconnected;
+list<CNode *> vNodesDisconnected GUARDED_BY(cs_vNodesDisconnected);
+
 CSemaphore *semOutbound = nullptr;
 CSemaphore *semOutboundAddNode = nullptr; // BU: separate semaphore for -addnodes
 CNodeSignals g_signals;
