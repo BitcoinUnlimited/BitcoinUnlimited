@@ -10,6 +10,7 @@
 #include <boost/thread.hpp>
 #include <memory>
 #include <mutex>
+#include <thread>
 
 #include "lockorder.h"
 #include "utilstrencodings.h"
