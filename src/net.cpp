@@ -899,8 +899,6 @@ int SocketSendData(CNode *pnode, bool fSendTwo = false) EXCLUSIVE_LOCKS_REQUIRED
     return progress;
 }
 
-extern list<CNode *> vNodesDisconnected;
-
 #if 0 // Not currenly used
 static bool ReverseCompareNodeMinPingTime(const CNodeRef &a, const CNodeRef &b)
 {
@@ -1209,8 +1207,9 @@ void CleanupDisconnectedNodes()
     //
     // Disconnect nodes
     //
+    list<CNode *> vNodesDisconnectedCopy;
     {
-        LOCK(cs_vNodes);
+        LOCK2(cs_vNodes, cs_vNodesDisconnected);
         // Disconnect unused nodes
         vector<CNode *> vNodesCopy = vNodes;
         for (CNode *pnode : vNodesCopy)
@@ -1236,36 +1235,36 @@ void CleanupDisconnectedNodes()
                 vNodesDisconnected.push_back(pnode);
             }
         }
+        vNodesDisconnectedCopy = vNodesDisconnected;
     }
+
+    // Delete disconnected nodes
+    for (CNode *pnode : vNodesDisconnectedCopy)
     {
-        // Delete disconnected nodes
-        list<CNode *> vNodesDisconnectedCopy = vNodesDisconnected;
-        for (CNode *pnode : vNodesDisconnectedCopy)
+        // wait until threads are done using it
+        if (pnode->GetRefCount() <= 0)
         {
-            // wait until threads are done using it
-            if (pnode->GetRefCount() <= 0)
+            bool fDelete = false;
             {
-                bool fDelete = false;
+                TRY_LOCK(pnode->cs_vSend, lockSend);
+                if (lockSend)
                 {
-                    TRY_LOCK(pnode->cs_vSend, lockSend);
-                    if (lockSend)
+                    TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
+                    if (lockRecv)
                     {
-                        TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                        if (lockRecv)
-                        {
-                            TRY_LOCK(pnode->cs_inventory, lockInv);
-                            if (lockInv)
-                                fDelete = true;
-                        }
+                        TRY_LOCK(pnode->cs_inventory, lockInv);
+                        if (lockInv)
+                            fDelete = true;
                     }
                 }
-                if (fDelete)
-                {
-                    vNodesDisconnected.remove(pnode);
-                    // no need to remove from vNodes. we know pnode has already been removed from vNodes since that
-                    // occurred prior to insertion into vNodesDisconnected
-                    delete pnode;
-                }
+            }
+            if (fDelete)
+            {
+                LOCK(cs_vNodesDisconnected);
+                vNodesDisconnected.remove(pnode);
+                // no need to remove from vNodes. we know pnode has already been removed from vNodes since that
+                // occurred prior to insertion into vNodesDisconnected
+                delete pnode;
             }
         }
     }
@@ -2874,7 +2873,7 @@ void NetCleanup()
     {
         CleanupDisconnectedNodes();
         {
-            LOCK(cs_vNodes);
+            LOCK2(cs_vNodes, cs_vNodesDisconnected);
             if ((vNodes.size() == 0) && (vNodesDisconnected.size() == 0))
                 break; // every node is properly disconnected
         }
@@ -2883,7 +2882,7 @@ void NetCleanup()
 
 
     {
-        LOCK(cs_vNodes);
+        LOCK2(cs_vNodes, cs_vNodesDisconnected);
         if (!((vNodes.size() == 0) && (vNodesDisconnected.size() == 0)))
         {
             LOG(NET, "Some node objects were not properly cleaned up.\n");

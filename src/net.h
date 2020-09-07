@@ -207,8 +207,12 @@ extern CAddrMan addrman;
 extern int nMaxConnections;
 /** The minimum number of xthin nodes to connect to */
 extern int nMinXthinNodes;
+
 extern std::vector<CNode *> vNodes;
 extern CCriticalSection cs_vNodes;
+extern std::list<CNode *> vNodesDisconnected;
+extern CCriticalSection cs_vNodesDisconnected;
+
 extern std::map<CInv, CTransactionRef> mapRelay;
 extern std::deque<std::pair<int64_t, CInv> > vRelayExpiration;
 extern CCriticalSection cs_mapRelay;
