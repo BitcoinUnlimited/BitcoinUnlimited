@@ -2169,7 +2169,7 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 #ifdef DEBUG_LOCKORDER
     {
         std::lock_guard<std::mutex> lock(lockdata.dd_mutex);
-        ret.pushKV("lockorders", lockdata.ordertracker.size());
+        ret.pushKV("lockorders", (uint64_t)lockdata.ordertracker.size());
     }
 #endif
     LOCK(cs_vNodes);
