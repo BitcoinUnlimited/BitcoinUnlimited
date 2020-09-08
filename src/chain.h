@@ -369,6 +369,10 @@ int64_t GetBlockProofEquivalentTime(const CBlockIndex &to,
     const CBlockIndex &tip,
     const Consensus::Params &);
 
+/** Find the last common ancestor two blocks have.
+ *  Both pa and pb must be non-nullptr. */
+const CBlockIndex *LastCommonAncestor(const CBlockIndex *pa, const CBlockIndex *pb);
+
 /**
  * Check if two block index are on the same fork.
  */

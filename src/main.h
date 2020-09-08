@@ -306,6 +306,8 @@ static const unsigned int REJECT_ALREADY_KNOWN = 0x101;
 static const unsigned int REJECT_CONFLICT = 0x102;
 /** Transaction cannot be committed on my fork */
 static const unsigned int REJECT_WRONG_FORK = 0x103;
+/** Block conflicts with a transaction already known */
+static const unsigned int REJECT_AGAINST_FINALIZED = 0x104;
 
 // BU cleaning up at destuction time creates many global variable dependencies.  Instead clean up in a function called
 // in main()

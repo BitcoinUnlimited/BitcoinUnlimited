@@ -1545,9 +1545,9 @@ UniValue invalidateblock(const UniValue &params, bool fHelp)
     return NullUniValue;
 }
 
-UniValue finalizeblock(const Config &config, const JSONRPCRequest &request)
+UniValue finalizeblock(const UniValue &params, bool fHelp)
 {
-    if (request.fHelp || request.params.size() != 1)
+    if (fHelp || params.size() != 1)
     {
         throw std::runtime_error("finalizeblock \"blockhash\"\n"
 
@@ -1561,7 +1561,7 @@ UniValue finalizeblock(const Config &config, const JSONRPCRequest &request)
                                  HelpExampleRpc("finalizeblock", "\"blockhash\""));
     }
 
-    std::string strHash = request.params[0].get_str();
+    std::string strHash = params[0].get_str();
     uint256 hash(uint256S(strHash));
     CValidationState state;
 
@@ -1573,12 +1573,12 @@ UniValue finalizeblock(const Config &config, const JSONRPCRequest &request)
         }
 
         CBlockIndex *pblockindex = mapBlockIndex[hash];
-        FinalizeBlock(config, state, pblockindex);
+        FinalizeBlock(state, pblockindex);
     }
 
     if (state.IsValid())
     {
-        ActivateBestChain(config, state);
+        ActivateBestChain(state, Params());
     }
 
     if (!state.IsValid())

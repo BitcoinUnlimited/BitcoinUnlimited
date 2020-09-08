@@ -3895,7 +3895,7 @@ bool ProcessNewBlock(CValidationState &state,
     return true;
 }
 
-bool FinalizeBlock(const Config &config, CValidationState &state, CBlockIndex *pindex)
+bool FinalizeBlock(CValidationState &state, CBlockIndex *pindex)
 {
     AssertLockHeld(cs_main);
     if (pindex->nStatus.isInvalid())
@@ -3915,19 +3915,15 @@ bool FinalizeBlock(const Config &config, CValidationState &state, CBlockIndex *p
             REJECT_AGAINST_FINALIZED, "bad-fork-prior-finalized");
     }
 
-    // We have a valid candidate, make sure it is not parked.
+    // We have a valid candidate
     pindexFinalized = pindex;
-    if (pindex->nStatus.isOnParkedChain())
-    {
-        UnparkBlock(pindex);
-    }
 
     // If the finalized block is not on the active chain, we need to rewind.
     if (!AreOnTheSameFork(pindex, chainActive.Tip()))
     {
         const CBlockIndex *pindexFork = chainActive.FindFork(pindex);
         CBlockIndex *pindexToInvalidate = chainActive.Tip()->GetAncestor(pindexFork->nHeight + 1);
-        return InvalidateBlock(config, state, pindexToInvalidate);
+        return InvalidateBlock(state, Params().GetConsensus(), pindexToInvalidate);
     }
 
     return true;
