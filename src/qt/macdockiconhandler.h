@@ -26,6 +26,7 @@ public:
     QMenu *dockMenu();
     static MacDockIconHandler *instance();
     static void cleanup();
+    void setIcon(const QIcon &icon);
 
 Q_SIGNALS:
     void dockIconClicked();
