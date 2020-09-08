@@ -1347,7 +1347,10 @@ CBlockIndex *FindMostWorkChain()
             LOGA("Mark block %s invalid because it forks prior to the "
                  "finalization point %d.\n",
                 pindexNew->GetBlockHash().ToString(), pindexFinalized->nHeight);
-            pindexNew->nStatus = pindexNew->nStatus.withFailed();
+
+            WRITELOCK(cs_mapBlockIndex);
+            pindexNew->nStatus |= BLOCK_FAILED_VALID;
+            pindexNew->nStatus &= ~BLOCK_VALID_CHAIN;
         }
 
         // Check whether all blocks on the path between the currently active chain and the candidate are valid.
@@ -3898,7 +3901,7 @@ bool ProcessNewBlock(CValidationState &state,
 bool FinalizeBlock(CValidationState &state, CBlockIndex *pindex)
 {
     AssertLockHeld(cs_main);
-    if (pindex->nStatus.isInvalid())
+    if (!pindex->IsValid(BLOCK_VALID_CHAIN))
     {
         // We try to finalize an invalid block.
         return state.DoS(100,
