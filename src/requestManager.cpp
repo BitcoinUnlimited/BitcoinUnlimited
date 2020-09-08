@@ -1091,7 +1091,8 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
 
     // If the peer reorganized, our previous pindexLastCommonBlock may not be an ancestor
     // of its current tip anymore. Go back enough to fix that.
-    state->pindexLastCommonBlock = const_cast<CBlockIndex *>(LastCommonAncestor(state->pindexLastCommonBlock, state->pindexBestKnownBlock));
+    state->pindexLastCommonBlock =
+        const_cast<CBlockIndex *>(LastCommonAncestor(state->pindexLastCommonBlock, state->pindexBestKnownBlock));
     if (state->pindexLastCommonBlock == state->pindexBestKnownBlock)
         return;
 
