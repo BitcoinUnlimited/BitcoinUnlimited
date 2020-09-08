@@ -18,7 +18,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/split.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/signals2/signal.hpp>
 
@@ -27,6 +27,7 @@
 #include <event2/event.h>
 #include <event2/thread.h>
 #include <event2/util.h>
+namespace bpl = boost::placeholders;
 
 /** Tor cookie size (from control-spec.txt) */
 static const int TOR_COOKIE_SIZE = 32;
@@ -425,8 +426,8 @@ TorController::TorController(struct event_base *baseIn, const std::string &_targ
     if (!reconnect_ev)
         LOGA("tor: Failed to create event for reconnection: out of memory?\n");
     // Start connection attempts immediately
-    if (!conn.Connect(target, boost::bind(&TorController::connected_cb, this, _1),
-            boost::bind(&TorController::disconnected_cb, this, _1)))
+    if (!conn.Connect(target, boost::bind(&TorController::connected_cb, this, bpl::_1),
+            boost::bind(&TorController::disconnected_cb, this, bpl::_1)))
     {
         LOGA("tor: Initiating connection to Tor control port %s failed\n", target);
     }
@@ -512,7 +513,7 @@ void TorController::auth_cb(TorControlConnection &_conn, const TorControlReply &
         // Note that the 'virtual' port doesn't have to be the same as our internal port, but this is just a convenient
         // choice.  TODO; refactor the shutdown sequence some day.
         _conn.Command(strprintf("ADD_ONION %s Port=%i,127.0.0.1:%i", private_key, GetListenPort(), GetListenPort()),
-            boost::bind(&TorController::add_onion_cb, this, _1, _2));
+            boost::bind(&TorController::add_onion_cb, this, bpl::_1, bpl::_2));
     }
     else
     {
@@ -579,8 +580,8 @@ void TorController::authchallenge_cb(TorControlConnection &_conn, const TorContr
 
             std::vector<uint8_t> computedClientHash =
                 ComputeResponse(TOR_SAFE_CLIENTKEY, cookie, clientNonce, serverNonce);
-            _conn.Command(
-                "AUTHENTICATE " + HexStr(computedClientHash), boost::bind(&TorController::auth_cb, this, _1, _2));
+            _conn.Command("AUTHENTICATE " + HexStr(computedClientHash),
+                boost::bind(&TorController::auth_cb, this, bpl::_1, bpl::_2));
         }
         else
         {
@@ -639,7 +640,7 @@ void TorController::protocolinfo_cb(TorControlConnection &_conn, const TorContro
         if (methods.count("NULL"))
         {
             LOG(TOR, "tor: Using NULL authentication\n");
-            _conn.Command("AUTHENTICATE", boost::bind(&TorController::auth_cb, this, _1, _2));
+            _conn.Command("AUTHENTICATE", boost::bind(&TorController::auth_cb, this, bpl::_1, bpl::_2));
         }
         else if (methods.count("SAFECOOKIE"))
         {
@@ -654,7 +655,7 @@ void TorController::protocolinfo_cb(TorControlConnection &_conn, const TorContro
                 clientNonce = std::vector<uint8_t>(TOR_NONCE_SIZE, 0);
                 GetRandBytes(&clientNonce[0], TOR_NONCE_SIZE);
                 _conn.Command("AUTHCHALLENGE SAFECOOKIE " + HexStr(clientNonce),
-                    boost::bind(&TorController::authchallenge_cb, this, _1, _2));
+                    boost::bind(&TorController::authchallenge_cb, this, bpl::_1, bpl::_2));
             }
             else
             {
@@ -675,8 +676,8 @@ void TorController::protocolinfo_cb(TorControlConnection &_conn, const TorContro
             {
                 LOG(TOR, "tor: Using HASHEDPASSWORD authentication\n");
                 boost::replace_all(torpassword, "\"", "\\\"");
-                _conn.Command(
-                    "AUTHENTICATE \"" + torpassword + "\"", boost::bind(&TorController::auth_cb, this, _1, _2));
+                _conn.Command("AUTHENTICATE \"" + torpassword + "\"",
+                    boost::bind(&TorController::auth_cb, this, bpl::_1, bpl::_2));
             }
             else
             {
@@ -698,7 +699,7 @@ void TorController::connected_cb(TorControlConnection &_conn)
 {
     reconnect_timeout = RECONNECT_TIMEOUT_START;
     // First send a PROTOCOLINFO command to figure out what authentication is expected
-    if (!_conn.Command("PROTOCOLINFO 1", boost::bind(&TorController::protocolinfo_cb, this, _1, _2)))
+    if (!_conn.Command("PROTOCOLINFO 1", boost::bind(&TorController::protocolinfo_cb, this, bpl::_1, bpl::_2)))
         LOGA("tor: Error sending initial protocolinfo command\n");
 }
 
@@ -725,8 +726,8 @@ void TorController::Reconnect()
     /* Try to reconnect and reestablish if we get booted - for example, Tor
      * may be restarting.
      */
-    if (!conn.Connect(target, boost::bind(&TorController::connected_cb, this, _1),
-            boost::bind(&TorController::disconnected_cb, this, _1)))
+    if (!conn.Connect(target, boost::bind(&TorController::connected_cb, this, bpl::_1),
+            boost::bind(&TorController::disconnected_cb, this, bpl::_1)))
     {
         LOGA("tor: Re-initiating connection to Tor control port %s failed\n", target);
     }

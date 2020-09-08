@@ -25,6 +25,7 @@
 #include <QDebug>
 #include <QSet>
 #include <QTimer>
+namespace bpl = boost::placeholders;
 
 WalletModel::WalletModel(const PlatformStyle *platformStyle,
     CWallet *_wallet,
@@ -477,21 +478,23 @@ static void NotifyWatchonlyChanged(WalletModel *walletmodel, bool fHaveWatchonly
 void WalletModel::subscribeToCoreSignals()
 {
     // Connect signals to wallet
-    wallet->NotifyStatusChanged.connect(boost::bind(&NotifyKeyStoreStatusChanged, this, _1));
-    wallet->NotifyAddressBookChanged.connect(boost::bind(NotifyAddressBookChanged, this, _1, _2, _3, _4, _5, _6));
-    wallet->NotifyTransactionChanged.connect(boost::bind(NotifyTransactionChanged, this, _1, _2, _3));
-    wallet->ShowProgress.connect(boost::bind(ShowProgress, this, _1, _2));
-    wallet->NotifyWatchonlyChanged.connect(boost::bind(NotifyWatchonlyChanged, this, _1));
+    wallet->NotifyStatusChanged.connect(boost::bind(&NotifyKeyStoreStatusChanged, this, bpl::_1));
+    wallet->NotifyAddressBookChanged.connect(
+        boost::bind(NotifyAddressBookChanged, this, bpl::_1, bpl::_2, bpl::_3, bpl::_4, bpl::_5, bpl::_6));
+    wallet->NotifyTransactionChanged.connect(boost::bind(NotifyTransactionChanged, this, bpl::_1, bpl::_2, bpl::_3));
+    wallet->ShowProgress.connect(boost::bind(ShowProgress, this, bpl::_1, bpl::_2));
+    wallet->NotifyWatchonlyChanged.connect(boost::bind(NotifyWatchonlyChanged, this, bpl::_1));
 }
 
 void WalletModel::unsubscribeFromCoreSignals()
 {
     // Disconnect signals from wallet
-    wallet->NotifyStatusChanged.disconnect(boost::bind(&NotifyKeyStoreStatusChanged, this, _1));
-    wallet->NotifyAddressBookChanged.disconnect(boost::bind(NotifyAddressBookChanged, this, _1, _2, _3, _4, _5, _6));
-    wallet->NotifyTransactionChanged.disconnect(boost::bind(NotifyTransactionChanged, this, _1, _2, _3));
-    wallet->ShowProgress.disconnect(boost::bind(ShowProgress, this, _1, _2));
-    wallet->NotifyWatchonlyChanged.disconnect(boost::bind(NotifyWatchonlyChanged, this, _1));
+    wallet->NotifyStatusChanged.disconnect(boost::bind(&NotifyKeyStoreStatusChanged, this, bpl::_1));
+    wallet->NotifyAddressBookChanged.disconnect(
+        boost::bind(NotifyAddressBookChanged, this, bpl::_1, bpl::_2, bpl::_3, bpl::_4, bpl::_5, bpl::_6));
+    wallet->NotifyTransactionChanged.disconnect(boost::bind(NotifyTransactionChanged, this, bpl::_1, bpl::_2, bpl::_3));
+    wallet->ShowProgress.disconnect(boost::bind(ShowProgress, this, bpl::_1, bpl::_2));
+    wallet->NotifyWatchonlyChanged.disconnect(boost::bind(NotifyWatchonlyChanged, this, bpl::_1));
 }
 
 // WalletModel::UnlockContext implementation

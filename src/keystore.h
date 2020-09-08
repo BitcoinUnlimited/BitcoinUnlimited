@@ -99,7 +99,7 @@ public:
             KeyMap::const_iterator mi = mapKeys.find(address);
             if (mi != mapKeys.end())
             {
-                keyOut = mi->second;
+                keyOut = CKey(mi->second);
                 return true;
             }
         }

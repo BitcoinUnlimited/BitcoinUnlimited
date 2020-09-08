@@ -7,7 +7,7 @@
 #include <boost/asio/basic_deadline_timer.hpp>
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/asio/ssl.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <iostream>
 #include <istream>
 #include <ostream>
@@ -38,7 +38,8 @@ public:
 
         // Use custom verifier as default rfc2818_verification does not appear to handle SNI
         // socket_.set_verify_callback(boost::asio::ssl::rfc2818_verification(cert_hostname));
-        socket_.set_verify_callback(boost::bind(&client::verify_certificate, this, _1, _2));
+        socket_.set_verify_callback(
+            boost::bind(&client::verify_certificate, this, boost::placeholders::_1, boost::placeholders::_2));
 
         boost::asio::async_connect(socket_.lowest_layer(), endpoint_iterator,
             boost::bind(&client::handle_connect, this, boost::asio::placeholders::error));

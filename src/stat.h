@@ -7,7 +7,7 @@
 
 #include <boost/asio.hpp>
 #include <boost/asio/steady_timer.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <chrono>
 // c++11 #include <type_traits>
 #include "univalue/include/univalue.h"
@@ -587,6 +587,7 @@ public:
         return *this;
     }
 
+    MinValMax(const MinValMax<NUM> &rhs) { *this = rhs; }
     MinValMax &operator=(const volatile MinValMax &rhs)
     {
         min = rhs.min;

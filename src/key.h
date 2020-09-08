@@ -65,6 +65,14 @@ public:
         LockObject(vch);
         memcpy(vch, secret.vch, sizeof(vch));
     }
+    CKey &operator=(const CKey &secret)
+    {
+        fValid = secret.fValid;
+        fCompressed = secret.fCompressed;
+        LockObject(vch);
+        memcpy(vch, secret.vch, sizeof(vch));
+        return *this;
+    }
 
     //! Destructor (again necessary because of memlocking).
     ~CKey() { UnlockObject(vch); }

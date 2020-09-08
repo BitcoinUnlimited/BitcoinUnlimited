@@ -1141,7 +1141,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 nFreeLimit = nMinLimitFreeRelay;
             }
 
-            minRelayTxFee = CFeeRate(nMinRelay * 1000);
+            minRelayTxFee = CFeeRate((CAmount)(nMinRelay * 1000));
             // useful but spammy
             // LOG(MEMPOOL, "MempoolBytes:%d  LimitFreeRelay:%.5g  nMinRelay:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d "
             //                         "TxFees:%d\n",
