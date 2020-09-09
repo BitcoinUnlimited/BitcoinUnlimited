@@ -266,9 +266,11 @@ bool AcceptBlockHeader(const CBlockHeader &block,
         // Get prev block index
         CBlockIndex *pindexPrev = LookupBlockIndex(block.hashPrevBlock);
         if (!pindexPrev)
+        {
             return state.DoS(10, error("%s: previous block %s not found while accepting %s", __func__,
                                      block.hashPrevBlock.ToString(), hash.ToString()),
                 0, "bad-prevblk");
+        }
         {
             READLOCK(cs_mapBlockIndex);
             if (pindexPrev->nStatus & BLOCK_FAILED_MASK)
@@ -1348,7 +1350,6 @@ CBlockIndex *FindMostWorkChain()
                  "finalization point %d.\n",
                 pindexNew->GetBlockHash().ToString(), pindexFinalized->nHeight);
 
-            WRITELOCK(cs_mapBlockIndex);
             pindexNew->nStatus |= BLOCK_FAILED_VALID;
             pindexNew->nStatus &= ~BLOCK_VALID_CHAIN;
         }
@@ -3900,13 +3901,15 @@ bool ProcessNewBlock(CValidationState &state,
 
 bool FinalizeBlock(CValidationState &state, CBlockIndex *pindex)
 {
-    AssertLockHeld(cs_main);
-    if (!pindex->IsValid(BLOCK_VALID_CHAIN))
     {
-        // We try to finalize an invalid block.
-        return state.DoS(100,
-            error("%s: Trying to finalize invalid block %s", __func__, pindex->GetBlockHash().ToString()),
-            REJECT_INVALID, "finalize-invalid-block");
+        READLOCK(cs_mapBlockIndex);
+        if (!pindex->IsValid(BLOCK_VALID_CHAIN))
+        {
+            // We try to finalize an invalid block.
+            return state.DoS(100,
+                error("%s: Trying to finalize invalid block %s", __func__, pindex->GetBlockHash().ToString()),
+                REJECT_INVALID, "finalize-invalid-block");
+        }
     }
 
     // Check that the request is consistent with current finalization.
@@ -3926,6 +3929,7 @@ bool FinalizeBlock(CValidationState &state, CBlockIndex *pindex)
     {
         const CBlockIndex *pindexFork = chainActive.FindFork(pindex);
         CBlockIndex *pindexToInvalidate = chainActive.Tip()->GetAncestor(pindexFork->nHeight + 1);
+        LOCK(cs_main);
         return InvalidateBlock(state, Params().GetConsensus(), pindexToInvalidate);
     }
 

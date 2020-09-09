@@ -1566,13 +1566,16 @@ UniValue finalizeblock(const UniValue &params, bool fHelp)
     CValidationState state;
 
     {
-        LOCK(cs_main);
-        if (mapBlockIndex.count(hash) == 0)
+        CBlockIndex *pblockindex;
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-        }
+            READLOCK(cs_mapBlockIndex);
+            if (mapBlockIndex.count(hash) == 0)
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+            }
 
-        CBlockIndex *pblockindex = mapBlockIndex[hash];
+            pblockindex = mapBlockIndex[hash];
+        }
         FinalizeBlock(state, pblockindex);
     }
 
