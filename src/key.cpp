@@ -80,7 +80,7 @@ int Hd44DeriveChildKey(unsigned char *secretSeed,
     if (keypath)
         *keypath = "m/" + std::to_string(purpose) + "'/" + std::to_string(coinType) + "'/" + std::to_string(account) +
                    "'/" + std::to_string(change) + "/" + std::to_string(index);
-    secret = childKey.key;
+    secret = CKey(childKey.key);
 
     // increment childkey index
     return index + 1;

@@ -45,9 +45,14 @@ private:
     CAmount nSatoshisPerK; // unit is satoshis-per-1,000-bytes
 public:
     CFeeRate() : nSatoshisPerK(0) {}
-    explicit CFeeRate(const CAmount &_nSatoshisPerK) : nSatoshisPerK(_nSatoshisPerK) {}
+    explicit CFeeRate(const CAmount _nSatoshisPerK) : nSatoshisPerK(_nSatoshisPerK) {}
     CFeeRate(const CAmount &nFeePaid, size_t nSize);
     CFeeRate(const CFeeRate &other) { nSatoshisPerK = other.nSatoshisPerK; }
+    CFeeRate &operator=(const CFeeRate other)
+    {
+        nSatoshisPerK = other.nSatoshisPerK;
+        return *this;
+    }
     CAmount GetFee(size_t size) const; // unit returned is satoshis
     CAmount GetFeePerK() const { return GetFee(1000); } // satoshis-per-1000-bytes
     /** Dust is too small to be spendable.  It is either set via the txDust tweak or proportional to the cost to

@@ -29,6 +29,8 @@ class CBlockIndex;
 static const int64_t nClientStartupTime = GetTime();
 static int64_t nLastBlockTipUpdateNotification = 0;
 
+namespace bpl = boost::placeholders;
+
 ClientModel::ClientModel(OptionsModel *_optionsModel, UnlimitedModel *ul, QObject *parent)
     : QObject(parent), unlimitedModel(ul), lastBlockTime(0), optionsModel(_optionsModel), peerTableModel(0),
       banTableModel(0), pollTimer1(0), pollTimer2(0), pollTimer3(0)
@@ -233,21 +235,21 @@ static void BlockTipChanged(ClientModel *clientmodel, bool initialSync, const CB
 void ClientModel::subscribeToCoreSignals()
 {
     // Connect signals to client
-    uiInterface.ShowProgress.connect(boost::bind(ShowProgress, this, _1, _2));
-    uiInterface.NotifyNumConnectionsChanged.connect(boost::bind(NotifyNumConnectionsChanged, this, _1));
+    uiInterface.ShowProgress.connect(boost::bind(ShowProgress, this, bpl::_1, bpl::_2));
+    uiInterface.NotifyNumConnectionsChanged.connect(boost::bind(NotifyNumConnectionsChanged, this, bpl::_1));
     uiInterface.NotifyAlertChanged.connect(boost::bind(NotifyAlertChanged, this));
     uiInterface.BannedListChanged.connect(boost::bind(BannedListChanged, this));
-    uiInterface.NotifyBlockTip.connect(boost::bind(BlockTipChanged, this, _1, _2, _3));
-    uiInterface.NotifyHeaderTip.connect(boost::bind(BlockTipChanged, this, _1, _2, _3));
+    uiInterface.NotifyBlockTip.connect(boost::bind(BlockTipChanged, this, bpl::_1, bpl::_2, bpl::_3));
+    uiInterface.NotifyHeaderTip.connect(boost::bind(BlockTipChanged, this, bpl::_1, bpl::_2, bpl::_3));
 }
 
 void ClientModel::unsubscribeFromCoreSignals()
 {
     // Disconnect signals from client
-    uiInterface.ShowProgress.disconnect(boost::bind(ShowProgress, this, _1, _2));
-    uiInterface.NotifyNumConnectionsChanged.disconnect(boost::bind(NotifyNumConnectionsChanged, this, _1));
+    uiInterface.ShowProgress.disconnect(boost::bind(ShowProgress, this, bpl::_1, bpl::_2));
+    uiInterface.NotifyNumConnectionsChanged.disconnect(boost::bind(NotifyNumConnectionsChanged, this, bpl::_1));
     uiInterface.NotifyAlertChanged.disconnect(boost::bind(NotifyAlertChanged, this));
     uiInterface.BannedListChanged.disconnect(boost::bind(BannedListChanged, this));
-    uiInterface.NotifyBlockTip.disconnect(boost::bind(BlockTipChanged, this, _1, _2, _3));
-    uiInterface.NotifyHeaderTip.disconnect(boost::bind(BlockTipChanged, this, _1, _2, _3));
+    uiInterface.NotifyBlockTip.disconnect(boost::bind(BlockTipChanged, this, bpl::_1, bpl::_2, bpl::_3));
+    uiInterface.NotifyHeaderTip.disconnect(boost::bind(BlockTipChanged, this, bpl::_1, bpl::_2, bpl::_3));
 }

@@ -28,6 +28,8 @@
 #include <QIcon>
 #include <QList>
 
+namespace bpl = boost::placeholders;
+
 // Amount column is right-aligned it contains numbers
 static int column_alignments[] = {
     Qt::AlignLeft | Qt::AlignVCenter, /* status */
@@ -779,13 +781,13 @@ static void ShowProgress(TransactionTableModel *ttm, const std::string &title, i
 void TransactionTableModel::subscribeToCoreSignals()
 {
     // Connect signals to wallet
-    wallet->NotifyTransactionChanged.connect(boost::bind(NotifyTransactionChanged, this, _1, _2, _3));
-    wallet->ShowProgress.connect(boost::bind(ShowProgress, this, _1, _2));
+    wallet->NotifyTransactionChanged.connect(boost::bind(NotifyTransactionChanged, this, bpl::_1, bpl::_2, bpl::_3));
+    wallet->ShowProgress.connect(boost::bind(ShowProgress, this, bpl::_1, bpl::_2));
 }
 
 void TransactionTableModel::unsubscribeFromCoreSignals()
 {
     // Disconnect signals from wallet
-    wallet->NotifyTransactionChanged.disconnect(boost::bind(NotifyTransactionChanged, this, _1, _2, _3));
-    wallet->ShowProgress.disconnect(boost::bind(ShowProgress, this, _1, _2));
+    wallet->NotifyTransactionChanged.disconnect(boost::bind(NotifyTransactionChanged, this, bpl::_1, bpl::_2, bpl::_3));
+    wallet->ShowProgress.disconnect(boost::bind(ShowProgress, this, bpl::_1, bpl::_2));
 }
