@@ -9,30 +9,20 @@
 #include "streams.h"
 #include "util.h"
 
-
-bool xversion_deterministic_hashing = false;
-
-XMapSaltedHasher::XMapSaltedHasher()
-    : k0(xversion_deterministic_hashing ? 0x1122334455667788UL : GetRand(std::numeric_limits<uint64_t>::max())),
-      k1(xversion_deterministic_hashing ? 0x99aabbccddeeff00UL : GetRand(std::numeric_limits<uint64_t>::max()))
-{
-}
-
-uint64_t XMapSaltedHasher::operator()(const uint64_t key) const
-{
-    CSipHasher hasher(k0, k1);
-    return hasher.Write(key).Finalize();
-}
-
 uint64_t CXVersionMessage::as_u64c(const uint64_t k) const
 {
     LOCK(cacheProtector);
-    if (xmap.count(k) == 0)
-        return 0;
-    if (cache_u64c.count(k) == 0)
+    const auto xmap_iter = xmap.find(k);
+    if (xmap_iter == xmap.end())
     {
-        const std::vector<uint8_t> &vec = xmap.at(k);
+        // we dont have that key, assuming zero
+        return 0;
+    }
+    const auto cache_iter = cache_u64c.find(k);
+    if (cache_iter == cache_u64c.end())
+    {
         uint64_t v = 0;
+        const std::vector<uint8_t> &vec = xmap_iter->second;
         try
         {
             CDataStream s(vec, SER_NETWORK, PROTOCOL_VERSION);
@@ -44,8 +34,9 @@ uint64_t CXVersionMessage::as_u64c(const uint64_t k) const
             v = 0;
         }
         cache_u64c[k] = v;
+        return v;
     }
-    return cache_u64c.at(k);
+    return cache_iter->second;
 }
 
 void CXVersionMessage::set_u64c(const uint64_t key, const uint64_t val)
@@ -57,6 +48,6 @@ void CXVersionMessage::set_u64c(const uint64_t key, const uint64_t val)
     vec.insert(vec.begin(), s.begin(), s.end());
 
     LOCK(cacheProtector);
-    xmap[key] = vec;
+    xmap[key] = std::move(vec);
     cache_u64c[key] = val;
 }
