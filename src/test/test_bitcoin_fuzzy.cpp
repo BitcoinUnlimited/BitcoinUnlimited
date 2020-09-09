@@ -576,9 +576,6 @@ int main(int argc, char **argv)
 {
     ECCVerifyHandle globalVerifyHandle;
 
-    /* Make a couple things determinstic for fuzzing */
-    xversion_deterministic_hashing = true;
-
     FuzzDeserNet<CBlock> fuzz_cblock("cblock");
     FuzzDeserNet<CTransaction> fuzz_ctransaction("ctransaction");
     FuzzDeserNet<CBlockLocator> fuzz_cblocklocator("cblocklocator");
