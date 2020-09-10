@@ -127,10 +127,7 @@ private:
 
     /** Bytes to reserve for coinbase and block header */
     uint64_t reserveBlockSize(const CScript &scriptPubKeyIn, int64_t coinbaseSize = -1);
-    /** Internal method to construct a new block template */
-    std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript &scriptPubKeyIn,
-        bool blockstreamCoreCompatible,
-        int64_t coinbaseSize = -1);
+
     /** Constructs a coinbase transaction */
     CTransactionRef coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue);
 

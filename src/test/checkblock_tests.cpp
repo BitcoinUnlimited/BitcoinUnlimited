@@ -44,7 +44,7 @@ bool read_block(const std::string &filename, CBlock &block)
 bool LockAndContextualCheckBlock(CBlock &block, CValidationState &state)
 {
     LOCK(cs_main);
-    return ContextualCheckBlock(block, state, nullptr, false);
+    return ContextualCheckBlock(block, state, nullptr);
 }
 
 BOOST_FIXTURE_TEST_SUITE(checkblock_tests, BasicTestingSetup) // BU harmonize suite name with filename

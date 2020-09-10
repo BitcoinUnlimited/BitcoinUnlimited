@@ -2073,19 +2073,9 @@ UniValue validateblocktemplate(const UniValue &params, bool fHelp)
     {
         LOCK(cs_main); // to freeze the state during block validity test
 
-        if (block.GetBlockSize() <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
+        if (!TestBlockValidity(state, chainparams, block, pindexPrev, false, true))
         {
-            if (!TestConservativeBlockValidity(state, chainparams, block, pindexPrev, false, true))
-            {
-                throw runtime_error(std::string("invalid block: ") + state.GetRejectReason());
-            }
-        }
-        else
-        {
-            if (!TestBlockValidity(state, chainparams, block, pindexPrev, false, true))
-            {
-                throw runtime_error(std::string("invalid block: ") + state.GetRejectReason());
-            }
+            throw runtime_error(std::string("invalid block: ") + state.GetRejectReason());
         }
 
         if (block.fExcessive)

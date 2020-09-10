@@ -83,16 +83,7 @@ bool TestBlockValidity(CValidationState &state,
     const CBlock &block,
     CBlockIndex *pindexPrev,
     bool fCheckPOW = true,
-    bool fCheckMerkleRoot = true,
-    bool fConservative = false);
-
-// used during mining
-bool TestConservativeBlockValidity(CValidationState &state,
-    const CChainParams &chainparams,
-    const CBlock &block,
-    CBlockIndex *pindexPrev,
-    bool fCheckPOW,
-    bool fCheckMerkleRoot);
+    bool fCheckMerkleRoot = true);
 
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
 
@@ -109,10 +100,7 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
 void InvalidChainFound(CBlockIndex *pindexNew);
 
 /** Context-dependent validity block checks */
-bool ContextualCheckBlock(const CBlock &block,
-    CValidationState &state,
-    CBlockIndex *pindexPrev,
-    const bool fConservative = false);
+bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIndex *pindexPrev);
 
 // BU: returns the blocksize if block is valid.  Otherwise 0
 bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
