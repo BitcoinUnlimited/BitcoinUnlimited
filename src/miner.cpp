@@ -187,22 +187,6 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _n
     return MakeTransactionRef(std::move(tx));
 }
 
-std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, int64_t coinbaseSize)
-{
-    std::unique_ptr<CBlockTemplate> tmpl(nullptr);
-
-    if (nBlockMaxSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
-        tmpl = CreateNewBlock(scriptPubKeyIn, false, coinbaseSize);
-
-    // If the block is too small we need to drop back to the 1MB ruleset
-    if ((!tmpl) || (tmpl->block.GetBlockSize() <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
-    {
-        tmpl = CreateNewBlock(scriptPubKeyIn, true, coinbaseSize);
-    }
-
-    return tmpl;
-}
-
 struct NumericallyLessTxHashComparator
 {
 public:
@@ -212,9 +196,7 @@ public:
     }
 };
 
-std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn,
-    bool blockstreamCoreCompatible,
-    int64_t coinbaseSize)
+std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, int64_t coinbaseSize)
 {
     resetBlock(scriptPubKeyIn, coinbaseSize);
 
@@ -330,21 +312,9 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     pblock->fXVal = xvalTweak.Value();
 
     CValidationState state;
-    if (blockstreamCoreCompatible)
+    if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
     {
-        if (!TestConservativeBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
-        {
-            throw std::runtime_error(
-                strprintf("%s: TestConservativeBlockValidity failed: %s", __func__, FormatStateMessage(state)));
-        }
-    }
-    else
-    {
-        if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
-        {
-            throw std::runtime_error(
-                strprintf("%s: TestBlockValidity failed: %s", __func__, FormatStateMessage(state)));
-        }
+        throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s", __func__, FormatStateMessage(state)));
     }
     if (pblock->fExcessive)
     {
