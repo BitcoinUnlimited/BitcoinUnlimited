@@ -85,15 +85,21 @@ CChainParams *GetChainParams(ChainSelector chainSelector)
 // helper functions
 namespace
 {
-CKey LoadKey(unsigned char *src)
+void checkSigInit()
 {
-    CKey secret;
     if (!sigInited)
     {
         sigInited = true;
+        SHA256AutoDetect();
         ECC_Start();
         verifyContext = new ECCVerifyHandle();
     }
+}
+
+CKey LoadKey(unsigned char *src)
+{
+    CKey secret;
+    checkSigInit();
     secret.Set(src, src + 32, true);
     return secret;
 }
@@ -138,14 +144,7 @@ SLAPI int Bin2Hex(unsigned char *val, int length, char *result, unsigned int res
 /** Given a private key, return its corresponding public key */
 SLAPI int GetPubKey(unsigned char *keyData, unsigned char *result, unsigned int resultLen)
 {
-    if (!sigInited)
-    {
-        sigInited = true;
-        SHA256AutoDetect();
-        ECC_Start();
-        verifyContext = new ECCVerifyHandle();
-    }
-
+    checkSigInit();
     CKey key = LoadKey(keyData);
     CPubKey pubkey = key.GetPubKey();
     unsigned int size = pubkey.size();
@@ -162,13 +161,7 @@ SLAPI int SignData(unsigned char *data,
     unsigned char *result,
     unsigned int resultLen)
 {
-    if (!sigInited)
-    {
-        sigInited = true;
-        ECC_Start();
-        verifyContext = new ECCVerifyHandle();
-    }
-
+    checkSigInit();
     CKey key = LoadKey(secret);
     uint256 hash;
     CSHA256().Write(data, datalen).Finalize(hash.begin());
@@ -202,14 +195,7 @@ SLAPI int SignTx(unsigned char *txData,
     unsigned int resultLen)
 {
     DbgAssert(nHashType & SIGHASH_FORKID, return 0);
-
-    if (!sigInited)
-    {
-        sigInited = true;
-        ECC_Start();
-        verifyContext = new ECCVerifyHandle();
-    }
-
+    checkSigInit();
     CTransaction tx;
     result[0] = 0;
 
@@ -261,15 +247,7 @@ SLAPI int SignTxSchnorr(unsigned char *txData,
     unsigned int resultLen)
 {
     DbgAssert(nHashType & SIGHASH_FORKID, return 0);
-
-    if (!sigInited)
-    {
-        sigInited = true;
-        SHA256AutoDetect();
-        ECC_Start();
-        verifyContext = new ECCVerifyHandle();
-    }
-
+    checkSigInit();
     CTransaction tx;
     result[0] = 0;
 
@@ -318,13 +296,7 @@ SLAPI int SignHashSchnorr(const unsigned char *hash,
 {
     uint256 sighash(hash);
     std::vector<unsigned char> sig;
-
-    if (!sigInited)
-    {
-        sigInited = true;
-        ECC_Start();
-        verifyContext = new ECCVerifyHandle();
-    }
+    checkSigInit();
 
     CKey key = LoadKey(keyData);
 
@@ -384,12 +356,7 @@ SLAPI void *CreateScriptMachine(unsigned int flags,
     unsigned char *txData,
     int txbuflen)
 {
-    if (!sigInited)
-    {
-        sigInited = true;
-        ECC_Start();
-        verifyContext = new ECCVerifyHandle();
-    }
+    checkSigInit();
 
     ScriptMachineData *smd = new ScriptMachineData();
     smd->tx = std::make_shared<CTransaction>();
@@ -680,6 +647,7 @@ jbyteArray makeJByteArray(JNIEnv *env, std::vector<unsigned char> &buf)
     return bArray;
 }
 
+
 extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Wallet_signMessage(JNIEnv *env,
     jobject ths,
     jbyteArray jmessage,
@@ -690,20 +658,67 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Wal
     if (privkey.size != 32)
         return jbyteArray();
 
+    checkSigInit();
+
     CKey key = LoadKey((unsigned char *)privkey.data);
 
     CHashWriter ss(SER_GETHASH, 0);
     ss << strMessageMagic << message.vec();
 
+    uint256 msgHash = ss.GetHash();
+    // __android_log_print(ANDROID_LOG_INFO, APPNAME, "signing msgHash %s\n", msgHash.GetHex().c_str());
     std::vector<unsigned char> vchSig;
-    if (!key.SignCompact(ss.GetHash(), vchSig)) // signing will only fail if the key is bogus
+    if (!key.SignCompact(msgHash, vchSig)) // signing will only fail if the key is bogus
     {
         return jbyteArray();
     }
     if (vchSig.size() == 0)
         return jbyteArray();
+
+    // __android_log_print(ANDROID_LOG_INFO, APPNAME, "signing sigSize %d data %s\n", vchSig.size(),
+    // GetHex(vchSig.begin(), vchSig.size()).c_str());
     return makeJByteArray(env, vchSig);
 }
+
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Wallet_verifyMessage(JNIEnv *env,
+    jobject ths,
+    jbyteArray jmessage,
+    jbyteArray addrBytes,
+    jbyteArray sigBytes)
+{
+    ByteArrayAccessor message(env, jmessage);
+    ByteArrayAccessor addr(env, addrBytes);
+    ByteArrayAccessor sig(env, sigBytes);
+    if (addr.size != 20)
+        return jbyteArray();
+
+    checkSigInit();
+
+    CHashWriter ss(SER_GETHASH, 0);
+    ss << strMessageMagic << message.vec();
+
+    uint256 msgHash = ss.GetHash();
+    //__android_log_print(ANDROID_LOG_INFO, APPNAME, "verifying msgHash %s\n", msgHash.GetHex().c_str());
+    //__android_log_print(ANDROID_LOG_INFO, APPNAME, "verifying sigSize %d data %s\n", sig.size, GetHex(sig.data,
+    // sig.size).c_str());
+
+    CPubKey pubkey;
+    if (!pubkey.RecoverCompact(msgHash, sig.vec()))
+        return jbyteArray();
+
+    CKeyID pkAddr = pubkey.GetID();
+    CKeyID passedAddr = CKeyID(uint160(addr.data));
+    //__android_log_print(ANDROID_LOG_INFO, APPNAME, "pkAddr %s\n", pkAddr.GetHex().c_str());
+    //__android_log_print(ANDROID_LOG_INFO, APPNAME, "passedAddr %s\n", passedAddr.GetHex().c_str());
+    if (pkAddr == passedAddr)
+    {
+        auto pkv = std::vector<unsigned char>(pubkey.begin(), pubkey.end());
+        return makeJByteArray(env, pkv);
+    }
+
+    return jbyteArray();
+}
+
 
 extern "C" JNIEXPORT jstring JNICALL Java_bitcoinunlimited_libbitcoincash_Codec_encode64(JNIEnv *env,
     jobject ths,
@@ -1169,12 +1184,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_bitcoinunlimited_libbitcoincash_Initia
 #endif
 
     // must be below the random number generator hookup
-    if (!sigInited)
-    {
-        sigInited = true;
-        SHA256AutoDetect();
-        ECC_Start();
-    }
+    checkSigInit();
 
     return env->NewStringUTF("");
 }
