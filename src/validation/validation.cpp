@@ -3913,6 +3913,7 @@ bool ProcessNewBlock(CValidationState &state,
 
 static bool FinalizeBlockInternal(CValidationState &state, CBlockIndex *pindex)
 {
+    if (pindex != chainActive.Genesis())
     {
         READLOCK(cs_mapBlockIndex);
         if (!pindex->IsValid(BLOCK_VALID_CHAIN))
