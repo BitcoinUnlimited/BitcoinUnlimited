@@ -171,6 +171,19 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &sta
             REJECT_INVALID, "bad-diffbits");
     }
 
+    if (fCheckpointsEnabled)
+    {
+        // Don't accept any forks from the main chain prior to the last checkpoint.
+        READLOCK(cs_mapBlockIndex);
+        CBlockIndex *pindex = Checkpoints::GetLastCheckpoint(Params().Checkpoints());
+        if (pindex && nHeight < pindex->nHeight)
+        {
+            return state.DoS(100,
+                error("%s: forked chain is older than last checkpoint (height %d)", __func__, nHeight),
+                REJECT_CHECKPOINT, "bad-fork-prior-to-checkpoint");
+        }
+    }
+
     // Check timestamp against prev
     if (block.GetBlockTime() <= pindexPrev->GetMedianTimePast())
         return state.Invalid(error("%s: block's timestamp is too early", __func__), REJECT_INVALID, "time-too-old");
