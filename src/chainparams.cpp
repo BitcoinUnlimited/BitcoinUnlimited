@@ -621,9 +621,19 @@ public:
         fMineBlocksOnDemand = false;
         fTestnetToBeDeprecatedFieldRPC = true;
 
-        checkpointData = (CCheckpointData){};
+        // clang-format off
+        checkpointData = CCheckpointData();
+        MapCheckpoints &checkpoints = checkpointData.mapCheckpoints;
+        checkpoints[     0] = uint256S("0x000000001dd410c49a788668ce26751718cc797474d3152a5fc073dd44fd9f7b");
+        checkpoints[  5677] = uint256S("0x0000000019df558b6686b1a1c3e7aee0535c38052651b711f84eebafc0cc4b5e");
+        // clang-format on
 
-        // chainTxData = ChainTxData{1522608381, 15052068, 0.15};
+        // Data as of block
+        // 0000000019df558b6686b1a1c3e7aee0535c38052651b711f84eebafc0cc4b5e
+        // (height 5677)
+        checkpointData.nTimeLastCheckpoint = 1599886634;
+        checkpointData.nTransactionsLastCheckpoint = 7432;
+        checkpointData.fTransactionsPerDay = 1.3;
     }
 };
 
