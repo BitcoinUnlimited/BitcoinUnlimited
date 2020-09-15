@@ -474,7 +474,9 @@ bool CheckAgainstCheckpoint(unsigned int height, const uint256 &hash, const CCha
     if (lkup != ckpt.mapCheckpoints.end()) // this block height is checkpointed
     {
         if (hash != lkup->second) // This block does not match the checkpoint
+        {
             return false;
+        }
     }
     return true;
 }

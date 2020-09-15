@@ -173,10 +173,22 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &sta
 
     if (fCheckpointsEnabled)
     {
-        // Don't accept any forks from the main chain prior to the last checkpoint.
+        const CChainParams &chainparams = Params();
+        // If the parent block belongs to the set of checkpointed blocks but it has a mismatched hash,
+        // then we are on the wrong fork so ignore
+        if (!CheckAgainstCheckpoint(pindexPrev->nHeight, *pindexPrev->phashBlock, chainparams))
+        {
+            return error("%s: CheckAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
+        }
         READLOCK(cs_mapBlockIndex);
-        CBlockIndex *pindex = Checkpoints::GetLastCheckpoint(Params().Checkpoints());
-        if (pindex && nHeight < pindex->nHeight)
+        const CBlockIndex *pindexMainChain = chainActive[nHeight];
+        if (pindexMainChain && pindexMainChain->GetBlockHeader() == block)
+        {
+            return true; // if this header is in the main chain it is valid and we are done
+        }
+        // Don't accept any forks from the main chain prior to the last checkpoint.
+        CBlockIndex *pcheckpoint = Checkpoints::GetLastCheckpoint(chainparams.Checkpoints());
+        if (pcheckpoint && nHeight < pcheckpoint->nHeight)
         {
             return state.DoS(100,
                 error("%s: forked chain is older than last checkpoint (height %d)", __func__, nHeight),
@@ -259,11 +271,6 @@ bool AcceptBlockHeader(const CBlockHeader &block,
                     error("%s: previous block %s is invalid", __func__, pindexPrev->GetBlockHash().GetHex().c_str()),
                     REJECT_INVALID, "bad-prevblk");
         }
-
-        // If the parent block belongs to the set of checkpointed blocks but it has a mismatched hash,
-        // then we are on the wrong fork so ignore
-        if (fCheckpointsEnabled && !CheckAgainstCheckpoint(pindexPrev->nHeight, *pindexPrev->phashBlock, chainparams))
-            return error("%s: CheckAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
 
         if (!ContextualCheckBlockHeader(block, state, pindexPrev))
             return false;
