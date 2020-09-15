@@ -58,6 +58,12 @@ public:
         READWRITE(nNonce);
     }
 
+    bool operator==(const CBlockHeader &b)
+    {
+        return (nVersion == b.nVersion && hashPrevBlock == b.hashPrevBlock && hashMerkleRoot == b.hashMerkleRoot &&
+                nTime == b.nTime && nBits == b.nBits && nNonce == b.nNonce);
+    }
+
     void SetNull()
     {
         nVersion = 0;
