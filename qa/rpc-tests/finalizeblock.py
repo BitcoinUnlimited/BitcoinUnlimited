@@ -58,6 +58,8 @@ class FinalizeBlockTest(BitcoinTestFramework):
         # getdata and one set of headers and thus we end up with the correct chaintip.
         disconnect_all(alt_node)
         alt_node.invalidateblock(tip)
+        # We will use this later
+        fork_block = alt_node.getbestblockhash()
 
         # We will use this later to check auto-finalization during a reorg
         auto_finalized_tip = alt_node.getbestblockhash()
@@ -88,13 +90,13 @@ class FinalizeBlockTest(BitcoinTestFramework):
             "Test that invalidating a finalized block moves the finalization backward...")
 
         print(str(node.getblockcount()))
+        finalized_block = node.getfinalizedblockhash()
         node.invalidateblock(tip)
 
         node.invalidateblock(node.getbestblockhash())
         node.reconsiderblock(tip)
-        finalized_block = node.getblockhash(int(node.getblockheader(tip)['height']) - AUTO_FINALIZATION_DEPTH)
         assert_equal(node.getbestblockhash(), tip)
-        assert_equal(node.getfinalizedblockhash(), finalized_block)
+        assert_equal(node.getfinalizedblockhash(), fork_block)
 
         # The node will now accept that chain as the finalized block moved back.
         node.reconsiderblock(alt_node.getbestblockhash())

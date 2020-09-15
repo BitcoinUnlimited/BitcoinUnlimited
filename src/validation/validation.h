@@ -176,6 +176,9 @@ bool FinalizeBlockAndInvalidate(CValidationState &state, CBlockIndex *pindex);
 /** Get the the block index for the currently finalized block */
 const CBlockIndex *GetFinalizedBlock();
 
+/** Is this block finalized or within the chain that is already finalized */
+bool IsBlockFinalized(const CBlockIndex *pindex);
+
 //! Check whether the block associated with this index entry is pruned or not.
 bool IsBlockPruned(const CBlockIndex *pblockindex);
 

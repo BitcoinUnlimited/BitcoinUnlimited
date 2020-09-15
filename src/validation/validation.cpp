@@ -3933,6 +3933,13 @@ static bool FinalizeBlockInternal(CValidationState &state, CBlockIndex *pindex)
             REJECT_AGAINST_FINALIZED, "bad-fork-prior-finalized");
     }
 
+    // If we receive a block prior to the finalization point we may end up rolling back the current
+    // finalization point. So we check here to see if the block is an ancestor of the finalized block index.
+    if (IsBlockFinalized(pindex))
+    {
+        return true;
+    }
+
     // We have a valid candidate
     pindexFinalized = pindex;
     return true;
@@ -3959,6 +3966,13 @@ const CBlockIndex *GetFinalizedBlock()
 {
     AssertLockHeld(cs_main);
     return pindexFinalized;
+}
+
+bool IsBlockFinalized(const CBlockIndex *pindex)
+{
+    AssertLockHeld(cs_main);
+    return pindexFinalized &&
+           pindexFinalized->GetAncestor(pindex->nHeight) == pindex;
 }
 
 bool IsBlockPruned(const CBlockIndex *pblockindex)
