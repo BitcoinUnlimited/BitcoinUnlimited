@@ -534,7 +534,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // Potentially mark this peer as a preferred download peer.
         UpdatePreferredDownload(pfrom);
 
-        if (pfrom->nServices & NODE_XVERSION)
+        // only send extversion message if both peers are using the protocol
+        if ((nLocalServices & NODE_XVERSION) && (pfrom->nServices & NODE_XVERSION))
         {
             // BU expedited procecessing requires the exchange of the listening port id
             // The former BUVERSION message has now been integrated into the xmap field in CXVersionMessage.
