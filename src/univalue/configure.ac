@@ -23,7 +23,7 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AC_PREREQ(2.60)
 AC_CONFIG_SRCDIR([lib/univalue.cpp])
 AC_CONFIG_AUX_DIR([build-aux])
-AC_CONFIG_MACRO_DIR([build-aux/m4])
+AC_CONFIG_MACRO_DIR([../../build-aux/m4])
 AC_CONFIG_HEADERS([univalue-config.h])
 AM_INIT_AUTOMAKE([subdir-objects foreign])
 
@@ -44,6 +44,9 @@ AC_SUBST(LIBUNIVALUE_AGE)
 
 LT_INIT
 LT_LANG([C++])
+
+dnl Require C++14 compiler (no GNU extensions)
+AX_CXX_COMPILE_STDCXX([14], [noext], [mandatory], [nodefault])
 
 # Enable debug
 AC_ARG_ENABLE([debug],

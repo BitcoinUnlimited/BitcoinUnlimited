@@ -93,10 +93,19 @@ void UniValue::writeObject(unsigned int prettyIndent, unsigned int indentLevel, 
     if (prettyIndent)
         s += "\n";
 
-    for (unsigned int i = 0; i < keys.size(); i++) {
+    // we do this to preserve insertion order of the keys as the internal std::map reorders them using
+    // the < operator
+    std::vector<std::string> vkeys(keys.size());
+    for (auto &key : keys)
+    {
+        vkeys[key.second] = key.first;
+    }
+
+    for (size_t i = 0; i < vkeys.size(); ++i)
+    {
         if (prettyIndent)
             indentStr(prettyIndent, indentLevel, s);
-        s += "\"" + json_escape(keys[i]) + "\":";
+        s += "\"" + json_escape(vkeys[i]) + "\":";
         if (prettyIndent)
             s += " ";
         s += values.at(i).write(prettyIndent, indentLevel + 1);
@@ -110,4 +119,3 @@ void UniValue::writeObject(unsigned int prettyIndent, unsigned int indentLevel, 
         indentStr(prettyIndent, indentLevel - 1, s);
     s += "}";
 }
-

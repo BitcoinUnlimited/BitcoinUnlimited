@@ -428,7 +428,7 @@ bool UniValue::read(const char *raw, size_t size)
         case JTOK_STRING: {
             if (expect(OBJ_NAME)) {
                 UniValue *top = stack.back();
-                top->keys.push_back(tokenVal);
+                top->keys.emplace(tokenVal, top->values.size());
                 clearExpect(OBJ_NAME);
                 setExpect(COLON);
             } else {
@@ -457,4 +457,3 @@ bool UniValue::read(const char *raw, size_t size)
 
     return true;
 }
-

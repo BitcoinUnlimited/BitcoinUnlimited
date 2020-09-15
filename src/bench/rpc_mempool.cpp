@@ -37,9 +37,9 @@ static void RpcMempool(benchmark::State &state)
         tx.vin[0].scriptSig = CScript() << OP_1;
         tx.vout.resize(1);
         tx.vout[0].scriptPubKey = CScript() << OP_1 << OP_EQUAL;
-        tx.vout[0].nValue = i * CENT;
+        tx.vout[0].nValue = i * COIN;
         const CTransactionRef tx_r{MakeTransactionRef(tx)};
-        AddTx(tx_r, /* fee */ i * CENT);
+        AddTx(tx_r, /* fee */ i * COIN);
     }
 
     while (state.KeepRunning())
@@ -67,10 +67,10 @@ static void RpcMempool10k(benchmark::State &state)
         {
             tx.vin[j].scriptSig = CScript() << OP_1;
             tx.vout[j].scriptPubKey = CScript() << OP_1 << OP_EQUAL;
-            tx.vout[j].nValue = int64_t(i * j) * CENT;
+            tx.vout[j].nValue = int64_t(i * j) * COIN;
         }
         const CTransactionRef tx_r{MakeTransactionRef(tx)};
-        AddTx(tx_r, /* fee */ int64_t(i) * CENT);
+        AddTx(tx_r, /* fee */ int64_t(i) * COIN);
     }
 
     while (state.KeepRunning())
