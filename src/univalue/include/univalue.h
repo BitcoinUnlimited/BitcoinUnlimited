@@ -3,6 +3,14 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+// In April 2020 Calin Culianu found an inefficiency when adding a key-value
+// pair to the univalue object. During every insertion the key was checked for
+// in a way that made the insertion N^2 in complexity, Based on his findings
+// we have changed the keys from a vector to a std::map making insertions log(n)
+// instead of N^2. Other methods were adjusted accordingly to the change in keys
+// data structure. This is not the exact fix Calin had remedied for this issue
+// but it is heavily based on and influenced by his solution. 
+
 #ifndef __UNIVALUE_H__
 #define __UNIVALUE_H__
 
@@ -78,7 +86,7 @@ public:
     bool checkObject(const std::map<std::string,UniValue::VType>& memberTypes) const;
     const UniValue& operator[](const std::string& key) const;
     const UniValue& operator[](size_t index) const;
-    bool exists(const std::string& key) const { size_t i; return findKey(key, i); }
+    bool exists(const std::string& key) const { return keys.count(key); }
 
     bool isNull() const { return (typ == VNULL); }
     bool isTrue() const { return (typ == VBOOL) && (val == "1"); }
@@ -160,17 +168,16 @@ public:
 private:
     UniValue::VType typ;
     std::string val;                       // numbers are stored as C++ strings
-    std::vector<std::string> keys;
+    std::map<std::string, size_t> keys; // key is key, value is index of value in values
     std::vector<UniValue> values;
 
-    bool findKey(const std::string& key, size_t& retIdx) const;
     void writeArray(unsigned int prettyIndent, unsigned int indentLevel, std::string& s) const;
     void writeObject(unsigned int prettyIndent, unsigned int indentLevel, std::string& s) const;
 
 public:
     // Strict type-specific getters, these throw std::runtime_error if the
     // value is of unexpected type
-    const std::vector<std::string>& getKeys() const;
+    const std::vector<std::string> getKeys() const;
     const std::vector<UniValue>& getValues() const;
     bool get_bool() const;
     const std::string& get_str() const;
