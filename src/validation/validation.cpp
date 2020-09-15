@@ -1353,7 +1353,6 @@ CBlockIndex *FindMostWorkChain()
                 pindexNew->GetBlockHash().ToString(), pindexFinalized->nHeight);
 
             pindexNew->nStatus |= BLOCK_FAILED_VALID;
-            pindexNew->nStatus &= ~BLOCK_VALID_CHAIN;
         }
 
         // Check whether all blocks on the path between the currently active chain and the candidate are valid.
