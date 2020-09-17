@@ -7,7 +7,7 @@ BCH Unlimited version 1.9.0.1 is now available from:
 
 Please report bugs using the issue tracker at github:
 
-  <https://github.com/BitcoinUnlimited/BitcoinUnlimited/issues>
+  <https://gitlab.com/bitcoinunlimited/BCHUnlimited/-/issues>
 
 This is a minor bugs fix release of BCH Unlimited compatible with the upcoming protocol upgrade of the Bitcoin Cash network. You could find
 Nov 15th, 2020 upgrade specifications here:
@@ -39,9 +39,10 @@ This is list of the main changes that have been merged in this release:
 
 - fix a 1.9.0 issue reported on macos
 - fixes for boost v1.73+
-- add support to build Electrs on macos
+- add support to build ElectrsCash on macos
 - xversion fixes and improvements
 - disable coin freeze feature
+- better handling of block header validation
 
 Commit details
 --------------
