@@ -15,6 +15,7 @@ const std::string CBaseChainParams::MAIN = "main";
 const std::string CBaseChainParams::UNL = "nol";
 const std::string CBaseChainParams::TESTNET = "test";
 const std::string CBaseChainParams::TESTNET4 = "test4";
+const std::string CBaseChainParams::SCALENET = "scale";
 const std::string CBaseChainParams::REGTEST = "regtest";
 
 /**
@@ -69,6 +70,20 @@ public:
 };
 static CBaseTestNet4Params testNet4Params;
 
+/**
+ * Scaling Network
+ */
+class CBaseScaleNetParams : public CBaseChainParams
+{
+public:
+    CBaseScaleNetParams()
+    {
+        nRPCPort = 38332;
+        strDataDir = "scalenet";
+    }
+};
+static CBaseScaleNetParams scaleNetParams;
+
 /*
  * Regression test
  */
@@ -101,6 +116,8 @@ CBaseChainParams &BaseParams(const std::string &chain)
         return testNetParams;
     else if (chain == CBaseChainParams::TESTNET4)
         return testNet4Params;
+    else if (chain == CBaseChainParams::SCALENET)
+        return scaleNetParams;
     else if (chain == CBaseChainParams::REGTEST)
         return regTestParams;
     else
@@ -117,17 +134,21 @@ std::string ChainNameFromCommandLine()
     num_selected += fTestNet;
     bool fTestNet4 = GetBoolArg("-testnet4", false);
     num_selected += fTestNet4;
+    bool fScaleNet = GetBoolArg("-scalenet", false);
+    num_selected += fScaleNet;
     bool fUnl = GetBoolArg("-chain_nol", false);
     num_selected += fUnl;
 
     if (num_selected > 1)
-        throw std::runtime_error("Invalid combination of -regtest, -testnet, -testnet4, and -chain_nol.");
+        throw std::runtime_error("Invalid combination of -regtest, -testnet, -testnet4, -scalenet and -chain_nol.");
     if (fRegTest)
         return CBaseChainParams::REGTEST;
     if (fTestNet)
         return CBaseChainParams::TESTNET;
     if (fTestNet4)
         return CBaseChainParams::TESTNET4;
+    if (fScaleNet)
+        return CBaseChainParams::SCALENET;
     if (fUnl)
         return CBaseChainParams::UNL;
     return CBaseChainParams::MAIN;
