@@ -332,13 +332,13 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
         found = CpuMineBlockHasher(&header, coinbaseBytes, merkleproof, randFunc);
     }
 
-    const auto nChecked = header.nNonce - startNonce;
+    const uint32_t nChecked = header.nNonce - startNonce;
 
     // Leave if not found:
     if (!found)
     {
-        const auto elapsed = GetTimeMillis() - start;
-        printf("Checked %d possibilities in %lld secs, %3.3f MH/s\n", nChecked, elapsed / 1000,
+        const int64_t elapsed = GetTimeMillis() - start;
+        printf("Checked %d possibilities in %ld secs, %3.3f MH/s\n", nChecked, elapsed / 1000,
             (nChecked / 1e6) / (elapsed / 1e3));
         return ret;
     }
