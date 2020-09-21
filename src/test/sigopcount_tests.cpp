@@ -405,7 +405,6 @@ BOOST_AUTO_TEST_CASE(consensusSigCheck)
         CScript goodsig1 = sign_multisig(scriptPubKey12, key1, CTransaction(txTo12), txFrom12.vout[0].nValue);
 
         sigchecks = evalForSigChecks(goodsig1, scriptPubKey12, flags);
-        printf("%d", sigchecks);
         BOOST_CHECK(sigchecks == 2); // ECDSA multisig sigchecks is N in a M-of-N sig
     }
 
