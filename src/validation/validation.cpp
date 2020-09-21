@@ -3972,8 +3972,7 @@ const CBlockIndex *GetFinalizedBlock()
 bool IsBlockFinalized(const CBlockIndex *pindex)
 {
     AssertLockHeld(cs_main);
-    return pindexFinalized &&
-           pindexFinalized->GetAncestor(pindex->nHeight) == pindex;
+    return pindexFinalized && pindexFinalized->GetAncestor(pindex->nHeight) == pindex;
 }
 
 bool IsBlockPruned(const CBlockIndex *pblockindex)
