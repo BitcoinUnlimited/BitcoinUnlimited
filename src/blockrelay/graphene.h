@@ -171,7 +171,11 @@ public:
         // transactions and the downside for pathological blocks is just that graphene won't work so we fall back
         // to xthin
         if (nBlockTxs > (thinrelay.GetMaxAllowedBlockSize() / MIN_TX_SIZE))
-            throw std::runtime_error("nBlockTxs exceeds threshold for excessive block txs");
+        {
+            throw std::runtime_error(strprintf(
+                "Based on number of transactions:(%d) the threshold for max allowed blocksize:(%d) will be exceeded",
+                nBlockTxs, thinrelay.GetMaxAllowedBlockSize()));
+        }
         if (!pGrapheneSet)
         {
             if (version > 3)
