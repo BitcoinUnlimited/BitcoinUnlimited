@@ -3925,6 +3925,7 @@ static bool FinalizeBlockInternal(CValidationState &state, CBlockIndex *pindex)
     }
 
     // Check that the request is consistent with current finalization.
+    LOCK(cs_main); // for pindexFinalized
     if (pindexFinalized && !AreOnTheSameFork(pindex, pindexFinalized))
     {
         return state.DoS(20, error("%s: Trying to finalize block %s which conflicts "
