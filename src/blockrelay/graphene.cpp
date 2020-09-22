@@ -27,8 +27,6 @@
 static bool ReconstructBlock(CNode *pfrom,
     std::shared_ptr<CBlockThinRelay> pblock,
     const std::map<uint64_t, CTransactionRef> &mapTxFromPools);
-extern CTweak<uint64_t> grapheneMinVersionSupported;
-extern CTweak<uint64_t> grapheneMaxVersionSupported;
 extern CTweak<uint64_t> grapheneFastFilterCompatibility;
 
 CMemPoolInfo::CMemPoolInfo(uint64_t _nTx) : nTx(_nTx) {}
@@ -1791,22 +1789,11 @@ bool NegotiateFastFilterSupport(CNode *pfrom)
     }
 }
 
+
 uint64_t NegotiateGrapheneVersion(CNode *pfrom)
 {
-    uint64_t selfMax = grapheneMaxVersionSupported.Value();
-    uint64_t selfMin = grapheneMinVersionSupported.Value();
-    uint64_t peerMin, peerMax;
-    {
-        LOCK(pfrom->cs_xversion);
-        peerMin = pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED);
-        peerMax = pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED);
-    }
-
-    uint64_t upper = (uint64_t)std::min(peerMax, selfMax);
-    uint64_t lower = (uint64_t)std::max(peerMin, selfMin);
-
-    if (lower > upper)
+    DbgAssert(pfrom, throw std::runtime_error("null CNode"));
+    if (pfrom->negotiatedGrapheneVersion == GRAPHENE_NO_VERSION_SUPPORTED)
         throw std::runtime_error("Sender and receiver support incompatible Graphene versions");
-
-    return upper;
+    return pfrom->negotiatedGrapheneVersion;
 }

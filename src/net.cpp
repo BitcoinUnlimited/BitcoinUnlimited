@@ -82,6 +82,8 @@ extern CTweak<bool> ignoreNetTimeouts;
 extern std::atomic<bool> fRescan;
 extern bool fReindex;
 extern CTxMemPool mempool;
+extern CTweak<uint64_t> grapheneMinVersionSupported;
+extern CTweak<uint64_t> grapheneMaxVersionSupported;
 
 bool ShutdownRequested();
 
@@ -3502,6 +3504,20 @@ void CNode::ReadConfigFromXVersion_OLD()
     nMempoolSyncMinVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED_OLD);
     nMempoolSyncMaxVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED_OLD);
     txConcat = xVersion.as_u64c(XVer::BU_TXN_CONCATENATION_OLD);
+    minGrapheneVersion = xVersion.as_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED_OLD);
+    maxGrapheneVersion = xVersion.as_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED_OLD);
+
+    {
+        uint64_t selfMax = grapheneMaxVersionSupported.Value();
+        uint64_t selfMin = grapheneMinVersionSupported.Value();
+
+        uint64_t upper = (uint64_t)std::min(maxGrapheneVersion, selfMax);
+        uint64_t lower = (uint64_t)std::max(minGrapheneVersion, selfMin);
+        if (lower > upper)
+            negotiatedGrapheneVersion = GRAPHENE_NO_VERSION_SUPPORTED;
+        else
+            negotiatedGrapheneVersion = upper;
+    }
 }
 
 void CNode::ReadConfigFromXVersion()
@@ -3532,6 +3548,20 @@ void CNode::ReadConfigFromXVersion()
     nMempoolSyncMinVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED);
     nMempoolSyncMaxVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED);
     txConcat = xVersion.as_u64c(XVer::BU_TXN_CONCATENATION);
+    minGrapheneVersion = xVersion.as_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED);
+    maxGrapheneVersion = xVersion.as_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED);
+
+    {
+        uint64_t selfMax = grapheneMaxVersionSupported.Value();
+        uint64_t selfMin = grapheneMinVersionSupported.Value();
+
+        uint64_t upper = (uint64_t)std::min(maxGrapheneVersion, selfMax);
+        uint64_t lower = (uint64_t)std::max(minGrapheneVersion, selfMin);
+        if (lower > upper)
+            negotiatedGrapheneVersion = GRAPHENE_NO_VERSION_SUPPORTED;
+        else
+            negotiatedGrapheneVersion = upper;
+    }
 }
 
 

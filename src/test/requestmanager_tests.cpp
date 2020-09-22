@@ -33,6 +33,8 @@
 #include <sstream>
 #include <string>
 
+extern CTweak<uint64_t> grapheneMaxVersionSupported;
+
 class CRequestManagerTest
 {
 private:
@@ -127,6 +129,8 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     dummyNodeGraphene.nServices &= ~NODE_XTHIN;
     dummyNodeGraphene.fSupportsCompactBlocks = false;
     dummyNodeGraphene.id = 2;
+    // This dummy node does not exchange a simulated xversion so jam in graphene supported version.
+    dummyNodeGraphene.negotiatedGrapheneVersion = grapheneMaxVersionSupported.Value();
     dummyNodeCmpct.nVersion = MIN_PEER_PROTO_VERSION;
     SetConnected(dummyNodeCmpct);
     dummyNodeCmpct.nServices &= ~NODE_GRAPHENE;

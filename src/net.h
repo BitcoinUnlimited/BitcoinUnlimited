@@ -104,6 +104,10 @@ static const bool DEFAULT_BLOCKSONLY = false;
 /** Default for XVersion */
 static const bool DEFAULT_USE_XVERSION = true;
 
+/** Internal constant that indicates we have no common graphene versions. */
+const uint64_t GRAPHENE_NO_VERSION_SUPPORTED = 0xfffffff;
+
+
 // BITCOINUNLIMITED START
 static const bool DEFAULT_FORCEBITNODES = false;
 // BITCOINUNLIMITED END
@@ -362,7 +366,13 @@ public:
     /** set to true if the next expected message is xVersion */
     std::atomic<bool> xVersionExpected{false};
     /** set to true if this node is ok with no message checksum */
-    bool skipChecksum;
+    bool skipChecksum = false;
+    /** Graphene min supported version */
+    uint64_t minGrapheneVersion = 0;
+    /** Graphene max supported version */
+    uint64_t maxGrapheneVersion = 0;
+    /** Negotiated graphene version.  Based on the other node and me, what's the best version to use? */
+    uint64_t negotiatedGrapheneVersion = GRAPHENE_NO_VERSION_SUPPORTED;
 
 
     // This is shared-locked whenever messages are processed.
