@@ -121,7 +121,7 @@ std::string ChainNameFromCommandLine()
     num_selected += fUnl;
 
     if (num_selected > 1)
-        throw std::runtime_error("Invalid combination of -regtest, -testnet, and -testnet4.");
+        throw std::runtime_error("Invalid combination of -regtest, -testnet, -testnet4, and -chain_nol.");
     if (fRegTest)
         return CBaseChainParams::REGTEST;
     if (fTestNet)
