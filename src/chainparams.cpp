@@ -573,8 +573,14 @@ public:
         // November 13, 2017 hard fork
         consensus.daaHeight = 3000;
 
+        // May, 15 2018 hard fork
+        consensus.may2018Height = 4000;
+
         // November 15, 2018 protocol upgrade
         consensus.nov2018Height = 4000;
+
+        // May, 15 2019 hard fork
+        consensus.may2019Height = 5000;
 
         // Nov, 15 2019 hard fork
         consensus.nov2019Height = 5000;
