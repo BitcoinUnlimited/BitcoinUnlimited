@@ -15,6 +15,7 @@
 #include <mutex>
 #include <set>
 #include <unordered_map>
+#include <utility>
 
 class COutPoint;
 
@@ -26,9 +27,11 @@ public:
 
     /// returns a double spend proof based on proof-id
     DoubleSpendProof proof(int proof) const;
-    /// adds a proof, returns an internal proof-id that proof is known under.
-    /// notice that if the proof (by hash) was known, that proof-id is returned instead.
-    int add(const DoubleSpendProof &proof);
+    /// Adds a proof, returns a pair of {fAdded, proofId}
+    /// proofId is an internal id that the proof is known under.
+    /// Note that if the proof (by hash) was known, the known id is returned instead,
+    /// and fAdded will be false.
+    std::pair<bool, int32_t> add(const DoubleSpendProof &proof);
     /// remove by proof-id
     void remove(int proof);
 

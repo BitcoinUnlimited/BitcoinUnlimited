@@ -1741,7 +1741,7 @@ CTransactionRef CTxMemPool::addDoubleSpendProof(const DoubleSpendProof &proof)
         return CTransactionRef(); // don't propagate new one.
 
     auto item = *iter;
-    item.dsproof = m_dspStorage->add(proof);
+    item.dsproof = m_dspStorage->add(proof).second;
     mapTx.replace(iter, item);
     return _get(oldTx->second.ptx->GetHash());
 }

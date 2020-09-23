@@ -31,7 +31,7 @@ DoubleSpendProof DoubleSpendProofStorage::proof(int proof) const
     return DoubleSpendProof();
 }
 
-int DoubleSpendProofStorage::add(const DoubleSpendProof &proof)
+std::pair<bool, int32_t> DoubleSpendProofStorage::add(const DoubleSpendProof &proof)
 {
     LOCK(m_lock);
 
@@ -50,21 +50,21 @@ int DoubleSpendProofStorage::add(const DoubleSpendProof &proof)
             m_nextId = 1;
         iter = m_proofs.find(m_nextId);
     }
-    m_proofs.insert(std::make_pair(m_nextId, proof));
-    m_dspIdLookupTable.insert(std::make_pair(hash, m_nextId));
+    m_proofs.emplace(m_nextId, proof);
+    m_dspIdLookupTable.emplace(hash, m_nextId);
 
-    return m_nextId++;
+    return {true, m_nextId++};
 }
 
 void DoubleSpendProofStorage::addOrphan(const DoubleSpendProof &proof, NodeId peerId)
 {
     LOCK(m_lock);
-    const int next = m_nextId;
-    const int id = add(proof);
-    if (id != next) // it was already in the storage
+    const auto res = add(proof);
+    if (!res.first) // it was already in the storage
         return;
 
-    m_orphans.insert(std::make_pair(id, std::make_pair(peerId, GetTime())));
+    const int32_t id = res.second;
+    m_orphans.emplace(id, std::make_pair(peerId, GetTime()));
     m_prevTxIdLookupTable[proof.prevTxId().GetCheapHash()].push_back(id);
 }
 
@@ -90,7 +90,7 @@ std::list<std::pair<int, int> > DoubleSpendProofStorage::findOrphans(const COutP
                 auto orphanIter = m_orphans.find(*proofId);
                 if (orphanIter != m_orphans.end())
                 {
-                    answer.push_back(std::make_pair(*proofId, orphanIter->second.first));
+                    answer.emplace_back(*proofId, orphanIter->second.first);
                 }
             }
         }
