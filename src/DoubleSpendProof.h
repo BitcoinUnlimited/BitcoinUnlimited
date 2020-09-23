@@ -4,10 +4,10 @@
 #ifndef BITCOIN_DOUBLESPENDPROOF_H
 #define BITCOIN_DOUBLESPENDPROOF_H
 
-#include "primitives/transaction.h"
-#include "serialize.h"
-#include "txmempool.h"
-#include <policy/policy.h>
+#include <primitives/transaction.h>
+#include <script/script.h>
+#include <serialize.h>
+#include <txmempool.h>
 #include <uint256.h>
 
 
@@ -15,7 +15,7 @@ class DoubleSpendProof
 {
 public:
     //! limit for the size of a `pushData` vector below
-    static constexpr size_t MaxPushDataSize = MAX_TX_IN_SCRIPT_SIG_SIZE;
+    static constexpr size_t MaxPushDataSize = MAX_SCRIPT_ELEMENT_SIZE;
 
     /** Creates an empty, invalid object */
     DoubleSpendProof();
