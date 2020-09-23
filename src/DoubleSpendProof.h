@@ -1,13 +1,12 @@
 // Copyright (C) 2019-2020 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#ifndef DOUBLESPENDPROOF_H
-#define DOUBLESPENDPROOF_H
+#ifndef BITCOIN_DOUBLESPENDPROOF_H
+#define BITCOIN_DOUBLESPENDPROOF_H
 
 #include "primitives/transaction.h"
 #include "serialize.h"
 #include "txmempool.h"
-#include <deque>
 #include <uint256.h>
 
 
@@ -38,11 +37,9 @@ public:
     Validity validate(const CTxMemPool &pool, const CTransactionRef ptx = nullptr) const;
 
     /** Returns the hash of the input transaction (UTXO) that is being doublespent */
-    uint256 prevTxId() const;
-
+    const uint256 &prevTxId() const { return m_prevTxId; }
     /** Returns the index of the output that is being doublespent */
-    int prevOutIndex() const;
-
+    int32_t prevOutIndex() const { return m_prevOutIndex; }
     /** get the hash of this doublespend proof */
     uint256 GetHash() const;
 
@@ -54,6 +51,8 @@ public:
         std::vector<std::vector<uint8_t> > pushData;
     };
 
+    const Spender &firstSpender() const { return m_spender1; }
+    const Spender &doubleSpender() const { return m_spender2; }
     // old fashioned serialization.
     ADD_SERIALIZE_METHODS
 

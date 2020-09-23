@@ -1,6 +1,7 @@
 // Copyright (C) 2019-2020 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "DoubleSpendProofStorage.h"
 #include "dosman.h"
 #include "hashwrapper.h"
@@ -8,7 +9,9 @@
 #include <primitives/transaction.h>
 #include <utiltime.h>
 
-#define SECONDS_TO_KEEP_ORPHANS 90
+#include <limits>
+
+static constexpr int64_t SECONDS_TO_KEEP_ORPHANS = 90;
 
 extern boost::asio::io_service stat_io_service;
 
@@ -21,7 +24,7 @@ DoubleSpendProofStorage::DoubleSpendProofStorage() : m_recentRejects(120000, 0.0
 DoubleSpendProofStorage::~DoubleSpendProofStorage() { m_timer.cancel(); }
 DoubleSpendProof DoubleSpendProofStorage::proof(int proof) const
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    LOCK(m_lock);
     auto iter = m_proofs.find(proof);
     if (iter != m_proofs.end())
         return iter->second;
@@ -30,7 +33,7 @@ DoubleSpendProof DoubleSpendProofStorage::proof(int proof) const
 
 int DoubleSpendProofStorage::add(const DoubleSpendProof &proof)
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    LOCK(m_lock);
 
     uint256 hash = proof.GetHash();
     auto lookupIter = m_dspIdLookupTable.find(hash);
@@ -55,7 +58,7 @@ int DoubleSpendProofStorage::add(const DoubleSpendProof &proof)
 
 void DoubleSpendProofStorage::addOrphan(const DoubleSpendProof &proof, NodeId peerId)
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    LOCK(m_lock);
     const int next = m_nextId;
     const int id = add(proof);
     if (id != next) // it was already in the storage
@@ -68,7 +71,7 @@ void DoubleSpendProofStorage::addOrphan(const DoubleSpendProof &proof, NodeId pe
 std::list<std::pair<int, int> > DoubleSpendProofStorage::findOrphans(const COutPoint &prevOut)
 {
     std::list<std::pair<int, int> > answer;
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    LOCK(m_lock);
     auto iter = m_prevTxIdLookupTable.find(prevOut.hash.GetCheapHash());
     if (iter == m_prevTxIdLookupTable.end())
         return answer;
@@ -100,7 +103,7 @@ std::list<std::pair<int, int> > DoubleSpendProofStorage::findOrphans(const COutP
 int DoubleSpendProofStorage::orphanCount(int proofId) { return m_orphans.count(proofId); }
 void DoubleSpendProofStorage::claimOrphan(int proofId)
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    LOCK(m_lock);
     auto orphan = m_orphans.find(proofId);
     if (orphan != m_orphans.end())
     {
@@ -125,7 +128,7 @@ void DoubleSpendProofStorage::claimOrphan(int proofId)
 
 void DoubleSpendProofStorage::remove(int proof)
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    LOCK(m_lock);
     auto iter = m_proofs.find(proof);
     if (iter == m_proofs.end())
         return;
@@ -164,7 +167,7 @@ void DoubleSpendProofStorage::remove(int proof)
 
 DoubleSpendProof DoubleSpendProofStorage::lookup(const uint256 &proofId) const
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    LOCK(m_lock);
     auto lookupIter = m_dspIdLookupTable.find(proofId);
     if (lookupIter == m_dspIdLookupTable.end())
         return DoubleSpendProof();
@@ -173,7 +176,7 @@ DoubleSpendProof DoubleSpendProofStorage::lookup(const uint256 &proofId) const
 
 bool DoubleSpendProofStorage::exists(const uint256 &proofId) const
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    LOCK(m_lock);
     return m_dspIdLookupTable.find(proofId) != m_dspIdLookupTable.end();
 }
 
@@ -184,7 +187,7 @@ void DoubleSpendProofStorage::periodicCleanup(const boost::system::error_code &e
     m_timer.expires_from_now(boost::posix_time::minutes(1));
     m_timer.async_wait(std::bind(&DoubleSpendProofStorage::periodicCleanup, this, std::placeholders::_1));
 
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    LOCK(m_lock);
     auto expire = GetTime() - SECONDS_TO_KEEP_ORPHANS;
     auto iter = m_orphans.begin();
     while (iter != m_orphans.end())
@@ -208,18 +211,28 @@ void DoubleSpendProofStorage::periodicCleanup(const boost::system::error_code &e
 
 bool DoubleSpendProofStorage::isRecentlyRejectedProof(const uint256 &proofHash) const
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    LOCK(m_lock);
     return m_recentRejects.contains(proofHash);
 }
 
 void DoubleSpendProofStorage::markProofRejected(const uint256 &proofHash)
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    LOCK(m_lock);
     m_recentRejects.insert(proofHash);
 }
 
 void DoubleSpendProofStorage::newBlockFound()
 {
-    std::lock_guard<std::recursive_mutex> lock(m_lock);
+    LOCK(m_lock);
     m_recentRejects.reset();
+}
+
+DoubleSpendProofStorage::SaltedHasher::SaltedHasher()
+    : k0(GetRand(std::numeric_limits<uint64_t>::max())), k1(GetRand(std::numeric_limits<uint64_t>::max()))
+{
+}
+
+size_t DoubleSpendProofStorage::SaltedHasher::operator()(const uint256 &hash) const
+{
+    return SipHashUint256(k0, k1, hash);
 }

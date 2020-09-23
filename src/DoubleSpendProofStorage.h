@@ -1,19 +1,20 @@
 // Copyright (C) 2019-2020 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#ifndef DOUBLESPENDPROOFSTORAGE_H
-#define DOUBLESPENDPROOFSTORAGE_H
+#ifndef BITCOIN_DOUBLESPENDPROOFSTORAGE_H
+#define BITCOIN_DOUBLESPENDPROOFSTORAGE_H
 
 #include "DoubleSpendProof.h"
 #include "bloom.h"
 #include "net.h"
 
 #include <boost/asio.hpp>
-#include <boost/unordered_map.hpp>
 
+#include <deque>
 #include <map>
 #include <mutex>
 #include <set>
+#include <unordered_map>
 
 class COutPoint;
 
@@ -55,13 +56,24 @@ public:
 
 private:
     // m_lock guards all the following data structures
-    mutable std::recursive_mutex m_lock;
+    mutable CCriticalSection m_lock;
 
-    std::map<int, DoubleSpendProof> m_proofs;
+    std::map<int32_t, DoubleSpendProof> m_proofs;
     int m_nextId = 1;
     std::map<int, std::pair<NodeId, int64_t> > m_orphans;
 
-    typedef boost::unordered_map<uint256, int, HashShortener> LookupTable;
+    //! A salted hasher for use with the uint256 type in the LookupTable below.
+    //! This code is inspired by txmempool.h's SaltedTxidHasher
+    class SaltedHasher
+    {
+        const uint64_t k0, k1; //! Salt
+    public:
+        SaltedHasher();
+        size_t operator()(const uint256 &hash) const;
+    };
+
+    using LookupTable = std::unordered_map<uint256, int32_t, SaltedHasher>;
+
     LookupTable m_dspIdLookupTable;
     std::map<uint64_t, std::deque<int> > m_prevTxIdLookupTable;
 
