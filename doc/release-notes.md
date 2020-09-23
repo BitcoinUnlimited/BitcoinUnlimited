@@ -44,9 +44,15 @@ This is list of the main changes that have been merged in this release:
 - disable coin freeze feature
 - better handling of block header validation
 
+
 Commit details
 --------------
 
+- `3ef2363b9` Repoint build status badge from Travis to Gitlab (Justaphf)
+- `d01385f31` Graphene version negotiation at connect time only (Andrew Stone)
+- `ea71bf0ee` Fix compile warning in bitcoin-miner.cpp (Peter Tschipper)
+- `af09b749d` Remove unnecessary printf from sigopcount_tests (ptschip)
+- `01ff735d4` Update runtime error message when block size is exceeded (Peter Tschipper)
 - `05ff861cbf` git ignore src/pull-tester/ctorout.txt (ptschip)
 - `a0b89b1332` fix univalue kvp insertion complexity. now log(N) instead of N^2 (Griffith)
 - `15de8e7837` move CheckAgainstCheckpoint call into contextualcheckblockheader (Griffith)
@@ -94,6 +100,7 @@ Thanks to everyone who directly contributed to this release:
 - Griffith
 - Peter Tschipper
 - redfish
+- Justing Holmes (Justaph)
 
 We have backported an amount of changes from other projects, namely Bitcoin Core.
 
