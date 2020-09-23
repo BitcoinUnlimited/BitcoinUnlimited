@@ -7,12 +7,16 @@
 #include "primitives/transaction.h"
 #include "serialize.h"
 #include "txmempool.h"
+#include <policy/policy.h>
 #include <uint256.h>
 
 
 class DoubleSpendProof
 {
 public:
+    //! limit for the size of a `pushData` vector below
+    static constexpr size_t MaxPushDataSize = MAX_TX_IN_SCRIPT_SIG_SIZE;
+
     /** Creates an empty, invalid object */
     DoubleSpendProof();
 
@@ -77,6 +81,30 @@ public:
         READWRITE(m_spender2.hashSequence);
         READWRITE(m_spender2.hashOutputs);
         READWRITE(m_spender2.pushData);
+
+        // Sanitize and check limits for both pushData vectors above
+        for (auto *pushData : {&m_spender1.pushData, &m_spender2.pushData})
+        {
+            // Enforce pushData.size() <= 1 predicate
+            if (pushData->size() > 1)
+            {
+                if (ser_action.ForRead())
+                {
+                    // Unserializing from network:
+                    //   Tolerate unknown data and just discard what we don't understand
+                    pushData->resize(1);
+                }
+                else
+                {
+                    // We are serializing an internally generated DSProof:
+                    //   ->size() > 1 is a programming error; throw so that calling code fails
+                    throw std::ios_base::failure("DSProof contained more than 1 pushData");
+                }
+            }
+            // Enforce script data must be within size limits
+            if (!pushData->empty() && pushData->front().size() > MaxPushDataSize)
+                throw std::ios_base::failure("DSProof script size limit exceeded");
+        }
     }
 
 private:

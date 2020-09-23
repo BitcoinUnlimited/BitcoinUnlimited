@@ -9,6 +9,8 @@
 #include "script/interpreter.h"
 #include "txmempool.h"
 
+#include <stdexcept>
+
 namespace
 {
 enum ScriptType
