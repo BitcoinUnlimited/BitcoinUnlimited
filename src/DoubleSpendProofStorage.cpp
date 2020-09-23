@@ -50,7 +50,7 @@ int DoubleSpendProofStorage::add(const DoubleSpendProof &proof)
     return m_nextId++;
 }
 
-void DoubleSpendProofStorage::addOrphan(const DoubleSpendProof &proof, int peerId)
+void DoubleSpendProofStorage::addOrphan(const DoubleSpendProof &proof, NodeId peerId)
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
     const int next = m_nextId;
