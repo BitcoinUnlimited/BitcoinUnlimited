@@ -55,8 +55,8 @@ public:
         std::vector<std::vector<uint8_t> > pushData;
     };
 
-    const Spender &firstSpender() const { return m_spender1; }
-    const Spender &doubleSpender() const { return m_spender2; }
+    const Spender &spender1() const { return m_spender1; }
+    const Spender &spender2() const { return m_spender2; }
     // old fashioned serialization.
     ADD_SERIALIZE_METHODS
 
