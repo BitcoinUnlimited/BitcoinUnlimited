@@ -356,6 +356,17 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
     BOOST_CHECK(dsp_list4.size() == 0);
 
 
+    // Check that orphan is removed when we add the dsproof again. This could happen
+    // in a multi-threaded environment where both an orphan gets added just before we add
+    // a fully validated proof (which happens after we've tried to reclaim prior orphans).
+    int proofId = pool.doubleSpendProofStorage()->add(dsp_first);
+    pool.doubleSpendProofStorage()->remove(proofId);
+    BOOST_CHECK(pool.doubleSpendProofStorage()->exists(dsp_first.GetHash()) == false);
+
+    pool.doubleSpendProofStorage()->addOrphan(dsp_first, peerId);
+    proofId = pool.doubleSpendProofStorage()->add(dsp_first);
+    BOOST_CHECK(pool.doubleSpendProofStorage()->orphanCount(proofId) == 0);
+
     // Cleanup
     vNodes.erase(vNodes.end() - 1);
 }
