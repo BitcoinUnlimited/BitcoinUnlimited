@@ -1,19 +1,22 @@
 // Copyright (C) 2019-2020 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#ifndef DOUBLESPENDPROOF_H
-#define DOUBLESPENDPROOF_H
+#ifndef BITCOIN_DOUBLESPENDPROOF_H
+#define BITCOIN_DOUBLESPENDPROOF_H
 
-#include "primitives/transaction.h"
-#include "serialize.h"
-#include "txmempool.h"
-#include <deque>
+#include <primitives/transaction.h>
+#include <script/script.h>
+#include <serialize.h>
+#include <txmempool.h>
 #include <uint256.h>
 
 
 class DoubleSpendProof
 {
 public:
+    //! limit for the size of a `pushData` vector below
+    static constexpr size_t MaxPushDataSize = MAX_SCRIPT_ELEMENT_SIZE;
+
     /** Creates an empty, invalid object */
     DoubleSpendProof();
 
@@ -38,11 +41,9 @@ public:
     Validity validate(const CTxMemPool &pool, const CTransactionRef ptx = nullptr) const;
 
     /** Returns the hash of the input transaction (UTXO) that is being doublespent */
-    uint256 prevTxId() const;
-
+    const uint256 &prevTxId() const { return m_prevTxId; }
     /** Returns the index of the output that is being doublespent */
-    int prevOutIndex() const;
-
+    int32_t prevOutIndex() const { return m_prevOutIndex; }
     /** get the hash of this doublespend proof */
     uint256 GetHash() const;
 
@@ -54,6 +55,8 @@ public:
         std::vector<std::vector<uint8_t> > pushData;
     };
 
+    const Spender &spender1() const { return m_spender1; }
+    const Spender &spender2() const { return m_spender2; }
     // old fashioned serialization.
     ADD_SERIALIZE_METHODS
 
@@ -78,6 +81,30 @@ public:
         READWRITE(m_spender2.hashSequence);
         READWRITE(m_spender2.hashOutputs);
         READWRITE(m_spender2.pushData);
+
+        // Sanitize and check limits for both pushData vectors above
+        for (auto *pushData : {&m_spender1.pushData, &m_spender2.pushData})
+        {
+            // Enforce pushData.size() <= 1 predicate
+            if (pushData->size() > 1)
+            {
+                if (ser_action.ForRead())
+                {
+                    // Unserializing from network:
+                    //   Tolerate unknown data and just discard what we don't understand
+                    pushData->resize(1);
+                }
+                else
+                {
+                    // We are serializing an internally generated DSProof:
+                    //   ->size() > 1 is a programming error; throw so that calling code fails
+                    throw std::ios_base::failure("DSProof contained more than 1 pushData");
+                }
+            }
+            // Enforce script data must be within size limits
+            if (!pushData->empty() && pushData->front().size() > MaxPushDataSize)
+                throw std::ios_base::failure("DSProof script size limit exceeded");
+        }
     }
 
 private:

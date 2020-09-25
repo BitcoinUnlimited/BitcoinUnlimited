@@ -897,7 +897,7 @@ private:
      */
     void removeUnchecked(txiter entry);
 
-    DoubleSpendProofStorage *m_dspStorage;
+    std::unique_ptr<DoubleSpendProofStorage> m_dspStorage;
 };
 
 /** This internal class holds the original state of mempool state values.

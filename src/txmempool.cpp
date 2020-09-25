@@ -695,12 +695,7 @@ CTxMemPool::CTxMemPool(const CFeeRate &_minReasonableRelayFee)
     nPeakRate = 0;
 }
 
-CTxMemPool::~CTxMemPool()
-{
-    delete minerPolicyEstimator;
-    delete m_dspStorage;
-}
-
+CTxMemPool::~CTxMemPool() { delete minerPolicyEstimator; }
 bool CTxMemPool::isSpent(const COutPoint &outpoint)
 {
     AssertWriteLockHeld(cs_txmempool);
@@ -1746,12 +1741,12 @@ CTransactionRef CTxMemPool::addDoubleSpendProof(const DoubleSpendProof &proof)
         return CTransactionRef(); // don't propagate new one.
 
     auto item = *iter;
-    item.dsproof = m_dspStorage->add(proof);
+    item.dsproof = m_dspStorage->add(proof).second;
     mapTx.replace(iter, item);
     return _get(oldTx->second.ptx->GetHash());
 }
 
-DoubleSpendProofStorage *CTxMemPool::doubleSpendProofStorage() const { return m_dspStorage; }
+DoubleSpendProofStorage *CTxMemPool::doubleSpendProofStorage() const { return m_dspStorage.get(); }
 CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const
 {
     READLOCK(cs_txmempool);

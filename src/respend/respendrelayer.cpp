@@ -111,7 +111,7 @@ void RespendRelayer::Trigger(CTxMemPool &pool)
             {
                 auto item = *originalTxIter;
                 dsp = DoubleSpendProof::create(originalTxIter->GetTx(), *pRespend);
-                item.dsproof = pool.doubleSpendProofStorage()->add(dsp);
+                item.dsproof = pool.doubleSpendProofStorage()->add(dsp).second;
                 LOG(DSPROOF, "Double spend found, creating double spend proof %d\n", item.dsproof);
                 pool.mapTx.replace(originalTxIter, item);
 

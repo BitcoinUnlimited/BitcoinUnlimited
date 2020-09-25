@@ -2087,7 +2087,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     mempool.doubleSpendProofStorage()->addOrphan(dsp, pfrom->GetId());
                     break;
                 case DoubleSpendProof::Invalid:
-                    throw std::runtime_error("Double spend proof didn't validate");
+                    throw std::runtime_error(strprintf("Double spend proof didn't validate (%s)", dspHash.ToString()));
                 default:
                     return false;
                 }

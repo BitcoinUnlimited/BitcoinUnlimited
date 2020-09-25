@@ -9,6 +9,8 @@
 #include "script/interpreter.h"
 #include "txmempool.h"
 
+#include <stdexcept>
+
 namespace
 {
 enum ScriptType
@@ -233,7 +235,7 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
     if (ptx == nullptr)
     {
         auto it = pool.mapNextTx.find({m_prevTxId, (uint32_t)m_prevOutIndex});
-        if (it == pool.mapNextTx.end() || (size_t)m_prevOutIndex >= it->second.ptx->vout.size())
+        if (it == pool.mapNextTx.end())
         {
             return MissingTransaction;
         }
@@ -336,6 +338,4 @@ void broadcastDspInv(const CTransactionRef &dspTx, const uint256 &hash, CTxMemPo
     }
 }
 
-uint256 DoubleSpendProof::prevTxId() const { return m_prevTxId; }
-int DoubleSpendProof::prevOutIndex() const { return m_prevOutIndex; }
 uint256 DoubleSpendProof::GetHash() const { return SerializeHash(*this); }
