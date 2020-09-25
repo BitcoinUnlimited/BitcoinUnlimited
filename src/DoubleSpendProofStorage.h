@@ -38,6 +38,9 @@ public:
     /// Each item is a pair of a proofId and the nodeId that send the proof to us
     std::list<std::pair<int, NodeId> > findOrphans(const COutPoint &prevOut);
 
+    //! Returns how many orphans have this proof id
+    int orphanCount(int proofId);
+
     void claimOrphan(int proofId);
 
     DoubleSpendProof lookup(const uint256 &proofId) const;

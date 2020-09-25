@@ -35,7 +35,10 @@ int DoubleSpendProofStorage::add(const DoubleSpendProof &proof)
     uint256 hash = proof.GetHash();
     auto lookupIter = m_dspIdLookupTable.find(hash);
     if (lookupIter != m_dspIdLookupTable.end())
+    {
+        claimOrphan(lookupIter->second);
         return lookupIter->second;
+    }
 
     auto iter = m_proofs.find(m_nextId);
     while (iter != m_proofs.end())
@@ -94,6 +97,7 @@ std::list<std::pair<int, int> > DoubleSpendProofStorage::findOrphans(const COutP
     return answer;
 }
 
+int DoubleSpendProofStorage::orphanCount(int proofId) { return m_orphans.count(proofId); }
 void DoubleSpendProofStorage::claimOrphan(int proofId)
 {
     std::lock_guard<std::recursive_mutex> lock(m_lock);
