@@ -43,11 +43,21 @@ This is list of the main changes that have been merged in this release:
 - xversion fixes and improvements
 - disable coin freeze feature
 - better handling of block header validation
+- various DS proof fixes
 
 
 Commit details
 --------------
 
+- `e4f648430` Fix merge conflict due to the last rebase (Andrea Suisani)
+- `1c48b9d28` Ensure new DSProof is valid (Calin Culianu)
+- `bc4114f26` Rename getters for private Spender(s) attrbutes in DoubleSpendClass (Andrea Suisani)
+- `8b4eddad2` Restricted size of pushData to 520 (Calin Culianu)
+- `00344be7c` Fixed a bug in addOrphan() (Calin Culianu)
+- `bcefff161` Enforce some message size limits for DSPROOF messages (Calin Culianu)
+- `8ab4d5d72` DSProof: Various nits and fixups (Calin Culianu)
+- `8cc157114` Remove orphans (if any) when adding a new dsproof (ptschip)
+- `03060d79c` Replace int with NodeId when using a peerId (ptschip)
 - `3ef2363b9` Repoint build status badge from Travis to Gitlab (Justaphf)
 - `d01385f31` Graphene version negotiation at connect time only (Andrew Stone)
 - `ea71bf0ee` Fix compile warning in bitcoin-miner.cpp (Peter Tschipper)
@@ -102,8 +112,9 @@ Thanks to everyone who directly contributed to this release:
 - redfish
 - Justing Holmes (Justaph)
 
-We have backported an amount of changes from other projects, namely Bitcoin Core.
+We have backported an amount of changes from other projects, namely Bitcoin Core and Bitcoin Cash Node.
 
 Following all the indirect contributors whose work has been imported via the above backports:
 
 - Hennadii Stepanov
+- Calin Culianu
