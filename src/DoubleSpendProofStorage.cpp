@@ -40,7 +40,7 @@ std::pair<bool, int32_t> DoubleSpendProofStorage::add(const DoubleSpendProof &pr
     if (lookupIter != m_dspIdLookupTable.end())
     {
         claimOrphan(lookupIter->second);
-        return lookupIter->second;
+        return {false, lookupIter->second};
     }
 
     auto iter = m_proofs.find(m_nextId);
