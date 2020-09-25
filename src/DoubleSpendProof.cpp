@@ -235,7 +235,7 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
     if (ptx == nullptr)
     {
         auto it = pool.mapNextTx.find({m_prevTxId, (uint32_t)m_prevOutIndex});
-        if (it == pool.mapNextTx.end() || (size_t)m_prevOutIndex >= it->second.ptx->vout.size())
+        if (it == pool.mapNextTx.end())
         {
             return MissingTransaction;
         }
