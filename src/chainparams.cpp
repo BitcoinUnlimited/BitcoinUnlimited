@@ -573,14 +573,23 @@ public:
         // November 13, 2017 hard fork
         consensus.daaHeight = 3000;
 
-        // November 15, 2019 protocol upgrade
+        // May, 15 2018 hard fork
+        consensus.may2018Height = 4000;
+
+        // November 15, 2018 protocol upgrade
         consensus.nov2018Height = 4000;
+
+        // May, 15 2019 hard fork
+        consensus.may2019Height = 5000;
 
         // Nov, 15 2019 hard fork
         consensus.nov2019Height = 5000;
 
         // May, 15 2020 hard fork
-        consensus.may2020Height = 6000;
+        // NOTE: Due to BCHN having completely removed the historical sig-ops counting code
+        //       the May 2020 height must be set to genesis in order to synchronize all blocks
+        //       using the post May 2020 hard fork sigchecks code
+        consensus.may2020Height = 0;
 
         // Nov 15, 2020 12:00:00 UTC protocol upgrade
         consensus.nov2020ActivationTime = 1605441600;
@@ -613,7 +622,7 @@ public:
         base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
         base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
         cashaddrPrefix = "bchtest";
-        vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
+        vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test4, pnSeed6_test4 + ARRAYLEN(pnSeed6_test4));
 
         fMiningRequiresPeers = true;
         fDefaultConsistencyChecks = false;
