@@ -223,10 +223,16 @@ BOOST_AUTO_TEST_CASE(test_userAgent)
     int *ptemp = &temp;
     std::string arch = (sizeof(ptemp) == 4) ? "32bit" : "64bit";
     mapArgs["-uacomment"] = uacomments[0];
+    std::string client_name(CLIENT_NAME);
 
-    const std::string versionMessage =
-        "/BCH Unlimited:" + std::to_string(CLIENT_VERSION_MAJOR) + "." + std::to_string(CLIENT_VERSION_MINOR) + "." +
-        std::to_string(CLIENT_VERSION_REVISION) + "(" + uacomments[0] + "; " + arch + ")/";
+    std::string versionMessage = "/" + client_name + ":" + std::to_string(CLIENT_VERSION_MAJOR) + "." +
+                                 std::to_string(CLIENT_VERSION_MINOR) + "." + std::to_string(CLIENT_VERSION_REVISION);
+
+    if (std::to_string(CLIENT_VERSION_BUILD) != "0")
+    {
+        versionMessage = versionMessage + "." + std::to_string(CLIENT_VERSION_BUILD);
+    }
+    versionMessage = versionMessage + "(" + uacomments[0] + "; " + arch + ")/";
 
     BOOST_CHECK_EQUAL(FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, uacomments), versionMessage);
 }
