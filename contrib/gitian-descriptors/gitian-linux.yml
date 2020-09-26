@@ -122,11 +122,11 @@ script: |
     if [ -d "$EXTRA_INCLUDES" ]; then
       export HOST_ID_SALT="$EXTRA_INCLUDES"
     fi
-    NO_RUST=0 #get rust compiled if we are on linux 64bit
     if [ "${i}" = "i686-pc-linux-gnu" ]; then
-      NO_RUST=1
+      make ${MAKEOPTS} -C ${BASEPREFIX} HOST="${i}" NO_RUST=1
+    else
+      make ${MAKEOPTS} -C ${BASEPREFIX} HOST="${i}"
     fi
-    make ${MAKEOPTS} -C ${BASEPREFIX} HOST="${i}" NO_RUST=${NO_RUST}
     unset HOST_ID_SALT
   done
 
