@@ -6,6 +6,7 @@
 
 #include "chainparams.h"
 #include "consensus/merkle.h"
+#include "policy/policy.h"
 #include "unlimited.h"
 #include "versionbits.h" // bip135 added
 
@@ -161,6 +162,7 @@ public:
         nDefaultPort = DEFAULT_MAINNET_PORT;
         nPruneAfterHeight = 100000;
         nDefaultExcessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
+        nDefaultMaxBlockMiningSize = DEFAULT_BLOCK_MAX_SIZE;
 
         genesis = CreateGenesisBlock(1231006505, 2083236893, 0x1d00ffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
@@ -277,6 +279,7 @@ public:
         nDefaultPort = DEFAULT_NOLNET_PORT;
         nPruneAfterHeight = 100000;
         nDefaultExcessiveBlockSize = std::numeric_limits<uint64_t>::max();
+        nDefaultMaxBlockMiningSize = std::numeric_limits<uint64_t>::max();
 
         // Aug, 1 2017 hard fork
         consensus.uahfHeight = 0;
@@ -384,6 +387,7 @@ public:
         nDefaultPort = DEFAULT_TESTNET_PORT;
         nPruneAfterHeight = 1000;
         nDefaultExcessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
+        nDefaultMaxBlockMiningSize = DEFAULT_BLOCK_MAX_SIZE;
 
         genesis = CreateGenesisBlock(1296688602, 414098458, 0x1d00ffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
@@ -508,6 +512,7 @@ public:
         nDefaultPort = DEFAULT_REGTESTNET_PORT;
         nPruneAfterHeight = 1000;
         nDefaultExcessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
+        nDefaultMaxBlockMiningSize = DEFAULT_BLOCK_MAX_SIZE;
 
         genesis = CreateGenesisBlock(1296688602, 2, 0x207fffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
@@ -609,6 +614,7 @@ public:
         nDefaultPort = DEFAULT_TESTNET4_PORT;
         nPruneAfterHeight = 1000;
         nDefaultExcessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE_TESTNET4;
+        nDefaultMaxBlockMiningSize = DEFAULT_BLOCK_MAX_SIZE_TESTNET4;
 
         genesis = CreateGenesisBlock(1597811185, 114152193, 0x1d00ffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
@@ -728,6 +734,7 @@ public:
         nDefaultPort = DEFAULT_SCALENET_PORT;
         nPruneAfterHeight = 10000;
         nDefaultExcessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE_SCALENET;
+        nDefaultMaxBlockMiningSize = DEFAULT_BLOCK_MAX_SIZE_SCALENET;
 
         genesis = CreateGenesisBlock(1598282438, -1567304284, 0x1d00ffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();

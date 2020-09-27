@@ -430,7 +430,7 @@ void UnlimitedSetup(void)
 {
     MIN_TX_REQUEST_RETRY_INTERVAL = GetArg("-txretryinterval", DEFAULT_MIN_TX_REQUEST_RETRY_INTERVAL);
     MIN_BLK_REQUEST_RETRY_INTERVAL = GetArg("-blkretryinterval", DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL);
-    maxGeneratedBlock = GetArg("-blockmaxsize", maxGeneratedBlock);
+    maxGeneratedBlock = GetArg("-blockmaxsize", Params().DefaultMaxBlockMiningSize());
     blockVersion = GetArg("-blockversion", blockVersion);
     excessiveBlockSize = GetArg("-excessiveblocksize", Params().DefaultExcessiveBlockSize());
     excessiveAcceptDepth = GetArg("-excessiveacceptdepth", excessiveAcceptDepth);
