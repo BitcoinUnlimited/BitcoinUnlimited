@@ -44,6 +44,9 @@ static const unsigned int DEFAULT_EXCESSIVE_BLOCK_SIZE = 32 * ONE_MEGABYTE;
 static const unsigned int DEFAULT_EXCESSIVE_BLOCK_SIZE_TESTNET4 = 2 * ONE_MEGABYTE;
 static const unsigned int DEFAULT_EXCESSIVE_BLOCK_SIZE_SCALENET = 256 * ONE_MEGABYTE;
 
+static const unsigned int MIN_EXCESSIVE_BLOCK_SIZE = 32000000;
+static const unsigned int MIN_EXCESSIVE_BLOCK_SIZE_REGTEST = 1000;
+
 /**
  * The ratio between the maximum allowable block size and the maximum allowable
  * SigChecks (executed signature check operations) in the block. (network rule).
