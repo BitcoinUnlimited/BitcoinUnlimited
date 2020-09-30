@@ -110,7 +110,7 @@ Thanks to everyone who directly contributed to this release:
 - Griffith
 - Peter Tschipper
 - redfish
-- Justing Holmes (Justaph)
+- Justin Holmes (Justaph)
 
 We have backported an amount of changes from other projects, namely Bitcoin Core and Bitcoin Cash Node.
 
