@@ -291,9 +291,6 @@ CTweak<bool> doubleSpendProofs("net.doubleSpendProofs",
     "Process and forward double spend proofs (default: true)",
     true);
 
-CTweak<bool> miningCPFP("mining.childPaysForParent",
-    "If enabled then we will mine ancestor packages and allow child pays for parent.",
-    true);
 CTweak<uint64_t> coinbaseReserve("mining.coinbaseReserve",
     "How much space to reserve for the coinbase transaction, in bytes",
     DEFAULT_COINBASE_RESERVE_SIZE);

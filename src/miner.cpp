@@ -38,7 +38,6 @@
 
 // Track timing information for Score and Package mining.
 std::atomic<int64_t> nTotalPackage{0};
-std::atomic<int64_t> nTotalScore{0};
 
 /** Maximum number of failed attempts to insert a package into a block */
 static const unsigned int MAX_PACKAGE_FAILURES = 5;
@@ -257,19 +256,10 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         std::vector<const CTxMemPoolEntry *> vtxe;
         addPriorityTxs(&vtxe);
 
-        // Mine by package (CPFP) or by score.
-        if (miningCPFP.Value() == true)
-        {
-            int64_t nStartPackage = GetStopwatchMicros();
-            addPackageTxs(&vtxe, canonical);
-            nTotalPackage += GetStopwatchMicros() - nStartPackage;
-        }
-        else
-        {
-            int64_t nStartScore = GetStopwatchMicros();
-            addScoreTxs(&vtxe);
-            nTotalScore += GetStopwatchMicros() - nStartScore;
-        }
+        // Mine by package (CPFP)
+        int64_t nStartPackage = GetStopwatchMicros();
+        addPackageTxs(&vtxe, canonical);
+        nTotalPackage += GetStopwatchMicros() - nStartPackage;
 
         nLastBlockTx = nBlockTx;
         nLastBlockSize = nBlockSize;
@@ -467,64 +457,6 @@ void BlockAssembler::AddToBlock(std::vector<const CTxMemPoolEntry *> *vtxe, CTxM
         LOGA("priority %.1f fee %s txid %s\n", dPriority,
             CFeeRate(iter->GetModifiedFee(), iter->GetTxSize()).ToString().c_str(),
             iter->GetTx().GetHash().ToString().c_str());
-    }
-}
-
-void BlockAssembler::addScoreTxs(std::vector<const CTxMemPoolEntry *> *vtxe)
-{
-    std::priority_queue<CTxMemPool::txiter, std::vector<CTxMemPool::txiter>, ScoreCompare> clearedTxs;
-    CTxMemPool::setEntries waitSet;
-    CTxMemPool::indexed_transaction_set::index<mining_score>::type::iterator mi =
-        mempool.mapTx.get<mining_score>().begin();
-    CTxMemPool::txiter iter;
-    while (!blockFinished && (mi != mempool.mapTx.get<mining_score>().end() || !clearedTxs.empty()))
-    {
-        // If no txs that were previously postponed are available to try
-        // again, then try the next highest score tx
-        if (clearedTxs.empty())
-        {
-            iter = mempool.mapTx.project<0>(mi);
-            mi++;
-        }
-        // If a previously postponed tx is available to try again, then it
-        // has higher score than all untried so far txs
-        else
-        {
-            iter = clearedTxs.top();
-            clearedTxs.pop();
-        }
-
-        // If tx already in block then skip
-        if (inBlock.count(iter))
-        {
-            continue;
-        }
-
-
-        // If tx is dependent on other mempool txs which haven't yet been included
-        // then put it in the waitSet
-        if (isStillDependent(iter))
-        {
-            waitSet.insert(iter);
-            continue;
-        }
-
-        // If this tx fits in the block add it, otherwise keep looping
-        if (TestForBlock(iter))
-        {
-            AddToBlock(vtxe, iter);
-
-            // This tx was successfully added, so
-            // add transactions that depend on this one to the priority queue to try again
-            for (CTxMemPool::txiter child : mempool.GetMemPoolChildren(iter))
-            {
-                if (waitSet.count(child))
-                {
-                    clearedTxs.push(child);
-                    waitSet.erase(child);
-                }
-            }
-        }
     }
 }
 
