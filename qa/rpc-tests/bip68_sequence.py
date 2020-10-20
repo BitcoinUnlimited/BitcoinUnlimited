@@ -24,7 +24,6 @@ SEQUENCE_LOCKTIME_MASK = 0x0000ffff
 NOT_FINAL_ERROR = "64: non-BIP68-final"
 
 class BIP68Test(BitcoinTestFramework):
-sequence.py
 
     def setup_network(self):
         self.nodes = []
