@@ -1545,6 +1545,53 @@ UniValue invalidateblock(const UniValue &params, bool fHelp)
     return NullUniValue;
 }
 
+UniValue finalizeblock(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+    {
+        throw std::runtime_error("finalizeblock \"blockhash\"\n"
+
+                                 "\nTreats a block as final. It cannot be reorged. Any chain\n"
+                                 "that does not contain this block is invalid. Used on a less\n"
+                                 "work chain, it can effectively PUTS YOU OUT OF CONSENSUS.\n"
+                                 "USE WITH CAUTION!\n"
+                                 "\nResult:\n"
+                                 "\nExamples:\n" +
+                                 HelpExampleCli("finalizeblock", "\"blockhash\"") +
+                                 HelpExampleRpc("finalizeblock", "\"blockhash\""));
+    }
+
+    std::string strHash = params[0].get_str();
+    uint256 hash(uint256S(strHash));
+    CValidationState state;
+
+    {
+        CBlockIndex *pblockindex;
+        {
+            READLOCK(cs_mapBlockIndex);
+            if (mapBlockIndex.count(hash) == 0)
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+            }
+
+            pblockindex = mapBlockIndex[hash];
+        }
+        FinalizeBlock(state, pblockindex);
+    }
+
+    if (state.IsValid())
+    {
+        ActivateBestChain(state, Params());
+    }
+
+    if (!state.IsValid())
+    {
+        throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
+    }
+
+    return NullUniValue;
+}
+
 UniValue reconsiderblock(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
@@ -2257,6 +2304,7 @@ static const CRPCCommand commands[] = {
     {"hidden", "invalidateblock", &invalidateblock, true}, {"hidden", "reconsiderblock", &reconsiderblock, true},
     {"hidden", "rollbackchain", &rollbackchain, true},
     {"hidden", "reconsidermostworkchain", &reconsidermostworkchain, true},
+    {"hidden", "finalizeblock", &finalizeblock, true},
 };
 
 void RegisterBlockchainRPCCommands(CRPCTable &table)

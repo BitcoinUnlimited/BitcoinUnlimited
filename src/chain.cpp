@@ -209,3 +209,33 @@ std::string CBlockFileInfo::ToString() const
     return strprintf("CBlockFileInfo(blocks=%u, size=%u, heights=%u...%u, time=%s...%s)", nBlocks, nSize, nHeightFirst,
         nHeightLast, DateTimeStrFormat("%Y-%m-%d", nTimeFirst), DateTimeStrFormat("%Y-%m-%d", nTimeLast));
 }
+
+const CBlockIndex *LastCommonAncestor(const CBlockIndex *pa, const CBlockIndex *pb)
+{
+    if (pa->nHeight > pb->nHeight)
+    {
+        pa = pa->GetAncestor(pb->nHeight);
+    }
+    else if (pb->nHeight > pa->nHeight)
+    {
+        pb = pb->GetAncestor(pa->nHeight);
+    }
+
+    while (pa != pb && pa && pb)
+    {
+        pa = pa->pprev;
+        pb = pb->pprev;
+    }
+
+    // Eventually all chain branches meet at the genesis block.
+    assert(pa == pb);
+    return pa;
+}
+
+bool AreOnTheSameFork(const CBlockIndex *pa, const CBlockIndex *pb)
+{
+    // The common ancestor needs to be either pa (pb is a child of pa) or pb (pa
+    // is a child of pb).
+    const CBlockIndex *pindexCommon = LastCommonAncestor(pa, pb);
+    return pindexCommon == pa || pindexCommon == pb;
+}

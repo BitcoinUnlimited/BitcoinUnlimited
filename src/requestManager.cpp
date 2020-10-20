@@ -63,29 +63,6 @@ unsigned int blkReqRetryInterval = MIN_BLK_REQUEST_RETRY_INTERVAL;
 // defined in main.cpp.  should be moved into a utilities file but want to make rebasing easier
 extern bool CanDirectFetch(const Consensus::Params &consensusParams);
 
-/** Find the last common ancestor two blocks have.
- *  Both pa and pb must be non-nullptr. */
-static CBlockIndex *LastCommonAncestor(CBlockIndex *pa, CBlockIndex *pb)
-{
-    if (pa->nHeight > pb->nHeight)
-    {
-        pa = pa->GetAncestor(pb->nHeight);
-    }
-    else if (pb->nHeight > pa->nHeight)
-    {
-        pb = pb->GetAncestor(pa->nHeight);
-    }
-
-    while (pa != pb && pa && pb)
-    {
-        pa = pa->pprev;
-        pb = pb->pprev;
-    }
-
-    // Eventually all chain branches meet at the genesis block.
-    assert(pa == pb);
-    return pa;
-}
 
 static bool IsBlockType(const CInv &obj)
 {
@@ -1114,7 +1091,8 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
 
     // If the peer reorganized, our previous pindexLastCommonBlock may not be an ancestor
     // of its current tip anymore. Go back enough to fix that.
-    state->pindexLastCommonBlock = LastCommonAncestor(state->pindexLastCommonBlock, state->pindexBestKnownBlock);
+    state->pindexLastCommonBlock =
+        const_cast<CBlockIndex *>(LastCommonAncestor(state->pindexLastCommonBlock, state->pindexBestKnownBlock));
     if (state->pindexLastCommonBlock == state->pindexBestKnownBlock)
         return;
 
