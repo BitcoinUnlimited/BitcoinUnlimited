@@ -26,8 +26,6 @@ extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_coinbaseFlags;
 
 extern std::atomic<int64_t> nTotalPackage;
-extern std::atomic<int64_t> nTotalScore;
-extern CTweak<bool> miningCPFP;
 
 namespace Consensus
 {
@@ -90,7 +88,7 @@ private:
     int nHeight;
     int64_t nLockTimeCutoff;
 
-    // Variables used for addScoreTxs and addPriorityTxs
+    // Variables used for addPriorityTxs
     int lastFewTxs;
     bool blockFinished;
 
@@ -110,15 +108,13 @@ private:
     void AddToBlock(std::vector<const CTxMemPoolEntry *> *vtxe, CTxMemPool::txiter iter);
 
     // Methods for how to add transactions to a block.
-    /** Add transactions based on modified feerate */
-    void addScoreTxs(std::vector<const CTxMemPoolEntry *> *vtxe);
     /** Add transactions based on tx "priority" */
     void addPriorityTxs(std::vector<const CTxMemPoolEntry *> *vtxe);
 
     /** Add transactions based on feerate including unconfirmed ancestors */
     void addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, bool fCanonical);
 
-    // helper function for addScoreTxs and addPriorityTxs
+    // helper function for addPriorityTxs
     bool IsIncrementallyGood(uint64_t nExtraSize, unsigned int nExtraSigOps);
     /** Test if tx will still "fit" in the block */
     bool TestForBlock(CTxMemPool::txiter iter);

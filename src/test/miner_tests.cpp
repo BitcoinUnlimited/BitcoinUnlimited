@@ -231,7 +231,6 @@ void GenerateBlocks(const CChainParams &chainparams,
     uint64_t nEndSize,
     uint64_t nIncrease)
 {
-    nTotalScore = 0;
     nTotalPackage = 0;
 
     // Now generate lots of blocks, increasing the block size on each iteration.
@@ -268,8 +267,6 @@ void GenerateBlocks(const CChainParams &chainparams,
         (double)(nTotalBlockSize / nBlockCount) * 100 / (nTotalExpectedBlockSize / nBlockCount));
     printf("Total mining time: %5.2f\n", (double)nTotalMine / 1000000);
     printf("packagetx mining %5.2f\n", (double)nTotalPackage / 1000000);
-    printf("scoretx mining %5.2f\n", (double)nTotalScore / 1000000);
-    printf("total score plus package mining time %5.2f\n", (double)(nTotalPackage + nTotalScore) / 1000000);
 
     mempool.clear();
 }
@@ -483,7 +480,6 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 
     // Now generate lots of full size blocks and verify that none exceed the maxGeneratedBlock value, the mempool has
     // 65k bytes of tx in it so this code will test both saturated and unsaturated blocks.
-    miningCPFP.Set(false);
     for (unsigned int i = 2000; i <= 80000; i += 2000)
     {
         maxGeneratedBlock = i;
@@ -555,8 +551,6 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     // We also reserved 5 bytes for tx count but only use 3 as we don't have > 65535 txs in a block
     BOOST_CHECK(minRoom == 2);
     mempool.clear();
-
-    miningCPFP.Set(true);
 
     // block size > limit
     tx.vin[0].scriptSig = CScript();
@@ -798,7 +792,6 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     mempool.clear();
 
     // Test package selection
-    miningCPFP.Set(true);
     TestPackageSelection(chainparams, scriptPubKey, txFirst);
 
     // Do a performance test of package selection. This will typically be commented out unless one wants
