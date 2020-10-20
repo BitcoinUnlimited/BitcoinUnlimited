@@ -67,15 +67,11 @@ class FinalizeBlockTest(BitcoinTestFramework):
         time_loop = 0
         while (status is "False"):
             for tip1 in node.getchaintips():
-                print("chaintip " + str(node.getchaintips()))
-                print("block " + str(block))
                 if tip1["hash"] == block:
                     assert(tip1["status"] != "active")
                     status = tip1["status"] == "invalid"
-                    print("tip status " + str(tip1["status"]))
             time.sleep(1)
             time_loop += 1
-            print(str(time_loop))
             if (time_loop > 10):
                 raise Exception("chaintip check failed")
 
