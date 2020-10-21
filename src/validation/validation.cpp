@@ -3973,6 +3973,8 @@ const CBlockIndex *GetFinalizedBlock()
 
 bool IsBlockFinalized(const CBlockIndex *pindex)
 {
+    DbgAssert(pindex != nullptr, return false);
+
     AssertLockHeld(cs_main);
     return pindexFinalized && pindexFinalized->GetAncestor(pindex->nHeight) == pindex;
 }
