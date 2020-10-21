@@ -30,6 +30,7 @@
 #include <unordered_set>
 
 extern CTweak<unsigned int> unconfPushAction;
+extern CTweak<int> maxReorgDepth;
 void ProcessOrphans(std::vector<uint256> &vWorkQueue);
 static bool FinalizeBlockInternal(CValidationState &state, CBlockIndex *pindex);
 
@@ -3271,7 +3272,7 @@ bool ConnectTip(CValidationState &state,
         LOG(BENCH, "      - Update Coins %.3fms\n", GetStopwatchMicros() - nStart);
 
         // Update the finalized block.
-        int32_t nHeightToFinalize = pindexNew->nHeight - GetArg("-maxreorgdepth", DEFAULT_MAX_REORG_DEPTH);
+        int32_t nHeightToFinalize = pindexNew->nHeight - maxReorgDepth.Value();
         CBlockIndex *pindexToFinalize = pindexNew->GetAncestor(nHeightToFinalize);
         if (pindexToFinalize && !FinalizeBlockInternal(state, pindexToFinalize))
         {

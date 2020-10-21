@@ -18,7 +18,7 @@
 
 extern std::atomic<uint64_t> nBlockSizeAtChainTip;
 
-/** Default for -maxreorgdepth */
+/** Default for -blockchain.maxReorgDepth */
 static const int DEFAULT_MAX_REORG_DEPTH = 10;
 
 enum DisconnectResult

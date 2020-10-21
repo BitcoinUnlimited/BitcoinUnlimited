@@ -30,7 +30,7 @@ class FullBlockTest(ComparisonTestFramework):
         Change the "outcome" variable from each TestInstance object to only do the comparison. '''
     def __init__(self):
         self.num_nodes = 1
-        self.extra_args = [[-maxreorgdepth = -1]]
+        self.extra_args = [[-blockchain.maxReorgDepth = -1]]
         self.block_heights = {}
         self.coinbase_key = CECKey()
         self.coinbase_key.set_secretbytes(b"horsebattery")

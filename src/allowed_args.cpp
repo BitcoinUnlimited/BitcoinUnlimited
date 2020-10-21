@@ -596,9 +596,6 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
             strprintf("Log transaction priority and fee per kB when mining blocks (default: %u)",
                          DEFAULT_PRINTPRIORITY))
         .addDebugArg("printtologfile", optionalBool, "Write log to debug.log")
-        .addDebugArg("maxreorgdepth=<n>", requiredInt,
-            strprintf("After how many new blocks do we consider a block final (default: %u)",
-                         DEFAULT_MAX_REORG_DEPTH))
 #ifdef ENABLE_WALLET
         .addDebugArg("privdb", optionalBool,
             strprintf("Sets the DB_PRIVATE flag in the wallet db environment (default: %u)", DEFAULT_WALLET_PRIVDB),

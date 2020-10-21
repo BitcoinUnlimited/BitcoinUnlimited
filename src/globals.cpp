@@ -45,6 +45,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "utiltime.h"
+#include "validation/validation.h"
 #include "validationinterface.h"
 #include "version.h"
 #include "versionbits.h"
@@ -497,6 +498,11 @@ during reindexing by allowing the size to be set to low and random values.
 CTweak<uint64_t> checkScriptDays("blockchain.checkScriptDays",
     "The number of days in the past we check scripts during initial block download.",
     DEFAULT_CHECKPOINT_DAYS);
+
+/** depth at which we mark blocks as final */
+CTweak<int> maxReorgDepth("blockchain.maxReorgDepth",
+    strprintf("After how many new blocks do we consider a block final(default: %ld)", DEFAULT_MAX_REORG_DEPTH),
+    DEFAULT_MAX_REORG_DEPTH);
 
 /** Dust Threshold (in satoshis) defines the minimum quantity an output may contain for the
     transaction to be considered standard, and therefore relayable.
