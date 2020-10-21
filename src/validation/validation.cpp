@@ -3925,24 +3925,26 @@ static bool FinalizeBlockInternal(CValidationState &state, CBlockIndex *pindex)
     }
 
     // Check that the request is consistent with current finalization.
-    LOCK(cs_main); // for pindexFinalized
-    if (pindexFinalized && !AreOnTheSameFork(pindex, pindexFinalized))
     {
-        return state.DoS(20, error("%s: Trying to finalize block %s which conflicts "
-                                   "with already finalized block",
-                                 __func__, pindex->GetBlockHash().ToString()),
-            REJECT_AGAINST_FINALIZED, "bad-fork-prior-finalized");
-    }
+        LOCK(cs_main); // for pindexFinalized
+        if (pindexFinalized && !AreOnTheSameFork(pindex, pindexFinalized))
+        {
+            return state.DoS(20, error("%s: Trying to finalize block %s which conflicts "
+                                       "with already finalized block",
+                                     __func__, pindex->GetBlockHash().ToString()),
+                REJECT_AGAINST_FINALIZED, "bad-fork-prior-finalized");
+        }
 
-    // If we receive a block prior to the finalization point we may end up rolling back the current
-    // finalization point. So we check here to see if the block is an ancestor of the finalized block index.
-    if (IsBlockFinalized(pindex))
-    {
-        return true;
-    }
+        // If we receive a block prior to the finalization point we may end up rolling back the current
+        // finalization point. So we check here to see if the block is an ancestor of the finalized block index.
+        if (IsBlockFinalized(pindex)) // also requires cs_main
+        {
+            return true;
+        }
 
-    // We have a valid candidate
-    pindexFinalized = pindex;
+        // We have a valid candidate
+        pindexFinalized = pindex;
+    }
     return true;
 }
 
