@@ -28,6 +28,7 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
+#include "validation/validation.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #endif

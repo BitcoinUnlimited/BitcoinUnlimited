@@ -11,6 +11,7 @@ import logging
 logging.getLogger().setLevel(logging.INFO)
 
 RPC_FINALIZE_INVALID_BLOCK_ERROR = 'finalize-invalid-block'
+AUTO_FINALIZATION_DEPTH = 10
 
 
 class FinalizeBlockTest(BitcoinTestFramework):
@@ -57,6 +58,12 @@ class FinalizeBlockTest(BitcoinTestFramework):
         # getdata and one set of headers and thus we end up with the correct chaintip.
         disconnect_all(alt_node)
         alt_node.invalidateblock(tip)
+        # We will use this later
+        fork_block = alt_node.getbestblockhash()
+
+        # We will use this later to check auto-finalization during a reorg
+        auto_finalized_tip = alt_node.getbestblockhash()
+
         alt_node.generate(10)
         waitFor(10, lambda: alt_node.getblockcount() == 19)
         connect_nodes_bi(self.nodes, 0, 1)
@@ -83,11 +90,13 @@ class FinalizeBlockTest(BitcoinTestFramework):
             "Test that invalidating a finalized block moves the finalization backward...")
 
         print(str(node.getblockcount()))
+        finalized_block = node.getfinalizedblockhash()
         node.invalidateblock(tip)
 
         node.invalidateblock(node.getbestblockhash())
         node.reconsiderblock(tip)
         assert_equal(node.getbestblockhash(), tip)
+        assert_equal(node.getfinalizedblockhash(), fork_block)
 
         # The node will now accept that chain as the finalized block moved back.
         node.reconsiderblock(alt_node.getbestblockhash())
@@ -96,11 +105,14 @@ class FinalizeBlockTest(BitcoinTestFramework):
         logging.info("Trigger reorg via block finalization...")
         node.finalizeblock(tip)
         assert_equal(node.getbestblockhash(), tip)
+        assert_equal(node.getfinalizedblockhash(), finalized_block)
 
         logging.info("Try to finalized a block on a competiting fork...")
         assert_raises_rpc_error(-20, RPC_FINALIZE_INVALID_BLOCK_ERROR,
                                 node.finalizeblock, alt_node.getbestblockhash())
-
+        assert node.getfinalizedblockhash() != alt_node.getbestblockhash(), \
+            "Finalize block is alt_node's tip!"
+        assert_equal(node.getfinalizedblockhash(), finalized_block)
 
 if __name__ == '__main__':
     FinalizeBlockTest().main()

@@ -184,6 +184,25 @@ UniValue getbestblockhash(const UniValue &params, bool fHelp)
     return chainActive.Tip()->GetBlockHash().GetHex();
 }
 
+UniValue getfinalizedblockhash(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+    {
+        throw std::runtime_error("getfinalizedblockhash\n"
+                                 "\nReturns the hash of the currently finalized block\n"
+                                 "\nResult:\n"
+                                 "\"hex\"      (string) the block hash hex encoded\n");
+    }
+
+    LOCK(cs_main);
+    const CBlockIndex *blockIndexFinalized = GetFinalizedBlock();
+    if (blockIndexFinalized)
+    {
+        return blockIndexFinalized->GetBlockHash().GetHex();
+    }
+    return UniValue(UniValue::VSTR);
+}
+
 UniValue getdifficulty(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -1576,7 +1595,7 @@ UniValue finalizeblock(const UniValue &params, bool fHelp)
 
             pblockindex = mapBlockIndex[hash];
         }
-        FinalizeBlock(state, pblockindex);
+        FinalizeBlockAndInvalidate(state, pblockindex);
     }
 
     if (state.IsValid())
@@ -2305,6 +2324,7 @@ static const CRPCCommand commands[] = {
     {"hidden", "rollbackchain", &rollbackchain, true},
     {"hidden", "reconsidermostworkchain", &reconsidermostworkchain, true},
     {"hidden", "finalizeblock", &finalizeblock, true},
+    {"hidden", "getfinalizedblockhash", &getfinalizedblockhash, true},
 };
 
 void RegisterBlockchainRPCCommands(CRPCTable &table)

@@ -30,7 +30,9 @@
 #include <unordered_set>
 
 extern CTweak<unsigned int> unconfPushAction;
+extern CTweak<int> maxReorgDepth;
 void ProcessOrphans(std::vector<uint256> &vWorkQueue);
+static bool FinalizeBlockInternal(CValidationState &state, CBlockIndex *pindex);
 
 class Hasher
 {
@@ -635,6 +637,7 @@ void UnloadBlockIndex()
         chainActive.SetTip(nullptr);
         pindexBestInvalid = nullptr;
         pindexBestHeader = nullptr;
+        pindexFinalized = nullptr;
         ResetASERTAnchorBlockCache();
         mapBlocksUnlinked.clear();
         vinfoBlockFile.clear();
@@ -1351,7 +1354,6 @@ CBlockIndex *FindMostWorkChain()
                 pindexNew->GetBlockHash().ToString(), pindexFinalized->nHeight);
 
             pindexNew->nStatus |= BLOCK_FAILED_VALID;
-            pindexNew->nStatus &= ~BLOCK_VALID_CHAIN;
         }
 
         // Check whether all blocks on the path between the currently active chain and the candidate are valid.
@@ -3269,6 +3271,19 @@ bool ConnectTip(CValidationState &state,
         assert(result);
         LOG(BENCH, "      - Update Coins %.3fms\n", GetStopwatchMicros() - nStart);
 
+        // Update the finalized block.
+        if (maxReorgDepth.Value() >= 0)
+        {
+            int32_t nHeightToFinalize = pindexNew->nHeight - maxReorgDepth.Value();
+            CBlockIndex *pindexToFinalize = pindexNew->GetAncestor(nHeightToFinalize);
+            if (pindexToFinalize && !FinalizeBlockInternal(state, pindexToFinalize))
+            {
+                state.SetCorruptionPossible();
+                return error("ConnectTip(): FinalizeBlock %s failed (%s)", pindexNew->GetBlockHash().ToString(),
+                    FormatStateMessage(state));
+            }
+        }
+
         mapBlockSource.erase(pindexNew->GetBlockHash());
         nTime3 = GetStopwatchMicros();
         nTimeConnectTotal += nTime3 - nTime2;
@@ -3899,8 +3914,9 @@ bool ProcessNewBlock(CValidationState &state,
     return true;
 }
 
-bool FinalizeBlock(CValidationState &state, CBlockIndex *pindex)
+static bool FinalizeBlockInternal(CValidationState &state, CBlockIndex *pindex)
 {
+    if (pindex != chainActive.Genesis())
     {
         READLOCK(cs_mapBlockIndex);
         if (!pindex->IsValid(BLOCK_VALID_CHAIN))
@@ -3913,16 +3929,33 @@ bool FinalizeBlock(CValidationState &state, CBlockIndex *pindex)
     }
 
     // Check that the request is consistent with current finalization.
-    if (pindexFinalized && !AreOnTheSameFork(pindex, pindexFinalized))
     {
-        return state.DoS(20, error("%s: Trying to finalize block %s which conflicts "
-                                   "with already finalized block",
-                                 __func__, pindex->GetBlockHash().ToString()),
-            REJECT_AGAINST_FINALIZED, "bad-fork-prior-finalized");
-    }
+        LOCK(cs_main); // for pindexFinalized
+        if (pindexFinalized && !AreOnTheSameFork(pindex, pindexFinalized))
+        {
+            return state.DoS(20, error("%s: Trying to finalize block %s which conflicts "
+                                       "with already finalized block",
+                                     __func__, pindex->GetBlockHash().ToString()),
+                REJECT_AGAINST_FINALIZED, "bad-fork-prior-finalized");
+        }
 
-    // We have a valid candidate
-    pindexFinalized = pindex;
+        // If we receive a block prior to the finalization point we may end up rolling back the current
+        // finalization point. So we check here to see if the block is an ancestor of the finalized block index.
+        if (IsBlockFinalized(pindex)) // also requires cs_main
+        {
+            return true;
+        }
+
+        // We have a valid candidate
+        pindexFinalized = pindex;
+    }
+    return true;
+}
+
+bool FinalizeBlockAndInvalidate(CValidationState &state, CBlockIndex *pindex)
+{
+    if (!FinalizeBlockInternal(state, pindex))
+        return false;
 
     // If the finalized block is not on the active chain, we need to rewind.
     if (!AreOnTheSameFork(pindex, chainActive.Tip()))
@@ -3934,6 +3967,20 @@ bool FinalizeBlock(CValidationState &state, CBlockIndex *pindex)
     }
 
     return true;
+}
+
+const CBlockIndex *GetFinalizedBlock()
+{
+    AssertLockHeld(cs_main);
+    return pindexFinalized;
+}
+
+bool IsBlockFinalized(const CBlockIndex *pindex)
+{
+    DbgAssert(pindex != nullptr, return false);
+
+    AssertLockHeld(cs_main);
+    return pindexFinalized && pindexFinalized->GetAncestor(pindex->nHeight) == pindex;
 }
 
 bool IsBlockPruned(const CBlockIndex *pblockindex)
