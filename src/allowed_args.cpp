@@ -596,6 +596,9 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
             strprintf("Log transaction priority and fee per kB when mining blocks (default: %u)",
                          DEFAULT_PRINTPRIORITY))
         .addDebugArg("printtologfile", optionalBool, "Write log to debug.log")
+        .addDebugArg("finalizationdelay=<n>", requiredInt,
+            strprintf("Minimum time between a block header received and the block finalization <n> (default: %u)",
+                         DEFAULT_MIN_FINALIZATION_DELAY))
 #ifdef ENABLE_WALLET
         .addDebugArg("privdb", optionalBool,
             strprintf("Sets the DB_PRIVATE flag in the wallet db environment (default: %u)", DEFAULT_WALLET_PRIVDB),

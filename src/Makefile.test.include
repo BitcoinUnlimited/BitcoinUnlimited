@@ -94,6 +94,7 @@ BITCOIN_TESTS =\
   test/electrumserver_tests.cpp \
   test/exploit_tests.cpp \
   test/fastfilter_tests.cpp \
+  test/finalization_tests.cpp \
   test/forkscsv_tests.cpp \
   test/getarg_tests.cpp \
   test/graphene_tests.cpp \
