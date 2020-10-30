@@ -52,7 +52,7 @@ void RPCServer::OnStarted(boost::function<void()> slot) { g_rpcSignals.Started.c
 void RPCServer::OnStopped(boost::function<void()> slot) { g_rpcSignals.Stopped.connect(slot); }
 void RPCServer::OnPreCommand(boost::function<void(const CRPCCommand &)> slot)
 {
-    g_rpcSignals.PreCommand.connect(boost::bind(slot, boost::placeholders::_1));
+    g_rpcSignals.PreCommand.connect(boost::bind(slot, boost::arg<1>()));
 }
 
 class CRPCConvertParam
@@ -647,7 +647,7 @@ std::vector<std::string> CRPCTable::listCommands() const
     typedef std::map<std::string, CRPCCommand> commandMap;
 
     std::transform(mapCommands.begin(), mapCommands.end(), std::back_inserter(commandList),
-        boost::bind(&commandMap::value_type::first, boost::placeholders::_1));
+        boost::bind(&commandMap::value_type::first, boost::arg<1>()));
     return commandList;
 }
 

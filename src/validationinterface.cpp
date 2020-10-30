@@ -5,37 +5,46 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "validationinterface.h"
-namespace bpl = boost::placeholders;
+#include <boost/bind/bind.hpp>
 
 static CMainSignals g_signals;
 
 CMainSignals &GetMainSignals() { return g_signals; }
 void RegisterValidationInterface(CValidationInterface *pwalletIn)
 {
-    g_signals.UpdatedBlockTip.connect(boost::bind(&CValidationInterface::UpdatedBlockTip, pwalletIn, bpl::_1));
-    g_signals.SyncTransaction.connect(
-        boost::bind(&CValidationInterface::SyncTransaction, pwalletIn, bpl::_1, bpl::_2, bpl::_3));
-    g_signals.UpdatedTransaction.connect(boost::bind(&CValidationInterface::UpdatedTransaction, pwalletIn, bpl::_1));
-    g_signals.SetBestChain.connect(boost::bind(&CValidationInterface::SetBestChain, pwalletIn, bpl::_1));
-    g_signals.Inventory.connect(boost::bind(&CValidationInterface::Inventory, pwalletIn, bpl::_1));
-    g_signals.Broadcast.connect(boost::bind(&CValidationInterface::ResendWalletTransactions, pwalletIn, bpl::_1));
-    g_signals.BlockChecked.connect(boost::bind(&CValidationInterface::BlockChecked, pwalletIn, bpl::_1, bpl::_2));
-    g_signals.ScriptForMining.connect(boost::bind(&CValidationInterface::GetScriptForMining, pwalletIn, bpl::_1));
-    g_signals.BlockFound.connect(boost::bind(&CValidationInterface::ResetRequestCount, pwalletIn, bpl::_1));
+    g_signals.UpdatedBlockTip.connect(boost::bind(&CValidationInterface::UpdatedBlockTip, pwalletIn, boost::arg<1>()));
+    g_signals.SyncTransaction.connect(boost::bind(
+        &CValidationInterface::SyncTransaction, pwalletIn, boost::arg<1>(), boost::arg<2>(), boost::arg<3>()));
+    g_signals.UpdatedTransaction.connect(
+        boost::bind(&CValidationInterface::UpdatedTransaction, pwalletIn, boost::arg<1>()));
+    g_signals.SetBestChain.connect(boost::bind(&CValidationInterface::SetBestChain, pwalletIn, boost::arg<1>()));
+    g_signals.Inventory.connect(boost::bind(&CValidationInterface::Inventory, pwalletIn, boost::arg<1>()));
+    g_signals.Broadcast.connect(
+        boost::bind(&CValidationInterface::ResendWalletTransactions, pwalletIn, boost::arg<1>()));
+    g_signals.BlockChecked.connect(
+        boost::bind(&CValidationInterface::BlockChecked, pwalletIn, boost::arg<1>(), boost::arg<2>()));
+    g_signals.ScriptForMining.connect(
+        boost::bind(&CValidationInterface::GetScriptForMining, pwalletIn, boost::arg<1>()));
+    g_signals.BlockFound.connect(boost::bind(&CValidationInterface::ResetRequestCount, pwalletIn, boost::arg<1>()));
 }
 
 void UnregisterValidationInterface(CValidationInterface *pwalletIn)
 {
-    g_signals.BlockFound.disconnect(boost::bind(&CValidationInterface::ResetRequestCount, pwalletIn, bpl::_1));
-    g_signals.ScriptForMining.disconnect(boost::bind(&CValidationInterface::GetScriptForMining, pwalletIn, bpl::_1));
-    g_signals.BlockChecked.disconnect(boost::bind(&CValidationInterface::BlockChecked, pwalletIn, bpl::_1, bpl::_2));
-    g_signals.Broadcast.disconnect(boost::bind(&CValidationInterface::ResendWalletTransactions, pwalletIn, bpl::_1));
-    g_signals.Inventory.disconnect(boost::bind(&CValidationInterface::Inventory, pwalletIn, bpl::_1));
-    g_signals.SetBestChain.disconnect(boost::bind(&CValidationInterface::SetBestChain, pwalletIn, bpl::_1));
-    g_signals.UpdatedTransaction.disconnect(boost::bind(&CValidationInterface::UpdatedTransaction, pwalletIn, bpl::_1));
-    g_signals.SyncTransaction.disconnect(
-        boost::bind(&CValidationInterface::SyncTransaction, pwalletIn, bpl::_1, bpl::_2, bpl::_3));
-    g_signals.UpdatedBlockTip.disconnect(boost::bind(&CValidationInterface::UpdatedBlockTip, pwalletIn, bpl::_1));
+    g_signals.BlockFound.disconnect(boost::bind(&CValidationInterface::ResetRequestCount, pwalletIn, boost::arg<1>()));
+    g_signals.ScriptForMining.disconnect(
+        boost::bind(&CValidationInterface::GetScriptForMining, pwalletIn, boost::arg<1>()));
+    g_signals.BlockChecked.disconnect(
+        boost::bind(&CValidationInterface::BlockChecked, pwalletIn, boost::arg<1>(), boost::arg<2>()));
+    g_signals.Broadcast.disconnect(
+        boost::bind(&CValidationInterface::ResendWalletTransactions, pwalletIn, boost::arg<1>()));
+    g_signals.Inventory.disconnect(boost::bind(&CValidationInterface::Inventory, pwalletIn, boost::arg<1>()));
+    g_signals.SetBestChain.disconnect(boost::bind(&CValidationInterface::SetBestChain, pwalletIn, boost::arg<1>()));
+    g_signals.UpdatedTransaction.disconnect(
+        boost::bind(&CValidationInterface::UpdatedTransaction, pwalletIn, boost::arg<1>()));
+    g_signals.SyncTransaction.disconnect(boost::bind(
+        &CValidationInterface::SyncTransaction, pwalletIn, boost::arg<1>(), boost::arg<2>(), boost::arg<3>()));
+    g_signals.UpdatedBlockTip.disconnect(
+        boost::bind(&CValidationInterface::UpdatedBlockTip, pwalletIn, boost::arg<1>()));
 }
 
 void UnregisterAllValidationInterfaces()
