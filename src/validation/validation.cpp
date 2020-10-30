@@ -3272,13 +3272,16 @@ bool ConnectTip(CValidationState &state,
         LOG(BENCH, "      - Update Coins %.3fms\n", GetStopwatchMicros() - nStart);
 
         // Update the finalized block.
-        int32_t nHeightToFinalize = pindexNew->nHeight - maxReorgDepth.Value();
-        CBlockIndex *pindexToFinalize = pindexNew->GetAncestor(nHeightToFinalize);
-        if (pindexToFinalize && !FinalizeBlockInternal(state, pindexToFinalize))
+        if (maxReorgDepth.Value() >= 0)
         {
-            state.SetCorruptionPossible();
-            return error("ConnectTip(): FinalizeBlock %s failed (%s)", pindexNew->GetBlockHash().ToString(),
-                FormatStateMessage(state));
+            int32_t nHeightToFinalize = pindexNew->nHeight - maxReorgDepth.Value();
+            CBlockIndex *pindexToFinalize = pindexNew->GetAncestor(nHeightToFinalize);
+            if (pindexToFinalize && !FinalizeBlockInternal(state, pindexToFinalize))
+            {
+                state.SetCorruptionPossible();
+                return error("ConnectTip(): FinalizeBlock %s failed (%s)", pindexNew->GetBlockHash().ToString(),
+                    FormatStateMessage(state));
+            }
         }
 
         mapBlockSource.erase(pindexNew->GetBlockHash());
