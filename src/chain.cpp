@@ -50,7 +50,7 @@ CBlockLocator CChain::GetLocator(const CBlockIndex *pindex) const
         if (_Contains(pindex))
         {
             // Use O(1) CChain index if possible.
-            pindex = _idx(nHeight);
+            pindex = vChain[nHeight];
         }
         else
         {
