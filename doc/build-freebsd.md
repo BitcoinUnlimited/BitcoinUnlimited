@@ -25,8 +25,8 @@ As your normal (non root) user, go through the steps below
 ### Fetch the code
 
 ```bash
-git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git
-cd BitcoinUnlimited/
+git clone https://gitlab.com/bitcoinunlimited/BCHUnlimited.git
+cd BCHUnlimited/
 ```
 
 ### Preparation
