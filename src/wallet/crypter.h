@@ -180,6 +180,7 @@ public:
 
     bool _HaveKey(const CKeyID &address) const
     {
+        AssertLockHeld(cs_KeyStore);
         if (!IsCrypted())
             return CBasicKeyStore::_HaveKey(address);
         return mapCryptedKeys.count(address) > 0;
