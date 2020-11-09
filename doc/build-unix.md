@@ -130,8 +130,8 @@ For the versions used, see [dependencies.md](dependencies.md)
 Start out by fetching the code
 
 ```bash
-git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git
-cd BitcoinUnlimited/
+git clone https://gitlab.com/bitcoinunlimited/BCHUnlimited.git
+cd BCHUnlimited/
 ```
 ## To build without wallet
 
