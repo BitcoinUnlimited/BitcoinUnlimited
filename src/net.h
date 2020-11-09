@@ -616,8 +616,10 @@ public:
         if ((xVersionEnabled && props.countWithAncestors > nLimitAncestorCount) ||
             (!xVersionEnabled && props.countWithAncestors > BCH_DEFAULT_DESCENDANT_LIMIT))
             return false;
-        if (props.sizeWithAncestors > nLimitAncestorSize)
+        if ((xVersionEnabled && props.sizeWithAncestors > nLimitAncestorSize) ||
+            (!xVersionEnabled && props.sizeWithAncestors > BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000))
             return false;
+
         return true;
     }
 
