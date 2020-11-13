@@ -667,7 +667,7 @@ class CScaleNetParams : public CChainParams
 public:
     CScaleNetParams()
     {
-        strNetworkID = CBaseChainParams::SCALENET;
+        strNetworkID = "scale";
         consensus.nSubsidyHalvingInterval = 210000;
         consensus.BIP16Height = 1;
         consensus.BIP34Height = 2;
