@@ -434,6 +434,7 @@ void UnlimitedSetup(void)
     blockVersion = GetArg("-blockversion", blockVersion);
     excessiveBlockSize = GetArg("-excessiveblocksize", Params().DefaultExcessiveBlockSize());
     excessiveAcceptDepth = GetArg("-excessiveacceptdepth", excessiveAcceptDepth);
+    maxSigChecks = excessiveBlockSize / BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO;
     LoadTweaks(); // The above options are deprecated so the same parameter defined as a tweak will override them
 
     // If the user configures it to 1, assume this means default
