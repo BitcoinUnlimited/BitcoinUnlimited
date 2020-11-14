@@ -143,7 +143,7 @@ for arg in sys.argv[1:]:
                 passOn = '--help'
                 showHelp = True
             else:
-                if passOn is not '--help':
+                if passOn != '--help':
                     passOn += " " + arg
         # add it to double_opts only for validation
         double_opts.add(arg)

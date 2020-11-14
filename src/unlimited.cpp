@@ -106,20 +106,11 @@ std::string ExcessiveBlockValidator(const uint64_t &value, uint64_t *item, bool 
                 << ").  This would cause you to orphan your own blocks.";
             return ret.str();
         }
-        if ((value < MIN_EXCESSIVE_BLOCK_SIZE) &&
-            ((Params().NetworkIDString() == "main") || (Params().NetworkIDString() == "test")))
+        if (value < Params().MinMaxBlockSize())
         {
             std::ostringstream ret;
             ret << Params().NetworkIDString() << "Sorry, your proposed excessive block size (" << value
-                << ") is smaller than the minimum EB size (" << MIN_EXCESSIVE_BLOCK_SIZE
-                << ").  This would cause you to orphan blocks from the rest of the net.";
-            return ret.str();
-        }
-        if ((value < MIN_EXCESSIVE_BLOCK_SIZE_REGTEST) && (Params().NetworkIDString() == "regtest"))
-        {
-            std::ostringstream ret;
-            ret << Params().NetworkIDString() << "Sorry, your proposed excessive block size (" << value
-                << ") is smaller than the minimum EB size (" << MIN_EXCESSIVE_BLOCK_SIZE_REGTEST
+                << ") is smaller than the minimum EB size (" << Params().MinMaxBlockSize()
                 << ").  This would cause you to orphan blocks from the rest of the net.";
             return ret.str();
         }
@@ -439,10 +430,11 @@ void UnlimitedSetup(void)
 {
     MIN_TX_REQUEST_RETRY_INTERVAL = GetArg("-txretryinterval", DEFAULT_MIN_TX_REQUEST_RETRY_INTERVAL);
     MIN_BLK_REQUEST_RETRY_INTERVAL = GetArg("-blkretryinterval", DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL);
-    maxGeneratedBlock = GetArg("-blockmaxsize", maxGeneratedBlock);
+    maxGeneratedBlock = GetArg("-blockmaxsize", Params().DefaultMaxBlockMiningSize());
     blockVersion = GetArg("-blockversion", blockVersion);
-    excessiveBlockSize = GetArg("-excessiveblocksize", excessiveBlockSize);
+    excessiveBlockSize = GetArg("-excessiveblocksize", Params().DefaultExcessiveBlockSize());
     excessiveAcceptDepth = GetArg("-excessiveacceptdepth", excessiveAcceptDepth);
+    maxSigChecks = excessiveBlockSize / BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO;
     LoadTweaks(); // The above options are deprecated so the same parameter defined as a tweak will override them
 
     // If the user configures it to 1, assume this means default
