@@ -16,7 +16,11 @@
 class CCoinsViewCache;
 
 /** Default for -blockmaxsize and -blockminsize, which control the range of sizes the mining code will create **/
-static const unsigned int DEFAULT_BLOCK_MAX_SIZE = 8000000;
+// this is now set in chain params
+static const unsigned int DEFAULT_BLOCK_MAX_SIZE_REGTEST = 1000;
+static const unsigned int DEFAULT_BLOCK_MAX_SIZE = 8 * ONE_MEGABYTE;
+static const unsigned int DEFAULT_BLOCK_MAX_SIZE_TESTNET4 = 2 * ONE_MEGABYTE;
+static const unsigned int DEFAULT_BLOCK_MAX_SIZE_SCALENET = 256 * ONE_MEGABYTE;
 static const unsigned int DEFAULT_BLOCK_MIN_SIZE = 0;
 
 /** Default for -blockprioritysize, a 5% maximum space for zero/low-fee transactions **/

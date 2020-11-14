@@ -72,7 +72,7 @@ class FinalizeBlockTest(BitcoinTestFramework):
         status = "False"
         block = alt_node.getbestblockhash()
         time_loop = 0
-        while (status is "False"):
+        while (status == "False"):
             for tip1 in node.getchaintips():
                 if tip1["hash"] == block:
                     assert(tip1["status"] != "active")
@@ -97,7 +97,7 @@ class FinalizeBlockTest(BitcoinTestFramework):
         node.reconsiderblock(tip)
         assert_equal(node.getbestblockhash(), tip)
         assert_equal(node.getfinalizedblockhash(), fork_block)
- 
+
         # The node will now accept that chain as the finalized block moved back.
         node.reconsiderblock(alt_node.getbestblockhash())
         assert_equal(node.getbestblockhash(), alt_node.getbestblockhash())
