@@ -11,6 +11,7 @@
 #include "rpc/protocol.h" // For HTTP status codes
 #include "sync.h"
 #include "ui_interface.h"
+#include "unlimited.h"
 #include "util.h"
 
 #include <mutex>
@@ -40,6 +41,8 @@
 
 /** Maximum size of http request (request line + headers) */
 static const size_t MAX_HEADERS_SIZE = 8192;
+/** Baseline HTTP Post body size. 2 * the excessive block size is added to this value in practice */
+static const size_t BASELINE_BODY_SIZE = 0x02000000;
 
 /** HTTP request work item */
 class HTTPWorkItem : public HTTPClosure
@@ -452,7 +455,7 @@ bool InitHTTPServer()
 
     evhttp_set_timeout(http, GetArg("-rpcservertimeout", DEFAULT_HTTP_SERVER_TIMEOUT));
     evhttp_set_max_headers_size(http, MAX_HEADERS_SIZE);
-    evhttp_set_max_body_size(http, MAX_SIZE);
+    evhttp_set_max_body_size(http, BASELINE_BODY_SIZE + (excessiveBlockSize * 2));
     evhttp_set_gencb(http, http_request_cb, nullptr);
 
     if (!HTTPBindAddresses(http))
