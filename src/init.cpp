@@ -845,6 +845,11 @@ bool AppInit2(Config &config)
 
     // also see: InitParameterInteraction()
 
+    if (chainparams.NetworkIDString() == "regtest")
+    {
+        max_blockfile_size = MAX_BLOCKFILE_SIZE_REGTEST;
+    }
+
     // if using block pruning, then disable txindex
     if (GetArg("-prune", 0))
     {
@@ -861,7 +866,7 @@ bool AppInit2(Config &config)
     else
     {
         // raise preallocation size of block and undo files
-        blockfile_chunk_size = MAX_BLOCKFILE_SIZE;
+        blockfile_chunk_size = max_blockfile_size;
         // multiply by 8 as this is the same difference between default and max blockfile size
         // we do not have a define max undofile size
         undofile_chunk_size = undofile_chunk_size * 8;
