@@ -186,6 +186,7 @@ unsigned int maxMessageSizeMultiplier = DEFAULT_MAX_MESSAGE_SIZE_MULTIPLIER;
 int nMaxOutConnections = DEFAULT_MAX_OUTBOUND_CONNECTIONS;
 bool fCanonicalTxsOrder = true;
 uint32_t blockVersion = 0; // Overrides the mined block version if non-zero
+uint64_t max_blockfile_size = MAX_BLOCKFILE_SIZE;
 
 std::vector<std::string> BUComments = std::vector<std::string>();
 std::string minerComment;

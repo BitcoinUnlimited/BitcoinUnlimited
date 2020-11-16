@@ -827,7 +827,7 @@ bool FindBlockPos(CValidationState &state,
 
     if (!fKnown)
     {
-        while (vinfoBlockFile[nFile].nSize + nAddSize >= MAX_BLOCKFILE_SIZE)
+        while ((vinfoBlockFile[nFile].nSize != 0) && (vinfoBlockFile[nFile].nSize + nAddSize >= max_blockfile_size))
         {
             nFile++;
             if (vinfoBlockFile.size() <= nFile)
