@@ -1994,6 +1994,8 @@ void static ProcessOneShot()
 
 void ThreadOpenConnections()
 {
+    nMinXthinNodes = GetArg("-min-xthin-nodes", MIN_XTHIN_NODES);
+
     // Connect to all "connect" peers
     if (mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0)
     {
@@ -2069,7 +2071,6 @@ void ThreadOpenConnections()
             // have not yet connected to enough XTHIN nodes.
             if (!fReindex)
             {
-                nMinXthinNodes = GetArg("-min-xthin-nodes", MIN_XTHIN_NODES);
                 if (nOutbound >= nMaxOutConnections && nThinBlockCapable <= min(nMinXthinNodes, nMaxOutConnections) &&
                     nDisconnects < MAX_DISCONNECTS && IsThinBlocksEnabled() && IsChainNearlySyncd())
                 {
