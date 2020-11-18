@@ -174,8 +174,11 @@ public:
 
         // List of Bitcoin Cash compatible seeders
         vSeeds.push_back(CDNSSeedData("bitcoinunlimited.info", "btccash-seeder.bitcoinunlimited.info", true));
-        vSeeds.push_back(CDNSSeedData("bitcoinabc.org", "seed.bitcoinabc.org", true));
         vSeeds.push_back(CDNSSeedData("bitcoinforks.org", "seed-bch.bitcoinforks.org", true));
+        vSeeds.push_back(CDNSSeedData("bchd.cash", "seed.bchd.cash", true));
+        vSeeds.push_back(CDNSSeedData("bch.loping.net", "seed.bch.loping.net", true));
+        vSeeds.push_back(CDNSSeedData("electroncash.de", "dnsseed.electroncash.de", true));
+        vSeeds.push_back(CDNSSeedData("flowee.cash", "seed.flowee.cash", true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1, 0);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1, 5);
@@ -403,12 +406,14 @@ public:
         vSeeds.clear();
         // nodes with support for servicebits filtering should be at the top
 
-        // Bitcoin ABC seeder
-        vSeeds.push_back(CDNSSeedData("bitcoinabc.org", "testnet-seed.bitcoinabc.org", true));
         // bitcoinforks seeders
-        vSeeds.push_back(CDNSSeedData("bitcoinforks.org", "testnet-seed-bch.bitcoinforks.org", true));
+        vSeeds.emplace_back(CDNSSeedData("bitcoinforks.org", "testnet-seed-bch.bitcoinforks.org", true));
         // BU seeder
-        vSeeds.push_back(CDNSSeedData("bitcoinunlimited.info", "testnet-seed.bitcoinunlimited.info", true));
+        vSeeds.emplace_back(CDNSSeedData("bitcoinunlimited.info", "testnet-seed.bitcoinunlimited.info", true));
+        // BCHD
+        vSeeds.emplace_back(CDNSSeedData("bchd.cash", "testnet-seed.bchd.cash", true));
+        // Loping.net
+        vSeeds.emplace_back(CDNSSeedData("loping", "seed.tbch.loping.net", true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 196);
@@ -630,6 +635,7 @@ public:
         vSeeds.clear();
         // nodes with support for servicebits filtering should be at the top
         vSeeds.emplace_back(CDNSSeedData("bitcoinforks.org", "testnet4-seed-bch.bitcoinforks.org", true));
+        vSeeds.emplace_back(CDNSSeedData("toom.im", "testnet4-seed-bch.toom.im", true));
         vSeeds.emplace_back(CDNSSeedData("loping.net", "seed.tbch4.loping.net", true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
