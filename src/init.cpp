@@ -464,6 +464,14 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
     RenameThread("loadblk");
     ScheduleBatchPriority();
 
+    // Allow the calling thread s little time to finish and redraw the QT wallet. For some reason
+    // on windows the launching of this thread will prevent the main wallet window from redrawing, until
+    // this thread has completed.
+    //
+    // TODO: investigate whether this is just a Windows issue.  It seems likely that it is given that this
+    //       thread is scheduled at a lower priority on Linux systems and therefore may not have the issue.
+    MilliSleep(500);
+
     // -reindex
     if (fReindex)
     {
