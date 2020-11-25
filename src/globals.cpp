@@ -338,7 +338,9 @@ CTweak<bool> unsafeGetBlockTemplate("mining.unsafeGetBlockTemplate",
     "(default: false)",
     false);
 
-CTweak<bool> xvalTweak("mining.xval", "Turn on/off Xpress Validation (default: false)", false);
+CTweak<bool> xvalTweak("mining.xval",
+    strprintf("Turn on/off Xpress Validation when mining a new block(true\/false - default: %d)", DEFAULT_XVAL_ENABLED),
+    DEFAULT_XVAL_ENABLED);
 
 CTweak<unsigned int> maxTxSize("net.excessiveTx",
     strprintf("Largest transaction size in bytes (default: %ld)", DEFAULT_LARGEST_TRANSACTION),

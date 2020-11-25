@@ -25,6 +25,8 @@
 
 #include <boost/test/unit_test.hpp>
 
+extern CTweak<bool> xvalTweak;
+
 BOOST_FIXTURE_TEST_SUITE(miner_tests, TestingSetup)
 
 
@@ -623,11 +625,12 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.vout[0].nValue -= 1000000;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).SpendsCoinbase(false).FromTx(tx));
-    SetBoolArg("-xval", false);
+
+    xvalTweak.Set(false);
     BOOST_CHECK_EXCEPTION(BlockAssembler(chainparams_regtest).CreateNewBlock(scriptPubKey), std::runtime_error,
         HasReason("bad-blk-signatures"));
     mempool.clear();
-    SetBoolArg("-xval", true);
+    xvalTweak.Set(true);
 
     // double spend txn pair in mempool, template creation fails
     tx.vin[0].prevout.hash = txFirst[0]->GetHash();
