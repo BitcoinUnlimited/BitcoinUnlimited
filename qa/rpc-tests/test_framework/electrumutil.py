@@ -29,7 +29,8 @@ def bitcoind_electrum_args():
     return ["-electrum=1", "-debug=electrum", "-debug=rpc",
             "-electrum.port=" + str(ELECTRUM_PORT),
             "-electrum.monitoring.port=" + str(random.randint(40000, 60000)),
-            "-electrum.rawarg=--cashaccount-activation-height=1"]
+            "-electrum.rawarg=--cashaccount-activation-height=1",
+            "-electrum.rawarg=--wait-duration-secs=1"]
 
 class ElectrumConnection:
     def __init__(self,):

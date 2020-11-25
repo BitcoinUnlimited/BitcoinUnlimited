@@ -17,7 +17,7 @@ from test_framework.connectrum.exc import ElectrumErrorResponse
 class ElectrumBlockchainAddress(BitcoinTestFramework):
     """
     Basic blockchain.address.* testing, mostly to check that the function
-    handle an address correctly. The blockchian.scripthash.* equivalents are
+    handle an address correctly. The blockchain.scripthash.* equivalents are
     more thoroughly tested.
     """
 
