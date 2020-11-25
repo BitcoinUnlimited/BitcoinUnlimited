@@ -10,6 +10,15 @@ from test_framework.electrumutil import (ElectrumConnection,
     address_to_scripthash, bitcoind_electrum_args, sync_electrum_height,
     wait_for_electrum_mempool)
 
+ADDRESS_SUBSCRIBE = 'blockchain.address.subscribe'
+ADDRESS_UNSUBSCRIBE = 'blockchain.address.unsubscribe'
+
+SCRIPTHASH_SUBSCRIBE = 'blockchain.scripthash.subscribe'
+SCRIPTHASH_UNSUBSCRIBE = 'blockchain.scripthash.unsubscribe'
+
+def address_to_address(a):
+    return a
+
 class ElectrumSubscriptionsTest(BitcoinTestFramework):
 
     def __init__(self):
@@ -25,28 +34,38 @@ class ElectrumSubscriptionsTest(BitcoinTestFramework):
 
 
         async def async_tests():
+            await self.test_subscribe_address(n)
+            await self.test_subscribe_scripthash(n)
+            await self.test_unsubscribe_address(n)
+            await self.test_unsubscribe_scripthash(n)
+            await self.test_subscribe_headers(n)
             await self.test_multiple_client_subs(n)
-
-            cli = ElectrumConnection()
-            await cli.connect()
-            await self.test_unsubscribe_scripthash(n, cli)
-            await self.test_subscribe_headers(n, cli)
-            await self.test_subscribe_scripthash(n, cli)
 
         loop = asyncio.get_event_loop()
         loop.run_until_complete(async_tests())
 
-    async def test_unsubscribe_scripthash(self, n, cli):
+    async def test_unsubscribe_scripthash(self, n):
+        return await self.test_unsubscribe(n,
+                SCRIPTHASH_SUBSCRIBE, SCRIPTHASH_UNSUBSCRIBE,
+                address_to_scripthash)
+
+    async def test_unsubscribe_address(self, n):
+        return await self.test_unsubscribe(n,
+                ADDRESS_SUBSCRIBE, ADDRESS_UNSUBSCRIBE,
+                address_to_address)
+
+    async def test_unsubscribe(self, n, subscribe, unsubscribe, addr_converter):
+        cli = ElectrumConnection()
+        await cli.connect()
         addr = n.getnewaddress()
-        scripthash = address_to_scripthash(addr)
-        _, queue = await cli.subscribe('blockchain.scripthash.subscribe', scripthash)
+        _, queue = await cli.subscribe(subscribe, addr_converter(addr))
 
         # Verify that we're receiving notifications
         n.sendtoaddress(addr, 10)
-        sh, _ = await asyncio.wait_for(queue.get(), timeout = 10)
-        assert_equal(scripthash, sh)
+        subscription_name, _ = await asyncio.wait_for(queue.get(), timeout = 10)
+        assert_equal(addr_converter(addr), subscription_name)
 
-        ok = await cli.call('blockchain.scripthash.unsubscribe', scripthash)
+        ok = await cli.call(unsubscribe, addr_converter(addr))
         assert(ok)
 
         # Verify that we're no longer receiving notifications
@@ -58,42 +77,59 @@ class ElectrumSubscriptionsTest(BitcoinTestFramework):
             pass
 
         # Unsubscribing from a hash we're not subscribed to should return false
-        ok = await cli.call('blockchain.scripthash.unsubscribe',
-                address_to_scripthash(n.getnewaddress()))
+        ok = await cli.call(unsubscribe, addr_converter(n.getnewaddress()))
         assert(not ok)
 
-    async def test_subscribe_scripthash(self, n, cli):
+
+    async def test_subscribe_scripthash(self, n):
+        return await self.test_subscribe(n,
+                SCRIPTHASH_SUBSCRIBE, SCRIPTHASH_UNSUBSCRIBE,
+                address_to_scripthash)
+
+    async def test_subscribe_address(self, n):
+        return await self.test_subscribe(n,
+                ADDRESS_SUBSCRIBE, ADDRESS_UNSUBSCRIBE,
+                address_to_address)
+
+    async def test_subscribe(self, n, subscribe, unsubscribe, addr_converter):
+        cli = ElectrumConnection()
+        await cli.connect()
+
         logging.info("Testing scripthash subscription")
         addr = n.getnewaddress()
-        scripthash = address_to_scripthash(addr)
-        statushash, queue = await cli.subscribe('blockchain.scripthash.subscribe', scripthash)
+        statushash, queue = await cli.subscribe(subscribe, addr_converter(addr))
 
         logging.info("Unused address should not have a statushash")
         assert_equal(None, statushash)
 
         logging.info("Check notification on receiving coins")
         n.sendtoaddress(addr, 10)
-        sh, new_statushash1 = await asyncio.wait_for(queue.get(), timeout = 10)
-        assert_equal(scripthash, sh)
+        subscription_name, new_statushash1 = await asyncio.wait_for(queue.get(), timeout = 10)
+        assert_equal(addr_converter(addr), subscription_name)
         assert(new_statushash1 != None and len(new_statushash1) == 64)
 
         logging.info("Check notification on block confirmation")
         assert(len(n.getrawmempool()) == 1)
         n.generate(1)
         assert(len(n.getrawmempool()) == 0)
-        sh, new_statushash2 = await asyncio.wait_for(queue.get(), timeout = 10)
-        assert_equal(scripthash, sh)
+        subscription_name, new_statushash2 = await asyncio.wait_for(queue.get(), timeout = 10)
+        assert_equal(addr_converter(addr), subscription_name)
         assert(new_statushash2 != new_statushash1)
         assert(new_statushash2 != None)
 
         logging.info("Check that we get notification when spending funds from address")
         n.sendtoaddress(n.getnewaddress(), n.getbalance(), "", "", True)
-        sh, new_statushash3 = await asyncio.wait_for(queue.get(), timeout = 10)
-        assert_equal(scripthash, sh)
+        subscription_name, new_statushash3 = await asyncio.wait_for(queue.get(), timeout = 10)
+        assert_equal(addr_converter(addr), subscription_name)
         assert(new_statushash3 != new_statushash2)
         assert(new_statushash3 != None)
 
-    async def test_subscribe_headers(self, n, cli):
+        # Clear mempool
+        n.generate(1)
+
+    async def test_subscribe_headers(self, n):
+        cli = ElectrumConnection()
+        await cli.connect()
         headers = []
 
         logging.info("Calling subscribe should return the current best block header")
@@ -134,7 +170,7 @@ class ElectrumSubscriptionsTest(BitcoinTestFramework):
             cli = clients[i]
             addr = addresses[i]
             scripthash = address_to_scripthash(addr)
-            statushash, queue = await cli.subscribe('blockchain.scripthash.subscribe', scripthash)
+            statushash, queue = await cli.subscribe(SCRIPTHASH_SUBSCRIBE, scripthash)
 
             # should be unique
             assert(statushash is not None)
