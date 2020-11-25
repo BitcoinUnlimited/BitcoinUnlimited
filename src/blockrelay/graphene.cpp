@@ -9,6 +9,7 @@
 #include "consensus/merkle.h"
 #include "dosman.h"
 #include "expedited.h"
+#include "extversionkeys.h"
 #include "net.h"
 #include "parallel.h"
 #include "policy/policy.h"
@@ -21,7 +22,6 @@
 #include "util.h"
 #include "utiltime.h"
 #include "validation/validation.h"
-#include "xversionkeys.h"
 
 #include <iomanip>
 static bool ReconstructBlock(CNode *pfrom,
@@ -1756,8 +1756,8 @@ bool NegotiateFastFilterSupport(CNode *pfrom)
 {
     uint64_t peerFastFilterPref;
     {
-        LOCK(pfrom->cs_xversion);
-        peerFastFilterPref = pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF);
+        LOCK(pfrom->cs_extversion);
+        peerFastFilterPref = pfrom->extversion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF);
     }
 
     if (grapheneFastFilterCompatibility.Value() == EITHER)

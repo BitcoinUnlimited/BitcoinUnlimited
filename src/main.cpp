@@ -24,6 +24,8 @@
 #include "consensus/validation.h"
 #include "dosman.h"
 #include "expedited.h"
+#include "extversionkeys.h"
+#include "extversionmessage.h"
 #include "hashwrapper.h"
 #include "index/txindex.h"
 #include "init.h"
@@ -55,8 +57,6 @@
 #include "validation/validation.h"
 #include "validationinterface.h"
 #include "versionbits.h"
-#include "xversionkeys.h"
-#include "xversionmessage.h"
 
 #include <algorithm>
 #include <boost/algorithm/hex.hpp>

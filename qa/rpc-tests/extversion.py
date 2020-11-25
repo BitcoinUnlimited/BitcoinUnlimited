@@ -18,7 +18,7 @@ from test_framework.nodemessages import *
 from test_framework.bumessages import *
 from test_framework.bunode import BasicBUCashNode,  VersionlessProtoHandler
 
-class XVersionTest(BitcoinTestFramework):
+class ExtversionTest(BitcoinTestFramework):
     def __init__(self):
         self.nodes = []
         BitcoinTestFramework.__init__(self)
@@ -29,7 +29,7 @@ class XVersionTest(BitcoinTestFramework):
     def setup_network(self, split=False):
         pass
 
-    def restart_node(self, send_initial_version = True):
+    def restart_node(self, send_initial_version = True, send_extversion = True):
         # remove any potential banlist
         banlist_fn = os.path.join(
             node_regtest_dir(self.options.tmpdir, 0),
@@ -44,12 +44,13 @@ class XVersionTest(BitcoinTestFramework):
         wait_bitcoinds()
         logging.info("Initializing test directory " + str(self.options.tmpdir))
         initialize_chain_clean(self.options.tmpdir, 1)
-        self.nodes = [ start_node(0, self.options.tmpdir, ["-debug=net", "-use-xversion=0"]) ]
+        self.nodes = [ start_node(0, self.options.tmpdir, ["-debug=net"]) ]
         self.pynode = pynode = BasicBUCashNode()
 
         pynode.connect(0, '127.0.0.1', p2p_port(0), self.nodes[0],
                        protohandler = VersionlessProtoHandler(),
-                       send_initial_version = send_initial_version)
+                       send_initial_version = send_initial_version,
+                       send_extversion = send_extversion)
         return pynode.cnxns[0]
 
     def network_and_finish(self):
@@ -58,53 +59,35 @@ class XVersionTest(BitcoinTestFramework):
         nt.join()
 
     def run_test(self):
-        logging.info("Testing xversion handling")
+        logging.info("Testing extversion handling")
 
-        ex1_xver = { 1 : b"2", 3 : b"4"}
-
-        def test_too_early(msg):
-            """ Test that the given message if it comes right after start up will
-            lead to rejection / banning as it comes too early. """
-            logging.info("Testing that an an early %s fails." % msg)
-            conn = self.restart_node(send_initial_version = False)
-            conn.send_message(msg, pushbuf = True)
-            self.network_and_finish()
-            assert conn.disconnected
-
-        # test failure due to early receipt
-        if 0:
-            for msg in [msg_xversion_old(), msg_xverack_old(),
-                        msg_xversion_old({1:b"2",3:b"45"})]:
-                test_too_early(msg)
-
-        # test regular set up including xversion
+        # test regular set up including extversion
         conn = self.restart_node()
         nt = NetworkThread()
         nt.start()
-
+        logging.info("sent version")
+        conn.wait_for(lambda : conn.remote_extversion)
+        logging.info("sent extversion")
+        conn.send_message(msg_extversion({1000 : b"test string"}))
         conn.wait_for_verack()
+        logging.info("sent verack")
         conn.send_message(msg_verack())
 
-        # now it is time for xversion
-        conn.wait_for(lambda : conn.remote_xversion)
-        conn.send_message(msg_xversion_old({1000 : b"test string"}))
 
-        conn.wait_for_xverack_old()
-        conn.send_message(msg_xverack_old())
 
-        # make sure xversion has actually been received properly
+        # make sure extversion has actually been received properly
 
         # test that it contains the BU_LISTEN_PORT (replacement for buversion message)
         # FIXME: use proper constant
-        assert 1<<17 in conn.remote_xversion.xver.keys()
+        assert 1<<33 in conn.remote_extversion.xver.keys()
 
         # Likewise, check that the remote end got our message
         node = self.nodes[0]
 
         peer_info = node.getpeerinfo()
         assert len(peer_info) == 1
-        assert "xversion_map" in peer_info[0]
-        xv_map = peer_info[0]["xversion_map"]
+        assert "extversion_map" in peer_info[0]
+        xv_map = peer_info[0]["extversion_map"]
 
         assert len(xv_map) == 1
         assert unhexlify(list(xv_map.values())[0]) == b"test string"
@@ -118,8 +101,8 @@ class XVersionTest(BitcoinTestFramework):
         node = self.nodes[0]
         peer_info = node.getpeerinfo()
         assert len(peer_info) == 1
-        assert "xversion_map" in peer_info[0]
-        xv_map = peer_info[0]["xversion_map"]
+        assert "extversion_map" in peer_info[0]
+        xv_map = peer_info[0]["extversion_map"]
         assert len(xv_map) == 1
         assert unhexlify(list(xv_map.values())[0]) == b"test string"
 
@@ -131,8 +114,8 @@ class XVersionTest(BitcoinTestFramework):
         node = self.nodes[0]
         peer_info = node.getpeerinfo()
         assert len(peer_info) == 1
-        assert "xversion_map" in peer_info[0]
-        xv_map = peer_info[0]["xversion_map"]
+        assert "extversion_map" in peer_info[0]
+        xv_map = peer_info[0]["extversion_map"]
         assert len(xv_map) == 1
 
         # TODO appent to this test to test a changeable key once one has been implemented in the node
@@ -140,6 +123,25 @@ class XVersionTest(BitcoinTestFramework):
         conn.connection.disconnect_node()
         nt.join()
 
+        # Test versionbit mismatch
+
+        logging.info("Testing extversion service bit mismatch")
+
+        # test regular set up including extversion
+        conn = self.restart_node()
+        nt = NetworkThread()
+        nt.start()
+        logging.info("sent version")
+        conn.wait_for(lambda : conn.remote_extversion)
+        # if we send verack instead of extversion we should get a verack response
+        logging.info("sent verack")
+        conn.send_message(msg_verack())
+        conn.wait_for_verack()
+
+        conn.connection.disconnect_node()
+        nt.join()
+
+
 if __name__ == '__main__':
-    xvt = XVersionTest()
+    xvt = ExtversionTest()
     xvt.main()

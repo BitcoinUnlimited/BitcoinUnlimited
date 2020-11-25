@@ -162,6 +162,8 @@ BITCOIN_CORE_H = \
   electrum/electrs.h \
   electrum/electrumrpcinfo.h \
   electrum/electrumserver.h \
+  extversionmessage.h \
+  extversionkeys.h \
   fast-cpp-csv-parser/csv.h \
   fastfilter.h \
   forks_csv.h \
@@ -241,8 +243,6 @@ BITCOIN_CORE_H = \
   validation/verifydb.h \
   validationinterface.h \
   versionbits.h \
-  xversionmessage.h \
-  xversionkeys.h \
   wallet/crypter.h \
   wallet/db.h \
   wallet/rpcwallet.h \
@@ -290,6 +290,7 @@ libbitcoin_server_a_SOURCES = \
   electrum/electrs.cpp \
   electrum/electrumrpcinfo.cpp \
   electrum/electrumserver.cpp \
+  extversionmessage.cpp \
   forks_csv.cpp \
   httprpc.cpp \
   httpserver.cpp \
@@ -339,7 +340,6 @@ libbitcoin_server_a_SOURCES = \
   validation/verifydb.cpp \
   validationinterface.cpp \
   versionbits.cpp \
-  xversionmessage.cpp \
   $(BITCOIN_CORE_H)
 
 if ENABLE_ZMQ

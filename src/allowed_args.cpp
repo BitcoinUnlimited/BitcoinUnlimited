@@ -672,9 +672,9 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
         .addArg("use-compactblocks", optionalBool,
             strprintf(_("Enable compact blocks to speed up the relay of blocks (default: %d)"),
                     DEFAULT_USE_COMPACT_BLOCKS))
-        .addArg("use-xversion", optionalBool,
-            strprintf(_("Enable extended versioning during node handshake (xversion) (default: %d)"),
-                    DEFAULT_USE_XVERSION))
+        .addArg("use-extversion", optionalBool,
+            strprintf(_("Enable extended versioning during node handshake (extversion) (default: %d)"),
+                    DEFAULT_USE_EXTVERSION))
         .addArg("preferential-timer=<millisec>", requiredInt,
             strprintf(_("Set graphene, thinblock and compactblock preferential timer duration (default: %u). Use 0 to "
                         "disable it."),

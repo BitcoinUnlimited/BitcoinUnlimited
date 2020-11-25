@@ -2,8 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef BITCOIN_XVERSIONMESSAGE_H
-#define BITCOIN_XVERSIONMESSAGE_H
+#ifndef BITCOIN_EXTVERSIONMESSAGE_H
+#define BITCOIN_EXTVERSIONMESSAGE_H
 
 
 #include "protocol.h"
@@ -18,16 +18,16 @@
 /** Maximum length of strSubVer in `version` message */
 static const unsigned int MAX_SUBVERSION_LENGTH = 256;
 
-const size_t MAX_XVERSION_MAP_SIZE = 100000;
+const size_t MAX_EXTVERSION_MAP_SIZE = 100000;
 
-typedef std::map<uint64_t, std::vector<uint8_t> > XVersionMap;
+typedef std::map<uint64_t, std::vector<uint8_t> > ExtversionMap;
 
 class CompactMapSerialization
 {
-    XVersionMap &map;
+    ExtversionMap &map;
 
 public:
-    CompactMapSerialization(XVersionMap &_map) : map(_map) {}
+    CompactMapSerialization(ExtversionMap &_map) : map(_map) {}
     template <typename Stream>
     void Serialize(Stream &s) const
     {
@@ -63,15 +63,15 @@ public:
   but in addition supports an appended
   (key, value) map, with the keys and values being uint64_t values.
 
-  The keys are declared in the xversion_keys.h header file which
+  The keys are declared in the extversion_keys.h header file which
   should obviously be kept in sync between different implementations.
 
   A size of 100kB for the serialized map must not be exceeded.
 
-  FIXME: Auto-generate the xversion_keys.h file to also support non-C++
+  FIXME: Auto-generate the extversion_keys.h file to also support non-C++
   clients and other software decoding these fields.
 */
-class CXVersionMessage
+class CExtversionMessage
 {
 protected:
     // cached values for conversion to uint64 (u64c)
@@ -80,9 +80,9 @@ protected:
 
 public:
     // extensible map for general settings
-    XVersionMap xmap;
+    ExtversionMap xmap;
 
-    CXVersionMessage() {}
+    CExtversionMessage() {}
     ADD_SERIALIZE_METHODS;
 
     //! Access xmap by given uint64_t key. Non-existent entries will return zero
@@ -94,10 +94,10 @@ public:
     template <typename Stream>
     const auto CheckSize(Stream &s)
     {
-        if (s.size() > MAX_XVERSION_MAP_SIZE)
+        if (s.size() > MAX_EXTVERSION_MAP_SIZE)
         {
             throw std::ios_base::failure(
-                strprintf("A version message xmap may be at most %d bytes.", MAX_XVERSION_MAP_SIZE));
+                strprintf("A version message xmap may be at most %d bytes.", MAX_EXTVERSION_MAP_SIZE));
         }
     };
 

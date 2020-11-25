@@ -17,6 +17,7 @@
 #include "consensus/tx_verify.h"
 #include "dosman.h"
 #include "expedited.h"
+#include "extversionkeys.h"
 #include "net.h"
 #include "parallel.h"
 #include "policy/policy.h"
@@ -29,7 +30,6 @@
 #include "util.h"
 #include "utiltime.h"
 #include "validation/validation.h"
-#include "xversionkeys.h"
 
 static bool ReconstructBlock(CNode *pfrom,
     int &missingCount,

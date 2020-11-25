@@ -332,8 +332,8 @@ class SendHeadersTest(BitcoinTestFramework):
 
         NetworkThread().start() # Start up network handling in another thread
 
-        inv_node.send_message(msg_xversion(), True)
-        test_node.send_message(msg_xversion(), True)
+        inv_node.send_message(msg_extversion(), True)
+        test_node.send_message(msg_extversion(), True)
 
         # Test logic begins here
         inv_node.wait_for_verack()

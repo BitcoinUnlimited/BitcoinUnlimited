@@ -14,6 +14,7 @@
 #include "coins.h"
 #include "compressor.h"
 #include "consensus/merkle.h"
+#include "extversionmessage.h"
 #include "net.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
@@ -27,7 +28,6 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 #include "version.h"
-#include "xversionmessage.h"
 
 #include <cstdio>
 #include <stdint.h>
@@ -612,7 +612,7 @@ int main(int argc, char **argv)
     FuzzAPICIblt fuzz_api_iblt;
     FuzzAPICGrapheneSet fuzz_api_graphene_set;
 
-    FuzzDeserNet<CXVersionMessage> fuzz_cxversionmessage("cxversionmessage");
+    FuzzDeserNet<CExtversionMessage> fuzz_CExtversionMessage("CExtversionMessage");
 
     // command line arguments can be used to constrain more and
     // more specifically to a particular test

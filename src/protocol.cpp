@@ -63,9 +63,7 @@ const char *GET_MEMPOOLSYNCTX = "getmemsynctx";
 const char *XPEDITEDREQUEST = "req_xpedited";
 const char *XPEDITEDBLK = "Xb";
 const char *XPEDITEDTXN = "Xt";
-const char *XVERSION_OLD = "xversion";
-const char *XVERACK_OLD = "xverack";
-const char *XVERSION = "extversion";
+const char *EXTVERSION = "extversion";
 const char *XUPDATE = "xupdate";
 const char *SENDCMPCT = "sendcmpct";
 const char *CMPCTBLOCK = "cmpctblock";
@@ -96,9 +94,8 @@ const static std::string allNetMessageTypes[] = {
     NetMsgType::GRAPHENEBLOCK, NetMsgType::GRAPHENETX, NetMsgType::GET_GRAPHENETX, NetMsgType::GET_GRAPHENE,
     NetMsgType::GET_GRAPHENE_RECOVERY, NetMsgType::GRAPHENE_RECOVERY, NetMsgType::MEMPOOLSYNC,
     NetMsgType::MEMPOOLSYNCTX, NetMsgType::GET_MEMPOOLSYNC, NetMsgType::GET_MEMPOOLSYNCTX, NetMsgType::XPEDITEDREQUEST,
-    NetMsgType::XPEDITEDBLK, NetMsgType::XPEDITEDTXN, NetMsgType::XVERSION_OLD, NetMsgType::XVERACK_OLD,
-    NetMsgType::XVERSION, NetMsgType::XUPDATE, NetMsgType::SENDCMPCT, NetMsgType::CMPCTBLOCK, NetMsgType::GETBLOCKTXN,
-    NetMsgType::BLOCKTXN, NetMsgType::DSPROOF,
+    NetMsgType::XPEDITEDBLK, NetMsgType::XPEDITEDTXN, NetMsgType::EXTVERSION, NetMsgType::XUPDATE,
+    NetMsgType::SENDCMPCT, NetMsgType::CMPCTBLOCK, NetMsgType::GETBLOCKTXN, NetMsgType::BLOCKTXN, NetMsgType::DSPROOF,
 
 };
 const static std::vector<std::string> allNetMessageTypesVec(allNetMessageTypes,

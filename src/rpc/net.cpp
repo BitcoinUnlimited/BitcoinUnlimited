@@ -229,13 +229,13 @@ UniValue getpeerinfo(const UniValue &params, bool fHelp)
 
             if (snode)
             {
-                LOCK(snode->cs_xversion);
+                LOCK(snode->cs_extversion);
                 UniValue xmap_enc(UniValue::VOBJ);
-                for (auto kv : snode->xVersion.xmap)
+                for (auto kv : snode->extversion.xmap)
                 {
                     xmap_enc.pushKV(strprintf("%016llx", kv.first), HexStr(kv.second).c_str());
                 }
-                obj.pushKV("xversion_map", xmap_enc);
+                obj.pushKV("extversion_map", xmap_enc);
             }
             ret.push_back(obj);
         }

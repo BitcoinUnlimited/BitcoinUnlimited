@@ -12,6 +12,7 @@
 #include "bloom.h"
 #include "chainparams.h"
 #include "compat.h"
+#include "extversionmessage.h"
 #include "fastfilter.h"
 #include "fs.h"
 #include "hashwrapper.h"
@@ -29,7 +30,6 @@
 #include "uint256.h"
 #include "unlimited.h"
 #include "util.h" // FIXME: reduce scope
-#include "xversionmessage.h"
 
 #include <atomic>
 #include <deque>
@@ -101,8 +101,8 @@ static const unsigned int MAX_DISCONNECTS = 200;
 static const uint64_t DEFAULT_MAX_UPLOAD_TARGET = 0;
 /** Default for blocks only*/
 static const bool DEFAULT_BLOCKSONLY = false;
-/** Default for XVersion */
-static const bool DEFAULT_USE_XVERSION = true;
+/** Default for Extversion */
+static const bool DEFAULT_USE_EXTVERSION = true;
 
 /** Internal constant that indicates we have no common graphene versions. */
 const uint64_t GRAPHENE_NO_VERSION_SUPPORTED = 0xfffffff;
@@ -359,12 +359,12 @@ public:
     uint64_t nMempoolSyncMinVersionSupported = 0;
     /** Maximum supported mempool synchronization version */
     uint64_t nMempoolSyncMaxVersionSupported = 0;
-    /** Tx concatenation supported (set by xversion) */
+    /** Tx concatenation supported (set by extversion) */
     uint64_t txConcat = 0;
-    /** set to true if this node support xVersion */
-    std::atomic<bool> xVersionEnabled{false};
-    /** set to true if the next expected message is xVersion */
-    std::atomic<bool> xVersionExpected{false};
+    /** set to true if this node support extversion */
+    std::atomic<bool> extversionEnabled{false};
+    /** set to true if the next expected message is extversion */
+    std::atomic<bool> extversionExpected{false};
     /** set to true if this node is ok with no message checksum */
     bool skipChecksum = false;
     /** Graphene min supported version */
@@ -432,9 +432,9 @@ public:
     /** used to make processing serial when version handshake is taking place */
     CCriticalSection csSerialPhase;
 
-    /** the intial xversion message sent in the handshake */
-    CCriticalSection cs_xversion;
-    CXVersionMessage xVersion GUARDED_BY(cs_xversion);
+    /** the intial extversion message sent in the handshake */
+    CCriticalSection cs_extversion;
+    CExtversionMessage extversion GUARDED_BY(cs_extversion);
 
     /** strSubVer is whatever byte array we read from the wire. However, this field is intended
         to be printed out, displayed to humans in various forms and so on. So we sanitize it and
@@ -613,19 +613,18 @@ public:
     {
         // Checking the descendants makes no sense -- the target node can't have descendants in its mempool if it
         // doesn't have this transaction!
-        if ((xVersionEnabled && props.countWithAncestors > nLimitAncestorCount) ||
-            (!xVersionEnabled && props.countWithAncestors > BCH_DEFAULT_DESCENDANT_LIMIT))
+        if ((extversionEnabled && props.countWithAncestors > nLimitAncestorCount) ||
+            (!extversionEnabled && props.countWithAncestors > BCH_DEFAULT_DESCENDANT_LIMIT))
             return false;
-        if ((xVersionEnabled && props.sizeWithAncestors > nLimitAncestorSize) ||
-            (!xVersionEnabled && props.sizeWithAncestors > BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000))
+        if ((extversionEnabled && props.sizeWithAncestors > nLimitAncestorSize) ||
+            (!extversionEnabled && props.sizeWithAncestors > BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000))
             return false;
 
         return true;
     }
 
-    /** Updates node configuration variables based on XVERSION data in the xVersion member variable */
-    void ReadConfigFromXVersion_OLD();
-    void ReadConfigFromXVersion();
+    /** Updates node configuration variables based on extversion data in the extversion member variable */
+    void ReadConfigFromExtversion();
 
     // requires LOCK(cs_vRecvMsg)
     unsigned int GetTotalRecvSize() EXCLUSIVE_LOCKS_REQUIRED(cs_vRecvMsg)

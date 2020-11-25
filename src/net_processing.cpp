@@ -20,6 +20,7 @@
 #include "dosman.h"
 #include "electrum/electrs.h"
 #include "expedited.h"
+#include "extversionkeys.h"
 #include "main.h"
 #include "merkleblock.h"
 #include "nodestate.h"
@@ -29,7 +30,6 @@
 #include "validation/validation.h"
 #include "validationinterface.h"
 #include "version.h"
-#include "xversionkeys.h"
 
 extern std::atomic<int64_t> nTimeBestReceived;
 extern std::atomic<int> nPreferredDownload;
@@ -535,14 +535,14 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         UpdatePreferredDownload(pfrom);
 
         // only send extversion message if both peers are using the protocol
-        if ((nLocalServices & NODE_XVERSION) && (pfrom->nServices & NODE_XVERSION))
+        if ((nLocalServices & NODE_EXTVERSION) && (pfrom->nServices & NODE_EXTVERSION))
         {
             // BU expedited procecessing requires the exchange of the listening port id
-            // The former BUVERSION message has now been integrated into the xmap field in CXVersionMessage.
+            // The former BUVERSION message has now been integrated into the xmap field in CExtversionMessage.
 
-            // prepare xversion message. This must be sent before we send a verack message in the new xversion spec
-            CXVersionMessage xver;
-            xver.set_u64c(XVer::XVERSION_VERSION_KEY, XVERSION_VERSION_VALUE);
+            // prepare extversion message. This must be sent before we send a verack message in the new spec
+            CExtversionMessage xver;
+            xver.set_u64c(XVer::EXTVERSION_VERSION_KEY, EXTVERSION_VERSION_VALUE);
             xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
             xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
             xver.set_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED, grapheneMaxVersionSupported.Value());
@@ -564,10 +564,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT, nLimitDescendantSize);
             xver.set_u64c(XVer::BU_TXN_CONCATENATION, 1);
 
-            electrum::set_xversion_flags(xver, chainparams.NetworkIDString());
+            electrum::set_extversion_flags(xver, chainparams.NetworkIDString());
 
-            pfrom->xVersionExpected = true;
-            pfrom->PushMessage(NetMsgType::XVERSION, xver);
+            pfrom->extversionExpected = true;
+            pfrom->PushMessage(NetMsgType::EXTVERSION, xver);
         }
         else
         {
@@ -610,18 +610,18 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         return error("%s receieved before VERSION message - disconnecting peer=%s", strCommand, pfrom->GetLogName());
     }
 
-    else if (strCommand == NetMsgType::XVERSION)
+    else if (strCommand == NetMsgType::EXTVERSION)
     {
         // set expected to false, we got the message
-        pfrom->xVersionExpected = false;
+        pfrom->extversionExpected = false;
         if (pfrom->fSuccessfullyConnected == true)
         {
             dosMan.Misbehaving(pfrom, 1);
             pfrom->fDisconnect = true;
-            return error("odd peer behavior: received verack message before xversion, disconnecting \n");
+            return error("odd peer behavior: received verack message before extversion, disconnecting \n");
         }
 
-        vRecv >> pfrom->xVersion;
+        vRecv >> pfrom->extversion;
 
         if (pfrom->addrFromPort != 0)
         {
@@ -630,7 +630,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 pfrom->GetLogName(), pfrom->cleanSubVer);
         }
 
-        pfrom->ReadConfigFromXVersion();
+        pfrom->ReadConfigFromExtversion();
 
         pfrom->PushMessage(NetMsgType::VERACK);
     }
@@ -666,44 +666,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
         pfrom->SetRecvVersion(std::min(pfrom->nVersion, PROTOCOL_VERSION));
 
-        if (pfrom->xVersionExpected.load() == true)
+        if (pfrom->extversionExpected.load() == true)
         {
-            // if we expected xversion but got a verack it is possible there is a service bit
+            // if we expected extversion but got a verack it is possible there is a service bit
             // mismatch so we should send a verack response because the peer might not
-            // support xversion
+            // support extversion
             pfrom->PushMessage(NetMsgType::VERACK);
-        }
-
-        /// LEGACY xversion code (old spec)
-        if (!(pfrom->nServices & NODE_XVERSION))
-        {
-            // prepare xversion message. This *must* be the next message after the verack has been received,
-            // if it comes at all in the old xversion spec.
-            CXVersionMessage xver;
-            xver.set_u64c(XVer::BU_LISTEN_PORT_OLD, GetListenPort());
-            xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM_OLD, 1); // we will ignore 0 value msg checksums
-            xver.set_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED_OLD, grapheneMaxVersionSupported.Value());
-            xver.set_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED_OLD, grapheneMinVersionSupported.Value());
-            xver.set_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF_OLD, grapheneFastFilterCompatibility.Value());
-            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_OLD, syncMempoolWithPeers.Value());
-            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED_OLD, mempoolSyncMaxVersionSupported.Value());
-            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED_OLD, mempoolSyncMinVersionSupported.Value());
-            xver.set_u64c(XVer::BU_XTHIN_VERSION_OLD, 2); // xthin version
-
-            size_t nLimitAncestors = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
-            size_t nLimitAncestorSize = GetArg("-limitancestorsize", BU_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
-            size_t nLimitDescendants = GetArg("-limitdescendantcount", BU_DEFAULT_DESCENDANT_LIMIT);
-            size_t nLimitDescendantSize = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
-
-            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT_OLD, nLimitAncestors);
-            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT_OLD, nLimitAncestorSize);
-            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT_OLD, nLimitDescendants);
-            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT_OLD, nLimitDescendantSize);
-            xver.set_u64c(XVer::BU_TXN_CONCATENATION_OLD, 1);
-
-            electrum::set_xversion_flags(xver, chainparams.NetworkIDString());
-
-            pfrom->PushMessage(NetMsgType::XVERSION_OLD, xver);
         }
 
         handleAddressAfterInit(pfrom);
@@ -711,7 +679,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         enableCompactBlocks(pfrom);
 
         // Tell the peer what maximum xthin bloom filter size we will consider acceptable.
-        // FIXME: integrate into xversion as well
+        // FIXME: integrate into extversion as well
         if (pfrom->ThinBlockCapable() && IsThinBlocksEnabled())
         {
             pfrom->PushMessage(NetMsgType::FILTERSIZEXTHIN, nXthinBloomFilterSize);
@@ -723,55 +691,21 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->fSuccessfullyConnected = true;
     }
 
-    else if (strCommand == NetMsgType::XVERSION_OLD)
-    {
-        vRecv >> pfrom->xVersion;
-
-        if (pfrom->addrFromPort != 0)
-        {
-            LOG(NET, "Encountered odd node that sent BUVERSION before XVERSION. Ignoring duplicate addrFromPort "
-                     "setting. peer=%s version=%s\n",
-                pfrom->GetLogName(), pfrom->cleanSubVer);
-        }
-
-        pfrom->ReadConfigFromXVersion_OLD();
-
-        pfrom->PushMessage(NetMsgType::XVERACK_OLD);
-        // handleAddressAfterInit(pfrom);
-        // enableSendHeaders(pfrom);
-        // enableCompactBlocks(pfrom);
-    }
-    else if (strCommand == NetMsgType::XVERACK_OLD)
-    {
-        // This step done after final handshake
-        // CheckAndRequestExpeditedBlocks(pfrom);
-    }
-
     else if (strCommand == NetMsgType::XUPDATE)
     {
-        CXVersionMessage xUpdate;
+        CExtversionMessage xUpdate;
         vRecv >> xUpdate;
         // check for peer trying to change non-changeable key
         for (auto entry : xUpdate.xmap)
         {
             if (XVer::IsChangableKey(entry.first))
             {
-                LOCK(pfrom->cs_xversion);
-                pfrom->xVersion.xmap[entry.first] = xUpdate.xmap[entry.first];
+                LOCK(pfrom->cs_extversion);
+                pfrom->extversion.xmap[entry.first] = xUpdate.xmap[entry.first];
             }
         }
     }
 
-    // XVERSION NOTICE: If you read this code as a reference to implement
-    // xversion, *please* refrain from sending 'sendheaders' or
-    // 'filtersizexthin' during the initial handshake to allow further
-    // simplification and streamlining of the connection handshake down the
-    // road. Allowing receipt of 'sendheaders'/'filtersizexthin' here is to
-    // allow connection with BUCash 1.5.0.x nodes that introduced parallelized
-    // message processing but not the state machine for (x)version
-    // serialization.  This is valid protocol behavior (as in not breaking any
-    // existing implementation) but likely still makes sense to be phased out
-    // down the road.
     else if (strCommand == NetMsgType::SENDHEADERS)
     {
         CNodeStateAccessor(nodestate, pfrom->GetId())->fPreferHeaders = true;
@@ -802,10 +736,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
     }
 
-    // XVERSION notice: Reply to pings before initial xversion handshake is
-    // complete. This behavior should also not be relied upon and it is likely
-    // better to phase this out later (requiring only proper, expected
-    // messages during the initial (x)version handshake).
     else if (strCommand == NetMsgType::PING)
     {
         LeaveCritical(&pfrom->csMsgSerializer);
@@ -2213,7 +2143,7 @@ bool ProcessMessages(CNode *pfrom)
                 break;
 
             // get the message from the queue
-            // simply getting the front message should be sufficient, the only time a xversion or verack is sent is
+            // simply getting the front message should be sufficient, the only time a extversion or verack is sent is
             // once the previous has been processed so tracking which stage of the handshake we are on is overkill
             std::swap(msg, pfrom->vRecvMsg_handshake.front());
             pfrom->vRecvMsg_handshake.pop_front();
@@ -2230,7 +2160,7 @@ bool ProcessMessages(CNode *pfrom)
                 {
                     std::string frontCommand = pfrom->vRecvMsg_handshake.front().hdr.GetCommand();
                     if (frontCommand == NetMsgType::VERSION || frontCommand == NetMsgType::VERACK ||
-                        frontCommand == NetMsgType::XVERSION)
+                        frontCommand == NetMsgType::EXTVERSION)
                     {
                         pfrom->vRecvMsg_handshake.clear();
                         pfrom->fDisconnect = true;
@@ -2239,14 +2169,6 @@ bool ProcessMessages(CNode *pfrom)
                             "recieved early handshake message after successfully connected, disconnecting peer=%s",
                             pfrom->GetLogName());
                     }
-
-                    // this code should only handle XVERSION_OLD and XVERACK_OLD messages
-                    std::swap(msg, pfrom->vRecvMsg_handshake.front());
-                    pfrom->vRecvMsg_handshake.pop_front();
-                    pfrom->currentRecvMsgSize -= msg.size();
-                    msgsProcessed++;
-                    fUsePriorityMsg = false;
-                    fUseLowPriorityMsg = false;
                 }
             }
             // Get next message to process checking whether it is a priority messasge and if so then
