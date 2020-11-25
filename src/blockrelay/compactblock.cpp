@@ -673,7 +673,7 @@ static bool ReconstructBlock(CNode *pfrom,
     }
     // Now that we've rebuilt the block successfully we can set the XVal flag which is used in
     // ConnectBlock() to determine which if any inputs we can skip the checking of inputs.
-    pblock->fXVal = true;
+    pblock->fXVal = DEFAULT_XVAL_ENABLED;
 
     return true;
 }
