@@ -176,10 +176,7 @@ class NodeConnCB(object):
     def on_xverack_old(self, conn, message):
         self.xverack_received = True
 
-    def on_xversion(self, conn, message):
-        conn.xver = message
-
-    def on_xversion_old(self, conn, message):
+    def on_extversion(self, conn, message):
         conn.xver = message
 
 
@@ -256,9 +253,7 @@ class NodeConn(asyncore.dispatcher):
         b"reject": msg_reject,
         b"mempool": msg_mempool,
         b"sendheaders": msg_sendheaders,
-        b"extversion" : msg_xversion,
-        b"xversion" : msg_xversion_old,
-        b"xverack" : msg_xverack_old,
+        b"extversion" : msg_extversion,
         b"xupdate" : msg_xupdate,
         b"sendcmpct": msg_sendcmpct,
         b"cmpctblock": msg_cmpctblock,
@@ -278,7 +273,7 @@ class NodeConn(asyncore.dispatcher):
         "regtest": b"\xda\xb5\xbf\xfa",
     }
 
-    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=1, bitcoinCash=True, send_initial_version = True, send_xversion = False):
+    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=1, bitcoinCash=True, send_initial_version = True, send_extversion = False):
         self.bitcoinCash = bitcoinCash
         if self.bitcoinCash:
             self.MAGIC_BYTES = self.CASH_MAGIC_BYTES
@@ -305,7 +300,7 @@ class NodeConn(asyncore.dispatcher):
         if send_initial_version:
             # stuff version msg into sendbuf
             vt = msg_version()
-            if send_xversion:
+            if send_extversion:
                 services = services | (1<<11)
             vt.nServices = services
             vt.addrTo.ip = self.dstaddr

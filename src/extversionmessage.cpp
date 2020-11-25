@@ -3,13 +3,13 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 
-#include "xversionmessage.h"
+#include "extversionmessage.h"
 #include "hashwrapper.h"
 #include "random.h"
 #include "streams.h"
 #include "util.h"
 
-uint64_t CXVersionMessage::as_u64c(const uint64_t k) const
+uint64_t CExtversionMessage::as_u64c(const uint64_t k) const
 {
     LOCK(cacheProtector);
     const auto xmap_iter = xmap.find(k);
@@ -39,7 +39,7 @@ uint64_t CXVersionMessage::as_u64c(const uint64_t k) const
     return cache_iter->second;
 }
 
-void CXVersionMessage::set_u64c(const uint64_t key, const uint64_t val)
+void CExtversionMessage::set_u64c(const uint64_t key, const uint64_t val)
 {
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
     s << COMPACTSIZE(val);

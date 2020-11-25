@@ -14,6 +14,7 @@
 #include "consensus/params.h"
 #include "consensus/validation.h"
 #include "dosman.h"
+#include "extversionkeys.h"
 #include "leakybucket.h"
 #include "main.h"
 #include "net.h"
@@ -32,7 +33,6 @@
 #include "validation/validation.h"
 #include "validationinterface.h"
 #include "version.h"
-#include "xversionkeys.h"
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/stats.hpp>

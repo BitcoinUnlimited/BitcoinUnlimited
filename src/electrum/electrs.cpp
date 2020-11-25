@@ -2,12 +2,12 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "electrum/electrs.h"
+#include "extversionkeys.h"
+#include "extversionmessage.h"
 #include "netaddress.h"
 #include "util.h"
 #include "utilhttp.h"
 #include "utilprocess.h"
-#include "xversionkeys.h"
-#include "xversionmessage.h"
 
 #include <map>
 #include <regex>
@@ -226,7 +226,7 @@ std::map<std::string, int64_t> fetch_electrs_info()
     return info;
 }
 
-void set_xversion_flags(CXVersionMessage &xver, const std::string &network)
+void set_extversion_flags(CExtversionMessage &xver, const std::string &network)
 {
     if (!GetBoolArg("-electrum", false))
     {

@@ -3,10 +3,10 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "electrum/electrs.h"
+#include "extversionkeys.h"
+#include "extversionmessage.h"
 #include "test/test_bitcoin.h"
 #include "util.h"
-#include "xversionkeys.h"
-#include "xversionmessage.h"
 
 #include <sstream>
 #include <string>
@@ -78,14 +78,14 @@ BOOST_AUTO_TEST_CASE(rawargs_verboseness)
     Logging::LogToggleCategory(ELECTRUM, false);
 }
 
-static void call_setter(std::unique_ptr<CXVersionMessage> &ver)
+static void call_setter(std::unique_ptr<CExtversionMessage> &ver)
 {
     constexpr char network[] = "main";
-    ver.reset(new CXVersionMessage);
-    set_xversion_flags(*ver, network);
+    ver.reset(new CExtversionMessage);
+    set_extversion_flags(*ver, network);
 }
 
-BOOST_AUTO_TEST_CASE(electrum_xversion)
+BOOST_AUTO_TEST_CASE(electrum_extversion)
 {
     constexpr uint64_t PORT = 2020;
     constexpr uint64_t NOT_SET = 0;
@@ -96,7 +96,7 @@ BOOST_AUTO_TEST_CASE(electrum_xversion)
     ss << PORT;
     SetArg("-electrum.port", ss.str());
 
-    std::unique_ptr<CXVersionMessage> ver;
+    std::unique_ptr<CExtversionMessage> ver;
 
     // Electrum server not enabled
     call_setter(ver);

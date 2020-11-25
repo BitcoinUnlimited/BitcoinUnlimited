@@ -7,6 +7,7 @@
 
 #include "clientversion.h"
 #include "consensus/consensus.h"
+#include "extversionmessage.h"
 #include "primitives/transaction.h"
 #include "reverse_iterator.h"
 #include "sync.h"
@@ -14,7 +15,6 @@
 #include "unlimited.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
-#include "xversionmessage.h"
 
 #include <stdint.h>
 #include <vector>

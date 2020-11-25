@@ -23,6 +23,7 @@
 #include "consensus/consensus.h"
 #include "crypto/common.h"
 #include "dosman.h"
+#include "extversionkeys.h"
 #include "hashwrapper.h"
 #include "iblt.h"
 #include "primitives/transaction.h"
@@ -30,7 +31,6 @@
 #include "ui_interface.h"
 #include "unlimited.h"
 #include "utilstrencodings.h"
-#include "xversionkeys.h"
 
 extern CTweak<bool> ignoreNetTimeouts;
 
@@ -724,8 +724,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 
             if (fSendLowPriority)
             {
-                if (strCommand == NetMsgType::VERSION || strCommand == NetMsgType::XVERSION ||
-                    strCommand == NetMsgType::XVERSION_OLD || strCommand == NetMsgType::XVERACK_OLD ||
+                if (strCommand == NetMsgType::VERSION || strCommand == NetMsgType::EXTVERSION ||
                     strCommand == NetMsgType::VERACK)
                 {
                     vRecvMsg_handshake.push_back(std::move(msg));
@@ -3208,7 +3207,7 @@ bool CAddrDB::Read(CAddrMan &addr, CDataStream &ssPeers)
 unsigned int ReceiveFloodSize() { return 1000 * GetArg("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER); }
 unsigned int SendBufferSize() { return 1000 * GetArg("-maxsendbuffer", DEFAULT_MAXSENDBUFFER); }
 CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn, bool fInboundIn)
-    : xVersionEnabled(false), skipChecksum(false), ssSend(SER_NETWORK, INIT_PROTO_VERSION), id(connmgr->NextNodeId()),
+    : extversionEnabled(false), skipChecksum(false), ssSend(SER_NETWORK, INIT_PROTO_VERSION), id(connmgr->NextNodeId()),
       addrKnown(5000, 0.001)
 {
     nServices = 0;
@@ -3477,80 +3476,36 @@ void CNode::DisconnectIfBanned()
     }
 }
 
-void CNode::ReadConfigFromXVersion_OLD()
+void CNode::ReadConfigFromExtversion()
 {
-    xVersionEnabled = true;
-    LOCK(cs_xversion);
-    skipChecksum = (xVersion.as_u64c(XVer::BU_MSG_IGNORE_CHECKSUM_OLD) == 1);
+    extversionEnabled = true;
+    LOCK(cs_extversion);
+    skipChecksum = (extversion.as_u64c(XVer::BU_MSG_IGNORE_CHECKSUM) == 1);
     if (addrFromPort == 0)
     {
-        addrFromPort = xVersion.as_u64c(XVer::BU_LISTEN_PORT_OLD) & 0xffff;
+        addrFromPort = extversion.as_u64c(XVer::BU_LISTEN_PORT) & 0xffff;
     }
 
-    uint64_t num = xVersion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT_OLD);
+    uint64_t num = extversion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT);
     if (num)
         nLimitAncestorCount = num; // num == 0 means the field was not provided.
-    num = xVersion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT_OLD);
+    num = extversion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT);
     if (num)
         nLimitAncestorSize = num;
 
-    num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT_OLD);
+    num = extversion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT);
     if (num)
         nLimitDescendantCount = num;
-    num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT_OLD);
+    num = extversion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT);
     if (num)
         nLimitDescendantSize = num;
 
-    canSyncMempoolWithPeers = (xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_OLD) == 1);
-    nMempoolSyncMinVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED_OLD);
-    nMempoolSyncMaxVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED_OLD);
-    txConcat = xVersion.as_u64c(XVer::BU_TXN_CONCATENATION_OLD);
-    minGrapheneVersion = xVersion.as_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED_OLD);
-    maxGrapheneVersion = xVersion.as_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED_OLD);
-
-    {
-        uint64_t selfMax = grapheneMaxVersionSupported.Value();
-        uint64_t selfMin = grapheneMinVersionSupported.Value();
-
-        uint64_t upper = (uint64_t)std::min(maxGrapheneVersion, selfMax);
-        uint64_t lower = (uint64_t)std::max(minGrapheneVersion, selfMin);
-        if (lower > upper)
-            negotiatedGrapheneVersion = GRAPHENE_NO_VERSION_SUPPORTED;
-        else
-            negotiatedGrapheneVersion = upper;
-    }
-}
-
-void CNode::ReadConfigFromXVersion()
-{
-    xVersionEnabled = true;
-    LOCK(cs_xversion);
-    skipChecksum = (xVersion.as_u64c(XVer::BU_MSG_IGNORE_CHECKSUM) == 1);
-    if (addrFromPort == 0)
-    {
-        addrFromPort = xVersion.as_u64c(XVer::BU_LISTEN_PORT) & 0xffff;
-    }
-
-    uint64_t num = xVersion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT);
-    if (num)
-        nLimitAncestorCount = num; // num == 0 means the field was not provided.
-    num = xVersion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT);
-    if (num)
-        nLimitAncestorSize = num;
-
-    num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT);
-    if (num)
-        nLimitDescendantCount = num;
-    num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT);
-    if (num)
-        nLimitDescendantSize = num;
-
-    canSyncMempoolWithPeers = (xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC) == 1);
-    nMempoolSyncMinVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED);
-    nMempoolSyncMaxVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED);
-    txConcat = xVersion.as_u64c(XVer::BU_TXN_CONCATENATION);
-    minGrapheneVersion = xVersion.as_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED);
-    maxGrapheneVersion = xVersion.as_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED);
+    canSyncMempoolWithPeers = (extversion.as_u64c(XVer::BU_MEMPOOL_SYNC) == 1);
+    nMempoolSyncMinVersionSupported = extversion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED);
+    nMempoolSyncMaxVersionSupported = extversion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED);
+    txConcat = extversion.as_u64c(XVer::BU_TXN_CONCATENATION);
+    minGrapheneVersion = extversion.as_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED);
+    maxGrapheneVersion = extversion.as_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED);
 
     {
         uint64_t selfMax = grapheneMaxVersionSupported.Value();
