@@ -1,4 +1,5 @@
 // Copyright (c) 2018 The Bitcoin Core developers
+// Copyright (c) 2020 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -31,14 +32,16 @@ UniValue getzmqnotifications(const Config &config,
             HelpExampleRpc("getzmqnotifications", ""));
     }
 
-    UniValue result(UniValue::VARR);
+    UniValue::Array result;
     if (g_zmq_notification_interface != nullptr) {
-        for (const auto *n :
-             g_zmq_notification_interface->GetActiveNotifiers()) {
-            UniValue obj(UniValue::VOBJ);
-            obj.pushKV("type", n->GetType());
-            obj.pushKV("address", n->GetAddress());
-            result.push_back(obj);
+        auto notifiers = g_zmq_notification_interface->GetActiveNotifiers();
+        result.reserve(notifiers.size());
+        for (const auto *n : notifiers) {
+            UniValue::Object obj;
+            obj.reserve(2);
+            obj.emplace_back("type", n->GetType());
+            obj.emplace_back("address", n->GetAddress());
+            result.emplace_back(std::move(obj));
         }
     }
 
