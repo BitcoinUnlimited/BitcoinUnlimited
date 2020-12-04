@@ -29,7 +29,7 @@ static const int DEFAULT_MAX_REORG_DEPTH = 10;
 static const int64_t DEFAULT_MIN_FINALIZATION_DELAY = 2 * 60 * 60;
 
 /** Is express validation turned on/off */
-static bool DEFAULT_XVAL_ENABLED = true;
+static const bool DEFAULT_XVAL_ENABLED = true;
 
 enum DisconnectResult
 {

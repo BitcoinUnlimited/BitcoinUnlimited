@@ -339,7 +339,7 @@ CTweak<bool> unsafeGetBlockTemplate("mining.unsafeGetBlockTemplate",
     false);
 
 CTweak<bool> xvalTweak("mining.xval",
-    strprintf("Turn on/off Xpress Validation when mining a new block(true\/false - default: %d)", DEFAULT_XVAL_ENABLED),
+    strprintf("Turn on/off Xpress Validation when mining a new block(true/false - default: %d)", DEFAULT_XVAL_ENABLED),
     DEFAULT_XVAL_ENABLED);
 
 CTweak<unsigned int> maxTxSize("net.excessiveTx",
