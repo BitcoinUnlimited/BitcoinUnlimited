@@ -277,7 +277,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             // If we found a txn then push it
             if (ptx)
             {
-                if (pfrom->txConcat != 0)
+                if (pfrom->txConcat)
                 {
                     ss << *ptx;
 
@@ -621,6 +621,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             return error("odd peer behavior: received verack message before extversion, disconnecting \n");
         }
 
+        LOCK(pfrom->cs_extversion);
         vRecv >> pfrom->extversion;
 
         if (pfrom->addrFromPort != 0)

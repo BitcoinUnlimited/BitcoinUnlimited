@@ -341,38 +341,43 @@ class CNode
 #endif
 
 public:
+    // All of the following variables should be atomics. They are potentially dynamic values because
+    // of the XUPDATE message which can modify these values at any time.
+
     /** This node's max acceptable number ancestor transactions.  Used to decide whether this node will accept a
      * particular transaction. */
-    size_t nLimitAncestorCount = BCH_DEFAULT_ANCESTOR_LIMIT;
+    std::atomic<size_t> nLimitAncestorCount{BCH_DEFAULT_ANCESTOR_LIMIT};
     /** This node's max acceptable sum of all ancestor transaction sizes.  Used to decide whether this node will accept
      * a particular transaction. */
-    size_t nLimitAncestorSize = BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000;
+    std::atomic<size_t> nLimitAncestorSize{BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000};
     /** This node's max acceptable number of descendants.  Used to decide whether this node will accept a particular
      * transaction. */
-    size_t nLimitDescendantCount = BCH_DEFAULT_DESCENDANT_LIMIT;
+    std::atomic<size_t> nLimitDescendantCount{BCH_DEFAULT_DESCENDANT_LIMIT};
     /** This node's max acceptable sum of all descendant transaction sizes.  Used to decide whether this node will
      * accept a particular transaction. */
-    size_t nLimitDescendantSize = BCH_DEFAULT_DESCENDANT_SIZE_LIMIT * 1000;
+    std::atomic<size_t> nLimitDescendantSize{BCH_DEFAULT_DESCENDANT_SIZE_LIMIT * 1000};
     /** Does this node support mempool synchronization? */
-    bool canSyncMempoolWithPeers = false;
+    std::atomic<bool> canSyncMempoolWithPeers{false};
     /** Minimum supported mempool synchronization version */
-    uint64_t nMempoolSyncMinVersionSupported = 0;
+    std::atomic<uint64_t> nMempoolSyncMinVersionSupported{0};
     /** Maximum supported mempool synchronization version */
-    uint64_t nMempoolSyncMaxVersionSupported = 0;
-    /** Tx concatenation supported (set by extversion) */
-    uint64_t txConcat = 0;
+    std::atomic<uint64_t> nMempoolSyncMaxVersionSupported{0};
+    /** Tx concatenation supported (set by xversion) */
+    std::atomic<bool> txConcat{false};
+    /** set to true if this node support xVersion */
     /** set to true if this node support extversion */
     std::atomic<bool> extversionEnabled{false};
     /** set to true if the next expected message is extversion */
     std::atomic<bool> extversionExpected{false};
     /** set to true if this node is ok with no message checksum */
-    bool skipChecksum = false;
+    std::atomic<bool> skipChecksum{false};
     /** Graphene min supported version */
-    uint64_t minGrapheneVersion = 0;
+    std::atomic<uint64_t> minGrapheneVersion{0};
     /** Graphene max supported version */
-    uint64_t maxGrapheneVersion = 0;
+    std::atomic<uint64_t> maxGrapheneVersion{0};
     /** Negotiated graphene version.  Based on the other node and me, what's the best version to use? */
-    uint64_t negotiatedGrapheneVersion = GRAPHENE_NO_VERSION_SUPPORTED;
+    std::atomic<uint64_t> negotiatedGrapheneVersion{GRAPHENE_NO_VERSION_SUPPORTED};
+    // END section for atomic XVERSION variables
 
 
     // This is shared-locked whenever messages are processed.
