@@ -13,7 +13,7 @@ Run the following to install the base dependencies for building:
 
 
 ```bash
-sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils git
+sudo apt-get install build-essential libtool autotools-dev autoconf automake pkg-config libssl-dev libevent-dev bsdmainutils git
 ```
 
 On at least Ubuntu 14.04+ and Debian 7+ there are generic names for the
