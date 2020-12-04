@@ -3511,8 +3511,8 @@ void CNode::ReadConfigFromExtversion()
         uint64_t selfMax = grapheneMaxVersionSupported.Value();
         uint64_t selfMin = grapheneMinVersionSupported.Value();
 
-        uint64_t upper = (uint64_t)std::min(maxGrapheneVersion, selfMax);
-        uint64_t lower = (uint64_t)std::max(minGrapheneVersion, selfMin);
+        uint64_t upper = (uint64_t)std::min(maxGrapheneVersion.load(), selfMax);
+        uint64_t lower = (uint64_t)std::max(minGrapheneVersion.load(), selfMin);
         if (lower > upper)
             negotiatedGrapheneVersion = GRAPHENE_NO_VERSION_SUPPORTED;
         else
