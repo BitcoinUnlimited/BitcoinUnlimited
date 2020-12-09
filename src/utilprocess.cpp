@@ -15,6 +15,12 @@
 #include <spawn.h>
 #include <sys/wait.h>
 #endif
+#if BOOST_OS_MACOS
+#include <mach-o/dyld.h>
+#include <poll.h>
+#include <signal.h>
+#include <spawn.h>
+#endif
 
 unsupported_platform_error::unsupported_platform_error(const std::string &func_name)
     : std::runtime_error("Function '" + func_name + "' is not implemented on this platform")
@@ -28,12 +34,23 @@ std::string this_process_path()
 #if BOOST_OS_LINUX
     // TODO: Replaced with std::read_symlink with C++17
     return boost::filesystem::read_symlink("/proc/self/exe").string();
+#elif BOOST_OS_MACOS
+    char buff[PATH_MAX + 1];
+    uint32_t buffsize = sizeof buff;
+    const auto rc = _NSGetExecutablePath(buff, &buffsize);
+    if (rc != 0)
+    {
+        std::stringstream ss;
+        ss << __func__ << " failed, return code " << rc;
+        throw std::runtime_error(ss.str());
+    }
+    return buff;
 #else
     throw unsupported_platform_error(__func__);
 #endif
 }
 
-#if BOOST_OS_LINUX
+#if BOOST_OS_LINUX || BOOST_OS_MACOS
 class posix_error : public subprocess_error
 {
 public:
@@ -69,7 +86,7 @@ SubProcess::SubProcess(const std::string &path_,
     : path(path_), args(args_), stdout_callb(stdout_callb_), stderr_callb(stderr_callb_), pid(-1), is_running(false),
       run_started(false)
 {
-#if !BOOST_OS_LINUX
+#if !(BOOST_OS_LINUX || BOOST_OS_MACOS)
     throw unsupported_platform_error(__func__);
 #endif
 }
@@ -110,7 +127,7 @@ void extract_line(std::string &buffer, getline_callb &callb)
     }
 }
 
-#if BOOST_OS_LINUX
+#if BOOST_OS_LINUX || BOOST_OS_MACOS
 struct RunCleanupRAII
 {
     std::atomic<bool> &is_running;
@@ -140,7 +157,7 @@ struct SpawnAttrRAII
 void SubProcess::Run()
 {
     DbgAssert(!run_started, return );
-#if BOOST_OS_LINUX
+#if BOOST_OS_LINUX || BOOST_OS_MACOS
     run_started.store(true);
     RunCleanupRAII cleanup{is_running, run_started, nullptr};
 
@@ -217,19 +234,27 @@ void SubProcess::Run()
         const size_t PIPE_STDOUT = 0;
         const size_t PIPE_STDERR = 1;
 
+        const ssize_t end_of_file = 0;
+
         if (plist[PIPE_STDOUT].revents & POLLIN)
         {
             int bytes_read = read(cout_pipe[PARENT], &buffer[0], buffer.length());
-            stdout_buffer += buffer.substr(0, static_cast<size_t>(bytes_read));
-            extract_line(stdout_buffer, stdout_callb);
-            continue;
+            if (bytes_read != end_of_file)
+            {
+                stdout_buffer += buffer.substr(0, static_cast<size_t>(bytes_read));
+                extract_line(stdout_buffer, stdout_callb);
+                continue;
+            }
         }
         if (plist[PIPE_STDERR].revents & POLLIN)
         {
             int bytes_read = read(cerr_pipe[PARENT], &buffer[0], buffer.length());
-            stderr_buffer += buffer.substr(0, static_cast<size_t>(bytes_read));
-            extract_line(stderr_buffer, stderr_callb);
-            continue;
+            if (bytes_read != end_of_file)
+            {
+                stderr_buffer += buffer.substr(0, static_cast<size_t>(bytes_read));
+                extract_line(stderr_buffer, stderr_callb);
+                continue;
+            }
         }
         // nothing left to read
         break;
@@ -266,7 +291,7 @@ void SubProcess::Run()
 
 void SubProcess::SendSignal(int signal)
 {
-#if BOOST_OS_LINUX
+#if BOOST_OS_LINUX || BOOST_OS_MACOS
     int curr_pid = pid; // copy to avoid a race
     if (curr_pid == -1)
     {
@@ -285,14 +310,14 @@ void SubProcess::SendSignal(int signal)
 
 void SubProcess::Interrupt()
 {
-#if BOOST_OS_LINUX
+#if BOOST_OS_LINUX || BOOST_OS_MACOS
     SendSignal(SIGINT);
 #endif
 }
 
 void SubProcess::Terminate()
 {
-#if BOOST_OS_LINUX
+#if BOOST_OS_LINUX || BOOST_OS_MACOS
     SendSignal(SIGKILL);
 #endif
 }
