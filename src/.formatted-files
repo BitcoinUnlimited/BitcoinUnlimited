@@ -115,6 +115,7 @@ keystore.cpp
 keystore.h
 leakybucket.h
 limitedmap.h
+logging.h
 main.cpp
 main.h
 memusage.h

@@ -5,9 +5,10 @@
 #ifndef TWEAK_H
 #define TWEAK_H
 
-#include <string>
+#include "logging.h"
 
 #include <mutex>
+#include <string>
 #include <thread>
 
 #include "univalue/include/univalue.h"
@@ -142,12 +143,16 @@ public:
         : name(namep), help(helpp), value(val), eventCb(callback)
     {
         tweaks[CTweakKey(name)] = this;
+        LOG(TWEAKS, "TWEAKS: Added CTweakRef [%s] to tweaks map with intial value %s", name,
+            UniValue(*val).getValStr());
     }
 
     CTweakRef(const std::string &namep, const std::string &helpp, DataType *val, EventFn callback = nullptr)
         : name(namep), help(helpp), value(val), eventCb(callback)
     {
         tweaks[CTweakKey(name)] = this;
+        LOG(TWEAKS, "TWEAKS: Added CTweakRef [%s] to tweaks map with intial value %s", name,
+            UniValue(*val).getValStr());
     }
 
     virtual std::string GetName() const { return name; }
@@ -176,6 +181,8 @@ public:
         std::lock_guard<std::recursive_mutex> lck(cs_tweak);
         DataType prior = *value;
         fill(v, *value);
+        LOG(TWEAKS, "TWEAKS: CTweakRef.Set [%s] changed value from %s to %s", name, UniValue(prior).getValStr(),
+            Get().getValStr());
         if (eventCb)
         {
             std::string result = eventCb(prior, value, false);
@@ -195,7 +202,12 @@ public:
     {
         std::lock_guard<std::recursive_mutex> lck(cs_tweak);
         if (value)
+        {
+            DataType prior = *value;
             *value = d;
+            LOG(TWEAKS, "TWEAKS: CTweakRef assignment [%s] changed value from %s to %s", name,
+                UniValue(prior).getValStr(), Get().getValStr());
+        }
         return *this;
     }
 };
@@ -233,12 +245,14 @@ public:
         : name(namep), help(helpp), value(v), eventCb(callback)
     {
         tweaks[CTweakKey(name)] = this;
+        LOG(TWEAKS, "TWEAKS: Added CTweak [%s] to tweaks map with intial value %s", name, UniValue(v).getValStr());
     }
 
     CTweak(const std::string &namep, const std::string &helpp, DataType v = DataType(), EventFn callback = nullptr)
         : name(namep), help(helpp), value(v), eventCb(callback)
     {
         tweaks[CTweakKey(name)] = this;
+        LOG(TWEAKS, "TWEAKS: Added CTweak [%s] to tweaks map with intial value %s", name, UniValue(v).getValStr());
     }
 
     virtual std::string GetName() const { return name; }
@@ -254,6 +268,8 @@ public:
         std::lock_guard<std::recursive_mutex> lck(cs_tweak);
         DataType prior = value;
         fill(v, value);
+        LOG(TWEAKS, "TWEAKS: CTweak.Set [%s] changed value from %s to %s", name, UniValue(prior).getValStr(),
+            Get().getValStr());
         if (eventCb)
         {
             std::string result = eventCb(prior, this, false);
@@ -286,7 +302,10 @@ public:
     CTweak &operator=(const DataType &d)
     {
         std::lock_guard<std::recursive_mutex> lck(cs_tweak);
+        DataType prior = value;
         value = d;
+        LOG(TWEAKS, "TWEAKS: CTweak assignment [%s] changed value from %s to %s", name, UniValue(prior).getValStr(),
+            Get().getValStr());
         return *this;
     }
 };
