@@ -433,6 +433,7 @@ void UnlimitedSetup(void)
     maxGeneratedBlock = GetArg("-blockmaxsize", Params().DefaultMaxBlockMiningSize());
     blockVersion = GetArg("-blockversion", blockVersion);
     excessiveBlockSize = GetArg("-excessiveblocksize", Params().DefaultExcessiveBlockSize());
+    LOG(TWEAKS, "TWEAKS: UnlimitedSetup() set excessiveBlockSize to %u", excessiveBlockSize);
     excessiveAcceptDepth = GetArg("-excessiveacceptdepth", excessiveAcceptDepth);
     maxSigChecks = excessiveBlockSize / BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO;
     LoadTweaks(); // The above options are deprecated so the same parameter defined as a tweak will override them
