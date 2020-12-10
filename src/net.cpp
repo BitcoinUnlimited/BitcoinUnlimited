@@ -658,6 +658,34 @@ static bool IsPriorityMsg(std::string strCommand)
         return false;
     }
 }
+
+void CNode::LookAhead()
+{
+    AssertLockHeld(cs_vRecvMsg);
+    if (fDownloading.load())
+        return;
+
+    // Do lookahead for block downloads.  If it is a block or thintype block then get the blockhash
+    // and indicate we are downloading it so that we don't re-request the block prematurely.
+    const std::string &strCommand = msg.hdr.GetCommand();
+    if (strCommand == NetMsgType::BLOCK || strCommand == NetMsgType::GRAPHENEBLOCK ||
+        strCommand == NetMsgType::CMPCTBLOCK || strCommand == NetMsgType::XTHINBLOCK ||
+        strCommand == NetMsgType::THINBLOCK)
+    {
+        if (msg.nDataPos >= SERIALIZED_HEADER_SIZE)
+        {
+            CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+            ss.append(msg.vRecv, SERIALIZED_HEADER_SIZE);
+
+            CBlockHeader header;
+            ss >> header;
+            requester.Downloading(header.GetHash(), this);
+
+            fDownloading.store(true);
+        }
+    }
+}
+
 bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 {
     AssertLockHeld(cs_vRecvMsg);
@@ -666,9 +694,16 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
         // Absorb network data.
         int handled;
         if (!msg.in_data)
+        {
             handled = msg.readHeader(pch, nBytes);
+        }
         else
+        {
             handled = msg.readData(pch, nBytes);
+
+            // Do a lookahead to determine if we need to set the downloading flag.
+            LookAhead();
+        }
 
         if (handled < 0)
             return false;
@@ -721,7 +756,6 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                     }
                 }
             }
-
             if (fSendLowPriority)
             {
                 if (strCommand == NetMsgType::VERSION || strCommand == NetMsgType::EXTVERSION ||
@@ -736,6 +770,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                 msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
             }
             messageHandlerCondition.notify_one();
+            fDownloading.store(false);
         }
     }
 

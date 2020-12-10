@@ -370,6 +370,11 @@ CTweakRef<unsigned int> briTweak("net.blockRetryInterval",
                                      MIN_BLK_REQUEST_RETRY_INTERVAL),
     &MIN_BLK_REQUEST_RETRY_INTERVAL);
 
+CTweak<unsigned int> blockLookAheadInterval("test.blockLookAheadInterval",
+    "How long to wait in microseconds before requesting a block from another source when we currently downloading "
+    "the block from another peer",
+    MIN_BLK_REQUEST_RETRY_INTERVAL);
+
 CTweakRef<std::string> subverOverrideTweak("net.subversionOverride",
     "If set, this field will override the normal subversion field.  This is useful if you need to hide your node",
     &subverOverride,
