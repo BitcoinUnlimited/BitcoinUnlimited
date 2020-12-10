@@ -87,6 +87,7 @@ public:
     typedef std::list<CNodeRequestData> ObjectSourceList;
     CInv obj;
     bool rateLimited;
+    int64_t nDownloadingSince; // last time we started downloading the object
     bool fProcessing; // object was received but is still being processed
     int64_t lastRequestTime; // In stopwatch time microseconds, 0 means no request
     unsigned int outstandingReqs;
@@ -96,6 +97,7 @@ public:
     CUnknownObj()
     {
         rateLimited = false;
+        nDownloadingSince = 0;
         fProcessing = false;
         outstandingReqs = 0;
         lastRequestTime = 0;
@@ -200,6 +202,9 @@ public:
 
     // Update the response time for this transaction request
     void UpdateTxnResponseTime(const CInv &obj, CNode *pfrom);
+
+    // Indicate that we got this object
+    void Downloading(const uint256 &hash, CNode *pfrom);
 
     // Indicate that we are processing this transaction
     void ProcessingTxn(const uint256 &hash, CNode *pfrom);

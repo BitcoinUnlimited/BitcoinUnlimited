@@ -142,6 +142,8 @@ public:
             vch.insert(it, first, last);
     }
 
+    // Append data from one datastream to this one.
+    void append(CDataStream &ss, const unsigned int nChars) { vch.insert(vch.end(), ss.begin(), ss.begin() + nChars); }
     void insert(iterator it, std::string::iterator first, std::string::iterator last)
     {
         if (last == first)

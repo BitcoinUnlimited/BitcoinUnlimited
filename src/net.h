@@ -107,7 +107,6 @@ static const bool DEFAULT_USE_EXTVERSION = true;
 /** Internal constant that indicates we have no common graphene versions. */
 const uint64_t GRAPHENE_NO_VERSION_SUPPORTED = 0xfffffff;
 
-
 // BITCOINUNLIMITED START
 static const bool DEFAULT_FORCEBITNODES = false;
 // BITCOINUNLIMITED END
@@ -647,8 +646,13 @@ public:
         return vSendMsg.size();
     }
 
+
     // requires LOCK(cs_vRecvMsg)
     bool ReceiveMsgBytes(const char *pch, unsigned int nBytes) EXCLUSIVE_LOCKS_REQUIRED(cs_vRecvMsg);
+
+    // Examine the current message (msg) to see if block or thintype blocks have begun downloading data.
+    std::atomic<bool> fDownloading{false};
+    void LookAhead() EXCLUSIVE_LOCKS_REQUIRED(cs_vRecvMsg);
 
     void SetRecvVersion(int nVersionIn)
     {

@@ -8,6 +8,7 @@
 #define BITCOIN_PRIMITIVES_BLOCK_H
 
 #include "primitives/transaction.h"
+#include "protocol.h"
 #include "serialize.h"
 #include "uint256.h"
 class arith_uint256;
@@ -79,7 +80,8 @@ public:
 
     int64_t GetBlockTime() const { return (int64_t)nTime; }
 };
-
+/** The expected size of a serialized block header */
+static const unsigned int SERIALIZED_HEADER_SIZE = ::GetSerializeSize(CBlockHeader(), SER_NETWORK, PROTOCOL_VERSION);
 
 class CBlock : public CBlockHeader
 {
