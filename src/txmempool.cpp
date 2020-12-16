@@ -1885,6 +1885,8 @@ void CTxMemPool::UpdateTransactionsPerSecondImpl(bool fAddTxn, const std::lock_g
     {
         nTxPerSec -= (nTxPerSec / TX_RATE_SMOOTHING_SEC) * nDeltaTime;
         nLastTime = nNow;
+        if (nTxPerSec < 0)
+            nTxPerSec = 0;
     }
 
     // Add the new tx to the rate
@@ -1893,8 +1895,6 @@ void CTxMemPool::UpdateTransactionsPerSecondImpl(bool fAddTxn, const std::lock_g
         nCount++;
         // The amount that the new tx will add to the tx rate
         nTxPerSec += 1 / TX_RATE_SMOOTHING_SEC;
-        if (nTxPerSec < 0)
-            nTxPerSec = 0;
     }
 
     // Calculate the peak rate if we've gone more that 1 second beyond the last sample time.
