@@ -723,6 +723,9 @@ UniValue setban(const UniValue &params, bool fHelp)
         if (params.size() == 4 && params[3].isTrue())
             absolute = true;
 
+        if (absolute == true && banTime < GetTime())
+            throw JSONRPCError(RPC_MISC_ERROR, "Error: Bantime specified is in the past");
+
         std::string userAgent = "unknown";
         CNodeRef bannedNode = FindNodeRef(netAddr);
         if (bannedNode)
