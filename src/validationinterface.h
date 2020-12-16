@@ -43,8 +43,8 @@ protected:
     virtual void Inventory(const uint256 &hash) {}
     virtual void ResendWalletTransactions(int64_t nBestBlockTime) {}
     virtual void BlockChecked(const CBlock &, const CValidationState &) {}
-    virtual void GetScriptForMining(boost::shared_ptr<CReserveScript> &){};
-    virtual void ResetRequestCount(const uint256 &hash){};
+    virtual void GetScriptForMining(boost::shared_ptr<CReserveScript> &) {}
+    virtual void ResetRequestCount(const uint256 &hash) {}
     friend void ::RegisterValidationInterface(CValidationInterface *);
     friend void ::UnregisterValidationInterface(CValidationInterface *);
     friend void ::UnregisterAllValidationInterfaces();

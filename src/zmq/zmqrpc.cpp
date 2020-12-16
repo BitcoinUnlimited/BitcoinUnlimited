@@ -4,7 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <zmq/zmqrpc.h>
-
+#include <rpc/protocol.h>
 #include <rpc/server.h>
 #include <zmq/zmqabstractnotifier.h>
 #include <zmq/zmqnotificationinterface.h>
@@ -13,9 +13,8 @@
 
 namespace {
 
-UniValue getzmqnotifications(const Config &config,
-                             const JSONRPCRequest &request) {
-    if (request.fHelp || request.params.size() != 0) {
+UniValue getzmqnotifications(const UniValue &params, bool fHelp) {
+    if (fHelp || params.size() != 0) {
         throw std::runtime_error(
             "getzmqnotifications\n"
             "\nReturns information about the active ZeroMQ notifications.\n"
@@ -32,16 +31,14 @@ UniValue getzmqnotifications(const Config &config,
             HelpExampleRpc("getzmqnotifications", ""));
     }
 
-    UniValue::Array result;
-    if (g_zmq_notification_interface != nullptr) {
-        auto notifiers = g_zmq_notification_interface->GetActiveNotifiers();
-        result.reserve(notifiers.size());
+    UniValue result(UniValue::VARR);
+    if (pzmqNotificationInterface != nullptr) {
+        auto notifiers = pzmqNotificationInterface->GetActiveNotifiers();
         for (const auto *n : notifiers) {
-            UniValue::Object obj;
-            obj.reserve(2);
-            obj.emplace_back("type", n->GetType());
-            obj.emplace_back("address", n->GetAddress());
-            result.emplace_back(std::move(obj));
+            UniValue obj(UniValue::VOBJ);
+            obj.pushKV("type", n->GetType());
+            obj.pushKV("address", n->GetAddress());
+            result.push_back(obj);
         }
     }
 
@@ -49,7 +46,7 @@ UniValue getzmqnotifications(const Config &config,
 }
 
 // clang-format off
-static const ContextFreeRPCCommand commands[] = {
+static const CRPCCommand commands[] = {
     //  category          name                     actor (function)        argNames
     //  ----------------- ------------------------ ----------------------- ----------
     { "zmq",            "getzmqnotifications",   getzmqnotifications,    {} },
@@ -60,6 +57,6 @@ static const ContextFreeRPCCommand commands[] = {
 
 void RegisterZMQRPCCommands(CRPCTable &t) {
     for (const auto &c : commands) {
-        t.appendCommand(c.name, &c);
+        t.appendCommand(c);
     }
 }

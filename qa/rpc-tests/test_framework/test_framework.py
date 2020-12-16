@@ -24,12 +24,14 @@ from .util import (
     initialize_chain,
     initialize_chain_clean,
     assert_equal,
+    start_node,
     start_nodes,
     connect_nodes_bi,
     sync_blocks,
     sync_mempools,
     stop_nodes,
     wait_bitcoinds,
+    wait_bitcoind_exit,
     enable_coverage,
     check_json_precision,
     initialize_chain_clean,
@@ -118,6 +120,26 @@ class BitcoinTestFramework(object):
         connect_nodes_bi(self.nodes, 2, 3)
         self.is_network_split = split
         self.sync_all()
+
+    def stop_node(self, i, expected_stderr='', wait=0):
+        """Stop a bitcoind test node"""
+        stop_nodes([self.nodes[i]])
+        self.wait_for_node_exit(i, 60)
+
+    def stop_nodes(self, wait=0):
+        """Stop multiple bitcoind test nodes"""
+        return stop_nodes(self.nodes)
+
+    def start_node(self, i, extra_args=None):
+        return start_node(i, self.options.tmpdir, extra_args)
+
+    def restart_node(self, i, extra_args=None):
+        """Stop and start a test node"""
+        self.stop_node(i)
+        self.start_node(i, extra_args)
+
+    def wait_for_node_exit(self, i, timeout):
+        wait_bitcoind_exit(i,timeout)
 
     def split_network(self):
         """

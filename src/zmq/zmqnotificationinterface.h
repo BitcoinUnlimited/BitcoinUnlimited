@@ -1,9 +1,5 @@
-<<<<<<< HEAD
 // Copyright (c) 2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
-=======
-// Copyright (c) 2015-2018 The Bitcoin Core developers
->>>>>>> 5df3c1d33e... RPC: Add new getzmqnotifications method.
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -30,9 +26,9 @@ protected:
     void Shutdown();
 
     // CValidationInterface
-    void SyncTransaction(const CTransactionRef &ptx, const CBlock *pblock, int txIndex = -1);
-    void UpdatedBlockTip(const CBlockIndex *pindex);
-    void SyncDoubleSpend(const CTransactionRef ptx);
+    void SyncTransaction(const CTransactionRef &ptx, const CBlock *pblock, int txIndex = -1) override;
+    void SyncDoubleSpend(const CTransactionRef ptx) override;
+    void UpdatedBlockTip(const CBlockIndex *pindex) override;
 
 private:
     CZMQNotificationInterface();
@@ -41,6 +37,6 @@ private:
     std::list<CZMQAbstractNotifier *> notifiers;
 };
 
-extern CZMQNotificationInterface *g_zmq_notification_interface;
+extern CZMQNotificationInterface *pzmqNotificationInterface;
 
 #endif // BITCOIN_ZMQ_ZMQNOTIFICATIONINTERFACE_H

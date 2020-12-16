@@ -507,7 +507,9 @@ static void addZmqOptions(AllowedArgs &allowedArgs)
         .addArg("zmqpubhashblock=<address>", requiredStr, _("Enable publish hash block in <address>"), zmqParamOptional)
         .addArg(
             "zmqpubhashtx=<address>", requiredStr, _("Enable publish hash transaction in <address>"), zmqParamOptional)
-        .addArg("zmqpubhashds=<address>", requiredStr, _("Enable publish hash double spent transaction in <address>"),
+        .addArg("zmqpubhashds=<address>", requiredStr,
+            _("Enable publishing of the hash of double spent transactions in <address>"), zmqParamOptional)
+        .addArg("zmqpubrawds=<address>", requiredStr, _("Enable publishing of raw double spend proofs to <address>"),
             zmqParamOptional)
         .addArg("zmqpubrawblock=<address>", requiredStr, _("Enable publish raw block in <address>"), zmqParamOptional)
         .addArg(
