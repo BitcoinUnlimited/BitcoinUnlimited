@@ -15,6 +15,7 @@ void RegisterValidationInterface(CValidationInterface *pwalletIn)
     g_signals.UpdatedBlockTip.connect(boost::bind(&CValidationInterface::UpdatedBlockTip, pwalletIn, boost::arg<1>()));
     g_signals.SyncTransaction.connect(boost::bind(
         &CValidationInterface::SyncTransaction, pwalletIn, boost::arg<1>(), boost::arg<2>(), boost::arg<3>()));
+    g_signals.SyncDoubleSpend.connect(boost::bind(&CValidationInterface::SyncDoubleSpend, pwalletIn, boost::arg<1>()));
     g_signals.UpdatedTransaction.connect(
         boost::bind(&CValidationInterface::UpdatedTransaction, pwalletIn, boost::arg<1>()));
     g_signals.SetBestChain.connect(boost::bind(&CValidationInterface::SetBestChain, pwalletIn, boost::arg<1>()));
@@ -45,6 +46,8 @@ void UnregisterValidationInterface(CValidationInterface *pwalletIn)
         &CValidationInterface::SyncTransaction, pwalletIn, boost::arg<1>(), boost::arg<2>(), boost::arg<3>()));
     g_signals.UpdatedBlockTip.disconnect(
         boost::bind(&CValidationInterface::UpdatedBlockTip, pwalletIn, boost::arg<1>()));
+    g_signals.SyncDoubleSpend.disconnect(
+        boost::bind(&CValidationInterface::SyncDoubleSpend, pwalletIn, boost::arg<1>()));
 }
 
 void UnregisterAllValidationInterfaces()

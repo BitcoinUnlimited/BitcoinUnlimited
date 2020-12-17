@@ -10,3 +10,4 @@
 CZMQAbstractNotifier::~CZMQAbstractNotifier() { assert(!psocket); }
 bool CZMQAbstractNotifier::NotifyBlock(const CBlockIndex * /*CBlockIndex*/) { return true; }
 bool CZMQAbstractNotifier::NotifyTransaction(const CTransactionRef & /*transaction*/) { return true; }
+bool CZMQAbstractNotifier::NotifyDoubleSpend(const CTransactionRef /*transaction*/) { return true; }

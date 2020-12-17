@@ -37,6 +37,7 @@ class CValidationInterface
 protected:
     virtual void UpdatedBlockTip(const CBlockIndex *pindex) {}
     virtual void SyncTransaction(const CTransactionRef &ptx, const CBlock *pblock, int txIdx) {}
+    virtual void SyncDoubleSpend(const CTransactionRef ptx) {}
     virtual void SetBestChain(const CBlockLocator &locator) {}
     virtual void UpdatedTransaction(const uint256 &hash) {}
     virtual void Inventory(const uint256 &hash) {}
@@ -55,6 +56,8 @@ struct CMainSignals
     boost::signals2::signal<void(const CBlockIndex *)> UpdatedBlockTip;
     /** Notifies listeners of updated transaction data (transaction, and optionally the block it is found in. */
     boost::signals2::signal<void(const CTransactionRef &, const CBlock *, int txIndex)> SyncTransaction;
+    /** Notifies listeners of a transaction in the mempool that was double spent. */
+    boost::signals2::signal<void(const CTransactionRef)> SyncDoubleSpend;
     /** Notifies listeners of an updated transaction without new data (for now: a coinbase potentially becoming
      * visible). */
     boost::signals2::signal<void(const uint256 &)> UpdatedTransaction;
