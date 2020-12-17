@@ -12,12 +12,12 @@ broadcasting locally generated transactions into the network, and
 providing a queryable RPC interface to interact on a polled basis for
 requesting blockchain related data. However, there exists only a
 limited service to notify external software of events like the arrival
-of new blocks or transactions.
+of new blocks, transactions or double spends.
 
 The ZeroMQ facility implements a notification interface through a set
 of specific notifiers. Currently there are notifiers that publish
-blocks and transactions. This read-only facility requires only the
-connection of a corresponding ZeroMQ subscriber port in receiving
+blocks, transactions and double spends. This read-only facility requires
+only the connection of a corresponding ZeroMQ subscriber port in receiving
 software; it is not authenticated nor is there any two-way protocol
 involvement. Therefore, subscribers should validate the received data
 since it may be out of date, incomplete or even invalid.
@@ -60,6 +60,8 @@ Currently, the following notifications are supported:
     -zmqpubhashblock=address
     -zmqpubrawblock=address
     -zmqpubrawtx=address
+    -zmqpubds=address
+    -smqpubrawds=address
 
 The socket type is PUB and the address must be a valid ZeroMQ socket
 address. The same address can be used in more than one notification.

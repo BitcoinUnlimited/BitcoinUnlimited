@@ -319,6 +319,9 @@ void broadcastDspInv(const CTransactionRef &dspTx, const uint256 &hash, CTxMemPo
         pwalletMain->MarkDoubleSpent(dspTx->GetHash());
 #endif
 
+    // Notify zmq
+    GetMainSignals().SyncDoubleSpend(dspTx);
+
     // send INV to all peers
     CInv inv(MSG_DOUBLESPENDPROOF, hash);
     LOG(DSPROOF, "Broadcasting dsproof INV: %s\n", hash.ToString());

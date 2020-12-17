@@ -34,6 +34,7 @@ public:
 
     virtual bool NotifyBlock(const CBlockIndex *pindex);
     virtual bool NotifyTransaction(const CTransactionRef &ptx);
+    virtual bool NotifyDoubleSpend(const CTransactionRef ptx);
 
 protected:
     void *psocket;

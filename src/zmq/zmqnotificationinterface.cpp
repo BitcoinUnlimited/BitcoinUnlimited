@@ -32,8 +32,10 @@ CZMQNotificationInterface *CZMQNotificationInterface::CreateWithArguments(
 
     factories["pubhashblock"] = CZMQAbstractNotifier::Create<CZMQPublishHashBlockNotifier>;
     factories["pubhashtx"] = CZMQAbstractNotifier::Create<CZMQPublishHashTransactionNotifier>;
+    factories["pubhashds"] = CZMQAbstractNotifier::Create<CZMQPublishHashDoubleSpendNotifier>;
     factories["pubrawblock"] = CZMQAbstractNotifier::Create<CZMQPublishRawBlockNotifier>;
     factories["pubrawtx"] = CZMQAbstractNotifier::Create<CZMQPublishRawTransactionNotifier>;
+    factories["pubrawds"] = CZMQAbstractNotifier::Create<CZMQPublishRawDoubleSpendNotifier>;
 
     for (std::map<std::string, CZMQNotifierFactory>::const_iterator i = factories.begin(); i != factories.end(); ++i)
     {
@@ -143,6 +145,23 @@ void CZMQNotificationInterface::SyncTransaction(const CTransactionRef &ptx, cons
     {
         CZMQAbstractNotifier *notifier = *i;
         if (notifier->NotifyTransaction(ptx))
+        {
+            i++;
+        }
+        else
+        {
+            notifier->Shutdown();
+            i = notifiers.erase(i);
+        }
+    }
+}
+
+void CZMQNotificationInterface::SyncDoubleSpend(const CTransactionRef ptx)
+{
+    for (std::list<CZMQAbstractNotifier *>::iterator i = notifiers.begin(); i != notifiers.end();)
+    {
+        CZMQAbstractNotifier *notifier = *i;
+        if (notifier->NotifyDoubleSpend(ptx))
         {
             i++;
         }
