@@ -176,18 +176,14 @@ public:
             // If a status update is needed (blocks came in since last check),
             //  update the status of this transaction from the wallet. Otherwise,
             // simply re-use the cached status.
-            TRY_LOCK(cs_main, lockMain);
-            if (lockMain)
+            TRY_LOCK(wallet->cs_wallet, lockWallet);
+            if (lockWallet)
             {
-                TRY_LOCK(wallet->cs_wallet, lockWallet);
-                if (lockWallet && rec->statusUpdateNeeded())
+                std::map<uint256, CWalletTx>::iterator mi = wallet->mapWallet.find(rec->hash);
+                if (mi != wallet->mapWallet.end())
                 {
-                    std::map<uint256, CWalletTx>::iterator mi = wallet->mapWallet.find(rec->hash);
-
-                    if (mi != wallet->mapWallet.end())
-                    {
+                    if (rec->statusUpdateNeeded() || mi->second.fDoubleSpent == true)
                         rec->updateStatus(mi->second);
-                    }
                 }
             }
             return rec;
@@ -306,6 +302,9 @@ QString TransactionTableModel::formatTxStatus(const TransactionRecord *wtx) cons
         break;
     case TransactionStatus::Conflicted:
         status = tr("Conflicted");
+        break;
+    case TransactionStatus::DoubleSpent:
+        status = tr("Double Spent");
         break;
     case TransactionStatus::Immature:
         status = tr("Immature (%1 confirmations, will be available after %2)")
@@ -494,6 +493,8 @@ QVariant TransactionTableModel::txStatusDecoration(const TransactionRecord *wtx)
         return QIcon(":/icons/transaction_confirmed");
     case TransactionStatus::Conflicted:
         return QIcon(":/icons/transaction_conflicted");
+    case TransactionStatus::DoubleSpent:
+        return QIcon(":/icons/warning");
     case TransactionStatus::Immature:
     {
         int total = wtx->status.depth + wtx->status.matures_in;

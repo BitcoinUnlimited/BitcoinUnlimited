@@ -11,6 +11,12 @@
 
 #include <stdexcept>
 
+#ifdef ENABLE_WALLET
+#include "wallet/db.h"
+#include "wallet/wallet.h"
+#include "wallet/walletdb.h"
+#endif
+
 namespace
 {
 enum ScriptType
@@ -307,6 +313,12 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
 
 void broadcastDspInv(const CTransactionRef &dspTx, const uint256 &hash, CTxMemPool::setEntries *setDescendants)
 {
+#ifdef ENABLE_WALLET
+    // If this transaction is in the wallet then mark it as doublespent
+    if (pwalletMain)
+        pwalletMain->MarkDoubleSpent(dspTx->GetHash());
+#endif
+
     // send INV to all peers
     CInv inv(MSG_DOUBLESPENDPROOF, hash);
     LOG(DSPROOF, "Broadcasting dsproof INV: %s\n", hash.ToString());

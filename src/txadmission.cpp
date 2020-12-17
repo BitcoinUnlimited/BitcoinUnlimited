@@ -596,47 +596,44 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     bool fRejectAbsurdFee,
     TransactionClass allowedTx)
 {
-    // This lock is here to serialize AcceptToMemoryPool(). This must be done because
-    // we do not enqueue the transaction prior to calling this function, as we do with
-    // the normal multi-threaded tx admission.
-    static CCriticalSection cs_accept;
-    LOCK(cs_accept);
-
     std::vector<COutPoint> vCoinsToUncache;
-
     bool res = false;
 
     // pause parallel tx entry and commit all txns to the pool so that there are no
     // other threads running txadmission and to ensure that the mempool state is current.
     CORRAL(txProcessingCorral, CORRAL_TX_PAUSE);
     CommitTxToMempool();
-    txHandlerSnap.Load();
 
-    bool isRespend = false;
-    bool missingInputs = false;
     CTxProperties txProperties;
     // If mempool policy aware relay is on, then supply a structure to gather the needed data,
     // otherwise nullptr turns it off.
     CTxProperties *txProps = (unconfPushAction.Value() == 0) ? nullptr : &txProperties;
-    res = ParallelAcceptToMemoryPool(txHandlerSnap, pool, state, tx, fLimitFree, &missingInputs, fOverrideMempoolLimit,
-        fRejectAbsurdFee, allowedTx, vCoinsToUncache, &isRespend, nullptr, txProps);
+    {
+        // This lock is here to serialize AcceptToMemoryPool(). This must be done because
+        // we do not enqueue the transaction prior to calling this function, as we do with
+        // the normal multi-threaded tx admission.
+        static CCriticalSection cs_accept;
+        LOCK(cs_accept);
+        txHandlerSnap.Load();
+
+        bool isRespend = false;
+        bool missingInputs = false;
+        res = ParallelAcceptToMemoryPool(txHandlerSnap, pool, state, tx, fLimitFree, &missingInputs,
+            fOverrideMempoolLimit, fRejectAbsurdFee, allowedTx, vCoinsToUncache, &isRespend, nullptr, txProps);
+
+        // Uncache any coins for txns that failed to enter the mempool but were NOT orphan txns
+        if (isRespend || (!res && !missingInputs))
+        {
+            for (const COutPoint &remove : vCoinsToUncache)
+                pcoinsTip->Uncache(remove);
+        }
+
+        if (pfMissingInputs)
+            *pfMissingInputs = missingInputs;
+    }
     if (res)
     {
         RelayTransaction(tx, txProps);
-    }
-
-    // Uncache any coins for txns that failed to enter the mempool but were NOT orphan txns
-    if (isRespend || (!res && !missingInputs))
-    {
-        for (const COutPoint &remove : vCoinsToUncache)
-            pcoinsTip->Uncache(remove);
-    }
-
-    if (pfMissingInputs)
-        *pfMissingInputs = missingInputs;
-
-    if (res)
-    {
         CommitTxToMempool();
         LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
             GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
