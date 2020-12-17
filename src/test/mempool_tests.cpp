@@ -23,11 +23,6 @@ struct MempoolData
     uint64_t nSizeWithAncestors = 0;
     uint64_t nSigopsWithAncestors = 0;
     uint64_t nFeesWithAncestors = 0;
-
-    // Descendant counters
-    uint64_t nCountWithDescendants = 0;
-    uint64_t nSizeWithDescendants = 0;
-    uint64_t nFeesWithDescendants = 0;
 };
 
 void CheckAncestors(MempoolData &expected_result, CTxMemPool &pool)
@@ -43,9 +38,6 @@ void CheckAncestors(MempoolData &expected_result, CTxMemPool &pool)
     BOOST_CHECK_EQUAL(iter->GetSizeWithAncestors(), expected_result.nSizeWithAncestors);
     BOOST_CHECK_EQUAL(iter->GetSigOpCountWithAncestors(), expected_result.nSigopsWithAncestors);
     BOOST_CHECK_EQUAL(iter->GetModFeesWithAncestors(), expected_result.nFeesWithAncestors);
-    BOOST_CHECK_EQUAL(iter->GetCountWithDescendants(), expected_result.nCountWithDescendants);
-    BOOST_CHECK_EQUAL(iter->GetSizeWithDescendants(), expected_result.nSizeWithDescendants);
-    BOOST_CHECK_EQUAL(iter->GetModFeesWithDescendants(), expected_result.nFeesWithDescendants);
 }
 
 void VerifyTxNotInMempool(MempoolData &expected_result, CTxMemPool &pool)
@@ -709,59 +701,59 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     std::vector<MempoolData> txns_expected =
     {
         // Chain1:
-        {tx1.GetHash(), 1, 21, 1, 1000, 11, 916, 21000},
-        {tx2.GetHash(), 1, 21, 1, 2000, 11, 916, 23000},
-        {tx3.GetHash(), 1, 21, 1, 3000, 7, 631, 27000},
-        {tx4.GetHash(), 1, 21, 1, 4000, 7, 631, 29000},
-        {tx5.GetHash(), 2, 84, 2, 2000, 10, 895, 20000},
-        {tx6.GetHash(), 2, 84, 2, 4000, 10, 895, 21000},
-        {tx7.GetHash(), 2, 84, 2, 6000, 6, 610, 24000},
-        {tx8.GetHash(), 2, 84, 2, 8000, 6, 610, 25000},
-        {tx9.GetHash(), 5, 284, 5, 9000, 9, 832, 19000},
-        {tx10.GetHash(), 5, 273, 5, 21000, 5, 547, 21000},
-        {tx11.GetHash(), 12, 736, 12, 45000, 4, 442, 14000},
-        {tx12.GetHash(), 6, 369, 6, 10000, 4, 274, 2000},
-        {tx13.GetHash(), 13, 799, 13, 46000, 2, 221, 3000},
-        {tx14.GetHash(), 13, 799, 13, 46000, 2, 221, 3000},
-        {tx15.GetHash(), 7, 432, 7, 10500, 1, 63, 500},
-        {tx16.GetHash(), 7, 432, 7, 10200, 1, 63, 200},
-        {tx17.GetHash(), 7, 432, 7, 10300, 1, 63, 300},
-        {tx18.GetHash(), 16, 1041, 16, 55000, 1, 158, 2000},
-        {tx19.GetHash(), 1, 21, 1, 6000, 2, 179, 8000},
-        {tx20.GetHash(), 1, 21, 1, 5000, 5, 463, 19000},
+        {tx1.GetHash(), 1, 21, 1, 1000},
+        {tx2.GetHash(), 1, 21, 1, 2000},
+        {tx3.GetHash(), 1, 21, 1, 3000},
+        {tx4.GetHash(), 1, 21, 1, 4000},
+        {tx5.GetHash(), 2, 84, 2, 2000},
+        {tx6.GetHash(), 2, 84, 2, 4000},
+        {tx7.GetHash(), 2, 84, 2, 6000},
+        {tx8.GetHash(), 2, 84, 2, 8000},
+        {tx9.GetHash(), 5, 284, 5, 9000},
+        {tx10.GetHash(), 5, 273, 5, 21000},
+        {tx11.GetHash(), 12, 736, 12, 45000},
+        {tx12.GetHash(), 6, 369, 6, 10000},
+        {tx13.GetHash(), 13, 799, 13, 46000},
+        {tx14.GetHash(), 13, 799, 13, 46000},
+        {tx15.GetHash(), 7, 432, 7, 10500},
+        {tx16.GetHash(), 7, 432, 7, 10200},
+        {tx17.GetHash(), 7, 432, 7, 10300},
+        {tx18.GetHash(), 16, 1041, 16, 55000},
+        {tx19.GetHash(), 1, 21, 1, 6000},
+        {tx20.GetHash(), 1, 21, 1, 5000},
 
         // Chain2:
-        {tx21.GetHash(), 1, 19, 1, 100000, 16, 1269, 4014000},
-        {tx22.GetHash(), 2, 115, 2, 200000, 15, 1250, 3914000},
-        {tx23.GetHash(), 3, 184, 3, 220000, 8, 744, 3432000},
-        {tx24.GetHash(), 4, 244, 4, 230000, 6, 615, 3402000},
-        {tx25.GetHash(), 4, 244, 4, 230000, 6, 615, 3402000},
-        {tx26.GetHash(), 6, 405, 6, 260000, 5, 555, 3392000},
-        {tx27.GetHash(), 1, 19, 1, 101000, 8, 703, 3876000},
-        {tx28.GetHash(), 2, 79, 2, 202000, 7, 684, 3775000},
-        {tx29.GetHash(), 5, 304, 5, 603000, 6, 624, 3674000},
-        {tx30.GetHash(), 6, 364, 6, 704000, 1, 60, 101000},
-        {tx31.GetHash(), 3, 175, 3, 220000, 6, 574, 3412000},
-        {tx32.GetHash(), 3, 175, 3, 220000, 5, 514, 3392000},
-        {tx33.GetHash(), 3, 175, 3, 220000, 5, 514, 3392000},
-        {tx34.GetHash(), 4, 235, 4, 240000, 5, 514, 3392000},
-        {tx35.GetHash(), 14, 1067, 14, 1024000, 4, 454, 3372000},
-        {tx36.GetHash(), 15, 1127, 15, 1224000, 2, 161, 3010000},
-        {tx37.GetHash(), 15, 1127, 15, 1105000, 2, 161, 2891000},
-        {tx38.GetHash(), 17, 1288, 17, 4115000, 1, 101, 2810000},
+        {tx21.GetHash(), 1, 19, 1, 100000},
+        {tx22.GetHash(), 2, 115, 2, 200000},
+        {tx23.GetHash(), 3, 184, 3, 220000},
+        {tx24.GetHash(), 4, 244, 4, 230000},
+        {tx25.GetHash(), 4, 244, 4, 230000},
+        {tx26.GetHash(), 6, 405, 6, 260000},
+        {tx27.GetHash(), 1, 19, 1, 101000},
+        {tx28.GetHash(), 2, 79, 2, 202000},
+        {tx29.GetHash(), 5, 304, 5, 603000},
+        {tx30.GetHash(), 6, 364, 6, 704000},
+        {tx31.GetHash(), 3, 175, 3, 220000},
+        {tx32.GetHash(), 3, 175, 3, 220000},
+        {tx33.GetHash(), 3, 175, 3, 220000},
+        {tx34.GetHash(), 4, 235, 4, 240000},
+        {tx35.GetHash(), 14, 1067, 14, 1024000},
+        {tx36.GetHash(), 15, 1127, 15, 1224000},
+        {tx37.GetHash(), 15, 1127, 15, 1105000},
+        {tx38.GetHash(), 17, 1288, 17, 4115000},
 
         // Chain3:
-        {tx39.GetHash(), 1, 20, 1, 1000, 4, 282, 34000},
-        {tx40.GetHash(), 1, 20, 1, 2000, 4, 282, 35000},
-        {tx41.GetHash(), 2, 91, 2, 10000, 7, 554, 68000},
-        {tx42.GetHash(), 5, 273, 5, 19000, 3, 262, 33000},
-        {tx43.GetHash(), 6, 333, 6, 31000, 2, 120, 27000},
-        {tx44.GetHash(), 1, 20, 1, 4000, 8, 574, 72000},
-        {tx45.GetHash(), 5, 271, 5, 35000, 2, 161, 26000},
-        {tx46.GetHash(), 3, 151, 3, 13000, 3, 221, 29000},
-        {tx47.GetHash(), 1, 19, 1, 10000, 3, 180, 36000},
-        {tx48.GetHash(), 7, 393, 7, 46000, 1, 60, 15000},
-        {tx49.GetHash(), 6, 331, 6, 49000, 1, 60, 14000}
+        {tx39.GetHash(), 1, 20, 1, 1000},
+        {tx40.GetHash(), 1, 20, 1, 2000},
+        {tx41.GetHash(), 2, 91, 2, 10000},
+        {tx42.GetHash(), 5, 273, 5, 19000},
+        {tx43.GetHash(), 6, 333, 6, 31000},
+        {tx44.GetHash(), 1, 20, 1, 4000},
+        {tx45.GetHash(), 5, 271, 5, 35000},
+        {tx46.GetHash(), 3, 151, 3, 13000},
+        {tx47.GetHash(), 1, 19, 1, 10000},
+        {tx48.GetHash(), 7, 393, 7, 46000},
+        {tx49.GetHash(), 6, 331, 6, 49000}
     };
     /* clang-format on */
     for (size_t i = 0; i < txns_expected.size(); i++)
@@ -775,10 +767,9 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
         /*
         printf(
-            "tx%ld countwanc %ld sizewanc %ld sigopswanc %u feeswanc %ld countwdesc %ld sizewdesc %ld feeswdesc %ld\n",
+            "tx%ld countwanc %ld sizewanc %ld sigopswanc %u feeswanc %ld\n",
             i + 1, iter->GetCountWithAncestors(), iter->GetSizeWithAncestors(), iter->GetSigOpCountWithAncestors(),
-            iter->GetModFeesWithAncestors(), iter->GetCountWithDescendants(), iter->GetSizeWithDescendants(),
-            iter->GetModFeesWithDescendants());
+            iter->GetModFeesWithAncestors());
         printf("tx%d: hash %s\n", (int)(i + 1), iter->GetTx().GetHash().ToString().c_str());
         */
 
@@ -861,61 +852,61 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     std::vector<MempoolData> txns_result =
     {
         // Chain1:
-        {tx1.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx2.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx3.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx4.GetHash(), 0, 0, 0, 0, 0, 0, 0},
+        {tx1.GetHash(), 0, 0, 0, 0},
+        {tx2.GetHash(), 0, 0, 0, 0},
+        {tx3.GetHash(), 0, 0, 0, 0},
+        {tx4.GetHash(), 0, 0, 0, 0},
 
-        {tx5.GetHash(), 1, 63, 1, 1000, 10, 895, 20000},
-        {tx6.GetHash(), 1, 63, 1, 2000, 10, 895, 21000},
-        {tx7.GetHash(), 1, 63, 1, 3000, 6, 610, 24000},
-        {tx8.GetHash(), 1, 63, 1, 4000, 6, 610, 25000},
-        {tx9.GetHash(), 3, 242, 3, 6000, 9, 832, 19000},
-        {tx10.GetHash(), 3, 231, 3, 14000, 5, 547, 21000},
-        {tx11.GetHash(), 8, 652, 8, 35000, 4, 442, 14000},
-        {tx12.GetHash(), 4, 327, 4, 7000, 4, 274, 2000},
-        {tx13.GetHash(), 9, 715, 9, 36000, 2, 221, 3000},
-        {tx14.GetHash(), 9, 715, 9, 36000, 2, 221, 3000},
-        {tx15.GetHash(), 5, 390, 5, 7500, 1, 63, 500},
-        {tx16.GetHash(), 5, 390, 5, 7200, 1, 63, 200},
-        {tx17.GetHash(), 5, 390, 5, 7300, 1, 63, 300},
-        {tx18.GetHash(), 12, 957, 12, 45000, 1, 158, 2000},
-        {tx19.GetHash(), 1, 21, 1, 6000, 2, 179, 8000},
-        {tx20.GetHash(), 1, 21, 1, 5000, 5, 463, 19000},
+        {tx5.GetHash(), 1, 63, 1, 1000},
+        {tx6.GetHash(), 1, 63, 1, 2000},
+        {tx7.GetHash(), 1, 63, 1, 3000},
+        {tx8.GetHash(), 1, 63, 1, 4000},
+        {tx9.GetHash(), 3, 242, 3, 6000},
+        {tx10.GetHash(), 3, 231, 3, 14000},
+        {tx11.GetHash(), 8, 652, 8, 35000},
+        {tx12.GetHash(), 4, 327, 4, 7000},
+        {tx13.GetHash(), 9, 715, 9, 36000},
+        {tx14.GetHash(), 9, 715, 9, 36000},
+        {tx15.GetHash(), 5, 390, 5, 7500},
+        {tx16.GetHash(), 5, 390, 5, 7200},
+        {tx17.GetHash(), 5, 390, 5, 7300},
+        {tx18.GetHash(), 12, 957, 12, 45000},
+        {tx19.GetHash(), 1, 21, 1, 6000},
+        {tx20.GetHash(), 1, 21, 1, 5000},
 
         // Chain2:
-        {tx21.GetHash(), 0, 0, 0, 0, 0, 0, 0},
+        {tx21.GetHash(), 0, 0, 0, 0},
 
-        {tx22.GetHash(), 1, 96, 1, 100000, 15, 1250, 3914000},
-        {tx23.GetHash(), 2, 165, 2, 120000, 8, 744, 3432000},
-        {tx24.GetHash(), 3, 225, 3, 130000, 6, 615, 3402000},
-        {tx25.GetHash(), 3, 225, 3, 130000, 6, 615, 3402000},
-        {tx26.GetHash(), 5, 386, 5, 160000, 5, 555, 3392000},
-        {tx27.GetHash(), 1, 19, 1, 101000, 8, 703, 3876000},
-        {tx28.GetHash(), 2, 79, 2, 202000, 7, 684, 3775000},
-        {tx29.GetHash(), 4, 285, 4, 503000, 6, 624, 3674000},
-        {tx30.GetHash(), 5, 345, 5, 604000, 1, 60, 101000},
-        {tx31.GetHash(), 2, 156, 2, 120000, 6, 574, 3412000},
-        {tx32.GetHash(), 2, 156, 2, 120000, 5, 514, 3392000},
-        {tx33.GetHash(), 2, 156, 2, 120000, 5, 514, 3392000},
-        {tx34.GetHash(), 3, 216, 3, 140000, 5, 514, 3392000},
-        {tx35.GetHash(), 13, 1048, 13, 924000, 4, 454, 3372000},
-        {tx36.GetHash(), 14, 1108, 14, 1124000, 2, 161, 3010000},
-        {tx37.GetHash(), 14, 1108, 14, 1005000, 2, 161, 2891000},
-        {tx38.GetHash(), 16, 1269, 16, 4015000, 1, 101, 2810000},
+        {tx22.GetHash(), 1, 96, 1, 100000},
+        {tx23.GetHash(), 2, 165, 2, 120000},
+        {tx24.GetHash(), 3, 225, 3, 130000},
+        {tx25.GetHash(), 3, 225, 3, 130000},
+        {tx26.GetHash(), 5, 386, 5, 160000},
+        {tx27.GetHash(), 1, 19, 1, 101000},
+        {tx28.GetHash(), 2, 79, 2, 202000},
+        {tx29.GetHash(), 4, 285, 4, 503000},
+        {tx30.GetHash(), 5, 345, 5, 604000},
+        {tx31.GetHash(), 2, 156, 2, 120000},
+        {tx32.GetHash(), 2, 156, 2, 120000},
+        {tx33.GetHash(), 2, 156, 2, 120000},
+        {tx34.GetHash(), 3, 216, 3, 140000},
+        {tx35.GetHash(), 13, 1048, 13, 924000},
+        {tx36.GetHash(), 14, 1108, 14, 1124000},
+        {tx37.GetHash(), 14, 1108, 14, 1005000},
+        {tx38.GetHash(), 16, 1269, 16, 4015000},
 
         // Chain3:
-        {tx39.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx40.GetHash(), 1, 20, 1, 2000, 4, 282, 35000},
-        {tx41.GetHash(), 1, 71, 1, 6000, 7, 554, 68000},
-        {tx42.GetHash(), 3, 233, 3, 14000, 3, 262, 33000},
-        {tx43.GetHash(), 4, 293, 4, 26000, 2, 120, 27000},
-        {tx44.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx45.GetHash(), 3, 232, 3, 21000, 2, 161, 26000},
-        {tx46.GetHash(), 2, 131, 2, 9000, 3, 221, 29000},
-        {tx47.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx48.GetHash(), 5, 353, 5, 41000, 1, 60, 15000},
-        {tx49.GetHash(), 4, 292, 4, 35000, 1, 60, 14000}
+        {tx39.GetHash(), 0, 0, 0, 0},
+        {tx40.GetHash(), 1, 20, 1, 2000},
+        {tx41.GetHash(), 1, 71, 1, 6000},
+        {tx42.GetHash(), 3, 233, 3, 14000},
+        {tx43.GetHash(), 4, 293, 4, 26000},
+        {tx44.GetHash(), 0, 0, 0, 0},
+        {tx45.GetHash(), 3, 232, 3, 21000},
+        {tx46.GetHash(), 2, 131, 2, 9000},
+        {tx47.GetHash(), 0, 0, 0, 0},
+        {tx48.GetHash(), 5, 353, 5, 41000},
+        {tx49.GetHash(), 4, 292, 4, 35000}
     };
     /* clang-format on */
 
@@ -940,17 +931,17 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     std::vector<MempoolData> txns_result2 =
     {
         // Chain3:
-        {tx39.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx40.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx41.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx42.GetHash(), 1, 142, 1, 6000, 3, 262, 33000},
-        {tx43.GetHash(), 2, 202, 2, 18000, 2, 120, 27000},
-        {tx44.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx45.GetHash(), 2, 161, 2, 15000, 2, 161, 26000},
-        {tx46.GetHash(), 1, 60, 1, 3000, 3, 221, 29000},
-        {tx47.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx48.GetHash(), 3, 262, 3, 33000, 1, 60, 15000},
-        {tx49.GetHash(), 3, 221, 3, 29000, 1, 60, 14000}
+        {tx39.GetHash(), 0, 0, 0, 0},
+        {tx40.GetHash(), 0, 0, 0, 0},
+        {tx41.GetHash(), 0, 0, 0, 0},
+        {tx42.GetHash(), 1, 142, 1, 6000},
+        {tx43.GetHash(), 2, 202, 2, 18000},
+        {tx44.GetHash(), 0, 0, 0, 0},
+        {tx45.GetHash(), 2, 161, 2, 15000},
+        {tx46.GetHash(), 1, 60, 1, 3000},
+        {tx47.GetHash(), 0, 0, 0, 0},
+        {tx48.GetHash(), 3, 262, 3, 33000},
+        {tx49.GetHash(), 3, 221, 3, 29000}
     };
     /* clang-format on */
 
@@ -977,27 +968,27 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     std::vector<MempoolData> txns_result3 =
     {
         // Chain1:
-        {tx1.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx2.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx3.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx4.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx5.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx6.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx7.GetHash(), 0, 0, 0, 0, 0, 0, 0},
+        {tx1.GetHash(), 0, 0, 0, 0},
+        {tx2.GetHash(), 0, 0, 0, 0},
+        {tx3.GetHash(), 0, 0, 0, 0},
+        {tx4.GetHash(), 0, 0, 0, 0},
+        {tx5.GetHash(), 0, 0, 0, 0},
+        {tx6.GetHash(), 0, 0, 0, 0},
+        {tx7.GetHash(), 0, 0, 0, 0},
 
-        {tx8.GetHash(), 1,63, 1, 4000, 6, 610, 25000},
-        {tx9.GetHash(), 1,116 , 1, 3000, 9, 832, 19000},
-        {tx10.GetHash(), 2, 168, 2, 11000, 5, 547, 21000},
-        {tx11.GetHash(), 5, 463, 5, 29000, 4, 442, 14000},
-        {tx12.GetHash(), 2, 201, 2, 4000, 4, 274, 2000},
-        {tx13.GetHash(), 6, 526, 6, 30000, 2, 221, 3000},
-        {tx14.GetHash(), 6, 526, 6, 30000, 2, 221, 3000},
-        {tx15.GetHash(), 3, 264, 3, 4500, 1, 63, 500},
-        {tx16.GetHash(), 3, 264, 3, 4200, 1, 63, 200},
-        {tx17.GetHash(), 3, 264, 3, 4300, 1, 63, 300},
-        {tx18.GetHash(), 9, 768, 9, 39000, 1, 158, 2000},
-        {tx19.GetHash(), 1, 21, 1, 6000, 2, 179, 8000},
-        {tx20.GetHash(), 1, 21, 1, 5000, 5, 463, 19000},
+        {tx8.GetHash(), 1,63, 1, 4000},
+        {tx9.GetHash(), 1,116 , 1, 3000},
+        {tx10.GetHash(), 2, 168, 2, 11000},
+        {tx11.GetHash(), 5, 463, 5, 29000},
+        {tx12.GetHash(), 2, 201, 2, 4000},
+        {tx13.GetHash(), 6, 526, 6, 30000},
+        {tx14.GetHash(), 6, 526, 6, 30000},
+        {tx15.GetHash(), 3, 264, 3, 4500},
+        {tx16.GetHash(), 3, 264, 3, 4200},
+        {tx17.GetHash(), 3, 264, 3, 4300},
+        {tx18.GetHash(), 9, 768, 9, 39000},
+        {tx19.GetHash(), 1, 21, 1, 6000},
+        {tx20.GetHash(), 1, 21, 1, 5000},
     };
     /* clang-format on */
 
@@ -1022,27 +1013,27 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     std::vector<MempoolData> txns_result4 =
     {
         // Chain1:
-        {tx1.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx2.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx3.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx4.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx5.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx6.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx7.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx8.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx9.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx10.GetHash(), 0, 0, 0, 0, 0, 0, 0},
+        {tx1.GetHash(), 0, 0, 0, 0},
+        {tx2.GetHash(), 0, 0, 0, 0},
+        {tx3.GetHash(), 0, 0, 0, 0},
+        {tx4.GetHash(), 0, 0, 0, 0},
+        {tx5.GetHash(), 0, 0, 0, 0},
+        {tx6.GetHash(), 0, 0, 0, 0},
+        {tx7.GetHash(), 0, 0, 0, 0},
+        {tx8.GetHash(), 0, 0, 0, 0},
+        {tx9.GetHash(), 0, 0, 0, 0},
+        {tx10.GetHash(), 0, 0, 0, 0},
 
-        {tx11.GetHash(), 2, 179, 2, 15000, 4, 442, 14000},
-        {tx12.GetHash(), 1, 85, 1, 1000, 4, 274, 2000},
-        {tx13.GetHash(), 3, 242, 3, 16000, 2, 221, 3000},
-        {tx14.GetHash(), 3, 242, 3, 16000, 2, 221, 3000},
-        {tx15.GetHash(), 2, 148, 2, 1500, 1, 63, 500},
-        {tx16.GetHash(), 2, 148, 2, 1200, 1, 63, 200},
-        {tx17.GetHash(), 2, 148, 2, 1300, 1, 63, 300},
-        {tx18.GetHash(), 6, 484, 6, 25000, 1, 158, 2000},
-        {tx19.GetHash(), 1, 21, 1, 6000, 2, 179, 8000},
-        {tx20.GetHash(), 1, 21, 1, 5000, 5, 463, 19000},
+        {tx11.GetHash(), 2, 179, 2, 15000},
+        {tx12.GetHash(), 1, 85, 1, 1000},
+        {tx13.GetHash(), 3, 242, 3, 16000},
+        {tx14.GetHash(), 3, 242, 3, 16000},
+        {tx15.GetHash(), 2, 148, 2, 1500},
+        {tx16.GetHash(), 2, 148, 2, 1200},
+        {tx17.GetHash(), 2, 148, 2, 1300},
+        {tx18.GetHash(), 6, 484, 6, 25000},
+        {tx19.GetHash(), 1, 21, 1, 6000},
+        {tx20.GetHash(), 1, 21, 1, 5000},
     };
     /* clang-format on */
 
@@ -1067,26 +1058,26 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     std::vector<MempoolData> txns_result5 =
     {
         // Chain1:
-        {tx1.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx2.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx3.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx4.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx5.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx6.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx7.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx8.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx9.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx10.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx11.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx12.GetHash(), 1, 85, 1, 1000, 4, 274, 2000},
-        {tx13.GetHash(), 1, 63, 1, 1000, 2, 221, 3000},
-        {tx14.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx15.GetHash(), 2, 148, 2, 1500, 1, 63, 500},
-        {tx16.GetHash(), 2, 148, 2, 1200, 1, 63, 200},
-        {tx17.GetHash(), 2, 148, 2, 1300, 1, 63, 300},
-        {tx18.GetHash(), 3, 242, 3, 9000, 1, 158, 2000},
-        {tx19.GetHash(), 1, 21, 1, 6000, 2, 179, 8000},
-        {tx20.GetHash(), 0, 0, 0, 0, 0, 0, 0}
+        {tx1.GetHash(), 0, 0, 0, 0},
+        {tx2.GetHash(), 0, 0, 0, 0},
+        {tx3.GetHash(), 0, 0, 0, 0},
+        {tx4.GetHash(), 0, 0, 0, 0},
+        {tx5.GetHash(), 0, 0, 0, 0},
+        {tx6.GetHash(), 0, 0, 0, 0},
+        {tx7.GetHash(), 0, 0, 0, 0},
+        {tx8.GetHash(), 0, 0, 0, 0},
+        {tx9.GetHash(), 0, 0, 0, 0},
+        {tx10.GetHash(), 0, 0, 0, 0},
+        {tx11.GetHash(), 0, 0, 0, 0},
+        {tx12.GetHash(), 1, 85, 1, 1000},
+        {tx13.GetHash(), 1, 63, 1, 1000},
+        {tx14.GetHash(), 0, 0, 0, 0},
+        {tx15.GetHash(), 2, 148, 2, 1500},
+        {tx16.GetHash(), 2, 148, 2, 1200},
+        {tx17.GetHash(), 2, 148, 2, 1300},
+        {tx18.GetHash(), 3, 242, 3, 9000},
+        {tx19.GetHash(), 1, 21, 1, 6000},
+        {tx20.GetHash(), 0, 0, 0, 0}
     };
     /* clang-format on */
 
@@ -1110,26 +1101,26 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     std::vector<MempoolData> txns_result6 =
     {
         // Chain1:
-        {tx1.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx2.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx3.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx4.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx5.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx6.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx7.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx8.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx9.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx10.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx11.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx12.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx13.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx14.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx15.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx16.GetHash(), 1, 63, 1, 200, 1, 63, 200},
-        {tx17.GetHash(), 1, 63, 1, 300, 1, 63, 300},
-        {tx18.GetHash(), 2, 179, 2, 8000, 1, 158, 2000},
-        {tx19.GetHash(), 1, 21, 1, 6000, 2, 179, 8000},
-        {tx20.GetHash(), 0, 0, 0, 0, 0, 0, 0}
+        {tx1.GetHash(), 0, 0, 0, 0},
+        {tx2.GetHash(), 0, 0, 0, 0},
+        {tx3.GetHash(), 0, 0, 0, 0},
+        {tx4.GetHash(), 0, 0, 0, 0},
+        {tx5.GetHash(), 0, 0, 0, 0},
+        {tx6.GetHash(), 0, 0, 0, 0},
+        {tx7.GetHash(), 0, 0, 0, 0},
+        {tx8.GetHash(), 0, 0, 0, 0},
+        {tx9.GetHash(), 0, 0, 0, 0},
+        {tx10.GetHash(), 0, 0, 0, 0},
+        {tx11.GetHash(), 0, 0, 0, 0},
+        {tx12.GetHash(), 0, 0, 0, 0},
+        {tx13.GetHash(), 0, 0, 0, 0},
+        {tx14.GetHash(), 0, 0, 0, 0},
+        {tx15.GetHash(), 0, 0, 0, 0},
+        {tx16.GetHash(), 1, 63, 1, 200},
+        {tx17.GetHash(), 1, 63, 1, 300},
+        {tx18.GetHash(), 2, 179, 2, 8000},
+        {tx19.GetHash(), 1, 21, 1, 6000},
+        {tx20.GetHash(), 0, 0, 0, 0}
     };
     /* clang-format on */
 
@@ -1173,25 +1164,25 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     std::vector<MempoolData> txns_result7 =
     {
         // Chain2:
-        {tx21.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx22.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx23.GetHash(), 0, 0, 0, 0, 0, 0, 0},
+        {tx21.GetHash(), 0, 0, 0, 0},
+        {tx22.GetHash(), 0, 0, 0, 0},
+        {tx23.GetHash(), 0, 0, 0, 0},
 
-        {tx24.GetHash(), 1, 60, 1, 10000, 6, 615, 3402000},
-        {tx25.GetHash(), 1, 60, 1, 10000, 6, 615, 3402000},
-        {tx26.GetHash(), 3, 221, 3, 40000, 5, 555, 3392000},
-        {tx27.GetHash(), 1, 19, 1, 101000, 8, 703, 3876000},
-        {tx28.GetHash(), 2, 79, 2, 202000, 7, 684, 3775000},
-        {tx29.GetHash(), 3, 189, 3, 403000, 6, 624, 3674000},
-        {tx30.GetHash(), 4, 249, 4, 504000, 1, 60, 101000},
-        {tx31.GetHash(), 1, 60, 1, 20000, 6, 574, 3412000},
-        {tx32.GetHash(), 1, 60, 1, 20000, 5, 514, 3392000},
-        {tx33.GetHash(), 1, 60, 1, 20000, 5, 514, 3392000},
-        {tx34.GetHash(), 2, 120, 2, 40000, 5, 514, 3392000},
-        {tx35.GetHash(), 11, 883, 11, 804000, 4, 454, 3372000},
-        {tx36.GetHash(), 12, 943, 12, 1004000, 2, 161, 3010000},
-        {tx37.GetHash(), 12, 943, 12, 885000, 2, 161, 2891000},
-        {tx38.GetHash(), 14, 1104, 14, 3895000, 1, 101, 2810000},
+        {tx24.GetHash(), 1, 60, 1, 10000},
+        {tx25.GetHash(), 1, 60, 1, 10000},
+        {tx26.GetHash(), 3, 221, 3, 40000},
+        {tx27.GetHash(), 1, 19, 1, 101000},
+        {tx28.GetHash(), 2, 79, 2, 202000},
+        {tx29.GetHash(), 3, 189, 3, 403000},
+        {tx30.GetHash(), 4, 249, 4, 504000},
+        {tx31.GetHash(), 1, 60, 1, 20000},
+        {tx32.GetHash(), 1, 60, 1, 20000},
+        {tx33.GetHash(), 1, 60, 1, 20000},
+        {tx34.GetHash(), 2, 120, 2, 40000},
+        {tx35.GetHash(), 11, 883, 11, 804000},
+        {tx36.GetHash(), 12, 943, 12, 1004000},
+        {tx37.GetHash(), 12, 943, 12, 885000},
+        {tx38.GetHash(), 14, 1104, 14, 3895000},
     };
     /* clang-format on */
 
@@ -1216,24 +1207,24 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     std::vector<MempoolData> txns_result8 =
     {
         // Chain2:
-        {tx21.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx22.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx23.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx24.GetHash(), 1, 60, 1, 10000, 6, 615, 3402000},
-        {tx25.GetHash(), 1, 60, 1, 10000, 6, 615, 3402000},
-        {tx26.GetHash(), 3, 221, 3, 40000, 5, 555, 3392000},
-        {tx27.GetHash(), 1, 19, 1, 101000, 8, 703, 3876000},
-        {tx28.GetHash(), 2, 79, 2, 202000, 7, 684, 3775000},
-        {tx29.GetHash(), 3, 189, 3, 403000, 6, 624, 3674000},
-        {tx30.GetHash(), 4, 249, 4, 504000, 1, 60, 101000},
-        {tx31.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx32.GetHash(), 1, 60, 1, 20000, 5, 514, 3392000},
-        {tx33.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx34.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx35.GetHash(), 8, 703, 8, 744000, 4, 454, 3372000},
-        {tx36.GetHash(), 9, 763, 9, 944000, 2, 161, 3010000},
-        {tx37.GetHash(), 9, 763, 9, 825000, 2, 161, 2891000},
-        {tx38.GetHash(), 11, 924, 11, 3835000, 1, 101, 2810000},
+        {tx21.GetHash(), 0, 0, 0, 0},
+        {tx22.GetHash(), 0, 0, 0, 0},
+        {tx23.GetHash(), 0, 0, 0, 0},
+        {tx24.GetHash(), 1, 60, 1, 10000},
+        {tx25.GetHash(), 1, 60, 1, 10000},
+        {tx26.GetHash(), 3, 221, 3, 40000},
+        {tx27.GetHash(), 1, 19, 1, 101000},
+        {tx28.GetHash(), 2, 79, 2, 202000},
+        {tx29.GetHash(), 3, 189, 3, 403000},
+        {tx30.GetHash(), 4, 249, 4, 504000},
+        {tx31.GetHash(), 0, 0, 0, 0},
+        {tx32.GetHash(), 1, 60, 1, 20000},
+        {tx33.GetHash(), 0, 0, 0, 0},
+        {tx34.GetHash(), 0, 0, 0, 0},
+        {tx35.GetHash(), 8, 703, 8, 744000},
+        {tx36.GetHash(), 9, 763, 9, 944000},
+        {tx37.GetHash(), 9, 763, 9, 825000},
+        {tx38.GetHash(), 11, 924, 11, 3835000},
     };
     /* clang-format on */
 
@@ -1258,24 +1249,24 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     std::vector<MempoolData> txns_result9 =
     {
         // Chain2:
-        {tx21.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx22.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx23.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx24.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx25.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx26.GetHash(), 1, 101, 1, 20000, 5, 555, 3392000},
-        {tx27.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx28.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx29.GetHash(), 1, 110, 1, 201000, 6, 624, 3674000},
-        {tx30.GetHash(), 2, 170, 2, 302000, 1, 60, 101000},
-        {tx31.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx32.GetHash(), 1, 60, 1, 20000, 5, 514, 3392000},
-        {tx33.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx34.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx35.GetHash(), 4, 504, 4, 522000, 4, 454, 3372000},
-        {tx36.GetHash(), 5, 564, 5, 722000, 2, 161, 3010000},
-        {tx37.GetHash(), 5, 564, 5, 603000, 2, 161, 2891000},
-        {tx38.GetHash(), 7, 725, 7, 3613000, 1, 101, 2810000},
+        {tx21.GetHash(), 0, 0, 0, 0},
+        {tx22.GetHash(), 0, 0, 0, 0},
+        {tx23.GetHash(), 0, 0, 0, 0},
+        {tx24.GetHash(), 0, 0, 0, 0},
+        {tx25.GetHash(), 0, 0, 0, 0},
+        {tx26.GetHash(), 1, 101, 1, 20000},
+        {tx27.GetHash(), 0, 0, 0, 0},
+        {tx28.GetHash(), 0, 0, 0, 0},
+        {tx29.GetHash(), 1, 110, 1, 201000},
+        {tx30.GetHash(), 2, 170, 2, 302000},
+        {tx31.GetHash(), 0, 0, 0, 0},
+        {tx32.GetHash(), 1, 60, 1, 20000},
+        {tx33.GetHash(), 0, 0, 0, 0},
+        {tx34.GetHash(), 0, 0, 0, 0},
+        {tx35.GetHash(), 4, 504, 4, 522000},
+        {tx36.GetHash(), 5, 564, 5, 722000},
+        {tx37.GetHash(), 5, 564, 5, 603000},
+        {tx38.GetHash(), 7, 725, 7, 3613000},
     };
     /* clang-format on */
 
@@ -1300,24 +1291,24 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     std::vector<MempoolData> txns_result10 =
     {
         // Chain2:
-        {tx21.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx22.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx23.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx24.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx25.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx26.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx27.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx28.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx29.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx30.GetHash(), 1, 60, 1, 101000, 1, 60, 101000},
-        {tx31.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx32.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx33.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx34.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx35.GetHash(), 0, 0, 0, 0, 0, 0, 0},
-        {tx36.GetHash(), 1, 60, 1, 200000, 2, 161, 3010000},
-        {tx37.GetHash(), 1, 60, 1, 81000, 2, 161, 2891000},
-        {tx38.GetHash(), 3, 221, 3, 3091000, 1, 101, 2810000},
+        {tx21.GetHash(), 0, 0, 0, 0},
+        {tx22.GetHash(), 0, 0, 0, 0},
+        {tx23.GetHash(), 0, 0, 0, 0},
+        {tx24.GetHash(), 0, 0, 0, 0},
+        {tx25.GetHash(), 0, 0, 0, 0},
+        {tx26.GetHash(), 0, 0, 0, 0},
+        {tx27.GetHash(), 0, 0, 0, 0},
+        {tx28.GetHash(), 0, 0, 0, 0},
+        {tx29.GetHash(), 0, 0, 0, 0},
+        {tx30.GetHash(), 1, 60, 1, 101000},
+        {tx31.GetHash(), 0, 0, 0, 0},
+        {tx32.GetHash(), 0, 0, 0, 0},
+        {tx33.GetHash(), 0, 0, 0, 0},
+        {tx34.GetHash(), 0, 0, 0, 0},
+        {tx35.GetHash(), 0, 0, 0, 0},
+        {tx36.GetHash(), 1, 60, 1, 200000},
+        {tx37.GetHash(), 1, 60, 1, 81000},
+        {tx38.GetHash(), 3, 221, 3, 3091000},
     };
     /* clang-format on */
 
@@ -1331,10 +1322,9 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
         /*
         printf(
-            "tx%ld countwanc %ld sizewanc %ld sigopswanc %u feeswanc %ld countwdesc %ld sizewdesc %ld feeswdesc %ld\n",
+            "tx%ld countwanc %ld sizewanc %ld sigopswanc %u feeswanc %ld\n",
             i + 1, iter->GetCountWithAncestors(), iter->GetSizeWithAncestors(), iter->GetSigOpCountWithAncestors(),
-            iter->GetModFeesWithAncestors(), iter->GetCountWithDescendants(), iter->GetSizeWithDescendants(),
-            iter->GetModFeesWithDescendants());
+            iter->GetModFeesWithAncestors());
         printf("tx%d: hash %s\n", (int)(i + 1), iter->GetTx().GetHash().ToString().c_str());
         */
 
@@ -1454,225 +1444,6 @@ void _CheckSort(CTxMemPool &pool, std::vector<std::string> &sortedOrder)
     {
         BOOST_CHECK_EQUAL(it->GetTx().GetHash().ToString(), sortedOrder[count]);
     }
-}
-
-BOOST_AUTO_TEST_CASE(MempoolIndexingTest)
-{
-    CTxMemPool pool;
-    TestMemPoolEntryHelper entry;
-    entry.hadNoDependencies = true;
-
-    /* 3rd highest fee */
-    CMutableTransaction tx1 = CMutableTransaction();
-    tx1.vout.resize(1);
-    tx1.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
-    tx1.vout[0].nValue = 10 * COIN;
-    pool.addUnchecked(tx1.GetHash(), entry.Fee(10000LL).Priority(10.0).FromTx(tx1));
-
-    /* highest fee */
-    CMutableTransaction tx2 = CMutableTransaction();
-    tx2.vout.resize(1);
-    tx2.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
-    tx2.vout[0].nValue = 2 * COIN;
-    pool.addUnchecked(tx2.GetHash(), entry.Fee(20000LL).Priority(9.0).FromTx(tx2));
-
-    /* lowest fee */
-    CMutableTransaction tx3 = CMutableTransaction();
-    tx3.vout.resize(1);
-    tx3.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
-    tx3.vout[0].nValue = 5 * COIN;
-    pool.addUnchecked(tx3.GetHash(), entry.Fee(0LL).Priority(100.0).FromTx(tx3));
-
-    /* 2nd highest fee */
-    CMutableTransaction tx4 = CMutableTransaction();
-    tx4.vout.resize(1);
-    tx4.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
-    tx4.vout[0].nValue = 6 * COIN;
-    pool.addUnchecked(tx4.GetHash(), entry.Fee(15000LL).Priority(1.0).FromTx(tx4));
-
-    /* equal fee rate to tx1, but newer */
-    CMutableTransaction tx5 = CMutableTransaction();
-    tx5.vout.resize(1);
-    tx5.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
-    tx5.vout[0].nValue = 11 * COIN;
-    entry.nTime = 1;
-    entry.dPriority = 10.0;
-    pool.addUnchecked(tx5.GetHash(), entry.Fee(10000LL).FromTx(tx5));
-    BOOST_CHECK_EQUAL(pool.size(), 5);
-
-    std::vector<std::string> sortedOrder;
-    sortedOrder.resize(5);
-    sortedOrder[0] = tx3.GetHash().ToString(); // 0
-    sortedOrder[1] = tx5.GetHash().ToString(); // 10000
-    sortedOrder[2] = tx1.GetHash().ToString(); // 10000
-    sortedOrder[3] = tx4.GetHash().ToString(); // 15000
-    sortedOrder[4] = tx2.GetHash().ToString(); // 20000
-    CheckSort<descendant_score>(pool, sortedOrder);
-
-    /* low fee but with high fee child */
-    /* tx6 -> tx7 -> tx8, tx9 -> tx10 */
-    CMutableTransaction tx6 = CMutableTransaction();
-    tx6.vout.resize(1);
-    tx6.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
-    tx6.vout[0].nValue = 20 * COIN;
-    pool.addUnchecked(tx6.GetHash(), entry.Fee(0LL).FromTx(tx6));
-    BOOST_CHECK_EQUAL(pool.size(), 6);
-    // Check that at this point, tx6 is sorted low
-    sortedOrder.insert(sortedOrder.begin(), tx6.GetHash().ToString());
-    CheckSort<descendant_score>(pool, sortedOrder);
-
-    CTxMemPool::setEntries setAncestors;
-    setAncestors.insert(pool.mapTx.find(tx6.GetHash()));
-    CMutableTransaction tx7 = CMutableTransaction();
-    tx7.vin.resize(1);
-    tx7.vin[0].prevout = COutPoint(tx6.GetHash(), 0);
-    tx7.vin[0].scriptSig = CScript() << OP_11;
-    tx7.vout.resize(2);
-    tx7.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
-    tx7.vout[0].nValue = 10 * COIN;
-    tx7.vout[1].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
-    tx7.vout[1].nValue = 1 * COIN;
-
-    std::string dummy;
-    CMutableTransaction tx10 = CMutableTransaction();
-    CMutableTransaction tx9 = CMutableTransaction();
-    CMutableTransaction tx8 = CMutableTransaction();
-    std::vector<std::string> snapshotOrder;
-    {
-        CTxMemPool::setEntries setAncestorsCalculated;
-        WRITELOCK(pool.cs_txmempool);
-        BOOST_CHECK_EQUAL(pool._CalculateMemPoolAncestors(entry.Fee(2000000LL).FromTx(tx7), setAncestorsCalculated, 100,
-                              1000000, 1000, 1000000, dummy),
-            true);
-        BOOST_CHECK(setAncestorsCalculated == setAncestors);
-
-        pool.addUnchecked(tx7.GetHash(), entry.FromTx(tx7), setAncestors);
-
-        BOOST_CHECK_EQUAL(pool._size(), 7);
-
-        // Now tx6 should be sorted higher (high fee child): tx7, tx6, tx2, ...
-        sortedOrder.erase(sortedOrder.begin());
-        sortedOrder.push_back(tx6.GetHash().ToString());
-        sortedOrder.push_back(tx7.GetHash().ToString());
-        _CheckSort<descendant_score>(pool, sortedOrder);
-
-        /* low fee child of tx7 */
-        tx8.vin.resize(1);
-        tx8.vin[0].prevout = COutPoint(tx7.GetHash(), 0);
-        tx8.vin[0].scriptSig = CScript() << OP_11;
-        tx8.vout.resize(1);
-        tx8.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
-        tx8.vout[0].nValue = 10 * COIN;
-        setAncestors.insert(pool.mapTx.find(tx7.GetHash()));
-        pool.addUnchecked(tx8.GetHash(), entry.Fee(0LL).Time(2).FromTx(tx8), setAncestors);
-
-        // Now tx8 should be sorted low, but tx6/tx both high
-        sortedOrder.insert(sortedOrder.begin(), tx8.GetHash().ToString());
-        _CheckSort<descendant_score>(pool, sortedOrder);
-
-        /* low fee child of tx7 */
-        tx9.vin.resize(1);
-        tx9.vin[0].prevout = COutPoint(tx7.GetHash(), 1);
-        tx9.vin[0].scriptSig = CScript() << OP_11;
-        tx9.vout.resize(1);
-        tx9.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
-        tx9.vout[0].nValue = 1 * COIN;
-        pool.addUnchecked(tx9.GetHash(), entry.Fee(0LL).Time(3).FromTx(tx9), setAncestors);
-
-        // tx9 should be sorted low
-        BOOST_CHECK_EQUAL(pool._size(), 9);
-        sortedOrder.insert(sortedOrder.begin(), tx9.GetHash().ToString());
-        _CheckSort<descendant_score>(pool, sortedOrder);
-
-        snapshotOrder = sortedOrder;
-
-        setAncestors.insert(pool.mapTx.find(tx8.GetHash()));
-        setAncestors.insert(pool.mapTx.find(tx9.GetHash()));
-        /* tx10 depends on tx8 and tx9 and has a high fee*/
-        tx10.vin.resize(2);
-        tx10.vin[0].prevout = COutPoint(tx8.GetHash(), 0);
-        tx10.vin[0].scriptSig = CScript() << OP_11;
-        tx10.vin[1].prevout = COutPoint(tx9.GetHash(), 0);
-        tx10.vin[1].scriptSig = CScript() << OP_11;
-        tx10.vout.resize(1);
-        tx10.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
-        tx10.vout[0].nValue = 10 * COIN;
-
-        setAncestorsCalculated.clear();
-        BOOST_CHECK_EQUAL(pool._CalculateMemPoolAncestors(entry.Fee(200000LL).Time(4).FromTx(tx10),
-                              setAncestorsCalculated, 100, 1000000, 1000, 1000000, dummy),
-            true);
-        BOOST_CHECK(setAncestorsCalculated == setAncestors);
-
-        pool.addUnchecked(tx10.GetHash(), entry.FromTx(tx10), setAncestors);
-    }
-
-    /**
-     *  tx8 and tx9 should both now be sorted higher
-     *  Final order after tx10 is added:
-     *
-     *  tx3 = 0 (1)
-     *  tx5 = 10000 (1)
-     *  tx1 = 10000 (1)
-     *  tx4 = 15000 (1)
-     *  tx2 = 20000 (1)
-     *  tx9 = 200k (2 txs)
-     *  tx8 = 200k (2 txs)
-     *  tx10 = 200k (1 tx)
-     *  tx6 = 2.2M (5 txs)
-     *  tx7 = 2.2M (4 txs)
-     */
-    sortedOrder.erase(sortedOrder.begin(), sortedOrder.begin() + 2); // take out tx9, tx8 from the beginning
-    sortedOrder.insert(sortedOrder.begin() + 5, tx9.GetHash().ToString());
-    sortedOrder.insert(sortedOrder.begin() + 6, tx8.GetHash().ToString());
-    sortedOrder.insert(sortedOrder.begin() + 7, tx10.GetHash().ToString()); // tx10 is just before tx6
-    CheckSort<descendant_score>(pool, sortedOrder);
-
-    // there should be 10 transactions in the mempool
-    BOOST_CHECK_EQUAL(pool.size(), 10);
-
-    // Now try removing tx10 and verify the sort order returns to normal
-    std::list<CTransactionRef> removed;
-    pool.removeRecursive(pool.mapTx.find(tx10.GetHash())->GetTx(), removed);
-    CheckSort<descendant_score>(pool, snapshotOrder);
-
-    pool.removeRecursive(pool.mapTx.find(tx9.GetHash())->GetTx(), removed);
-    pool.removeRecursive(pool.mapTx.find(tx8.GetHash())->GetTx(), removed);
-    /* Now check the sort on the mining score index.
-     * Final order should be:
-     *
-     * tx7 (2M)
-     * tx2 (20k)
-     * tx4 (15000)
-     * tx1/tx5 (10000)
-     * tx3/6 (0)
-     * (Ties resolved by hash)
-     */
-    sortedOrder.clear();
-    sortedOrder.push_back(tx7.GetHash().ToString());
-    sortedOrder.push_back(tx2.GetHash().ToString());
-    sortedOrder.push_back(tx4.GetHash().ToString());
-    if (tx1.GetHash() < tx5.GetHash())
-    {
-        sortedOrder.push_back(tx5.GetHash().ToString());
-        sortedOrder.push_back(tx1.GetHash().ToString());
-    }
-    else
-    {
-        sortedOrder.push_back(tx1.GetHash().ToString());
-        sortedOrder.push_back(tx5.GetHash().ToString());
-    }
-    if (tx3.GetHash() < tx6.GetHash())
-    {
-        sortedOrder.push_back(tx6.GetHash().ToString());
-        sortedOrder.push_back(tx3.GetHash().ToString());
-    }
-    else
-    {
-        sortedOrder.push_back(tx3.GetHash().ToString());
-        sortedOrder.push_back(tx6.GetHash().ToString());
-    }
-    CheckSort<mining_score>(pool, sortedOrder);
 }
 
 BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest)
