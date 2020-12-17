@@ -258,9 +258,6 @@ void entryToJSON(UniValue &info, const CTxMemPoolEntry &e)
     info.pushKV("doublespent", (e.dsproof == 1 ? true : false));
     info.pushKV("startingpriority", e.GetPriority(e.GetHeight()));
     info.pushKV("currentpriority", e.GetPriority(chainActive.Height()));
-    info.pushKV("descendantcount", e.GetCountWithDescendants());
-    info.pushKV("descendantsize", e.GetSizeWithDescendants());
-    info.pushKV("descendantfees", e.GetModFeesWithDescendants());
     info.pushKV("ancestorcount", e.GetCountWithAncestors());
     info.pushKV("ancestorsize", e.GetSizeWithAncestors());
     info.pushKV("ancestorfees", e.GetModFeesWithAncestors());
@@ -417,7 +414,7 @@ UniValue getmempoolancestors(const UniValue &params, bool fHelp)
     CTxMemPool::setEntries setAncestors;
     uint64_t noLimit = std::numeric_limits<uint64_t>::max();
     std::string dummy;
-    mempool._CalculateMemPoolAncestors(*it, setAncestors, noLimit, noLimit, noLimit, noLimit, dummy, nullptr, false);
+    mempool._CalculateMemPoolAncestors(*it, setAncestors, noLimit, noLimit, dummy, nullptr, false);
 
     if (!fVerbose)
     {

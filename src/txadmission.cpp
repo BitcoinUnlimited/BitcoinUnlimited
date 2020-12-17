@@ -1197,15 +1197,12 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         // Calculate in-mempool ancestors, up to a limit.
         size_t nLimitAncestors = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
         size_t nLimitAncestorSize = GetArg("-limitancestorsize", BU_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
-        size_t nLimitDescendants = GetArg("-limitdescendantcount", BU_DEFAULT_DESCENDANT_LIMIT);
-        size_t nLimitDescendantSize = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
         std::string errString;
         CTxMemPool::setEntries setAncestors;
         {
             READLOCK(pool.cs_txmempool);
             // note we could resolve ancestors to hashes and return those if that saves time in the txc thread
-            if (!pool._CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize,
-                    nLimitDescendants, nLimitDescendantSize, errString))
+            if (!pool._CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize, errString))
             {
                 if (debugger)
                 {
@@ -1249,10 +1246,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 size += ancestor->GetTxSize();
             }
             txProps->sizeWithAncestors = size;
-
-            // How can something we are just adding have any descendants?  It can't so these values are just this tx
-            txProps->countWithDescendants = 1;
-            txProps->sizeWithDescendants = tx->GetTxSize();
         }
 
         // Check again against just the consensus-critical mandatory script
