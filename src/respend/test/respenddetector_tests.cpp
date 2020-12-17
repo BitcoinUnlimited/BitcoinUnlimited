@@ -56,7 +56,7 @@ public:
 class RespendFixture : public BasicTestingSetup
 {
 public:
-    RespendFixture() : mempool(CFeeRate(0)), dummyaction(new DummyRespendAction) {}
+    RespendFixture() : mempool(), dummyaction(new DummyRespendAction) {}
     CTxMemPool mempool;
     std::shared_ptr<DummyRespendAction> dummyaction;
 };
@@ -223,7 +223,7 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
     vNodes.push_back(&node);
     ClearInventory(&node);
 
-    CTxMemPool pool(CFeeRate(0));
+    CTxMemPool pool;
     TestMemPoolEntryHelper entry;
 
     CBasicKeyStore keystore;

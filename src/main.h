@@ -247,7 +247,7 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats);
    Determine whether free transactions are subject to rate limiting. If -limitfreerelay is not zero then rate limiting
    for free txns will be in effect. If it is zero, then no free transactions will be allowed to enter the memory pool.
  */
-bool AreFreeTxnsDisallowed();
+bool AreFreeTxnsAllowed();
 
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state);

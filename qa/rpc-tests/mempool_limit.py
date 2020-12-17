@@ -37,25 +37,29 @@ class MempoolLimitTest(BitcoinTestFramework):
         txids = []
         utxos = create_confirmed_utxos(self.relayfee, self.nodes[0], 91)
 
-        #create a mempool tx that will be evicted
-        us0 = utxos.pop()
-        inputs = [{ "txid" : us0["txid"], "vout" : us0["vout"]}]
-        outputs = {self.nodes[0].getnewaddress() : 0.0001}
-        tx = self.nodes[0].createrawtransaction(inputs, outputs)
-        self.nodes[0].settxfee(self.relayfee) # specifically fund this tx with low fee
-        txF = self.nodes[0].fundrawtransaction(tx)
-        txFS = self.nodes[0].signrawtransaction(txF['hex'])
-        txid = self.nodes[0].sendrawtransaction(txFS['hex'])
-
+        # create a lot of txns up to but not exceeding the maxmempool
         relayfee = self.nodes[0].getnetworkinfo()['relayfee']
         base_fee = relayfee*100
-        for i in range (3):
+        for i in range (2):
             txids.append([])
-            txids[i] = create_lots_of_big_transactions(self.nodes[0], self.txouts, utxos[30*i:30*i+30], 30, (i+1)*base_fee)
+            txids[i] = create_lots_of_big_transactions(self.nodes[0], self.txouts, utxos[33*i:33*i+33], 33, (i+1)*base_fee)
+            print(str(self.nodes[0].getmempoolinfo()))
 
-        assert(txid not in self.nodes[0].getrawmempool())
-        txdata = self.nodes[0].gettransaction(txid)
-        assert(txdata['confirmations'] ==  0) #confirmation should still be 0
+        num_txns_in_mempool = self.nodes[0].getmempoolinfo()["size"]
+
+        # create another txn that will exceed the maxmempool which should evict some random transaction.
+        all_txns = self.nodes[0].getrawmempool()
+
+        i = 2
+        new_txn = create_lots_of_big_transactions(self.nodes[0], self.txouts, utxos[33*i:33*i+33], 1, (i+1)*base_fee)
+        print("newtxns " + str(new_txn[0]))
+        assert(self.nodes[0].getmempoolinfo()["usage"] < self.nodes[0].getmempoolinfo()["maxmempool"])
+
+        # make sure the mempool count did not change
+        assert(num_txns_in_mempool == self.nodes[0].getmempoolinfo()["size"])
+
+        # make sure new tx is in the mempool
+        assert(new_txn[0] in self.nodes[0].getrawmempool())
 
 if __name__ == '__main__':
     MempoolLimitTest().main()

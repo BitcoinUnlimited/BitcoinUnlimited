@@ -28,7 +28,7 @@ static const int32_t txHashesSize = 45;
  */
 BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_no_fee_inc)
 {
-    CTxMemPool mpool(CFeeRate(1000));
+    CTxMemPool mpool;
     TestMemPoolEntryHelper entry;
     double basepri = 10;
 
@@ -123,7 +123,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_no_fee_inc)
 
 BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_gradual_fee_inc)
 {
-    CTxMemPool mpool(CFeeRate(1000));
+    CTxMemPool mpool;
     TestMemPoolEntryHelper entry;
     double basepri = 10;
 
@@ -227,7 +227,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_gradual_fee_inc)
 
 BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_short_partial_fee_inc)
 {
-    CTxMemPool mpool(CFeeRate(1000));
+    CTxMemPool mpool;
     TestMemPoolEntryHelper entry;
     double basepri = 10;
 
@@ -370,7 +370,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_short_partial_fee_inc)
 
 BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_short_full_fee_inc)
 {
-    CTxMemPool mpool(CFeeRate(1000));
+    CTxMemPool mpool;
     TestMemPoolEntryHelper entry;
     double basepri = 10;
 
@@ -511,7 +511,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_short_full_fee_inc)
 
 BOOST_AUTO_TEST_CASE(BlockPolicyEstimates_tx_bell_curve)
 {
-    CTxMemPool mpool(CFeeRate(1000));
+    CTxMemPool mpool;
     TestMemPoolEntryHelper entry;
     double basepri = 10;
 

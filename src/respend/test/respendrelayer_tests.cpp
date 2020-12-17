@@ -94,7 +94,7 @@ BOOST_AUTO_TEST_CASE(is_interesting)
 
 BOOST_AUTO_TEST_CASE(triggers_correctly)
 {
-    CTxMemPool pool(CFeeRate(0));
+    CTxMemPool pool;
     TestMemPoolEntryHelper entry;
 
     CBasicKeyStore keystore;

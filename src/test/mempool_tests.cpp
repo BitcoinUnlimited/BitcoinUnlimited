@@ -63,7 +63,7 @@ BOOST_FIXTURE_TEST_SUITE(mempool_tests, TestingSetup)
 BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 {
     TestMemPoolEntryHelper entry;
-    CTxMemPool pool(CFeeRate(0));
+    CTxMemPool pool;
     pool.clear();
 
     /* Create a complex set of chained transactions and then update their state after removing some from the mempool.
@@ -1383,7 +1383,7 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest)
     }
 
 
-    CTxMemPool testPool(CFeeRate(0));
+    CTxMemPool testPool;
     std::list<CTransactionRef> removed;
 
     // Nothing in pool, remove should do nothing:
@@ -1458,7 +1458,7 @@ void _CheckSort(CTxMemPool &pool, std::vector<std::string> &sortedOrder)
 
 BOOST_AUTO_TEST_CASE(MempoolIndexingTest)
 {
-    CTxMemPool pool(CFeeRate(0));
+    CTxMemPool pool;
     TestMemPoolEntryHelper entry;
     entry.hadNoDependencies = true;
 
@@ -1677,7 +1677,7 @@ BOOST_AUTO_TEST_CASE(MempoolIndexingTest)
 
 BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest)
 {
-    CTxMemPool pool(CFeeRate(0));
+    CTxMemPool pool;
     TestMemPoolEntryHelper entry;
     entry.hadNoDependencies = true;
 
@@ -1779,7 +1779,8 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest)
 
 BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest)
 {
-    CTxMemPool pool(CFeeRate(1000));
+    CTxMemPool pool;
+    std::vector<COutPoint> vNoSpendsRemaining;
     TestMemPoolEntryHelper entry;
     entry.dPriority = 10.0;
 
@@ -1799,13 +1800,17 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest)
     tx2.vout[0].nValue = 10 * COIN;
     pool.addUnchecked(tx2.GetHash(), entry.Fee(5000LL).FromTx(tx2, &pool));
 
-    pool.TrimToSize(pool.DynamicMemoryUsage()); // should do nothing
+    vNoSpendsRemaining.clear();
+    pool.TrimToSize(pool.DynamicMemoryUsage(), &vNoSpendsRemaining, true); // should do nothing
     BOOST_CHECK(pool.exists(tx1.GetHash()));
     BOOST_CHECK(pool.exists(tx2.GetHash()));
+    BOOST_CHECK(pool.size() == 2);
 
-    pool.TrimToSize(pool.DynamicMemoryUsage() * 3 / 4); // should remove the lower-feerate transaction
-    BOOST_CHECK(pool.exists(tx1.GetHash()));
-    BOOST_CHECK(!pool.exists(tx2.GetHash()));
+    vNoSpendsRemaining.clear();
+    pool.TrimToSize(pool.DynamicMemoryUsage() * 3 / 4, &vNoSpendsRemaining, true);
+    BOOST_CHECK(!pool.exists(tx1.GetHash()));
+    BOOST_CHECK(pool.exists(tx2.GetHash()));
+    BOOST_CHECK(pool.size() == 1);
 
     pool.addUnchecked(tx2.GetHash(), entry.FromTx(tx2, &pool));
     CMutableTransaction tx3 = CMutableTransaction();
@@ -1817,20 +1822,15 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest)
     tx3.vout[0].nValue = 10 * COIN;
     pool.addUnchecked(tx3.GetHash(), entry.Fee(20000LL).FromTx(tx3, &pool));
 
-    pool.TrimToSize(pool.DynamicMemoryUsage() * 3 / 4); // tx3 should pay for tx2 (CPFP)
-    BOOST_CHECK(!pool.exists(tx1.GetHash()));
-    BOOST_CHECK(pool.exists(tx2.GetHash()));
-    BOOST_CHECK(pool.exists(tx3.GetHash()));
-
-    // mempool is limited to tx1's size in memory usage, so nothing fits
-    pool.TrimToSize(::GetSerializeSize(CTransaction(tx1), SER_NETWORK, PROTOCOL_VERSION));
+    // mempool is limited to tx2's size in memory usage, so nothing fits
+    pool.TrimToSize(::GetSerializeSize(CTransaction(tx2), SER_NETWORK, PROTOCOL_VERSION));
     BOOST_CHECK(!pool.exists(tx1.GetHash()));
     BOOST_CHECK(!pool.exists(tx2.GetHash()));
     BOOST_CHECK(!pool.exists(tx3.GetHash()));
+    BOOST_CHECK(pool.size() == 0);
 
     CFeeRate maxFeeRateRemoved(25000, ::GetSerializeSize(CTransaction(tx3), SER_NETWORK, PROTOCOL_VERSION) +
                                           ::GetSerializeSize(CTransaction(tx2), SER_NETWORK, PROTOCOL_VERSION));
-    BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(), maxFeeRateRemoved.GetFeePerK() + 1000);
 
     CMutableTransaction tx4 = CMutableTransaction();
     tx4.vin.resize(2);
@@ -1885,59 +1885,110 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest)
     pool.addUnchecked(tx6.GetHash(), entry.Fee(1100LL).FromTx(tx6, &pool));
     pool.addUnchecked(tx7.GetHash(), entry.Fee(9000LL).FromTx(tx7, &pool));
 
-    // we only require this remove, at max, 2 txn, because its not clear what we're really optimizing for aside from
-    // that
-    pool.TrimToSize(pool.DynamicMemoryUsage() - 1);
+    // we only require this removes both tx6 and tx7 because tx6 is chosen which then also removes the decendant tx7.
+    vNoSpendsRemaining.clear();
+    pool.TrimToSize(pool.DynamicMemoryUsage() - 1, &vNoSpendsRemaining, true);
     BOOST_CHECK(pool.exists(tx4.GetHash()));
-    BOOST_CHECK(pool.exists(tx6.GetHash()));
+    BOOST_CHECK(pool.exists(tx5.GetHash()));
+    BOOST_CHECK(!pool.exists(tx6.GetHash()));
     BOOST_CHECK(!pool.exists(tx7.GetHash()));
+    BOOST_CHECK(pool.size() == 2);
 
     if (!pool.exists(tx5.GetHash()))
+    {
         pool.addUnchecked(tx5.GetHash(), entry.Fee(1000LL).FromTx(tx5, &pool));
+    }
     pool.addUnchecked(tx7.GetHash(), entry.Fee(9000LL).FromTx(tx7, &pool));
 
-    pool.TrimToSize(pool.DynamicMemoryUsage() / 2); // should maximize mempool size by only removing 5/7
+    // should maximize mempool size by only removing tx5 and its decendants
+    pool.TrimToSize(pool.DynamicMemoryUsage() / 2, &vNoSpendsRemaining, true);
     BOOST_CHECK(pool.exists(tx4.GetHash()));
     BOOST_CHECK(!pool.exists(tx5.GetHash()));
-    BOOST_CHECK(pool.exists(tx6.GetHash()));
+    BOOST_CHECK(!pool.exists(tx6.GetHash()));
     BOOST_CHECK(!pool.exists(tx7.GetHash()));
+    BOOST_CHECK(pool.size() == 1);
 
-    pool.addUnchecked(tx5.GetHash(), entry.Fee(1000LL).FromTx(tx5, &pool));
-    pool.addUnchecked(tx7.GetHash(), entry.Fee(9000LL).FromTx(tx7, &pool));
+    // Add two single txns that are not chained and then trim the pool by 1 byte.
+    pool.clear();
+    pool.addUnchecked(tx1.GetHash(), entry.Fee(10000LL).FromTx(tx1, &pool));
+    pool.addUnchecked(tx4.GetHash(), entry.Fee(7000LL).FromTx(tx4, &pool));
+    vNoSpendsRemaining.clear();
+    pool.TrimToSize(pool.DynamicMemoryUsage() - 1, &vNoSpendsRemaining, true);
+    BOOST_CHECK(!pool.exists(tx1.GetHash()));
+    BOOST_CHECK(pool.exists(tx4.GetHash()));
+    BOOST_CHECK(pool.size() == 1); // tx1 should be trimmed from the pool
 
-    std::vector<CTransactionRef> vtx;
-    std::list<CTransactionRef> conflicts;
-    SetMockTime(42);
-    SetMockTime(42 + CTxMemPool::ROLLING_FEE_HALFLIFE);
-    BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(), maxFeeRateRemoved.GetFeePerK() + 1000);
-    // ... we should keep the same min fee until we get a block
-    pool.removeForBlock(vtx, 1, conflicts);
-    SetMockTime(42 + 2 * CTxMemPool::ROLLING_FEE_HALFLIFE);
-    BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(), (maxFeeRateRemoved.GetFeePerK() + 1000) / 2);
-    // ... then feerate should drop 1/2 each halflife
+    // Add a chain of 10 txns and trim. Only the very last txn in the chain should be removed
+    pool.clear();
+    pool.addUnchecked(tx1.GetHash(), entry.Fee(10000LL).FromTx(tx1, &pool));
 
-    SetMockTime(42 + 2 * CTxMemPool::ROLLING_FEE_HALFLIFE + CTxMemPool::ROLLING_FEE_HALFLIFE / 2);
-    BOOST_CHECK_EQUAL(
-        pool.GetMinFee(pool.DynamicMemoryUsage() * 5 / 2).GetFeePerK(), (maxFeeRateRemoved.GetFeePerK() + 1000) / 4);
-    // ... with a 1/2 halflife when mempool is < 1/2 its target size
+    // Make a txn we can used for chaining
+    CMutableTransaction tx;
+    uint256 hash;
+    tx.vin.resize(1);
+    tx.vin[0].scriptSig = CScript();
+    tx.vin[0].prevout.hash = tx1.GetHash();
+    tx.vin[0].prevout.n = 0;
+    tx.vout.resize(1);
+    tx.vout[0].nValue = 5000000000LL;
 
-    SetMockTime(42 + 2 * CTxMemPool::ROLLING_FEE_HALFLIFE + CTxMemPool::ROLLING_FEE_HALFLIFE / 2 +
-                CTxMemPool::ROLLING_FEE_HALFLIFE / 4);
-    BOOST_CHECK_EQUAL(
-        pool.GetMinFee(pool.DynamicMemoryUsage() * 9 / 2).GetFeePerK(), (maxFeeRateRemoved.GetFeePerK() + 1000) / 8);
-    // ... with a 1/4 halflife when mempool is < 1/4 its target size
+    // Create a chain of transactions with varying fees applied to the descendants. This will create a chain
+    // of descendant packages.
+    for (unsigned int i = 1; i <= 9; ++i)
+    {
+        int nFee = 1000;
+        tx.vout[0].nValue -= nFee;
+        hash = tx.GetHash();
+        bool spendsCoinbase = false;
+        pool.addUnchecked(
+            hash, entry.Fee(nFee).Time(GetTime() + i).SpendsCoinbase(spendsCoinbase).SigOps(1).FromTx(tx));
+        tx.vin[0].prevout.hash = hash;
+    }
+    BOOST_CHECK(pool.size() == 10);
+    pool.TrimToSize(pool.DynamicMemoryUsage() - 1, &vNoSpendsRemaining, false);
+    BOOST_CHECK(pool.size() == 9); // only the 10nth should be trimmed from the pool
+    BOOST_CHECK(!pool.exists(tx.GetHash())); // last hash should not exist
 
-    SetMockTime(42 + 7 * CTxMemPool::ROLLING_FEE_HALFLIFE + CTxMemPool::ROLLING_FEE_HALFLIFE / 2 +
-                CTxMemPool::ROLLING_FEE_HALFLIFE / 4);
-    BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(), 1000);
-    // ... but feerate should never drop below 1000
+    // Add a chain of 100 txns and trim. At most the very last 4 txns in the chain should be removed
+    pool.clear();
+    pool.addUnchecked(tx1.GetHash(), entry.Fee(10000LL).FromTx(tx1, &pool));
 
-    SetMockTime(42 + 8 * CTxMemPool::ROLLING_FEE_HALFLIFE + CTxMemPool::ROLLING_FEE_HALFLIFE / 2 +
-                CTxMemPool::ROLLING_FEE_HALFLIFE / 4);
-    BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(), 0);
-    // ... unless it has gone all the way to 0 (after getting past 1000/2)
+    // Store all hashes so we can check them for existence later
+    std::vector<uint256> vHashes;
+    vHashes.push_back(tx1.GetHash());
 
-    SetMockTime(0);
+    // Make a txn we can used for chaining
+    tx.vin.resize(1);
+    tx.vin[0].scriptSig = CScript();
+    tx.vin[0].prevout.hash = tx1.GetHash();
+    tx.vin[0].prevout.n = 0;
+    tx.vout.resize(1);
+    tx.vout[0].nValue = 5000000000LL;
+
+    // Create a chain of transactions with varying fees applied to the descendants. This will create a chain
+    // of descendant packages.
+    for (unsigned int i = 1; i <= 99; ++i)
+    {
+        int nFee = 1000;
+        tx.vout[0].nValue -= nFee;
+        hash = tx.GetHash();
+        vHashes.push_back(tx.GetHash());
+        bool spendsCoinbase = false;
+        pool.addUnchecked(
+            hash, entry.Fee(nFee).Time(GetTime() + i).SpendsCoinbase(spendsCoinbase).SigOps(1).FromTx(tx));
+        tx.vin[0].prevout.hash = hash;
+    }
+
+    BOOST_CHECK(pool.size() == 100);
+    pool.TrimToSize(pool.DynamicMemoryUsage() - 1, &vNoSpendsRemaining, false);
+
+    // The chain will have been trimmed anywhere from 1 to 10% of that last
+    // part of the chain. But at least 1 transaction, the very last in the chain,
+    // will have been removed.
+    BOOST_CHECK(pool.size() >= 90 && pool.size() < 100);
+    for (size_t i = 0; i <= vHashes.size() - 10; i++) // first 90 hashes should exist
+        BOOST_CHECK(pool.exists(vHashes[i]));
+    BOOST_CHECK(!pool.exists(tx.GetHash())); // at minimum the last hash should not exist
 }
 
 BOOST_AUTO_TEST_SUITE_END()

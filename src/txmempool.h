@@ -507,14 +507,6 @@ private:
     uint64_t totalTxSize; //! sum of all mempool tx' byte sizes
     uint64_t cachedInnerUsage; //! sum of dynamic memory usage of all the map elements (NOT the maps themselves)
 
-    CFeeRate minReasonableRelayFee;
-
-    mutable int64_t lastRollingFeeUpdate;
-    mutable bool blockSinceLastRollingFeeBump;
-    mutable double rollingMinimumFeeRate; //! minimum fee to get into the pool, decreases exponentially
-
-    void trackPackageRemoved(const CFeeRate &rate);
-
     std::mutex cs_txPerSec;
     double nTxPerSec GUARDED_BY(cs_txPerSec); //! txns per second accepted into the mempool
     double nInstantaneousTxPerSec GUARDED_BY(cs_txPerSec); //! instantaneous (1-second resolution) txns per second
@@ -596,7 +588,7 @@ public:
      *  around what it "costs" to relay a transaction around the network and
      *  below which we would reasonably say a transaction has 0-effective-fee.
      */
-    CTxMemPool(const CFeeRate &_minReasonableRelayFee);
+    CTxMemPool();
     ~CTxMemPool();
 
     /** Atomically (with respect to the mempool) call f on each mempool entry, and then clear the mempool */
@@ -658,11 +650,6 @@ public:
     void _removeConflicts(const CTransaction &tx, std::list<CTransactionRef> &removed);
     void removeForBlock(const std::vector<CTransactionRef> &vtx,
         uint64_t nBlockHeight,
-        std::list<CTransactionRef> &conflicted,
-        bool fCurrentEstimate = true,
-        std::vector<CTxChange> *txChange = nullptr);
-    void removeForBlock_Legacy(const std::vector<CTransactionRef> &vtx,
-        unsigned int nBlockHeight,
         std::list<CTransactionRef> &conflicted,
         bool fCurrentEstimate = true,
         std::vector<CTxChange> *txChange = nullptr);
@@ -776,20 +763,13 @@ public:
         return true;
     }
 
-    /** The minimum fee to get into the mempool, which may itself not be enough
-      *  for larger-sized transactions.
-      *  The minReasonableRelayFee constructor arg is used to bound the time it
-      *  takes the fee rate to go back down all the way to 0. When the feerate
-      *  would otherwise be half of this, it is set to 0 instead.
-      */
-    CFeeRate GetMinFee(size_t sizelimit) const;
-    CFeeRate _GetMinFee(size_t sizelimit) const;
-
     /** Remove transactions from the mempool until its dynamic size is <= sizelimit.
       *  pvNoSpendsRemaining, if set, will be populated with the list of outpoints
       *  which are not in mempool which no longer have any spends in this mempool.
       */
-    void TrimToSize(size_t sizelimit, std::vector<COutPoint> *pvNoSpendsRemaining = nullptr);
+    void TrimToSize(size_t sizelimit,
+        std::vector<COutPoint> *pvNoSpendsRemaining = nullptr,
+        bool fDeterministic = false);
 
     /** Expire all transaction (and their dependencies) in the mempool older than time. Return the number of removed
      * transactions. */

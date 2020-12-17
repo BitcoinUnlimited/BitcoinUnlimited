@@ -271,12 +271,12 @@ std::string FormatStateMessage(const CValidationState &state)
 }
 
 
-bool AreFreeTxnsDisallowed()
+bool AreFreeTxnsAllowed()
 {
     if (GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY) > 0)
-        return false;
+        return true;
 
-    return true;
+    return false;
 }
 
 bool GetTransaction(const uint256 &hash,
