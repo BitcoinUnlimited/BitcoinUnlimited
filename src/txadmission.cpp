@@ -269,7 +269,7 @@ void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age)
         LOG(MEMPOOL, "Expired %i transactions from the memory pool\n", expired);
 
     std::vector<COutPoint> vNoSpendsRemaining;
-    pool.TrimToSize(limit, &vNoSpendsRemaining);
+    pool.TrimToSize(limit, &vNoSpendsRemaining, false);
     for (const COutPoint &removed : vNoSpendsRemaining)
         pcoinsTip->Uncache(removed);
 }
@@ -1018,23 +1018,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
         nSize = entry.GetTxSize();
 
-        CAmount mempoolRejectFee =
-            pool.GetMinFee(GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000).GetFee(nSize);
-        if (mempoolRejectFee > 0 && nModifiedFees < mempoolRejectFee)
-        {
-            if (debugger)
-            {
-                debugger->AddInvalidReason("mempool min fee not met");
-                debugger->standard = false;
-            }
-            else
-            {
-                return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool min fee not met", false,
-                    strprintf("%d < %d", nFees, mempoolRejectFee));
-            }
-        }
-        else if (GetBoolArg("-relaypriority", DEFAULT_RELAYPRIORITY) && nModifiedFees < ::minRelayTxFee.GetFee(nSize) &&
-                 !AllowFree(entry.GetPriority(chainActive.Height() + 1)))
+        if (GetBoolArg("-relaypriority", DEFAULT_RELAYPRIORITY) && nModifiedFees < ::minRelayTxFee.GetFee(nSize) &&
+            !AllowFree(entry.GetPriority(chainActive.Height() + 1)))
         {
             if (debugger)
             {
@@ -1146,36 +1131,52 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             // LOG(MEMPOOL, "MempoolBytes:%d  LimitFreeRelay:%.5g  nMinRelay:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d "
             //                         "TxFees:%d\n",
             //                poolBytes, nFreeLimit, nMinRelay, ((double)nFees) / nSize, nSize, nFees);
-            if ((fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize)) ||
-                (nLimitFreeRelay == 0 && nFees < ::minRelayTxFee.GetFee(nSize)))
+            if (fLimitFree)
             {
-                static double dFreeCount = 0;
+                if (nLimitFreeRelay > 0 && nFees < ::minRelayTxFee.GetFee(nSize))
+                {
+                    static double dFreeCount = 0;
 
-                // Use an exponentially decaying ~10-minute window:
-                dFreeCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - nLastTime));
+                    // Use an exponentially decaying ~10-minute window:
+                    dFreeCount *= std::pow(1.0 - 1.0 / 600.0, (double)(nNow - nLastTime));
+                    nLastTime = nNow;
 
-                // -limitfreerelay unit is thousand-bytes-per-minute
-                // At default rate it would take over a month to fill 1GB
-                LOG(MEMPOOL, "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount + nSize);
-                if ((dFreeCount + nSize) >=
-                    (nFreeLimit * 10 * 1000 * nLargestBlockSeen / BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
+                    // -limitfreerelay unit is thousand-bytes-per-minute
+                    // At default rate it would take over a month to fill 1GB
+                    LOG(MEMPOOL, "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount + nSize);
+                    if ((dFreeCount + nSize) >=
+                        (nFreeLimit * 10 * 1000 * nLargestBlockSeen / BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
+                    {
+                        if (debugger)
+                        {
+                            debugger->AddInvalidReason("rate limited free transaction");
+                            debugger->standard = false;
+                        }
+                        else
+                        {
+                            thindata.UpdateMempoolLimiterBytesSaved(nSize);
+                            LOG(MEMPOOL, "AcceptToMemoryPool : free transaction %s rejected by rate limiter\n",
+                                hash.ToString());
+                            return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "rate limited free transaction");
+                        }
+                    }
+                    dFreeCount += nSize;
+                }
+                else if (nFees < ::minRelayTxFee.GetFee(nSize))
                 {
                     if (debugger)
                     {
-                        debugger->AddInvalidReason("rate limited free transaction");
+                        debugger->AddInvalidReason("mempool min fee not met");
                         debugger->standard = false;
                     }
                     else
                     {
                         thindata.UpdateMempoolLimiterBytesSaved(nSize);
-                        LOG(MEMPOOL, "AcceptToMemoryPool : free transaction %s rejected by rate limiter\n",
-                            hash.ToString());
-                        return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "rate limited free transaction");
+                        LOG(MEMPOOL, "AcceptToMemoryPool : min fee not met for %s\n", hash.ToString());
+                        return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool min fee not met");
                     }
                 }
-                dFreeCount += nSize;
             }
-            nLastTime = nNow;
         }
         // BU - Xtreme Thinblocks Auto Mempool Limiter - end section
 

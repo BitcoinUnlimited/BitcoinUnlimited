@@ -151,15 +151,21 @@ class MiningTest (BitcoinTestFramework):
         assert_equal(self.nodes[0].getmempoolinfo()["mempoolminfee"], 0)
 
         # Make the minlimitertxfee so high it would be higher than any possible fee.
+        # In this case because the -limitfreerelay is set by default in the python scripts
+        # the following transactions will be considered free, and as a result should enter the mempool
+        # and be mineable.
         self.nodes[0].set("minlimitertxfee=1000")
         self.nodes[1].set("minlimitertxfee=1000")
         self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
         self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
         self.sync_all()
+        assert_equal(self.nodes[0].getmempoolinfo()["size"], 4)
+        assert_equal(self.nodes[1].getmempoolinfo()["size"], 4)
         assert_equal(str(self.nodes[0].getnetworkinfo()["relayfee"]), "0.01000000")
         self.nodes[0].generate(1)
         self.sync_all()
         assert_equal(self.nodes[0].getmempoolinfo()["size"], 0)
+        assert_equal(self.nodes[1].getmempoolinfo()["size"], 0)
 
 
 if __name__ == '__main__':

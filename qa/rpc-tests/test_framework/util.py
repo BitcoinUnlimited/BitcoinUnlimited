@@ -1180,7 +1180,7 @@ def create_tx(node, coinbase, to_address, amount):
 def create_lots_of_big_transactions(node, txouts, utxos, num, fee):
     addr = node.getnewaddress()
     txids = []
-    for i in range(len(utxos)):
+    for i in range(num):
         t = utxos.pop()
         inputs = []
         inputs.append({ "txid" : t["txid"], "vout" : t["vout"]})

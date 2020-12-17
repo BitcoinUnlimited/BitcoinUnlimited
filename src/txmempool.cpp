@@ -673,8 +673,7 @@ void CTxMemPoolEntry::ReplaceAncestorState(int64_t modifySize, CAmount modifyFee
     assert(int(nSigOpCountWithAncestors) >= 0);
 }
 
-CTxMemPool::CTxMemPool(const CFeeRate &_minReasonableRelayFee)
-    : nTransactionsUpdated(0), m_dspStorage(new DoubleSpendProofStorage())
+CTxMemPool::CTxMemPool() : nTransactionsUpdated(0), m_dspStorage(new DoubleSpendProofStorage())
 {
     _clear(); // lock free clear
 
@@ -683,12 +682,7 @@ CTxMemPool::CTxMemPool(const CFeeRate &_minReasonableRelayFee)
     // of transactions in the pool
     nCheckFrequency = 0;
 
-    minerPolicyEstimator = new CBlockPolicyEstimator(_minReasonableRelayFee);
-    minReasonableRelayFee = _minReasonableRelayFee;
-
-    lastRollingFeeUpdate = 0;
-    blockSinceLastRollingFeeBump = false;
-    rollingMinimumFeeRate = 0;
+    minerPolicyEstimator = new CBlockPolicyEstimator(minRelayTxFee);
 
     nTxPerSec = 0;
     nInstantaneousTxPerSec = 0;
@@ -1039,8 +1033,6 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
 
         // Before the txs in the new block have been removed from the mempool, update policy estimates
         minerPolicyEstimator->processBlock(nBlockHeight, setTxnsInBlock, fCurrentEstimate);
-        lastRollingFeeUpdate = GetTime();
-        blockSinceLastRollingFeeBump = true;
 
         // Remove Transactions that were in the block from the mempool.
         for (txiter it : setTxnsInBlock)
@@ -1120,122 +1112,6 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
     ResubmitCommitQ();
 }
 
-// This is the old version of remove for block which is still kept for testing purposes.
-void CTxMemPool::removeForBlock_Legacy(const std::vector<CTransactionRef> &vtx,
-    unsigned int nBlockHeight,
-    std::list<CTransactionRef> &conflicts,
-    bool fCurrentEstimate,
-    std::vector<CTxChange> *txChanges)
-{
-    typedef std::map<txiter, std::vector<txiter>, CompareIteratorByHash> DeferredMap;
-
-    WRITELOCK(cs_txmempool);
-    std::vector<txiter> entriesToRemove;
-
-    DeferredMap deferred;
-    std::queue<txiter> ready;
-
-    CTxMemPool::TxMempoolOriginalStateMap changeSet;
-
-    setEntries setTxnsInBlock;
-    for (const auto &tx : vtx)
-    {
-        uint256 hash = tx->GetHash();
-        txiter i = mapTx.find(hash);
-        if (i == mapTx.end())
-            continue; // not in the mempool
-        ready.push(i);
-        setTxnsInBlock.insert(i);
-    }
-    // Before the txs in the new block have been removed from the mempool, update policy estimates
-    minerPolicyEstimator->processBlock(nBlockHeight, setTxnsInBlock, fCurrentEstimate);
-    lastRollingFeeUpdate = GetTime();
-    blockSinceLastRollingFeeBump = true;
-
-    while (!ready.empty())
-    {
-        txiter nextTx = ready.front();
-        ready.pop();
-
-        const auto &links = mapLinks.find(nextTx);
-        if (links == mapLinks.end())
-        {
-            DbgAssert(!"should never happen", );
-            continue;
-        }
-        if (links->second.parents.empty()) // This tx has no ancestors, so its ready to be removed
-        {
-            // place any tx that were deferred because this tx was required back onto the ready Q
-            DeferredMap::iterator deferredSet = deferred.find(nextTx);
-            if (deferredSet != deferred.end())
-            {
-                for (auto j = deferredSet->second.begin(); j != deferredSet->second.end(); ++j)
-                {
-                    ready.push(*j);
-                }
-                deferred.erase(deferredSet);
-            }
-            // Remove this tx from the mempool
-            setEntries stage;
-            stage.insert(nextTx); // nextTx is invalid now
-            _RemoveStaged(stage, true, (txChanges) ? &changeSet : nullptr);
-        }
-        else // This tx has ancestors, so put it in the deferred queue waiting for them
-        {
-            auto tmp = links->second.parents.begin();
-            if (tmp != links->second.parents.end())
-            {
-                txiter t = *tmp;
-                std::vector<txiter> &vec = deferred[t];
-                vec.push_back(nextTx);
-            }
-            else // an empty txiter should never be part of the parents
-            {
-                DbgAssert(!"tx parents is corrupt!", {
-                    links->second.parents.clear();
-                    ready.push(nextTx);
-                });
-            }
-        }
-
-        // If we run out of tx in the ready queue, grab everything that was deferred
-        // and put them back in the ready q
-        if (ready.empty() && !deferred.empty())
-        {
-            DbgAssert(!"Impossible tx topology", );
-            for (auto i = deferred.begin(); i != deferred.end(); ++i)
-            {
-                for (auto j = i->second.begin(); j != i->second.end(); ++j)
-                {
-                    ready.push(*j);
-                }
-            }
-            deferred.clear();
-        }
-    }
-
-    // process changeSet into a list of tx and mempool change
-    if (txChanges)
-    {
-        txChanges->reserve(changeSet.size());
-        // Create the change set list and sort into dependency order
-        for (auto &mc : changeSet)
-        {
-            txChanges->push_back(CTxChange(mc.second));
-        }
-        sort(txChanges->begin(), txChanges->end(), [](const CTxChange &a, const CTxChange &b) {
-            return a.now.countWithDescendants > b.now.countWithDescendants;
-        });
-    }
-
-    // Remove conflicting tx
-    for (const auto &tx : vtx)
-    {
-        _removeConflicts(*tx, conflicts);
-        _ClearPrioritisation(tx->GetHash());
-    }
-}
-
 void CTxMemPool::_clear()
 {
     mapLinks.clear();
@@ -1243,9 +1119,6 @@ void CTxMemPool::_clear()
     mapNextTx.clear();
     totalTxSize = 0;
     cachedInnerUsage = 0;
-    lastRollingFeeUpdate = GetTime();
-    blockSinceLastRollingFeeBump = false;
-    rollingMinimumFeeRate = 0;
     ++nTransactionsUpdated;
 }
 
@@ -1747,85 +1620,65 @@ CTransactionRef CTxMemPool::addDoubleSpendProof(const DoubleSpendProof &proof)
 }
 
 DoubleSpendProofStorage *CTxMemPool::doubleSpendProofStorage() const { return m_dspStorage.get(); }
-CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const
-{
-    READLOCK(cs_txmempool);
-    return _GetMinFee(sizelimit);
-}
-
-CFeeRate CTxMemPool::_GetMinFee(size_t sizelimit) const
-{
-    AssertLockHeld(cs_txmempool);
-    if (!blockSinceLastRollingFeeBump || rollingMinimumFeeRate == 0)
-        return CFeeRate(rollingMinimumFeeRate);
-
-    int64_t time = GetTime();
-    if (time > lastRollingFeeUpdate + 10)
-    {
-        double halflife = ROLLING_FEE_HALFLIFE;
-        size_t dmu = _DynamicMemoryUsage();
-        if (dmu < sizelimit / 4)
-            halflife /= 4;
-        else if (dmu < sizelimit / 2)
-            halflife /= 2;
-
-        rollingMinimumFeeRate = rollingMinimumFeeRate / pow(2.0, (time - lastRollingFeeUpdate) / halflife);
-        lastRollingFeeUpdate = time;
-
-        if (rollingMinimumFeeRate < minReasonableRelayFee.GetFeePerK() / 2)
-        {
-            rollingMinimumFeeRate = 0;
-            return CFeeRate(0);
-        }
-    }
-    return std::max(CFeeRate(rollingMinimumFeeRate), minReasonableRelayFee);
-}
-
-void CTxMemPool::trackPackageRemoved(const CFeeRate &rate)
-{
-    AssertLockHeld(cs_txmempool);
-    if (rate.GetFeePerK() > rollingMinimumFeeRate)
-    {
-        rollingMinimumFeeRate = rate.GetFeePerK();
-        blockSinceLastRollingFeeBump = false;
-    }
-}
-
-void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint> *pvNoSpendsRemaining)
+void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint> *pvNoSpendsRemaining, bool fDeterministic)
 {
     WRITELOCK(cs_txmempool);
     unsigned nTxnRemoved = 0;
-    CFeeRate maxFeeRateRemoved(0);
+
+    FastRandomContext insecure_rand(fDeterministic);
     while (_DynamicMemoryUsage() > sizelimit)
     {
-        indexed_transaction_set::index<descendant_score>::type::iterator it = mapTx.get<descendant_score>().begin();
+        if (mapTx.size() == 0)
+            break;
 
-        // We set the new mempool min fee to the feerate of the removed set, plus the
-        // "minimum reasonable fee rate" (ie some value under which we consider txn
-        // to have 0 fee). This way, we don't allow txn to enter mempool with feerate
-        // equal to txn which were removed with no block in between.
-        CFeeRate removed(it->GetModFeesWithDescendants(), it->GetSizeWithDescendants());
-        removed += minReasonableRelayFee;
-        trackPackageRemoved(removed);
-        maxFeeRateRemoved = std::max(maxFeeRateRemoved, removed);
-
+        // Use the following scope to make sure that the iterator is destroyed and can't be used later
+        // because we'll be removing the transaction associated with it.
+        uint64_t nAncestors = 0;
         setEntries stage;
-        _CalculateDescendants(mapTx.project<0>(it), stage);
+        {
+            // Pick a random entry to delete
+            indexed_transaction_set::index<entry_time>::type::iterator it = mapTx.get<entry_time>().begin();
+            auto nEntryToDelete = insecure_rand.randrange((uint64_t)mapTx.size());
+            std::advance(it, nEntryToDelete);
+            DbgAssert(it != mapTx.get<entry_time>().end(), return );
+
+            // Delete the entry and any descendants
+            _CalculateDescendants(mapTx.project<0>(it), stage);
+
+            // If the descendant chain to remove is more than 10% of the total
+            // chain size, then iterate through the setEntries to find a transaction
+            // that be <= 10% of the total. In this way we don't remove an entire
+            // chain that may be 100's or 1000's of txns long.
+            nAncestors = it->GetCountWithAncestors();
+        }
+        uint64_t nSizeOfTxnChain = nAncestors + stage.size();
+        if (nSizeOfTxnChain >= 10 && (double)nAncestors <= ((double)nSizeOfTxnChain * 0.90))
+        {
+            for (auto it2 : stage)
+            {
+                if ((double)it2->GetCountWithAncestors() > ((double)nSizeOfTxnChain * 0.90))
+                {
+                    stage.clear();
+                    _CalculateDescendants(it2, stage);
+                    break;
+                }
+            }
+        }
         nTxnRemoved += stage.size();
 
-        std::vector<CTransaction> txn;
+        std::vector<CTransactionRef> vTxn;
         if (pvNoSpendsRemaining)
         {
-            txn.reserve(stage.size());
+            vTxn.reserve(stage.size());
             for (txiter it3 : stage)
-                txn.push_back(it3->GetTx());
+                vTxn.push_back(it3->GetSharedTx());
         }
         _RemoveStaged(stage, false);
         if (pvNoSpendsRemaining)
         {
-            for (const CTransaction &tx : txn)
+            for (const CTransactionRef ptx : vTxn)
             {
-                for (const CTxIn &txin : tx.vin)
+                for (const CTxIn &txin : ptx->vin)
                 {
                     if (_exists(txin.prevout.hash))
                         continue;
@@ -1838,8 +1691,8 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint> *pvNoSpends
         }
     }
 
-    if (maxFeeRateRemoved > CFeeRate(0))
-        LOG(MEMPOOL, "Removed %u txn, rolling minimum fee bumped to %s\n", nTxnRemoved, maxFeeRateRemoved.ToString());
+    if (nTxnRemoved > 0)
+        LOG(MEMPOOL, "Removed %u txn\n", nTxnRemoved);
 }
 
 void CTxMemPool::UpdateTransactionsPerSecond()
