@@ -36,7 +36,9 @@ QString TransactionDesc::FormatTxStatus(const CWalletTx &wtx)
     else
     {
         int nDepth = wtx.GetDepthInMainChain();
-        if (nDepth < 0)
+        if (nDepth == 0 && wtx.fDoubleSpent)
+            return tr("double spent");
+        else if (nDepth < 0)
             return tr("conflicted");
         else if (GetAdjustedTime() - wtx.nTimeReceived > 2 * 60 && wtx.GetRequestCount() == 0)
             return tr("%1/offline").arg(nDepth);
@@ -70,7 +72,6 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
             strHTML += tr(", broadcast through %n node(s)", "", nRequests);
     }
     strHTML += "<br>";
-
     strHTML += "<b>" + tr("Date") + ":</b> " + (nTime ? GUIUtil::dateTimeStr(nTime) : "") + "<br>";
 
     //

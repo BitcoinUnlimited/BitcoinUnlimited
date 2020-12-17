@@ -988,6 +988,16 @@ bool CWallet::AbandonTransaction(const uint256 &hashTx)
     return true;
 }
 
+void CWallet::MarkDoubleSpent(const uint256 &hashTx)
+{
+    LOCK(cs_wallet);
+    if (mapWallet.count(hashTx))
+    {
+        mapWallet[hashTx].fDoubleSpent = true;
+        NotifyTransactionChanged(this, hashTx, CT_UPDATED);
+    }
+}
+
 void CWallet::MarkConflicted(const uint256 &hashBlock, const uint256 &hashTx)
 {
     LOCK(cs_wallet);

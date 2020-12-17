@@ -250,6 +250,22 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                 }
             }
         }
+        else if (inv.type == MSG_DOUBLESPENDPROOF && doubleSpendProofs.Value() == true)
+        {
+            DoubleSpendProof dsp = mempool.doubleSpendProofStorage()->lookup(inv.hash);
+            if (!dsp.isEmpty())
+            {
+                CDataStream ssDSP(SER_NETWORK, PROTOCOL_VERSION);
+                ssDSP.reserve(600);
+                ssDSP << dsp;
+                pfrom->PushMessage(NetMsgType::DSPROOF, ssDSP);
+            }
+            else
+            {
+                pfrom->PushMessage(NetMsgType::REJECT, std::string(NetMsgType::DSPROOF), REJECT_INVALID,
+                    std::string("dsproof requested was not found"));
+            }
+        }
         else if (inv.IsKnownType())
         {
             CTransactionRef ptx = nullptr;
@@ -287,22 +303,6 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     {
                         pfrom->PushMessage(NetMsgType::TX, ss);
                         ss.clear();
-                    }
-                }
-                else if (inv.type == MSG_DOUBLESPENDPROOF && doubleSpendProofs.Value() == true)
-                {
-                    DoubleSpendProof dsp = mempool.doubleSpendProofStorage()->lookup(inv.hash);
-                    if (!dsp.isEmpty())
-                    {
-                        CDataStream ssDSP(SER_NETWORK, PROTOCOL_VERSION);
-                        ssDSP.reserve(600);
-                        ssDSP << dsp;
-                        pfrom->PushMessage(NetMsgType::DSPROOF, ssDSP);
-                    }
-                    else
-                    {
-                        pfrom->PushMessage(NetMsgType::REJECT, std::string(NetMsgType::DSPROOF), REJECT_INVALID,
-                            std::string("dsproof requested was not found"));
                     }
                 }
                 else
@@ -447,6 +447,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     {
         grapheneVersionCompatible = false;
     }
+
     // ------------------------- BEGIN INITIAL COMMAND SET PROCESSING
     if (strCommand == NetMsgType::VERSION)
     {
