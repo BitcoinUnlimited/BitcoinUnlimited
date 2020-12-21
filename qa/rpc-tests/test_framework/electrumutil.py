@@ -32,9 +32,16 @@ def bitcoind_electrum_args():
             "-electrum.rawarg=--cashaccount-activation-height=1",
             "-electrum.rawarg=--wait-duration-secs=1"]
 
+class TestClient(StratumClient):
+    is_connected = False
+
+    def connection_lost(self, protocol):
+        self.is_connected = False
+        super().connection_lost(protocol)
+
 class ElectrumConnection:
-    def __init__(self,):
-        self.cli = StratumClient()
+    def __init__(self, loop = None):
+        self.cli = TestClient(loop)
 
     async def connect(self):
         connect_timeout = 30
@@ -44,6 +51,7 @@ class ElectrumConnection:
             try:
                 await self.cli.connect(ServerInfo(None,
                     ip_addr = "127.0.0.1", ports = ELECTRUM_PORT))
+                self.cli.is_connected = True
                 break
 
             except Exception as e:
@@ -52,14 +60,23 @@ class ElectrumConnection:
 
             time.sleep(1)
 
+    def disconnect(self):
+        self.cli.close()
 
     async def call(self, method, *args):
+        if not self.cli.is_connected:
+            raise Exception("not connected")
         return await self.cli.RPC(method, *args)
 
     async def subscribe(self, method, *args):
+        if not self.cli.is_connected:
+            raise Exception("not connected")
         future, queue = self.cli.subscribe(method, *args)
         result = await future
         return result, queue
+
+    def is_connected(self):
+        return self.cli.is_connected
 
 def script_to_scripthash(script):
     import hashlib

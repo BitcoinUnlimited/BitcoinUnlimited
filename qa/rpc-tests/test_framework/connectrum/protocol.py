@@ -21,7 +21,7 @@ class StratumProtocol(asyncio.Protocol):
         if not self.closed:
             self.closed = True
             self.close()
-            self.client._connection_lost(self)
+            self.client.connection_lost(self)
 
     def data_received(self, data):
         self.buf += data
