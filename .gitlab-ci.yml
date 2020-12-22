@@ -179,7 +179,6 @@ build-debian-electrscash:
     needs: ["build-debian"]
     script:
         - export PATH=$PATH:`pwd`/depends/x86_64-unknown-linux-gnu/native/bin # for cargo
-        - apt-get install -y python3-git clang cmake > /dev/null
         - ./autogen.sh > /dev/null
         - cd build
         - ../configure --cache-file=config.cache --prefix=$PWD/../depends/x86_64-unknown-linux-gnu > /dev/null
@@ -230,8 +229,6 @@ test-debian-qa-electrscash:
         - mkdir -p $CI_PROJECT_DIR/cores
         - mkdir -p $CI_PROJECT_DIR/saved-cores
         - echo $CI_PROJECT_DIR/cores/core.%e.%p.%h.%t | tee /proc/sys/kernel/core_pattern
-        - apt-get install -y python3-zmq gdb python3-pip > /dev/null
-        - pip3 install psutil > /dev/null
         - (cd build;
             ./qa/pull-tester/rpc-tests.py --electrum-only --no-ipv6-rpc-listen --gitlab)
     dependencies:
