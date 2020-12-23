@@ -7,6 +7,8 @@
 #include "main.h"
 #include "pubkey.h"
 #include "script/interpreter.h"
+#include "script/sign.h"
+#include "script/standard.h"
 #include "txmempool.h"
 
 #include <stdexcept>
@@ -23,6 +25,19 @@ enum ScriptType
 {
     P2PKH
 };
+
+static bool IsPayToPubKeyHash(const CScript &script)
+{
+    txnouttype outtype = TX_NONSTANDARD;
+    std::vector<CTxDestination> dests;
+    int nReq = 0;
+    if (!ExtractDestinations(script, outtype, dests, nReq))
+        return false;
+    if (outtype != TX_PUBKEYHASH || dests.size() != 1 || nReq != 1)
+        return false;
+
+    return true;
+}
 
 void getP2PKHSignature(const CScript &script, std::vector<uint8_t> &vchRet)
 {
@@ -113,8 +128,10 @@ public:
 }
 
 // static
-DoubleSpendProof DoubleSpendProof::create(const CTransaction &t1, const CTransaction &t2)
+DoubleSpendProof DoubleSpendProof::create(const CTransaction &t1, const CTransaction &t2, CTxMemPool &pool)
 {
+    AssertLockHeld(pool.cs_txmempool);
+
     if (t1.GetHash() == t2.GetHash())
         throw std::runtime_error("Can not create dsproof from identical transactions");
 
@@ -132,16 +149,23 @@ DoubleSpendProof DoubleSpendProof::create(const CTransaction &t1, const CTransac
             const CTxIn &in2 = t2.vin.at(inputIndex2);
             if (in1.prevout == in2.prevout)
             {
+                // Get the coin if it exists. Because this is a double spent coin the coin is likely spent and we
+                // need to check the mempool to get the coin.
+                const CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
+                Coin coin;
+                if (!viewMemPool.GetCoin(in1.prevout, coin))
+                    throw std::runtime_error(
+                        strprintf("Coin was not found for double spend %s", in1.prevout.hash.ToString()));
+
+                // Currently we only allow P2PKH
+                if (!IsPayToPubKeyHash(coin.out.scriptPubKey))
+                    throw std::runtime_error("Can not create dsproof: Transaction was not P2PKH");
+
                 answer.m_prevOutIndex = in1.prevout.n;
                 answer.m_prevTxId = in1.prevout.hash;
 
                 s1.outSequence = in1.nSequence;
                 s2.outSequence = in2.nSequence;
-
-                // TODO pass in the mempool and find the prev-tx we spend
-                // then we can determine what script type we are dealing with and
-                // be smarter about finding the signature.
-                // Assume p2pkh for now.
 
                 s1.pushData.resize(1);
                 getP2PKHSignature(in1.scriptSig, s1.pushData.front());
@@ -193,17 +217,26 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
     AssertLockHeld(pool.cs_txmempool);
 
     if (m_prevTxId.IsNull() || m_prevOutIndex < 0)
+    {
+        LOG(DSPROOF, "WARNING: Previous transaction id or or output index for dsproof is either null or invalid\n");
         return Invalid;
+    }
     if (m_spender1.pushData.empty() || m_spender1.pushData.front().empty() || m_spender2.pushData.empty() ||
         m_spender2.pushData.front().empty())
+    {
+        LOG(DSPROOF, "WARNING: One or both signatures for dsproof are empty\n");
         return Invalid;
+    }
 
     // check if ordering is proper. By convention, the first tx must have the smaller hash.
     int diff = m_spender1.hashOutputs.Compare(m_spender2.hashOutputs);
     if (diff == 0)
         diff = m_spender1.hashPrevOutputs.Compare(m_spender2.hashPrevOutputs);
     if (diff > 0)
+    {
+        LOG(DSPROOF, "WARNING: Transaction id ordering in dsproof is incorrect\n");
         return Invalid;
+    }
 
     // Get the previous output we are spending.
     int64_t amount;
@@ -212,7 +245,11 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
     if (prevTx.get())
     {
         if (prevTx->vout.size() <= (size_t)m_prevOutIndex)
+        {
+            LOG(DSPROOF, "WARNING: The transaction we are spending the output size is not greater than "
+                         "output index\n");
             return Invalid;
+        }
 
         auto output = prevTx->vout.at(m_prevOutIndex);
         amount = output.nValue;
@@ -266,21 +303,27 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
         {
             // Found the input script we need!
             CScript inScript = tx.vin[i].scriptSig;
-            if (inScript.IsPayToScriptHash())
-                return Invalid;
-
             auto scriptIter = inScript.begin();
             opcodetype type;
             if (!inScript.GetOp(scriptIter, type)) // P2PKH: first signature
+            {
+                LOG(DSPROOF, "WARNING: dsproof is invalid because GetOp() for signature failed\n");
                 return Invalid;
+            }
             if (!inScript.GetOp(scriptIter, type, pubkey)) // then pubkey
+            {
+                LOG(DSPROOF, "WARNING: dsproof is invalid because GetOP() for pubkey failed\n");
                 return Invalid;
+            }
             break;
         }
     }
 
     if (pubkey.empty())
+    {
+        LOG(DSPROOF, "WARNING: dsproof is invalid because pubkey is empty\n");
         return Invalid;
+    }
 
     CScript inScript;
     if (scriptType == P2PKH)
