@@ -21,7 +21,7 @@ public:
     DoubleSpendProof();
 
     /** Create a proof object, given two conflicting transactions */
-    static DoubleSpendProof create(const CTransaction &tx1, const CTransaction &tx2);
+    static DoubleSpendProof create(const CTransaction &tx1, const CTransaction &tx2, CTxMemPool &pool);
 
     /** Returns true if this object is invalid, i.e. does not represent a double spend proof */
     bool isEmpty() const;

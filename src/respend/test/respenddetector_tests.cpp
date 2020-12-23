@@ -92,13 +92,6 @@ static std::vector<CMutableTransaction> SetupDummyInputs(CBasicKeyStore &keystor
     dummyTransactions[0].vout[1].scriptPubKey << ToByteVector(key[1].GetPubKey()) << OP_CHECKSIG;
     AddCoins(coinsRet, dummyTransactions[0], nHeight);
 
-    dummyTransactions[1].vout.resize(2);
-    dummyTransactions[1].vout[0].nValue = 21 * CENT;
-    dummyTransactions[1].vout[0].scriptPubKey = GetScriptForDestination(key[2].GetPubKey().GetID());
-    dummyTransactions[1].vout[1].nValue = 22 * CENT;
-    dummyTransactions[1].vout[1].scriptPubKey = GetScriptForDestination(key[3].GetPubKey().GetID());
-    AddCoins(coinsRet, dummyTransactions[1], nHeight);
-
     return dummyTransactions;
 }
 
@@ -223,7 +216,9 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
     vNodes.push_back(&node);
     ClearInventory(&node);
 
-    CTxMemPool pool;
+    CTxMemPool &pool = mempool;
+    pool.clear();
+
     TestMemPoolEntryHelper entry;
 
     CBasicKeyStore keystore;
@@ -243,7 +238,9 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
     CKey key;
     key.MakeNewKey(true);
     keystore.AddKey(key);
-    t1.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
+    t1.vout[0].scriptPubKey << OP_DUP << OP_HASH160 << ToByteVector(key.GetPubKey().GetID()) << OP_EQUALVERIFY
+                            << OP_CHECKSIG;
+
     CTransaction tx1(t1);
     {
         TransactionSignatureCreator tsc(&keystore, &tx1, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
@@ -264,7 +261,8 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
     t2.vout[0].nValue = 50 * CENT;
     key.MakeNewKey(true);
     keystore.AddKey(key);
-    t2.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
+    t2.vout[0].scriptPubKey << OP_DUP << OP_HASH160 << ToByteVector(key.GetPubKey().GetID()) << OP_EQUALVERIFY
+                            << OP_CHECKSIG;
     CTransaction tx2(t2);
     {
         TransactionSignatureCreator tsc(&keystore, &tx2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
@@ -275,20 +273,21 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
     }
     CTransaction tx2a(t2);
     pool.addUnchecked(tx2a.GetHash(), entry.FromTx(tx2a));
+    BOOST_CHECK(pool.size() == 2);
 
 
-    // Create a spend of tx1 and tx2's output.
+    // Create a spend of tx1's output.
     CMutableTransaction s1;
     s1.nLockTime = 0;
     s1.vin.resize(1);
     s1.vin[0].prevout.hash = tx1a.GetHash();
     s1.vin[0].prevout.n = 0;
     s1.vout.resize(1);
-    s1.vout[0].nValue = 100 * CENT;
-    CKey key1;
-    key1.MakeNewKey(true);
-    keystore.AddKey(key1);
-    s1.vout[0].scriptPubKey = GetScriptForDestination(key1.GetPubKey().GetID());
+    s1.vout[0].nValue = 50 * CENT;
+    key.MakeNewKey(true);
+    keystore.AddKey(key);
+    s1.vout[0].scriptPubKey << OP_DUP << OP_HASH160 << ToByteVector(key.GetPubKey().GetID()) << OP_EQUALVERIFY
+                            << OP_CHECKSIG;
 
     CTransaction spend1(s1);
     {
@@ -301,7 +300,7 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
     CTransaction spend1a(s1);
 
 
-    // Create a respend tx1's output.
+    // Create a respend tx1a's output.
     CMutableTransaction s2;
     s2.nLockTime = 0;
     s2.vin.resize(1);
@@ -311,7 +310,8 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
     s2.vout[0].nValue = 50 * CENT;
     key.MakeNewKey(true);
     keystore.AddKey(key);
-    s2.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
+    s2.vout[0].scriptPubKey << OP_DUP << OP_HASH160 << ToByteVector(key.GetPubKey().GetID()) << OP_EQUALVERIFY
+                            << OP_CHECKSIG;
 
     CTransaction spend2(s2);
     {
@@ -325,7 +325,17 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
 
     // add a ds orphan for spend1a and spend2a
     ClearInventory(&node);
-    const auto dsp_first = DoubleSpendProof::create(spend1a, spend2a);
+    DoubleSpendProof dsp_first;
+    {
+        READLOCK(pool.cs_txmempool);
+        dsp_first = DoubleSpendProof::create(spend1a, spend2a, pool);
+        {
+            auto ref = MakeTransactionRef(spend2a);
+            auto rc = dsp_first.validate(pool, ref);
+            BOOST_CHECK(rc == DoubleSpendProof::Valid);
+        }
+    }
+
     int peerId = 1;
     pool.doubleSpendProofStorage()->addOrphan(dsp_first, peerId);
 
@@ -348,11 +358,13 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
     // do a check for respend to trigger the orphan code with spend1a. The orphan will be removed and the inv
     // for the dsproof should be broadcast.
     ClearInventory(&node);
-    RespendDetector detector(pool, MakeTransactionRef(spend1a), {dummyaction});
+
+
+    RespendDetector detector(pool, MakeTransactionRef(spend2a), {dummyaction});
     BOOST_CHECK_EQUAL(size_t(1), node.GetInventoryToSendSize());
-    BOOST_CHECK(0x94a0 == node.vInventoryToSend.at(0).type);
+    BOOST_CHECK(!node.vInventoryToSend.empty() && 0x94a0 == node.vInventoryToSend.at(0).type);
     std::list<std::pair<int, int> > dsp_list4 =
-        pool.doubleSpendProofStorage()->findOrphans(COutPoint(tx1.GetHash(), 0));
+        pool.doubleSpendProofStorage()->findOrphans(COutPoint(tx1a.GetHash(), 0));
     BOOST_CHECK(dsp_list4.size() == 0);
 
 
