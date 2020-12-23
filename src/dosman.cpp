@@ -276,6 +276,13 @@ void CDoSManager::Misbehaving(CNode *pNode, int howmuch, BanReason reason)
     // Update the old misbehavior
     UpdateMisbehavior(pNode);
 
+    // return if the node is whitelised
+    if (pNode->fWhitelisted)
+    {
+        LOGA("%s is whitelisted, hence not ban score increase", pNode->GetLogName());
+        return;
+    }
+
     // Add the new misbehavior and check whether to ban
     double prior = pNode->nMisbehavior.load();
     while (true)
