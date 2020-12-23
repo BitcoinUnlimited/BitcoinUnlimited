@@ -45,6 +45,11 @@ static const double TX_RATE_SMOOTHING_SEC = 60;
 /** Sample resolution in milliseconds over which to compute the instantaneous transaction rate */
 static const int TX_RATE_RESOLUTION_MILLIS = 1000;
 
+/** If our indicated (and possibly dirty) number of ancestors in a transaction chain is less than
+  * this value then we'll immediately update the correct and current ancestor chain state
+  */
+static const uint32_t MAX_UPDATED_CHAIN_STATE = 500;
+
 /** Dump the mempool to disk. */
 bool DumpMempool();
 
@@ -100,6 +105,7 @@ private:
     uint64_t nSizeWithAncestors;
     CAmount nModFeesWithAncestors;
     unsigned int nSigOpCountWithAncestors;
+    bool fDirty;
 
 public:
     unsigned char sighashType;
@@ -137,9 +143,9 @@ public:
     size_t DynamicMemoryUsage() const { return nUsageSize; }
     const LockPoints &GetLockPoints() const { return lockPoints; }
     // Increments the ancestor state values
-    void UpdateAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps);
+    void UpdateAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps, bool dirty);
     // Replaces the previous ancestor state with new set of values
-    void ReplaceAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps);
+    void ReplaceAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps, bool dirty);
     // Updates the fee delta used for mining priority score, and the
     // modified fees with descendants.
     void UpdateFeeDelta(int64_t feeDelta);
@@ -153,36 +159,53 @@ public:
     uint64_t GetSizeWithAncestors() const { return nSizeWithAncestors; }
     CAmount GetModFeesWithAncestors() const { return nModFeesWithAncestors; }
     unsigned int GetSigOpCountWithAncestors() const { return nSigOpCountWithAncestors; }
+    bool IsDirty() const { return fDirty; }
 };
 
 struct update_ancestor_state
 {
-    update_ancestor_state(int64_t _modifySize, CAmount _modifyFee, int64_t _modifyCount, int _modifySigOps)
-        : modifySize(_modifySize), modifyFee(_modifyFee), modifyCount(_modifyCount), modifySigOps(_modifySigOps)
+    update_ancestor_state(int64_t _modifySize, CAmount _modifyFee, int64_t _modifyCount, int _modifySigOps, bool _dirty)
+        : modifySize(_modifySize), modifyFee(_modifyFee), modifyCount(_modifyCount), modifySigOps(_modifySigOps),
+          dirty(_dirty)
     {
     }
 
-    void operator()(CTxMemPoolEntry &e) { e.UpdateAncestorState(modifySize, modifyFee, modifyCount, modifySigOps); }
+    void operator()(CTxMemPoolEntry &e)
+    {
+        e.UpdateAncestorState(modifySize, modifyFee, modifyCount, modifySigOps, dirty);
+    }
+
 private:
     int64_t modifySize;
     CAmount modifyFee;
     int64_t modifyCount;
     int modifySigOps;
+    bool dirty;
 };
 
 struct replace_ancestor_state
 {
-    replace_ancestor_state(int64_t _modifySize, CAmount _modifyFee, int64_t _modifyCount, int _modifySigOps)
-        : modifySize(_modifySize), modifyFee(_modifyFee), modifyCount(_modifyCount), modifySigOps(_modifySigOps)
+    replace_ancestor_state(int64_t _modifySize,
+        CAmount _modifyFee,
+        int64_t _modifyCount,
+        int _modifySigOps,
+        bool _dirty)
+        : modifySize(_modifySize), modifyFee(_modifyFee), modifyCount(_modifyCount), modifySigOps(_modifySigOps),
+          dirty(_dirty)
     {
     }
 
-    void operator()(CTxMemPoolEntry &e) { e.ReplaceAncestorState(modifySize, modifyFee, modifyCount, modifySigOps); }
+    void operator()(CTxMemPoolEntry &e)
+    {
+        e.ReplaceAncestorState(modifySize, modifyFee, modifyCount, modifySigOps, dirty);
+    }
+
 private:
     int64_t modifySize;
     CAmount modifyFee;
     int64_t modifyCount;
     int modifySigOps;
+    bool dirty;
 };
 
 struct ancestor_state
@@ -449,6 +472,7 @@ public:
 
     /** Return the set of mempool parents for this entry */
     const setEntries &GetMemPoolParents(txiter entry) const;
+    const setEntries GetMemPoolParents(const CTransaction &tx) const;
     /** Return the set of mempool children for this entry */
     const setEntries &GetMemPoolChildren(txiter entry) const;
 
@@ -479,6 +503,9 @@ public:
     // Connects an output to the transaction that spends it.
     std::map<COutPoint, CInPoint> mapNextTx;
     std::map<uint256, std::pair<double, CAmount> > mapDeltas;
+
+    // Transaction chain tips for dirty chains of transactions
+    std::set<uint256> setDirtyTxnChainTips;
 
     /** Create a new CTxMemPool.
      *  minReasonableRelayFee should be a feerate which is, roughly, somewhere
@@ -631,6 +658,22 @@ public:
         uint64_t limitAncestorSize,
         std::string &errString);
 
+    /** For a given transaction, which may be part of a chain of unconfirmed transactions, find all
+     *  the associated transaction chaintips, if any.
+     */
+    void CalculateTxnChainTips(txiter it, mapEntryHistory &mapTxnChainTips);
+
+    /** Update the ancestor state for the set of supplied transaction chains. This step is done after
+     *  a block has finished processing and we have already removed the transactions from the mempool
+     */
+    void UpdateTxnChainState(mapEntryHistory &mapTxnChainTips);
+
+    /** Update the ancestor state for this transaction only. Ancestor states can be dirty or not but
+     *  there are times when we need to ensure they are not dirty, such as, when we do an rpc call
+     *  or prioritise a transaction.
+     */
+    void UpdateTxnChainState(txiter it);
+
     /** Get tx properties, returns true if tx in mempool and fills fields */
     bool GetTxProperties(const uint256 &hash, CTxProperties *txProps) const
     {
@@ -718,11 +761,6 @@ private:
     /** Sever link between specified transaction and direct children. */
     void UpdateChildrenForRemoval(txiter entry);
 
-    /** Update the ancestor state for the set of supplied transaction chains. This step is done after
-     *  a block has finished processing and we have already removed the transactions from the mempool
-     */
-    void UpdateTxnChainState(mapEntryHistory &mapTxnChainTips);
-
     /** Internal implementation of transaction per sec rate update logic
      *  Requires that the cs_txPerSec lock be held by the calling method
      */
@@ -734,6 +772,7 @@ private:
      */
     void removeUnchecked(txiter entry);
 
+    /** Temporary storage for double spend proofs */
     std::unique_ptr<DoubleSpendProofStorage> m_dspStorage;
 };
 

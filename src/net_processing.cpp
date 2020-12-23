@@ -44,6 +44,7 @@ extern CTweak<uint64_t> mempoolSyncMaxVersionSupported;
 extern CTweak<uint64_t> syncMempoolWithPeers;
 extern CTweak<uint32_t> randomlyDontInv;
 extern CTweak<uint32_t> doubleSpendProofs;
+extern CTweak<bool> extVersionEnabled;
 
 /** How many inbound connections will we track before pruning entries */
 const uint32_t MAX_INBOUND_CONNECTIONS_TRACKED = 10000;
@@ -536,7 +537,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         UpdatePreferredDownload(pfrom);
 
         // only send extversion message if both peers are using the protocol
-        if ((nLocalServices & NODE_EXTVERSION) && (pfrom->nServices & NODE_EXTVERSION))
+        if ((nLocalServices & NODE_EXTVERSION) && (pfrom->nServices & NODE_EXTVERSION) &&
+            extVersionEnabled.Value() == true)
         {
             // BU expedited procecessing requires the exchange of the listening port id
             // The former BUVERSION message has now been integrated into the xmap field in CExtversionMessage.
@@ -611,7 +613,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         return error("%s receieved before VERSION message - disconnecting peer=%s", strCommand, pfrom->GetLogName());
     }
 
-    else if (strCommand == NetMsgType::EXTVERSION)
+    else if (strCommand == NetMsgType::EXTVERSION && extVersionEnabled.Value() == true)
     {
         // set expected to false, we got the message
         pfrom->extversionExpected = false;

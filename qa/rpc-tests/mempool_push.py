@@ -16,10 +16,10 @@ import logging
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 
-BCH_UNCONF_DEPTH = 25
+BCH_UNCONF_DEPTH = 50
 BCH_UNCONF_SIZE_KB = 101
 BCH_UNCONF_SIZE = BCH_UNCONF_SIZE_KB*1000
-DELAY_TIME = 65
+DELAY_TIME = 120
 
 class MyTest (BitcoinTestFramework):
 
@@ -29,24 +29,43 @@ class MyTest (BitcoinTestFramework):
 
     def setup_network(self, split=False):
         mempoolConf = [
-            ["-blockprioritysize=2000000", "-limitdescendantcount=25", "-limitancestorcount=25",
-             "-limitancestorsize=101", "-limitdescendantsize=101"],
+            ["-blockprioritysize=2000000",
+             "-limitancestorsize=%d" % (BCH_UNCONF_SIZE_KB*2),
+             "-limitdescendantsize=%d" % (BCH_UNCONF_SIZE_KB*2),
+             "-limitancestorcount=%d" % (BCH_UNCONF_DEPTH),
+             "-limitdescendantcount=%d" % (BCH_UNCONF_DEPTH)],
             ["-blockprioritysize=2000000",
              "-maxmempool=8080",
-             "-limitancestorsize=%d" % (BCH_UNCONF_SIZE_KB*3),
-             "-limitdescendantsize=%d" % (BCH_UNCONF_SIZE_KB*3),
-             "-limitancestorcount=%d" % (BCH_UNCONF_DEPTH*3),
-             "-limitdescendantcount=%d" % (BCH_UNCONF_DEPTH*3),
+             "-limitancestorsize=%d" % (BCH_UNCONF_SIZE_KB*2),
+             "-limitdescendantsize=%d" % (BCH_UNCONF_SIZE_KB*2),
+             "-limitancestorcount=%d" % (BCH_UNCONF_DEPTH*2),
+             "-limitdescendantcount=%d" % (BCH_UNCONF_DEPTH*2),
              "-net.restrictInputs=0"],
             ["-blockprioritysize=2000000", "-limitdescendantcount=1000", "-limitancestorcount=1000",
              "-limitancestorsize=1000", "-limitdescendantsize=1000", "-net.restrictInputs=0"],
+
+            # Launch a peer that simulates a non BU node
+            ["-blockprioritysize=2000000",
+             "-limitancestorsize=%d" % (BCH_UNCONF_SIZE_KB),
+             "-limitdescendantsize=%d" % (BCH_UNCONF_SIZE_KB),
+             "-limitancestorcount=%d" % (BCH_UNCONF_DEPTH),
+             "-limitdescendantcount=%d" % (BCH_UNCONF_DEPTH),
+             "-test.extVersion=0",
+             "-net.restrictInputs=0"],
             ]
-        self.nodes = start_nodes(3, self.options.tmpdir, mempoolConf)
+        self.nodes = start_nodes(4, self.options.tmpdir, mempoolConf)
         connect_nodes_full(self.nodes)
         self.is_network_split=False
         self.sync_blocks()
 
     def run_test (self):
+
+        #create coins that we can use for creating multi input transactions
+        self.relayfee = self.nodes[1].getnetworkinfo()['relayfee']
+        utxo_count = BCH_UNCONF_DEPTH * 3
+        utxos = create_confirmed_utxos(self.relayfee, self.nodes[1], utxo_count)
+
+
         # kick us out of IBD mode since the cached blocks will be old time so it'll look like our blockchain isn't up to date
         # if we are in IBD mode, we don't request incoming tx.
         self.nodes[0].generate(1)
@@ -55,25 +74,43 @@ class MyTest (BitcoinTestFramework):
         bal = self.nodes[1].getbalance()
         addr = self.nodes[1].getnewaddress()
 
+        # create multi input transactions that are chained. This will cause any transactions that are greater
+        # than the BCH default chain limit to be prevented from entering the mempool, however they will enter the
+        # orphanpool instead.
         txhex = []
+        tx_amount = 0
         for i in range(1,BCH_UNCONF_DEPTH*3 + 1):
           try:
-              txhex.append(self.nodes[1].sendtoaddress(addr, bal-(Decimal("0.01")*i)))  # enough so that it uses the one "big" UTXO, but has fee left over
+              inputs = []
+              inputs.append(utxos.pop())
+              if (i == 1):
+                inputs.append(utxos.pop())
+              else:
+                inputs.append({ "txid" : txid, "vout" : 0})
+
+              outputs = {}
+              if (i == 1):
+                tx_amount = inputs[0]["amount"] + inputs[1]["amount"] - self.relayfee
+              else:
+                tx_amount = inputs[0]["amount"] + tx_amount - self.relayfee
+              outputs[self.nodes[1].getnewaddress()] = tx_amount
+              rawtx = self.nodes[1].createrawtransaction(inputs, outputs)
+              signed_tx = self.nodes[1].signrawtransaction(rawtx)["hex"]
+              txid = self.nodes[1].sendrawtransaction(signed_tx)
+
+              txhex.append(txid)  # enough so that it uses the one 
               logging.info("tx depth %d" % i) # Keep travis from timing out
           except JSONRPCException as e: # an exception you don't catch is a testing error
               print(str(e))
               raise
-          if i > 20 and i <= 30:  # Bracket the unconf chain acceptance depth of this node for efficiency
+          if i > 45 and i <= 55:  # Bracket the unconf chain acceptance depth of this node for efficiency
               # Test that every tx beyond the unconf limit is inserted into the orphan pool -- nothing is dropped
               # but it won't be relayed to me from the other node so I need to manually inject
-              rawtx = self.nodes[1].getrawtransaction(txhex[-1])
-              self.nodes[0].enqueuerawtransaction(rawtx)
+              self.nodes[0].enqueuerawtransaction(signed_tx)
               waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] + self.nodes[0].getorphanpoolinfo()["size"] == i)
-              mempool = self.nodes[0].getmempoolinfo()
-              orphs = self.nodes[0].getorphanpoolinfo()
-
         waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH)
         waitFor(DELAY_TIME, lambda: self.nodes[1].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH*3)
+        waitFor(DELAY_TIME, lambda: self.nodes[3].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH)
         # Set small to commit just a few tx so we can see if the missing ones get pushed
         # self.nodes[0].set("mining.blockSize=6000")
 
@@ -87,6 +124,7 @@ class MyTest (BitcoinTestFramework):
 
         connect_nodes(self.nodes[0], 1)
         connect_nodes(self.nodes[0], 2)
+        connect_nodes(self.nodes[0], 3)
 
         blkhex = self.nodes[0].getblock(blk)
         waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH)
@@ -94,8 +132,11 @@ class MyTest (BitcoinTestFramework):
         waitFor(DELAY_TIME, lambda: self.nodes[2].getbestblockhash() == blk)  # we don't want a fork
         self.nodes[2].set("mining.blockSize=6000")
         blk2 = self.nodes[2].generate(1)[0]
-        # after the block propagates, nodes will push 25 tx to this node.
+        self.sync_blocks()
+
+        # after the block propagates, nodes will push 50 tx to these nodes.
         waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH)
+        waitFor(DELAY_TIME, lambda: self.nodes[3].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH)
 
         waitFor(DELAY_TIME, lambda: self.nodes[1].getbestblockhash() == blk2)  # make sure its settled so we can get a good leftover count for the next test.
         unconfLeftOver = self.nodes[1].getmempoolinfo()["size"]
@@ -139,7 +180,7 @@ class MyTest (BitcoinTestFramework):
         self.sync_blocks()
         logging.info("Block heights: %s" % str([x.getblockcount() for x in self.nodes]))
 
-        # Create an unconfirmed chain that exceeds what node 0 allows
+        # Create an unconfirmed chain that exceeds what a non BU node would allow (node3)
         cumulativeTxSize = 0
         while cumulativeTxSize < BCH_UNCONF_SIZE:
             txhash = self.nodes[1].sendmany("",amounts,0)
@@ -148,11 +189,30 @@ class MyTest (BitcoinTestFramework):
             logging.info("fee: %s fee sat/byte: %s" % (str(txinfo["fee"]), str(txinfo["fee"]*100000000/Decimal(len(tx)/2)) ))
             cumulativeTxSize += len(tx)/2  # /2 because tx is a hex representation of the tx
             logging.info("total size: %d" % cumulativeTxSize)
+            logging.info("tx: %s" % txhash)
 
         txCommitted = self.nodes[1].getmempoolinfo()["size"]
-        waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == txCommitted-1)  # nodes[0] will eliminate 1 tx because ancestor size too big
+        waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == txCommitted)  # nodes[0] will eliminate 1 tx because ancestor size too big
+        waitFor(DELAY_TIME, lambda: self.nodes[3].getmempoolinfo()["size"] == txCommitted-1)  # nodes[3] will eliminate 1 tx because ancestor size too big
         waitFor(DELAY_TIME, lambda: self.nodes[2].getmempoolinfo()["size"] == txCommitted)  # nodes[2] should have gotten everything because its ancestor size conf is large
+        first_txCommitted = txCommitted
+
+        #send more txns to violate the BU nodes settings (node0)
+        while cumulativeTxSize < BCH_UNCONF_SIZE*2:
+            txhash = self.nodes[1].sendmany("",amounts,0)
+            tx = self.nodes[1].getrawtransaction(txhash)
+            txinfo = self.nodes[1].gettransaction(txhash)
+            logging.info("fee: %s fee sat/byte: %s" % (str(txinfo["fee"]), str(txinfo["fee"]*100000000/Decimal(len(tx)/2)) ))
+            cumulativeTxSize += len(tx)/2  # /2 because tx is a hex representation of the tx
+            logging.info("total size: %d" % cumulativeTxSize)
+            logging.info("tx: %s" % txhash)
+        txCommitted = self.nodes[1].getmempoolinfo()["size"]
+        waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == txCommitted-1)  # nodes[0] will eliminate 1 tx because ancestor size too big
+        waitFor(DELAY_TIME, lambda: self.nodes[2].getmempoolinfo()["size"] == txCommitted)  # nodes[2] should have gotten 
+
+
         self.nodes[0].generate(1)
+        waitFor(DELAY_TIME, lambda: self.nodes[3].getmempoolinfo()["size"] == first_txCommitted - 1)  # node 1 should push the tx that's now acceptable to node 3
         waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == 1)  # node 1 should push the tx that's now acceptable to node 0
         self.nodes[0].generate(1)  # clean up
 

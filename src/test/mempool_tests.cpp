@@ -13,6 +13,7 @@
 #include <vector>
 
 extern CCoinsViewCache *pcoinsTip;
+extern std::atomic<bool> fMempoolTests;
 
 struct MempoolData
 {
@@ -23,6 +24,7 @@ struct MempoolData
     uint64_t nSizeWithAncestors = 0;
     uint64_t nSigopsWithAncestors = 0;
     uint64_t nFeesWithAncestors = 0;
+    bool fDirty = false;
 };
 
 void CheckAncestors(MempoolData &expected_result, CTxMemPool &pool)
@@ -33,11 +35,11 @@ void CheckAncestors(MempoolData &expected_result, CTxMemPool &pool)
         printf("ERROR: tx %s not found in mempool\n", expected_result.hash.ToString().c_str());
         throw;
     }
-
     BOOST_CHECK_EQUAL(iter->GetCountWithAncestors(), expected_result.nCountWithAncestors);
     BOOST_CHECK_EQUAL(iter->GetSizeWithAncestors(), expected_result.nSizeWithAncestors);
     BOOST_CHECK_EQUAL(iter->GetSigOpCountWithAncestors(), expected_result.nSigopsWithAncestors);
     BOOST_CHECK_EQUAL(iter->GetModFeesWithAncestors(), expected_result.nFeesWithAncestors);
+    BOOST_CHECK_EQUAL(iter->IsDirty(), expected_result.fDirty);
 }
 
 void VerifyTxNotInMempool(MempoolData &expected_result, CTxMemPool &pool)
@@ -54,6 +56,10 @@ BOOST_FIXTURE_TEST_SUITE(mempool_tests, TestingSetup)
 
 BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 {
+    // Indicate we're doing the mempool tests. This will prevent the auto updating ancestor state for
+    // the entire txn chains, which will allow us to test these shorter chains for their dirty and non-dirty states.
+    fMempoolTests.store(true);
+
     TestMemPoolEntryHelper entry;
     CTxMemPool pool;
     pool.clear();
@@ -709,16 +715,16 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
         {tx6.GetHash(), 2, 84, 2, 4000},
         {tx7.GetHash(), 2, 84, 2, 6000},
         {tx8.GetHash(), 2, 84, 2, 8000},
-        {tx9.GetHash(), 5, 284, 5, 9000},
-        {tx10.GetHash(), 5, 273, 5, 21000},
-        {tx11.GetHash(), 12, 736, 12, 45000},
-        {tx12.GetHash(), 6, 369, 6, 10000},
-        {tx13.GetHash(), 13, 799, 13, 46000},
-        {tx14.GetHash(), 13, 799, 13, 46000},
-        {tx15.GetHash(), 7, 432, 7, 10500},
-        {tx16.GetHash(), 7, 432, 7, 10200},
-        {tx17.GetHash(), 7, 432, 7, 10300},
-        {tx18.GetHash(), 16, 1041, 16, 55000},
+        {tx9.GetHash(), 5, 284, 5, 9000, true},
+        {tx10.GetHash(), 5, 273, 5, 21000, true},
+        {tx11.GetHash(), 12, 736, 12, 45000, true},
+        {tx12.GetHash(), 6, 369, 6, 10000, true},
+        {tx13.GetHash(), 13, 799, 13, 46000, true},
+        {tx14.GetHash(), 13, 799, 13, 46000, true},
+        {tx15.GetHash(), 7, 432, 7, 10500, true},
+        {tx16.GetHash(), 7, 432, 7, 10200, true},
+        {tx17.GetHash(), 7, 432, 7, 10300, true},
+        {tx18.GetHash(), 28, 1777, 28, 100000, true},
         {tx19.GetHash(), 1, 21, 1, 6000},
         {tx20.GetHash(), 1, 21, 1, 5000},
 
@@ -728,32 +734,32 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
         {tx23.GetHash(), 3, 184, 3, 220000},
         {tx24.GetHash(), 4, 244, 4, 230000},
         {tx25.GetHash(), 4, 244, 4, 230000},
-        {tx26.GetHash(), 6, 405, 6, 260000},
+        {tx26.GetHash(), 9, 589, 9, 480000, true},
         {tx27.GetHash(), 1, 19, 1, 101000},
         {tx28.GetHash(), 2, 79, 2, 202000},
-        {tx29.GetHash(), 5, 304, 5, 603000},
-        {tx30.GetHash(), 6, 364, 6, 704000},
+        {tx29.GetHash(), 5, 304, 5, 603000, true},
+        {tx30.GetHash(), 6, 364, 6, 704000, true},
         {tx31.GetHash(), 3, 175, 3, 220000},
         {tx32.GetHash(), 3, 175, 3, 220000},
         {tx33.GetHash(), 3, 175, 3, 220000},
         {tx34.GetHash(), 4, 235, 4, 240000},
-        {tx35.GetHash(), 14, 1067, 14, 1024000},
-        {tx36.GetHash(), 15, 1127, 15, 1224000},
-        {tx37.GetHash(), 15, 1127, 15, 1105000},
-        {tx38.GetHash(), 17, 1288, 17, 4115000},
+        {tx35.GetHash(), 25, 1711, 25, 2044000, true},
+        {tx36.GetHash(), 26, 1771, 26, 2244000, true},
+        {tx37.GetHash(), 26, 1771, 26, 2125000, true},
+        {tx38.GetHash(), 53, 3643, 53, 7179000, true},
 
         // Chain3:
         {tx39.GetHash(), 1, 20, 1, 1000},
         {tx40.GetHash(), 1, 20, 1, 2000},
         {tx41.GetHash(), 2, 91, 2, 10000},
-        {tx42.GetHash(), 5, 273, 5, 19000},
-        {tx43.GetHash(), 6, 333, 6, 31000},
+        {tx42.GetHash(), 5, 273, 5, 19000, true},
+        {tx43.GetHash(), 6, 333, 6, 31000, true},
         {tx44.GetHash(), 1, 20, 1, 4000},
-        {tx45.GetHash(), 5, 271, 5, 35000},
+        {tx45.GetHash(), 5, 271, 5, 35000, true},
         {tx46.GetHash(), 3, 151, 3, 13000},
         {tx47.GetHash(), 1, 19, 1, 10000},
-        {tx48.GetHash(), 7, 393, 7, 46000},
-        {tx49.GetHash(), 6, 331, 6, 49000}
+        {tx48.GetHash(), 7, 393, 7, 46000, true},
+        {tx49.GetHash(), 6, 331, 6, 49000, true}
     };
     /* clang-format on */
     for (size_t i = 0; i < txns_expected.size(); i++)
@@ -776,6 +782,125 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
         CheckAncestors(txns_expected[i], pool);
     }
 
+    /* Check that we can find the correct txn chaintips */
+    CTxMemPool::mapEntryHistory mapTxnChainTips;
+    CTxMemPool::txiter it;
+
+    {
+        READLOCK(pool.cs_txmempool);
+        mapTxnChainTips.clear();
+        it = pool.mapTx.find(tx1.GetHash());
+        BOOST_CHECK(it != pool.mapTx.end());
+        if (it != pool.mapTx.end())
+        {
+            pool.CalculateTxnChainTips(it, mapTxnChainTips);
+            BOOST_CHECK(mapTxnChainTips.size() == 0);
+        }
+
+        mapTxnChainTips.clear();
+        it = pool.mapTx.find(tx11.GetHash());
+        BOOST_CHECK(it != pool.mapTx.end());
+        if (it != pool.mapTx.end())
+        {
+            pool.CalculateTxnChainTips(it, mapTxnChainTips);
+            BOOST_CHECK(mapTxnChainTips.size() == 5);
+
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx1.GetHash())) == 1);
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx2.GetHash())) == 1);
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx3.GetHash())) == 1);
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx4.GetHash())) == 1);
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx20.GetHash())) == 1);
+        }
+
+        mapTxnChainTips.clear();
+        it = pool.mapTx.find(tx16.GetHash());
+        BOOST_CHECK(it != pool.mapTx.end());
+        if (it != pool.mapTx.end())
+        {
+            pool.CalculateTxnChainTips(it, mapTxnChainTips);
+            BOOST_CHECK(mapTxnChainTips.size() == 2);
+
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx1.GetHash())) == 1);
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx2.GetHash())) == 1);
+        }
+
+        mapTxnChainTips.clear();
+        it = pool.mapTx.find(tx18.GetHash());
+        BOOST_CHECK(it != pool.mapTx.end());
+        if (it != pool.mapTx.end())
+        {
+            pool.CalculateTxnChainTips(it, mapTxnChainTips);
+            BOOST_CHECK(mapTxnChainTips.size() == 6);
+
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx1.GetHash())) == 1);
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx2.GetHash())) == 1);
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx3.GetHash())) == 1);
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx4.GetHash())) == 1);
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx19.GetHash())) == 1);
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx20.GetHash())) == 1);
+        }
+
+        mapTxnChainTips.clear();
+        it = pool.mapTx.find(tx26.GetHash());
+        BOOST_CHECK(it != pool.mapTx.end());
+        if (it != pool.mapTx.end())
+        {
+            pool.CalculateTxnChainTips(it, mapTxnChainTips);
+            BOOST_CHECK(mapTxnChainTips.size() == 1);
+
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx21.GetHash())) == 1);
+        }
+
+        mapTxnChainTips.clear();
+        it = pool.mapTx.find(tx38.GetHash());
+        BOOST_CHECK(it != pool.mapTx.end());
+        if (it != pool.mapTx.end())
+        {
+            pool.CalculateTxnChainTips(it, mapTxnChainTips);
+            BOOST_CHECK(mapTxnChainTips.size() == 2);
+
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx21.GetHash())) == 1);
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx27.GetHash())) == 1);
+        }
+
+        mapTxnChainTips.clear();
+        it = pool.mapTx.find(tx42.GetHash());
+        BOOST_CHECK(it != pool.mapTx.end());
+        if (it != pool.mapTx.end())
+        {
+            pool.CalculateTxnChainTips(it, mapTxnChainTips);
+            BOOST_CHECK(mapTxnChainTips.size() == 3);
+
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx39.GetHash())) == 1);
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx40.GetHash())) == 1);
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx44.GetHash())) == 1);
+        }
+
+        mapTxnChainTips.clear();
+        it = pool.mapTx.find(tx48.GetHash());
+        BOOST_CHECK(it != pool.mapTx.end());
+        if (it != pool.mapTx.end())
+        {
+            pool.CalculateTxnChainTips(it, mapTxnChainTips);
+            BOOST_CHECK(mapTxnChainTips.size() == 3);
+
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx39.GetHash())) == 1);
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx40.GetHash())) == 1);
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx44.GetHash())) == 1);
+        }
+
+        mapTxnChainTips.clear();
+        it = pool.mapTx.find(tx49.GetHash());
+        BOOST_CHECK(it != pool.mapTx.end());
+        if (it != pool.mapTx.end())
+        {
+            pool.CalculateTxnChainTips(it, mapTxnChainTips);
+            BOOST_CHECK(mapTxnChainTips.size() == 2);
+
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx44.GetHash())) == 1);
+            BOOST_CHECK(mapTxnChainTips.count(pool.mapTx.find(tx47.GetHash())) == 1);
+        }
+    }
 
     /* Do a removeforblock using tx1,tx2,tx3 and tx4 as having been mined and are in the block
 
@@ -848,6 +973,10 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     BOOST_CHECK_EQUAL(pool.size(), 41);
 
     // Validate the new state is correct
+    //
+    // After our first removeForBlock() all the transaction chain states that were dirty
+    // will have been updated correctly and this will be true from this point onward.
+
     /* clang-format off */
     std::vector<MempoolData> txns_result =
     {
@@ -1268,6 +1397,9 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
         {tx37.GetHash(), 5, 564, 5, 603000},
         {tx38.GetHash(), 7, 725, 7, 3613000},
     };
+    pool.removeForBlock(vtx, 1, dummy, false);
+    BOOST_CHECK_EQUAL(pool.size(), 18);
+
     /* clang-format on */
 
     for (size_t i = 0; i < txns_result9.size(); i++)
@@ -1329,6 +1461,313 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
         */
 
         CheckAncestors(txns_result10[i], pool);
+    }
+
+
+    // Resubmit all transactions from chain2 to the mempool but with the mempool test flag off
+    // This should result in all transactions being updated correctly and not be dirty
+    fMempoolTests.store(false);
+
+    // Remove rest of the transactions from the mempool
+    vtx.push_back(MakeTransactionRef(tx16));
+    vtx.push_back(MakeTransactionRef(tx17));
+    vtx.push_back(MakeTransactionRef(tx18));
+    vtx.push_back(MakeTransactionRef(tx19));
+    vtx.push_back(MakeTransactionRef(tx26));
+    vtx.push_back(MakeTransactionRef(tx29));
+    vtx.push_back(MakeTransactionRef(tx30));
+    vtx.push_back(MakeTransactionRef(tx32));
+    vtx.push_back(MakeTransactionRef(tx35));
+    vtx.push_back(MakeTransactionRef(tx36));
+    vtx.push_back(MakeTransactionRef(tx37));
+    vtx.push_back(MakeTransactionRef(tx38));
+    vtx.push_back(MakeTransactionRef(tx42));
+    vtx.push_back(MakeTransactionRef(tx43));
+    vtx.push_back(MakeTransactionRef(tx44));
+    vtx.push_back(MakeTransactionRef(tx45));
+    vtx.push_back(MakeTransactionRef(tx46));
+    vtx.push_back(MakeTransactionRef(tx47));
+    vtx.push_back(MakeTransactionRef(tx48));
+    vtx.push_back(MakeTransactionRef(tx49));
+    pool.removeForBlock(vtx, 1, dummy, false);
+    BOOST_CHECK_EQUAL(pool.size(), 0);
+
+
+    /*
+    Chain1:
+
+    1      2   3      4
+    |      |   |      |
+    5      6   7      8
+     \    /     \    /
+      \  /       \  /
+       9          10      20
+       | \        |       /
+       |  \______ 11 ____/
+       |          |\
+       12         | \
+      /|\        13 14      19
+     / | \        | /       /
+    15 16 17      18 ______/
+
+    */
+
+    // Chain:1 Transactions
+
+    // tx1
+    pool.addUnchecked(tx1.GetHash(), entry.Fee(1000LL).Priority(10.0).SigOps(1).FromTx(tx1));
+
+    // tx2
+    pool.addUnchecked(tx2.GetHash(), entry.Fee(2000LL).Priority(10.0).SigOps(1).FromTx(tx2));
+
+    // tx3
+    pool.addUnchecked(tx3.GetHash(), entry.Fee(3000LL).Priority(10.0).SigOps(1).FromTx(tx3));
+
+    // tx4
+    pool.addUnchecked(tx4.GetHash(), entry.Fee(4000LL).Priority(10.0).SigOps(1).FromTx(tx4));
+
+    // tx5 - child of tx1
+    pool.addUnchecked(tx5.GetHash(), entry.Fee(1000LL).Priority(10.0).SigOps(1).FromTx(tx5));
+
+    // tx6 - child of tx2
+    pool.addUnchecked(tx6.GetHash(), entry.Fee(2000LL).Priority(10.0).SigOps(1).FromTx(tx6));
+
+    // tx7 - child of tx3
+    pool.addUnchecked(tx7.GetHash(), entry.Fee(3000LL).Priority(10.0).SigOps(1).FromTx(tx7));
+
+    // tx8 - child of tx4
+    pool.addUnchecked(tx8.GetHash(), entry.Fee(4000LL).Priority(10.0).SigOps(1).FromTx(tx8));
+
+    // tx9 - child of tx5 and tx6 and has two outputs
+    pool.addUnchecked(tx9.GetHash(), entry.Fee(3000LL).Priority(10.0).SigOps(1).FromTx(tx9));
+
+    // tx10 - child of tx7 and tx8 and has one output
+    pool.addUnchecked(tx10.GetHash(), entry.Fee(7000LL).SigOps(1).FromTx(tx10));
+
+    // tx20
+    pool.addUnchecked(tx20.GetHash(), entry.Fee(5000LL).Priority(10.0).SigOps(1).FromTx(tx20));
+
+    // tx11 - child of tx9, tx10 and tx20, and has two outputs
+    pool.addUnchecked(tx11.GetHash(), entry.Fee(10000LL).SigOps(1).FromTx(tx11));
+
+    // tx12 - child of tx9 and has three outputs
+    pool.addUnchecked(tx12.GetHash(), entry.Fee(1000LL).Priority(10.0).SigOps(1).FromTx(tx12));
+
+    // tx13 - child of tx11 and has one output
+    pool.addUnchecked(tx13.GetHash(), entry.Fee(1000LL).SigOps(1).FromTx(tx13));
+
+    // tx14 - child of tx11 and has one output
+    pool.addUnchecked(tx14.GetHash(), entry.Fee(1000LL).SigOps(1).FromTx(tx14));
+
+    // tx15 - child of tx12
+    pool.addUnchecked(tx15.GetHash(), entry.Fee(500LL).SigOps(1).FromTx(tx15));
+
+    // tx16 - child of tx12
+    pool.addUnchecked(tx16.GetHash(), entry.Fee(200LL).SigOps(1).FromTx(tx16));
+
+    // tx17 - child of tx12
+    pool.addUnchecked(tx17.GetHash(), entry.Fee(300LL).SigOps(1).FromTx(tx17));
+
+    // tx19
+    pool.addUnchecked(tx19.GetHash(), entry.Fee(6000LL).Priority(10.0).SigOps(1).FromTx(tx19));
+
+    // tx18 - child of tx13, tx14 and 19, and has two outputs
+    pool.addUnchecked(tx18.GetHash(), entry.Fee(2000LL).SigOps(1).FromTx(tx18));
+
+
+    // Chain:2 Transactions
+    /*
+
+                            21                     27
+                            |                      /
+            ________________22_______________     /
+           /         /      |      \         \   28
+          /         /       23      \         \  /
+         /         /       / \       \         \/
+        31        32      24 25      33        29
+         \         \       \ /       /         /\
+          \         \       26      /         /  \
+           \         \      |      /         /    \
+           34_________\_____35____/_________/     30
+                           / \
+                          36 37
+                           \ /
+                            38
+    */
+
+    // tx21
+    pool.addUnchecked(tx21.GetHash(), entry.Fee(100000LL).Priority(10.0).SigOps(1).FromTx(tx21));
+
+    // tx22 - child of tx21 and has 5 outputs
+    pool.addUnchecked(tx22.GetHash(), entry.Fee(100000LL).Priority(10.0).SigOps(1).FromTx(tx22));
+
+    // tx23 - child of tx22 and has two outputs
+    pool.addUnchecked(tx23.GetHash(), entry.Fee(20000LL).Priority(10.0).SigOps(1).FromTx(tx23));
+
+    // tx24 - child of tx23 and has one output
+    pool.addUnchecked(tx24.GetHash(), entry.Fee(10000LL).SigOps(1).FromTx(tx24));
+
+    // tx25 - child of tx23 and has one output
+    pool.addUnchecked(tx25.GetHash(), entry.Fee(10000LL).SigOps(1).FromTx(tx25));
+
+    // tx26 - child of tx24 and tx25 and has one output
+    pool.addUnchecked(tx26.GetHash(), entry.Fee(20000LL).SigOps(1).FromTx(tx26));
+
+    // tx27
+    pool.addUnchecked(tx27.GetHash(), entry.Fee(101000LL).Priority(10.0).SigOps(1).FromTx(tx27));
+
+    // tx28 - child of tx27 and has one output
+    pool.addUnchecked(tx28.GetHash(), entry.Fee(101000LL).SigOps(1).FromTx(tx28));
+
+    // tx29 - child of tx22 and tx28 and has two outputs
+    pool.addUnchecked(tx29.GetHash(), entry.Fee(201000LL).Priority(10.0).SigOps(1).FromTx(tx29));
+
+    // tx30 - child of tx29 and has one output
+    pool.addUnchecked(tx30.GetHash(), entry.Fee(101000LL).SigOps(1).FromTx(tx30));
+
+    // tx31 - child of tx22 and has one output
+    pool.addUnchecked(tx31.GetHash(), entry.Fee(20000LL).SigOps(1).FromTx(tx31));
+
+    // tx32 - child of tx22 and has one output
+    pool.addUnchecked(tx32.GetHash(), entry.Fee(20000LL).SigOps(1).FromTx(tx32));
+
+    // tx33 - child of tx22 and has one output
+    pool.addUnchecked(tx33.GetHash(), entry.Fee(20000LL).SigOps(1).FromTx(tx33));
+
+    // tx34 - child of tx31 and has one output
+    pool.addUnchecked(tx34.GetHash(), entry.Fee(20000LL).SigOps(1).FromTx(tx34));
+
+    // tx35 - child of tx26, tx29, tx32, tx33, tx34 and has two outputs
+    pool.addUnchecked(tx35.GetHash(), entry.Fee(281000LL).Priority(10.0).SigOps(1).FromTx(tx35));
+
+    // tx36 - child of tx35 and has one output
+    pool.addUnchecked(tx36.GetHash(), entry.Fee(200000LL).SigOps(1).FromTx(tx36));
+
+    // tx37 - child of tx35 and has one output
+    pool.addUnchecked(tx37.GetHash(), entry.Fee(81000LL).SigOps(1).FromTx(tx37));
+
+    // tx38 - child of tx36 and tx37 and has one output
+    pool.addUnchecked(tx38.GetHash(), entry.Fee(2810000LL).SigOps(1).FromTx(tx38));
+
+    /*
+    Chain3:  we will mine txn 39, 44 and 47
+
+           44
+           /
+    39 40 41
+     \ | / \
+      \|/   \   47
+       42   46  /
+       |     \ /
+       43    45
+       |       \
+       48      49
+
+    */
+
+    // tx39
+    pool.addUnchecked(tx39.GetHash(), entry.Fee(1000LL).Priority(10.0).SigOps(1).FromTx(tx39));
+
+    // tx40
+    pool.addUnchecked(tx40.GetHash(), entry.Fee(2000LL).Priority(10.0).SigOps(1).FromTx(tx40));
+
+    // tx44
+    pool.addUnchecked(tx44.GetHash(), entry.Fee(4000LL).Priority(10.0).SigOps(1).FromTx(tx44));
+
+    // tx41
+    pool.addUnchecked(tx41.GetHash(), entry.Fee(6000LL).Priority(10.0).SigOps(1).FromTx(tx41));
+
+    // tx42 - child of tx39, tx40 and tx41 and has one output
+    pool.addUnchecked(tx42.GetHash(), entry.Fee(6000LL).SigOps(1).FromTx(tx42));
+
+    // tx43 - child of tx42 and has one output
+    pool.addUnchecked(tx43.GetHash(), entry.Fee(12000LL).SigOps(1).FromTx(tx43));
+
+    // tx48 child of tx43
+    pool.addUnchecked(tx48.GetHash(), entry.Fee(15000LL).Priority(10.0).SigOps(1).FromTx(tx48));
+
+    // tx47
+    pool.addUnchecked(tx47.GetHash(), entry.Fee(10000LL).Priority(10.0).SigOps(1).FromTx(tx47));
+
+    // tx46 child of tx41
+    pool.addUnchecked(tx46.GetHash(), entry.Fee(3000LL).Priority(10.0).SigOps(1).FromTx(tx46));
+
+    // tx45 - child of tx46 and tx47 and has one output
+    pool.addUnchecked(tx45.GetHash(), entry.Fee(12000LL).SigOps(1).FromTx(tx45));
+
+    // tx49 child of tx45
+    pool.addUnchecked(tx49.GetHash(), entry.Fee(14000LL).Priority(10.0).SigOps(1).FromTx(tx49));
+
+    // Validate the current state is correct
+    /* clang-format off */
+    BOOST_CHECK_EQUAL(pool.size(), 49);
+    std::vector<MempoolData> txns_fully_updated =
+    {
+        // Chain1:
+        {tx1.GetHash(), 1, 21, 1, 1000},
+        {tx2.GetHash(), 1, 21, 1, 2000},
+        {tx3.GetHash(), 1, 21, 1, 3000},
+        {tx4.GetHash(), 1, 21, 1, 4000},
+        {tx5.GetHash(), 2, 84, 2, 2000},
+        {tx6.GetHash(), 2, 84, 2, 4000},
+        {tx7.GetHash(), 2, 84, 2, 6000},
+        {tx8.GetHash(), 2, 84, 2, 8000},
+        {tx9.GetHash(), 5, 284, 5, 9000},
+        {tx10.GetHash(), 5, 273, 5, 21000},
+        {tx11.GetHash(), 12, 736, 12, 45000},
+        {tx12.GetHash(), 6, 369, 6, 10000},
+        {tx13.GetHash(), 13, 799, 13, 46000},
+        {tx14.GetHash(), 13, 799, 13, 46000},
+        {tx15.GetHash(), 7, 432, 7, 10500},
+        {tx16.GetHash(), 7, 432, 7, 10200},
+        {tx17.GetHash(), 7, 432, 7, 10300},
+        {tx18.GetHash(), 16, 1041, 16, 55000},
+        {tx19.GetHash(), 1, 21, 1, 6000},
+        {tx20.GetHash(), 1, 21, 1, 5000},
+
+        // Chain2:
+        {tx21.GetHash(), 1, 19, 1, 100000},
+        {tx22.GetHash(), 2, 115, 2, 200000},
+        {tx23.GetHash(), 3, 184, 3, 220000},
+        {tx24.GetHash(), 4, 244, 4, 230000},
+        {tx25.GetHash(), 4, 244, 4, 230000},
+        {tx26.GetHash(), 6, 405, 6, 260000},
+        {tx27.GetHash(), 1, 19, 1, 101000},
+        {tx28.GetHash(), 2, 79, 2, 202000},
+        {tx29.GetHash(), 5, 304, 5, 603000},
+        {tx30.GetHash(), 6, 364, 6, 704000},
+        {tx31.GetHash(), 3, 175, 3, 220000},
+        {tx32.GetHash(), 3, 175, 3, 220000},
+        {tx33.GetHash(), 3, 175, 3, 220000},
+        {tx34.GetHash(), 4, 235, 4, 240000},
+        {tx35.GetHash(), 14, 1067, 14, 1024000},
+        {tx36.GetHash(), 15, 1127, 15, 1224000},
+        {tx37.GetHash(), 15, 1127, 15, 1105000},
+        {tx38.GetHash(), 17, 1288, 17, 4115000},
+
+        // Chain3:
+        {tx39.GetHash(), 1, 20, 1, 1000},
+        {tx40.GetHash(), 1, 20, 1, 2000},
+        {tx41.GetHash(), 2, 91, 2, 10000},
+        {tx42.GetHash(), 5, 273, 5, 19000},
+        {tx43.GetHash(), 6, 333, 6, 31000},
+        {tx44.GetHash(), 1, 20, 1, 4000},
+        {tx45.GetHash(), 5, 271, 5, 35000},
+        {tx46.GetHash(), 3, 151, 3, 13000},
+        {tx47.GetHash(), 1, 19, 1, 10000},
+        {tx48.GetHash(), 7, 393, 7, 46000},
+        {tx49.GetHash(), 6, 331, 6, 49000}
+    };
+    /* clang-format on */
+    for (size_t i = 0; i < txns_fully_updated.size(); i++)
+    {
+        CTxMemPool::txiter iter = pool.mapTx.find(txns_fully_updated[i].hash);
+        if (iter == pool.mapTx.end())
+        {
+            printf("ERROR: tx %s not found in mempool\n", txns_fully_updated[i].hash.ToString().c_str());
+            throw;
+        }
+        CheckAncestors(txns_fully_updated[i], pool);
     }
 }
 

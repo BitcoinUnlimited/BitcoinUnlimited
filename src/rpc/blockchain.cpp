@@ -537,6 +537,10 @@ UniValue getmempoolentry(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction not in mempool");
     }
 
+    // Update the ancestor chain state if this transaction is part of
+    // an unconfirmed chain
+    mempool.UpdateTxnChainState(it);
+
     const CTxMemPoolEntry &e = *it;
     UniValue info(UniValue::VOBJ);
     entryToJSON(info, e);

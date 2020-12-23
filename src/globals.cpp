@@ -90,6 +90,10 @@ std::atomic<CBlockIndex *> pindexBestInvalid{nullptr};
 // The max allowed size of the in memory UTXO cache.
 std::atomic<int64_t> nCoinCacheMaxSize{0};
 
+// Indicates whether we're doing mempool tests or not when updating transaction chain state. This helps to simplify
+// our unit testing and checking for dirty vs non-dirty states.
+std::atomic<bool> fMempoolTests{false};
+
 CCriticalSection cs_main;
 CChain chainActive; // chainActive.Tip() is lock free, other APIs take an internal lock
 
@@ -249,11 +253,6 @@ std::queue<CTxInputData> txInQ GUARDED_BY(csTxInQ);
 // Transaction that cannot be processed in this round (may potentially conflict with other tx)
 std::queue<CTxInputData> txDeferQ GUARDED_BY(csTxInQ);
 
-// Transactions that arrive when the chain is not syncd can be place here at times when we've received
-// the block announcement but havn't yet downloaded the block and updated the tip. In this case there can
-// be txns that are perfectly valid yet are flagged as being non-final or has too many ancestors.
-std::queue<CTxInputData> txWaitNextBlockQ GUARDED_BY(csTxInQ);
-;
 
 // Transactions that have been validated and are waiting to be committed into the mempool
 CWaitableCriticalSection csCommitQ;
@@ -569,6 +568,10 @@ CTweak<double> dMinLimiterTxFee("minlimitertxfee",
 CTweak<bool> avoidReconsiderMostWorkChain("test.avoidReconsiderMostWorkChain",
     "Disable reconsidermostworkchain during initial bootstrap when chain is not synced (default: false)",
     false);
+
+// To test the behavior of the interaction between BU and other nodes that do not support extversion
+// it's useful to be able to turn it off.
+CTweak<bool> extVersionEnabled("test.extVersion", "Is extended version being used (default: true)", true);
 
 CRequestManager requester; // after the maps nodes and tweaks
 CState nodestate;
