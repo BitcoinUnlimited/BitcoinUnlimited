@@ -143,12 +143,6 @@ extern std::queue<CTxInputData> txInQ;
 // Guarded by csTxInQ
 extern std::queue<CTxInputData> txDeferQ;
 
-// Transactions that arrive when the chain is not syncd can be place here at times when we've received
-// the block announcement but havn't yet downloaded the block and updated the tip. In this case there can
-// be txns that are perfectly valid yet are flagged as being non-final or has too many ancestors.
-// Guarded by csTxInQ
-extern std::queue<CTxInputData> txWaitNextBlockQ;
-
 // Transactions that are validated and can be committed to the mempool, and protection
 extern CWaitableCriticalSection csCommitQ;
 extern CConditionVariable cvCommitQ;

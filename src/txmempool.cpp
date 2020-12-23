@@ -28,6 +28,8 @@
 #include "validation/validation.h"
 #include "version.h"
 
+extern std::atomic<bool> fMempoolTests;
+
 using namespace std;
 CTxMemPoolEntry::CTxMemPoolEntry()
     : tx(), nFee(), nTime(0), entryPriority(0), entryHeight(0), hadNoDependencies(0), inChainInputValue(0),
@@ -65,6 +67,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef _tx,
     nSizeWithAncestors = tx->GetTxSize();
     nModFeesWithAncestors = nFee;
     nSigOpCountWithAncestors = sigOpCount;
+    fDirty = false;
 }
 
 double CTxMemPoolEntry::GetPriority(unsigned int currentHeight) const
@@ -249,6 +252,7 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
             // removed +1 from test below as per BU: Fix use after free bug
             if (parentHashes.size() + setAncestors.size() > limitAncestorCount)
             {
+                setAncestors.insert(parentHashes.begin(), parentHashes.end());
                 errString = strprintf("too many unconfirmed ancestors (%u+%u) [limit: %u]", parentHashes.size(),
                     setAncestors.size(), limitAncestorCount);
                 return false;
@@ -346,31 +350,68 @@ void CTxMemPool::_UpdateEntryForAncestors(txiter it)
     int64_t updateSize = 0;
     CAmount updateFee = 0;
     int updateSigOps = 0;
+    bool fDirty = false;
+    bool fParentIsDirty = false;
 
     setEntries setParents = GetMemPoolParents(it);
-    if (setParents.size() > 1)
+    for (txiter parent : setParents)
     {
-        uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
-        setEntries setAncestors;
-        std::string dummy;
-        _CalculateMemPoolAncestors(*(it), setAncestors, nNoLimit, nNoLimit, dummy);
-        for (txiter ancestorIt : setAncestors)
-        {
-            updateSize += ancestorIt->GetTxSize();
-            updateFee += ancestorIt->GetModifiedFee();
-            updateSigOps += ancestorIt->GetSigOpCount();
-        }
-        updateCount = setAncestors.size();
-    }
-    else if (setParents.size() == 1)
-    {
-        txiter parent = *setParents.begin();
         updateSize += parent->GetSizeWithAncestors();
         updateFee += parent->GetModFeesWithAncestors();
         updateSigOps += parent->GetSigOpCountWithAncestors();
         updateCount += parent->GetCountWithAncestors();
+
+        if (parent->IsDirty())
+            fParentIsDirty = true;
     }
-    mapTx.modify(it, update_ancestor_state(updateSize, updateFee, updateCount, updateSigOps));
+
+    // If we have more than one parent then we can't really know how many ancestors we
+    // have without calling CalulateMemPoolAncestors(), which as transaction chains become
+    // longer, has a marked negative performance impact. So rather than do that we mark the transaction
+    // state as dirty. Then later we can update the entire chain state all at once, at various
+    // defined intervals, and also we can mine any "dirty" chains if there is
+    // still space in the block for them.
+    if (setParents.size() > 1 || fParentIsDirty)
+    {
+        // If we're still a small length chain then update the correct chain state. We use a flag
+        // fMempoolTests so that we can turn off this auto updating which makes our mempool unit
+        // testing easier to do.
+        if (updateCount <= MAX_UPDATED_CHAIN_STATE && !fParentIsDirty && fMempoolTests.load() == false)
+        {
+            size_t nLimitAncestors = MAX_UPDATED_CHAIN_STATE;
+            size_t nLimitAncestorSize = std::numeric_limits<uint64_t>::max();
+            std::string errString;
+            CTxMemPool::setEntries setAncestors;
+            _CalculateMemPoolAncestors(*it, setAncestors, nLimitAncestors, nLimitAncestorSize, errString);
+            setAncestors.erase(it);
+
+            updateCount = 0;
+            updateSize = 0;
+            updateFee = 0;
+            updateSigOps = 0;
+            for (txiter iter : setAncestors)
+            {
+                updateSize += iter->GetTxSize();
+                updateFee += iter->GetFee();
+                updateSigOps += iter->GetSigOpCount();
+            }
+            updateCount = setAncestors.size();
+
+            fDirty = false;
+        }
+        else
+        {
+            fDirty = true;
+
+            // If the parents are not dirty then this is a new dirty chaintip and
+            // we need to save it for later so that the entire chain state can be
+            // properly updated at some point in time.
+            if (!fParentIsDirty)
+                setDirtyTxnChainTips.insert(it->GetTx().GetHash());
+        }
+    }
+
+    mapTx.modify(it, update_ancestor_state(updateSize, updateFee, updateCount, updateSigOps, fDirty));
 }
 
 void CTxMemPool::UpdateChildrenForRemoval(txiter it)
@@ -383,13 +424,56 @@ void CTxMemPool::UpdateChildrenForRemoval(txiter it)
     }
 }
 
+void CTxMemPool::CalculateTxnChainTips(txiter it, mapEntryHistory &mapTxnChainTips)
+{
+    // Iterate through all the parents of this transaction to find the chaintips. The chaintips
+    // will be the transaction/s that has/have no parents.
+    AssertLockHeld(cs_txmempool);
+    setEntries parents = GetMemPoolParents(it);
+    if (parents.empty())
+    {
+        return;
+    }
+
+    while (!parents.empty())
+    {
+        txiter parentIter = *parents.begin();
+        const setEntries &nextParents = GetMemPoolParents(parentIter);
+        parents.erase(parents.begin());
+
+        if (nextParents.empty())
+        {
+            DbgAssert(!parentIter->IsDirty(), );
+
+            // Add the chaintip
+            ancestor_state ancestorState(parentIter->GetSizeWithAncestors(), parentIter->GetModFeesWithAncestors(),
+                parentIter->GetCountWithAncestors(), parentIter->GetSigOpCountWithAncestors());
+            mapTxnChainTips.emplace(parentIter, ancestorState);
+        }
+        else
+            parents.insert(nextParents.begin(), nextParents.end());
+    }
+}
+
+void CTxMemPool::UpdateTxnChainState(txiter it)
+{
+    AssertLockHeld(cs_txmempool);
+    if (it->IsDirty())
+    {
+        CTxMemPool::mapEntryHistory mapTxnChainTips;
+        mempool.CalculateTxnChainTips(it, mapTxnChainTips);
+        if (!mapTxnChainTips.empty())
+            mempool.UpdateTxnChainState(mapTxnChainTips);
+    }
+}
+
 void CTxMemPool::UpdateTxnChainState(mapEntryHistory &mapTxnChainTips)
 {
     AssertWriteLockHeld(cs_txmempool);
 
     // As a starting point, re-calculate all chaintip ancestor states. Although at least one chaintip
     // parent will have been mined there could still be other chaintip parents that were not mined.
-    //
+    // And mark the ancestor state as not "dirty".
     /*
        Chain prior to being mined:
 
@@ -429,11 +513,12 @@ void CTxMemPool::UpdateTxnChainState(mapEntryHistory &mapTxnChainTips)
             nAncestorModifiedFee += it->GetModifiedFee();
         }
         mapTx.modify(iter_tip.first,
-            replace_ancestor_state(nAncestorSize, nAncestorModifiedFee, nAncestorCount, nAncestorSigOps));
+            replace_ancestor_state(nAncestorSize, nAncestorModifiedFee, nAncestorCount, nAncestorSigOps, false));
     }
 
-    // For each txnChainTip find the difference between the old chain tip ancestor state
-    // values and the new ancestor state values and apply them to all of the descendants.
+    // For each txnChainTip find the difference between the new chain tip ancestor state
+    // values and old new ancestor state values and apply them to all of the descendants, and
+    // mark the new state as not "dirty".
     for (auto iter_tip : mapTxnChainTips)
     {
         // Find difference
@@ -453,8 +538,8 @@ void CTxMemPool::UpdateTxnChainState(mapEntryHistory &mapTxnChainTips)
         for (txiter it : setDescendants)
         {
             assert(!mapTxnChainTips.count(it));
-            mapTx.modify(it, update_ancestor_state(
-                                 nAncestorSizeDiff, nAncestorModifiedFeeDiff, nAncestorCountDiff, nAncestorSigOpsDiff));
+            mapTx.modify(it, update_ancestor_state(nAncestorSizeDiff, nAncestorModifiedFeeDiff, nAncestorCountDiff,
+                                 nAncestorSigOpsDiff, false));
         }
     }
 }
@@ -498,7 +583,11 @@ void CTxMemPool::_UpdateForRemoveFromMempool(const setEntries &entriesToRemove)
     }
 }
 
-void CTxMemPoolEntry::UpdateAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps)
+void CTxMemPoolEntry::UpdateAncestorState(int64_t modifySize,
+    CAmount modifyFee,
+    int64_t modifyCount,
+    int modifySigOps,
+    bool dirty)
 {
     // Ancestor state can be modified by subtraction so we use a DbgAssert here to make sure
     // we don't accitdentally trigger these asserts on mainnet.
@@ -509,9 +598,15 @@ void CTxMemPoolEntry::UpdateAncestorState(int64_t modifySize, CAmount modifyFee,
     DbgAssert(int64_t(nCountWithAncestors) > 0, );
     nSigOpCountWithAncestors += modifySigOps;
     DbgAssert(int(nSigOpCountWithAncestors) >= 0, );
+
+    fDirty = dirty;
 }
 
-void CTxMemPoolEntry::ReplaceAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount, int modifySigOps)
+void CTxMemPoolEntry::ReplaceAncestorState(int64_t modifySize,
+    CAmount modifyFee,
+    int64_t modifyCount,
+    int modifySigOps,
+    bool dirty)
 {
     nSizeWithAncestors = modifySize;
     assert(int64_t(nSizeWithAncestors) > 0);
@@ -520,6 +615,8 @@ void CTxMemPoolEntry::ReplaceAncestorState(int64_t modifySize, CAmount modifyFee
     assert(int64_t(nCountWithAncestors) > 0);
     nSigOpCountWithAncestors = modifySigOps;
     assert(int(nSigOpCountWithAncestors) >= 0);
+
+    fDirty = dirty;
 }
 
 CTxMemPool::CTxMemPool() : nTransactionsUpdated(0), m_dspStorage(new DoubleSpendProofStorage())
@@ -881,6 +978,20 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
                 _UpdateParent(updateIt, it, false);
             }
         }
+        // Add any additional dirty chain tips from set of mempool txn chain tips that need to be
+        // updated.
+        for (uint256 hash : setDirtyTxnChainTips)
+        {
+            // if the txn still exists then add it to the set of chaintips
+            auto it = mapTx.find(hash);
+            if (it != mapTx.end())
+            {
+                ancestor_state ancestorState(it->GetSizeWithAncestors(), it->GetModFeesWithAncestors(),
+                    it->GetCountWithAncestors(), it->GetSigOpCountWithAncestors());
+                mapTxnChainTips.emplace(it, ancestorState);
+            }
+        }
+        setDirtyTxnChainTips.clear();
 
         // Before the txs in the new block have been removed from the mempool, update policy estimates
         minerPolicyEstimator->processBlock(nBlockHeight, setTxnsInBlock, fCurrentEstimate);
@@ -1045,26 +1156,29 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
         }
         assert(setParentCheck == GetMemPoolParents(it));
         // Verify ancestor state is correct.
-        setEntries setAncestors;
-        uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
-        std::string dummy;
-        _CalculateMemPoolAncestors(*it, setAncestors, nNoLimit, nNoLimit, dummy);
-        uint64_t nCountCheck = setAncestors.size() + 1;
-        uint64_t nSizeCheck = it->GetTxSize();
-        CAmount nFeesCheck = it->GetModifiedFee();
-        unsigned int nSigOpCheck = it->GetSigOpCount();
-
-        for (txiter ancestorIt : setAncestors)
+        if (!it->IsDirty())
         {
-            nSizeCheck += ancestorIt->GetTxSize();
-            nFeesCheck += ancestorIt->GetModifiedFee();
-            nSigOpCheck += ancestorIt->GetSigOpCount();
-        }
+            setEntries setAncestors;
+            uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
+            std::string dummy;
+            _CalculateMemPoolAncestors(*it, setAncestors, nNoLimit, nNoLimit, dummy);
+            uint64_t nCountCheck = setAncestors.size() + 1;
+            uint64_t nSizeCheck = it->GetTxSize();
+            CAmount nFeesCheck = it->GetModifiedFee();
+            unsigned int nSigOpCheck = it->GetSigOpCount();
 
-        assert(it->GetCountWithAncestors() == nCountCheck);
-        assert(it->GetSizeWithAncestors() == nSizeCheck);
-        assert(it->GetSigOpCountWithAncestors() == nSigOpCheck);
-        assert(it->GetModFeesWithAncestors() == nFeesCheck);
+            for (txiter ancestorIt : setAncestors)
+            {
+                nSizeCheck += ancestorIt->GetTxSize();
+                nFeesCheck += ancestorIt->GetModifiedFee();
+                nSigOpCheck += ancestorIt->GetSigOpCount();
+            }
+
+            assert(it->GetCountWithAncestors() == nCountCheck);
+            assert(it->GetSizeWithAncestors() == nSizeCheck);
+            assert(it->GetSigOpCountWithAncestors() == nSigOpCheck);
+            assert(it->GetModFeesWithAncestors() == nFeesCheck);
+        }
 
         // Check children against mapNextTx
         CTxMemPool::setEntries setChildrenCheck;
@@ -1232,7 +1346,16 @@ void CTxMemPool::PrioritiseTransaction(const uint256 hash,
         txiter it = mapTx.find(hash);
         if (it != mapTx.end())
         {
+            // If this is part of an unconfirmed chain then update the ancestor chain state first.
+            UpdateTxnChainState(it);
             mapTx.modify(it, update_fee_delta(deltas.second));
+
+            // Update all the ancestor state for all the descendants with the new feeDelta
+            setEntries setDescendants;
+            _CalculateDescendants(it, setDescendants);
+            setDescendants.erase(it);
+            for (txiter descIt : setDescendants)
+                mapTx.modify(descIt, update_ancestor_state(0, nFeeDelta, 0, 0, false));
         }
     }
     LOGA("PrioritiseTransaction: %s priority += %f, fee += %d\n", strHash, dPriorityDelta, FormatMoney(nFeeDelta));
@@ -1258,7 +1381,7 @@ void CTxMemPool::_ApplyDeltas(const uint256 hash, double &dPriorityDelta, CAmoun
 void CTxMemPool::ClearPrioritisation(const uint256 hash)
 {
     WRITELOCK(cs_txmempool);
-    mapDeltas.erase(hash);
+    _ClearPrioritisation(hash);
 }
 void CTxMemPool::_ClearPrioritisation(const uint256 hash) { mapDeltas.erase(hash); }
 bool CTxMemPool::HasNoInputsOf(const CTransactionRef &tx) const
@@ -1402,6 +1525,21 @@ const CTxMemPool::setEntries &CTxMemPool::GetMemPoolParents(txiter entry) const
     txlinksMap::const_iterator it = mapLinks.find(entry);
     assert(it != mapLinks.end());
     return it->second.parents;
+}
+
+const CTxMemPool::setEntries CTxMemPool::GetMemPoolParents(const CTransaction &tx) const
+{
+    AssertLockHeld(cs_txmempool);
+    setEntries txparents;
+    for (unsigned int i = 0; i < tx.vin.size(); i++)
+    {
+        txiter piter = mapTx.find(tx.vin[i].prevout.hash);
+        if (piter != mapTx.end())
+        {
+            txparents.insert(piter);
+        }
+    }
+    return txparents;
 }
 
 const CTxMemPool::setEntries &CTxMemPool::GetMemPoolChildren(txiter entry) const

@@ -21,6 +21,7 @@
 #include "respend/respenddetector.h"
 #include "threadgroup.h"
 #include "timedata.h"
+#include "txmempool.h"
 #include "txorphanpool.h"
 #include "unlimited.h"
 #include "util.h"
@@ -328,13 +329,6 @@ void CommitTxToMempool()
             txDeferQ.push(txInQ.front());
             txInQ.pop();
         }
-        // If the chain is now syncd and there are txns in the wait queue then add these also to the deferred queue.
-        // The wait queue is not very active and it will typically have just 1 or 2 txns in it, if any at all.
-        while (IsChainSyncd() && !txWaitNextBlockQ.empty())
-        {
-            txDeferQ.push(txWaitNextBlockQ.front());
-            txWaitNextBlockQ.pop();
-        }
 
         // Move the previously deferred txns into active processing.
 
@@ -485,21 +479,6 @@ void ThreadTxAdmission()
                         // LOG(MEMPOOL, "Accepted tx: peer=%s: accepted %s onto Q\n", txd.nodeName,
                         //     tx->GetHash().ToString());
                     }
-                    else if (state.GetRejectCode() == REJECT_WAITING)
-                    {
-                        // If the chain is not sync'd entirely then we'll defer this tx until
-                        // the new block is processed.
-                        LOCK(csTxInQ);
-                        if (txWaitNextBlockQ.size() <= (10 * excessiveBlockSize / 1000000))
-                        {
-                            txWaitNextBlockQ.push(txd);
-                            LOG(MEMPOOL, "Tx %s is waiting on next block, reason:%s\n", tx->GetHash().ToString(),
-                                state.GetRejectReason());
-                        }
-                        else
-                            LOG(MEMPOOL, "WaitNexBlockQueue is full - tx:%s reason:%s\n", tx->GetHash().ToString(),
-                                state.GetRejectReason());
-                    }
                     else
                     {
                         LOG(MEMPOOL, "Rejected tx: %s(%d) %s: %s. peer %s  hash %s \n", state.GetRejectReason(),
@@ -560,7 +539,7 @@ void ThreadTxAdmission()
                     }
 
                     int nDoS = 0;
-                    if (state.IsInvalid(nDoS) && state.GetRejectCode() != REJECT_WAITING)
+                    if (state.IsInvalid(nDoS))
                     {
                         LOG(MEMPOOL, "%s from peer=%s was not accepted: %s\ntx: %s", tx->GetHash().ToString(),
                             txd.nodeName, FormatStateMessage(state), EncodeHexTx(*tx));
@@ -753,10 +732,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         }
         else
         {
-            if (!IsChainSyncd() && IsChainNearlySyncd())
-                return state.DoS(0, false, REJECT_WAITING, "non-final");
-            else
-                return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
+            return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
         }
     }
 
@@ -1014,7 +990,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         entry.UpdateRuntimeSigOps(resourceTracker.GetSigOps(), resourceTracker.GetSighashBytes());
 
         nSize = entry.GetTxSize();
-
         if (GetBoolArg("-relaypriority", DEFAULT_RELAYPRIORITY) && nModifiedFees < ::minRelayTxFee.GetFee(nSize) &&
             !AllowFree(entry.GetPriority(chainActive.Height() + 1)))
         {
@@ -1127,10 +1102,10 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             // useful but spammy
             // LOG(MEMPOOL, "MempoolBytes:%d  LimitFreeRelay:%.5g  nMinRelay:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d "
             //                         "TxFees:%d\n",
-            //                poolBytes, nFreeLimit, nMinRelay, ((double)nFees) / nSize, nSize, nFees);
+            //                poolBytes, nFreeLimit, nMinRelay, ((double)nModifiedFees) / nSize, nSize, nModifiedFees);
             if (fLimitFree)
             {
-                if (nLimitFreeRelay > 0 && nFees < ::minRelayTxFee.GetFee(nSize))
+                if (nLimitFreeRelay > 0 && nModifiedFees < ::minRelayTxFee.GetFee(nSize))
                 {
                     static double dFreeCount = 0;
 
@@ -1159,7 +1134,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                     }
                     dFreeCount += nSize;
                 }
-                else if (nFees < ::minRelayTxFee.GetFee(nSize))
+                else if (nModifiedFees < ::minRelayTxFee.GetFee(nSize))
                 {
                     if (debugger)
                     {
@@ -1194,59 +1169,88 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             }
         }
 
-        // Calculate in-mempool ancestors, up to a limit.
-        size_t nLimitAncestors = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
-        size_t nLimitAncestorSize = GetArg("-limitancestorsize", BU_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
+        // Calculate in-mempool ancestors, up to the BCH default limit. We don't need to calculate
+        // them any further.
+        size_t nLimitAncestors = GetArg("-limitancestorcount", BCH_DEFAULT_ANCESTOR_LIMIT);
+        size_t nLimitAncestorSize = GetArg("-limitancestorsize", BCH_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
         std::string errString;
         CTxMemPool::setEntries setAncestors;
         {
             READLOCK(pool.cs_txmempool);
-            // note we could resolve ancestors to hashes and return those if that saves time in the txc thread
-            if (!pool._CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize, errString))
+            pool._CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize, errString);
+            if (setAncestors.size() >= BCH_DEFAULT_ANCESTOR_LIMIT && restrictInputs.Value() == true)
             {
-                if (debugger)
-                {
-                    debugger->AddInvalidReason("too-long-mempool-chain");
-                    debugger->mineable = false;
-                }
-                else
+                if (tx->vin.size() > 1)
                 {
                     // this is effectively "missing inputs" since they are not usable due to unconf depth, so set the
                     // flag so that this tx gets on the orphan queue
                     *pfMissingInputs = true;
-                    // If the chain is not sync'd entirely then we'll defer this tx until the new block is processed.
-                    if (!IsChainSyncd() && IsChainNearlySyncd())
-                        return state.DoS(0, false, REJECT_WAITING, "too-long-mempool-chain");
+
+                    if (debugger)
+                    {
+                        debugger->AddInvalidReason("bad-txn-too-many-inputs");
+                        debugger->standard = false;
+                    }
                     else
-                        return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
+                    {
+                        return state.DoS(0, false, REJECT_NONSTANDARD, "bad-txn-too-many-inputs");
+                    }
+                }
+            }
+
+            if (txProps)
+            {
+                // In general restrict inputs will always be true. Only if we're doing some sort
+                // of testing on mainnet would we turn this off, therefore the calculation of mempool
+                // ancestors is straightforward since there will only ever be one parent for chains
+                // longer than the BCH_DEFAULT_ANCESTOR_LIMIT.
+                if (restrictInputs.Value() == true)
+                {
+                    if (setAncestors.size() >= BCH_DEFAULT_ANCESTOR_LIMIT)
+                    {
+                        CTxMemPool::setEntries setParents = pool.GetMemPoolParents(*tx);
+                        DbgAssert(setParents.size() == 1, return false); // we should only have 1 parent
+                        txProps->countWithAncestors = 1;
+                        txProps->sizeWithAncestors = tx->GetTxSize();
+                        for (auto parent : setParents)
+                        {
+                            txProps->countWithAncestors += parent->GetCountWithAncestors();
+                            txProps->sizeWithAncestors += parent->GetSizeWithAncestors();
+                        }
+                    }
+                    else
+                    {
+                        // If we are < the BCH_DEFAULT_ANCESTOR_LIMIT then we could have multiple parents
+                        // so we have to count up the values manually.
+                        txProps->countWithAncestors = setAncestors.size() + 1;
+                        uint64_t size = tx->GetTxSize();
+                        for (auto ancestor : setAncestors)
+                        {
+                            size += ancestor->GetTxSize();
+                        }
+                        txProps->sizeWithAncestors = size;
+                    }
+                }
+                else
+                {
+                    // we have to calculate all ancestors, this would only happen in test mode when
+                    // we don't want to restrict inputs
+                    uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
+                    std::string dummy2;
+                    CTxMemPool::setEntries setAncestorsTest;
+                    pool._CalculateMemPoolAncestors(entry, setAncestorsTest, nNoLimit, nNoLimit, dummy2);
+
+                    txProps->countWithAncestors = setAncestorsTest.size() + 1;
+                    uint64_t size = tx->GetTxSize();
+                    for (auto ancestor : setAncestorsTest)
+                    {
+                        size += ancestor->GetTxSize();
+                    }
+                    txProps->sizeWithAncestors = size;
                 }
             }
         }
-        // If restrict inputs is enabled and we are extending a long unconfirmed chain past the network
-        // default limit, then make sure to check that the txn only has one input. This prevents the reverse
-        // double spend attack.
-        if (setAncestors.size() >= BCH_DEFAULT_ANCESTOR_LIMIT && restrictInputs.Value() == true)
-        {
-            if (tx->vin.size() > 1)
-            {
-                // this is effectively "missing inputs" since they are not usable due to unconf depth, so set the
-                // flag so that this tx gets on the orphan queue
-                *pfMissingInputs = true;
 
-                return state.DoS(0, false, REJECT_NONSTANDARD, "bad-txn-too-many-inputs");
-            }
-        }
-
-        if (txProps) // This is inefficient since _CalculateMemPoolAncestors also calculates this
-        {
-            txProps->countWithAncestors = setAncestors.size();
-            uint64_t size = tx->GetTxSize();
-            for (auto ancestor : setAncestors)
-            {
-                size += ancestor->GetTxSize();
-            }
-            txProps->sizeWithAncestors = size;
-        }
 
         // Check again against just the consensus-critical mandatory script
         // verification flags, in case of bugs in the standard flags that cause

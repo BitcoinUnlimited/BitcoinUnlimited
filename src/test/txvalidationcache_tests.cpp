@@ -456,27 +456,6 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
         prevout = tx.GetHash();
     }
 
-
-    // Add one more which should fail because it's over the 50 limit.
-    {
-        CMutableTransaction tx;
-        tx.vin.resize(1);
-        tx.vin[0].prevout.hash = prevout;
-        tx.vin[0].prevout.n = 0;
-        tx.vout.resize(1);
-        tx.vout[0].nValue = 11 * CENT;
-        tx.vout[0].scriptPubKey = scriptPubKey;
-
-        // Sign:
-        std::vector<unsigned char> vchSig;
-        hash = SignatureHash(scriptPubKey, tx, 0, sighashType, 11 * CENT, 0);
-        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
-        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
-        vchSig.push_back((unsigned char)sighashType);
-        tx.vin[0].scriptSig << vchSig;
-        BOOST_CHECK(!ToMemPool(tx, "too-long-mempool-chain"));
-    }
-
     SetArg("-limitancestorcount", std::to_string(52));
     SetArg("-limitdescendantcount", std::to_string(52));
 
@@ -498,7 +477,6 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
         vchSig.push_back((unsigned char)sighashType);
         tx.vin[0].scriptSig << vchSig;
         BOOST_CHECK(ToMemPool(tx));
-
         prevout = tx.GetHash();
     }
 
@@ -553,27 +531,6 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
         BOOST_CHECK(ToMemPool(tx));
 
         prevout = tx.GetHash();
-    }
-
-    // Now try to add one more tx with only one input. It should fail because
-    // we are over the limit of 52.
-    {
-        CMutableTransaction tx;
-        tx.vin.resize(1);
-        tx.vin[0].prevout.hash = prevout;
-        tx.vin[0].prevout.n = 0;
-        tx.vout.resize(1);
-        tx.vout[0].nValue = 11 * CENT;
-        tx.vout[0].scriptPubKey = scriptPubKey;
-
-        // Sign:
-        std::vector<unsigned char> vchSig;
-        hash = SignatureHash(scriptPubKey, tx, 0, sighashType, 11 * CENT, 0);
-        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
-        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
-        vchSig.push_back((unsigned char)sighashType);
-        tx.vin[0].scriptSig << vchSig;
-        BOOST_CHECK(!ToMemPool(tx, "too-long-mempool-chain"));
     }
 
     dMinLimiterTxFee.Set(nTempFee);

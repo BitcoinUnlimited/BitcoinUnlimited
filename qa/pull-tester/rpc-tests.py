@@ -251,7 +251,7 @@ testScripts = [ RpcTest(t) for t in [
     'disablewallet',
     'sendheaders',
     'keypool',
-    Disabled('prioritise_transaction', "TODO"),
+    'prioritise_transaction',
     Disabled('invalidblockrequest', "TODO"),
     'invalidtxrequest',
     'abandonconflict',

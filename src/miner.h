@@ -112,7 +112,7 @@ private:
     void addPriorityTxs(std::vector<const CTxMemPoolEntry *> *vtxe);
 
     /** Add transactions based on feerate including unconfirmed ancestors */
-    void addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, bool fCanonical);
+    void addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, bool fCanonical, bool fAllowDirty);
 
     // helper function for addPriorityTxs
     bool IsIncrementallyGood(uint64_t nExtraSize, unsigned int nExtraSigOps);

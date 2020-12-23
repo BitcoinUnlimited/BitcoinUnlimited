@@ -314,11 +314,8 @@ UniValue prioritisetransaction(const UniValue &params, bool fHelp)
             HelpExampleCli("prioritisetransaction", "\"txid\" 0.0 10000") +
             HelpExampleRpc("prioritisetransaction", "\"txid\", 0.0, 10000"));
 
-    LOCK(cs_main);
-
     uint256 hash = ParseHashStr(params[0].get_str(), "txid");
     CAmount nAmount = params[2].get_int64();
-
     mempool.PrioritiseTransaction(hash, params[0].get_str(), params[1].get_real(), nAmount);
     return true;
 }

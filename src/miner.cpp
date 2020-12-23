@@ -257,8 +257,13 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         addPriorityTxs(&vtxe);
 
         // Mine by package (CPFP)
+        // We make two passes through addPackageTxs(). The first pass is for
+        // transactions and chains that are not dirty, which will likely be the bulk
+        // of the block. Then a second quick pass is made to see if any dirty transactions
+        // would be able to fill the rest of the block.
         int64_t nStartPackage = GetStopwatchMicros();
-        addPackageTxs(&vtxe, canonical);
+        addPackageTxs(&vtxe, canonical, false);
+        addPackageTxs(&vtxe, canonical, true);
         nTotalPackage += GetStopwatchMicros() - nStartPackage;
 
         nLastBlockTx = nBlockTx;
@@ -499,7 +504,7 @@ void BlockAssembler::SortForBlock(const CTxMemPool::setEntries &package, std::ve
 // the current algo is still much better than the older method which needed to update calculations for the
 // entire descendant tree after each package was added to the block.
 
-void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, bool fCanonical)
+void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, bool fCanonical, bool fAllowDirtyTxns)
 {
     AssertLockHeld(mempool.cs_txmempool);
 
@@ -510,7 +515,7 @@ void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, b
         iter = mempool.mapTx.project<0>(mi);
 
         // Skip txns we know are in the block
-        if (inBlock.count(iter))
+        if (inBlock.count(iter) || (fAllowDirtyTxns == false && iter->IsDirty() == true))
         {
             continue;
         }

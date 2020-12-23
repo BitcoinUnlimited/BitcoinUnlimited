@@ -618,7 +618,7 @@ public:
         // Checking the descendants makes no sense -- the target node can't have descendants in its mempool if it
         // doesn't have this transaction!
         if ((extversionEnabled && props.countWithAncestors > nLimitAncestorCount) ||
-            (!extversionEnabled && props.countWithAncestors > BCH_DEFAULT_DESCENDANT_LIMIT))
+            (!extversionEnabled && props.countWithAncestors > BCH_DEFAULT_ANCESTOR_LIMIT))
             return false;
         if ((extversionEnabled && props.sizeWithAncestors > nLimitAncestorSize) ||
             (!extversionEnabled && props.sizeWithAncestors > BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000))
