@@ -43,7 +43,7 @@ class StratumClient:
 
         # next step: call connect()
 
-    def _connection_lost(self, protocol):
+    def connection_lost(self, protocol):
         # Ignore connection_lost for old connections
         if protocol is not self.protocol:
             return
@@ -63,7 +63,7 @@ class StratumClient:
         if self.ka_task:
             self.ka_task.cancel()
             self.ka_task = None
-            
+
 
     async def connect(self, server_info, proto_code=None, *,
                             use_tor=False, disable_cert_verify=False,
@@ -82,7 +82,7 @@ class StratumClient:
         if proto_code == 'g':       # websocket
             # to do this, we'll need a websockets implementation that
             # operates more like a asyncio.Transport
-            # maybe: `asyncws` or `aiohttp` 
+            # maybe: `asyncws` or `aiohttp`
             raise NotImplementedError('sorry no WebSocket transport yet')
 
         hostname, port, use_ssl = server_info.get_port(proto_code)
@@ -110,7 +110,7 @@ class StratumClient:
 
         if use_ssl == True and disable_cert_verify:
             # Create a more liberal SSL context that won't
-            # object to self-signed certicates. This is 
+            # object to self-signed certicates. This is
             # very bad on public Internet, but probably ok
             # over Tor
             use_ssl = ssl.create_default_context()
@@ -152,6 +152,7 @@ class StratumClient:
 
         # close whatever we had
         if self.protocol:
+            logger.warn("connect called when already connected, closing previous connection")
             self.protocol.close()
             self.protocol = None
 
@@ -160,7 +161,7 @@ class StratumClient:
 
     async def _keepalive(self):
         '''
-            Keep our connect to server alive forever, with some 
+            Keep our connect to server alive forever, with some
             pointless traffic.
         '''
         while self.protocol:
@@ -242,7 +243,7 @@ class StratumClient:
         result = msg.get('result')
 
         # fetch and forget about the request
-        inf = self.inflight.pop(resp_id) 
+        inf = self.inflight.pop(resp_id)
         if not inf:
             logger.error("Incoming server message had unknown ID in it: %s" % resp_id)
             return
@@ -252,7 +253,7 @@ class StratumClient:
 
         if 'error' in msg:
             err = msg['error']
-            
+
             logger.info("Error response: '%s'" % err)
             rv.set_exception(ElectrumErrorResponse(err, req))
 
@@ -268,7 +269,7 @@ class StratumClient:
                 blockchain.address.get_balance
 
             .. and sometimes take arguments, all of which are positional.
-    
+
             Returns a future which will you should await for
             the result from the server. Failures are returned as exceptions.
         '''
@@ -283,7 +284,7 @@ class StratumClient:
             Expects a method name, which look like:
                 server.peers.subscribe
             .. and sometimes take arguments, all of which are positional.
-    
+
             Returns a tuple: (Future, asyncio.Queue).
             The future will have the result of the initial
             call, and the queue will receive additional
@@ -292,7 +293,7 @@ class StratumClient:
         assert '.' in method
         assert method.endswith('subscribe')
         return self._send_request(method, params, is_subscribe=True)
-        
+
 
 if __name__ == '__main__':
     from transport import SocketTransport
@@ -321,7 +322,7 @@ if __name__ == '__main__':
     c = StratumClient(loop=loop)
 
     loop.run_until_complete(c.connect(which, proto_code, disable_cert_verify=True, use_tor=True))
-    
+
     rv = loop.run_until_complete(c.RPC('server.peers.subscribe'))
     print("DONE!: this server has %d peers" % len(rv))
     loop.close()
