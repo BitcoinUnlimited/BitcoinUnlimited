@@ -9,8 +9,65 @@ from .script import *
 from test_framework.connectrum.client import StratumClient
 from test_framework.connectrum.svr_info import ServerInfo
 from test_framework.util import waitFor
+from test_framework.test_framework import BitcoinTestFramework
+from test_framework.mininode import (
+    P2PDataStore,
+    NodeConn,
+    NetworkThread,
+)
+from test_framework.util import assert_equal, p2p_port
+from test_framework.blocktools import create_coinbase, create_block, \
+    create_transaction, pad_tx
+import time
 
 ELECTRUM_PORT = None
+
+class ElectrumTestFramework(BitcoinTestFramework):
+
+    def __init__(self):
+        super().__init__()
+        self.setup_clean_chain = True
+        self.num_nodes = 1
+        self.extra_args = [bitcoind_electrum_args()]
+
+    def bootstrap_p2p(self):
+        """Add a P2P connection to the node."""
+        self.p2p = P2PDataStore()
+        self.connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], self.p2p)
+        self.p2p.add_connection(self.connection)
+        NetworkThread().start()
+        self.p2p.wait_for_verack()
+        assert(self.p2p.connection.state == "connected")
+
+    def mine_blocks(self, n, num_blocks, txns = None):
+        """
+        Mine a block without using bitcoind
+        """
+        prev = n.getblockheader(n.getbestblockhash())
+        prev_height = prev['height']
+        prev_hash = prev['hash']
+        prev_time = max(prev['time'] + 1, int(time.time()))
+        blocks = [ ]
+        for i in range(num_blocks):
+            coinbase = create_coinbase(prev_height + 1)
+            b = create_block(
+                    hashprev = prev_hash,
+                    coinbase = coinbase,
+                    txns = txns,
+                    nTime = prev_time + 1)
+            txns = None
+            b.solve()
+            blocks.append(b)
+
+            prev_time = b.nTime
+            prev_height += 1
+            prev_hash = b.hash
+
+        self.p2p.send_blocks_and_test(blocks, n)
+        assert_equal(blocks[-1].hash, n.getbestblockhash())
+
+        # Return coinbases for spending later
+        return [b.vtx[0] for b in blocks]
 
 def compare(node, key, expected, is_debug_data = False):
     info = node.getelectruminfo()
