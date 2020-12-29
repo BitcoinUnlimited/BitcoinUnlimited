@@ -5,103 +5,168 @@ Tests the electrum call 'blockchain.transaction.get'
 """
 import asyncio
 from test_framework.util import assert_equal, p2p_port
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.loginit import logging
-from test_framework.electrumutil import *
-from test_framework.nodemessages import COIN, ToHex
-from test_framework.blocktools import create_coinbase, create_block, \
-    create_transaction
-from test_framework.mininode import (
-    P2PDataStore,
-    NodeConn,
-    NetworkThread,
+from test_framework.electrumutil import ElectrumTestFramework, ElectrumConnection
+from test_framework.nodemessages import ToHex
+from test_framework.blocktools import create_transaction, pad_tx
+from test_framework.script import (
+        CScript,
+        OP_CHECKSIG,
+        OP_DROP,
+        OP_DUP,
+        OP_EQUAL,
+        OP_EQUALVERIFY,
+        OP_FALSE,
+        OP_HASH160,
+        OP_TRUE,
 )
-from test_framework.script import CScript, OP_TRUE, OP_DROP, OP_NOP
-import time
+from test_framework.nodemessages import COIN
 
 TX_GET = "blockchain.transaction.get"
+DUMMY_HASH = 0x1111111111111111111111111111111111111111
 
-class ElectrumTransactionGet(BitcoinTestFramework):
-
-    def __init__(self):
-        super().__init__()
-        self.setup_clean_chain = True
-        self.num_nodes = 1
-        self.extra_args = [bitcoind_electrum_args()]
-
-
-    def bootstrap_p2p(self):
-        """Add a P2P connection to the node.
-
-        Helper to connect and wait for version handshake."""
-        self.p2p = P2PDataStore()
-        self.connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], self.p2p)
-        self.p2p.add_connection(self.connection)
-        NetworkThread().start()
-        self.p2p.wait_for_verack()
-        assert(self.p2p.connection.state == "connected")
-
-    def mine_blocks(self, n, num_blocks, txns = None):
-        prev = n.getblockheader(n.getbestblockhash())
-        print(prev)
-        prev_height = prev['height']
-        prev_hash = prev['hash']
-        prev_time = max(prev['time'] + 1, int(time.time()))
-        blocks = [ ]
-        for i in range(num_blocks):
-            coinbase = create_coinbase(prev_height + 1)
-            b = create_block(
-                    hashprev = prev_hash,
-                    coinbase = coinbase,
-                    txns = txns,
-                    nTime = prev_time + 1)
-            txns = None
-            b.solve()
-            blocks.append(b)
-
-            prev_time = b.nTime
-            prev_height += 1
-            prev_hash = b.hash
-
-        self.p2p.send_blocks_and_test(blocks, n)
-        assert_equal(blocks[-1].hash, n.getbestblockhash())
-
-        # Return coinbases for spending later
-        return [b.vtx[0] for b in blocks]
-
+class ElectrumTransactionGet(ElectrumTestFramework):
 
     def run_test(self):
         n = self.nodes[0]
         self.bootstrap_p2p()
 
-        coinbases = self.mine_blocks(n, 5)
+        coinbases = self.mine_blocks(n, 103)
 
-        async def async_tests():
-            cli = ElectrumConnection()
+        # non-coinbase transactions
+        prevtx = coinbases[0]
+        nonstandard_tx = create_transaction(
+                prevtx = prevtx,
+                value = prevtx.vout[0].nValue, n = 0,
+                sig = CScript([OP_TRUE]),
+                out = CScript([OP_FALSE, OP_DROP]))
+
+        prevtx = coinbases[1]
+        p2sh_tx = create_transaction(
+                prevtx = prevtx,
+                value = prevtx.vout[0].nValue, n = 0,
+                sig = CScript([OP_TRUE]),
+                out = CScript([OP_HASH160, DUMMY_HASH, OP_EQUAL]))
+
+        prevtx = coinbases[2]
+        p2pkh_tx = create_transaction(
+                prevtx = prevtx,
+                value = prevtx.vout[0].nValue, n = 0,
+                sig = CScript([OP_TRUE]),
+                out = CScript([OP_DUP, OP_HASH160, DUMMY_HASH, OP_EQUALVERIFY, OP_CHECKSIG]))
+
+        for tx in [nonstandard_tx, p2sh_tx, p2pkh_tx]:
+            pad_tx(tx)
+
+        coinbases.extend(self.mine_blocks(n, 1, [nonstandard_tx, p2sh_tx, p2pkh_tx]))
+        self.sync_height()
+
+
+        async def async_tests(loop):
+            cli = ElectrumConnection(loop)
             await cli.connect()
 
-            # Test raw
-            for tx in coinbases:
-                assert_equal(ToHex(tx), await cli.call(TX_GET, tx.hash))
+            return await asyncio.gather(
+                self.test_verbose(n, cli, nonstandard_tx.hash, p2sh_tx.hash, p2pkh_tx.hash),
+                self.test_non_verbose(cli, coinbases)
+            )
 
-            # Test verbose.
-            # The spec is unclear. It states:
-            #
-            # "whatever the coin daemon returns when asked for a
-            #  verbose form of the raw transaction"
-            #
-            # Just check the basics.
-            for tx in coinbases:
-                electrum = await cli.call(TX_GET, tx.hash, True)
-                bitcoind = n.getrawtransaction(tx.hash, True)
-                assert_equal(bitcoind['txid'], electrum['txid'])
-                assert_equal(bitcoind['locktime'], electrum['locktime'])
-                assert_equal(bitcoind['size'], electrum['size'])
-                assert_equal(bitcoind['hex'], electrum['hex'])
-                assert_equal(len(bitcoind['vin']), len(bitcoind['vin']))
-                assert_equal(len(bitcoind['vout']), len(bitcoind['vout']))
 
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(async_tests())
+        loop.run_until_complete(async_tests(loop))
+
+    async def test_non_verbose(self, cli, coinbases):
+        for tx in coinbases:
+            assert_equal(ToHex(tx), await cli.call(TX_GET, tx.hash))
+
+    async def test_verbose(self, n, cli, nonstandard_tx, p2sh_tx, p2pkh_tx):
+        """
+        The spec is unclear. It states:
+
+        "whatever the coin daemon returns when asked for a
+         verbose form of the raw transaction"
+
+        We should test for defacto "common denominators" between bitcoind
+        implementations.
+        """
+
+        # All the transactions are confirmed in the tip
+        block = n.getbestblockhash()
+        coinbase_tx = n.getblock(block)['tx'][0]
+
+        async def check_tx(txid, check_output_type = False):
+            electrum = await cli.call(TX_GET, txid, True)
+            bitcoind = n.getrawtransaction(txid, True, block)
+
+            assert_equal(bitcoind['txid'], electrum['txid'])
+            assert_equal(bitcoind['locktime'], electrum['locktime'])
+            assert_equal(bitcoind['size'], electrum['size'])
+            assert_equal(bitcoind['hex'], electrum['hex'])
+            assert_equal(bitcoind['version'], electrum['version'])
+            assert_equal(bitcoind['confirmations'], electrum['confirmations'])
+            assert_equal(bitcoind['time'], electrum['time'])
+
+            # inputs
+            assert_equal(len(bitcoind['vin']), len(bitcoind['vin']))
+            for i in range(len(bitcoind['vin'])):
+                if 'coinbase' in bitcoind['vin'][i]:
+                    # bitcoind drops txid and adds 'coinbase' for coinbase
+                    # inputs
+                    assert_equal(bitcoind['vin'][i]['coinbase'], electrum['vin'][i]['coinbase'])
+                    assert_equal(bitcoind['vin'][i]['sequence'], electrum['vin'][i]['sequence'])
+                    continue
+
+                assert_equal(
+                        bitcoind['vin'][i]['txid'],
+                        electrum['vin'][i]['txid'])
+                assert_equal(
+                        bitcoind['vin'][i]['vout'],
+                        electrum['vin'][i]['vout'])
+                assert_equal(
+                        bitcoind['vin'][i]['sequence'],
+                        electrum['vin'][i]['sequence'])
+                assert_equal(
+                        bitcoind['vin'][i]['scriptSig']['hex'],
+                        electrum['vin'][i]['scriptSig']['hex'])
+
+                # There is more than one way to represent script as assembly.
+                # For instance '51' can be represented as '1' or 'OP_PUSHNUM_1'.
+                # Just check for existance.
+                assert('asm' in electrum['vin'][i]['scriptSig'])
+
+
+            # outputs
+            assert_equal(len(bitcoind['vout']), len(bitcoind['vout']))
+            for i in range(len(bitcoind['vout'])):
+                assert_equal(
+                        bitcoind['vout'][i]['n'],
+                        electrum['vout'][i]['n'])
+
+                assert_equal(
+                        bitcoind['vout'][i]['value'],
+                        electrum['vout'][i]['value_coin'])
+
+                assert_equal(
+                        bitcoind['vout'][i]['value'] * COIN,
+                        electrum['vout'][i]['value_satoshi'])
+
+                assert_equal(
+                        bitcoind['vout'][i]['scriptPubKey']['hex'],
+                        electrum['vout'][i]['scriptPubKey']['hex'])
+                assert('asm' in electrum['vout'][i]['scriptPubKey'])
+
+                if check_output_type:
+                    assert_equal(
+                        bitcoind['vout'][i]['scriptPubKey']['type'],
+                        electrum['vout'][i]['scriptPubKey']['type'])
+
+        await asyncio.gather(
+                # ElectrsCash cannot tell if it's nonstandard
+                check_tx(nonstandard_tx, check_output_type = False),
+                check_tx(p2sh_tx),
+                check_tx(p2pkh_tx),
+                check_tx(coinbase_tx),
+        )
+
+
 if __name__ == '__main__':
     ElectrumTransactionGet().main()
