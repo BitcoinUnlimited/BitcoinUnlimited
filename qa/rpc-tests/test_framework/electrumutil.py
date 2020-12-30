@@ -12,6 +12,13 @@ from test_framework.util import waitFor
 
 ELECTRUM_PORT = None
 
+ERROR_CODE_INVALID_REQUEST = -32600
+ERROR_CODE_METHOD_NOT_FOUND = -32601
+ERROR_CODE_INVALID_PARAMS = -32602
+ERROR_CODE_INTERNAL_ERROR = -32603
+ERROR_CODE_NOT_FOUND = -32004
+ERROR_CODE_TIMEOUT = -32005
+
 def compare(node, key, expected, is_debug_data = False):
     info = node.getelectruminfo()
     if is_debug_data:
@@ -105,3 +112,38 @@ def wait_for_electrum_mempool(node, *, count, timeout = 10):
     except Exception as e:
         print("Waited for {} txs, had {}".format(count, node.getelectruminfo()['debuginfo']['electrscash_mempool_count']))
         raise
+
+"""
+Asserts that function call throw a electrum error, optionally testing for
+the contents of the error.
+"""
+async def assert_response_error(call,
+        error_code = None, error_string = None):
+    from test_framework.connectrum.exc import ElectrumErrorResponse
+    try:
+        await call()
+        raise AssertionError("assert_electrum_error: Error was not thrown.")
+    except ElectrumErrorResponse as exception:
+        res = exception.response
+
+        if error_code is not None:
+            if not 'code' in res:
+                raise AssertionError(
+                    "assert_response_error: Error code is missing in response")
+
+            if res['code'] != error_code:
+                raise AssertionError((
+                    "assert_response_error: Expected error code {}, "
+                    "got {} (Full response: {})".format(
+                    error_code, res['code'], str(exception))))
+
+        if error_string is not None:
+            if not 'message' in res:
+                raise AssertionError(
+                    "assert_response_error: Error message is missing in response")
+
+            if error_string not in res['message']:
+                raise AssertionError((
+                    "assert_response_error: Expected error string '{}', "
+                    "not found in '{}' (Full response: {})").format(
+                    error_string, res['message'], str(exception)))
