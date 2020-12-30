@@ -43,7 +43,6 @@ class ElectrumTransactionGet(BitcoinTestFramework):
 
     def mine_blocks(self, n, num_blocks, txns = None):
         prev = n.getblockheader(n.getbestblockhash())
-        print(prev)
         prev_height = prev['height']
         prev_hash = prev['hash']
         prev_time = max(prev['time'] + 1, int(time.time()))
