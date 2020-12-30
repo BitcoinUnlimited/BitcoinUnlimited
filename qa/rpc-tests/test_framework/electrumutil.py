@@ -69,6 +69,11 @@ class ElectrumTestFramework(BitcoinTestFramework):
         # Return coinbases for spending later
         return [b.vtx[0] for b in blocks]
 
+    def sync_height(self, n = None):
+        if n is None:
+            n = self.nodes[0]
+        sync_electrum_height(n)
+
 def compare(node, key, expected, is_debug_data = False):
     info = node.getelectruminfo()
     if is_debug_data:
