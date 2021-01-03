@@ -153,6 +153,13 @@ class ElectrumTransactionGet(ElectrumTestFramework):
                         electrum['vout'][i]['scriptPubKey']['hex'])
                 assert('asm' in electrum['vout'][i]['scriptPubKey'])
 
+                if 'addresses' in bitcoind['vout'][i]['scriptPubKey']:
+                    assert_equal(
+                            bitcoind['vout'][i]['scriptPubKey']['addresses'],
+                            electrum['vout'][i]['scriptPubKey']['addresses'])
+                else:
+                    assert_equal([], electrum['vout'][i]['scriptPubKey']['addresses'])
+
                 if check_output_type:
                     assert_equal(
                         bitcoind['vout'][i]['scriptPubKey']['type'],
