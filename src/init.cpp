@@ -80,7 +80,8 @@
 #include <thread>
 
 #if ENABLE_ZMQ
-#include "zmq/zmqnotificationinterface.h"
+#include <zmq/zmqnotificationinterface.h>
+#include <zmq/zmqrpc.h>
 #endif
 
 using namespace std;
@@ -89,10 +90,6 @@ bool fFeeEstimatesInitialized = false;
 
 /** Has the AppInit2() startup phase returned */
 std::atomic<bool> fAppInit2{false};
-
-#if ENABLE_ZMQ
-static CZMQNotificationInterface *pzmqNotificationInterface = nullptr;
-#endif
 
 #ifdef WIN32
 // Win32 LevelDB doesn't use filedescriptors, and the ones used for
@@ -963,6 +960,9 @@ bool AppInit2(Config &config)
     bool fDisableWallet = GetBoolArg("-disablewallet", false);
     if (!fDisableWallet)
         RegisterWalletRPCCommands(tableRPC);
+#endif
+#if ENABLE_ZMQ
+    RegisterZMQRPCCommands(tableRPC);
 #endif
 
     nConnectTimeout = GetArg("-timeout", DEFAULT_CONNECT_TIMEOUT);

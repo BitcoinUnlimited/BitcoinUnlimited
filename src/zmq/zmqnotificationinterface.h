@@ -1,5 +1,5 @@
 // Copyright (c) 2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -19,15 +19,16 @@ public:
     virtual ~CZMQNotificationInterface();
 
     static CZMQNotificationInterface *CreateWithArguments(const std::map<std::string, std::string> &args);
+    std::list<const CZMQAbstractNotifier *> GetActiveNotifiers() const;
 
 protected:
     bool Initialize();
     void Shutdown();
 
     // CValidationInterface
-    void SyncTransaction(const CTransactionRef &ptx, const CBlock *pblock, int txIndex = -1);
-    void UpdatedBlockTip(const CBlockIndex *pindex);
-    void SyncDoubleSpend(const CTransactionRef ptx);
+    void SyncTransaction(const CTransactionRef &ptx, const CBlock *pblock, int txIndex = -1) override;
+    void SyncDoubleSpend(const CTransactionRef ptx) override;
+    void UpdatedBlockTip(const CBlockIndex *pindex) override;
 
 private:
     CZMQNotificationInterface();
@@ -35,5 +36,7 @@ private:
     void *pcontext;
     std::list<CZMQAbstractNotifier *> notifiers;
 };
+
+extern CZMQNotificationInterface *pzmqNotificationInterface;
 
 #endif // BITCOIN_ZMQ_ZMQNOTIFICATIONINTERFACE_H

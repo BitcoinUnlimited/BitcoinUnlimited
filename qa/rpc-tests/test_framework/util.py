@@ -18,6 +18,7 @@ from binascii import hexlify, unhexlify
 from base64 import b64encode
 from decimal import Decimal, ROUND_DOWN
 import decimal
+import hashlib
 import json
 import http.client
 import random
@@ -51,6 +52,32 @@ PORT_MIN = 5000
 PORT_RANGE = 30000
 
 debug_port_assignments = False
+
+
+# Serialization/deserialization tools
+def sha256(s):
+    """Return the sha256 hash of the passed binary data
+
+    >>> hexlify(sha256("e hat eye pie plus one is O".encode()))
+    b'c5b94099f454a3807377724eb99a33fbe9cb5813006cadc03e862a89d410eaf0'
+    """
+    return hashlib.new('sha256', s).digest()
+
+
+def hash256(s):
+    """Return the double SHA256 hash (what bitcoin typically uses) of the passed binary data
+
+    >>> hexlify(hash256("There was a terrible ghastly silence".encode()))
+    b'730ac30b1e7f4061346277ab639d7a68c6686aeba4cc63280968b903024a0a40'
+    """
+    return sha256(sha256(s))
+
+def hash160(msg):
+    """RIPEME160(SHA256(msg)) -> bytes"""
+    h = hashlib.new('ripemd160')
+    h.update(hashlib.sha256(msg).digest())
+    return h.digest()
+
 
 class TimeoutException(Exception):
     pass
@@ -729,6 +756,10 @@ def wait_bitcoinds():
     for bitcoind in bitcoind_processes.values():
         bitcoind.wait(timeout=BITCOIND_PROC_WAIT_TIMEOUT)
     bitcoind_processes.clear()
+
+def wait_bitcoind_exit(i, timeout=BITCOIND_PROC_WAIT_TIMEOUT):
+    # Wait for all bitcoinds to cleanly exit
+    bitcoind_processes[i].wait(timeout=timeout)
 
 def is_bitcoind_running(i):
     assert i in bitcoind_processes

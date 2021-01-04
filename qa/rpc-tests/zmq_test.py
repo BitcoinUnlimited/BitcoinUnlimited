@@ -3,11 +3,13 @@
 # Copyright (c) 2015-2017 The Bitcoin Unlimited developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-import test_framework.loginit
+
 #
 # Test ZMQ interface
 #
 
+import time
+import test_framework.loginit
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 import zmq
@@ -16,9 +18,21 @@ import struct
 import http.client
 import urllib.parse
 
+def ZmqReceive(socket, timeout=30):
+    start = time.time()
+    while True:
+        try:
+            return socket.recv_multipart()
+        except zmq.ZMQError as e:
+            if e.errno != zmq.EAGAIN or time.time() - start >= timeout:
+                raise
+            time.sleep(0.05)
+
+
+
 class ZMQTest (BitcoinTestFramework):
 
-    port = 28332
+    port = 28340 # ZMQ ports of these test must be unique so multiple tests can be run simultaneously
 
     def setup_nodes(self):
         self.zmqContext = zmq.Context()
@@ -44,11 +58,11 @@ class ZMQTest (BitcoinTestFramework):
             self.sync_all()
 
             print("listen...")
-            msg = self.zmqSubSocket.recv_multipart()
+            msg = ZmqReceive(self.zmqSubSocket)
             topic = msg[0]
             body = msg[1]
 
-            msg = self.zmqSubSocket.recv_multipart()
+            msg = ZmqReceive(self.zmqSubSocket)
             topic = msg[0]
             body = msg[1]
             if topic == b"hashblock":
@@ -61,7 +75,7 @@ class ZMQTest (BitcoinTestFramework):
 
             zmqHashes = []
             for x in range(0,n*2):
-                msg = self.zmqSubSocket.recv_multipart()
+                msg = ZmqReceive(self.zmqSubSocket)
                 topic = msg[0]
                 body = msg[1]
                 if topic == b"hashblock":
@@ -75,7 +89,7 @@ class ZMQTest (BitcoinTestFramework):
             self.sync_all()
 
             # now we should receive a zmq msg because the tx was broadcast
-            msg = self.zmqSubSocket.recv_multipart()
+            msg = ZmqReceive(self.zmqSubSocket)
             topic = msg[0]
             body = msg[1]
             hashZMQ = ""
@@ -102,7 +116,7 @@ class ZMQTest (BitcoinTestFramework):
             self.sync_all()
 
             #check we received zmq notification
-            msg = self.zmqSubSocket.recv_multipart()
+            msg = ZmqReceive(self.zmqSubSocket)
             topic = msg[0]
             body = msg[1]
             hashZMQ = ""
@@ -114,19 +128,19 @@ class ZMQTest (BitcoinTestFramework):
             self.sync_all()
 
             #check we received zmq notification
-            msg = self.zmqSubSocket.recv_multipart()
+            msg = ZmqReceive(self.zmqSubSocket)
             topic = msg[0]
             body = msg[1]
-            msg = self.zmqSubSocket.recv_multipart()
+            msg = ZmqReceive(self.zmqSubSocket)
             topic = msg[0]
             body = msg[1]
-            msg = self.zmqSubSocket.recv_multipart()
+            msg = ZmqReceive(self.zmqSubSocket)
             topic = msg[0]
             body = msg[1]
-            msg = self.zmqSubSocket.recv_multipart()
+            msg = ZmqReceive(self.zmqSubSocket)
             topic = msg[0]
             body = msg[1]
-            msg = self.zmqSubSocket.recv_multipart()
+            msg = ZmqReceive(self.zmqSubSocket)
             topic = msg[0]
             body = msg[1]
 
@@ -137,7 +151,8 @@ class ZMQTest (BitcoinTestFramework):
 
             # Send 2 transactions that double spend each another
             wallet = self.nodes[0].listunspent()
-            t  = wallet.pop()
+            walletp2pkh = list(filter(lambda x : len(x["scriptPubKey"]) != 70, wallet))  # Find an input that is not P2PK
+            t = walletp2pkh.pop()
             inputs = []
             inputs.append({ "txid" : t["txid"], "vout" : t["vout"]})
             outputs = { self.nodes[1].getnewaddress() : t["amount"] }
@@ -152,7 +167,7 @@ class ZMQTest (BitcoinTestFramework):
             self.sync_all()
 
             #check we received zmq notification
-            msg = self.zmqSubSocket.recv_multipart()
+            msg = ZmqReceive(self.zmqSubSocket)
             topic = msg[0]
             body = msg[1]
             hashZMQ = ""
@@ -172,7 +187,7 @@ class ZMQTest (BitcoinTestFramework):
             self.sync_all()
 
             # now we should receive a zmq ds msg because the tx was broadcast
-            msg = self.zmqSubSocket.recv_multipart()
+            msg = ZmqReceive(self.zmqSubSocket)
             topic = msg[0]
             body = msg[1]
             hashZMQ = ""
