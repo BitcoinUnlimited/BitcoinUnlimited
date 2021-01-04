@@ -23,17 +23,14 @@ DELAY_TIME = 120
 
 class MyTest (BitcoinTestFramework):
 
-    def setup_chain(self,bitcoinConfDict=None, wallets=None):
-        logging.info("Initializing test directory " + self.options.tmpdir)
-        initialize_chain(self.options.tmpdir, bitcoinConfDict, wallets)
-
     def setup_network(self, split=False):
         mempoolConf = [
             ["-blockprioritysize=2000000",
              "-limitancestorsize=%d" % (BCH_UNCONF_SIZE_KB*2),
              "-limitdescendantsize=%d" % (BCH_UNCONF_SIZE_KB*2),
              "-limitancestorcount=%d" % (BCH_UNCONF_DEPTH),
-             "-limitdescendantcount=%d" % (BCH_UNCONF_DEPTH)],
+             "-limitdescendantcount=%d" % (BCH_UNCONF_DEPTH),
+             "-debug=net", "-debug=mempool"],
             ["-blockprioritysize=2000000",
              "-maxmempool=8080",
              "-limitancestorsize=%d" % (BCH_UNCONF_SIZE_KB*2),
@@ -59,12 +56,14 @@ class MyTest (BitcoinTestFramework):
         self.sync_blocks()
 
     def run_test (self):
-
         #create coins that we can use for creating multi input transactions
         self.relayfee = self.nodes[1].getnetworkinfo()['relayfee']
-        utxo_count = BCH_UNCONF_DEPTH * 3
+        utxo_count = BCH_UNCONF_DEPTH * 3 + 1
+        startHeight = self.nodes[1].getblockcount()
+        logging.info("Starting at %d blocks" % startHeight)
         utxos = create_confirmed_utxos(self.relayfee, self.nodes[1], utxo_count)
-
+        startHeight = self.nodes[1].getblockcount()
+        logging.info("Initial sync to %d blocks" % startHeight)
 
         # kick us out of IBD mode since the cached blocks will be old time so it'll look like our blockchain isn't up to date
         # if we are in IBD mode, we don't request incoming tx.

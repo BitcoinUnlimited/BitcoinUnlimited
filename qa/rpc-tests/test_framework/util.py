@@ -1121,24 +1121,43 @@ def satoshi_round(amount):
 # Helper to create at least "count" utxos
 # Pass in a fee that is sufficient for relay and mining new transactions.
 def create_confirmed_utxos(fee, node, count):
-    node.generate(int(0.5*count)+101)
     utxos = node.listunspent()
-    iterations = count - len(utxos)
-    addr1 = node.getnewaddress()
-    addr2 = node.getnewaddress()
-    if iterations <= 0:
+    if len(utxos) == 0:  # make sure we have a utxo
+        node.generate(1)
+    lengthen = 101 - node.getblockcount()
+    if lengthen > 0:  # make sure the chain has matured
+        node.generate(lengthen)
+
+    utxos = node.listunspent()
+
+    nUtxos = len(utxos)
+    if nUtxos >= count:  # We have enough
         return utxos
-    for i in range(iterations):
+    addr = node.getnewaddress()
+
+    SPLIT_WIDTH = 25
+    addr = [ node.getnewaddress() for x in range(0,SPLIT_WIDTH)]
+    while nUtxos < count:
+        while len(utxos) == 0:  # Reload if needed
+            utxos = node.listunspent()
+            if len(utxos) == 0:
+                node.generate(1)
+
         t = utxos.pop()
         inputs = []
         inputs.append({ "txid" : t["txid"], "vout" : t["vout"]})
         outputs = {}
         send_value = t['amount'] - fee
-        outputs[addr1] = satoshi_round(send_value/2)
-        outputs[addr2] = satoshi_round(send_value/2)
+        splits = min(SPLIT_WIDTH-1, count - nUtxos) + 1  # + 1 because the tx consumes 1
+        if splits==1: # DONE
+            break
+        for i in range(0, splits):
+            outputs[addr[i]] = satoshi_round(send_value/splits)
         raw_tx = node.createrawtransaction(inputs, outputs)
         signed_tx = node.signrawtransaction(raw_tx)["hex"]
         txid = node.sendrawtransaction(signed_tx)
+        nUtxos += splits - 1  # consumed 1, created splits utxos
+
 
     while (node.getmempoolinfo()['size'] > 0):
         node.generate(1)
