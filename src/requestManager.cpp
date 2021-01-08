@@ -1018,7 +1018,7 @@ void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
 {
     AssertLockHeld(cs_main);
 
-    int nBlocksInFlight = 0;
+    uint64_t nBlocksInFlight = 0;
     {
         LOCK(cs_objDownloader);
         nBlocksInFlight = mapRequestManagerNodeState[pto->GetId()].nBlocksInFlight;
@@ -1027,6 +1027,7 @@ void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
         nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
     {
         std::vector<CBlockIndex *> vToDownload;
+
         FindNextBlocksToDownload(pto, pto->nMaxBlocksInTransit.load() - nBlocksInFlight, vToDownload);
         // LOG(REQ, "IBD AskFor %d blocks from peer=%s\n", vToDownload.size(), pto->GetLogName());
         std::vector<CInv> vGetBlocks;
@@ -1077,10 +1078,13 @@ void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
 
 // Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
 // at most count entries.
-void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, std::vector<CBlockIndex *> &vBlocks)
+void CRequestManager::FindNextBlocksToDownload(CNode *node, size_t count, std::vector<CBlockIndex *> &vBlocks)
 {
     if (count == 0)
+    {
         return;
+    }
+    DbgAssert(count <= 128, count = 128);
 
     NodeId nodeid = node->GetId();
     vBlocks.reserve(vBlocks.size() + count);
@@ -1127,7 +1131,7 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
         // Read up to 128 (or more, if more blocks than that are needed) successors of pindexWalk (towards
         // pindexBestKnownBlock) into vToFetch. We fetch 128, because CBlockIndex::GetAncestor may be as expensive
         // as iterating over ~100 CBlockIndex* entries anyway.
-        int nToFetch = std::min(nMaxHeight - pindexWalk->nHeight, std::max<int>(count - vBlocks.size(), 128));
+        int nToFetch = std::min((size_t)(nMaxHeight - pindexWalk->nHeight), count - vBlocks.size());
         vToFetch.resize(nToFetch);
         pindexWalk = state->pindexBestKnownBlock->GetAncestor(pindexWalk->nHeight + nToFetch);
         vToFetch[nToFetch - 1] = pindexWalk;
@@ -1387,7 +1391,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         {
             BLOCK_DOWNLOAD_WINDOW.store(blockDownloadWindow.Value());
         }
-        LOG(THIN | BLK, "BLOCK_DOWNLOAD_WINDOW is %d nMaxBlocksInTransit is %d\n", BLOCK_DOWNLOAD_WINDOW.load(),
+        LOG(THIN | BLK, "BLOCK_DOWNLOAD_WINDOW is %d nMaxBlocksInTransit is %lu\n", BLOCK_DOWNLOAD_WINDOW.load(),
             pnode->nMaxBlocksInTransit.load());
 
         // Update the appropriate response time based on the type of block received.

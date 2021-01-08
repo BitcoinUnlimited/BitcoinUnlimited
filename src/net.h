@@ -519,7 +519,7 @@ public:
 
     CCriticalSection cs_nAvgBlkResponseTime;
     double nAvgBlkResponseTime GUARDED_BY(cs_nAvgBlkResponseTime);
-    std::atomic<int64_t> nMaxBlocksInTransit;
+    std::atomic<uint64_t> nMaxBlocksInTransit;
 
     unsigned short addrFromPort;
 
