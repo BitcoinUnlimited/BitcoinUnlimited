@@ -738,12 +738,16 @@ static void addElectrumOptions(AllowedArgs &allowedArgs)
     allowedArgs.addHeader(_("Electrum server options:"))
         .addArg("electrum", optionalBool, "Enable electrum server")
         .addArg("electrum.dir", requiredStr, "Data directory for electrum database")
-        .addArg("electrum.port", requiredStr, "Port electrum RPC listens on (default: mainnet 50001, testnet: 60001")
-        .addArg("electrum.host", requiredStr, "Host electrum RPC listens on (default: 127.0.0.1)")
+        .addArg("electrum.port", requiredStr,
+            "Port electrum RPC listens on (default: mainnet 50001, testnet: 60001, testnet4: 62001, scalenet: 63001")
+        .addArg("electrum.host", requiredStr, "Host electrum RPC listens on (default: all interfaces)")
         .addArg("electrum.rawarg", optionalStr,
             "Raw argument to pass directly to underlying electrum daemon "
             "(example: -electrum.rawarg=\"--server-banner=\\\"Welcome to my server!\\\"\"). "
             "This option can be specified multiple times.")
+        .addArg("electrum.ws.host", requiredStr, "Host electrum Websocket listens on (default: all interfaces")
+        .addArg("electrum.ws.port", requiredStr, "Port electrum Websocket listens on (default: mainnet 50003, testnet: "
+                                                 "60003, testnet4: 62003, scalenet: 63003")
         .addArg("electrum.shutdownonerror", optionalBool, "Shutdown if the electrum server exits unexpectedly")
         .addArg("electrum.blocknotify", optionalBool, "Instantly notify electrum server of new blocks. "
                                                       "Must only be used with ElectrsCash 2.0.0 or later")
