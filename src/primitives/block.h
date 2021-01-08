@@ -139,12 +139,17 @@ public:
 
     uint64_t GetHeight() const // Returns the block's height as specified in its coinbase transaction
     {
+        if (nVersion < 2)
+            throw std::runtime_error("Block does not contain height");
         const CScript &sig = vtx[0]->vin[0].scriptSig;
         int numlen = sig[0];
         if (numlen == OP_0)
             return 0;
         if ((numlen >= OP_1) && (numlen <= OP_16))
             return numlen - OP_1 + 1;
+        // Did you call this on a pre BIP34, or it could be a deliberately invalid block
+        if ((int)sig.size() - 1 < numlen)
+            throw std::runtime_error("Invalid block height");
         std::vector<unsigned char> heightScript(numlen);
         copy(sig.begin() + 1, sig.begin() + 1 + numlen, heightScript.begin());
         CScriptNum coinbaseHeight(heightScript, false, numlen);

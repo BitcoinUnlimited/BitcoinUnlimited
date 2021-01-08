@@ -414,6 +414,38 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
                    "WAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY too long.";
     BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
 
+    {
+        CBlock blk = pblocktemplate->block;
+        blk.GetHeight();
+        try
+        {
+            blk.nVersion = 1;
+            blk.GetHeight();
+            BOOST_CHECK(false); // should have thrown
+        }
+        catch (std::runtime_error &e)
+        {
+            BOOST_CHECK(std::string(e.what()).find("Block does not contain height") != std::string::npos);
+        }
+
+        try
+        {
+            blk.nVersion = 2;
+            CMutableTransaction txCoinbase(*blk.vtx[0]);
+            std::vector<unsigned char> v(10);
+            CScript scr = (CScript() << v);
+            scr[0] = scr.size(); // Make the number bigger than this buffer
+            txCoinbase.vin[0].scriptSig = scr;
+            blk.vtx[0] = MakeTransactionRef(std::move(txCoinbase));
+            blk.GetHeight();
+            BOOST_CHECK(false); // should have thrown
+        }
+        catch (std::runtime_error &e)
+        {
+            BOOST_CHECK(std::string(e.what()).find("Invalid block height") != std::string::npos);
+        }
+    }
+
     // We can't make transactions until we have inputs
     // Therefore, load 100 blocks :)
     int baseheight = 0;

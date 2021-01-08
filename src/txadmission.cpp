@@ -607,13 +607,15 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
                 pcoinsTip->Uncache(remove);
         }
 
+        if (res)
+            CommitTxToMempool();
+
         if (pfMissingInputs)
             *pfMissingInputs = missingInputs;
     }
     if (res)
     {
         RelayTransaction(tx, txProps);
-        CommitTxToMempool();
         LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
             GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
     }

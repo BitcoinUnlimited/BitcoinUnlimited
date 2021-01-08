@@ -1296,8 +1296,10 @@ void CleanupDisconnectedNodes()
             }
             if (fDelete)
             {
-                LOCK(cs_vNodesDisconnected);
-                vNodesDisconnected.remove(pnode);
+                {
+                    LOCK(cs_vNodesDisconnected);
+                    vNodesDisconnected.remove(pnode);
+                }
                 // no need to remove from vNodes. we know pnode has already been removed from vNodes since that
                 // occurred prior to insertion into vNodesDisconnected
                 delete pnode;
