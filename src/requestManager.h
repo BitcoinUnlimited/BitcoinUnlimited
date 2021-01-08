@@ -123,7 +123,7 @@ struct CRequestManagerNodeState
     int64_t nDownloadingSince;
 
     // How many blocks are currently in flight and requested by this node.
-    int nBlocksInFlight;
+    uint64_t nBlocksInFlight;
 
     // Track how many thin type objects were requested for this peer
     double nNumRequests;
@@ -246,7 +246,7 @@ public:
     void RequestNextBlocksToDownload(CNode *pto);
 
     // This gets called from RequestNextBlocksToDownload
-    void FindNextBlocksToDownload(CNode *node, unsigned int count, std::vector<CBlockIndex *> &vBlocks);
+    void FindNextBlocksToDownload(CNode *node, size_t count, std::vector<CBlockIndex *> &vBlocks);
 
     // Request to synchronize mempool with peer pto
     void RequestMempoolSync(CNode *pto);

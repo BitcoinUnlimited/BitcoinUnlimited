@@ -409,7 +409,7 @@ CTweak<CAmount> maxTxFee("wallet.maxTxFee",
     DEFAULT_TRANSACTION_MAXFEE);
 
 /** Number of blocks that can be requested at any given time from a single peer. */
-CTweak<unsigned int> maxBlocksInTransitPerPeer("net.maxBlocksInTransitPerPeer",
+CTweak<uint64_t> maxBlocksInTransitPerPeer("net.maxBlocksInTransitPerPeer",
     "Number of blocks that can be requested at any given time from a single peer. 0 means use algorithm (default: 0)",
     0);
 /** Size of the "block download window": how far ahead of our current height do we fetch?
