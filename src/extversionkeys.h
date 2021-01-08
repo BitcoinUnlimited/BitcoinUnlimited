@@ -46,6 +46,8 @@ enum {
     // there is a gap here from 000d to f00d
     BU_ELECTRUM_SERVER_PORT_TCP             = MAKE_KEY_BU(0000f00d),
     BU_ELECTRUM_SERVER_PROTOCOL_VERSION     = MAKE_KEY_BU(0000f00e),
+    BU_ELECTRUM_WS_SERVER_PORT_TCP          = MAKE_KEY_BU(0000f00f),
+
 }; // enum keys
 
 
