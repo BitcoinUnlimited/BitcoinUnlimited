@@ -29,7 +29,7 @@ class ElectrumTransactionGet(ElectrumTestFramework):
         n = self.nodes[0]
         self.bootstrap_p2p()
 
-        coinbases = self.mine_blocks(n, 103)
+        coinbases = self.mine_blocks(n, 104)
 
         # non-coinbase transactions
         prevtx = coinbases[0]
@@ -53,11 +53,20 @@ class ElectrumTransactionGet(ElectrumTestFramework):
                 sig = CScript([OP_TRUE]),
                 out = CScript([OP_DUP, OP_HASH160, DUMMY_HASH, OP_EQUALVERIFY, OP_CHECKSIG]))
 
-        for tx in [nonstandard_tx, p2sh_tx, p2pkh_tx]:
+        prevtx = coinbases[3]
+        unconfirmed_tx = create_transaction(
+                prevtx = prevtx,
+                value = prevtx.vout[0].nValue, n = 0,
+                sig = CScript([OP_TRUE]),
+                out = CScript([OP_DUP, OP_HASH160, DUMMY_HASH, OP_EQUALVERIFY, OP_CHECKSIG]))
+
+        for tx in [nonstandard_tx, p2sh_tx, p2pkh_tx, unconfirmed_tx]:
             pad_tx(tx)
 
         coinbases.extend(self.mine_blocks(n, 1, [nonstandard_tx, p2sh_tx, p2pkh_tx]))
         self.sync_height()
+        n.sendrawtransaction(ToHex(unconfirmed_tx))
+        self.wait_for_mempool_count(count = 1)
 
 
         async def async_tests(loop):
@@ -65,19 +74,19 @@ class ElectrumTransactionGet(ElectrumTestFramework):
             await cli.connect()
 
             return await asyncio.gather(
-                self.test_verbose(n, cli, nonstandard_tx.hash, p2sh_tx.hash, p2pkh_tx.hash),
-                self.test_non_verbose(cli, coinbases)
+                self.test_verbose(n, cli, nonstandard_tx.hash, p2sh_tx.hash, p2pkh_tx.hash, unconfirmed_tx.hash),
+                self.test_non_verbose(cli, coinbases, unconfirmed_tx)
             )
 
 
         loop = asyncio.get_event_loop()
         loop.run_until_complete(async_tests(loop))
 
-    async def test_non_verbose(self, cli, coinbases):
-        for tx in coinbases:
+    async def test_non_verbose(self, cli, coinbases, unconfirmed):
+        for tx in coinbases + [unconfirmed]:
             assert_equal(ToHex(tx), await cli.call(TX_GET, tx.hash))
 
-    async def test_verbose(self, n, cli, nonstandard_tx, p2sh_tx, p2pkh_tx):
+    async def test_verbose(self, n, cli, nonstandard_tx, p2sh_tx, p2pkh_tx, unconfirmed_tx):
         """
         The spec is unclear. It states:
 
@@ -88,27 +97,43 @@ class ElectrumTransactionGet(ElectrumTestFramework):
         implementations.
         """
 
-        # All the transactions are confirmed in the tip
+        # All confirmed transactions are confirmed in the tip
         block = n.getbestblockhash()
+        tipheight = n.getblockcount()
         coinbase_tx = n.getblock(block)['tx'][0]
 
-        async def check_tx(txid, check_output_type = False):
+
+        async def check_tx(txid, is_confirmed = True, check_output_type = False):
             electrum = await cli.call(TX_GET, txid, True)
             bitcoind = n.getrawtransaction(txid, True, block)
+
+            is_coinbase = 'coinbase' in bitcoind['vin'][0]
+
+            if not is_confirmed:
+                # Transaction is unconfirmed. We handle this slightly different
+                # than bitcoind.
+                assert_equal(None, electrum['blockhash'])
+                assert_equal(None, electrum['confirmations'])
+                assert_equal(None, electrum['time'])
+                assert_equal(None, electrum['height'])
+            else:
+                assert_equal(n.getbestblockhash(), electrum['blockhash'])
+                assert_equal(1, electrum['confirmations'])
+                assert_equal(bitcoind['time'], electrum['time'])
+                assert_equal(tipheight, electrum['height'])
+
 
             assert_equal(bitcoind['txid'], electrum['txid'])
             assert_equal(bitcoind['locktime'], electrum['locktime'])
             assert_equal(bitcoind['size'], electrum['size'])
             assert_equal(bitcoind['hex'], electrum['hex'])
             assert_equal(bitcoind['version'], electrum['version'])
-            assert_equal(bitcoind['confirmations'], electrum['confirmations'])
-            assert_equal(bitcoind['time'], electrum['time'])
 
             # inputs
             assert_equal(len(bitcoind['vin']), len(bitcoind['vin']))
             for i in range(len(bitcoind['vin'])):
                 if 'coinbase' in bitcoind['vin'][i]:
-                    # bitcoind drops txid and adds 'coinbase' for coinbase
+                    # bitcoind drops txid and other fields, butadds 'coinbase' for coinbase
                     # inputs
                     assert_equal(bitcoind['vin'][i]['coinbase'], electrum['vin'][i]['coinbase'])
                     assert_equal(bitcoind['vin'][i]['sequence'], electrum['vin'][i]['sequence'])
@@ -153,6 +178,13 @@ class ElectrumTransactionGet(ElectrumTestFramework):
                         electrum['vout'][i]['scriptPubKey']['hex'])
                 assert('asm' in electrum['vout'][i]['scriptPubKey'])
 
+                if 'addresses' in bitcoind['vout'][i]['scriptPubKey']:
+                    assert_equal(
+                            bitcoind['vout'][i]['scriptPubKey']['addresses'],
+                            electrum['vout'][i]['scriptPubKey']['addresses'])
+                else:
+                    assert_equal([], electrum['vout'][i]['scriptPubKey']['addresses'])
+
                 if check_output_type:
                     assert_equal(
                         bitcoind['vout'][i]['scriptPubKey']['type'],
@@ -164,6 +196,7 @@ class ElectrumTransactionGet(ElectrumTestFramework):
                 check_tx(p2sh_tx),
                 check_tx(p2pkh_tx),
                 check_tx(coinbase_tx),
+                check_tx(unconfirmed_tx, is_confirmed = False),
         )
 
 

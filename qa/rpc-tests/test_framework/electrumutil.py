@@ -74,6 +74,11 @@ class ElectrumTestFramework(BitcoinTestFramework):
             n = self.nodes[0]
         sync_electrum_height(n)
 
+    def wait_for_mempool_count(self, n = None, *, count, timeout = 10):
+        if n is None:
+            n = self.nodes[0]
+        wait_for_electrum_mempool(n, count = count, timeout = timeout)
+
 def compare(node, key, expected, is_debug_data = False):
     info = node.getelectruminfo()
     if is_debug_data:
