@@ -32,7 +32,7 @@ static bool ToMemPool(CMutableTransaction &tx, std::string rejectReason = "")
     CValidationState state;
     bool fMissingInputs = false;
     bool ret = false;
-    ret = AcceptToMemoryPool(mempool, state, MakeTransactionRef(tx), false, &fMissingInputs, true, false);
+    ret = AcceptToMemoryPool(mempool, state, MakeTransactionRef(tx), false, &fMissingInputs, false);
 
     if (rejectReason != "")
         BOOST_CHECK_EQUAL(rejectReason, state.GetRejectReason());
