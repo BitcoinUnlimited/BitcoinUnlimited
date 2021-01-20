@@ -22,11 +22,11 @@ extern BlockDBMode BLOCK_DB_MODE;
 extern CDatabaseAbstract *pblockdb;
 
 /** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
-static const unsigned int DEFAULT_BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
+static const uint64_t DEFAULT_BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
 /** The pre-allocation chunk size for rev?????.dat files (since 0.8) */
-static const unsigned int DEFAULT_UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
-extern unsigned int blockfile_chunk_size;
-extern unsigned int undofile_chunk_size;
+static const uint64_t DEFAULT_UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
+extern uint64_t blockfile_chunk_size;
+extern uint64_t undofile_chunk_size;
 
 void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache,
     const int64_t &_nBlockDBCache,
@@ -76,12 +76,12 @@ void PruneAndFlush();
 
 bool FindBlockPos(CValidationState &state,
     CDiskBlockPos &pos,
-    unsigned int nAddSize,
+    uint64_t nAddSize,
     unsigned int nHeight,
     uint64_t nTime,
     bool fKnown = false);
 
-bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigned int nAddSize);
+bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, uint64_t nAddSize);
 
 
 extern BlockDBMode BLOCK_DB_MODE;

@@ -24,8 +24,8 @@ extern std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
 extern CTweak<uint64_t> pruneIntervalTweak;
 
 CDatabaseAbstract *pblockdb = nullptr;
-unsigned int blockfile_chunk_size = DEFAULT_BLOCKFILE_CHUNK_SIZE;
-unsigned int undofile_chunk_size = DEFAULT_UNDOFILE_CHUNK_SIZE;
+uint64_t blockfile_chunk_size = DEFAULT_BLOCKFILE_CHUNK_SIZE;
+uint64_t undofile_chunk_size = DEFAULT_UNDOFILE_CHUNK_SIZE;
 
 /**
   * Config param to determine what DB type we are using
@@ -792,7 +792,7 @@ void PruneAndFlush()
 
 bool FindBlockPos(CValidationState &state,
     CDiskBlockPos &pos,
-    unsigned int nAddSize,
+    uint64_t nAddSize,
     unsigned int nHeight,
     uint64_t nTime,
     bool fKnown)
@@ -851,14 +851,18 @@ bool FindBlockPos(CValidationState &state,
 
     vinfoBlockFile[nFile].AddBlock(nHeight, nTime);
     if (fKnown)
+    {
         vinfoBlockFile[nFile].nSize = std::max(pos.nPos + nAddSize, vinfoBlockFile[nFile].nSize);
+    }
     else
+    {
         vinfoBlockFile[nFile].nSize += nAddSize;
+    }
 
     if (!fKnown)
     {
-        unsigned int nOldChunks = (pos.nPos + blockfile_chunk_size - 1) / blockfile_chunk_size;
-        unsigned int nNewChunks = (vinfoBlockFile[nFile].nSize + blockfile_chunk_size - 1) / blockfile_chunk_size;
+        uint64_t nOldChunks = (pos.nPos + blockfile_chunk_size - 1) / blockfile_chunk_size;
+        uint64_t nNewChunks = (vinfoBlockFile[nFile].nSize + blockfile_chunk_size - 1) / blockfile_chunk_size;
         if (nNewChunks > nOldChunks)
         {
             if (fPruneMode)
@@ -885,7 +889,7 @@ bool FindBlockPos(CValidationState &state,
     return true;
 }
 
-bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigned int nAddSize)
+bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, uint64_t nAddSize)
 {
     // nUndoPos for blockdb is a flag, set it to 1 to inidicate we have the data
     if (pblockdb)
@@ -902,13 +906,13 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
 
     LOCK(cs_LastBlockFile);
 
-    unsigned int nNewSize;
+    uint64_t nNewSize;
     pos.nPos = vinfoBlockFile[nFile].nUndoSize;
     nNewSize = vinfoBlockFile[nFile].nUndoSize += nAddSize;
     setDirtyFileInfo.insert(nFile);
 
-    unsigned int nOldChunks = (pos.nPos + undofile_chunk_size - 1) / undofile_chunk_size;
-    unsigned int nNewChunks = (nNewSize + undofile_chunk_size - 1) / undofile_chunk_size;
+    uint64_t nOldChunks = (pos.nPos + undofile_chunk_size - 1) / undofile_chunk_size;
+    uint64_t nNewChunks = (nNewSize + undofile_chunk_size - 1) / undofile_chunk_size;
     if (nNewChunks > nOldChunks)
     {
         if (fPruneMode)
