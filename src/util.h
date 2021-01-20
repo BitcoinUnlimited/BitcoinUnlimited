@@ -422,7 +422,7 @@ void ParseParameters(int argc, const char *const argv[], const AllowedArgs::Allo
 void FileCommit(FILE *fileout);
 bool TruncateFile(FILE *file, unsigned int length);
 int RaiseFileDescriptorLimit(int nMinFD);
-void AllocateFileRange(FILE *file, unsigned int offset, unsigned int length);
+void AllocateFileRange(FILE *file, uint64_t offset, uint64_t length);
 fs::path GetForksCsvFile(); // bip135 added
 void ReadConfigFile(std::map<std::string, std::string> &mapSettingsRet,
     std::map<std::string, std::vector<std::string> > &mapMultiSettingsRet,
