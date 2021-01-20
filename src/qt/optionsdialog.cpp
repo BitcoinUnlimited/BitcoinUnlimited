@@ -157,7 +157,7 @@ void OptionsDialog::setModel(OptionsModel *_model)
     connect(ui->connectSocksTor, SIGNAL(clicked(bool)), this, SLOT(showRestartWarning()));
     /* Display */
     connect(ui->lang, SIGNAL(valueChanged()), this, SLOT(showRestartWarning()));
-    connect(ui->thirdPartyTxUrls, SIGNAL(textChanged(const QString &)), this, SLOT(showRestartWarning()));
+    connect(ui->thirdPartyTxUrls, SIGNAL(textChanged(const QString &)), this, SLOT(thirdPartyTxWarning()));
 }
 
 void OptionsDialog::setMapper()
@@ -237,6 +237,23 @@ void OptionsDialog::showRestartWarning(bool fPersistent)
         // clear non-persistent status label after 10 seconds
         // Todo: should perhaps be a class attribute, if we extend the use of statusLabel
         QTimer::singleShot(10000, this, SLOT(clearStatusLabel()));
+    }
+}
+
+void OptionsDialog::thirdPartyTxWarning(bool fPersistent)
+{
+    QString str = ui->thirdPartyTxUrls->displayText();
+
+    const char *err = isInvalidThirdPartyTxUrlString(str);
+
+    if (err != nullptr)
+    {
+        ui->statusLabel->setStyleSheet("QLabel { color: red; }");
+        ui->statusLabel->setText(tr(err));
+    }
+    else // Its a valid URL
+    {
+        showRestartWarning(fPersistent);
     }
 }
 
