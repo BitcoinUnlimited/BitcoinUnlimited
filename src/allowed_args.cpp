@@ -613,7 +613,11 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
             walletParamOptional)
 #endif
         .addArg(
-            "shrinkdebugfile", optionalBool, _("Shrink debug.log file on client startup (default: 1 when no -debug)"));
+            "shrinkdebugfile", optionalBool, _("Shrink debug.log file on client startup (default: 1 when no -debug)"))
+        .addArg("maxtipage=<n>", requiredInt,
+            strprintf(_("Maximum time since the last block was mined in seconds before we consider ourselves still in "
+                        "IBD <n> (default: %u)"),
+                    DEFAULT_MAX_TIP_AGE));
 }
 
 static void addNodeRelayOptions(AllowedArgs &allowedArgs)
