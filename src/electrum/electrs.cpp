@@ -174,9 +174,6 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
     // bitcoind data dir (for cookie file)
     args.push_back("--daemon-dir=" + GetDataDir(false).string());
 
-    // Use rpc interface instead of attempting to parse *blk files
-    args.push_back("--jsonrpc-import");
-
     // Where to store electrs database files.
     const std::string defaultDir = (GetDataDir() / ELECTRSCASH_BIN).string();
     args.push_back("--db-dir=" + GetArg("-electrum.dir", defaultDir));
