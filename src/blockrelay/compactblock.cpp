@@ -332,11 +332,10 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock
     // a full block if a mismatch occurs.
     if (!fMerkleRootCorrect)
     {
-        return error("mismatched merkle root on compactblock: rerequesting a full block, peer=%s", pfrom->GetLogName());
-
         thinrelay.ClearAllBlockData(pfrom, header.GetHash());
         thinrelay.RequestBlock(pfrom, header.GetHash());
-        return true;
+
+        return error("mismatched merkle root on compactblock: rerequesting a full block, peer=%s", pfrom->GetLogName());
     }
 
     nWaitingForTxns = missingCount;

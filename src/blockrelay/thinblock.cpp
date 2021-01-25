@@ -716,6 +716,7 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<
     // thinblock which has the full Tx hash data rather than just the truncated hash.
     if (_collision || !fMerkleRootCorrect)
     {
+        RequestThinBlock(pfrom, header.GetHash());
         if (!fMerkleRootCorrect)
         {
             return error(
@@ -723,7 +724,6 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<
         }
         else
         {
-            RequestThinBlock(pfrom, header.GetHash());
             return error("TX HASH COLLISION for xthinblock: re-requesting a thinblock, peer=%s", pfrom->GetLogName());
         }
     }
