@@ -36,7 +36,7 @@
 #include <queue>
 #include <thread>
 
-// Track timing information for Score and Package mining.
+// Track timing information for Package mining.
 std::atomic<int64_t> nTotalPackage{0};
 
 /** Maximum number of failed attempts to insert a package into a block */
@@ -59,16 +59,6 @@ using namespace std;
 uint64_t nLastBlockTx = 0;
 uint64_t nLastBlockSize = 0;
 
-
-class ScoreCompare
-{
-public:
-    ScoreCompare() {}
-    bool operator()(const CTxMemPool::txiter a, const CTxMemPool::txiter b) const
-    {
-        return CompareTxMemPoolEntryByScore()(*b, *a); // Convert to less than
-    }
-};
 
 int64_t UpdateTime(CBlockHeader *pblock, const Consensus::Params &consensusParams, const CBlockIndex *pindexPrev)
 {
