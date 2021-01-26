@@ -307,13 +307,13 @@ void CommitTxToMempool()
             requester.Received(CInv(MSG_TX, data.hash), nullptr);
         }
     }
+#ifdef ENABLE_WALLET
     for (auto &it : *txCommitQFinal)
     {
         CTxCommitData &data = it.second;
-#ifdef ENABLE_WALLET
         SyncWithWallets(data.entry.GetSharedTx(), nullptr, -1);
-#endif
     }
+#endif
     txCommitQFinal->clear();
     delete txCommitQFinal;
 
