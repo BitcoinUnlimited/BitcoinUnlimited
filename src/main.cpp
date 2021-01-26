@@ -340,6 +340,7 @@ bool GetTransaction(const uint256 &hash,
             }
             txOut = block.vtx.at(pos);
             txTime = block.nTime;
+            hashBlock = pindexSlow->GetBlockHash();
             return true;
         }
     }
