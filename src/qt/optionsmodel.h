@@ -90,4 +90,7 @@ Q_SIGNALS:
     void coinControlFeaturesChanged(bool);
 };
 
+// Returns nullptr if this URL is valid, otherwise returns an untranslated error message
+const char *isInvalidThirdPartyTxUrlString(QString value);
+
 #endif // BITCOIN_QT_OPTIONSMODEL_H
