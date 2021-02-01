@@ -229,6 +229,8 @@ public:
         checkpoints[609136] = uint256S("0x000000000000000000b48bb207faac5ac655c313e41ac909322eaa694f5bc5b1");
         // May 15th 2020 activate op_reverse, SigChecks
         checkpoints[635259] = uint256S("0x00000000000000000033dfef1fc2d6a5d5520b078c55193a9bf498c5b27530f7");
+        // Nov 15th 2020 new aserti3-2d DAA
+        checkpoints[661648] = uint256S("0x0000000000000000029e471c41818d24b8b74c911071c4ef0b4a0509f9b5a8ce");
 
         // clang-format on
         // * UNIX timestamp of last checkpoint block
@@ -449,6 +451,8 @@ public:
         checkpoints[1341712] = uint256S("0x00000000fffc44ea2e202bd905a9fbbb9491ef9e9d5a9eed4039079229afa35b");
         // May 15th 2020 activate op_reverse, SigCheck
         checkpoints[1378461] = uint256S("0x0000000099f5509b5f36b1926bcf82b21d936ebeadee811030dfbbb7fae915d7");
+        // Nov 15th 2020 new aserti3-2d DAA
+        checkpoints[1421482] = uint256S("0x0000000023e0680a8a062b3cc289a4a341124ce7fcb6340ede207e194d73b60a");
 
         // clang-format on
         // Data as of block
@@ -656,7 +660,9 @@ public:
         checkpointData = CCheckpointData();
         MapCheckpoints &checkpoints = checkpointData.mapCheckpoints;
         checkpoints[     0] = uint256S("0x000000001dd410c49a788668ce26751718cc797474d3152a5fc073dd44fd9f7b");
-        checkpoints[  5677] = uint256S("0x0000000019df558b6686b1a1c3e7aee0535c38052651b711f84eebafc0cc4b5e");
+        checkpoints[  5000] = uint256S("0x000000009f092d074574a216faec682040a853c4f079c33dfd2c3ef1fd8108c4");
+        // Nov 15th, 2020 new aserti3-2d DAA
+        checkpoints[ 16845] = uint256S("0x00000000fb325b8f34fe80c96a5f708a08699a68bbab82dba4474d86bd743077");
         // clang-format on
 
         // Data as of block
@@ -780,6 +786,9 @@ public:
         MapCheckpoints &checkpoints = checkpointData.mapCheckpoints;
         checkpoints[     0] = uint256S("0x00000000e6453dc2dfe1ffa19023f86002eb11dbb8e87d0291a4599f0430be52");
         checkpoints[    45] = uint256S("0x00000000d75a7c9098d02b321e9900b16ecbd552167e65683fe86e5ecf88b320");
+        // scalenet periodically reorgs to height 10,000
+        checkpoints[ 10000] = uint256S("0x00000000b711dc753130e5083888d106f99b920b1b8a492eb5ac41d40e482905");
+
         // clang-format on
 
         // Data as of block
