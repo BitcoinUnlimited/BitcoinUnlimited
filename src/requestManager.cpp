@@ -1023,8 +1023,7 @@ void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
         LOCK(cs_objDownloader);
         nBlocksInFlight = mapRequestManagerNodeState[pto->GetId()].nBlocksInFlight;
     }
-    if (!pto->fDisconnectRequest && !pto->fDisconnect && !pto->fClient &&
-        nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
+    if (!pto->fDisconnectRequest && !pto->fDisconnect && !pto->fClient && nBlocksInFlight < pto->nMaxBlocksInTransit)
     {
         std::vector<CBlockIndex *> vToDownload;
 

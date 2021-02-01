@@ -68,7 +68,7 @@ CompactBlock::CompactBlock(const CBlock &block, const CRollingFastFilter<4 * 102
         const CTransaction &tx = *block.vtx[i];
         if (inventoryKnown && !inventoryKnown->contains(tx.GetHash()))
         {
-            prefilledtxn.push_back(PrefilledTransaction{static_cast<uint16_t>(i - (prevIndex + 1)), tx});
+            prefilledtxn.push_back(PrefilledTransaction{static_cast<uint32_t>(i - (prevIndex + 1)), tx});
             prevIndex = i;
         }
         else
@@ -294,7 +294,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock
 
                 // If there are more hashes to request than available indices then we will not be able to
                 // reconstruct the compact block so just send a full block.
-                if (setHashesToRequest.size() > std::numeric_limits<uint16_t>::max())
+                if (setHashesToRequest.size() > std::numeric_limits<uint32_t>::max())
                 {
                     // Since we can't process this compactblock then clear out the data from memory
                     thinrelay.ClearAllBlockData(pfrom, pblock->GetHash());
