@@ -37,10 +37,11 @@ Test is as follows:
 """
 import os
 import time
+import logging
+import test_framework.loginit
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
-import logging
 
 class MempoolPersistTest(BitcoinTestFramework):
     def set_test_params(self):
@@ -49,6 +50,8 @@ class MempoolPersistTest(BitcoinTestFramework):
     def run_test(self):
         chain_height = self.nodes[0].getblockcount()
         assert_equal(chain_height, 200)
+
+        ########## Check the memory pool persistence ###########
 
         logging.info("Mine a single block to get out of IBD")
         self.nodes[0].generate(1)
@@ -107,6 +110,96 @@ class MempoolPersistTest(BitcoinTestFramework):
         os.mkdir(mempooldotnew1)
         assert_raises_rpc_error(-1, "Unable to dump mempool to disk", self.nodes[1].savemempool)
         os.rmdir(mempooldotnew1)
+
+        ########## Check the orphan pool persistence ###########
+
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+        node_args = [["-debug=net", "-debug=mempool"]]
+        self.nodes = start_nodes(1, self.options.tmpdir, node_args)
+        self.nodes = start_nodes(2, self.options.tmpdir)
+        connect_nodes_full(self.nodes)
+        self.sync_blocks()
+
+        #create coins that we can use for creating multi input transactions
+        BCH_UNCONF_DEPTH = 50
+        DELAY_TIME = 240
+        self.relayfee = self.nodes[1].getnetworkinfo()['relayfee']
+        utxo_count = BCH_UNCONF_DEPTH * 3 + 1
+        startHeight = self.nodes[1].getblockcount()
+        logging.info("Starting at %d blocks" % startHeight)
+        utxos = create_confirmed_utxos(self.relayfee, self.nodes[1], utxo_count)
+        startHeight = self.nodes[1].getblockcount()
+        logging.info("Initial sync to %d blocks" % startHeight)
+
+        # create multi input transactions that are chained. This will cause any transactions that are greater
+        # than the BCH default chain limit to be prevented from entering the mempool, however they will enter the
+        # orphanpool instead.
+        tx_amount = 0
+        for i in range(1, BCH_UNCONF_DEPTH + 6):
+          try:
+              inputs = []
+              inputs.append(utxos.pop())
+              if (i == 1):
+                inputs.append(utxos.pop())
+              else:
+                inputs.append({ "txid" : txid, "vout" : 0})
+
+              outputs = {}
+              if (i == 1):
+                tx_amount = inputs[0]["amount"] + inputs[1]["amount"] - self.relayfee
+              else:
+                tx_amount = inputs[0]["amount"] + tx_amount - self.relayfee
+              outputs[self.nodes[1].getnewaddress()] = tx_amount
+              rawtx = self.nodes[1].createrawtransaction(inputs, outputs)
+              signed_tx = self.nodes[1].signrawtransaction(rawtx)["hex"]
+              txid = self.nodes[1].sendrawtransaction(signed_tx, False, "standard", True)
+
+              logging.info("tx depth %d" % i) # Keep travis from timing out
+          except JSONRPCException as e: # an exception you don't catch is a testing error
+              print(str(e))
+              raise
+
+        waitFor(DELAY_TIME, lambda: self.nodes[0].getorphanpoolinfo()["size"] == 0)
+        waitFor(DELAY_TIME, lambda: self.nodes[1].getorphanpoolinfo()["size"] == 5)
+
+        #stop and start nodes and verify that the orphanpool was resurrected
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+        self.nodes = start_nodes(2, self.options.tmpdir)
+        waitFor(DELAY_TIME, lambda: self.nodes[0].getorphanpoolinfo()["size"] == 0)
+        waitFor(DELAY_TIME, lambda: self.nodes[1].getorphanpoolinfo()["size"] == 5)
+
+        orphanpooldat0 = os.path.join(self.options.tmpdir, 'node0', 'regtest', 'orphanpool.dat')
+        orphanpooldat1 = os.path.join(self.options.tmpdir, 'node1', 'regtest', 'orphanpool.dat')
+        logging.info("Remove the orphanpool.dat file. Verify that saveorphanpool to disk via RPC re-creates it")
+        os.remove(orphanpooldat0)
+        self.nodes[0].saveorphanpool()
+        assert os.path.isfile(orphanpooldat0)
+
+        logging.info("Stop nodes, make node1 use orphanpool.dat from node0. Verify it has 5 transactions")
+        os.rename(orphanpooldat0, orphanpooldat1)
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+        self.nodes = start_nodes(2, self.options.tmpdir)
+        waitFor(10, lambda: len(self.nodes[1].getraworphanpool()) == 5)
+
+        logging.info("Prevent bitcoind from writing orphanpool.dat to disk. Verify that `saveorphanpool` fails")
+        # try to dump orphanpool content on a directory rather than a file
+        # which is an implementation detail that could change and break this test
+        orphanpooldotnew1 = orphanpooldat1 + '.new'
+        os.mkdir(orphanpooldotnew1)
+        assert_raises_rpc_error(-1, "Unable to dump orphanpool to disk", self.nodes[1].saveorphanpool)
+        os.rmdir(orphanpooldotnew1)
+
+        #stop and start with persistmempool off and verify that the orphan pool was not resurrected
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+        node_args = [['-persistmempool=0'], ['-persistmempool=0']]
+        self.nodes = start_nodes(2, self.options.tmpdir, node_args)
+        waitFor(DELAY_TIME, lambda: self.nodes[0].getorphanpoolinfo()["size"] == 0)
+        waitFor(DELAY_TIME, lambda: self.nodes[1].getorphanpoolinfo()["size"] == 0)
+
 
 if __name__ == '__main__':
     MempoolPersistTest().main()

@@ -2209,6 +2209,24 @@ UniValue savemempool(const UniValue &params, bool fHelp)
     return NullUniValue;
 }
 
+UniValue saveorphanpool(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+    {
+        throw std::runtime_error("saveorphanpool\n"
+                                 "\nDumps the orphanpool to disk.\n"
+                                 "\nExamples:\n" +
+                                 HelpExampleCli("saveorphanpool", "") + HelpExampleRpc("saveorphanpool", ""));
+    }
+
+    if (!orphanpool.DumpOrphanPool())
+    {
+        throw JSONRPCError(RPC_MISC_ERROR, "Unable to dump orphanpool to disk");
+    }
+
+    return NullUniValue;
+}
+
 UniValue getchaintxstats(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() > 2)
@@ -2318,7 +2336,8 @@ static const CRPCCommand commands[] = {
     {"blockchain", "evicttransaction", &evicttransaction, true}, {"blockchain", "getrawmempool", &getrawmempool, true},
     {"blockchain", "getraworphanpool", &getraworphanpool, true}, {"blockchain", "gettxout", &gettxout, true},
     {"blockchain", "gettxoutsetinfo", &gettxoutsetinfo, true}, {"blockchain", "savemempool", &savemempool, true},
-    {"blockchain", "verifychain", &verifychain, true}, {"blockchain", "getblockstats", &getblockstats, true},
+    {"blockchain", "saveorphanpool", &saveorphanpool, true}, {"blockchain", "verifychain", &verifychain, true},
+    {"blockchain", "getblockstats", &getblockstats, true},
 
     /* Not shown in help */
     {"hidden", "invalidateblock", &invalidateblock, true}, {"hidden", "reconsiderblock", &reconsiderblock, true},

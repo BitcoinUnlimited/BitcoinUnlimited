@@ -1179,13 +1179,14 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         CTxMemPool::setEntries setAncestors;
         {
             READLOCK(pool.cs_txmempool);
-            pool._CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize, errString);
-            if (setAncestors.size() >= BCH_DEFAULT_ANCESTOR_LIMIT && restrictInputs.Value() == true)
+            bool ret =
+                pool._CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize, errString);
+            if ((!ret || setAncestors.size() >= BCH_DEFAULT_ANCESTOR_LIMIT) && restrictInputs.Value() == true)
             {
                 if (tx->vin.size() > 1)
                 {
-                    // this is effectively "missing inputs" since they are not usable due to unconf depth, so set the
-                    // flag so that this tx gets on the orphan queue
+                    // this is effectively "missing inputs" since they are not usable due to unconf depth and size, so
+                    // set the flag so that this tx gets on the orphan queue
                     *pfMissingInputs = true;
 
                     if (debugger)
@@ -1195,7 +1196,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                     }
                     else
                     {
-                        return state.DoS(0, false, REJECT_NONSTANDARD, "bad-txn-too-many-inputs");
+                        return state.DoS(0, false, REJECT_MULTIPLE_INPUTS, "bad-txn-too-many-inputs");
                     }
                 }
             }

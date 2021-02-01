@@ -34,7 +34,7 @@ static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 1000000;
 /** Default for -mempoolexpiry, expiration time for mempool transactions in hours */
 static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 72;
 /** Default for -orphanpoolexpiry, expiration time for orphan pool transactions in hours */
-static const unsigned int DEFAULT_ORPHANPOOL_EXPIRY = 15;
+static const unsigned int DEFAULT_ORPHANPOOL_EXPIRY = 72;
 
 
 struct CDNSSeedData

@@ -1725,8 +1725,13 @@ static const uint64_t MEMPOOL_DUMP_VERSION = 1541030400;
 bool LoadMempool(void)
 {
     int64_t nExpiryTimeout = GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
-    FILE *filestr = fopen((GetDataDir() / "mempool.dat").string().c_str(), "rb");
-    CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
+    FILE *fileMempool = fopen((GetDataDir() / "mempool.dat").string().c_str(), "rb");
+    if (!fileMempool)
+    {
+        LOGA("Failed to open mempool file from disk. Continuing anyway.\n");
+        return false;
+    }
+    CAutoFile file(fileMempool, SER_DISK, CLIENT_VERSION);
     if (file.IsNull())
     {
         LOGA("Failed to open mempool file from disk. Continuing anyway.\n");
@@ -1815,13 +1820,14 @@ bool DumpMempool(void)
 
     try
     {
-        FILE *filestr = fopen((GetDataDir() / "mempool.dat.new").string().c_str(), "wb");
-        if (!filestr)
+        FILE *fileMempool = fopen((GetDataDir() / "mempool.dat.new").string().c_str(), "wb");
+        if (!fileMempool)
         {
+            LOGA("Could not dump mempool, failed to open mempool file from disk. Continuing anyway.\n");
             return false;
         }
 
-        CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
+        CAutoFile file(fileMempool, SER_DISK, CLIENT_VERSION);
 
         uint64_t version = MEMPOOL_DUMP_VERSION;
         file << version;
