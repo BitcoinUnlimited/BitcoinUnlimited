@@ -352,8 +352,8 @@ std::string gbt_vb_name(const Consensus::DeploymentPos pos)
 }
 
 // Sets the version bits in a block
-static int32_t UtilMkBlockTmplVersionBits(int32_t version,
-    std::set<std::string> setClientRules,
+int32_t UtilMkBlockTmplVersionBits(int32_t version,
+    const std::set<std::string> &setClientRules,
     CBlockIndex *pindexPrev,
     UniValue *paRules,
     UniValue *pvbavailable)
@@ -421,7 +421,7 @@ static int32_t UtilMkBlockTmplVersionBits(int32_t version,
 }
 
 
-static UniValue MkFullMiningCandidateJson(std::set<std::string> setClientRules,
+static UniValue MkFullMiningCandidateJson(const std::set<std::string> &setClientRules,
     CBlockIndex *pindexPrev,
     int64_t coinbaseSize,
     std::unique_ptr<CBlockTemplate> &pblocktemplate,
