@@ -73,6 +73,17 @@ public:
         READLOCK(cs_orphanpool);
         return nBytesOrphanPool;
     }
+
+private:
+    //! Return all the orphan pool data structures so they can be saved to disk
+    std::vector<CTxOrphanPool::COrphanTx> AllTxOrphanPoolInfo() const;
+
+public:
+    //! Load the orphan pool from disk
+    bool LoadOrphanPool();
+
+    //! Save the orphan pool to disk
+    bool DumpOrphanPool();
 };
 extern CTxOrphanPool orphanpool;
 

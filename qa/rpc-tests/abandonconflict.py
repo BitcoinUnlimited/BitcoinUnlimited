@@ -98,7 +98,7 @@ class AbandonConflictTest(BitcoinTestFramework):
 
         # Verify that even with a zero min relay fee, the tx is not reaccepted from wallet on startup once abandoned
         stop_node(self.nodes[0],0)
-        self.nodes[0]=start_node(0, self.options.tmpdir, ["-debug=net,mempool","-logtimemicros","-minlimitertxfee=0.0"])
+        self.nodes[0]=start_node(0, self.options.tmpdir, ["-debug=net,mempool","-logtimemicros","-minlimitertxfee=0.0", "-persistmempool=0"])
         assert(len(self.nodes[0].getrawmempool()) == 0)
         assert(self.nodes[0].getbalance() == balance)
 

@@ -48,6 +48,7 @@
 #include "txadmission.h"
 #include "txdb.h"
 #include "txmempool.h"
+#include "txorphanpool.h"
 #include "ui_interface.h"
 #include "unlimited.h"
 #include "util.h"
@@ -250,6 +251,7 @@ void Shutdown()
     if (fDumpMempoolLater && GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
     {
         DumpMempool();
+        orphanpool.DumpOrphanPool();
     }
 
     if (fFeeEstimatesInitialized)
@@ -547,27 +549,9 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
     }
 
     // In case a previous shutdown left the chain in an incorrect state, reconsider
-    // the most work chain.
+    // the most work chain. This needs to be done before we call ActivateBestChain() even
+    // though it is invoked again after ActivateBestChain().
     ReconsiderChainOnStartup();
-
-    // scan for better chains in the block chain database, that are not yet connected in the active best chain
-    uiInterface.InitMessage(_("Activating best chain..."));
-    CValidationState state;
-    if (!ActivateBestChain(state, chainparams))
-    {
-        LOGA("WARNING: ActivateBestChain failed on startup\n");
-    }
-
-    // Reconsider the most work chain if we're not already synced. This is necessary
-    // when switching from an ABC/BCHN client or when a operator failed to upgrade their BU
-    // node before a hardfork. This must be done directly after ActivateBestChain() or
-    // a switch from ABC/BCHN to a BU node may not work because some blocks may have been parked.
-    ReconsiderChainOnStartup();
-
-    // Initialize the atomic flags used for determining whether we are in IBD or whether the chain
-    // is almost synced.
-    IsChainNearlySyncdInit();
-    IsInitialBlockDownloadInit();
 
 #ifdef ENABLE_WALLET
     uiInterface.InitMessage(_("Reaccepting Wallet Transactions"));
@@ -585,8 +569,28 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
     if (GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
     {
         LoadMempool();
+        orphanpool.LoadOrphanPool();
         fDumpMempoolLater = !fRequestShutdown;
     }
+
+    // scan for better chains in the block chain database, that are not yet connected in the active best chain
+    uiInterface.InitMessage(_("Activating best chain..."));
+    CValidationState state;
+    if (!ActivateBestChain(state, chainparams))
+    {
+        LOGA("WARNING: ActivateBestChain failed on startup\n");
+    }
+
+    // Reconsider the most work chain again here if we're not already synced. This is necessary
+    // when switching from an ABC/BCHN client or when a operator failed to upgrade their BU
+    // node before a hardfork. This must be done directly after ActivateBestChain() or
+    // a switch from ABC/BCHN to a BU node may not work because some blocks may have been parked.
+    ReconsiderChainOnStartup();
+
+    // Initialize the atomic flags used for determining whether we are in IBD or whether the chain
+    // is almost synced.
+    IsChainNearlySyncdInit();
+    IsInitialBlockDownloadInit();
 
     // Startup txindex. If we start it earlier and before ActivateBestChain
     // we can end up grinding slowly through ActivateBestChain when txindex still has unfinished

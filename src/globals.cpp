@@ -399,7 +399,10 @@ CTweak<unsigned int> unconfPushAction("net.unconfChainResendAction",
     "0: do not resend, 1: send an INV, 2: send the TX (default: 2)",
     2);
 CTweak<bool> restrictInputs("net.restrictInputs",
-    "Do we want to restrict max inputs to 1 for unconfirmed transaction chains that are longer than 25 (default: true)",
+    strprintf("Restrict max inputs to 1 for unconfirmed transaction chains that are longer than %d or larger than %d KB"
+              "(default: true)",
+                                BCH_DEFAULT_ANCESTOR_LIMIT,
+                                BCH_DEFAULT_ANCESTOR_SIZE_LIMIT),
     true);
 
 CTweak<CAmount> maxTxFee("wallet.maxTxFee",
