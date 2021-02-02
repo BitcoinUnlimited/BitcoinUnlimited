@@ -232,7 +232,11 @@ class BitcoinTestFramework(object):
         if self.options.gitlab is True:
             basedir = os.path.normpath(os.path.dirname(os.path.realpath(__file__))+"/../../qa_tests")
             if os.path.exists(basedir) == False:
-                os.mkdir(path=basedir, mode=0o700)
+                try:
+                    os.mkdir(path=basedir, mode=0o700)
+                except FileExistsError as _:
+                    # ignore
+                    pass
             self.options.tmpdir = tempfile.mkdtemp(prefix="test_"+testname+"_", dir=basedir)
 
 
