@@ -241,7 +241,6 @@ bool AcceptBlockHeader(const CBlockHeader &block,
     const CChainParams &chainparams,
     CBlockIndex **ppindex)
 {
-    AssertLockHeld(cs_main);
     // Check for duplicate
     uint256 hash = block.GetHash();
     CBlockIndex *pindex = nullptr;

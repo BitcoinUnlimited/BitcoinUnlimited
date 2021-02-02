@@ -34,7 +34,6 @@
 extern std::atomic<int64_t> nTimeBestReceived;
 extern std::atomic<int> nPreferredDownload;
 extern int nSyncStarted;
-extern std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders;
 extern CTweak<unsigned int> maxBlocksInTransitPerPeer;
 extern CTweak<uint64_t> grapheneMinVersionSupported;
 extern CTweak<uint64_t> grapheneMaxVersionSupported;
@@ -1227,8 +1226,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             ReadCompactSize(vRecv); // ignore tx count; assume it is 0.
         }
 
-        LOCK(cs_main);
-
         // Nothing interesting. Stop asking this peers for more headers.
         if (nCount == 0)
             return true;
@@ -1268,8 +1265,11 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             if (fNewUnconnectedHeaders)
             {
                 uint256 hash = header.GetHash();
-                if (mapUnConnectedHeaders.size() < MAX_UNCONNECTED_HEADERS)
-                    mapUnConnectedHeaders[hash] = std::make_pair(header, GetTime());
+                {
+                    LOCK(csUnconnectedHeaders);
+                    if (mapUnConnectedHeaders.size() < MAX_UNCONNECTED_HEADERS)
+                        mapUnConnectedHeaders[hash] = std::make_pair(header, GetTime());
+                }
 
                 // update hashLastUnknownBlock so that we'll be able to download the block from this peer even
                 // if we receive the headers, which will connect this one, from a different peer.
@@ -1283,43 +1283,46 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         if (fNewUnconnectedHeaders)
             return true;
 
-        // If possible add any previously unconnected headers to the headers vector and remove any expired entries.
-        std::map<uint256, std::pair<CBlockHeader, int64_t> >::iterator mi = mapUnConnectedHeaders.begin();
-        while (mi != mapUnConnectedHeaders.end())
         {
-            std::map<uint256, std::pair<CBlockHeader, int64_t> >::iterator toErase = mi;
-
-            // Add the header if it connects to the previous header
-            if (headers.back().GetHash() == (*mi).second.first.hashPrevBlock)
+            LOCK(csUnconnectedHeaders);
+            // If possible add any previously unconnected headers to the headers vector and remove any expired entries.
+            std::map<uint256, std::pair<CBlockHeader, int64_t> >::iterator mi = mapUnConnectedHeaders.begin();
+            while (mi != mapUnConnectedHeaders.end())
             {
-                headers.push_back((*mi).second.first);
-                mapUnConnectedHeaders.erase(toErase);
+                std::map<uint256, std::pair<CBlockHeader, int64_t> >::iterator toErase = mi;
 
-                // if you found one to connect then search from the beginning again in case there is another
-                // that will connect to this new header that was added.
-                mi = mapUnConnectedHeaders.begin();
-                continue;
-            }
-
-            // Remove any entries that have been in the cache too long.  Unconnected headers should only exist
-            // for a very short while, typically just a second or two.
-            int64_t nTimeHeaderArrived = (*mi).second.second;
-            uint256 headerHash = (*mi).first;
-            mi++;
-            if (GetTime() - nTimeHeaderArrived >= UNCONNECTED_HEADERS_TIMEOUT)
-            {
-                mapUnConnectedHeaders.erase(toErase);
-            }
-            // At this point we know the headers in the list received are known to be in order, therefore,
-            // check if the header is equal to some other header in the list. If so then remove it from the cache.
-            else
-            {
-                for (const CBlockHeader &header : headers)
+                // Add the header if it connects to the previous header
+                if (headers.back().GetHash() == (*mi).second.first.hashPrevBlock)
                 {
-                    if (header.GetHash() == headerHash)
+                    headers.push_back((*mi).second.first);
+                    mapUnConnectedHeaders.erase(toErase);
+
+                    // if you found one to connect then search from the beginning again in case there is another
+                    // that will connect to this new header that was added.
+                    mi = mapUnConnectedHeaders.begin();
+                    continue;
+                }
+
+                // Remove any entries that have been in the cache too long.  Unconnected headers should only exist
+                // for a very short while, typically just a second or two.
+                int64_t nTimeHeaderArrived = (*mi).second.second;
+                uint256 headerHash = (*mi).first;
+                mi++;
+                if (GetTime() - nTimeHeaderArrived >= UNCONNECTED_HEADERS_TIMEOUT)
+                {
+                    mapUnConnectedHeaders.erase(toErase);
+                }
+                // At this point we know the headers in the list received are known to be in order, therefore,
+                // check if the header is equal to some other header in the list. If so then remove it from the cache.
+                else
+                {
+                    for (const CBlockHeader &header : headers)
                     {
-                        mapUnConnectedHeaders.erase(toErase);
-                        break;
+                        if (header.GetHash() == headerHash)
+                        {
+                            mapUnConnectedHeaders.erase(toErase);
+                            break;
+                        }
                     }
                 }
             }
