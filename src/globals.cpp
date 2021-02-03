@@ -118,7 +118,8 @@ std::set<int> setDirtyFileInfo GUARDED_BY(cs_main);
 /** Dirty block index entries. */
 std::set<CBlockIndex *> setDirtyBlockIndex GUARDED_BY(cs_main);
 /** Holds temporary mining candidates */
-map<int64_t, CMiningCandidate> miningCandidatesMap GUARDED_BY(cs_main);
+CCriticalSection csMiningCandidates;
+map<int64_t, CMiningCandidate> miningCandidatesMap GUARDED_BY(csMiningCandidates);
 
 /** Flags for coinbase transactions we create */
 CCriticalSection cs_coinbaseFlags;
@@ -303,6 +304,15 @@ CTweak<uint64_t> coinbaseReserve("mining.coinbaseReserve",
     strprintf("How much space to reserve for the coinbase transaction, in bytes (default: %d)",
                                      DEFAULT_COINBASE_RESERVE_SIZE),
     DEFAULT_COINBASE_RESERVE_SIZE);
+CTweak<uint64_t> maxMiningCandidates("mining.maxCandidates",
+    strprintf("How many simultaneous block candidates to track (default: %d)", DEFAULT_MAX_MINING_CANDIDATES),
+    DEFAULT_MAX_MINING_CANDIDATES);
+
+CTweak<uint64_t> minMiningCandidateInterval("mining.minCandidateInterval",
+    strprintf("Reuse a block candidate if requested within this many seconds (default: %d)",
+                                                DEFAULT_MIN_CANDIDATE_INTERVAL),
+    DEFAULT_MIN_CANDIDATE_INTERVAL);
+
 CTweakRef<std::string> miningCommentTweak("mining.comment", "Include this text in a block's coinbase.", &minerComment);
 
 CTweakRef<uint64_t> miningBlockSize("mining.blockSize",

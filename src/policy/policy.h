@@ -22,7 +22,10 @@ static const unsigned int DEFAULT_BLOCK_MAX_SIZE = 8 * ONE_MEGABYTE;
 static const unsigned int DEFAULT_BLOCK_MAX_SIZE_TESTNET4 = 2 * ONE_MEGABYTE;
 static const unsigned int DEFAULT_BLOCK_MAX_SIZE_SCALENET = 256 * ONE_MEGABYTE;
 static const unsigned int DEFAULT_BLOCK_MIN_SIZE = 0;
-
+// Maximum number of mining candidates that this node will remember simultaneously
+static const unsigned int DEFAULT_MAX_MINING_CANDIDATES = 10;
+// Send an existing mining candidate if a request comes in within this many seconds of its construction
+static const unsigned int DEFAULT_MIN_CANDIDATE_INTERVAL = 30;
 /** Default for -blockprioritysize, a 5% maximum space for zero/low-fee transactions **/
 static const unsigned int DEFAULT_BLOCK_PRIORITY_SIZE = DEFAULT_BLOCK_MAX_SIZE / 20;
 

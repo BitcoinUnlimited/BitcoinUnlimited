@@ -33,12 +33,28 @@ class MiningTest (BitcoinTestFramework):
 
     def run_test(self):
 
+        now = int(time.time())
+
+        self.nodes[0].setmocktime(now)
+        self.nodes[1].setmocktime(now)
+
         node = self.nodes[0]
         node.generate(100)
         # generate enough blocks so that nodes[0] has a balance
 
-        # test basic failure
+        # test candidate reuse
         c = node.getminingcandidate()
+        d = node.getminingcandidate()
+        # note that its not actually illegal to create a new candidate, but the code *should* reuse in this situation
+        assert c["id"] == d["id"]
+
+        # We should get a new mining candidate after 30 seconds
+        interval = self.nodes[0].get("mining.minCandidateInterval")["mining.minCandidateInterval"]
+        self.nodes[0].setmocktime(now+interval+1)
+        e = node.getminingcandidate()
+        assert c["id"] != e["id"]
+        
+        # test basic failure
         del c["merkleProof"]
         del c["prevhash"]
         id = c["id"]
@@ -47,13 +63,13 @@ class MiningTest (BitcoinTestFramework):
         assert ret == "id not found"
 
         # didn't provide a nonce
-        c = node.getminingcandidate()
-        del c["merkleProof"]
-        del c["prevhash"]
-        expectException(lambda: node.submitminingsolution(c), JSONRPCException)
+        f = node.getminingcandidate()
+        del f["merkleProof"]
+        del f["prevhash"]
+        expectException(lambda: node.submitminingsolution(f), JSONRPCException)
 
-        # ask for a valid coinbase size
-        c = node.getminingcandidate(1050)
+        # ask for a valid coinbase size (should not throw an exception, so no explicit test)
+        f = node.getminingcandidate(1050)
 
         # ask for a coinbase size that is too big
         expectException(lambda: node.getminingcandidate(1000000000000000), JSONRPCException)
@@ -64,7 +80,7 @@ class MiningTest (BitcoinTestFramework):
         # the most awful mining algorithm: just submit with an arbitrary nonce
         # (works because testnet accepts almost anything)
         nonce = 0
-        c["id"] = id
+        c["id"] = id  # submit this old mining candidate which should still be valid because bitcoind remembers it
         while 1:
             nonce += 1
             c = node.getminingcandidate()
