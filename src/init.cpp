@@ -1293,7 +1293,7 @@ bool AppInit2(Config &config)
 
                 uiInterface.InitMessage(_("Opening UTXO database..."));
                 COverrideOptions overridecache;
-                overridecache.block_size = 128;
+                overridecache.block_size = 4096;
                 pcoinsdbview = new CCoinsViewDB(cacheConfig.nCoinDBCache, false, fReindex, true, &overridecache);
 
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
