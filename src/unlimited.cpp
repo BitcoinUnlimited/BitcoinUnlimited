@@ -958,7 +958,7 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nTx, uint6
         // Within a 1MB block transactions can be 1MB, so nothing to check WRT transaction size
     }
 
-    if (block.nVersion >= 2)
+    if ((block.nVersion >= 2) && (block.nTime >= 1364140153)) // BIP34 time and block version for use of GetHeight
         LOGA("Acceptable block %s at %d: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " \n",
             block.GetHash().ToString(), block.GetHeight(), block.nVersion, block.nTime, blockSize, nTx);
     else
