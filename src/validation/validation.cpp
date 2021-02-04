@@ -182,11 +182,13 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &sta
     if (fCheckpointsEnabled)
     {
         const CChainParams &chainparams = Params();
-        // If the parent block belongs to the set of checkpointed blocks but it has a mismatched hash,
+        // If this block belongs to the set of checkpointed blocks but it has a mismatched hash,
         // then we are on the wrong fork so ignore
-        if (!CheckAgainstCheckpoint(pindexPrev->nHeight, *pindexPrev->phashBlock, chainparams))
+        if (!CheckAgainstCheckpoint(nHeight, block.GetHash(), chainparams))
         {
-            return error("%s: CheckAgainstCheckpoint(): %s", __func__, state.GetRejectReason().c_str());
+            return state.DoS(0, error("%s: invalid header at checkpoint (height %d) (hash %s)", __func__, nHeight,
+                                    block.GetHash().ToString()),
+                REJECT_CHECKPOINT, "bad-header-at-checkpoint");
         }
         READLOCK(cs_mapBlockIndex);
         const CBlockIndex *pindexMainChain = chainActive[nHeight];
@@ -199,8 +201,8 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &sta
         if (pcheckpoint && nHeight < pcheckpoint->nHeight)
         {
             return state.DoS(100,
-                error("%s: forked chain is older than last checkpoint (height %d)", __func__, nHeight),
-                REJECT_CHECKPOINT, "bad-fork-prior-to-checkpoint");
+                error("%s: forked chain is older than last checkpoint (height %d)", __func__, nHeight), REJECT_FORK,
+                "bad-fork-prior-to-checkpoint");
         }
     }
 
@@ -273,6 +275,10 @@ bool AcceptBlockHeader(const CBlockHeader &block,
                                      block.hashPrevBlock.ToString(), hash.ToString()),
                 0, "bad-prevblk");
         }
+
+        if (!ContextualCheckBlockHeader(block, state, pindexPrev))
+            return false;
+
         {
             READLOCK(cs_mapBlockIndex);
             if (pindexPrev->nStatus & BLOCK_FAILED_MASK)
@@ -280,9 +286,6 @@ bool AcceptBlockHeader(const CBlockHeader &block,
                     error("%s: previous block %s is invalid", __func__, pindexPrev->GetBlockHash().GetHex().c_str()),
                     REJECT_INVALID, "bad-prevblk");
         }
-
-        if (!ContextualCheckBlockHeader(block, state, pindexPrev))
-            return false;
     }
     if (pindex == nullptr)
         pindex = AddToBlockIndex(block);

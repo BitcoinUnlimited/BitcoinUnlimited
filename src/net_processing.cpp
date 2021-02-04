@@ -1336,6 +1336,15 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             CValidationState state;
             if (!AcceptBlockHeader(header, state, chainparams, &pindexLast))
             {
+                // Disconnect any peers that give us a bad checkpointed header.
+                // This prevents us from getting stuck in IBD where we download the intial headers.
+                // If we don't disconnect then we could end up attempting to download headers
+                // only from peers that are not on our own fork.
+                if (state.GetRejectCode() == REJECT_CHECKPOINT)
+                {
+                    pfrom->fDisconnect = true;
+                }
+
                 int nDos;
                 if (state.IsInvalid(nDos))
                 {
@@ -1344,9 +1353,11 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                         dosMan.Misbehaving(pfrom, nDos);
                     }
                 }
+
                 // all headers from this one forward reference a fork that we don't follow, so erase them
                 headers.erase(headers.begin() + i, headers.end());
                 nCount = headers.size();
+
                 break;
             }
             else
