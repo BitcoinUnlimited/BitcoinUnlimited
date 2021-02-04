@@ -8,11 +8,10 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cassert>
+#include <condition_variable>
+#include <mutex>
 #include <vector>
-
-#include <boost/thread/condition_variable.hpp>
-#include <boost/thread/locks.hpp>
-#include <boost/thread/mutex.hpp>
 
 template <typename T>
 class CCheckQueueControl;
@@ -32,13 +31,13 @@ class CCheckQueue
 {
 private:
     //! Mutex to protect the inner state
-    boost::mutex mutex;
+    std::mutex mutex;
 
     //! Worker threads block on this when out of work
-    boost::condition_variable condWorker;
+    std::condition_variable condWorker;
 
     //! Master thread blocks on this when out of work
-    boost::condition_variable condMaster;
+    std::condition_variable condMaster;
 
     //! The queue of elements to be processed.
     //! As the order of booleans doesn't matter, it is used as a LIFO (stack)
@@ -72,7 +71,7 @@ private:
     /** Internal function that does bulk of the verification work. */
     bool Loop(bool fMaster = false)
     {
-        boost::condition_variable &cond = fMaster ? condMaster : condWorker;
+        std::condition_variable &cond = fMaster ? condMaster : condWorker;
         std::vector<T> vChecks;
         vChecks.reserve(nBatchSize);
         unsigned int nNow = 0;
@@ -80,7 +79,7 @@ private:
         do
         {
             {
-                boost::unique_lock<boost::mutex> lock(mutex);
+                std::unique_lock<std::mutex> lock(mutex);
                 // first do the clean-up of the previous loop run (allowing us to do it in the same critsect)
                 if (nNow)
                 {
@@ -122,7 +121,8 @@ private:
                         return fRet;
                     }
                     nIdle++;
-                    cond.wait(lock); // wait
+                    std::chrono::milliseconds period(100);
+                    cond.wait_for(lock, period); // wait but periodically wake up to check fExit
                     nIdle--;
                 }
                 // Decide how many work units to process now.
@@ -173,7 +173,7 @@ public:
     //! Add a batch of checks to the queue
     void Add(std::vector<T> &vChecks)
     {
-        boost::unique_lock<boost::mutex> lock(mutex);
+        std::unique_lock<std::mutex> lock(mutex);
         for (T &check : vChecks)
         {
             queue.push_back(T());
@@ -189,7 +189,7 @@ public:
     ~CCheckQueue() {}
     bool IsIdle()
     {
-        boost::unique_lock<boost::mutex> lock(mutex);
+        std::unique_lock<std::mutex> lock(mutex);
         return (nTotal == nIdle && nTodo == 0 && fAllOk == true);
     }
 };
