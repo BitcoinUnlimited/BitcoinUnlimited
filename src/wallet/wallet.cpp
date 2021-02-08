@@ -1468,7 +1468,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate)
                 nNow = GetTime();
                 if (pindex) // if pindex is nullptr we are done anyway so no need to show the log
                     LOGA("Still rescanning. At block %d. Progress=%f\n", pindex->nHeight,
-                        Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), pindex));
+                        Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), pindex, false));
             }
         }
         ShowProgress(_("Rescanning..."), 100); // hide progress dialog in GUI

@@ -611,7 +611,7 @@ bool LoadBlockIndexDB()
 
     LOGA("%s: hashBestChain=%s height=%d date=%s progress=%f\n", __func__, chainActive.Tip()->GetBlockHash().ToString(),
         chainActive.Height(), DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
-        Checkpoints::GuessVerificationProgress(chainparams.Checkpoints(), chainActive.Tip()));
+        Checkpoints::GuessVerificationProgress(chainparams.Checkpoints(), chainActive.Tip(), !fCheckpointsEnabled));
 
     return true;
 }
@@ -3084,7 +3084,7 @@ void UpdateTip(CBlockIndex *pindexNew)
         __func__, chainActive.Tip()->GetBlockHash().ToString(), chainActive.Height(), chainActive.Tip()->nBits,
         log(chainActive.Tip()->nChainWork.getdouble()) / log(2.0), (unsigned long)chainActive.Tip()->nChainTx,
         DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
-        Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), chainActive.Tip()),
+        Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), chainActive.Tip(), !fCheckpointsEnabled),
         pcoinsTip->DynamicMemoryUsage() * (1.0 / (1 << 20)), pcoinsTip->GetCacheSize());
 
     if (!IsInitialBlockDownload())
