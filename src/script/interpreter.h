@@ -290,6 +290,11 @@ private:
 public:
     bool empty() { return m_stack_size == 0; }
     bool all_true() { return m_first_false_pos == NO_FALSE; }
+    void clear()
+    {
+        m_stack_size = 0;
+        m_first_false_pos = NO_FALSE;
+    }
     void push_back(bool f)
     {
         if (m_first_false_pos == NO_FALSE && !f)
