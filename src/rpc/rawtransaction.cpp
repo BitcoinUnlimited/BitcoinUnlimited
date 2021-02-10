@@ -1480,8 +1480,7 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
         // push to local node and sync with wallets
         CValidationState state;
         bool fMissingInputs;
-        if (!AcceptToMemoryPool(
-                mempool, state, ptx, AreFreeTxnsAllowed(), &fMissingInputs, false, !fOverrideFees, txClass))
+        if (!AcceptToMemoryPool(mempool, state, ptx, AreFreeTxnsAllowed(), &fMissingInputs, !fOverrideFees, txClass))
         {
             if (state.IsInvalid() && state.GetRejectCode() != REJECT_MULTIPLE_INPUTS)
             {
@@ -1684,7 +1683,7 @@ UniValue validaterawtransaction(const UniValue &params, bool fHelp)
         std::vector<COutPoint> vCoinsToUncache;
         bool isRespend = false;
         ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, std::move(ptx), AreFreeTxnsAllowed(), &fMissingInputs,
-            false, fOverrideFees, txClass, vCoinsToUncache, &isRespend, &debugger);
+            fOverrideFees, txClass, vCoinsToUncache, &isRespend, &debugger);
     }
     else if (fHaveChain)
     {

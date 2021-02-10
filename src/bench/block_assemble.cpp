@@ -85,8 +85,7 @@ static void AssembleBlock(benchmark::State &state)
         {
             CValidationState vstate;
             bool ret{AcceptToMemoryPool(mempool, vstate, txr, false, /* fLimitFree */
-                nullptr /* pfMissingInputs */, false, /* fOverrideMempoolLimit */
-                true, /* fRejectAbsurdFee */
+                nullptr /* pfMissingInputs */, true, /* fRejectAbsurdFee */
                 TransactionClass::DEFAULT)};
             assert(ret);
         }

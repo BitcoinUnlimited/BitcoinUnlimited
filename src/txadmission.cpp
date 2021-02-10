@@ -471,7 +471,7 @@ void ThreadTxAdmission()
                     // otherwise nullptr turns it off.
                     CTxProperties *txProps = (unconfPushAction.Value() == 0) ? nullptr : &txProperties;
                     if (ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, tx, true, &fMissingInputs, false,
-                            false, TransactionClass::DEFAULT, vCoinsToUncache, &isRespend, nullptr, txProps))
+                            TransactionClass::DEFAULT, vCoinsToUncache, &isRespend, nullptr, txProps))
                     {
                         acceptedSomething = true;
                         RelayTransaction(tx, txProps);
@@ -571,7 +571,6 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     const CTransactionRef &tx,
     bool fLimitFree,
     bool *pfMissingInputs,
-    bool fOverrideMempoolLimit,
     bool fRejectAbsurdFee,
     TransactionClass allowedTx)
 {
@@ -597,8 +596,8 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
 
         bool isRespend = false;
         bool missingInputs = false;
-        res = ParallelAcceptToMemoryPool(txHandlerSnap, pool, state, tx, fLimitFree, &missingInputs,
-            fOverrideMempoolLimit, fRejectAbsurdFee, allowedTx, vCoinsToUncache, &isRespend, nullptr, txProps);
+        res = ParallelAcceptToMemoryPool(txHandlerSnap, pool, state, tx, fLimitFree, &missingInputs, fRejectAbsurdFee,
+            allowedTx, vCoinsToUncache, &isRespend, nullptr, txProps);
 
         // Uncache any coins for txns that failed to enter the mempool but were NOT orphan txns
         if (isRespend || (!res && !missingInputs))
@@ -628,7 +627,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     const CTransactionRef &tx,
     bool fLimitFree,
     bool *pfMissingInputs,
-    bool fOverrideMempoolLimit,
     bool fRejectAbsurdFee,
     TransactionClass allowedTx,
     std::vector<COutPoint> &vCoinsToUncache,
