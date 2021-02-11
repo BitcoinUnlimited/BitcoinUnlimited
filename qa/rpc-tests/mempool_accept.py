@@ -321,6 +321,16 @@ class MyTest (BitcoinTestFramework):
                 n.generate(1)
                 self.sync_blocks()
 
+    def removeTxPersistFiles(self):
+        for d in ["node%d" % x for x in range(1,5)]:
+            fname = self.options.tmpdir + os.sep + d + os.sep + "regtest" + os.sep + "mempool.dat"
+            if os.path.exists(fname):
+                os.remove(fname)
+            fname = self.options.tmpdir + os.sep + d + os.sep + "regtest" + os.sep + "orphanpool.dat"
+            if os.path.exists(fname):
+                os.remove(fname)
+
+                
     def run_test(self):
         decContext = decimal.getcontext().prec
         decimal.getcontext().prec = 8 + 8  # 8 digits to get to 21million, and each bitcoin is 100 million satoshis
@@ -444,9 +454,12 @@ class MyTest (BitcoinTestFramework):
 
         # Stop and start 4 nodes with different minlimitertxfee's.  Then send transactions with varying
         # fees and see if they propagated correctly.
+        self.nodes[0].generate(1) # clean up
+        self.sync_blocks()
         logging.info("starting mempool limiting tests")
         stop_nodes(self.nodes)
         wait_bitcoinds()
+        self.removeTxPersistFiles()
 
         self.nodes = start_nodes(4, self.options.tmpdir, [["-minlimitertxfee=1.0", "-limitfreerelay=0"], ["-minlimitertxfee=2.0", "-limitfreerelay=0"], ["-minlimitertxfee=3.5", "-limitfreerelay=0"], ["-minlimitertxfee=0.0", "-limitfreerelay=0"]])
         # Now interconnect the nodes
@@ -525,18 +538,18 @@ class MyTest (BitcoinTestFramework):
             assert e.error["message"] == 'Transaction not in mempool'
 
 
-
         # Stop and start 4 nodes with different limitfreerelay's.  Then send transactions with varying
         # fees and see if they propagated correctly.
         stop_nodes(self.nodes)
         wait_bitcoinds()
+        self.removeTxPersistFiles()
 
         self.nodes = start_nodes(4, self.options.tmpdir, [["-minlimitertxfee=0.0", "-limitfreerelay=0"], ["-minlimitertxfee=1.0", "-limitfreerelay=1"], ["-minlimitertxfee=2.0", "-limitfreerelay=1"], ["-minlimitertxfee=3.0", "-limitfreerelay=2"]])
 
         #clear all mempools by mining a block
         interconnect_nodes(self.nodes)
         self.nodes[0].generate(1)
-        self.sync_all()
+        self.sync_blocks()
 
         for i in range(100):
             self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), "1e-4")
@@ -548,11 +561,11 @@ class MyTest (BitcoinTestFramework):
         waitFor(30, lambda: self.nodes[0].getmempoolinfo()["bytes"] > 20000)
         waitFor(30, lambda: self.nodes[1].getmempoolinfo()["size"] == 100)
         waitFor(30, lambda: self.nodes[1].getmempoolinfo()["bytes"] > 20000)
-        waitFor(30, lambda: self.nodes[2].getmempoolinfo()["size"] == 44)
-        waitFor(30, lambda: self.nodes[2].getmempoolinfo()["bytes"] < 10000)
+        waitFor(30, lambda: (self.nodes[2].getmempoolinfo()["size"] >= 43) and (self.nodes[2].getmempoolinfo()["size"] <= 45))
+        waitFor(30, lambda: self.nodes[2].getmempoolinfo()["bytes"] < 11000)
         waitFor(30, lambda: self.nodes[2].getmempoolinfo()["bytes"] > 9750)
-        waitFor(30, lambda: self.nodes[3].getmempoolinfo()["size"] == 87)
-        waitFor(30, lambda: self.nodes[3].getmempoolinfo()["bytes"] < 20000)
+        waitFor(30, lambda: [print("Node 3 mempool, expecting 87: %s" % str(self.nodes[3].getmempoolinfo())), (self.nodes[3].getmempoolinfo()["size"] >= 86) and (self.nodes[3].getmempoolinfo()["size"] <= 90)][-1])
+        waitFor(30, lambda: self.nodes[3].getmempoolinfo()["bytes"] < 22000)
         waitFor(30, lambda: self.nodes[3].getmempoolinfo()["bytes"] > 19500)
 
         # stop and start all nodes with mempool persist off and limitfreerelay off but increase the minlimitertxfee to a high
@@ -602,6 +615,7 @@ if __name__ == '__main__':
 def Test():
     global BitcoinCli
     t = MyTest(True)
+    t.drop_to_pdb = True
     bitcoinConf = {
         "debug": ["blk", "mempool", "net", "req"],
         "blockprioritysize": 2000000,  # we don't want any transactions rejected due to insufficient fees...

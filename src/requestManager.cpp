@@ -117,6 +117,7 @@ void CRequestManager::Cleanup()
 
 void CRequestManager::cleanup(OdMap::iterator &itemIt)
 {
+    LOCK(cs_objDownloader);
     CUnknownObj &item = itemIt->second;
     // Because we'll ignore anything deleted from the map, reduce the # of requests in flight by every request we made
     // for this object
@@ -176,6 +177,10 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
         // end up with dangling noderefs when the peer tries to disconnect.
         if (!data.fProcessing)
             data.AddSource(from);
+        else
+        {
+            LOG(REQ, "Not calling AddSource for %s at %s.  Already processing.\n", obj.ToString(), from->GetLogName());
+        }
     }
     else if (IsBlockType(obj))
     {

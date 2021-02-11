@@ -21,6 +21,7 @@ import decimal
 import hashlib
 import json
 import http.client
+import pprint
 import random
 import shutil
 import subprocess
@@ -53,6 +54,16 @@ PORT_RANGE = 30000
 
 debug_port_assignments = False
 
+def getNodeInfo(node):
+    PP_INDENT=2
+    PP_WIDTH=3*80
+    ret = ""
+    ret += "\n** getinfo:\n" + pprint.pformat(node.getinfo(),PP_INDENT,PP_WIDTH)
+    ret += "\n** getmempoolinfo:\n" + pprint.pformat(node.getmempoolinfo(),PP_INDENT,PP_WIDTH)
+    ret += "\n** getorphanpoolinfo:\n" + pprint.pformat(node.getorphanpoolinfo(),PP_INDENT,PP_WIDTH)
+    v = node.getpeerinfo()
+    ret += ("\n** %d peers:\n" % len(v)) + pprint.pformat(v,PP_INDENT,PP_WIDTH)
+    return ret
 
 # Serialization/deserialization tools
 def sha256(s):
@@ -354,6 +365,10 @@ def sync_blocks(rpc_connections, *, wait=1, verbose=1, timeout=60):
                 graph[nodeIdx] = connectedTo
             if not is_connected(graph):
                 raise Exception('sync_blocks: bitcoind nodes cannot sync because they are not all connected.  Node connection graph: %s' % str(graph))
+    print("sync_blocks timeout, printing debug info: ")
+    for rpc in rpc_connections:
+        print("NODE: ")
+        print(getNodeInfo(rpc))
     raise Exception('sync_blocks: blocks did not sync through various nodes before the timeout of %d seconds kicked in' % timeout)
 
 def sync_blocks_to(height, rpc_connections, *, wait=1, verbose=1, timeout=60):
@@ -745,6 +760,8 @@ def stop_nodes(nodes):
             node.stop()
         except http.client.CannotSendRequest as e:
             print("WARN: Unable to stop node: " + repr(e))
+        except AttributeError:  # One of the nodes is None (never started)
+            pass
     del nodes[:] # Emptying array closes connections as a side effect
 
 def set_node_times(nodes, t):

@@ -38,8 +38,8 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
 
     def setup_network(self):
         self.nodes = []
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug"]))
+        self.nodes.append(start_node(0, self.options.tmpdir))
+        self.nodes.append(start_node(1, self.options.tmpdir))
         self.is_network_split = False
         connect_nodes(self.nodes[0], 1)
 
@@ -348,8 +348,9 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
 
 def Test():
     t = ValidateblocktemplateTest()
+    t.drop_to_pdb = True
     bitcoinConf = {
-        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
+        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict","-event"],
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...
     }
 

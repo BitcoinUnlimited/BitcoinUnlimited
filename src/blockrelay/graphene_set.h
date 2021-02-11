@@ -101,9 +101,14 @@ public:
 
     // Generate cheap hash from seeds using SipHash
     uint64_t GetShortID(const uint256 &txhash) const;
+    // The ordinality of all possible items that could appear in this set
     uint64_t GetNReceiverUniverseItems() const { return nReceiverUniverseItems; }
+    // It false items are returned in arbitrary order
     bool GetOrdered() const { return ordered; }
+    // True if fast filters are being used
     bool GetComputeOptimized() const { return computeOptimized; }
+    // Return the false positive rate for this set's bloom filter
+    double GetBloomFPR() const { return bloomFPR; }
     std::vector<unsigned char> GetEncodedRank() const { return encodedRank; }
     std::shared_ptr<CIblt> GetIblt() const { return pSetIblt; }
     std::shared_ptr<CBloomFilter> GetRegularFilter() const { return pSetFilter; }

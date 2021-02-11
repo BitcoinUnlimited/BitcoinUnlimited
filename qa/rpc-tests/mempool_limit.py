@@ -50,16 +50,26 @@ class MempoolLimitTest(BitcoinTestFramework):
         # create another txn that will exceed the maxmempool which should evict some random transaction.
         all_txns = self.nodes[0].getrawmempool()
 
-        i = 2
-        new_txn = create_lots_of_big_transactions(self.nodes[0], self.txouts, utxos[33*i:33*i+33], 1, (i+1)*base_fee)
-        print("newtxns " + str(new_txn[0]))
-        assert(self.nodes[0].getmempoolinfo()["usage"] < self.nodes[0].getmempoolinfo()["maxmempool"])
+        tries = 0
+        while tries < 10:
+            i = 2
+            new_txn = create_lots_of_big_transactions(self.nodes[0], self.txouts, utxos[33*i:33*i+33], 1, (i+1)*base_fee + Decimal(0.00001*tries)) # Adding tries to the fee changes the transaction (we are reusing the prev UTXOs)
+            print("newtxns " + str(new_txn[0]))
+            assert(self.nodes[0].getmempoolinfo()["usage"] < self.nodes[0].getmempoolinfo()["maxmempool"])
 
-        # make sure the mempool count did not change
-        assert(num_txns_in_mempool == self.nodes[0].getmempoolinfo()["size"])
+            # make sure the mempool count did not change
+            waitFor(10, lambda: num_txns_in_mempool == self.nodes[0].getmempoolinfo()["size"])
 
-        # make sure new tx is in the mempool
-        assert(new_txn[0] in self.nodes[0].getrawmempool())
+            # make sure new tx is in the mempool, but since the mempool has a random eviction policy,
+            # this tx could be the one that was evicted.  So retry 10 times to make failures it VERY unlikely
+            # we have a spurious failure due to ejecting the tx we just added.
+            if new_txn[0] in self.nodes[0].getrawmempool():
+                break
+            tries+=1
+
+        if tries >= 10:
+            assert False, "Newly created tx is repeatedly NOT being put into the mempool"
+
 
 if __name__ == '__main__':
     MempoolLimitTest().main()

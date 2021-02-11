@@ -160,15 +160,15 @@ class MempoolPersistTest(BitcoinTestFramework):
               print(str(e))
               raise
 
-        waitFor(DELAY_TIME, lambda: self.nodes[0].getorphanpoolinfo()["size"] == 0)
-        waitFor(DELAY_TIME, lambda: self.nodes[1].getorphanpoolinfo()["size"] == 5)
+        waitFor(DELAY_TIME, lambda: self.nodes[0].getorphanpoolinfo()["size"] == 0, lambda: print (getNodeInfo(self.nodes[0])))
+        waitFor(DELAY_TIME, lambda: self.nodes[1].getorphanpoolinfo()["size"] == 5, lambda: print (getNodeInfo(self.nodes[1])))
 
         #stop and start nodes and verify that the orphanpool was resurrected
         stop_nodes(self.nodes)
         wait_bitcoinds()
         self.nodes = start_nodes(2, self.options.tmpdir)
-        waitFor(DELAY_TIME, lambda: self.nodes[0].getorphanpoolinfo()["size"] == 0)
-        waitFor(DELAY_TIME, lambda: self.nodes[1].getorphanpoolinfo()["size"] == 5)
+        waitFor(DELAY_TIME, lambda: self.nodes[0].getorphanpoolinfo()["size"] == 0, lambda: print (getNodeInfo(self.nodes[0])))
+        waitFor(DELAY_TIME, lambda: self.nodes[1].getorphanpoolinfo()["size"] == 5, lambda: print (getNodeInfo(self.nodes[1])))
 
         orphanpooldat0 = os.path.join(self.options.tmpdir, 'node0', 'regtest', 'orphanpool.dat')
         orphanpooldat1 = os.path.join(self.options.tmpdir, 'node1', 'regtest', 'orphanpool.dat')
@@ -203,3 +203,14 @@ class MempoolPersistTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     MempoolPersistTest().main()
+
+def Test():
+    t = MempoolPersistTest()
+    t.drop_to_pdb = True
+    bitcoinConf = {
+        "debug": ["blk", "mempool", "net", "req", "-event"],
+        "logtimemicros": 1
+    }
+
+    flags = standardFlags()
+    t.main(flags, bitcoinConf, None)

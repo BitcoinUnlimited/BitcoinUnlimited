@@ -376,7 +376,6 @@ void CBlockPolicyEstimator::processTransaction(const CTxMemPoolEntry &entry, boo
     LOG(ESTIMATEFEE, "Blockpolicy mempool tx %s ", hash.ToString().substr(0, 10));
     mapMemPoolTxs[hash].stats = &feeStats;
     mapMemPoolTxs[hash].bucketIndex = feeStats.NewTx(txHeight, (double)feeRate.GetFeePerK());
-    LOG(ESTIMATEFEE, "\n");
 }
 
 void CBlockPolicyEstimator::processBlockTx(unsigned int nBlockHeight, const CTxMemPoolEntry &entry)

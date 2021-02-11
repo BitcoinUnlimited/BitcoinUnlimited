@@ -157,6 +157,7 @@ uint64_t CalculateCurrentUsage()
 /* Prune a block file (modify associated database entries)*/
 void PruneOneBlockFile(const int fileNumber)
 {
+    AssertLockHeld(cs_main); // For setDirtyBlockIndex
     READLOCK(cs_mapBlockIndex);
     for (BlockMap::iterator it = mapBlockIndex.begin(); it != mapBlockIndex.end(); ++it)
     {

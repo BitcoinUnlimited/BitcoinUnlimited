@@ -63,6 +63,9 @@ class MyTest (BitcoinTestFramework):
         logging.info("Starting at %d blocks" % startHeight)
         utxos = create_confirmed_utxos(self.relayfee, self.nodes[1], utxo_count)
         startHeight = self.nodes[1].getblockcount()
+        # Sync blocks now, or the node 0 generate below could fork the blockchain, resulting in the a bunch of tx created by create_confirmed_utxo being unconfirmed
+        # on node 0 which means they won't be admitted into node 0's mempool breaking this test.
+        self.sync_blocks()
         logging.info("Initial sync to %d blocks" % startHeight)
 
         # kick us out of IBD mode since the cached blocks will be old time so it'll look like our blockchain isn't up to date
@@ -72,6 +75,8 @@ class MyTest (BitcoinTestFramework):
         logging.info("ancestor count test")
         bal = self.nodes[1].getbalance()
         addr = self.nodes[1].getnewaddress()
+        #logging.info("Node 0 start:\n %s\n" % getNodeInfo(self.nodes[0]))
+        #logging.info("Node 1 start:\n %s\n" % getNodeInfo(self.nodes[1]))
 
         # create multi input transactions that are chained. This will cause any transactions that are greater
         # than the BCH default chain limit to be prevented from entering the mempool, however they will enter the
@@ -96,18 +101,18 @@ class MyTest (BitcoinTestFramework):
               rawtx = self.nodes[1].createrawtransaction(inputs, outputs)
               signed_tx = self.nodes[1].signrawtransaction(rawtx)["hex"]
               txid = self.nodes[1].sendrawtransaction(signed_tx)
+              self.nodes[0].enqueuerawtransaction(signed_tx)  # Manually jam for speed
 
               txhex.append(txid)  # enough so that it uses the one 
               logging.info("tx depth %d" % i) # Keep travis from timing out
           except JSONRPCException as e: # an exception you don't catch is a testing error
               print(str(e))
               raise
-          if i > 45 and i <= 55:  # Bracket the unconf chain acceptance depth of this node for efficiency
+          if i > BCH_UNCONF_DEPTH-5 and i <= BCH_UNCONF_DEPTH+5:  # Bracket the unconf chain acceptance depth of this node for efficiency
               # Test that every tx beyond the unconf limit is inserted into the orphan pool -- nothing is dropped
               # but it won't be relayed to me from the other node so I need to manually inject
-              self.nodes[0].enqueuerawtransaction(signed_tx)
-              waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] + self.nodes[0].getorphanpoolinfo()["size"] == i)
-        waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH)
+              waitFor(DELAY_TIME, lambda: [print("Node 0: mempool size: %d, orphan pool size: %d" % (self.nodes[0].getmempoolinfo()["size"], self.nodes[0].getorphanpoolinfo()["size"])),self.nodes[0].getmempoolinfo()["size"] + self.nodes[0].getorphanpoolinfo()["size"] >= i][-1], lambda: "Node 0 Info:\n" + getNodeInfo(self.nodes[0]))
+        waitFor(DELAY_TIME, lambda: [print("Node 0 connected to: %d mempool (should be %d): %s" % (len(self.nodes[0].getpeerinfo()), BCH_UNCONF_DEPTH, str(self.nodes[0].getmempoolinfo()))), self.nodes[0].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH][-1], lambda: "Node 0 Info:\n" + getNodeInfo(self.nodes[0]))
         waitFor(DELAY_TIME, lambda: self.nodes[1].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH*3)
         waitFor(DELAY_TIME, lambda: self.nodes[3].getmempoolinfo()["size"] == BCH_UNCONF_DEPTH)
         # Set small to commit just a few tx so we can see if the missing ones get pushed
@@ -115,11 +120,13 @@ class MyTest (BitcoinTestFramework):
 
         # disconnect to prove that the orphan queue gets pushed into the mempool when block generated
         disconnect_all(self.nodes[0])
+        opSz = self.nodes[0].getorphanpoolinfo()["size"]
         blk = self.nodes[0].generate(1)[0]
 
         # check that all orphans got pushed into the mempool once the block was mined
-        waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == 5)
-        waitFor(DELAY_TIME, lambda: self.nodes[0].getorphanpoolinfo()["size"] == 0)
+        consumed = min(BCH_UNCONF_DEPTH, opSz)
+        waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == min(BCH_UNCONF_DEPTH, opSz), lambda: "Node 0:\n" + getNodeInfo(self.nodes[0]))
+        waitFor(DELAY_TIME, lambda: self.nodes[0].getorphanpoolinfo()["size"] == opSz-consumed)
 
         connect_nodes(self.nodes[0], 1)
         connect_nodes(self.nodes[0], 2)

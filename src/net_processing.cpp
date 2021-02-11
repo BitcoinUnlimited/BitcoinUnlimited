@@ -938,7 +938,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             {
                 LOCK(cs_main);
                 bool fAlreadyHaveBlock = AlreadyHaveBlock(inv);
-                LOG(NET, "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHaveBlock ? "have" : "new", pfrom->id);
+                LOG(NET, "got BLOCK inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHaveBlock ? "have" : "new",
+                    pfrom->id);
 
                 requester.UpdateBlockAvailability(pfrom->GetId(), inv.hash);
                 // RE !IsInitialBlockDownload(): We do not want to get the block if the system is executing the initial
@@ -1228,144 +1229,158 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         // Nothing interesting. Stop asking this peers for more headers.
         if (nCount == 0)
-            return true;
-
-        // Check all headers to make sure they are continuous before attempting to accept them.
-        // This prevents and attacker from keeping us from doing direct fetch by giving us out
-        // of order headers.
-        bool fNewUnconnectedHeaders = false;
-        uint256 hashLastBlock;
-        hashLastBlock.SetNull();
-        for (const CBlockHeader &header : headers)
         {
-            // check that the first header has a previous block in the blockindex.
-            if (hashLastBlock.IsNull())
-            {
-                if (LookupBlockIndex(header.hashPrevBlock))
-                    hashLastBlock = header.hashPrevBlock;
-            }
+            LOG(NET, "No more headers from peer %s\n", pfrom->GetLogName());
+            return true;
+        }
 
-            // Add this header to the map if it doesn't connect to a previous header
-            if (header.hashPrevBlock != hashLastBlock)
+        CBlockIndex *pindexLast = nullptr;
+        {
+            // We need to handle appending the header and analyzing the unconnected ones sequentially, or
+            // 2 simultaneously processed header messages may cause an out of order header to not be reconnected
+            // when its parent arrives.
+
+            // We are reusing csUnConnected headers to both force this code to be sequential and to protect
+            // the unconnected headers data structure.
+            LOCK(csUnconnectedHeaders);
+
+            // Check all headers to make sure they are continuous before attempting to accept them.
+            // This prevents and attacker from keeping us from doing direct fetch by giving us out
+            // of order headers.
+            bool fNewUnconnectedHeaders = false;
+            uint256 hashLastBlock;
+            hashLastBlock.SetNull();
+            for (const CBlockHeader &header : headers)
             {
-                // If we still haven't finished downloading the initial headers during node sync and we get
-                // an out of order header then we must disconnect the node so that we can finish downloading
-                // initial headers from a diffeent peer. An out of order header at this point is likely an attack
-                // to prevent the node from syncing.
-                if (header.GetBlockTime() < GetAdjustedTime() - 24 * 60 * 60)
+                // LOG(NET, "Received header %s from %s\n", header.GetHash().ToString(), pfrom->GetLogName());
+                // check that the first header has a previous block in the blockindex.
+                if (hashLastBlock.IsNull())
                 {
-                    pfrom->fDisconnect = true;
-                    return error("non-continuous-headers sequence during node sync - disconnecting peer=%s",
-                        pfrom->GetLogName());
+                    if (LookupBlockIndex(header.hashPrevBlock))
+                        hashLastBlock = header.hashPrevBlock;
                 }
-                fNewUnconnectedHeaders = true;
-            }
 
-            // if we have an unconnected header then add every following header to the unconnected headers cache.
-            if (fNewUnconnectedHeaders)
-            {
-                uint256 hash = header.GetHash();
+                // Add this header to the map if it doesn't connect to a previous header
+                if (header.hashPrevBlock != hashLastBlock)
                 {
-                    LOCK(csUnconnectedHeaders);
+                    // If we still haven't finished downloading the initial headers during node sync and we get
+                    // an out of order header then we must disconnect the node so that we can finish downloading
+                    // initial headers from a diffeent peer. An out of order header at this point is likely an attack
+                    // to prevent the node from syncing.
+                    if (header.GetBlockTime() < GetAdjustedTime() - 24 * 60 * 60)
+                    {
+                        pfrom->fDisconnect = true;
+                        return error("non-continuous-headers sequence during node sync - disconnecting peer=%s",
+                            pfrom->GetLogName());
+                    }
+                    fNewUnconnectedHeaders = true;
+                }
+
+                // if we have an unconnected header then add every following header to the unconnected headers cache.
+                if (fNewUnconnectedHeaders)
+                {
+                    uint256 hash = header.GetHash();
+                    // LOG(NET, "Header %s from %s is unconnected\n", hash.ToString(), pfrom->GetLogName());
                     if (mapUnConnectedHeaders.size() < MAX_UNCONNECTED_HEADERS)
                         mapUnConnectedHeaders[hash] = std::make_pair(header, GetTime());
+                    else
+                        LOG(NET, "Ignoring header %s -- too many unconnected headers.\n", hash.ToString());
+
+                    // update hashLastUnknownBlock so that we'll be able to download the block from this peer even
+                    // if we receive the headers, which will connect this one, from a different peer.
+                    requester.UpdateBlockAvailability(pfrom->GetId(), hash);
                 }
 
-                // update hashLastUnknownBlock so that we'll be able to download the block from this peer even
-                // if we receive the headers, which will connect this one, from a different peer.
-                requester.UpdateBlockAvailability(pfrom->GetId(), hash);
+                hashLastBlock = header.GetHash();
             }
+            // return without error if we have an unconnected header.  This way we can try to connect it when the next
+            // header arrives.
+            if (fNewUnconnectedHeaders)
+                return true;
 
-            hashLastBlock = header.GetHash();
-        }
-        // return without error if we have an unconnected header.  This way we can try to connect it when the next
-        // header arrives.
-        if (fNewUnconnectedHeaders)
-            return true;
-
-        {
-            LOCK(csUnconnectedHeaders);
-            // If possible add any previously unconnected headers to the headers vector and remove any expired entries.
-            std::map<uint256, std::pair<CBlockHeader, int64_t> >::iterator mi = mapUnConnectedHeaders.begin();
-            while (mi != mapUnConnectedHeaders.end())
             {
-                std::map<uint256, std::pair<CBlockHeader, int64_t> >::iterator toErase = mi;
-
-                // Add the header if it connects to the previous header
-                if (headers.back().GetHash() == (*mi).second.first.hashPrevBlock)
+                // If possible add any previously unconnected headers to the headers vector and remove any expired
+                // entries.
+                std::map<uint256, std::pair<CBlockHeader, int64_t> >::iterator mi = mapUnConnectedHeaders.begin();
+                while (mi != mapUnConnectedHeaders.end())
                 {
-                    headers.push_back((*mi).second.first);
-                    mapUnConnectedHeaders.erase(toErase);
+                    std::map<uint256, std::pair<CBlockHeader, int64_t> >::iterator toErase = mi;
 
-                    // if you found one to connect then search from the beginning again in case there is another
-                    // that will connect to this new header that was added.
-                    mi = mapUnConnectedHeaders.begin();
-                    continue;
-                }
-
-                // Remove any entries that have been in the cache too long.  Unconnected headers should only exist
-                // for a very short while, typically just a second or two.
-                int64_t nTimeHeaderArrived = (*mi).second.second;
-                uint256 headerHash = (*mi).first;
-                mi++;
-                if (GetTime() - nTimeHeaderArrived >= UNCONNECTED_HEADERS_TIMEOUT)
-                {
-                    mapUnConnectedHeaders.erase(toErase);
-                }
-                // At this point we know the headers in the list received are known to be in order, therefore,
-                // check if the header is equal to some other header in the list. If so then remove it from the cache.
-                else
-                {
-                    for (const CBlockHeader &header : headers)
+                    // Add the header if it connects to the previous header
+                    if (headers.back().GetHash() == (*mi).second.first.hashPrevBlock)
                     {
-                        if (header.GetHash() == headerHash)
+                        headers.push_back((*mi).second.first);
+                        mapUnConnectedHeaders.erase(toErase);
+
+                        // if you found one to connect then search from the beginning again in case there is another
+                        // that will connect to this new header that was added.
+                        mi = mapUnConnectedHeaders.begin();
+                        continue;
+                    }
+
+                    // Remove any entries that have been in the cache too long.  Unconnected headers should only exist
+                    // for a very short while, typically just a second or two.
+                    int64_t nTimeHeaderArrived = (*mi).second.second;
+                    uint256 headerHash = (*mi).first;
+                    mi++;
+                    if (GetTime() - nTimeHeaderArrived >= UNCONNECTED_HEADERS_TIMEOUT)
+                    {
+                        mapUnConnectedHeaders.erase(toErase);
+                    }
+                    // At this point we know the headers in the list received are known to be in order, therefore,
+                    // check if the header is equal to some other header in the list. If so then remove it from the
+                    // cache.
+                    else
+                    {
+                        for (const CBlockHeader &header : headers)
                         {
-                            mapUnConnectedHeaders.erase(toErase);
-                            break;
+                            if (header.GetHash() == headerHash)
+                            {
+                                mapUnConnectedHeaders.erase(toErase);
+                                break;
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // Check and accept each header in dependency order (oldest block to most recent)
-        CBlockIndex *pindexLast = nullptr;
-        int i = 0;
-        for (const CBlockHeader &header : headers)
-        {
-            CValidationState state;
-            if (!AcceptBlockHeader(header, state, chainparams, &pindexLast))
+            // Check and accept each header in dependency order (oldest block to most recent)
+            int i = 0;
+            for (const CBlockHeader &header : headers)
             {
-                // Disconnect any peers that give us a bad checkpointed header.
-                // This prevents us from getting stuck in IBD where we download the intial headers.
-                // If we don't disconnect then we could end up attempting to download headers
-                // only from peers that are not on our own fork.
-                if (state.GetRejectCode() == REJECT_CHECKPOINT)
+                CValidationState state;
+                if (!AcceptBlockHeader(header, state, chainparams, &pindexLast))
                 {
-                    pfrom->fDisconnect = true;
-                }
-
-                int nDos;
-                if (state.IsInvalid(nDos))
-                {
-                    if (nDos > 0)
+                    // Disconnect any peers that give us a bad checkpointed header.
+                    // This prevents us from getting stuck in IBD where we download the intial headers.
+                    // If we don't disconnect then we could end up attempting to download headers
+                    // only from peers that are not on our own fork.
+                    if (state.GetRejectCode() == REJECT_CHECKPOINT)
                     {
-                        dosMan.Misbehaving(pfrom, nDos);
+                        pfrom->fDisconnect = true;
                     }
+
+                    int nDos;
+                    if (state.IsInvalid(nDos))
+                    {
+                        if (nDos > 0)
+                        {
+                            dosMan.Misbehaving(pfrom, nDos);
+                        }
+                    }
+
+                    // all headers from this one forward reference a fork that we don't follow, so erase them
+                    headers.erase(headers.begin() + i, headers.end());
+                    nCount = headers.size();
+
+                    break;
                 }
+                else
+                    PV->UpdateMostWorkOurFork(header);
 
-                // all headers from this one forward reference a fork that we don't follow, so erase them
-                headers.erase(headers.begin() + i, headers.end());
-                nCount = headers.size();
-
-                break;
+                i++;
             }
-            else
-                PV->UpdateMostWorkOurFork(header);
-
-            i++;
         }
-
         if (pindexLast)
             requester.UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
 
