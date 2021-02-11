@@ -88,7 +88,7 @@ public:
     std::shared_ptr<CGrapheneSet> pGrapheneSet;
     uint64_t version;
     bool computeOptimized;
-    double fpr;
+    double fpr = FILTER_FPR_MAX;
 
 public:
     CGrapheneBlock(const CBlockRef pblock,

@@ -2064,7 +2064,7 @@ UniValue validatechainhistory(const UniValue &params, bool fHelp)
 
     LOGA("validatechainhistory starting at %d %s\n", pos->nHeight, pos->phashBlock->ToString());
 
-    LOCK(cs_main); // modifying contents of CBlockIndex
+    LOCK(cs_main); // modifying contents of CBlockIndex and setDirtyBlockIndex
 
     while (pos && !failedChain)
     {
@@ -2298,7 +2298,7 @@ struct CompareBlocksByHeight
 
 void MarkAllContainingChainsInvalid(CBlockIndex *invalidBlock)
 {
-    LOCK(cs_main);
+    LOCK(cs_main); // setDirtyBlockIndex
     READLOCK(cs_mapBlockIndex);
 
     bool dirty = false;

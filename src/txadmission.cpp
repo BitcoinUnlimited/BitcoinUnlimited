@@ -76,13 +76,15 @@ static inline uint256 IncomingConflictHash(const COutPoint &prevout)
     return hash;
 }
 
-void StartTxAdmission()
+void InitTxAdmission()
 {
     if (txCommitQ == nullptr)
         txCommitQ = new std::map<uint256, CTxCommitData>();
-
     txHandlerSnap.Load(); // Get an initial view for the transaction processors
+}
 
+void StartTxAdmissionThreads()
+{
     // Start incoming transaction processing threads
     for (unsigned int i = 0; i < numTxAdmissionThreads.Value(); i++)
     {

@@ -151,8 +151,10 @@ extern std::map<uint256, CTxCommitData> *txCommitQ;
 // returns a transaction ref, if it exists in the commitQ
 CTransactionRef CommitQGet(uint256 hash);
 
+/** Initialize the transaction mempool admission state */
+void InitTxAdmission();
 /** Start the transaction mempool admission threads */
-void StartTxAdmission();
+void StartTxAdmissionThreads();
 /** Stop the transaction mempool admission threads (assumes that ShutdownRequested() will return true) */
 void StopTxAdmission();
 /** Wait for the currently enqueued transactions to be flushed.  If new tx keep coming in, you may wait a while */

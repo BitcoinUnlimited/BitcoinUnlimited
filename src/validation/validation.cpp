@@ -288,7 +288,10 @@ bool AcceptBlockHeader(const CBlockHeader &block,
         }
     }
     if (pindex == nullptr)
+    {
+        LOCK(cs_main);
         pindex = AddToBlockIndex(block);
+    }
 
     if (ppindex)
         *ppindex = pindex;
@@ -319,6 +322,7 @@ void PruneBlockIndexCandidates()
 
 CBlockIndex *AddToBlockIndex(const CBlockHeader &block)
 {
+    AssertLockHeld(cs_main); // For setDirtyBlockIndex
     WRITELOCK(cs_mapBlockIndex);
     // Check for duplicate
     uint256 hash = block.GetHash();
@@ -1206,7 +1210,7 @@ bool CheckInputs(const CTransactionRef &tx,
 
 bool ReconsiderBlock(CValidationState &state, CBlockIndex *pindex)
 {
-    AssertLockHeld(cs_main);
+    AssertLockHeld(cs_main); // for setDirtyBlockIndex
 
     int nHeight = pindex->nHeight;
 
@@ -1463,7 +1467,7 @@ CBlockIndex *FindMostWorkChain()
 
 bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensusParams, CBlockIndex *pindex)
 {
-    AssertLockHeld(cs_main);
+    AssertLockHeld(cs_main); // for setDirtyBlockIndex
 
     // Mark the block itself as invalid.
     {
@@ -1724,7 +1728,7 @@ bool ReceivedBlockTransactions(const CBlock &block,
     CBlockIndex *pindexNew,
     const CDiskBlockPos &pos)
 {
-    AssertLockHeld(cs_main); // for setBlockIndexCandidates
+    AssertLockHeld(cs_main); // for setBlockIndexCandidates & setDirtyBlockIndex
     WRITELOCK(cs_mapBlockIndex); // for nStatus and nSequenceId
 
     pindexNew->nTx = block.vtx.size();
@@ -1790,7 +1794,7 @@ bool AcceptBlock(const CBlock &block,
     bool fRequested,
     CDiskBlockPos *dbp)
 {
-    AssertLockHeld(cs_main);
+    AssertLockHeld(cs_main); // for setDirtyBlockIndex
 
     CBlockIndex *&pindex = *ppindex;
 
@@ -2724,7 +2728,7 @@ bool ConnectBlock(const CBlock &block,
     /** BU: Start Section to validate inputs - if there are parallel blocks being checked
      *      then the winner of this race will get to update the UTXO.
      */
-    AssertLockHeld(cs_main);
+    AssertLockHeld(cs_main); // for setDirtyBlockIndex (et al)
     // Section for boost scoped lock on the scriptcheck_mutex
     boost::thread::id this_id(boost::this_thread::get_id());
 
@@ -2877,7 +2881,7 @@ bool ConnectBlock(const CBlock &block,
 
 void InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state)
 {
-    AssertLockHeld(cs_main);
+    AssertLockHeld(cs_main); // For setDirtyBlockIndex (et al)
     int nDoS = 0;
     if (state.IsInvalid(nDoS))
     {

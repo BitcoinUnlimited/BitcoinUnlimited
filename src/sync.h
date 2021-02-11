@@ -313,7 +313,7 @@ public:
     {
         assert(pszName != nullptr);
         // we no longer allow naming critical sections cs, please name it something more meaningful
-        assert(std::string(pszName) != "cs");
+        assert(strcmp(pszName, "cs") != 0);
         if (fTry)
             TryEnter(pszName, pszFile, nLine, type);
         else

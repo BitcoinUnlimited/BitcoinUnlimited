@@ -144,6 +144,7 @@ bool CBlockLevelDB::ReadUndo(CBlockUndo &blockundo, const CBlockIndex *pindex)
 
 bool CBlockLevelDB::EraseUndo(const CBlockIndex *pindex)
 {
+    AssertLockHeld(cs_main); // For setDirtyBlockIndex
     std::ostringstream key;
     uint256 hashBlock;
     int64_t nBlockTime = 0;

@@ -159,7 +159,7 @@ void SyncStorage(const CChainParams &chainparams)
         pblocktreeother->GetSortedHashIndex(hashesByHeight);
         CValidationState state;
         int bestHeight = 0;
-        CBlockIndex *pindexBest = new CBlockIndex();
+        CBlockIndex *pindexBest = nullptr;
         std::vector<CBlockIndex *> blocksToRemove;
         for (const std::pair<int, CDiskBlockIndex> &item : hashesByHeight)
         {
@@ -305,6 +305,7 @@ void SyncStorage(const CChainParams &chainparams)
         // if bestHeight != 0 then pindexBest has been initialized and we can update the best block.
         if (bestHeight != 0)
         {
+            assert(pindexBest);
             pcoinsdbview->WriteBestBlock(pindexBest->GetBlockHash(), SEQUENTIAL_BLOCK_FILES);
         }
     }
@@ -316,7 +317,7 @@ void SyncStorage(const CChainParams &chainparams)
         LOGA("indexByHeight size = %u \n", indexByHeight.size());
         int64_t bestHeight = 0;
         int64_t lastFinishedFile = 0;
-        CBlockIndex *pindexBest = new CBlockIndex();
+        CBlockIndex *pindexBest = nullptr;
         // Load block file info
         int loadedblockfile = 0;
         pblocktreeother->ReadLastBlockFile(loadedblockfile);
@@ -443,6 +444,7 @@ void SyncStorage(const CChainParams &chainparams)
         // if bestHeight != 0 then pindexBest has been initialized and we can update the best block.
         if (bestHeight != 0)
         {
+            assert(pindexBest);
             pcoinsdbview->WriteBestBlock(pindexBest->GetBlockHash(), LEVELDB_BLOCK_STORAGE);
         }
     }
@@ -451,6 +453,8 @@ void SyncStorage(const CChainParams &chainparams)
     pcoinsdbview->WriteBestBlock(emptyHash, otherMode);
     FlushStateToDisk();
     LOGA("Block database upgrade completed.\n");
+    if (pblockdbsync)
+        delete pblockdbsync;
 }
 
 bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos, const CMessageHeader::MessageStartChars &messageStart)
@@ -573,6 +577,7 @@ bool FlushStateToDiskInternal(CValidationState &state,
     bool fFlushForPrune,
     std::set<int> setFilesToPrune)
 {
+    AssertLockHeld(cs_main); // For setDirtyBlockIndex
     static int64_t nLastWrite = 0;
     static int64_t nLastFlush = 0;
     static int64_t nLastSetChain = 0;

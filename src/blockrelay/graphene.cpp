@@ -64,6 +64,7 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     else
         pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock,
             blockHashes, shorttxidk0, shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, computeOptimized, true));
+    fpr = pGrapheneSet->GetBloomFPR();
 }
 
 CGrapheneBlock::~CGrapheneBlock() { pGrapheneSet = nullptr; }

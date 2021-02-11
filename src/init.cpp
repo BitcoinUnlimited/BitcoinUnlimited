@@ -1267,7 +1267,6 @@ bool AppInit2(Config &config)
     LOGA("* Using %.1fMiB for in-memory UTXO set\n", nCoinCacheMaxSize * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
-    StartTxAdmission();
 
     while (!fLoaded)
     {
@@ -1299,6 +1298,7 @@ bool AppInit2(Config &config)
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
                 uiInterface.InitMessage(_("Opening Coins Cache database..."));
                 pcoinsTip = new CCoinsViewCache(pcoinscatcher);
+                InitTxAdmission();
 
                 if (fReindex)
                 {
@@ -1410,6 +1410,8 @@ bool AppInit2(Config &config)
             }
         }
     }
+
+    StartTxAdmissionThreads();
 
     // As LoadBlockIndex can take several minutes, it's possible the user
     // requested to kill the GUI during the last operation. If so, exit.
