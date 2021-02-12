@@ -24,8 +24,10 @@
 #include "txorphanpool.h"
 #include "ui_interface.h"
 #include "util.h"
+#include "utilstrencodings.h"
 #include "validationinterface.h"
 
+#include <algorithm>
 #include <boost/scope_exit.hpp>
 #include <unordered_set>
 
@@ -1630,30 +1632,23 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
     // Enforce block nVersion=2 rule that the coinbase starts with serialized block height
     if (nHeight >= consensusParams.BIP34Height)
     {
-        // For legacy reasons keep the original way of checking BIP34 compliance
-        CScript expect = CScript() << nHeight;
-        if (block.vtx[0]->vin[0].scriptSig.size() < expect.size() ||
-            !std::equal(expect.begin(), expect.end(), block.vtx[0]->vin[0].scriptSig.begin()))
+        // BIP34 specifies minimal CScript encoding only
+        // see: https://github.com/bitcoin/bips/blob/master/bip-0034.mediawiki#specification
+        const CScript expect = CScript() << nHeight;
+        const CScript &scriptSig = block.vtx[0]->vin[0].scriptSig;
+        if (scriptSig.size() < expect.size() || !std::equal(expect.begin(), expect.end(), scriptSig.begin()))
         {
-            // However the original way only checks a specific serialized int encoding, BUT BIP34 does not mandate
-            // the most efficient encoding, only that it be a "serialized CScript", and then gives an example with
-            // 3 byte encoding.  Therefore we've ended up with miners that only generate 3 byte encodings...
-            int blockCoinbaseHeight = block.GetHeight();
-            if (blockCoinbaseHeight == nHeight)
-            {
-                LOG(BLK, "Mined block valid but suboptimal height format, different client interpretions of "
-                         "BIP34 may cause fork");
-            }
-            else
-            {
-                uint256 hashp = block.hashPrevBlock;
-                uint256 hash = block.GetHash();
-                return state.DoS(100, error("%s: block height mismatch in coinbase, expected %d, got %d, block is %s, "
-                                            "parent block is %s, pprev is %s",
-                                          __func__, nHeight, blockCoinbaseHeight, hash.ToString(), hashp.ToString(),
-                                          pindexPrev->phashBlock->ToString()),
-                    REJECT_INVALID, "bad-cb-height");
-            }
+            const std::string hashpHex = block.hashPrevBlock.ToString(), hashHex = block.GetHash().ToString(),
+                              expectHex = HexStr(expect),
+                              scriptSigHex = HexStr(
+                                  scriptSig.begin(), scriptSig.begin() + std::min(expect.size(), scriptSig.size()));
+
+            return state.DoS(100, error("%s: block height not correctly encoded in coinbase, expected minimally-encoded"
+                                        " height %d (script hex: %s), instead got hex: %s, block is %s, parent block is"
+                                        " %s, pprev is %s",
+                                      __func__, nHeight, expectHex, scriptSigHex, hashHex, hashpHex,
+                                      pindexPrev->phashBlock->ToString()),
+                REJECT_INVALID, "bad-cb-height");
         }
     }
 
