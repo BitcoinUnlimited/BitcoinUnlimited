@@ -8,10 +8,10 @@ PROJECT_NAME = "ElectrsCash"
 GIT_REPO = "https://github.com/BitcoinUnlimited/{}.git".format(PROJECT_NAME)
 # When released put a tag here 'v2.0.0'
 # When in development, put 'master' here.
-GIT_BRANCH = "master"
+GIT_BRANCH = "v3.0.0"
 # When released put a hash here: "aa95d64d050c286356dadb78d19c2e687dec85cf"
 # When in development, put 'None' here
-EXPECT_HEAD = None
+EXPECT_HEAD = "9288d9f1bc828e06dca3b8783567c7557530740b"
 
 ROOT_DIR = os.path.realpath(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
