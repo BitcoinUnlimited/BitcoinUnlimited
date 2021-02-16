@@ -2403,16 +2403,8 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
     else
     {
         txNew.nLockTime = height;
-
-        // Secondly occasionally randomly pick a nLockTime even further back, so
-        // that transactions that are delayed after signing for whatever reason,
-        // e.g. high-latency mix networks and some CoinJoin implementations, have
-        // better privacy.
-        if (GetRandInt(10) == 0)
-            txNew.nLockTime = std::max(0, (int)txNew.nLockTime - GetRandInt(100));
     }
 
-    DbgAssert(txNew.nLockTime <= (unsigned int)chainActive.Height(), txNew.nLockTime = 0);
     assert(txNew.nLockTime < LOCKTIME_THRESHOLD);
 
     {
