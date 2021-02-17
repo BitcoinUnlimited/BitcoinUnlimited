@@ -34,7 +34,7 @@ Main Changes in 1.9.1
 This is list of the main changes that have been merged in this release:
 
 - Unbounded Mempool Transaction Chains ([see here](https://docs.google.com/document/d/1Rgc60VipaMnbWksyXw_3L0oOqqCW2j0FKtENlqLgqYw) for more details)
-- Add DSPproof at wallet UI level
+- Add DSProof at wallet UI level
 - Add zmq notifications for dsproofs
 - Fix Compact Blocks to work with big blocks
 - Compatibility with [ElectrsCash 3.0.0](https://github.com/BitcoinUnlimited/ElectrsCash/blob/master/RELEASE-NOTES.md)
