@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -24,6 +24,8 @@
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
+
+extern CTweak<bool> xvalTweak;
 
 BOOST_FIXTURE_TEST_SUITE(miner_tests, TestingSetup)
 
@@ -231,7 +233,6 @@ void GenerateBlocks(const CChainParams &chainparams,
     uint64_t nEndSize,
     uint64_t nIncrease)
 {
-    nTotalScore = 0;
     nTotalPackage = 0;
 
     // Now generate lots of blocks, increasing the block size on each iteration.
@@ -268,8 +269,6 @@ void GenerateBlocks(const CChainParams &chainparams,
         (double)(nTotalBlockSize / nBlockCount) * 100 / (nTotalExpectedBlockSize / nBlockCount));
     printf("Total mining time: %5.2f\n", (double)nTotalMine / 1000000);
     printf("packagetx mining %5.2f\n", (double)nTotalPackage / 1000000);
-    printf("scoretx mining %5.2f\n", (double)nTotalScore / 1000000);
-    printf("total score plus package mining time %5.2f\n", (double)(nTotalPackage + nTotalScore) / 1000000);
 
     mempool.clear();
 }
@@ -415,6 +414,38 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
                    "WAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY too long.";
     BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
 
+    {
+        CBlock blk = pblocktemplate->block;
+        blk.GetHeight();
+        try
+        {
+            blk.nVersion = 1;
+            blk.GetHeight();
+            BOOST_CHECK(false); // should have thrown
+        }
+        catch (std::runtime_error &e)
+        {
+            BOOST_CHECK(std::string(e.what()).find("Block does not contain height") != std::string::npos);
+        }
+
+        try
+        {
+            blk.nVersion = 2;
+            CMutableTransaction txCoinbase(*blk.vtx[0]);
+            std::vector<unsigned char> v(10);
+            CScript scr = (CScript() << v);
+            scr[0] = scr.size(); // Make the number bigger than this buffer
+            txCoinbase.vin[0].scriptSig = scr;
+            blk.vtx[0] = MakeTransactionRef(std::move(txCoinbase));
+            blk.GetHeight();
+            BOOST_CHECK(false); // should have thrown
+        }
+        catch (std::runtime_error &e)
+        {
+            BOOST_CHECK(std::string(e.what()).find("Invalid block height") != std::string::npos);
+        }
+    }
+
     // We can't make transactions until we have inputs
     // Therefore, load 100 blocks :)
     int baseheight = 0;
@@ -483,7 +514,6 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 
     // Now generate lots of full size blocks and verify that none exceed the maxGeneratedBlock value, the mempool has
     // 65k bytes of tx in it so this code will test both saturated and unsaturated blocks.
-    miningCPFP.Set(false);
     for (unsigned int i = 2000; i <= 80000; i += 2000)
     {
         maxGeneratedBlock = i;
@@ -556,8 +586,6 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     BOOST_CHECK(minRoom == 2);
     mempool.clear();
 
-    miningCPFP.Set(true);
-
     // block size > limit
     tx.vin[0].scriptSig = CScript();
     // 18 * (520char + DROP) + OP_1 = 9433 bytes
@@ -629,11 +657,12 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.vout[0].nValue -= 1000000;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).SpendsCoinbase(false).FromTx(tx));
-    SetBoolArg("-xval", false);
+
+    xvalTweak.Set(false);
     BOOST_CHECK_EXCEPTION(BlockAssembler(chainparams_regtest).CreateNewBlock(scriptPubKey), std::runtime_error,
         HasReason("bad-blk-signatures"));
     mempool.clear();
-    SetBoolArg("-xval", true);
+    xvalTweak.Set(true);
 
     // double spend txn pair in mempool, template creation fails
     tx.vin[0].prevout.hash = txFirst[0]->GetHash();
@@ -798,7 +827,6 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     mempool.clear();
 
     // Test package selection
-    miningCPFP.Set(true);
     TestPackageSelection(chainparams, scriptPubKey, txFirst);
 
     // Do a performance test of package selection. This will typically be commented out unless one wants

@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -88,7 +88,7 @@ public:
     std::shared_ptr<CGrapheneSet> pGrapheneSet;
     uint64_t version;
     bool computeOptimized;
-    double fpr;
+    double fpr = FILTER_FPR_MAX;
 
 public:
     CGrapheneBlock(const CBlockRef pblock,
@@ -171,7 +171,11 @@ public:
         // transactions and the downside for pathological blocks is just that graphene won't work so we fall back
         // to xthin
         if (nBlockTxs > (thinrelay.GetMaxAllowedBlockSize() / MIN_TX_SIZE))
-            throw std::runtime_error("nBlockTxs exceeds threshold for excessive block txs");
+        {
+            throw std::runtime_error(strprintf(
+                "Based on number of transactions:(%d) the threshold for max allowed blocksize:(%d) will be exceeded",
+                nBlockTxs, thinrelay.GetMaxAllowedBlockSize()));
+        }
         if (!pGrapheneSet)
         {
             if (version > 3)

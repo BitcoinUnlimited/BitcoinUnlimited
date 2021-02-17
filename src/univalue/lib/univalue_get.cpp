@@ -89,11 +89,16 @@ bool ParseDouble(const std::string& str, double *out)
 }
 }
 
-const std::vector<std::string>& UniValue::getKeys() const
+const std::vector<std::string> UniValue::getKeys() const
 {
     if (typ != VOBJ)
         throw std::runtime_error("JSON value is not an object as expected");
-    return keys;
+    std::vector<std::string> retkeys;
+    for (auto &key : keys)
+    {
+        retkeys.push_back(key.first);
+    }
+    return retkeys;
 }
 
 const std::vector<UniValue>& UniValue::getValues() const

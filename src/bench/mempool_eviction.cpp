@@ -92,7 +92,7 @@ static void MempoolEviction(benchmark::State &state)
     tx7.vout[1].scriptPubKey = CScript() << OP_7 << OP_EQUAL;
     tx7.vout[1].nValue = 10 * COIN;
 
-    CTxMemPool pool(CFeeRate(1000));
+    CTxMemPool pool;
     const CTransactionRef tx1_r{MakeTransactionRef(tx1)};
     const CTransactionRef tx2_r{MakeTransactionRef(tx2)};
     const CTransactionRef tx3_r{MakeTransactionRef(tx3)};

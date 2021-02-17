@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -275,6 +275,13 @@ void CDoSManager::Misbehaving(CNode *pNode, int howmuch, BanReason reason)
 
     // Update the old misbehavior
     UpdateMisbehavior(pNode);
+
+    // return if the node is whitelised
+    if (pNode->fWhitelisted)
+    {
+        LOGA("%s is whitelisted, hence not ban score increase", pNode->GetLogName());
+        return;
+    }
 
     // Add the new misbehavior and check whether to ban
     double prior = pNode->nMisbehavior.load();

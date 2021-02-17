@@ -33,7 +33,7 @@ class BUProtocolHandler(NodeConnCB):
         self.last_getheaders = None
         self.disconnected = False
         self.remoteVersion = 0
-        self.remote_xversion = None
+        self.remote_extversion = None
         self.buverack_received = False
         self.parent = None
         self.requestOnInv = 0
@@ -60,17 +60,9 @@ class BUProtocolHandler(NodeConnCB):
         conn.ver_recv = conn.ver_send
         self.verack_received = True
 
-    def on_xversion(self, conn, message):
+    def on_extversion(self, conn, message):
         self.show_debug_msg("extversion received\n")
-        self.remote_xversion = message
-
-    def on_xverack_old(self, conn, message):
-        self.show_debug_msg("xverack received\n")
-        self.xverack_received = True
-
-    def on_xversion_old(self, conn, message):
-        self.show_debug_msg("xversion received\n")
-        self.remote_xversion = message
+        self.remote_extversion = message
 
     def add_connection(self, conn):
         self.connection = conn
@@ -285,11 +277,11 @@ version messages. Useful for testing that part of the P2P handshake. """
 
     def on_extversion(self, conn, message):
         self.show_debug_msg("extversion received\n")
-        self.remote_xversion = message
+        self.remote_extversion = message
 
-    def on_xversion(self, conn, message):
+    def on_extversion(self, conn, message):
         self.show_debug_msg("xversion (old) received\n")
-        self.remote_xversion = message
+        self.remote_extversion = message
 
     def on_verack(self, conn, message):
         self.show_debug_msg("verack received\n")
@@ -306,10 +298,10 @@ class BasicBUCashNode():
         self.nthin = 0
         self.nxthin = 0
 
-    def connect(self, id, ip, port, rpc=None, protohandler=None, send_initial_version = True, send_xversion = False):
+    def connect(self, id, ip, port, rpc=None, protohandler=None, send_initial_version = True, send_extversion = False):
         if not protohandler:
             protohandler = BUProtocolHandler()
-        conn = NodeConn(ip, port, rpc, protohandler, bitcoinCash=True, send_initial_version = send_initial_version, send_xversion = send_xversion)
+        conn = NodeConn(ip, port, rpc, protohandler, bitcoinCash=True, send_initial_version = send_initial_version, send_extversion = send_extversion)
         protohandler.add_connection(conn)
         protohandler.add_parent(self)
         self.cnxns[id] = protohandler

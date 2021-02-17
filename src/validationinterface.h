@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -37,13 +37,14 @@ class CValidationInterface
 protected:
     virtual void UpdatedBlockTip(const CBlockIndex *pindex) {}
     virtual void SyncTransaction(const CTransactionRef &ptx, const CBlock *pblock, int txIdx) {}
+    virtual void SyncDoubleSpend(const CTransactionRef ptx) {}
     virtual void SetBestChain(const CBlockLocator &locator) {}
     virtual void UpdatedTransaction(const uint256 &hash) {}
     virtual void Inventory(const uint256 &hash) {}
     virtual void ResendWalletTransactions(int64_t nBestBlockTime) {}
     virtual void BlockChecked(const CBlock &, const CValidationState &) {}
-    virtual void GetScriptForMining(boost::shared_ptr<CReserveScript> &){};
-    virtual void ResetRequestCount(const uint256 &hash){};
+    virtual void GetScriptForMining(boost::shared_ptr<CReserveScript> &) {}
+    virtual void ResetRequestCount(const uint256 &hash) {}
     friend void ::RegisterValidationInterface(CValidationInterface *);
     friend void ::UnregisterValidationInterface(CValidationInterface *);
     friend void ::UnregisterAllValidationInterfaces();
@@ -55,6 +56,8 @@ struct CMainSignals
     boost::signals2::signal<void(const CBlockIndex *)> UpdatedBlockTip;
     /** Notifies listeners of updated transaction data (transaction, and optionally the block it is found in. */
     boost::signals2::signal<void(const CTransactionRef &, const CBlock *, int txIndex)> SyncTransaction;
+    /** Notifies listeners of a transaction in the mempool that was double spent. */
+    boost::signals2::signal<void(const CTransactionRef)> SyncDoubleSpend;
     /** Notifies listeners of an updated transaction without new data (for now: a coinbase potentially becoming
      * visible). */
     boost::signals2::signal<void(const uint256 &)> UpdatedTransaction;

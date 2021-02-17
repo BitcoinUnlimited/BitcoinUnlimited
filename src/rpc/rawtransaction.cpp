@@ -1,6 +1,6 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -26,6 +26,7 @@
 #include "script/standard.h"
 #include "txadmission.h"
 #include "txmempool.h"
+#include "txorphanpool.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
 #include "validation/validation.h"
@@ -1409,7 +1410,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
 
 UniValue sendrawtransaction(const UniValue &params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > 3)
+    if (fHelp || params.size() < 1 || params.size() > 4)
         throw runtime_error(
             "sendrawtransaction \"hexstring\" ( allowhighfees, allownonstandard )\n"
             "\nSubmits raw transaction (serialized, hex-encoded) to local node and network.\n"
@@ -1421,6 +1422,7 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
             "2. allowhighfees    (boolean, optional, default=false) Allow high fees\n"
             "3. allownonstandard (string 'standard', 'nonstandard', 'default', optional, default='default')\n"
             "                    Force standard or nonstandard transaction check\n"
+            "4. alloworphans    (boolean, optional, default=false) Allow orphans and store them in the orphan pool\n"
             "\nResult:\n"
             "\"hex\"             (string) The transaction hash in hex\n"
             "\nExamples:\n"
@@ -1442,6 +1444,7 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
 
     bool fOverrideFees = false;
     TransactionClass txClass = TransactionClass::DEFAULT;
+    bool fAllowOrphans = false;
 
     // 2nd parameter allows high fees
     if (params.size() > 1)
@@ -1454,6 +1457,12 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
         txClass = ParseTransactionClass(params[2].get_str());
         if (txClass == TransactionClass::INVALID)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid transaction class");
+    }
+    // 4th parameter is to not reject orphans if for instance you were building a long unconfirmend chain
+    // greater than the standard limit
+    if (params.size() > 3)
+    {
+        fAllowOrphans = params[3].get_bool();
     }
 
     CCoinsViewCache &view = *pcoinsTip;
@@ -1471,16 +1480,22 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
         // push to local node and sync with wallets
         CValidationState state;
         bool fMissingInputs;
-        if (!AcceptToMemoryPool(mempool, state, ptx, false, &fMissingInputs, false, !fOverrideFees, txClass))
+        if (!AcceptToMemoryPool(mempool, state, ptx, AreFreeTxnsAllowed(), &fMissingInputs, !fOverrideFees, txClass))
         {
-            if (state.IsInvalid())
+            if (state.IsInvalid() && state.GetRejectCode() != REJECT_MULTIPLE_INPUTS)
             {
                 throw JSONRPCError(
                     RPC_TRANSACTION_REJECTED, strprintf("%i: %s", state.GetRejectCode(), state.GetRejectReason()));
             }
             else
             {
-                if (fMissingInputs)
+                if (fMissingInputs && fAllowOrphans)
+                {
+                    WRITELOCK(orphanpool.cs_orphanpool);
+                    orphanpool.AddOrphanTx(ptx, 0);
+                    return hashTx.GetHex();
+                }
+                else if (fMissingInputs)
                 {
                     throw JSONRPCError(RPC_TRANSACTION_ERROR, "Missing inputs");
                 }
@@ -1667,7 +1682,7 @@ UniValue validaterawtransaction(const UniValue &params, bool fHelp)
         bool fMissingInputs = false;
         std::vector<COutPoint> vCoinsToUncache;
         bool isRespend = false;
-        ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, std::move(ptx), false, &fMissingInputs, false,
+        ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, std::move(ptx), AreFreeTxnsAllowed(), &fMissingInputs,
             fOverrideFees, txClass, vCoinsToUncache, &isRespend, &debugger);
     }
     else if (fHaveChain)

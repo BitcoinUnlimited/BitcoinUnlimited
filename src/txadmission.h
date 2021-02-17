@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -143,12 +143,6 @@ extern std::queue<CTxInputData> txInQ;
 // Guarded by csTxInQ
 extern std::queue<CTxInputData> txDeferQ;
 
-// Transactions that arrive when the chain is not syncd can be place here at times when we've received
-// the block announcement but havn't yet downloaded the block and updated the tip. In this case there can
-// be txns that are perfectly valid yet are flagged as being non-final or has too many ancestors.
-// Guarded by csTxInQ
-extern std::queue<CTxInputData> txWaitNextBlockQ;
-
 // Transactions that are validated and can be committed to the mempool, and protection
 extern CWaitableCriticalSection csCommitQ;
 extern CConditionVariable cvCommitQ;
@@ -157,8 +151,10 @@ extern std::map<uint256, CTxCommitData> *txCommitQ;
 // returns a transaction ref, if it exists in the commitQ
 CTransactionRef CommitQGet(uint256 hash);
 
+/** Initialize the transaction mempool admission state */
+void InitTxAdmission();
 /** Start the transaction mempool admission threads */
-void StartTxAdmission();
+void StartTxAdmissionThreads();
 /** Stop the transaction mempool admission threads (assumes that ShutdownRequested() will return true) */
 void StopTxAdmission();
 /** Wait for the currently enqueued transactions to be flushed.  If new tx keep coming in, you may wait a while */
@@ -173,7 +169,6 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     const CTransactionRef &ptx,
     bool fLimitFree,
     bool *pfMissingInputs,
-    bool fOverrideMempoolLimit = false,
     bool fRejectAbsurdFee = false,
     TransactionClass allowedTx = TransactionClass::DEFAULT);
 
@@ -184,7 +179,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     const CTransactionRef &ptx,
     bool fLimitFree,
     bool *pfMissingInputs,
-    bool fOverrideMempoolLimit,
     bool fRejectAbsurdFee,
     TransactionClass allowedTx,
     std::vector<COutPoint> &vCoinsToUncache,

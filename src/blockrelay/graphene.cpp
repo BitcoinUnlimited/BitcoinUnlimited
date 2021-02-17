@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,6 +9,7 @@
 #include "consensus/merkle.h"
 #include "dosman.h"
 #include "expedited.h"
+#include "extversionkeys.h"
 #include "net.h"
 #include "parallel.h"
 #include "policy/policy.h"
@@ -21,14 +22,11 @@
 #include "util.h"
 #include "utiltime.h"
 #include "validation/validation.h"
-#include "xversionkeys.h"
 
 #include <iomanip>
 static bool ReconstructBlock(CNode *pfrom,
     std::shared_ptr<CBlockThinRelay> pblock,
     const std::map<uint64_t, CTransactionRef> &mapTxFromPools);
-extern CTweak<uint64_t> grapheneMinVersionSupported;
-extern CTweak<uint64_t> grapheneMaxVersionSupported;
 extern CTweak<uint64_t> grapheneFastFilterCompatibility;
 
 CMemPoolInfo::CMemPoolInfo(uint64_t _nTx) : nTx(_nTx) {}
@@ -66,6 +64,7 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     else
         pGrapheneSet = std::make_shared<CGrapheneSet>(CGrapheneSet(nReceiverMemPoolTx, nSenderMempoolPlusBlock,
             blockHashes, shorttxidk0, shorttxidk1, grapheneSetVersion, (uint32_t)sipHashNonce, computeOptimized, true));
+    fpr = pGrapheneSet->GetBloomFPR();
 }
 
 CGrapheneBlock::~CGrapheneBlock() { pGrapheneSet = nullptr; }
@@ -863,7 +862,7 @@ static bool ReconstructBlock(CNode *pfrom,
 
     // Now that we've rebuilt the block successfully we can set the XVal flag which is used in
     // ConnectBlock() to determine which if any inputs we can skip the checking of inputs.
-    pblock->fXVal = true;
+    pblock->fXVal = DEFAULT_XVAL_ENABLED;
 
     return true;
 }
@@ -1758,8 +1757,8 @@ bool NegotiateFastFilterSupport(CNode *pfrom)
 {
     uint64_t peerFastFilterPref;
     {
-        LOCK(pfrom->cs_xversion);
-        peerFastFilterPref = pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF);
+        LOCK(pfrom->cs_extversion);
+        peerFastFilterPref = pfrom->extversion.as_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF);
     }
 
     if (grapheneFastFilterCompatibility.Value() == EITHER)
@@ -1791,22 +1790,11 @@ bool NegotiateFastFilterSupport(CNode *pfrom)
     }
 }
 
+
 uint64_t NegotiateGrapheneVersion(CNode *pfrom)
 {
-    uint64_t selfMax = grapheneMaxVersionSupported.Value();
-    uint64_t selfMin = grapheneMinVersionSupported.Value();
-    uint64_t peerMin, peerMax;
-    {
-        LOCK(pfrom->cs_xversion);
-        peerMin = pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED);
-        peerMax = pfrom->xVersion.as_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED);
-    }
-
-    uint64_t upper = (uint64_t)std::min(peerMax, selfMax);
-    uint64_t lower = (uint64_t)std::max(peerMin, selfMin);
-
-    if (lower > upper)
+    DbgAssert(pfrom, throw std::runtime_error("null CNode"));
+    if (pfrom->negotiatedGrapheneVersion == GRAPHENE_NO_VERSION_SUPPORTED)
         throw std::runtime_error("Sender and receiver support incompatible Graphene versions");
-
-    return upper;
+    return pfrom->negotiatedGrapheneVersion;
 }

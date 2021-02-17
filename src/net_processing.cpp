@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2020 The Bitcoin Unlimited developers
 // Copyright (C) 2019-2020 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -20,6 +20,7 @@
 #include "dosman.h"
 #include "electrum/electrs.h"
 #include "expedited.h"
+#include "extversionkeys.h"
 #include "main.h"
 #include "merkleblock.h"
 #include "nodestate.h"
@@ -29,12 +30,10 @@
 #include "validation/validation.h"
 #include "validationinterface.h"
 #include "version.h"
-#include "xversionkeys.h"
 
 extern std::atomic<int64_t> nTimeBestReceived;
 extern std::atomic<int> nPreferredDownload;
 extern int nSyncStarted;
-extern std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders;
 extern CTweak<unsigned int> maxBlocksInTransitPerPeer;
 extern CTweak<uint64_t> grapheneMinVersionSupported;
 extern CTweak<uint64_t> grapheneMaxVersionSupported;
@@ -44,6 +43,7 @@ extern CTweak<uint64_t> mempoolSyncMaxVersionSupported;
 extern CTweak<uint64_t> syncMempoolWithPeers;
 extern CTweak<uint32_t> randomlyDontInv;
 extern CTweak<uint32_t> doubleSpendProofs;
+extern CTweak<bool> extVersionEnabled;
 
 /** How many inbound connections will we track before pruning entries */
 const uint32_t MAX_INBOUND_CONNECTIONS_TRACKED = 10000;
@@ -250,6 +250,22 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                 }
             }
         }
+        else if (inv.type == MSG_DOUBLESPENDPROOF && doubleSpendProofs.Value() == true)
+        {
+            DoubleSpendProof dsp = mempool.doubleSpendProofStorage()->lookup(inv.hash);
+            if (!dsp.isEmpty())
+            {
+                CDataStream ssDSP(SER_NETWORK, PROTOCOL_VERSION);
+                ssDSP.reserve(600);
+                ssDSP << dsp;
+                pfrom->PushMessage(NetMsgType::DSPROOF, ssDSP);
+            }
+            else
+            {
+                pfrom->PushMessage(NetMsgType::REJECT, std::string(NetMsgType::DSPROOF), REJECT_INVALID,
+                    std::string("dsproof requested was not found"));
+            }
+        }
         else if (inv.IsKnownType())
         {
             CTransactionRef ptx = nullptr;
@@ -277,7 +293,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
             // If we found a txn then push it
             if (ptx)
             {
-                if (pfrom->txConcat != 0)
+                if (pfrom->txConcat)
                 {
                     ss << *ptx;
 
@@ -287,22 +303,6 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                     {
                         pfrom->PushMessage(NetMsgType::TX, ss);
                         ss.clear();
-                    }
-                }
-                else if (inv.type == MSG_DOUBLESPENDPROOF && doubleSpendProofs.Value() == true)
-                {
-                    DoubleSpendProof dsp = mempool.doubleSpendProofStorage()->lookup(inv.hash);
-                    if (!dsp.isEmpty())
-                    {
-                        CDataStream ssDSP(SER_NETWORK, PROTOCOL_VERSION);
-                        ssDSP.reserve(600);
-                        ssDSP << dsp;
-                        pfrom->PushMessage(NetMsgType::DSPROOF, ssDSP);
-                    }
-                    else
-                    {
-                        pfrom->PushMessage(NetMsgType::REJECT, std::string(NetMsgType::DSPROOF), REJECT_INVALID,
-                            std::string("dsproof requested was not found"));
                     }
                 }
                 else
@@ -447,6 +447,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     {
         grapheneVersionCompatible = false;
     }
+
     // ------------------------- BEGIN INITIAL COMMAND SET PROCESSING
     if (strCommand == NetMsgType::VERSION)
     {
@@ -534,14 +535,16 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         // Potentially mark this peer as a preferred download peer.
         UpdatePreferredDownload(pfrom);
 
-        if (pfrom->nServices & NODE_XVERSION)
+        // only send extversion message if both peers are using the protocol
+        if ((nLocalServices & NODE_EXTVERSION) && (pfrom->nServices & NODE_EXTVERSION) &&
+            extVersionEnabled.Value() == true)
         {
             // BU expedited procecessing requires the exchange of the listening port id
-            // The former BUVERSION message has now been integrated into the xmap field in CXVersionMessage.
+            // The former BUVERSION message has now been integrated into the xmap field in CExtversionMessage.
 
-            // prepare xversion message. This must be sent before we send a verack message in the new xversion spec
-            CXVersionMessage xver;
-            xver.set_u64c(XVer::XVERSION_VERSION_KEY, XVERSION_VERSION_VALUE);
+            // prepare extversion message. This must be sent before we send a verack message in the new spec
+            CExtversionMessage xver;
+            xver.set_u64c(XVer::EXTVERSION_VERSION_KEY, EXTVERSION_VERSION_VALUE);
             xver.set_u64c(XVer::BU_LISTEN_PORT, GetListenPort());
             xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM, 1); // we will ignore 0 value msg checksums
             xver.set_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED, grapheneMaxVersionSupported.Value());
@@ -563,10 +566,10 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT, nLimitDescendantSize);
             xver.set_u64c(XVer::BU_TXN_CONCATENATION, 1);
 
-            electrum::set_xversion_flags(xver, chainparams.NetworkIDString());
+            electrum::set_extversion_flags(xver, chainparams.NetworkIDString());
 
-            pfrom->xVersionExpected = true;
-            pfrom->PushMessage(NetMsgType::XVERSION, xver);
+            pfrom->extversionExpected = true;
+            pfrom->PushMessage(NetMsgType::EXTVERSION, xver);
         }
         else
         {
@@ -609,18 +612,19 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         return error("%s receieved before VERSION message - disconnecting peer=%s", strCommand, pfrom->GetLogName());
     }
 
-    else if (strCommand == NetMsgType::XVERSION)
+    else if (strCommand == NetMsgType::EXTVERSION && extVersionEnabled.Value() == true)
     {
         // set expected to false, we got the message
-        pfrom->xVersionExpected = false;
+        pfrom->extversionExpected = false;
         if (pfrom->fSuccessfullyConnected == true)
         {
             dosMan.Misbehaving(pfrom, 1);
             pfrom->fDisconnect = true;
-            return error("odd peer behavior: received verack message before xversion, disconnecting \n");
+            return error("odd peer behavior: received verack message before extversion, disconnecting \n");
         }
 
-        vRecv >> pfrom->xVersion;
+        LOCK(pfrom->cs_extversion);
+        vRecv >> pfrom->extversion;
 
         if (pfrom->addrFromPort != 0)
         {
@@ -629,7 +633,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 pfrom->GetLogName(), pfrom->cleanSubVer);
         }
 
-        pfrom->ReadConfigFromXVersion();
+        pfrom->ReadConfigFromExtversion();
 
         pfrom->PushMessage(NetMsgType::VERACK);
     }
@@ -665,44 +669,12 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
         pfrom->SetRecvVersion(std::min(pfrom->nVersion, PROTOCOL_VERSION));
 
-        if (pfrom->xVersionExpected.load() == true)
+        if (pfrom->extversionExpected.load() == true)
         {
-            // if we expected xversion but got a verack it is possible there is a service bit
+            // if we expected extversion but got a verack it is possible there is a service bit
             // mismatch so we should send a verack response because the peer might not
-            // support xversion
+            // support extversion
             pfrom->PushMessage(NetMsgType::VERACK);
-        }
-
-        /// LEGACY xversion code (old spec)
-        if (!(pfrom->nServices & NODE_XVERSION))
-        {
-            // prepare xversion message. This *must* be the next message after the verack has been received,
-            // if it comes at all in the old xversion spec.
-            CXVersionMessage xver;
-            xver.set_u64c(XVer::BU_LISTEN_PORT_OLD, GetListenPort());
-            xver.set_u64c(XVer::BU_MSG_IGNORE_CHECKSUM_OLD, 1); // we will ignore 0 value msg checksums
-            xver.set_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED_OLD, grapheneMaxVersionSupported.Value());
-            xver.set_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED_OLD, grapheneMinVersionSupported.Value());
-            xver.set_u64c(XVer::BU_GRAPHENE_FAST_FILTER_PREF_OLD, grapheneFastFilterCompatibility.Value());
-            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_OLD, syncMempoolWithPeers.Value());
-            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED_OLD, mempoolSyncMaxVersionSupported.Value());
-            xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED_OLD, mempoolSyncMinVersionSupported.Value());
-            xver.set_u64c(XVer::BU_XTHIN_VERSION_OLD, 2); // xthin version
-
-            size_t nLimitAncestors = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
-            size_t nLimitAncestorSize = GetArg("-limitancestorsize", BU_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
-            size_t nLimitDescendants = GetArg("-limitdescendantcount", BU_DEFAULT_DESCENDANT_LIMIT);
-            size_t nLimitDescendantSize = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
-
-            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT_OLD, nLimitAncestors);
-            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT_OLD, nLimitAncestorSize);
-            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT_OLD, nLimitDescendants);
-            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT_OLD, nLimitDescendantSize);
-            xver.set_u64c(XVer::BU_TXN_CONCATENATION_OLD, 1);
-
-            electrum::set_xversion_flags(xver, chainparams.NetworkIDString());
-
-            pfrom->PushMessage(NetMsgType::XVERSION_OLD, xver);
         }
 
         handleAddressAfterInit(pfrom);
@@ -710,7 +682,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         enableCompactBlocks(pfrom);
 
         // Tell the peer what maximum xthin bloom filter size we will consider acceptable.
-        // FIXME: integrate into xversion as well
+        // FIXME: integrate into extversion as well
         if (pfrom->ThinBlockCapable() && IsThinBlocksEnabled())
         {
             pfrom->PushMessage(NetMsgType::FILTERSIZEXTHIN, nXthinBloomFilterSize);
@@ -722,55 +694,21 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         pfrom->fSuccessfullyConnected = true;
     }
 
-    else if (strCommand == NetMsgType::XVERSION_OLD)
-    {
-        vRecv >> pfrom->xVersion;
-
-        if (pfrom->addrFromPort != 0)
-        {
-            LOG(NET, "Encountered odd node that sent BUVERSION before XVERSION. Ignoring duplicate addrFromPort "
-                     "setting. peer=%s version=%s\n",
-                pfrom->GetLogName(), pfrom->cleanSubVer);
-        }
-
-        pfrom->ReadConfigFromXVersion_OLD();
-
-        pfrom->PushMessage(NetMsgType::XVERACK_OLD);
-        // handleAddressAfterInit(pfrom);
-        // enableSendHeaders(pfrom);
-        // enableCompactBlocks(pfrom);
-    }
-    else if (strCommand == NetMsgType::XVERACK_OLD)
-    {
-        // This step done after final handshake
-        // CheckAndRequestExpeditedBlocks(pfrom);
-    }
-
     else if (strCommand == NetMsgType::XUPDATE)
     {
-        CXVersionMessage xUpdate;
+        CExtversionMessage xUpdate;
         vRecv >> xUpdate;
         // check for peer trying to change non-changeable key
         for (auto entry : xUpdate.xmap)
         {
             if (XVer::IsChangableKey(entry.first))
             {
-                LOCK(pfrom->cs_xversion);
-                pfrom->xVersion.xmap[entry.first] = xUpdate.xmap[entry.first];
+                LOCK(pfrom->cs_extversion);
+                pfrom->extversion.xmap[entry.first] = xUpdate.xmap[entry.first];
             }
         }
     }
 
-    // XVERSION NOTICE: If you read this code as a reference to implement
-    // xversion, *please* refrain from sending 'sendheaders' or
-    // 'filtersizexthin' during the initial handshake to allow further
-    // simplification and streamlining of the connection handshake down the
-    // road. Allowing receipt of 'sendheaders'/'filtersizexthin' here is to
-    // allow connection with BUCash 1.5.0.x nodes that introduced parallelized
-    // message processing but not the state machine for (x)version
-    // serialization.  This is valid protocol behavior (as in not breaking any
-    // existing implementation) but likely still makes sense to be phased out
-    // down the road.
     else if (strCommand == NetMsgType::SENDHEADERS)
     {
         CNodeStateAccessor(nodestate, pfrom->GetId())->fPreferHeaders = true;
@@ -801,10 +739,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
     }
 
-    // XVERSION notice: Reply to pings before initial xversion handshake is
-    // complete. This behavior should also not be relied upon and it is likely
-    // better to phase this out later (requiring only proper, expected
-    // messages during the initial (x)version handshake).
     else if (strCommand == NetMsgType::PING)
     {
         LeaveCritical(&pfrom->csMsgSerializer);
@@ -1004,7 +938,8 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             {
                 LOCK(cs_main);
                 bool fAlreadyHaveBlock = AlreadyHaveBlock(inv);
-                LOG(NET, "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHaveBlock ? "have" : "new", pfrom->id);
+                LOG(NET, "got BLOCK inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHaveBlock ? "have" : "new",
+                    pfrom->id);
 
                 requester.UpdateBlockAvailability(pfrom->GetId(), inv.hash);
                 // RE !IsInitialBlockDownload(): We do not want to get the block if the system is executing the initial
@@ -1292,131 +1227,160 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             ReadCompactSize(vRecv); // ignore tx count; assume it is 0.
         }
 
-        LOCK(cs_main);
-
         // Nothing interesting. Stop asking this peers for more headers.
         if (nCount == 0)
-            return true;
-
-        // Check all headers to make sure they are continuous before attempting to accept them.
-        // This prevents and attacker from keeping us from doing direct fetch by giving us out
-        // of order headers.
-        bool fNewUnconnectedHeaders = false;
-        uint256 hashLastBlock;
-        hashLastBlock.SetNull();
-        for (const CBlockHeader &header : headers)
         {
-            // check that the first header has a previous block in the blockindex.
-            if (hashLastBlock.IsNull())
-            {
-                if (LookupBlockIndex(header.hashPrevBlock))
-                    hashLastBlock = header.hashPrevBlock;
-            }
-
-            // Add this header to the map if it doesn't connect to a previous header
-            if (header.hashPrevBlock != hashLastBlock)
-            {
-                // If we still haven't finished downloading the initial headers during node sync and we get
-                // an out of order header then we must disconnect the node so that we can finish downloading
-                // initial headers from a diffeent peer. An out of order header at this point is likely an attack
-                // to prevent the node from syncing.
-                if (header.GetBlockTime() < GetAdjustedTime() - 24 * 60 * 60)
-                {
-                    pfrom->fDisconnect = true;
-                    return error("non-continuous-headers sequence during node sync - disconnecting peer=%s",
-                        pfrom->GetLogName());
-                }
-                fNewUnconnectedHeaders = true;
-            }
-
-            // if we have an unconnected header then add every following header to the unconnected headers cache.
-            if (fNewUnconnectedHeaders)
-            {
-                uint256 hash = header.GetHash();
-                if (mapUnConnectedHeaders.size() < MAX_UNCONNECTED_HEADERS)
-                    mapUnConnectedHeaders[hash] = std::make_pair(header, GetTime());
-
-                // update hashLastUnknownBlock so that we'll be able to download the block from this peer even
-                // if we receive the headers, which will connect this one, from a different peer.
-                requester.UpdateBlockAvailability(pfrom->GetId(), hash);
-            }
-
-            hashLastBlock = header.GetHash();
+            LOG(NET, "No more headers from peer %s\n", pfrom->GetLogName());
+            return true;
         }
-        // return without error if we have an unconnected header.  This way we can try to connect it when the next
-        // header arrives.
-        if (fNewUnconnectedHeaders)
-            return true;
 
-        // If possible add any previously unconnected headers to the headers vector and remove any expired entries.
-        std::map<uint256, std::pair<CBlockHeader, int64_t> >::iterator mi = mapUnConnectedHeaders.begin();
-        while (mi != mapUnConnectedHeaders.end())
+        CBlockIndex *pindexLast = nullptr;
         {
-            std::map<uint256, std::pair<CBlockHeader, int64_t> >::iterator toErase = mi;
+            // We need to handle appending the header and analyzing the unconnected ones sequentially, or
+            // 2 simultaneously processed header messages may cause an out of order header to not be reconnected
+            // when its parent arrives.
 
-            // Add the header if it connects to the previous header
-            if (headers.back().GetHash() == (*mi).second.first.hashPrevBlock)
-            {
-                headers.push_back((*mi).second.first);
-                mapUnConnectedHeaders.erase(toErase);
+            // We are reusing csUnConnected headers to both force this code to be sequential and to protect
+            // the unconnected headers data structure.
+            LOCK(csUnconnectedHeaders);
 
-                // if you found one to connect then search from the beginning again in case there is another
-                // that will connect to this new header that was added.
-                mi = mapUnConnectedHeaders.begin();
-                continue;
-            }
-
-            // Remove any entries that have been in the cache too long.  Unconnected headers should only exist
-            // for a very short while, typically just a second or two.
-            int64_t nTimeHeaderArrived = (*mi).second.second;
-            uint256 headerHash = (*mi).first;
-            mi++;
-            if (GetTime() - nTimeHeaderArrived >= UNCONNECTED_HEADERS_TIMEOUT)
+            // Check all headers to make sure they are continuous before attempting to accept them.
+            // This prevents and attacker from keeping us from doing direct fetch by giving us out
+            // of order headers.
+            bool fNewUnconnectedHeaders = false;
+            uint256 hashLastBlock;
+            hashLastBlock.SetNull();
+            for (const CBlockHeader &header : headers)
             {
-                mapUnConnectedHeaders.erase(toErase);
-            }
-            // At this point we know the headers in the list received are known to be in order, therefore,
-            // check if the header is equal to some other header in the list. If so then remove it from the cache.
-            else
-            {
-                for (const CBlockHeader &header : headers)
+                // LOG(NET, "Received header %s from %s\n", header.GetHash().ToString(), pfrom->GetLogName());
+                // check that the first header has a previous block in the blockindex.
+                if (hashLastBlock.IsNull())
                 {
-                    if (header.GetHash() == headerHash)
+                    if (LookupBlockIndex(header.hashPrevBlock))
+                        hashLastBlock = header.hashPrevBlock;
+                }
+
+                // Add this header to the map if it doesn't connect to a previous header
+                if (header.hashPrevBlock != hashLastBlock)
+                {
+                    // If we still haven't finished downloading the initial headers during node sync and we get
+                    // an out of order header then we must disconnect the node so that we can finish downloading
+                    // initial headers from a diffeent peer. An out of order header at this point is likely an attack
+                    // to prevent the node from syncing.
+                    if (header.GetBlockTime() < GetAdjustedTime() - 24 * 60 * 60)
+                    {
+                        pfrom->fDisconnect = true;
+                        return error("non-continuous-headers sequence during node sync - disconnecting peer=%s",
+                            pfrom->GetLogName());
+                    }
+                    fNewUnconnectedHeaders = true;
+                }
+
+                // if we have an unconnected header then add every following header to the unconnected headers cache.
+                if (fNewUnconnectedHeaders)
+                {
+                    uint256 hash = header.GetHash();
+                    // LOG(NET, "Header %s from %s is unconnected\n", hash.ToString(), pfrom->GetLogName());
+                    if (mapUnConnectedHeaders.size() < MAX_UNCONNECTED_HEADERS)
+                        mapUnConnectedHeaders[hash] = std::make_pair(header, GetTime());
+                    else
+                        LOG(NET, "Ignoring header %s -- too many unconnected headers.\n", hash.ToString());
+
+                    // update hashLastUnknownBlock so that we'll be able to download the block from this peer even
+                    // if we receive the headers, which will connect this one, from a different peer.
+                    requester.UpdateBlockAvailability(pfrom->GetId(), hash);
+                }
+
+                hashLastBlock = header.GetHash();
+            }
+            // return without error if we have an unconnected header.  This way we can try to connect it when the next
+            // header arrives.
+            if (fNewUnconnectedHeaders)
+                return true;
+
+            {
+                // If possible add any previously unconnected headers to the headers vector and remove any expired
+                // entries.
+                std::map<uint256, std::pair<CBlockHeader, int64_t> >::iterator mi = mapUnConnectedHeaders.begin();
+                while (mi != mapUnConnectedHeaders.end())
+                {
+                    std::map<uint256, std::pair<CBlockHeader, int64_t> >::iterator toErase = mi;
+
+                    // Add the header if it connects to the previous header
+                    if (headers.back().GetHash() == (*mi).second.first.hashPrevBlock)
+                    {
+                        headers.push_back((*mi).second.first);
+                        mapUnConnectedHeaders.erase(toErase);
+
+                        // if you found one to connect then search from the beginning again in case there is another
+                        // that will connect to this new header that was added.
+                        mi = mapUnConnectedHeaders.begin();
+                        continue;
+                    }
+
+                    // Remove any entries that have been in the cache too long.  Unconnected headers should only exist
+                    // for a very short while, typically just a second or two.
+                    int64_t nTimeHeaderArrived = (*mi).second.second;
+                    uint256 headerHash = (*mi).first;
+                    mi++;
+                    if (GetTime() - nTimeHeaderArrived >= UNCONNECTED_HEADERS_TIMEOUT)
                     {
                         mapUnConnectedHeaders.erase(toErase);
-                        break;
                     }
-                }
-            }
-        }
-
-        // Check and accept each header in dependency order (oldest block to most recent)
-        CBlockIndex *pindexLast = nullptr;
-        int i = 0;
-        for (const CBlockHeader &header : headers)
-        {
-            CValidationState state;
-            if (!AcceptBlockHeader(header, state, chainparams, &pindexLast))
-            {
-                int nDos;
-                if (state.IsInvalid(nDos))
-                {
-                    if (nDos > 0)
+                    // At this point we know the headers in the list received are known to be in order, therefore,
+                    // check if the header is equal to some other header in the list. If so then remove it from the
+                    // cache.
+                    else
                     {
-                        dosMan.Misbehaving(pfrom, nDos);
+                        for (const CBlockHeader &header : headers)
+                        {
+                            if (header.GetHash() == headerHash)
+                            {
+                                mapUnConnectedHeaders.erase(toErase);
+                                break;
+                            }
+                        }
                     }
                 }
-                // all headers from this one forward reference a fork that we don't follow, so erase them
-                headers.erase(headers.begin() + i, headers.end());
-                nCount = headers.size();
-                break;
             }
-            else
-                PV->UpdateMostWorkOurFork(header);
 
-            i++;
+            // Check and accept each header in dependency order (oldest block to most recent)
+            int i = 0;
+            for (const CBlockHeader &header : headers)
+            {
+                CValidationState state;
+                if (!AcceptBlockHeader(header, state, chainparams, &pindexLast))
+                {
+                    // Disconnect any peers that give us a bad checkpointed header.
+                    // This prevents us from getting stuck in IBD where we download the intial headers.
+                    // If we don't disconnect then we could end up attempting to download headers
+                    // only from peers that are not on our own fork.
+                    if (state.GetRejectCode() == REJECT_CHECKPOINT)
+                    {
+                        pfrom->fDisconnect = true;
+                    }
+
+                    int nDos;
+                    if (state.IsInvalid(nDos))
+                    {
+                        if (nDos > 0)
+                        {
+                            dosMan.Misbehaving(pfrom, nDos);
+                        }
+                    }
+
+                    // all headers from this one forward reference a fork that we don't follow, so erase them
+                    headers.erase(headers.begin() + i, headers.end());
+                    nCount = headers.size();
+
+                    break;
+                }
+                else
+                    PV->UpdateMostWorkOurFork(header);
+
+                i++;
+            }
         }
-
         if (pindexLast)
             requester.UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
 
@@ -2086,7 +2050,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                     mempool.doubleSpendProofStorage()->addOrphan(dsp, pfrom->GetId());
                     break;
                 case DoubleSpendProof::Invalid:
-                    throw std::runtime_error("Double spend proof didn't validate");
+                    throw std::runtime_error(strprintf("Double spend proof didn't validate (%s)", dspHash.ToString()));
                 default:
                     return false;
                 }
@@ -2212,7 +2176,7 @@ bool ProcessMessages(CNode *pfrom)
                 break;
 
             // get the message from the queue
-            // simply getting the front message should be sufficient, the only time a xversion or verack is sent is
+            // simply getting the front message should be sufficient, the only time a extversion or verack is sent is
             // once the previous has been processed so tracking which stage of the handshake we are on is overkill
             std::swap(msg, pfrom->vRecvMsg_handshake.front());
             pfrom->vRecvMsg_handshake.pop_front();
@@ -2229,7 +2193,7 @@ bool ProcessMessages(CNode *pfrom)
                 {
                     std::string frontCommand = pfrom->vRecvMsg_handshake.front().hdr.GetCommand();
                     if (frontCommand == NetMsgType::VERSION || frontCommand == NetMsgType::VERACK ||
-                        frontCommand == NetMsgType::XVERSION)
+                        frontCommand == NetMsgType::EXTVERSION)
                     {
                         pfrom->vRecvMsg_handshake.clear();
                         pfrom->fDisconnect = true;
@@ -2238,14 +2202,6 @@ bool ProcessMessages(CNode *pfrom)
                             "recieved early handshake message after successfully connected, disconnecting peer=%s",
                             pfrom->GetLogName());
                     }
-
-                    // this code should only handle XVERSION_OLD and XVERACK_OLD messages
-                    std::swap(msg, pfrom->vRecvMsg_handshake.front());
-                    pfrom->vRecvMsg_handshake.pop_front();
-                    pfrom->currentRecvMsgSize -= msg.size();
-                    msgsProcessed++;
-                    fUsePriorityMsg = false;
-                    fUseLowPriorityMsg = false;
                 }
             }
             // Get next message to process checking whether it is a priority messasge and if so then

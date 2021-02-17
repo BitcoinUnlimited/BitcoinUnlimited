@@ -94,6 +94,7 @@ BITCOIN_TESTS =\
   test/electrumserver_tests.cpp \
   test/exploit_tests.cpp \
   test/fastfilter_tests.cpp \
+  test/finalization_tests.cpp \
   test/forkscsv_tests.cpp \
   test/getarg_tests.cpp \
   test/graphene_tests.cpp \
@@ -150,7 +151,7 @@ BITCOIN_TESTS =\
   test/util_tests.cpp \
   test/utilhttp_tests.cpp \
   test/utilprocess_tests.cpp \
-  test/xversionmessage_tests.cpp
+  test/extversionmessage_tests.cpp
 
 if ENABLE_WALLET
 BITCOIN_TESTS += \

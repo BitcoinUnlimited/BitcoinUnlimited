@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -22,6 +22,7 @@
 
 #include <boost/test/unit_test.hpp>
 
+extern CTweak<double> dMinLimiterTxFee;
 extern void LimitMempoolSize(CTxMemPool &pool, size_t limit, unsigned long age);
 
 BOOST_AUTO_TEST_SUITE(txvalidationcache_tests) // BU harmonize suite name with filename
@@ -31,7 +32,7 @@ static bool ToMemPool(CMutableTransaction &tx, std::string rejectReason = "")
     CValidationState state;
     bool fMissingInputs = false;
     bool ret = false;
-    ret = AcceptToMemoryPool(mempool, state, MakeTransactionRef(tx), false, &fMissingInputs, true, false);
+    ret = AcceptToMemoryPool(mempool, state, MakeTransactionRef(tx), false, &fMissingInputs, false);
 
     if (rejectReason != "")
         BOOST_CHECK_EQUAL(rejectReason, state.GetRejectReason());
@@ -406,6 +407,9 @@ BOOST_FIXTURE_TEST_CASE(uncache_coins, TestChain100Setup)
 
 BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
 {
+    double nTempFee = dMinLimiterTxFee.Value();
+    dMinLimiterTxFee.Set(0.0);
+
     CScript scriptPubKey = CScript() << ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG;
 
     // Get 1 more spendable coinbase tx
@@ -452,27 +456,6 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
         prevout = tx.GetHash();
     }
 
-
-    // Add one more which should fail because it's over the 50 limit.
-    {
-        CMutableTransaction tx;
-        tx.vin.resize(1);
-        tx.vin[0].prevout.hash = prevout;
-        tx.vin[0].prevout.n = 0;
-        tx.vout.resize(1);
-        tx.vout[0].nValue = 11 * CENT;
-        tx.vout[0].scriptPubKey = scriptPubKey;
-
-        // Sign:
-        std::vector<unsigned char> vchSig;
-        hash = SignatureHash(scriptPubKey, tx, 0, sighashType, 11 * CENT, 0);
-        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
-        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
-        vchSig.push_back((unsigned char)sighashType);
-        tx.vin[0].scriptSig << vchSig;
-        BOOST_CHECK(!ToMemPool(tx, "too-long-mempool-chain"));
-    }
-
     SetArg("-limitancestorcount", std::to_string(52));
     SetArg("-limitdescendantcount", std::to_string(52));
 
@@ -494,7 +477,6 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
         vchSig.push_back((unsigned char)sighashType);
         tx.vin[0].scriptSig << vchSig;
         BOOST_CHECK(ToMemPool(tx));
-
         prevout = tx.GetHash();
     }
 
@@ -551,25 +533,6 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
         prevout = tx.GetHash();
     }
 
-    // Now try to add one more tx with only one input. It should fail because
-    // we are over the limit of 52.
-    {
-        CMutableTransaction tx;
-        tx.vin.resize(1);
-        tx.vin[0].prevout.hash = prevout;
-        tx.vin[0].prevout.n = 0;
-        tx.vout.resize(1);
-        tx.vout[0].nValue = 11 * CENT;
-        tx.vout[0].scriptPubKey = scriptPubKey;
-
-        // Sign:
-        std::vector<unsigned char> vchSig;
-        hash = SignatureHash(scriptPubKey, tx, 0, sighashType, 11 * CENT, 0);
-        BOOST_CHECK(hash != SIGNATURE_HASH_ERROR);
-        BOOST_CHECK(coinbaseKey.SignECDSA(hash, vchSig));
-        vchSig.push_back((unsigned char)sighashType);
-        tx.vin[0].scriptSig << vchSig;
-        BOOST_CHECK(!ToMemPool(tx, "too-long-mempool-chain"));
-    }
+    dMinLimiterTxFee.Set(nTempFee);
 }
 BOOST_AUTO_TEST_SUITE_END()

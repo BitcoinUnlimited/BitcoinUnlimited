@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -22,11 +22,10 @@ namespace Checkpoints
 //! Return conservative estimate of total number of blocks, 0 if unknown
 int GetTotalBlocksEstimate(const CCheckpointData &data);
 
-//! Unused: Returns last CBlockIndex* in mapBlockIndex that is a checkpoint
-// CBlockIndex *GetLastCheckpoint(const CCheckpointData &data);
+//! Returns the last CBlockIndex* in mapBlockIndex that is a checkpoint
+CBlockIndex *GetLastCheckpoint(const CCheckpointData &data);
 
 double GuessVerificationProgress(const CCheckpointData &data, CBlockIndex *pindex, bool fSigchecks = true);
-
 } // namespace Checkpoints
 
 #endif // BITCOIN_CHECKPOINTS_H

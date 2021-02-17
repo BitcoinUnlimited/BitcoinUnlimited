@@ -67,7 +67,12 @@ private:
     }
 
     //! Set this key data to be invalid
-    void Invalidate() { vch[0] = 0xFF; }
+    void Invalidate()
+    {
+        memset(vch, 0, PUBLIC_KEY_SIZE); // don't expose arbitrary stack bytes
+        vch[0] = 0xFF;
+    }
+
 public:
     bool static ValidSize(const std::vector<uint8_t> &vch) { return vch.size() > 0 && GetLen(vch[0]) == vch.size(); }
     //! Construct an invalid public key.

@@ -8,10 +8,32 @@ import test_framework.loginit
 # Test re-org scenarios with a mempool that contains transactions
 # that spend (directly or indirectly) coinbase transactions.
 #
-
+import logging
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 from test_framework.blocktools import *
+
+import code, traceback, signal
+
+def debug(sig, frame):
+    """Interrupt running process, and provide a python prompt for
+    interactive debugging."""
+    d={'_frame':frame}         # Allow access to frame object.
+    d.update(frame.f_globals)  # Unless shadowed by global
+    d.update(frame.f_locals)
+
+    #i = code.InteractiveConsole(d)
+    message  = "Signal received : entering python shell.\nTraceback:\n"
+    message += ''.join(traceback.format_stack(frame))
+    logging.info(message)
+    logging.info("FRAME: ")
+    logging.info(str(d))
+
+    #i.interact(message)
+
+def initSigDebugging():
+    signal.signal(signal.SIGUSR1, debug)  # Register handler
+
 
 # Create one-input, one-output, no-fee transaction:
 class RawTransactionsTest(BitcoinTestFramework):
@@ -31,20 +53,20 @@ class RawTransactionsTest(BitcoinTestFramework):
         connect_nodes_full(self.nodes)
 
         self.is_network_split=False
-        self.sync_all()
+        self.sync_blocks()
 
     def run_test(self):
-
+        initSigDebugging()
         #prepare some coins for multiple *rawtransaction commands
         self.nodes[2].generate(1)
-        self.sync_all()
+        self.sync_blocks()
         self.nodes[0].generate(101)
-        self.sync_all()
+        self.sync_blocks()
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(),1.5)
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(),1.0)
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(),5.0)
         self.nodes[0].generate(5)
-        self.sync_all()
+        self.sync_blocks()
 
         #########################################
         # sendrawtransaction with missing input #
@@ -103,7 +125,7 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         # send 1.2 BTC to msig adr
         txId = self.nodes[0].sendtoaddress(mSigObj, 1.2)
-        self.sync_all()
+        # self.sync_blocks()
         self.nodes[0].generate(1)
         self.sync_blocks()
         assert_equal(self.nodes[2].getbalance(), bal+Decimal('1.20000000')) #node2 has both keys of the 2of2 ms addr., tx should affect the balance
@@ -153,7 +175,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         rawTx = self.nodes[0].decoderawtransaction(rawTxSigned['hex'])
         self.sync_all()
         self.nodes[0].generate(1)
-        self.sync_all()
+        self.sync_blocks()
         assert_equal(self.nodes[0].getbalance(), bal+Decimal('50.00000000')+Decimal('2.19000000')) #block reward + tx
 
         #########################################

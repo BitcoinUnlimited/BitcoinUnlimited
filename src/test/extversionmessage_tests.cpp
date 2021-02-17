@@ -1,8 +1,8 @@
-// Copyright (c) 2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "xversionmessage.h"
+#include "extversionmessage.h"
 #include "serialize.h"
 #include "streams.h"
 #include "test/test_bitcoin.h"
@@ -14,7 +14,7 @@
 
 using namespace std;
 
-BOOST_FIXTURE_TEST_SUITE(xversionmessage_tests, BasicTestingSetup)
+BOOST_FIXTURE_TEST_SUITE(extversionmessage_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(decode1)
 {
@@ -31,7 +31,7 @@ BOOST_AUTO_TEST_CASE(decode1)
 
     v.insert(v.end(), xmap1.begin(), xmap1.end());
 
-    CXVersionMessage xver;
+    CExtversionMessage xver;
 
     CDataStream stream(v, SER_NETWORK, PROTOCOL_VERSION);
     stream.SetVersion(0);

@@ -1,5 +1,5 @@
 // Copyright (c) 2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -29,6 +29,12 @@ public:
     bool NotifyTransaction(const CTransactionRef &ptx);
 };
 
+class CZMQPublishHashDoubleSpendNotifier : public CZMQAbstractPublishNotifier
+{
+public:
+    bool NotifyDoubleSpend(const CTransactionRef ptx);
+};
+
 class CZMQPublishRawBlockNotifier : public CZMQAbstractPublishNotifier
 {
 public:
@@ -39,6 +45,12 @@ class CZMQPublishRawTransactionNotifier : public CZMQAbstractPublishNotifier
 {
 public:
     bool NotifyTransaction(const CTransactionRef &ptx);
+};
+
+class CZMQPublishRawDoubleSpendNotifier : public CZMQAbstractPublishNotifier
+{
+public:
+    bool NotifyDoubleSpend(const CTransactionRef ptx);
 };
 
 #endif // BITCOIN_ZMQ_ZMQPUBLISHNOTIFIER_H

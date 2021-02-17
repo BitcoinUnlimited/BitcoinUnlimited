@@ -1,11 +1,14 @@
-// Copyright (c) 2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
 // Copyright (c) 2018 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "txorphanpool.h"
+
+#include "init.h"
 #include "main.h"
 #include "timedata.h"
+#include "txadmission.h"
 #include "util.h"
 #include "utiltime.h"
 
@@ -131,3 +134,127 @@ void CTxOrphanPool::QueryHashes(std::vector<uint256> &vHashes)
     for (auto &it : mapOrphanTransactions)
         vHashes.push_back(it.first);
 }
+
+std::vector<CTxOrphanPool::COrphanTx> CTxOrphanPool::AllTxOrphanPoolInfo() const
+{
+    AssertLockHeld(orphanpool.cs_orphanpool);
+    std::vector<COrphanTx> vInfo;
+    vInfo.reserve(mapOrphanTransactions.size());
+    for (auto &it : mapOrphanTransactions)
+        vInfo.push_back(it.second);
+
+    return vInfo;
+}
+
+
+static const uint64_t ORPHANPOOL_DUMP_VERSION = 1;
+bool CTxOrphanPool::LoadOrphanPool()
+{
+    uint64_t nExpiryTimeout = GetArg("-orphanpoolexpiry", DEFAULT_ORPHANPOOL_EXPIRY) * 60 * 60;
+    FILE *fileOrphanpool = fopen((GetDataDir() / "orphanpool.dat").string().c_str(), "rb");
+    if (!fileOrphanpool)
+    {
+        LOGA("Failed to open orphanpool file from disk. Continuing anyway.\n");
+        return false;
+    }
+    CAutoFile file(fileOrphanpool, SER_DISK, CLIENT_VERSION);
+    if (file.IsNull())
+    {
+        LOGA("Failed to open orphanpool file from disk. Continuing anyway.\n");
+        return false;
+    }
+
+    uint64_t count = 0;
+    uint64_t skipped = 0;
+    uint64_t nNow = GetTime();
+
+    try
+    {
+        uint64_t version;
+        file >> version;
+        if (version != ORPHANPOOL_DUMP_VERSION)
+        {
+            return false;
+        }
+        uint64_t num;
+        file >> num;
+        while (num--)
+        {
+            CTransaction tx;
+            uint64_t nTime;
+            file >> tx;
+            file >> nTime;
+
+            if (nTime + nExpiryTimeout > nNow)
+            {
+                CTxInputData txd;
+                txd.tx = MakeTransactionRef(tx);
+                EnqueueTxForAdmission(txd);
+                ++count;
+            }
+            else
+            {
+                ++skipped;
+            }
+
+            if (ShutdownRequested())
+                return false;
+        }
+    }
+    catch (const std::exception &e)
+    {
+        LOGA("Failed to deserialize orphanpool data on disk: %s. Continuing anyway.\n", e.what());
+        return false;
+    }
+
+    LOGA("Imported orphanpool transactions from disk: %i successes, %i expired\n", count, skipped);
+    return true;
+}
+
+bool CTxOrphanPool::DumpOrphanPool()
+{
+    uint64_t start = GetStopwatchMicros();
+
+    std::vector<COrphanTx> vInfo;
+    {
+        READLOCK(cs_orphanpool);
+        vInfo = AllTxOrphanPoolInfo();
+    }
+
+    uint64_t mid = GetStopwatchMicros();
+
+    try
+    {
+        FILE *fileOrphanpool = fopen((GetDataDir() / "orphanpool.dat.new").string().c_str(), "wb");
+        if (!fileOrphanpool)
+        {
+            LOGA("Failed to dump orphanpool, failed to open orphanpool file from disk. Continuing anyway.\n");
+            return false;
+        }
+
+        CAutoFile file(fileOrphanpool, SER_DISK, CLIENT_VERSION);
+
+        uint64_t version = ORPHANPOOL_DUMP_VERSION;
+        file << version;
+
+        file << (uint64_t)vInfo.size();
+        for (const auto &i : vInfo)
+        {
+            file << *(i.ptx);
+            file << (uint64_t)i.nEntryTime;
+        }
+
+        FileCommit(file.Get());
+        file.fclose();
+        RenameOver(GetDataDir() / "orphanpool.dat.new", GetDataDir() / "orphanpool.dat");
+        uint64_t last = GetStopwatchMicros();
+        LOGA("Dumped orphanpool: %gs to copy, %gs to dump\n", (mid - start) * 0.000001, (last - mid) * 0.000001);
+    }
+    catch (const std::exception &e)
+    {
+        LOGA("Failed to dump orphanpool: %s. Continuing anyway.\n", e.what());
+        return false;
+    }
+    return true;
+}
+

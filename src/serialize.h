@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -24,7 +24,9 @@
 
 #include "prevector.h"
 
-static const unsigned int MAX_SIZE = 0x02000000 * 8; // BU Allow 256MB JSON encodings
+// BU Allow a maximum message size of 256MB
+// BU does not use this value for json encoding size calculations
+static const unsigned int MAX_SIZE = 0x02000000 * 8;
 
 /**
  * Dummy data type to identify deserializing constructors.
@@ -395,7 +397,7 @@ void WriteCompactSize(Stream &os, uint64_t nSize)
 }
 
 template <typename Stream>
-uint64_t ReadCompactUint64(Stream &is)
+uint64_t ReadCompactSizeWithLimit(Stream &is, const uint64_t limit)
 {
     uint8_t chSize = ser_readdata8(is);
     uint64_t nSizeRet = 0;
@@ -420,6 +422,10 @@ uint64_t ReadCompactUint64(Stream &is)
         nSizeRet = ser_readdata64(is);
         if (nSizeRet < 0x100000000ULL)
             throw std::ios_base::failure("non-canonical ReadCompactSize()");
+    }
+    if (nSizeRet > limit)
+    {
+        throw std::ios_base::failure("ReadCompactSize(): size too large");
     }
     return nSizeRet;
 }
@@ -427,36 +433,9 @@ uint64_t ReadCompactUint64(Stream &is)
 template <typename Stream>
 uint64_t ReadCompactSize(Stream &is)
 {
-    uint8_t chSize = ser_readdata8(is);
-    uint64_t nSizeRet = 0;
-    if (chSize < 253)
-    {
-        nSizeRet = chSize;
-    }
-    else if (chSize == 253)
-    {
-        nSizeRet = ser_readdata16(is);
-        if (nSizeRet < 253)
-            throw std::ios_base::failure("non-canonical ReadCompactSize()");
-    }
-    else if (chSize == 254)
-    {
-        nSizeRet = ser_readdata32(is);
-        if (nSizeRet < 0x10000u)
-            throw std::ios_base::failure("non-canonical ReadCompactSize()");
-    }
-    else
-    {
-        nSizeRet = ser_readdata64(is);
-        if (nSizeRet < 0x100000000ULL)
-            throw std::ios_base::failure("non-canonical ReadCompactSize()");
-    }
-    if (nSizeRet > (uint64_t)MAX_SIZE)
-    {
-        throw std::ios_base::failure("ReadCompactSize(): size too large");
-    }
-    return nSizeRet;
+    return ReadCompactSizeWithLimit(is, MAX_SIZE);
 }
+
 
 /**
  * Variable-length integers: bytes are a MSB base-128 encoding of the number.
@@ -647,9 +626,10 @@ class CCompactSize
 {
 protected:
     uint64_t &n;
+    const uint64_t limit;
 
 public:
-    CCompactSize(uint64_t &nIn) : n(nIn) {}
+    CCompactSize(uint64_t &nIn, const uint64_t &_limit = MAX_SIZE) : n(nIn), limit(_limit) {}
     template <typename Stream>
     void Serialize(Stream &s) const
     {
@@ -659,7 +639,7 @@ public:
     template <typename Stream>
     void Unserialize(Stream &s)
     {
-        n = ReadCompactSize<Stream>(s);
+        n = ReadCompactSizeWithLimit<Stream>(s, limit);
     }
 };
 

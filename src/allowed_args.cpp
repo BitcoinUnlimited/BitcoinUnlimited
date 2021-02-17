@@ -1,5 +1,5 @@
 // Copyright (c) 2017 Stephen McCarthy
-// Copyright (c) 2017-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2017-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -28,6 +28,7 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
+#include "validation/validation.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #endif
@@ -243,7 +244,9 @@ static void addChainSelectionOptions(AllowedArgs &allowedArgs)
 {
     allowedArgs.addHeader(_("Chain selection options:"))
         .addArg("chain_nol", optionalBool, _("Use the no-limit blockchain"))
-        .addArg("testnet", optionalBool, _("Use the test chain"))
+        .addArg("testnet", optionalBool, _("Use the test3 chain"))
+        .addArg("testnet4", optionalBool, _("Use the test4 chain"))
+        .addArg("scalenet", optionalBool, _("Use the scaling test chain"))
         .addDebugArg("regtest", optionalBool,
             "Enter regression test mode, which uses a special chain in which blocks can be solved instantly. "
             "This is intended for regression testing tools and app development.");
@@ -380,8 +383,10 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
         .addDebugArg("enforcenodebloom", optionalBool,
             strprintf("Enforce minimum protocol version to limit use of bloom filters (default: %u)", 0))
         .addArg(
-            "port=<port>", requiredInt, strprintf(_("Listen for connections on <port> (default: %u or testnet: %u)"),
-                                            DEFAULT_MAINNET_PORT, DEFAULT_TESTNET_PORT))
+            "port=<port>", requiredInt, strprintf(_("Listen for connections on <port> (default: %u, "
+                                                    "testnet: %u, testnet4: %u, scalenet: %u, nol: %u, regtest: %u)"),
+                                            DEFAULT_MAINNET_PORT, DEFAULT_TESTNET_PORT, DEFAULT_TESTNET4_PORT,
+                                            DEFAULT_SCALENET_PORT, DEFAULT_NOLNET_PORT, DEFAULT_REGTESTNET_PORT))
         .addArg("proxy=<ip:port>", requiredStr, _("Connect through SOCKS5 proxy"))
         .addArg(
             "proxyrandomize", optionalBool,
@@ -502,6 +507,10 @@ static void addZmqOptions(AllowedArgs &allowedArgs)
         .addArg("zmqpubhashblock=<address>", requiredStr, _("Enable publish hash block in <address>"), zmqParamOptional)
         .addArg(
             "zmqpubhashtx=<address>", requiredStr, _("Enable publish hash transaction in <address>"), zmqParamOptional)
+        .addArg("zmqpubhashds=<address>", requiredStr,
+            _("Enable publishing of the hash of double spent transactions in <address>"), zmqParamOptional)
+        .addArg("zmqpubrawds=<address>", requiredStr, _("Enable publishing of raw double spend proofs to <address>"),
+            zmqParamOptional)
         .addArg("zmqpubrawblock=<address>", requiredStr, _("Enable publish raw block in <address>"), zmqParamOptional)
         .addArg(
             "zmqpubrawtx=<address>", requiredStr, _("Enable publish raw transaction in <address>"), zmqParamOptional);
@@ -595,13 +604,20 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
             strprintf("Log transaction priority and fee per kB when mining blocks (default: %u)",
                          DEFAULT_PRINTPRIORITY))
         .addDebugArg("printtologfile", optionalBool, "Write log to debug.log")
+        .addDebugArg("finalizationdelay=<n>", requiredInt,
+            strprintf("Minimum time between a block header received and the block finalization <n> (default: %u)",
+                         DEFAULT_MIN_FINALIZATION_DELAY))
 #ifdef ENABLE_WALLET
         .addDebugArg("privdb", optionalBool,
             strprintf("Sets the DB_PRIVATE flag in the wallet db environment (default: %u)", DEFAULT_WALLET_PRIVDB),
             walletParamOptional)
 #endif
         .addArg(
-            "shrinkdebugfile", optionalBool, _("Shrink debug.log file on client startup (default: 1 when no -debug)"));
+            "shrinkdebugfile", optionalBool, _("Shrink debug.log file on client startup (default: 1 when no -debug)"))
+        .addArg("maxtipage=<n>", requiredInt,
+            strprintf(_("Maximum time since the last block was mined in seconds before we consider ourselves still in "
+                        "IBD <n> (default: %u)"),
+                    DEFAULT_MAX_TIP_AGE));
 }
 
 static void addNodeRelayOptions(AllowedArgs &allowedArgs)
@@ -664,9 +680,9 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
         .addArg("use-compactblocks", optionalBool,
             strprintf(_("Enable compact blocks to speed up the relay of blocks (default: %d)"),
                     DEFAULT_USE_COMPACT_BLOCKS))
-        .addArg("use-xversion", optionalBool,
-            strprintf(_("Enable extended versioning during node handshake (xversion) (default: %d)"),
-                    DEFAULT_USE_XVERSION))
+        .addArg("use-extversion", optionalBool,
+            strprintf(_("Enable extended versioning during node handshake (extversion) (default: %d)"),
+                    DEFAULT_USE_EXTVERSION))
         .addArg("preferential-timer=<millisec>", requiredInt,
             strprintf(_("Set graphene, thinblock and compactblock preferential timer duration (default: %u). Use 0 to "
                         "disable it."),
@@ -702,8 +718,11 @@ static void addRpcServerOptions(AllowedArgs &allowedArgs)
               "<USERNAME>:<SALT>$<HASH>. A canonical python script is included in share/rpcuser. This option can be "
               "specified multiple times"))
         .addArg("rpcport=<port>", requiredInt,
-            strprintf(_("Listen for JSON-RPC connections on <port> (default: %u or testnet: %u)"),
-                    BaseParams(CBaseChainParams::MAIN).RPCPort(), BaseParams(CBaseChainParams::TESTNET).RPCPort()))
+            strprintf(_("Listen for JSON-RPC connections on <port> (default: %u, testnet: %u, testnet4: %u, scalenet: "
+                        "%u, nol: %u, regtest: %u)"),
+                    BaseParams(CBaseChainParams::MAIN).RPCPort(), BaseParams(CBaseChainParams::TESTNET).RPCPort(),
+                    BaseParams(CBaseChainParams::TESTNET4).RPCPort(), BaseParams(CBaseChainParams::SCALENET).RPCPort(),
+                    BaseParams(CBaseChainParams::UNL).RPCPort(), BaseParams(CBaseChainParams::REGTEST).RPCPort()))
         .addArg("rpcallowip=<ip>", requiredStr,
             _("Allow JSON-RPC connections from specified source. Valid for <ip> are a single IP (e.g. 1.2.3.4), a "
               "network/netmask (e.g. 1.2.3.4/255.255.255.0) or a network/CIDR (e.g. 1.2.3.4/24). This option can be "
@@ -723,12 +742,16 @@ static void addElectrumOptions(AllowedArgs &allowedArgs)
     allowedArgs.addHeader(_("Electrum server options:"))
         .addArg("electrum", optionalBool, "Enable electrum server")
         .addArg("electrum.dir", requiredStr, "Data directory for electrum database")
-        .addArg("electrum.port", requiredStr, "Port electrum RPC listens on (default: mainnet 50001, testnet: 60001")
-        .addArg("electrum.host", requiredStr, "Host electrum RPC listens on (default: 127.0.0.1)")
+        .addArg("electrum.port", requiredStr,
+            "Port electrum RPC listens on (default: mainnet 50001, testnet: 60001, testnet4: 62001, scalenet: 63001")
+        .addArg("electrum.host", requiredStr, "Host electrum RPC listens on (default: all interfaces)")
         .addArg("electrum.rawarg", optionalStr,
             "Raw argument to pass directly to underlying electrum daemon "
             "(example: -electrum.rawarg=\"--server-banner=\\\"Welcome to my server!\\\"\"). "
             "This option can be specified multiple times.")
+        .addArg("electrum.ws.host", requiredStr, "Host electrum Websocket listens on (default: all interfaces")
+        .addArg("electrum.ws.port", requiredStr, "Port electrum Websocket listens on (default: mainnet 50003, testnet: "
+                                                 "60003, testnet4: 62003, scalenet: 63003")
         .addArg("electrum.shutdownonerror", optionalBool, "Shutdown if the electrum server exits unexpectedly")
         .addArg("electrum.blocknotify", optionalBool, "Instantly notify electrum server of new blocks. "
                                                       "Must only be used with ElectrsCash 2.0.0 or later")
@@ -816,8 +839,11 @@ BitcoinCli::BitcoinCli() : AllowedArgs(true)
         .addArg("rpcconnect=<ip>", requiredStr,
             strprintf(_("Send commands to node running on <ip> (default: %s)"), DEFAULT_RPCCONNECT))
         .addArg("rpcport=<port>", requiredInt,
-            strprintf(_("Connect to JSON-RPC on <port> (default: %u or testnet: %u)"),
-                    BaseParams(CBaseChainParams::MAIN).RPCPort(), BaseParams(CBaseChainParams::TESTNET).RPCPort()))
+            strprintf(_("Connect to JSON-RPC on <port> (default: %u, testnet: %u, testnet4: %u, scalenet: %u, nol: %u, "
+                        "regtest: %u)"),
+                    BaseParams(CBaseChainParams::MAIN).RPCPort(), BaseParams(CBaseChainParams::TESTNET).RPCPort(),
+                    BaseParams(CBaseChainParams::TESTNET4).RPCPort(), BaseParams(CBaseChainParams::SCALENET).RPCPort(),
+                    BaseParams(CBaseChainParams::UNL).RPCPort(), BaseParams(CBaseChainParams::REGTEST).RPCPort()))
         .addArg("rpcwait", optionalBool, _("Wait for RPC server to start"))
         .addArg("rpcuser=<user>", requiredStr, _("Username for JSON-RPC connections"))
         .addArg("rpcpassword=<pw>", requiredStr, _("Password for JSON-RPC connections"))

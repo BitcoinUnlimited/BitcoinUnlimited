@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -36,9 +36,8 @@
 #include <queue>
 #include <thread>
 
-// Track timing information for Score and Package mining.
+// Track timing information for Package mining.
 std::atomic<int64_t> nTotalPackage{0};
-std::atomic<int64_t> nTotalScore{0};
 
 /** Maximum number of failed attempts to insert a package into a block */
 static const unsigned int MAX_PACKAGE_FAILURES = 5;
@@ -60,16 +59,6 @@ using namespace std;
 uint64_t nLastBlockTx = 0;
 uint64_t nLastBlockSize = 0;
 
-
-class ScoreCompare
-{
-public:
-    ScoreCompare() {}
-    bool operator()(const CTxMemPool::txiter a, const CTxMemPool::txiter b) const
-    {
-        return CompareTxMemPoolEntryByScore()(*b, *a); // Convert to less than
-    }
-};
 
 int64_t UpdateTime(CBlockHeader *pblock, const Consensus::Params &consensusParams, const CBlockIndex *pindexPrev)
 {
@@ -187,22 +176,6 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _n
     return MakeTransactionRef(std::move(tx));
 }
 
-std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, int64_t coinbaseSize)
-{
-    std::unique_ptr<CBlockTemplate> tmpl(nullptr);
-
-    if (nBlockMaxSize > BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
-        tmpl = CreateNewBlock(scriptPubKeyIn, false, coinbaseSize);
-
-    // If the block is too small we need to drop back to the 1MB ruleset
-    if ((!tmpl) || (tmpl->block.GetBlockSize() <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE))
-    {
-        tmpl = CreateNewBlock(scriptPubKeyIn, true, coinbaseSize);
-    }
-
-    return tmpl;
-}
-
 struct NumericallyLessTxHashComparator
 {
 public:
@@ -212,9 +185,7 @@ public:
     }
 };
 
-std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn,
-    bool blockstreamCoreCompatible,
-    int64_t coinbaseSize)
+std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn, int64_t coinbaseSize)
 {
     resetBlock(scriptPubKeyIn, coinbaseSize);
 
@@ -275,19 +246,15 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
         std::vector<const CTxMemPoolEntry *> vtxe;
         addPriorityTxs(&vtxe);
 
-        // Mine by package (CPFP) or by score.
-        if (miningCPFP.Value() == true)
-        {
-            int64_t nStartPackage = GetStopwatchMicros();
-            addPackageTxs(&vtxe, canonical);
-            nTotalPackage += GetStopwatchMicros() - nStartPackage;
-        }
-        else
-        {
-            int64_t nStartScore = GetStopwatchMicros();
-            addScoreTxs(&vtxe);
-            nTotalScore += GetStopwatchMicros() - nStartScore;
-        }
+        // Mine by package (CPFP)
+        // We make two passes through addPackageTxs(). The first pass is for
+        // transactions and chains that are not dirty, which will likely be the bulk
+        // of the block. Then a second quick pass is made to see if any dirty transactions
+        // would be able to fill the rest of the block.
+        int64_t nStartPackage = GetStopwatchMicros();
+        addPackageTxs(&vtxe, canonical, false);
+        addPackageTxs(&vtxe, canonical, true);
+        nTotalPackage += GetStopwatchMicros() - nStartPackage;
 
         nLastBlockTx = nBlockTx;
         nLastBlockSize = nBlockSize;
@@ -330,21 +297,9 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     pblock->fXVal = xvalTweak.Value();
 
     CValidationState state;
-    if (blockstreamCoreCompatible)
+    if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
     {
-        if (!TestConservativeBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
-        {
-            throw std::runtime_error(
-                strprintf("%s: TestConservativeBlockValidity failed: %s", __func__, FormatStateMessage(state)));
-        }
-    }
-    else
-    {
-        if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
-        {
-            throw std::runtime_error(
-                strprintf("%s: TestBlockValidity failed: %s", __func__, FormatStateMessage(state)));
-        }
+        throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s", __func__, FormatStateMessage(state)));
     }
     if (pblock->fExcessive)
     {
@@ -500,64 +455,6 @@ void BlockAssembler::AddToBlock(std::vector<const CTxMemPoolEntry *> *vtxe, CTxM
     }
 }
 
-void BlockAssembler::addScoreTxs(std::vector<const CTxMemPoolEntry *> *vtxe)
-{
-    std::priority_queue<CTxMemPool::txiter, std::vector<CTxMemPool::txiter>, ScoreCompare> clearedTxs;
-    CTxMemPool::setEntries waitSet;
-    CTxMemPool::indexed_transaction_set::index<mining_score>::type::iterator mi =
-        mempool.mapTx.get<mining_score>().begin();
-    CTxMemPool::txiter iter;
-    while (!blockFinished && (mi != mempool.mapTx.get<mining_score>().end() || !clearedTxs.empty()))
-    {
-        // If no txs that were previously postponed are available to try
-        // again, then try the next highest score tx
-        if (clearedTxs.empty())
-        {
-            iter = mempool.mapTx.project<0>(mi);
-            mi++;
-        }
-        // If a previously postponed tx is available to try again, then it
-        // has higher score than all untried so far txs
-        else
-        {
-            iter = clearedTxs.top();
-            clearedTxs.pop();
-        }
-
-        // If tx already in block then skip
-        if (inBlock.count(iter))
-        {
-            continue;
-        }
-
-
-        // If tx is dependent on other mempool txs which haven't yet been included
-        // then put it in the waitSet
-        if (isStillDependent(iter))
-        {
-            waitSet.insert(iter);
-            continue;
-        }
-
-        // If this tx fits in the block add it, otherwise keep looping
-        if (TestForBlock(iter))
-        {
-            AddToBlock(vtxe, iter);
-
-            // This tx was successfully added, so
-            // add transactions that depend on this one to the priority queue to try again
-            for (CTxMemPool::txiter child : mempool.GetMemPoolChildren(iter))
-            {
-                if (waitSet.count(child))
-                {
-                    clearedTxs.push(child);
-                    waitSet.erase(child);
-                }
-            }
-        }
-    }
-}
-
 void BlockAssembler::SortForBlock(const CTxMemPool::setEntries &package, std::vector<CTxMemPool::txiter> &sortedEntries)
 {
     // Sort package by ancestor count
@@ -597,7 +494,7 @@ void BlockAssembler::SortForBlock(const CTxMemPool::setEntries &package, std::ve
 // the current algo is still much better than the older method which needed to update calculations for the
 // entire descendant tree after each package was added to the block.
 
-void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, bool fCanonical)
+void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, bool fCanonical, bool fAllowDirtyTxns)
 {
     AssertLockHeld(mempool.cs_txmempool);
 
@@ -608,7 +505,7 @@ void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, b
         iter = mempool.mapTx.project<0>(mi);
 
         // Skip txns we know are in the block
-        if (inBlock.count(iter))
+        if (inBlock.count(iter) || (fAllowDirtyTxns == false && iter->IsDirty() == true))
         {
             continue;
         }
@@ -622,8 +519,7 @@ void BlockAssembler::addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, b
         CTxMemPool::setEntries ancestors;
         uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
         std::string dummy;
-        mempool._CalculateMemPoolAncestors(
-            *iter, ancestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy, &inBlock, false);
+        mempool._CalculateMemPoolAncestors(*iter, ancestors, nNoLimit, nNoLimit, dummy, &inBlock, false);
 
         // Include in the package the current txn we're working with
         ancestors.insert(iter);

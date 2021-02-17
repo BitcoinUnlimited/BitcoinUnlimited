@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,6 +7,7 @@
 
 #include "clientversion.h"
 #include "consensus/consensus.h"
+#include "extversionmessage.h"
 #include "primitives/transaction.h"
 #include "reverse_iterator.h"
 #include "sync.h"
@@ -14,7 +15,6 @@
 #include "unlimited.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
-#include "xversionmessage.h"
 
 #include <stdint.h>
 #include <vector>

@@ -1,5 +1,5 @@
 // Copyright (c) 2014-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -20,6 +20,8 @@ public:
     static const std::string MAIN;
     static const std::string UNL;
     static const std::string TESTNET;
+    static const std::string TESTNET4;
+    static const std::string SCALENET;
     static const std::string REGTEST;
 
     const std::string &DataDir() const { return strDataDir; }

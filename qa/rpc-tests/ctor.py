@@ -63,7 +63,8 @@ class CtorTest (BitcoinTestFramework):
         initialize_chain_clean(self.options.tmpdir, 7, bitcoinConfDict, wallets)
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(4, self.options.tmpdir, binary=[self.bitcoindBin]*4)
+        args=[["-blockchain.maxReorgDepth=-1"],["-blockchain.maxReorgDepth=-1"],["-blockchain.maxReorgDepth=-1"],["-blockchain.maxReorgDepth=-1"]]
+        self.nodes = start_nodes(4, self.options.tmpdir, extra_args=args, binary=[self.bitcoindBin]*4)
         setup_connection_tracking(self.nodes)
         # Now interconnect the nodes
         connect_nodes_full(self.nodes[:3])

@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -23,11 +23,11 @@ extern CSharedCriticalSection cs_mapBlockIndex;
 class CBlockFileInfo
 {
 public:
-    unsigned int nBlocks; //!< number of blocks stored in file
-    unsigned int nSize; //!< number of used bytes of block file
-    unsigned int nUndoSize; //!< number of used bytes in the undo file
-    unsigned int nHeightFirst; //!< lowest height of block in file
-    unsigned int nHeightLast; //!< highest height of block in file
+    uint32_t nBlocks; //!< number of blocks stored in file
+    uint64_t nSize; //!< number of used bytes of block file
+    uint64_t nUndoSize; //!< number of used bytes in the undo file
+    uint32_t nHeightFirst; //!< lowest height of block in file
+    uint32_t nHeightLast; //!< highest height of block in file
     uint64_t nTimeFirst; //!< earliest time of block in file
     uint64_t nTimeLast; //!< latest time of block in file
 
@@ -204,6 +204,8 @@ public:
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
 
+    //! (memory only) The time (in seconds) the block header was added to the index.
+    uint64_t nTimeReceived;
 
     void SetNull()
     {
@@ -219,6 +221,7 @@ public:
         nChainTx = 0;
         nStatus = 0;
         nSequenceId = 0;
+        nTimeReceived = 0;
 
         nVersion = 0;
         hashMerkleRoot = uint256();
@@ -318,6 +321,8 @@ public:
         return pbegin[(pend - pbegin) / 2];
     }
 
+    /** Return the time the header was added to the blockindex */
+    int64_t GetHeaderReceivedTime() const { return nTimeReceived; }
     std::string ToString() const
     {
         return strprintf("CBlockIndex(pprev=%p, nHeight=%d, merkle=%s, hashBlock=%s)", pprev, nHeight,
@@ -368,6 +373,15 @@ int64_t GetBlockProofEquivalentTime(const CBlockIndex &to,
     const CBlockIndex &from,
     const CBlockIndex &tip,
     const Consensus::Params &);
+
+/** Find the last common ancestor two blocks have.
+ *  Both pa and pb must be non-nullptr. */
+const CBlockIndex *LastCommonAncestor(const CBlockIndex *pa, const CBlockIndex *pb);
+
+/**
+ * Check if two block index are on the same fork.
+ */
+bool AreOnTheSameFork(const CBlockIndex *pa, const CBlockIndex *pb);
 
 /** Used to marshal pointers into hashes for db storage. */
 class CDiskBlockIndex : public CBlockIndex

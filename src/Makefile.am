@@ -162,6 +162,8 @@ BITCOIN_CORE_H = \
   electrum/electrs.h \
   electrum/electrumrpcinfo.h \
   electrum/electrumserver.h \
+  extversionmessage.h \
+  extversionkeys.h \
   fast-cpp-csv-parser/csv.h \
   fastfilter.h \
   forks_csv.h \
@@ -176,6 +178,7 @@ BITCOIN_CORE_H = \
   keystore.h \
   dbwrapper.h \
   limitedmap.h \
+  logging.h \
   main.h \
   memusage.h \
   merkleblock.h \
@@ -241,8 +244,6 @@ BITCOIN_CORE_H = \
   validation/verifydb.h \
   validationinterface.h \
   versionbits.h \
-  xversionmessage.h \
-  xversionkeys.h \
   wallet/crypter.h \
   wallet/db.h \
   wallet/rpcwallet.h \
@@ -251,7 +252,8 @@ BITCOIN_CORE_H = \
   zmq/zmqabstractnotifier.h \
   zmq/zmqconfig.h\
   zmq/zmqnotificationinterface.h \
-  zmq/zmqpublishnotifier.h
+  zmq/zmqpublishnotifier.h \
+  zmq/zmqrpc.h
 
 
 obj/build.h: FORCE
@@ -290,6 +292,7 @@ libbitcoin_server_a_SOURCES = \
   electrum/electrs.cpp \
   electrum/electrumrpcinfo.cpp \
   electrum/electrumserver.cpp \
+  extversionmessage.cpp \
   forks_csv.cpp \
   httprpc.cpp \
   httpserver.cpp \
@@ -339,7 +342,6 @@ libbitcoin_server_a_SOURCES = \
   validation/verifydb.cpp \
   validationinterface.cpp \
   versionbits.cpp \
-  xversionmessage.cpp \
   $(BITCOIN_CORE_H)
 
 if ENABLE_ZMQ
@@ -348,7 +350,8 @@ libbitcoin_zmq_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_zmq_a_SOURCES = \
   zmq/zmqabstractnotifier.cpp \
   zmq/zmqnotificationinterface.cpp \
-  zmq/zmqpublishnotifier.cpp
+  zmq/zmqpublishnotifier.cpp \
+  zmq/zmqrpc.cpp
 endif
 
 

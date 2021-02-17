@@ -1,11 +1,12 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "chainparams.h"
 #include "consensus/merkle.h"
+#include "policy/policy.h"
 #include "unlimited.h"
 #include "versionbits.h" // bip135 added
 
@@ -160,6 +161,9 @@ public:
         pchCashMessageStart[3] = 0xe8;
         nDefaultPort = DEFAULT_MAINNET_PORT;
         nPruneAfterHeight = 100000;
+        nDefaultExcessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
+        nMinMaxBlockSize = MIN_EXCESSIVE_BLOCK_SIZE;
+        nDefaultMaxBlockMiningSize = DEFAULT_BLOCK_MAX_SIZE;
 
         genesis = CreateGenesisBlock(1231006505, 2083236893, 0x1d00ffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
@@ -170,8 +174,11 @@ public:
 
         // List of Bitcoin Cash compatible seeders
         vSeeds.push_back(CDNSSeedData("bitcoinunlimited.info", "btccash-seeder.bitcoinunlimited.info", true));
-        vSeeds.push_back(CDNSSeedData("bitcoinabc.org", "seed.bitcoinabc.org", true));
         vSeeds.push_back(CDNSSeedData("bitcoinforks.org", "seed-bch.bitcoinforks.org", true));
+        vSeeds.push_back(CDNSSeedData("bchd.cash", "seed.bchd.cash", true));
+        vSeeds.push_back(CDNSSeedData("bch.loping.net", "seed.bch.loping.net", true));
+        vSeeds.push_back(CDNSSeedData("electroncash.de", "dnsseed.electroncash.de", true));
+        vSeeds.push_back(CDNSSeedData("flowee.cash", "seed.flowee.cash", true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1, 0);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1, 5);
@@ -222,6 +229,8 @@ public:
         checkpoints[609136] = uint256S("0x000000000000000000b48bb207faac5ac655c313e41ac909322eaa694f5bc5b1");
         // May 15th 2020 activate op_reverse, SigChecks
         checkpoints[635259] = uint256S("0x00000000000000000033dfef1fc2d6a5d5520b078c55193a9bf498c5b27530f7");
+        // Nov 15th 2020 new aserti3-2d DAA
+        checkpoints[661648] = uint256S("0x0000000000000000029e471c41818d24b8b74c911071c4ef0b4a0509f9b5a8ce");
 
         // clang-format on
         // * UNIX timestamp of last checkpoint block
@@ -275,6 +284,9 @@ public:
         pchMessageStart[3] = 0xe9;
         nDefaultPort = DEFAULT_NOLNET_PORT;
         nPruneAfterHeight = 100000;
+        nDefaultExcessiveBlockSize = std::numeric_limits<uint64_t>::max();
+        nMinMaxBlockSize = MIN_EXCESSIVE_BLOCK_SIZE_REGTEST;
+        nDefaultMaxBlockMiningSize = std::numeric_limits<uint64_t>::max();
 
         // Aug, 1 2017 hard fork
         consensus.uahfHeight = 0;
@@ -381,6 +393,9 @@ public:
         pchCashMessageStart[3] = 0xf4;
         nDefaultPort = DEFAULT_TESTNET_PORT;
         nPruneAfterHeight = 1000;
+        nDefaultExcessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
+        nMinMaxBlockSize = MIN_EXCESSIVE_BLOCK_SIZE;
+        nDefaultMaxBlockMiningSize = DEFAULT_BLOCK_MAX_SIZE;
 
         genesis = CreateGenesisBlock(1296688602, 414098458, 0x1d00ffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
@@ -393,12 +408,14 @@ public:
         vSeeds.clear();
         // nodes with support for servicebits filtering should be at the top
 
-        // Bitcoin ABC seeder
-        vSeeds.push_back(CDNSSeedData("bitcoinabc.org", "testnet-seed.bitcoinabc.org", true));
         // bitcoinforks seeders
-        vSeeds.push_back(CDNSSeedData("bitcoinforks.org", "testnet-seed-bch.bitcoinforks.org", true));
+        vSeeds.emplace_back(CDNSSeedData("bitcoinforks.org", "testnet-seed-bch.bitcoinforks.org", true));
         // BU seeder
-        vSeeds.push_back(CDNSSeedData("bitcoinunlimited.info", "testnet-seed.bitcoinunlimited.info", true));
+        vSeeds.emplace_back(CDNSSeedData("bitcoinunlimited.info", "testnet-seed.bitcoinunlimited.info", true));
+        // BCHD
+        vSeeds.emplace_back(CDNSSeedData("bchd.cash", "testnet-seed.bchd.cash", true));
+        // Loping.net
+        vSeeds.emplace_back(CDNSSeedData("loping", "seed.tbch.loping.net", true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 196);
@@ -434,6 +451,8 @@ public:
         checkpoints[1341712] = uint256S("0x00000000fffc44ea2e202bd905a9fbbb9491ef9e9d5a9eed4039079229afa35b");
         // May 15th 2020 activate op_reverse, SigCheck
         checkpoints[1378461] = uint256S("0x0000000099f5509b5f36b1926bcf82b21d936ebeadee811030dfbbb7fae915d7");
+        // Nov 15th 2020 new aserti3-2d DAA
+        checkpoints[1421482] = uint256S("0x0000000023e0680a8a062b3cc289a4a341124ce7fcb6340ede207e194d73b60a");
 
         // clang-format on
         // Data as of block
@@ -504,6 +523,9 @@ public:
         pchCashMessageStart[3] = 0xfa;
         nDefaultPort = DEFAULT_REGTESTNET_PORT;
         nPruneAfterHeight = 1000;
+        nDefaultExcessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE;
+        nMinMaxBlockSize = MIN_EXCESSIVE_BLOCK_SIZE_REGTEST;
+        nDefaultMaxBlockMiningSize = DEFAULT_BLOCK_MAX_SIZE;
 
         genesis = CreateGenesisBlock(1296688602, 2, 0x207fffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
@@ -534,6 +556,251 @@ public:
 };
 static CRegTestParams regTestParams;
 
+/**
+ * Testnet (v4)
+ */
+class CTestNet4Params : public CChainParams
+{
+public:
+    CTestNet4Params()
+    {
+        strNetworkID = "test4";
+        consensus.nSubsidyHalvingInterval = 210000;
+        consensus.BIP16Height = 1;
+        consensus.BIP34Height = 2;
+        consensus.BIP34Hash = uint256S("00000000b0c65b1e03baace7d5c093db0d6aac224df01484985ffd5e86a1a20c");
+        consensus.BIP65Height = 3;
+        consensus.BIP66Height = 4;
+        consensus.BIP68Height = 5;
+        consensus.powLimit = uint256S("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+
+        // two weeks
+        consensus.nPowTargetTimespan = 14 * 24 * 60 * 60;
+        consensus.nPowTargetSpacing = 10 * 60;
+        consensus.fPowAllowMinDifficultyBlocks = true;
+        consensus.fPowNoRetargeting = false;
+        // The half life for the ASERT DAA. For every (nASERTHalfLife) seconds behind schedule the blockchain gets,
+        // difficulty is cut in half. Doubled if blocks are ahead of schedule.
+        // One hour
+        consensus.nASERTHalfLife = 60 * 60;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].windowsize = 2016;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].threshold = 1512; // 75% of 2016
+
+        // August 1, 2017 hard fork
+        consensus.uahfHeight = 6;
+
+        // November 13, 2017 hard fork
+        consensus.daaHeight = 3000;
+
+        // May, 15 2018 hard fork
+        consensus.may2018Height = 4000;
+
+        // November 15, 2018 protocol upgrade
+        consensus.nov2018Height = 4000;
+
+        // May, 15 2019 hard fork
+        consensus.may2019Height = 5000;
+
+        // Nov, 15 2019 hard fork
+        consensus.nov2019Height = 5000;
+
+        // May, 15 2020 hard fork
+        // NOTE: Due to BCHN having completely removed the historical sig-ops counting code
+        //       the May 2020 height must be set to genesis in order to synchronize all blocks
+        //       using the post May 2020 hard fork sigchecks code
+        consensus.may2020Height = 0;
+
+        // Nov 15, 2020 12:00:00 UTC protocol upgrade
+        consensus.nov2020ActivationTime = 1605441600;
+
+        pchMessageStart[0] = 0xcd;
+        pchMessageStart[1] = 0x22;
+        pchMessageStart[2] = 0xa7;
+        pchMessageStart[3] = 0x92;
+        pchCashMessageStart[0] = 0xe2;
+        pchCashMessageStart[1] = 0xb7;
+        pchCashMessageStart[2] = 0xda;
+        pchCashMessageStart[3] = 0xaf;
+        nDefaultPort = DEFAULT_TESTNET4_PORT;
+        nPruneAfterHeight = 1000;
+        nDefaultExcessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE_TESTNET4;
+        nMinMaxBlockSize = MIN_EXCESSIVE_BLOCK_SIZE_REGTEST;
+        nDefaultMaxBlockMiningSize = DEFAULT_BLOCK_MAX_SIZE_TESTNET4;
+
+        genesis = CreateGenesisBlock(1597811185, 114152193, 0x1d00ffff, 1, 50 * COIN);
+        consensus.hashGenesisBlock = genesis.GetHash();
+        assert(consensus.hashGenesisBlock ==
+               uint256S("0x000000001dd410c49a788668ce26751718cc797474d3152a5fc073dd44fd9f7b"));
+
+        vFixedSeeds.clear();
+        vSeeds.clear();
+        // nodes with support for servicebits filtering should be at the top
+        vSeeds.emplace_back(CDNSSeedData("bitcoinforks.org", "testnet4-seed-bch.bitcoinforks.org", true));
+        vSeeds.emplace_back(CDNSSeedData("toom.im", "testnet4-seed-bch.toom.im", true));
+        vSeeds.emplace_back(CDNSSeedData("loping.net", "seed.tbch4.loping.net", true));
+
+        base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
+        base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 196);
+        base58Prefixes[SECRET_KEY] = std::vector<uint8_t>(1, 239);
+        base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
+        base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
+        cashaddrPrefix = "bchtest";
+        vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test4, pnSeed6_test4 + ARRAYLEN(pnSeed6_test4));
+
+        fMiningRequiresPeers = true;
+        fDefaultConsistencyChecks = false;
+        fRequireStandard = false;
+        fMineBlocksOnDemand = false;
+        fTestnetToBeDeprecatedFieldRPC = true;
+
+        // clang-format off
+        checkpointData = CCheckpointData();
+        MapCheckpoints &checkpoints = checkpointData.mapCheckpoints;
+        checkpoints[     0] = uint256S("0x000000001dd410c49a788668ce26751718cc797474d3152a5fc073dd44fd9f7b");
+        checkpoints[  5000] = uint256S("0x000000009f092d074574a216faec682040a853c4f079c33dfd2c3ef1fd8108c4");
+        // Nov 15th, 2020 new aserti3-2d DAA
+        checkpoints[ 16845] = uint256S("0x00000000fb325b8f34fe80c96a5f708a08699a68bbab82dba4474d86bd743077");
+        // clang-format on
+
+        // Data as of block
+        // 0000000019df558b6686b1a1c3e7aee0535c38052651b711f84eebafc0cc4b5e
+        // (height 5677)
+        checkpointData.nTimeLastCheckpoint = 1599886634;
+        checkpointData.nTransactionsLastCheckpoint = 7432;
+        checkpointData.fTransactionsPerDay = 1.3;
+    }
+};
+
+static CTestNet4Params testNet4Params;
+
+/**
+ * Scaling Network
+ */
+class CScaleNetParams : public CChainParams
+{
+public:
+    CScaleNetParams()
+    {
+        strNetworkID = "scale";
+        consensus.nSubsidyHalvingInterval = 210000;
+        consensus.BIP16Height = 1;
+        consensus.BIP34Height = 2;
+        consensus.BIP34Hash = uint256S("00000000c8c35eaac40e0089a83bf5c5d9ecf831601f98c21ed4a7cb511a07d8");
+        consensus.BIP65Height = 3;
+        consensus.BIP66Height = 4;
+        consensus.BIP68Height = 5;
+        consensus.powLimit = uint256S("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+
+        // two weeks
+        consensus.nPowTargetTimespan = 14 * 24 * 60 * 60;
+        consensus.nPowTargetSpacing = 10 * 60;
+        consensus.fPowAllowMinDifficultyBlocks = true;
+        consensus.fPowNoRetargeting = false;
+
+        // The half life for the ASERT DAA. For every (nASERTHalfLife) seconds behind schedule the blockchain gets,
+        // difficulty is cut in half. Doubled if blocks are ahead of schedule.
+        // Two days
+        consensus.nASERTHalfLife = 2 * 24 * 60 * 60;
+        // REVISIT: Not sure if the following are correct for ScaleNet (copied from TestNet4)
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].windowsize = 2016;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].threshold = 1512; // 75% of 2016
+
+        // August 1, 2017 hard fork
+        consensus.uahfHeight = 6;
+
+        // November 13, 2017 hard fork
+        consensus.daaHeight = 3000;
+
+        // May, 15 2018 hard fork
+        consensus.may2018Height = 4000;
+
+        // November 15, 2018 protocol upgrade
+        consensus.nov2018Height = 4000;
+
+        // May, 15 2019 hard fork
+        consensus.may2019Height = 5000;
+
+        // Nov, 15 2019 hard fork
+        consensus.nov2019Height = 5000;
+
+        // May, 15 2020 hard fork
+        // NOTE: Due to BCHN having completely removed the historical sig-ops counting code
+        //       the May 2020 height must be set to genesis in order to synchronize all blocks
+        //       using the post May 2020 hard fork sigchecks code
+        // NOTE: Specifically in scalenet there are several blocks in the 4000-6000 height range
+        //       that fail the historical sig-ops count check but pass the May 2020 sigchecks code
+        consensus.may2020Height = 0;
+
+        // Nov 15, 2020 12:00:00 UTC protocol upgrade
+        consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
+
+        pchMessageStart[0] = 0xba;
+        pchMessageStart[1] = 0xc2;
+        pchMessageStart[2] = 0x2d;
+        pchMessageStart[3] = 0xc4;
+        pchCashMessageStart[0] = 0xc3;
+        pchCashMessageStart[1] = 0xaf;
+        pchCashMessageStart[2] = 0xe1;
+        pchCashMessageStart[3] = 0xa2;
+        nDefaultPort = DEFAULT_SCALENET_PORT;
+        nPruneAfterHeight = 10000;
+        nDefaultExcessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE_SCALENET;
+        nMinMaxBlockSize = MIN_EXCESSIVE_BLOCK_SIZE;
+        nDefaultMaxBlockMiningSize = DEFAULT_BLOCK_MAX_SIZE_SCALENET;
+
+        genesis = CreateGenesisBlock(1598282438, -1567304284, 0x1d00ffff, 1, 50 * COIN);
+        consensus.hashGenesisBlock = genesis.GetHash();
+        assert(
+            consensus.hashGenesisBlock == uint256S("00000000e6453dc2dfe1ffa19023f86002eb11dbb8e87d0291a4599f0430be52"));
+        assert(genesis.hashMerkleRoot == uint256S("4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"));
+
+        vFixedSeeds.clear();
+        vSeeds.clear();
+        // nodes with support for servicebits filtering should be at the top
+        vSeeds.emplace_back(CDNSSeedData("bitcoinforks.org", "scalenet-seed-bch.bitcoinforks.org", true));
+        vSeeds.emplace_back(CDNSSeedData("toom.im", "scalenet-seed-bch.toom.im", true));
+        vSeeds.emplace_back(CDNSSeedData("loping.net", "seed.sbch.loping.net", true));
+
+        base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
+        base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 196);
+        base58Prefixes[SECRET_KEY] = std::vector<uint8_t>(1, 239);
+        base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
+        base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
+        cashaddrPrefix = "bchtest";
+        vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_scalenet, pnSeed6_scalenet + ARRAYLEN(pnSeed6_scalenet));
+
+        fMiningRequiresPeers = true;
+        fDefaultConsistencyChecks = false;
+        fRequireStandard = false;
+        fMineBlocksOnDemand = false;
+        fTestnetToBeDeprecatedFieldRPC = true;
+
+        // clang-format off
+        checkpointData = CCheckpointData();
+        MapCheckpoints &checkpoints = checkpointData.mapCheckpoints;
+        checkpoints[     0] = uint256S("0x00000000e6453dc2dfe1ffa19023f86002eb11dbb8e87d0291a4599f0430be52");
+        checkpoints[    45] = uint256S("0x00000000d75a7c9098d02b321e9900b16ecbd552167e65683fe86e5ecf88b320");
+        // scalenet periodically reorgs to height 10,000
+        checkpoints[ 10000] = uint256S("0x00000000b711dc753130e5083888d106f99b920b1b8a492eb5ac41d40e482905");
+
+        // clang-format on
+
+        // Data as of block
+        // REVISIT: Is below data correct? This is based on what BCHN merged
+        checkpointData.nTimeLastCheckpoint = 0;
+        checkpointData.nTransactionsLastCheckpoint = 0;
+        checkpointData.fTransactionsPerDay = 0;
+    }
+};
+
+static CScaleNetParams scaleNetParams;
+
 CChainParams *pCurrentParams = 0;
 
 const CChainParams &Params()
@@ -548,6 +815,10 @@ CChainParams &Params(const std::string &chain)
         return mainParams;
     else if (chain == CBaseChainParams::TESTNET)
         return testNetParams;
+    else if (chain == CBaseChainParams::TESTNET4)
+        return testNet4Params;
+    else if (chain == CBaseChainParams::SCALENET)
+        return scaleNetParams;
     else if (chain == CBaseChainParams::REGTEST)
         return regTestParams;
     else if (chain == CBaseChainParams::UNL)

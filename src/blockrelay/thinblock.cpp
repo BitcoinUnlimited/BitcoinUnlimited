@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -17,6 +17,7 @@
 #include "consensus/tx_verify.h"
 #include "dosman.h"
 #include "expedited.h"
+#include "extversionkeys.h"
 #include "net.h"
 #include "parallel.h"
 #include "policy/policy.h"
@@ -29,7 +30,6 @@
 #include "util.h"
 #include "utiltime.h"
 #include "validation/validation.h"
-#include "xversionkeys.h"
 
 static bool ReconstructBlock(CNode *pfrom,
     int &missingCount,
@@ -716,6 +716,7 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<
     // thinblock which has the full Tx hash data rather than just the truncated hash.
     if (_collision || !fMerkleRootCorrect)
     {
+        RequestThinBlock(pfrom, header.GetHash());
         if (!fMerkleRootCorrect)
         {
             return error(
@@ -723,7 +724,6 @@ bool CXThinBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<
         }
         else
         {
-            RequestThinBlock(pfrom, header.GetHash());
             return error("TX HASH COLLISION for xthinblock: re-requesting a thinblock, peer=%s", pfrom->GetLogName());
         }
     }
@@ -877,7 +877,7 @@ static bool ReconstructBlock(CNode *pfrom,
     }
     // Now that we've rebuilt the block successfully we can set the XVal flag which is used in
     // ConnectBlock() to determine which if any inputs we can skip the checking of inputs.
-    pblock->fXVal = true;
+    pblock->fXVal = DEFAULT_XVAL_ENABLED;
 
     return true;
 }

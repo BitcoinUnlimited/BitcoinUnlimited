@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -79,8 +79,8 @@ public:
     static const int VERSION_WITH_HDDATA = 10;
     static const int CURRENT_VERSION = VERSION_WITH_HDDATA;
 
-    int nVersion;
-    int64_t nCreateTime; // 0 means unknown
+    int nVersion = CKeyMetadata::CURRENT_VERSION;
+    int64_t nCreateTime = 0; // 0 means unknown
     std::string hdKeypath; // optional HD/bip32 keypath
     CKeyID hdMasterKeyID; // id of the hd masterkey used to derive this key
 

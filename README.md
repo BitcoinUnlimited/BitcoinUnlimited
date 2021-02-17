@@ -1,6 +1,6 @@
 [Website](https://www.bitcoinunlimited.info)  | [Download](https://www.bitcoinunlimited.info/download) | [Setup](README.md)   |   [Miner](doc/miner.md)  |  [ElectronCash](doc/bu-electrum-integration.md)  |  [UnconfirmedChains](doc/unconfirmedTxChainLimits.md)
 
-[![Build Status](https://travis-ci.org/BitcoinUnlimited/BitcoinUnlimited.svg?branch=release)](https://travis-ci.org/BitcoinUnlimited/BitcoinUnlimited)
+[![Build Status](https://gitlab.com/bitcoinunlimited/BCHUnlimited/badges/dev/pipeline.svg?key_text=Build%20Status%20%28dev%29&key_width=110)](https://gitlab.com/bitcoinunlimited/BCHUnlimited/-/pipelines)
 
 # What is Bitcoin Cash?
 

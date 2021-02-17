@@ -1,13 +1,13 @@
-// Copyright (c) 2019 The Bitcoin Unlimited developers
+// Copyright (c) 2019-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "electrum/electrs.h"
+#include "extversionkeys.h"
+#include "extversionmessage.h"
 #include "netaddress.h"
 #include "util.h"
 #include "utilhttp.h"
 #include "utilprocess.h"
-#include "xversionkeys.h"
-#include "xversionmessage.h"
 
 #include <map>
 #include <regex>
@@ -19,10 +19,11 @@ constexpr char ELECTRSCASH_BIN[] = "electrscash";
 
 static std::string monitoring_port() { return GetArg("-electrum.monitoring.port", "4224"); }
 static std::string monitoring_host() { return GetArg("-electrum.monitoring.host", "127.0.0.1"); }
-static std::string rpc_host() { return GetArg("-electrum.host", "127.0.0.1"); }
+static std::string rpc_host() { return GetArg("-electrum.host", "0.0.0.0"); }
 static std::string rpc_port(const std::string &network)
 {
-    std::map<std::string, std::string> portmap = {{"main", "50001"}, {"test", "60001"}, {"regtest", "60401"}};
+    const std::map<std::string, std::string> portmap = {
+        {"main", "50001"}, {"test", "60001"}, {"regtest", "60401"}, {"test4", "62001"}, {"scale", "63001"}};
 
     auto defaultPort = portmap.find(network);
     if (defaultPort == end(portmap))
@@ -34,11 +35,24 @@ static std::string rpc_port(const std::string &network)
 
     return GetArg("-electrum.port", defaultPort->second);
 }
-
-static bool is_electrum_server_public()
+static std::string ws_host() { return GetArg("-electrum.ws.host", "0.0.0.0"); }
+static std::string ws_port(const std::string &network)
 {
-    const auto host = rpc_host();
+    const std::map<std::string, std::string> portmap = {
+        {"main", "50003"}, {"test", "60003"}, {"regtest", "60403"}, {"test4", "62003"}, {"scale", "63003"}};
 
+    auto defaultPort = portmap.find(network);
+    if (defaultPort == end(portmap))
+    {
+        std::stringstream ss;
+        ss << "Electrum server does not support '" << network << "' network.";
+        throw std::invalid_argument(ss.str());
+    }
+    return GetArg("-electrum.ws.port", defaultPort->second);
+}
+
+static bool is_public_host(const std::string &host)
+{
     // Special case, CNetAddr treats "0.0.0.0" as local, but electrs
     // treats it as listen on all IPs.
     if (host == "0.0.0.0")
@@ -155,12 +169,10 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
     }
 
     args.push_back("--electrum-rpc-addr=" + rpc_host() + ":" + rpc_port(network));
+    args.push_back("--electrum-ws-addr=" + ws_host() + ":" + ws_port(network));
 
     // bitcoind data dir (for cookie file)
     args.push_back("--daemon-dir=" + GetDataDir(false).string());
-
-    // Use rpc interface instead of attempting to parse *blk files
-    args.push_back("--jsonrpc-import");
 
     // Where to store electrs database files.
     const std::string defaultDir = (GetDataDir() / ELECTRSCASH_BIN).string();
@@ -168,7 +180,7 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
 
     // Tell electrs what network we're on
     const std::map<std::string, std::string> netmapping = {
-        {"main", "bitcoin"}, {"test", "testnet"}, {"regtest", "regtest"}};
+        {"main", "bitcoin"}, {"test", "testnet"}, {"regtest", "regtest"}, {"test4", "testnet4"}, {"scale", "scalenet"}};
     if (!netmapping.count(network))
     {
         std::stringstream ss;
@@ -182,9 +194,6 @@ std::vector<std::string> electrs_args(int rpcport, const std::string &network)
     {
         args.push_back("--cookie=" + GetArg("-rpcuser", "") + ":" + GetArg("-rpcpassword", ""));
     }
-
-    // max txs to look up per address
-    args.push_back("--txid-limit=" + GetArg("-electrum.addr.limit", "500"));
 
     for (auto &a : mapMultiArgs["-electrum.rawarg"])
     {
@@ -226,21 +235,29 @@ std::map<std::string, int64_t> fetch_electrs_info()
     return info;
 }
 
-void set_xversion_flags(CXVersionMessage &xver, const std::string &network)
+void set_extversion_flags(CExtversionMessage &xver, const std::string &network)
 {
     if (!GetBoolArg("-electrum", false))
     {
         return;
     }
-    if (!is_electrum_server_public())
+
+    // Electrum protocol version 1.4.3
+    constexpr uint64_t major = 1;
+    constexpr uint64_t minor = 4;
+    constexpr uint64_t revision = 3;
+
+    const uint64_t electrum_protocol_version = 1000000 * major + 10000 * minor + 100 * revision;
+
+    if (is_public_host(rpc_host()))
     {
-        return;
+        xver.set_u64c(XVer::BU_ELECTRUM_SERVER_PORT_TCP, std::stoul(rpc_port(network)));
+        xver.set_u64c(XVer::BU_ELECTRUM_SERVER_PROTOCOL_VERSION, electrum_protocol_version);
     }
-
-    constexpr double ELECTRUM_PROTOCOL_VERSION = 1.4;
-
-    xver.set_u64c(XVer::BU_ELECTRUM_SERVER_PORT_TCP, std::stoul(rpc_port(network)));
-    xver.set_u64c(
-        XVer::BU_ELECTRUM_SERVER_PROTOCOL_VERSION, static_cast<uint64_t>(ELECTRUM_PROTOCOL_VERSION * 1000000));
+    if (is_public_host(ws_host()))
+    {
+        xver.set_u64c(XVer::BU_ELECTRUM_WS_SERVER_PORT_TCP, std::stoul(ws_port(network)));
+        xver.set_u64c(XVer::BU_ELECTRUM_SERVER_PROTOCOL_VERSION, electrum_protocol_version);
+    }
 }
 } // ns electrum

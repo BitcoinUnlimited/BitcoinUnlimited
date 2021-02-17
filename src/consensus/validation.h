@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -19,8 +19,10 @@ static const unsigned char REJECT_DUPLICATE = 0x12;
 static const unsigned char REJECT_NONSTANDARD = 0x40;
 static const unsigned char REJECT_DUST = 0x41;
 static const unsigned char REJECT_INSUFFICIENTFEE = 0x42;
-static const unsigned char REJECT_CHECKPOINT = 0x43;
+static const unsigned char REJECT_FORK = 0x43;
 static const unsigned char REJECT_WAITING = 0x44;
+static const unsigned char REJECT_MULTIPLE_INPUTS = 0x45; /* Used if we restrict transaction inputs in txadmission */
+static const unsigned char REJECT_CHECKPOINT = 0x46;
 
 /** Capture information about block/transaction validation */
 class CValidationState
@@ -84,6 +86,7 @@ public:
         return false;
     }
     bool CorruptionPossible() const { return corruptionPossible; }
+    void SetCorruptionPossible() { corruptionPossible = true; }
     unsigned int GetRejectCode() const { return chRejectCode; }
     std::string GetRejectReason() const { return strRejectReason; }
     std::string GetDebugMessage() const { return strDebugMessage; }

@@ -1,5 +1,5 @@
 // Copyright (c) 2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -23,6 +23,16 @@ CZMQNotificationInterface::~CZMQNotificationInterface()
     }
 }
 
+std::list<const CZMQAbstractNotifier *> CZMQNotificationInterface::GetActiveNotifiers() const
+{
+    std::list<const CZMQAbstractNotifier *> result;
+    for (const auto *n : notifiers)
+    {
+        result.push_back(n);
+    }
+    return result;
+}
+
 CZMQNotificationInterface *CZMQNotificationInterface::CreateWithArguments(
     const std::map<std::string, std::string> &args)
 {
@@ -32,8 +42,10 @@ CZMQNotificationInterface *CZMQNotificationInterface::CreateWithArguments(
 
     factories["pubhashblock"] = CZMQAbstractNotifier::Create<CZMQPublishHashBlockNotifier>;
     factories["pubhashtx"] = CZMQAbstractNotifier::Create<CZMQPublishHashTransactionNotifier>;
+    factories["pubhashds"] = CZMQAbstractNotifier::Create<CZMQPublishHashDoubleSpendNotifier>;
     factories["pubrawblock"] = CZMQAbstractNotifier::Create<CZMQPublishRawBlockNotifier>;
     factories["pubrawtx"] = CZMQAbstractNotifier::Create<CZMQPublishRawTransactionNotifier>;
+    factories["pubrawds"] = CZMQAbstractNotifier::Create<CZMQPublishRawDoubleSpendNotifier>;
 
     for (std::map<std::string, CZMQNotifierFactory>::const_iterator i = factories.begin(); i != factories.end(); ++i)
     {
@@ -153,3 +165,23 @@ void CZMQNotificationInterface::SyncTransaction(const CTransactionRef &ptx, cons
         }
     }
 }
+
+void CZMQNotificationInterface::SyncDoubleSpend(const CTransactionRef ptx)
+{
+    for (std::list<CZMQAbstractNotifier *>::iterator i = notifiers.begin(); i != notifiers.end();)
+    {
+        CZMQAbstractNotifier *notifier = *i;
+        if (notifier->NotifyDoubleSpend(ptx))
+        {
+            i++;
+        }
+        else
+        {
+            notifier->Shutdown();
+            i = notifiers.erase(i);
+        }
+    }
+}
+
+
+CZMQNotificationInterface *pzmqNotificationInterface = nullptr;

@@ -33,8 +33,8 @@ NOTE: Must build with QT 5.3 or higher. Building with Qt4 is not supported.
 
 1. Clone the Bitcoin source code and cd into `BitcoinUnlimited`
     ```bash
-    git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git
-    cd BitcoinUnlimited
+    git clone https://gitlab.com/bitcoinunlimited/BCHUnlimited.git
+    cd BCHUnlimited/
     ```
 
 2.  Build:

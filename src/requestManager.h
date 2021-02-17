@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -87,6 +87,7 @@ public:
     typedef std::list<CNodeRequestData> ObjectSourceList;
     CInv obj;
     bool rateLimited;
+    int64_t nDownloadingSince; // last time we started downloading the object
     bool fProcessing; // object was received but is still being processed
     int64_t lastRequestTime; // In stopwatch time microseconds, 0 means no request
     unsigned int outstandingReqs;
@@ -96,6 +97,7 @@ public:
     CUnknownObj()
     {
         rateLimited = false;
+        nDownloadingSince = 0;
         fProcessing = false;
         outstandingReqs = 0;
         lastRequestTime = 0;
@@ -121,7 +123,7 @@ struct CRequestManagerNodeState
     int64_t nDownloadingSince;
 
     // How many blocks are currently in flight and requested by this node.
-    int nBlocksInFlight;
+    uint64_t nBlocksInFlight;
 
     // Track how many thin type objects were requested for this peer
     double nNumRequests;
@@ -140,6 +142,8 @@ protected:
     friend UniValue getstructuresizes(const UniValue &params, bool fHelp);
 #endif
     friend class CState;
+
+    friend class CRequestManagerTest;
 
     // maps and iterators all GUARDED_BY cs_objDownloader
     typedef std::map<uint256, CUnknownObj> OdMap;
@@ -199,6 +203,9 @@ public:
     // Update the response time for this transaction request
     void UpdateTxnResponseTime(const CInv &obj, CNode *pfrom);
 
+    // Indicate that we got this object
+    void Downloading(const uint256 &hash, CNode *pfrom);
+
     // Indicate that we are processing this transaction
     void ProcessingTxn(const uint256 &hash, CNode *pfrom);
 
@@ -239,7 +246,7 @@ public:
     void RequestNextBlocksToDownload(CNode *pto);
 
     // This gets called from RequestNextBlocksToDownload
-    void FindNextBlocksToDownload(CNode *node, unsigned int count, std::vector<CBlockIndex *> &vBlocks);
+    void FindNextBlocksToDownload(CNode *node, size_t count, std::vector<CBlockIndex *> &vBlocks);
 
     // Request to synchronize mempool with peer pto
     void RequestMempoolSync(CNode *pto);

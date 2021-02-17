@@ -1,5 +1,5 @@
 // Copyright (c) 2018 The Bitcoin developers
-// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -110,12 +110,17 @@ void RespendRelayer::Trigger(CTxMemPool &pool)
             try
             {
                 auto item = *originalTxIter;
-                dsp = DoubleSpendProof::create(originalTxIter->GetTx(), *pRespend);
-                item.dsproof = pool.doubleSpendProofStorage()->add(dsp);
+                dsp = DoubleSpendProof::create(originalTxIter->GetTx(), *pRespend, pool);
+                item.dsproof = pool.doubleSpendProofStorage()->add(dsp).second;
                 LOG(DSPROOF, "Double spend found, creating double spend proof %d\n", item.dsproof);
                 pool.mapTx.replace(originalTxIter, item);
 
                 ptx = pool._get(originalTxIter->GetTx().GetHash());
+
+                DoubleSpendProof::Validity validity;
+                validity = dsp.validate(pool);
+                if (validity == DoubleSpendProof::Invalid)
+                    throw std::runtime_error("Invalid dsproof");
             }
             catch (const std::exception &e)
             {

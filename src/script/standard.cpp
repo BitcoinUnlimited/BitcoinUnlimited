@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -125,7 +125,7 @@ static bool MatchLabelPublic(const CScript &script, std::vector<valtype> &dataCa
         }
         dataCarriage.emplace_back(data);
     }
-    catch (scriptnum_error)
+    catch (scriptnum_error &)
     {
         return false;
     }
@@ -184,7 +184,7 @@ static bool MatchFreezeCLTV(const CScript &script, std::vector<valtype> &pubkeys
         // after key extraction we should still have one byte which represent OP_CHECKSIG
         return (s + 1 == script.end());
     }
-    catch (scriptnum_error)
+    catch (scriptnum_error &)
     {
         return false;
     }

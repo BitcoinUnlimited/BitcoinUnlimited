@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -264,6 +264,7 @@ public:
     mutable CAmount nImmatureWatchCreditCached;
     mutable CAmount nAvailableWatchCreditCached;
     mutable CAmount nChangeCached;
+    mutable bool fDoubleSpent;
 
     CWalletTx() { Init(nullptr); }
     CWalletTx(const CWallet *pwalletIn) { Init(pwalletIn); }
@@ -298,6 +299,7 @@ public:
         nImmatureWatchCreditCached = 0;
         nChangeCached = 0;
         nOrderPos = -1;
+        fDoubleSpent = false;
     }
 
     ADD_SERIALIZE_METHODS;
@@ -623,6 +625,11 @@ private:
     void AddToSpends(const COutPoint &outpoint, const uint256 &wtxid);
     void AddToSpends(const uint256 &wtxid);
 
+public:
+    /** Mark a wallet transaction as double spent */
+    void MarkDoubleSpent(const uint256 &hashTx);
+
+private:
     /* Mark a transaction (and its in-wallet descendants) as conflicting with a particular block. */
     void MarkConflicted(const uint256 &hashBlock, const uint256 &hashTx);
 

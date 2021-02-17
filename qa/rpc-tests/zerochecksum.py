@@ -60,9 +60,9 @@ class MyTest(BitcoinTestFramework):
         nt.join()
 
     def run_test(self):
-        logging.info("Testing xversion handling")
+        logging.info("Testing extversion handling")
 
-        # test regular set up including xversion
+        # test regular set up including extversion
         def chksumTest(chksum_zero_recv, chksum_zero_recv_advertise, chksum_zero_send):
             conn = self.restart_node()
             self.hndlr.allow0Checksum = chksum_zero_recv
@@ -73,10 +73,10 @@ class MyTest(BitcoinTestFramework):
             conn.wait_for_verack()
             conn.send_message(msg_verack())
 
-            # now it is time for xversion
-            conn.send_message(msg_xversion({0x00020002 : int(chksum_zero_recv_advertise)}))
+            # now it is time for extversion
+            conn.send_message(msg_extversion({0x00020002 : int(chksum_zero_recv_advertise)}))
 
-            conn.wait_for(lambda : conn.remote_xversion)
+            conn.wait_for(lambda : conn.remote_extversion)
             if len(self.hndlr.exceptions):
                 return
             conn.send_message(msg_ping())

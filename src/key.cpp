@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Copyright (c) 2017 The Zcash developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -80,7 +80,7 @@ int Hd44DeriveChildKey(unsigned char *secretSeed,
     if (keypath)
         *keypath = "m/" + std::to_string(purpose) + "'/" + std::to_string(coinType) + "'/" + std::to_string(account) +
                    "'/" + std::to_string(change) + "/" + std::to_string(index);
-    secret = childKey.key;
+    secret = CKey(childKey.key);
 
     // increment childkey index
     return index + 1;

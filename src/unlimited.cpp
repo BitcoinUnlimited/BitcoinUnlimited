@@ -1,5 +1,5 @@
 // Copyright (c) 2015 G. Andrew Stone
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -23,6 +23,7 @@
 #include "dstencode.h"
 #include "expedited.h"
 #include "hashwrapper.h"
+#include "init.h"
 #include "leakybucket.h"
 #include "miner.h"
 #include "net.h"
@@ -40,6 +41,7 @@
 #include "txmempool.h"
 #include "txorphanpool.h"
 #include "ui_interface.h"
+#include "unlimited.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
@@ -68,11 +70,7 @@ static atomic<bool> fIsChainNearlySyncd{false};
 // on whether we really have finished sync or not.
 static std::atomic<bool> fIsInitialBlockDownload{true};
 
-extern CTweakRef<uint64_t> miningBlockSize;
-extern CTweakRef<uint64_t> ebTweak;
-
 int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
-static const int NEW_CANDIDATE_INTERVAL = 30; // seconds
 
 bool IsTrafficShapingEnabled();
 UniValue validateblocktemplate(const UniValue &params, bool fHelp);
@@ -106,20 +104,11 @@ std::string ExcessiveBlockValidator(const uint64_t &value, uint64_t *item, bool 
                 << ").  This would cause you to orphan your own blocks.";
             return ret.str();
         }
-        if ((value < MIN_EXCESSIVE_BLOCK_SIZE) &&
-            ((Params().NetworkIDString() == "main") || (Params().NetworkIDString() == "test")))
+        if (value < Params().MinMaxBlockSize())
         {
             std::ostringstream ret;
             ret << Params().NetworkIDString() << "Sorry, your proposed excessive block size (" << value
-                << ") is smaller than the minimum EB size (" << MIN_EXCESSIVE_BLOCK_SIZE
-                << ").  This would cause you to orphan blocks from the rest of the net.";
-            return ret.str();
-        }
-        if ((value < MIN_EXCESSIVE_BLOCK_SIZE_REGTEST) && (Params().NetworkIDString() == "regtest"))
-        {
-            std::ostringstream ret;
-            ret << Params().NetworkIDString() << "Sorry, your proposed excessive block size (" << value
-                << ") is smaller than the minimum EB size (" << MIN_EXCESSIVE_BLOCK_SIZE_REGTEST
+                << ") is smaller than the minimum EB size (" << Params().MinMaxBlockSize()
                 << ").  This would cause you to orphan blocks from the rest of the net.";
             return ret.str();
         }
@@ -390,19 +379,31 @@ UniValue pushtx(const UniValue &params, bool fHelp)
 
 void UnlimitedPushTxns(CNode *dest)
 {
-    LOCK(dest->cs_filter);
     std::vector<uint256> vtxid;
     mempool.queryHashes(vtxid);
     vector<CInv> vInv;
+    unsigned int count = 0;
     for (uint256 &hash : vtxid)
     {
+        // Periodically check to make sure we are not shutting down.  It can take a long time to push all txns
+        // when mempools are huge.
+        count++;
+        if (((count & 0xFFF) == 0) && ShutdownRequested())
+            return; // abort because shutting down
+
         CInv inv(MSG_TX, hash);
         CTransactionRef ptx = nullptr;
         ptx = mempool.get(hash);
         if (ptx == nullptr)
-            continue; // another thread removed since queryHashes, maybe...
-        if ((dest->pfilter && dest->pfilter->IsRelevantAndUpdate(ptx)) || (!dest->pfilter))
-            vInv.push_back(inv);
+            continue; // another thread removed since queryHashes
+
+        // Dont hold this lock during a PushMessage.  This code isn't really perf sensitive so ok to lock in the loop
+        {
+            LOCK(dest->cs_filter);
+            if ((dest->pfilter && dest->pfilter->IsRelevantAndUpdate(ptx)) || (!dest->pfilter))
+                vInv.push_back(inv);
+        }
+
         if (vInv.size() == MAX_INV_SZ)
         {
             dest->PushMessage("inv", vInv);
@@ -439,10 +440,12 @@ void UnlimitedSetup(void)
 {
     MIN_TX_REQUEST_RETRY_INTERVAL = GetArg("-txretryinterval", DEFAULT_MIN_TX_REQUEST_RETRY_INTERVAL);
     MIN_BLK_REQUEST_RETRY_INTERVAL = GetArg("-blkretryinterval", DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL);
-    maxGeneratedBlock = GetArg("-blockmaxsize", maxGeneratedBlock);
+    maxGeneratedBlock = GetArg("-blockmaxsize", Params().DefaultMaxBlockMiningSize());
     blockVersion = GetArg("-blockversion", blockVersion);
-    excessiveBlockSize = GetArg("-excessiveblocksize", excessiveBlockSize);
+    excessiveBlockSize = GetArg("-excessiveblocksize", Params().DefaultExcessiveBlockSize());
+    LOG(TWEAKS, "TWEAKS: UnlimitedSetup() set excessiveBlockSize to %u", excessiveBlockSize);
     excessiveAcceptDepth = GetArg("-excessiveacceptdepth", excessiveAcceptDepth);
+    maxSigChecks = excessiveBlockSize / BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO;
     LoadTweaks(); // The above options are deprecated so the same parameter defined as a tweak will override them
 
     // If the user configures it to 1, assume this means default
@@ -955,8 +958,12 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nTx, uint6
         // Within a 1MB block transactions can be 1MB, so nothing to check WRT transaction size
     }
 
-    LOGA("Acceptable block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " \n", block.nVersion, block.nTime, blockSize,
-        nTx);
+    if ((block.nVersion >= 2) && (block.nTime >= 1364140153)) // BIP34 time and block version for use of GetHeight
+        LOGA("Acceptable block %s at %d: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " \n",
+            block.GetHash().ToString(), block.GetHeight(), block.nVersion, block.nTime, blockSize, nTx);
+    else
+        LOGA("Acceptable block %s: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " \n", block.GetHash().ToString(),
+            block.nVersion, block.nTime, blockSize, nTx);
     return false;
 }
 
@@ -1639,24 +1646,21 @@ UniValue setlog(const UniValue &params, bool fHelp)
 }
 
 /** Mining-Candidate begin */
+static int64_t lastMiningCandidateId = 0;
 
 /** Oustanding candidates are removed 30 sec after a new block has been found*/
 static void RmOldMiningCandidates()
 {
-    LOCK(cs_main);
-    static unsigned int prevheight = 0;
+    LOCK(csMiningCandidates);
     unsigned int height = GetBlockchainHeight();
 
-    if (height <= prevheight)
-        return;
-
-    int64_t tdiff = GetTime() - (chainActive.Tip()->nTime + NEW_CANDIDATE_INTERVAL);
+    int64_t tdiff = GetTime() - (chainActive.Tip()->nTime + minMiningCandidateInterval.Value());
     if (tdiff >= 0)
     {
         // Clean out mining candidates that are the same height as a discovered block.
         for (auto it = miningCandidatesMap.cbegin(); it != miningCandidatesMap.cend();)
         {
-            if (it->second.block.GetHeight() <= prevheight)
+            if ((it->second.block == nullptr) || (it->second.block->GetHeight() <= height))
             {
                 it = miningCandidatesMap.erase(it);
             }
@@ -1665,15 +1669,28 @@ static void RmOldMiningCandidates()
                 ++it;
             }
         }
-        prevheight = height;
+    }
+
+    // LOGA("Mining Candidate Map Size: %d\n", miningCandidatesMap.size());
+    auto maxCandid = maxMiningCandidates.Value();
+    if (maxCandid <= 0)
+        maxCandid = 1; // sanity check
+    if (miningCandidatesMap.size() > maxCandid)
+    {
+        miningCandidatesMap.erase(lastMiningCandidateId - (maxCandid - 1));
+        // LOGA("New Mining Candidate Map Size: %d\n", miningCandidatesMap.size());
     }
 }
 
-static void AddMiningCandidate(CMiningCandidate &candid, int64_t id)
+
+static uint64_t AddMiningCandidate(CMiningCandidate &candid)
 {
     // Save candidate so can be looked up:
-    LOCK(cs_main);
-    miningCandidatesMap[id] = candid;
+    LOCK(csMiningCandidates);
+    lastMiningCandidateId++;
+    candid.id = lastMiningCandidateId;
+    miningCandidatesMap[lastMiningCandidateId] = candid;
+    return lastMiningCandidateId;
 }
 
 std::vector<uint256> GetMerkleProofBranches(CBlock *pblock)
@@ -1691,21 +1708,41 @@ std::vector<uint256> GetMerkleProofBranches(CBlock *pblock)
     return ret;
 }
 
+static CMiningCandidate *FindRecentMiningCandidate(CScript *coinbaseScript, int32_t desiredVersion)
+{
+    LOCK(csMiningCandidates);
+    if ((lastMiningCandidateId == 0) || (miningCandidatesMap.size() == 0))
+        return nullptr; // No candidates
+    auto it = miningCandidatesMap.find(lastMiningCandidateId);
+    if (it == miningCandidatesMap.end())
+        return nullptr; // latest candidate has been removed
+    CMiningCandidate &candid = it->second;
+    if (candid.creationTime + minMiningCandidateInterval.Value() < (uint64_t)GetTime())
+        return nullptr; // Too old
+
+    // desired version bits changed
+    if (candid.block->nVersion != desiredVersion)
+        return nullptr;
+
+    // I don't care what the coinbase script is (probably because its anything from this wallet)
+    if (coinbaseScript == nullptr)
+        return &candid;
+
+    // The last candidate's script was the same as what I want now.
+    if (*coinbaseScript == candid.block->vtx[0]->vout[0].scriptPubKey)
+        return &candid;
+
+    return nullptr;
+}
+
 /** Create Mining-Candidate JSON to send to miner */
 static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
 {
-    static int64_t id = 0;
     UniValue ret(UniValue::VOBJ);
-    CBlock &block = candid.block;
-
-    RmOldMiningCandidates();
-
-    // Save candidate so can be looked up:
-    id++;
-    AddMiningCandidate(candid, id);
-    ret.pushKV("id", id);
+    CBlock &block = *(candid.block);
 
     ret.pushKV("prevhash", block.hashPrevBlock.GetHex());
+    ret.pushKV("id", candid.id);
 
     {
         const CTransaction *tran = block.vtx[0].get();
@@ -1739,6 +1776,7 @@ static UniValue MkMiningCandidateJson(CMiningCandidate &candid)
 
     return ret;
 }
+
 
 /** RPC Get a block candidate*/
 UniValue getminingcandidate(const UniValue &params, bool fHelp)
@@ -1785,28 +1823,62 @@ UniValue getminingcandidate(const UniValue &params, bool fHelp)
         destStr = params[1].get_str();
     }
 
-    // validate destination address (if supplied)
-    if (!destStr.empty())
+    RmOldMiningCandidates();
+    uint32_t blockVer = UtilMkBlockTmplVersionBits(
+        CBlockHeader::CURRENT_VERSION, std::set<std::string>(), chainActive.Tip(), nullptr, nullptr);
+
     {
-        CTxDestination destination = DecodeDestination(destStr);
-        if (!IsValidDestination(destination))
+        // Lock the mining candidates so that another request or a solution does not modify the coinbase while we are
+        // using it
+        LOCK(csMiningCandidates);
+        CMiningCandidate *recentCandidate = nullptr;
+        // validate destination address (if supplied)
+        if (!destStr.empty())
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("Error: Invalid address \"%s\"", destStr));
+            CTxDestination destination = DecodeDestination(destStr);
+            if (!IsValidDestination(destination))
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("Error: Invalid address \"%s\"", destStr));
+            }
+            coinbaseScript = GetScriptForDestination(destination);
+            candid.localCoinbase = false;
+
+            // Look for a recent candidate
+            recentCandidate = FindRecentMiningCandidate(&coinbaseScript, blockVer);
         }
-        coinbaseScript = GetScriptForDestination(destination);
+        else
+        {
+            candid.localCoinbase = true;
+
+            // Look for a recent candidate
+            recentCandidate = FindRecentMiningCandidate(nullptr, blockVer);
+        }
+
+        if (recentCandidate)
+        {
+            ret = MkMiningCandidateJson(*recentCandidate);
+            return ret;
+        }
+        else
+        {
+            candid.block = MakeBlockRef();
+            mkblocktemplate(UniValue(UniValue::VARR), coinbaseSize, candid.block.get(), coinbaseScript);
+            candid.creationTime = GetTime();
+
+            // Save candidate so it can be looked up:
+            AddMiningCandidate(candid);
+
+            ret = MkMiningCandidateJson(candid);
+            return ret;
+        }
     }
-
-    mkblocktemplate(UniValue(UniValue::VARR), coinbaseSize, &candid.block, coinbaseScript);
-
-    ret = MkMiningCandidateJson(candid);
-    return ret;
 }
 
 /** RPC Submit a solved block candidate*/
 UniValue submitminingsolution(const UniValue &params, bool fHelp)
 {
     UniValue rcvd;
-    CBlock block;
+    CBlockRef block;
 
     if (fHelp || params.size() != 1)
     {
@@ -1827,7 +1899,7 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
     int64_t id = rcvd["id"].get_int64();
 
     {
-        LOCK(cs_main);
+        LOCK(csMiningCandidates);
         if (miningCandidatesMap.count(id) == 1)
         {
             block = miningCandidatesMap[id].block;
@@ -1844,18 +1916,18 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
     {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "nonce not found");
     }
-    block.nNonce = (uint32_t)nonce.get_int64(); // 64 bit to deal with sign bit in 32 bit unsigned int
+    block->nNonce = (uint32_t)nonce.get_int64(); // 64 bit to deal with sign bit in 32 bit unsigned int
 
     UniValue time = rcvd["time"];
     if (!time.isNull())
     {
-        block.nTime = (uint32_t)time.get_int64();
+        block->nTime = (uint32_t)time.get_int64();
     }
 
     UniValue version = rcvd["version"];
     if (!version.isNull())
     {
-        block.nVersion = version.get_int(); // version signed 32 bit int
+        block->nVersion = version.get_int(); // version signed 32 bit int
     }
 
     // Coinbase:
@@ -1864,7 +1936,7 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
     if (!cbhex.isNull())
     {
         if (DecodeHexTx(coinbase, cbhex.get_str()))
-            block.vtx[0] = MakeTransactionRef(std::move(coinbase));
+            block->vtx[0] = MakeTransactionRef(std::move(coinbase));
         else
         {
             throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "coinbase decode failed");
@@ -1873,12 +1945,12 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
 
     // MerkleRoot:
     {
-        std::vector<uint256> merkleProof = GetMerkleProofBranches(&block);
-        uint256 t = block.vtx[0]->GetHash();
-        block.hashMerkleRoot = CalculateMerkleRoot(t, merkleProof);
+        std::vector<uint256> merkleProof = GetMerkleProofBranches(block.get());
+        uint256 t = block->vtx[0]->GetHash();
+        block->hashMerkleRoot = CalculateMerkleRoot(t, merkleProof);
     }
 
-    UniValue uvsub = SubmitBlock(block); // returns string on failure
+    UniValue uvsub = SubmitBlock(*block); // returns string on failure
     RmOldMiningCandidates();
     return uvsub;
 }
@@ -1992,7 +2064,7 @@ UniValue validatechainhistory(const UniValue &params, bool fHelp)
 
     LOGA("validatechainhistory starting at %d %s\n", pos->nHeight, pos->phashBlock->ToString());
 
-    LOCK(cs_main); // modifying contents of CBlockIndex
+    LOCK(cs_main); // modifying contents of CBlockIndex and setDirtyBlockIndex
 
     while (pos && !failedChain)
     {
@@ -2073,19 +2145,9 @@ UniValue validateblocktemplate(const UniValue &params, bool fHelp)
     {
         LOCK(cs_main); // to freeze the state during block validity test
 
-        if (block.GetBlockSize() <= BLOCKSTREAM_CORE_MAX_BLOCK_SIZE)
+        if (!TestBlockValidity(state, chainparams, block, pindexPrev, false, true))
         {
-            if (!TestConservativeBlockValidity(state, chainparams, block, pindexPrev, false, true))
-            {
-                throw runtime_error(std::string("invalid block: ") + state.GetRejectReason());
-            }
-        }
-        else
-        {
-            if (!TestBlockValidity(state, chainparams, block, pindexPrev, false, true))
-            {
-                throw runtime_error(std::string("invalid block: ") + state.GetRejectReason());
-            }
+            throw runtime_error(std::string("invalid block: ") + state.GetRejectReason());
         }
 
         if (block.fExcessive)
@@ -2147,8 +2209,15 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
     ret.pushKV("tweaks", (int64_t)tweaks.size());
     ret.pushKV("mapRelay", (int64_t)mapRelay.size());
     ret.pushKV("vRelayExpiration", (int64_t)vRelayExpiration.size());
-    ret.pushKV("vNodes", (int64_t)vNodes.size());
-    ret.pushKV("vNodesDisconnected", (int64_t)vNodesDisconnected.size());
+
+    {
+        LOCK(cs_vNodes);
+        ret.pushKV("vNodes", (int64_t)vNodes.size());
+    }
+    {
+        LOCK(cs_vNodesDisconnected);
+        ret.pushKV("vNodesDisconnected", (int64_t)vNodesDisconnected.size());
+    }
     {
         READLOCK(orphanpool.cs_orphanpool);
         ret.pushKV("mapOrphanTransactions", (int64_t)orphanpool.mapOrphanTransactions.size());
@@ -2169,7 +2238,7 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
 #ifdef DEBUG_LOCKORDER
     {
         std::lock_guard<std::mutex> lock(lockdata.dd_mutex);
-        ret.pushKV("lockorders", lockdata.ordertracker.size());
+        ret.pushKV("lockorders", (uint64_t)lockdata.ordertracker.size());
     }
 #endif
     LOCK(cs_vNodes);
@@ -2229,7 +2298,7 @@ struct CompareBlocksByHeight
 
 void MarkAllContainingChainsInvalid(CBlockIndex *invalidBlock)
 {
-    LOCK(cs_main);
+    LOCK(cs_main); // setDirtyBlockIndex
     READLOCK(cs_mapBlockIndex);
 
     bool dirty = false;

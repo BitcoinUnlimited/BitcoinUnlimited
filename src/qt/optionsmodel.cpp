@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -63,7 +63,7 @@ void OptionsModel::Init(bool resetSettings)
     nDisplayUnit = settings.value("nDisplayUnit").toInt();
 
     if (!settings.contains("strThirdPartyTxUrls"))
-        settings.setValue("strThirdPartyTxUrls", "");
+        settings.setValue("strThirdPartyTxUrls", "https://explorer.bitcoinunlimited.info/tx/%s");
     strThirdPartyTxUrls = settings.value("strThirdPartyTxUrls", "").toString();
 
     if (!settings.contains("fCoinControlFeatures"))
@@ -228,6 +228,28 @@ QVariant OptionsModel::data(const QModelIndex &index, int role) const
     return QVariant();
 }
 
+const char *isInvalidThirdPartyTxUrlString(QString value)
+{
+    // Check that the URLs are valid, and https.  Requiring https ensures that certain schemes that auto-execute
+    // cannot be used.  Although the user would need to explicitly configure such to happen, preventing
+    // this configuration protects the average user, and there isn't much application for weird schemes.
+    QStringList listUrls = value.split("|", QString::SkipEmptyParts);
+    for (int i = 0; i < listUrls.size(); ++i)
+    {
+        // remove whitespace and replace our tx placeholder with some valid URL data for validity checking.
+        QUrl url = QUrl(listUrls[i].replace("%s", "tx").trimmed(), QUrl::StrictMode);
+        if (!url.isValid())
+        {
+            return ("URL is invalid");
+        }
+        if (url.scheme().toLower() != "https")
+        {
+            return ("URL must be https");
+        }
+    }
+    return nullptr;
+}
+
 // write QSettings values
 bool OptionsModel::setData(const QModelIndex &index, const QVariant &value, int role)
 {
@@ -344,9 +366,14 @@ bool OptionsModel::setData(const QModelIndex &index, const QVariant &value, int 
         case ThirdPartyTxUrls:
             if (strThirdPartyTxUrls != value.toString())
             {
-                strThirdPartyTxUrls = value.toString();
-                settings.setValue("strThirdPartyTxUrls", strThirdPartyTxUrls);
-                setRestartRequired(true);
+                const char *ret = isInvalidThirdPartyTxUrlString(value.toString());
+
+                if (ret == nullptr)
+                {
+                    strThirdPartyTxUrls = value.toString();
+                    settings.setValue("strThirdPartyTxUrls", strThirdPartyTxUrls);
+                    setRestartRequired(true);
+                }
             }
             break;
         case Language:

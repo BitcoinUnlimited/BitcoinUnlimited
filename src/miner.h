@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -26,8 +26,6 @@ extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_coinbaseFlags;
 
 extern std::atomic<int64_t> nTotalPackage;
-extern std::atomic<int64_t> nTotalScore;
-extern CTweak<bool> miningCPFP;
 
 namespace Consensus
 {
@@ -36,6 +34,12 @@ struct Params;
 
 static const bool DEFAULT_PRINTPRIORITY = false;
 
+// Determine the correct version bits based on bip135 choices and passed settings
+int32_t UtilMkBlockTmplVersionBits(int32_t version,
+    const std::set<std::string> &setClientRules,
+    CBlockIndex *pindexPrev,
+    UniValue *paRules,
+    UniValue *pvbavailable);
 
 struct CBlockTemplate
 {
@@ -90,7 +94,7 @@ private:
     int nHeight;
     int64_t nLockTimeCutoff;
 
-    // Variables used for addScoreTxs and addPriorityTxs
+    // Variables used for addPriorityTxs
     int lastFewTxs;
     bool blockFinished;
 
@@ -110,15 +114,13 @@ private:
     void AddToBlock(std::vector<const CTxMemPoolEntry *> *vtxe, CTxMemPool::txiter iter);
 
     // Methods for how to add transactions to a block.
-    /** Add transactions based on modified feerate */
-    void addScoreTxs(std::vector<const CTxMemPoolEntry *> *vtxe);
     /** Add transactions based on tx "priority" */
     void addPriorityTxs(std::vector<const CTxMemPoolEntry *> *vtxe);
 
     /** Add transactions based on feerate including unconfirmed ancestors */
-    void addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, bool fCanonical);
+    void addPackageTxs(std::vector<const CTxMemPoolEntry *> *vtxe, bool fCanonical, bool fAllowDirty);
 
-    // helper function for addScoreTxs and addPriorityTxs
+    // helper function for addPriorityTxs
     bool IsIncrementallyGood(uint64_t nExtraSize, unsigned int nExtraSigOps);
     /** Test if tx will still "fit" in the block */
     bool TestForBlock(CTxMemPool::txiter iter);
@@ -127,10 +129,7 @@ private:
 
     /** Bytes to reserve for coinbase and block header */
     uint64_t reserveBlockSize(const CScript &scriptPubKeyIn, int64_t coinbaseSize = -1);
-    /** Internal method to construct a new block template */
-    std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript &scriptPubKeyIn,
-        bool blockstreamCoreCompatible,
-        int64_t coinbaseSize = -1);
+
     /** Constructs a coinbase transaction */
     CTransactionRef coinbaseTx(const CScript &scriptPubKeyIn, int nHeight, CAmount nValue);
 

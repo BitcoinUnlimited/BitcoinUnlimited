@@ -8,10 +8,10 @@ PROJECT_NAME = "ElectrsCash"
 GIT_REPO = "https://github.com/BitcoinUnlimited/{}.git".format(PROJECT_NAME)
 # When released put a tag here 'v2.0.0'
 # When in development, put 'master' here.
-GIT_BRANCH = "v2.0.0"
+GIT_BRANCH = "v3.0.0"
 # When released put a hash here: "aa95d64d050c286356dadb78d19c2e687dec85cf"
 # When in development, put 'None' here
-EXPECT_HEAD = "7dc599c09bf2f7604e2bdd7ecf613381c77e3092"
+EXPECT_HEAD = "9288d9f1bc828e06dca3b8783567c7557530740b"
 
 ROOT_DIR = os.path.realpath(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
@@ -28,6 +28,7 @@ parser.add_argument('--dst', help='Where to copy produced binary',
 parser.add_argument('--target', help='Target platform (e.g. x86_64-pc-linux-gnu)',
     default="x86_64-unknown-linux-gnu")
 parser.add_argument('--debug', help="Do a debug build", action = "store_true")
+parser.add_argument('--builddir', help="Out of source build directory", default=None)
 args = parser.parse_args()
 
 level = logging.DEBUG if args.verbose else logging.INFO
@@ -49,13 +50,14 @@ def check_dependencies():
         import git
     except Exception as e:
         logging.error("Failed to 'import git'")
-        logging.error("Tip: On Debian/Ubuntu you need to install python3-git")
+        logging.error("Tip: Install with: python3 -m pip install gitpython")
+        logging.error("Tip: On Debian/Ubuntu you can install python3-git")
         bail(str(e))
 
     import shutil
     if shutil.which("cargo") is None:
         logging.error("Cannot find 'cargo', will not be able to build {}".format(PROJECT_NAME))
-        logging.error("You need to install rust (1.34+) https://rustup.rs/")
+        logging.error("You need to install rust (1.38+) https://rustup.rs/")
         logging.error("Tip: On Debian/Ubuntu you need to install cargo")
         bail("rust not found")
 
@@ -124,9 +126,15 @@ def cargo_run(args):
 def get_target(makefile_target):
     # Try to map target passed from makefile to the equalent in rust
     # To see supported targets, run: rustc --print target-list
+
+    # Trim away darwin version number
+    if makefile_target.startswith('x86_64-apple-darwin'):
+        makefile_target = 'x86_64-apple-darwin'
+
     target_map = {
             'x86_64-pc-linux-gnu' : 'x86_64-unknown-linux-gnu',
-            'i686-pc-linux-gnu' : 'i686-unknown-linux-gnu'
+            'i686-pc-linux-gnu' : 'i686-unknown-linux-gnu',
+            'x86_64-apple-darwin': 'x86_64-apple-darwin'
     }
 
     if makefile_target in target_map:
@@ -146,21 +154,30 @@ if not os.path.exists(ELECTRS_DIR):
     clone_repo()
 verify_repo(args.allow_modified)
 
-def build_flags(debug, target):
+def build_flags(debug, target, builddir):
     flags = ["--target={}".format(get_target(target))]
+    if builddir is not None:
+        flags.append("--target-dir={}".format(os.path.abspath(builddir)))
     if debug:
         return flags
     return flags + ["--release"]
 
-cargo_run(["build", "--verbose", "--locked"] + build_flags(args.debug, args.target))
-cargo_run(["test", "--verbose", "--locked"] + build_flags(args.debug, args.target))
+cargo_run(["build", "--verbose", "--locked"] + build_flags(args.debug, args.target, args.builddir))
+cargo_run(["test", "--verbose", "--locked"] + build_flags(args.debug, args.target, args.builddir))
 
-def build_dir(debug):
+def build_type_dir(debug):
     if debug:
         return "debug"
     return "release"
 
-src = os.path.join(ELECTRS_DIR, "target", get_target(args.target), build_dir(args.debug), ELECTRS_BIN)
+def binary_dir(target, debug, builddir):
+    """
+    The directory where the electrscash binaries are built.
+    """
+    root = builddir if builddir is not None else os.path.join(ELECTRS_DIR, "target")
+    return os.path.join(root, get_target(target), build_type_dir(debug))
+
+src = os.path.join(binary_dir(args.target, args.debug, args.builddir), ELECTRS_BIN)
 logging.info("Copying %s to %s", src, args.dst)
 shutil.copy(src, args.dst)
 

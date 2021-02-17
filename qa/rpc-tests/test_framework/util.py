@@ -18,8 +18,10 @@ from binascii import hexlify, unhexlify
 from base64 import b64encode
 from decimal import Decimal, ROUND_DOWN
 import decimal
+import hashlib
 import json
 import http.client
+import pprint
 import random
 import shutil
 import subprocess
@@ -51,6 +53,42 @@ PORT_MIN = 5000
 PORT_RANGE = 30000
 
 debug_port_assignments = False
+
+def getNodeInfo(node):
+    PP_INDENT=2
+    PP_WIDTH=3*80
+    ret = ""
+    ret += "\n** getinfo:\n" + pprint.pformat(node.getinfo(),PP_INDENT,PP_WIDTH)
+    ret += "\n** getmempoolinfo:\n" + pprint.pformat(node.getmempoolinfo(),PP_INDENT,PP_WIDTH)
+    ret += "\n** getorphanpoolinfo:\n" + pprint.pformat(node.getorphanpoolinfo(),PP_INDENT,PP_WIDTH)
+    v = node.getpeerinfo()
+    ret += ("\n** %d peers:\n" % len(v)) + pprint.pformat(v,PP_INDENT,PP_WIDTH)
+    return ret
+
+# Serialization/deserialization tools
+def sha256(s):
+    """Return the sha256 hash of the passed binary data
+
+    >>> hexlify(sha256("e hat eye pie plus one is O".encode()))
+    b'c5b94099f454a3807377724eb99a33fbe9cb5813006cadc03e862a89d410eaf0'
+    """
+    return hashlib.new('sha256', s).digest()
+
+
+def hash256(s):
+    """Return the double SHA256 hash (what bitcoin typically uses) of the passed binary data
+
+    >>> hexlify(hash256("There was a terrible ghastly silence".encode()))
+    b'730ac30b1e7f4061346277ab639d7a68c6686aeba4cc63280968b903024a0a40'
+    """
+    return sha256(sha256(s))
+
+def hash160(msg):
+    """RIPEME160(SHA256(msg)) -> bytes"""
+    h = hashlib.new('ripemd160')
+    h.update(hashlib.sha256(msg).digest())
+    return h.digest()
+
 
 class TimeoutException(Exception):
     pass
@@ -327,6 +365,10 @@ def sync_blocks(rpc_connections, *, wait=1, verbose=1, timeout=60):
                 graph[nodeIdx] = connectedTo
             if not is_connected(graph):
                 raise Exception('sync_blocks: bitcoind nodes cannot sync because they are not all connected.  Node connection graph: %s' % str(graph))
+    print("sync_blocks timeout, printing debug info: ")
+    for rpc in rpc_connections:
+        print("NODE: ")
+        print(getNodeInfo(rpc))
     raise Exception('sync_blocks: blocks did not sync through various nodes before the timeout of %d seconds kicked in' % timeout)
 
 def sync_blocks_to(height, rpc_connections, *, wait=1, verbose=1, timeout=60):
@@ -718,6 +760,8 @@ def stop_nodes(nodes):
             node.stop()
         except http.client.CannotSendRequest as e:
             print("WARN: Unable to stop node: " + repr(e))
+        except AttributeError:  # One of the nodes is None (never started)
+            pass
     del nodes[:] # Emptying array closes connections as a side effect
 
 def set_node_times(nodes, t):
@@ -729,6 +773,10 @@ def wait_bitcoinds():
     for bitcoind in bitcoind_processes.values():
         bitcoind.wait(timeout=BITCOIND_PROC_WAIT_TIMEOUT)
     bitcoind_processes.clear()
+
+def wait_bitcoind_exit(i, timeout=BITCOIND_PROC_WAIT_TIMEOUT):
+    # Wait for all bitcoinds to cleanly exit
+    bitcoind_processes[i].wait(timeout=timeout)
 
 def is_bitcoind_running(i):
     assert i in bitcoind_processes
@@ -1121,24 +1169,43 @@ def satoshi_round(amount):
 # Helper to create at least "count" utxos
 # Pass in a fee that is sufficient for relay and mining new transactions.
 def create_confirmed_utxos(fee, node, count):
-    node.generate(int(0.5*count)+101)
     utxos = node.listunspent()
-    iterations = count - len(utxos)
-    addr1 = node.getnewaddress()
-    addr2 = node.getnewaddress()
-    if iterations <= 0:
+    if len(utxos) == 0:  # make sure we have a utxo
+        node.generate(1)
+    lengthen = 101 - node.getblockcount()
+    if lengthen > 0:  # make sure the chain has matured
+        node.generate(lengthen)
+
+    utxos = node.listunspent()
+
+    nUtxos = len(utxos)
+    if nUtxos >= count:  # We have enough
         return utxos
-    for i in range(iterations):
+    addr = node.getnewaddress()
+
+    SPLIT_WIDTH = 25
+    addr = [ node.getnewaddress() for x in range(0,SPLIT_WIDTH)]
+    while nUtxos < count:
+        while len(utxos) == 0:  # Reload if needed
+            utxos = node.listunspent()
+            if len(utxos) == 0:
+                node.generate(1)
+
         t = utxos.pop()
         inputs = []
         inputs.append({ "txid" : t["txid"], "vout" : t["vout"]})
         outputs = {}
         send_value = t['amount'] - fee
-        outputs[addr1] = satoshi_round(send_value/2)
-        outputs[addr2] = satoshi_round(send_value/2)
+        splits = min(SPLIT_WIDTH-1, count - nUtxos) + 1  # + 1 because the tx consumes 1
+        if splits==1: # DONE
+            break
+        for i in range(0, splits):
+            outputs[addr[i]] = satoshi_round(send_value/splits)
         raw_tx = node.createrawtransaction(inputs, outputs)
         signed_tx = node.signrawtransaction(raw_tx)["hex"]
         txid = node.sendrawtransaction(signed_tx)
+        nUtxos += splits - 1  # consumed 1, created splits utxos
+
 
     while (node.getmempoolinfo()['size'] > 0):
         node.generate(1)
@@ -1180,7 +1247,7 @@ def create_tx(node, coinbase, to_address, amount):
 def create_lots_of_big_transactions(node, txouts, utxos, num, fee):
     addr = node.getnewaddress()
     txids = []
-    for i in range(len(utxos)):
+    for i in range(num):
         t = utxos.pop()
         inputs = []
         inputs.append({ "txid" : t["txid"], "vout" : t["vout"]})

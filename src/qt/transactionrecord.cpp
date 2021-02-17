@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -205,7 +205,6 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
 
 void TransactionRecord::updateStatus(const CWalletTx &wtx)
 {
-    AssertLockHeld(cs_main);
     // Determine transaction status
 
     // Find the block the tx is in
@@ -268,15 +267,20 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
         }
         else if (status.depth == 0)
         {
-            status.status = TransactionStatus::Unconfirmed;
+            if (wtx.fDoubleSpent)
+                status.status = TransactionStatus::DoubleSpent;
+            else
+                status.status = TransactionStatus::Unconfirmed;
         }
         else if (status.depth < RecommendedNumConfirmations)
         {
             status.status = TransactionStatus::Confirming;
+            wtx.fDoubleSpent = false;
         }
         else
         {
             status.status = TransactionStatus::Confirmed;
+            wtx.fDoubleSpent = false;
         }
     }
 }

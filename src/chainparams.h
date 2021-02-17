@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -34,7 +34,7 @@ static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 1000000;
 /** Default for -mempoolexpiry, expiration time for mempool transactions in hours */
 static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 72;
 /** Default for -orphanpoolexpiry, expiration time for orphan pool transactions in hours */
-static const unsigned int DEFAULT_ORPHANPOOL_EXPIRY = 15;
+static const unsigned int DEFAULT_ORPHANPOOL_EXPIRY = 72;
 
 
 struct CDNSSeedData
@@ -68,7 +68,9 @@ enum
     DEFAULT_MAINNET_PORT = 8333,
     DEFAULT_TESTNET_PORT = 18333,
     DEFAULT_NOLNET_PORT = 9333,
-    DEFAULT_REGTESTNET_PORT = 18444
+    DEFAULT_REGTESTNET_PORT = 18444,
+    DEFAULT_TESTNET4_PORT = 28333,
+    DEFAULT_SCALENET_PORT = 38333,
 };
 
 /**
@@ -117,6 +119,9 @@ public:
     const std::string &CashAddrPrefix() const { return cashaddrPrefix; }
     const std::vector<SeedSpec6> &FixedSeeds() const { return vFixedSeeds; }
     const CCheckpointData &Checkpoints() const { return checkpointData; }
+    uint64_t DefaultExcessiveBlockSize() const { return nDefaultExcessiveBlockSize; }
+    uint64_t MinMaxBlockSize() const { return nMinMaxBlockSize; }
+    uint64_t DefaultMaxBlockMiningSize() const { return nDefaultMaxBlockMiningSize; }
 protected:
     CChainParams() {}
     Consensus::Params consensus;
@@ -136,6 +141,9 @@ protected:
     bool fMineBlocksOnDemand;
     bool fTestnetToBeDeprecatedFieldRPC;
     CCheckpointData checkpointData;
+    uint64_t nDefaultExcessiveBlockSize;
+    uint64_t nMinMaxBlockSize;
+    uint64_t nDefaultMaxBlockMiningSize;
 };
 
 /**

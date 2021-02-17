@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,7 +7,7 @@
 
 #include <boost/asio.hpp>
 #include <boost/asio/steady_timer.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <chrono>
 // c++11 #include <type_traits>
 #include "univalue/include/univalue.h"
@@ -587,6 +587,7 @@ public:
         return *this;
     }
 
+    MinValMax(const MinValMax<NUM> &rhs) { *this = rhs; }
     MinValMax &operator=(const volatile MinValMax &rhs)
     {
         min = rhs.min;

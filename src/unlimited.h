@@ -1,5 +1,5 @@
 // Copyright (c) 2015 G. Andrew Stone
-// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -282,6 +282,10 @@ std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool valida
 extern CTweak<unsigned int> maxTxSize;
 extern CTweak<uint64_t> coinbaseReserve;
 extern CTweak<unsigned int> unconfPushAction;
+extern CTweakRef<uint64_t> miningBlockSize;
+extern CTweakRef<uint64_t> ebTweak;
+extern CTweak<uint64_t> maxMiningCandidates;
+extern CTweak<uint64_t> minMiningCandidateInterval;
 
 extern std::list<CStatBase *> mallocedStats;
 
@@ -305,7 +309,12 @@ std::vector<uint256> GetMerkleProofBranches(CBlock *pblock);
 class CMiningCandidate
 {
 public:
-    CBlock block;
+    bool localCoinbase = false; // Did this wallet produce the coinbase (is so we can reuse candidates)
+    uint64_t creationTime = 0;
+    uint64_t id = 0;
+    CBlockRef block;
 };
+extern CCriticalSection csMiningCandidates;
+
 extern std::map<int64_t, CMiningCandidate> miningCandidatesMap;
 #endif

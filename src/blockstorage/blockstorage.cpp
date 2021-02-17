@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -24,8 +24,8 @@ extern std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
 extern CTweak<uint64_t> pruneIntervalTweak;
 
 CDatabaseAbstract *pblockdb = nullptr;
-unsigned int blockfile_chunk_size = DEFAULT_BLOCKFILE_CHUNK_SIZE;
-unsigned int undofile_chunk_size = DEFAULT_UNDOFILE_CHUNK_SIZE;
+uint64_t blockfile_chunk_size = DEFAULT_BLOCKFILE_CHUNK_SIZE;
+uint64_t undofile_chunk_size = DEFAULT_UNDOFILE_CHUNK_SIZE;
 
 /**
   * Config param to determine what DB type we are using
@@ -159,7 +159,7 @@ void SyncStorage(const CChainParams &chainparams)
         pblocktreeother->GetSortedHashIndex(hashesByHeight);
         CValidationState state;
         int bestHeight = 0;
-        CBlockIndex *pindexBest = new CBlockIndex();
+        CBlockIndex *pindexBest = nullptr;
         std::vector<CBlockIndex *> blocksToRemove;
         for (const std::pair<int, CDiskBlockIndex> &item : hashesByHeight)
         {
@@ -305,6 +305,7 @@ void SyncStorage(const CChainParams &chainparams)
         // if bestHeight != 0 then pindexBest has been initialized and we can update the best block.
         if (bestHeight != 0)
         {
+            assert(pindexBest);
             pcoinsdbview->WriteBestBlock(pindexBest->GetBlockHash(), SEQUENTIAL_BLOCK_FILES);
         }
     }
@@ -316,7 +317,7 @@ void SyncStorage(const CChainParams &chainparams)
         LOGA("indexByHeight size = %u \n", indexByHeight.size());
         int64_t bestHeight = 0;
         int64_t lastFinishedFile = 0;
-        CBlockIndex *pindexBest = new CBlockIndex();
+        CBlockIndex *pindexBest = nullptr;
         // Load block file info
         int loadedblockfile = 0;
         pblocktreeother->ReadLastBlockFile(loadedblockfile);
@@ -443,6 +444,7 @@ void SyncStorage(const CChainParams &chainparams)
         // if bestHeight != 0 then pindexBest has been initialized and we can update the best block.
         if (bestHeight != 0)
         {
+            assert(pindexBest);
             pcoinsdbview->WriteBestBlock(pindexBest->GetBlockHash(), LEVELDB_BLOCK_STORAGE);
         }
     }
@@ -451,6 +453,8 @@ void SyncStorage(const CChainParams &chainparams)
     pcoinsdbview->WriteBestBlock(emptyHash, otherMode);
     FlushStateToDisk();
     LOGA("Block database upgrade completed.\n");
+    if (pblockdbsync)
+        delete pblockdbsync;
 }
 
 bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos, const CMessageHeader::MessageStartChars &messageStart)
@@ -573,6 +577,7 @@ bool FlushStateToDiskInternal(CValidationState &state,
     bool fFlushForPrune,
     std::set<int> setFilesToPrune)
 {
+    AssertLockHeld(cs_main); // For setDirtyBlockIndex
     static int64_t nLastWrite = 0;
     static int64_t nLastFlush = 0;
     static int64_t nLastSetChain = 0;
@@ -792,7 +797,7 @@ void PruneAndFlush()
 
 bool FindBlockPos(CValidationState &state,
     CDiskBlockPos &pos,
-    unsigned int nAddSize,
+    uint64_t nAddSize,
     unsigned int nHeight,
     uint64_t nTime,
     bool fKnown)
@@ -827,7 +832,7 @@ bool FindBlockPos(CValidationState &state,
 
     if (!fKnown)
     {
-        while (vinfoBlockFile[nFile].nSize + nAddSize >= MAX_BLOCKFILE_SIZE)
+        while ((vinfoBlockFile[nFile].nSize != 0) && (vinfoBlockFile[nFile].nSize + nAddSize >= max_blockfile_size))
         {
             nFile++;
             if (vinfoBlockFile.size() <= nFile)
@@ -851,14 +856,18 @@ bool FindBlockPos(CValidationState &state,
 
     vinfoBlockFile[nFile].AddBlock(nHeight, nTime);
     if (fKnown)
+    {
         vinfoBlockFile[nFile].nSize = std::max(pos.nPos + nAddSize, vinfoBlockFile[nFile].nSize);
+    }
     else
+    {
         vinfoBlockFile[nFile].nSize += nAddSize;
+    }
 
     if (!fKnown)
     {
-        unsigned int nOldChunks = (pos.nPos + blockfile_chunk_size - 1) / blockfile_chunk_size;
-        unsigned int nNewChunks = (vinfoBlockFile[nFile].nSize + blockfile_chunk_size - 1) / blockfile_chunk_size;
+        uint64_t nOldChunks = (pos.nPos + blockfile_chunk_size - 1) / blockfile_chunk_size;
+        uint64_t nNewChunks = (vinfoBlockFile[nFile].nSize + blockfile_chunk_size - 1) / blockfile_chunk_size;
         if (nNewChunks > nOldChunks)
         {
             if (fPruneMode)
@@ -885,7 +894,7 @@ bool FindBlockPos(CValidationState &state,
     return true;
 }
 
-bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigned int nAddSize)
+bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, uint64_t nAddSize)
 {
     // nUndoPos for blockdb is a flag, set it to 1 to inidicate we have the data
     if (pblockdb)
@@ -902,13 +911,13 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
 
     LOCK(cs_LastBlockFile);
 
-    unsigned int nNewSize;
+    uint64_t nNewSize;
     pos.nPos = vinfoBlockFile[nFile].nUndoSize;
     nNewSize = vinfoBlockFile[nFile].nUndoSize += nAddSize;
     setDirtyFileInfo.insert(nFile);
 
-    unsigned int nOldChunks = (pos.nPos + undofile_chunk_size - 1) / undofile_chunk_size;
-    unsigned int nNewChunks = (nNewSize + undofile_chunk_size - 1) / undofile_chunk_size;
+    uint64_t nOldChunks = (pos.nPos + undofile_chunk_size - 1) / undofile_chunk_size;
+    uint64_t nNewChunks = (nNewSize + undofile_chunk_size - 1) / undofile_chunk_size;
     if (nNewChunks > nOldChunks)
     {
         if (fPruneMode)

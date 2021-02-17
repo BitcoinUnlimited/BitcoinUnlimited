@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -68,7 +68,7 @@ CompactBlock::CompactBlock(const CBlock &block, const CRollingFastFilter<4 * 102
         const CTransaction &tx = *block.vtx[i];
         if (inventoryKnown && !inventoryKnown->contains(tx.GetHash()))
         {
-            prefilledtxn.push_back(PrefilledTransaction{static_cast<uint16_t>(i - (prevIndex + 1)), tx});
+            prefilledtxn.push_back(PrefilledTransaction{static_cast<uint32_t>(i - (prevIndex + 1)), tx});
             prevIndex = i;
         }
         else
@@ -294,7 +294,7 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock
 
                 // If there are more hashes to request than available indices then we will not be able to
                 // reconstruct the compact block so just send a full block.
-                if (setHashesToRequest.size() > std::numeric_limits<uint16_t>::max())
+                if (setHashesToRequest.size() > std::numeric_limits<uint32_t>::max())
                 {
                     // Since we can't process this compactblock then clear out the data from memory
                     thinrelay.ClearAllBlockData(pfrom, pblock->GetHash());
@@ -332,11 +332,10 @@ bool CompactBlock::process(CNode *pfrom, std::shared_ptr<CBlockThinRelay> pblock
     // a full block if a mismatch occurs.
     if (!fMerkleRootCorrect)
     {
-        return error("mismatched merkle root on compactblock: rerequesting a full block, peer=%s", pfrom->GetLogName());
-
         thinrelay.ClearAllBlockData(pfrom, header.GetHash());
         thinrelay.RequestBlock(pfrom, header.GetHash());
-        return true;
+
+        return error("mismatched merkle root on compactblock: rerequesting a full block, peer=%s", pfrom->GetLogName());
     }
 
     nWaitingForTxns = missingCount;
@@ -673,7 +672,7 @@ static bool ReconstructBlock(CNode *pfrom,
     }
     // Now that we've rebuilt the block successfully we can set the XVal flag which is used in
     // ConnectBlock() to determine which if any inputs we can skip the checking of inputs.
-    pblock->fXVal = true;
+    pblock->fXVal = DEFAULT_XVAL_ENABLED;
 
     return true;
 }

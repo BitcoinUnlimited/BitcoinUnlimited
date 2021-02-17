@@ -214,7 +214,7 @@ a non zero suffix as a key.
 
 ### Bitcoin Unlimited
 In the Bitcoin Unlimited reference implementation, the `xversion`
-message is handled using the `CXVersionMessage` class. The actual
+message is handled using the `CExtversionMessage` class. The actual
 `xmap` is serialized and deserialized using the
 `CompactMapSerialization` adapter class.  To avoid attacks that could
 cause a slow-down of key lookup in the `xmap` tables, the table is

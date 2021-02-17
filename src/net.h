@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,6 +12,7 @@
 #include "bloom.h"
 #include "chainparams.h"
 #include "compat.h"
+#include "extversionmessage.h"
 #include "fastfilter.h"
 #include "fs.h"
 #include "hashwrapper.h"
@@ -29,7 +30,6 @@
 #include "uint256.h"
 #include "unlimited.h"
 #include "util.h" // FIXME: reduce scope
-#include "xversionmessage.h"
 
 #include <atomic>
 #include <deque>
@@ -101,8 +101,11 @@ static const unsigned int MAX_DISCONNECTS = 200;
 static const uint64_t DEFAULT_MAX_UPLOAD_TARGET = 0;
 /** Default for blocks only*/
 static const bool DEFAULT_BLOCKSONLY = false;
-/** Default for XVersion */
-static const bool DEFAULT_USE_XVERSION = true;
+/** Default for Extversion */
+static const bool DEFAULT_USE_EXTVERSION = true;
+
+/** Internal constant that indicates we have no common graphene versions. */
+const uint64_t GRAPHENE_NO_VERSION_SUPPORTED = 0xfffffff;
 
 // BITCOINUNLIMITED START
 static const bool DEFAULT_FORCEBITNODES = false;
@@ -207,8 +210,12 @@ extern CAddrMan addrman;
 extern int nMaxConnections;
 /** The minimum number of xthin nodes to connect to */
 extern int nMinXthinNodes;
+
 extern std::vector<CNode *> vNodes;
 extern CCriticalSection cs_vNodes;
+extern std::list<CNode *> vNodesDisconnected;
+extern CCriticalSection cs_vNodesDisconnected;
+
 extern std::map<CInv, CTransactionRef> mapRelay;
 extern std::deque<std::pair<int64_t, CInv> > vRelayExpiration;
 extern CCriticalSection cs_mapRelay;
@@ -333,32 +340,43 @@ class CNode
 #endif
 
 public:
+    // All of the following variables should be atomics. They are potentially dynamic values because
+    // of the XUPDATE message which can modify these values at any time.
+
     /** This node's max acceptable number ancestor transactions.  Used to decide whether this node will accept a
      * particular transaction. */
-    size_t nLimitAncestorCount = BCH_DEFAULT_ANCESTOR_LIMIT;
+    std::atomic<size_t> nLimitAncestorCount{BCH_DEFAULT_ANCESTOR_LIMIT};
     /** This node's max acceptable sum of all ancestor transaction sizes.  Used to decide whether this node will accept
      * a particular transaction. */
-    size_t nLimitAncestorSize = BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000;
+    std::atomic<size_t> nLimitAncestorSize{BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000};
     /** This node's max acceptable number of descendants.  Used to decide whether this node will accept a particular
      * transaction. */
-    size_t nLimitDescendantCount = BCH_DEFAULT_DESCENDANT_LIMIT;
+    std::atomic<size_t> nLimitDescendantCount{BCH_DEFAULT_DESCENDANT_LIMIT};
     /** This node's max acceptable sum of all descendant transaction sizes.  Used to decide whether this node will
      * accept a particular transaction. */
-    size_t nLimitDescendantSize = BCH_DEFAULT_DESCENDANT_SIZE_LIMIT * 1000;
+    std::atomic<size_t> nLimitDescendantSize{BCH_DEFAULT_DESCENDANT_SIZE_LIMIT * 1000};
     /** Does this node support mempool synchronization? */
-    bool canSyncMempoolWithPeers = false;
+    std::atomic<bool> canSyncMempoolWithPeers{false};
     /** Minimum supported mempool synchronization version */
-    uint64_t nMempoolSyncMinVersionSupported = 0;
+    std::atomic<uint64_t> nMempoolSyncMinVersionSupported{0};
     /** Maximum supported mempool synchronization version */
-    uint64_t nMempoolSyncMaxVersionSupported = 0;
+    std::atomic<uint64_t> nMempoolSyncMaxVersionSupported{0};
     /** Tx concatenation supported (set by xversion) */
-    uint64_t txConcat = 0;
+    std::atomic<bool> txConcat{false};
     /** set to true if this node support xVersion */
-    std::atomic<bool> xVersionEnabled{false};
-    /** set to true if the next expected message is xVersion */
-    std::atomic<bool> xVersionExpected{false};
+    /** set to true if this node support extversion */
+    std::atomic<bool> extversionEnabled{false};
+    /** set to true if the next expected message is extversion */
+    std::atomic<bool> extversionExpected{false};
     /** set to true if this node is ok with no message checksum */
-    bool skipChecksum;
+    std::atomic<bool> skipChecksum{false};
+    /** Graphene min supported version */
+    std::atomic<uint64_t> minGrapheneVersion{0};
+    /** Graphene max supported version */
+    std::atomic<uint64_t> maxGrapheneVersion{0};
+    /** Negotiated graphene version.  Based on the other node and me, what's the best version to use? */
+    std::atomic<uint64_t> negotiatedGrapheneVersion{GRAPHENE_NO_VERSION_SUPPORTED};
+    // END section for atomic XVERSION variables
 
 
     // This is shared-locked whenever messages are processed.
@@ -418,9 +436,9 @@ public:
     /** used to make processing serial when version handshake is taking place */
     CCriticalSection csSerialPhase;
 
-    /** the intial xversion message sent in the handshake */
-    CCriticalSection cs_xversion;
-    CXVersionMessage xVersion GUARDED_BY(cs_xversion);
+    /** the intial extversion message sent in the handshake */
+    CCriticalSection cs_extversion;
+    CExtversionMessage extversion GUARDED_BY(cs_extversion);
 
     /** strSubVer is whatever byte array we read from the wire. However, this field is intended
         to be printed out, displayed to humans in various forms and so on. So we sanitize it and
@@ -501,7 +519,7 @@ public:
 
     CCriticalSection cs_nAvgBlkResponseTime;
     double nAvgBlkResponseTime GUARDED_BY(cs_nAvgBlkResponseTime);
-    std::atomic<int64_t> nMaxBlocksInTransit;
+    std::atomic<uint64_t> nMaxBlocksInTransit;
 
     unsigned short addrFromPort;
 
@@ -599,17 +617,18 @@ public:
     {
         // Checking the descendants makes no sense -- the target node can't have descendants in its mempool if it
         // doesn't have this transaction!
-        if ((xVersionEnabled && props.countWithAncestors > nLimitAncestorCount) ||
-            (!xVersionEnabled && props.countWithAncestors > BCH_DEFAULT_DESCENDANT_LIMIT))
+        if ((extversionEnabled && props.countWithAncestors > nLimitAncestorCount) ||
+            (!extversionEnabled && props.countWithAncestors > BCH_DEFAULT_ANCESTOR_LIMIT))
             return false;
-        if (props.sizeWithAncestors > nLimitAncestorSize)
+        if ((extversionEnabled && props.sizeWithAncestors > nLimitAncestorSize) ||
+            (!extversionEnabled && props.sizeWithAncestors > BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000))
             return false;
+
         return true;
     }
 
-    /** Updates node configuration variables based on XVERSION data in the xVersion member variable */
-    void ReadConfigFromXVersion_OLD();
-    void ReadConfigFromXVersion();
+    /** Updates node configuration variables based on extversion data in the extversion member variable */
+    void ReadConfigFromExtversion();
 
     // requires LOCK(cs_vRecvMsg)
     unsigned int GetTotalRecvSize() EXCLUSIVE_LOCKS_REQUIRED(cs_vRecvMsg)
@@ -627,8 +646,13 @@ public:
         return vSendMsg.size();
     }
 
+
     // requires LOCK(cs_vRecvMsg)
     bool ReceiveMsgBytes(const char *pch, unsigned int nBytes) EXCLUSIVE_LOCKS_REQUIRED(cs_vRecvMsg);
+
+    // Examine the current message (msg) to see if block or thintype blocks have begun downloading data.
+    std::atomic<bool> fDownloading{false};
+    void LookAhead() EXCLUSIVE_LOCKS_REQUIRED(cs_vRecvMsg);
 
     void SetRecvVersion(int nVersionIn)
     {

@@ -1,4 +1,4 @@
-// Copyright (c) 2019 The Bitcoin Unlimited developers
+// Copyright (c) 2019-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -13,7 +13,7 @@ BOOST_FIXTURE_TEST_SUITE(utilprocess_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(this_process_path_test)
 {
-#if BOOST_OS_LINUX
+#if BOOST_OS_LINUX || BOOST_OS_MACOS
     std::string path = this_process_path();
     // TODO: replace boost with std::string::ends_with in C++20
     BOOST_CHECK(boost::algorithm::ends_with(path, "/test_bitcoin"));
@@ -25,19 +25,27 @@ BOOST_AUTO_TEST_CASE(this_process_path_test)
 static bool bin_exists(const std::string &path) { return boost::filesystem::exists(path); }
 BOOST_AUTO_TEST_CASE(subprocess_return_code)
 {
-#if (BOOST_OS_LINUX && (BOOST_VERSION >= 106500))
+#if ((BOOST_OS_LINUX || BOOST_OS_MACOS) && (BOOST_VERSION >= 106500))
+    std::string truebin = "/bin/true";
+    std::string falsebin = "/bin/false";
+
+#if BOOST_OS_MACOS
+    truebin = "/usr/bin/true";
+    falsebin = "/usr/bin/false";
+#endif
+
     auto dummy_callb = [](const std::string &) {};
 
-    if (!bin_exists("/bin/true") || !bin_exists("/bin/false"))
+    if (!bin_exists(truebin) || !bin_exists(falsebin))
     {
         std::cerr << "Skipping test " << __func__ << std::endl;
     }
 
-    SubProcess p_true("/bin/true", {}, dummy_callb, dummy_callb);
+    SubProcess p_true(truebin, {}, dummy_callb, dummy_callb);
     BOOST_CHECK_NO_THROW(p_true.Run());
     BOOST_CHECK(!p_true.IsRunning());
 
-    SubProcess p_false("/bin/false", {}, dummy_callb, dummy_callb);
+    SubProcess p_false(falsebin, {}, dummy_callb, dummy_callb);
     try
     {
         // run throws when exit code is != 0
@@ -54,7 +62,7 @@ BOOST_AUTO_TEST_CASE(subprocess_return_code)
 
 BOOST_AUTO_TEST_CASE(subprocess_stdout)
 {
-#if (BOOST_OS_LINUX && (BOOST_VERSION >= 106500))
+#if ((BOOST_OS_LINUX || BOOST_OS_MACOS) && (BOOST_VERSION >= 106500))
     std::vector<std::string> callback_lines;
     auto callb = [&callback_lines](const std::string &line) { callback_lines.push_back(line); };
 
@@ -73,7 +81,7 @@ BOOST_AUTO_TEST_CASE(subprocess_stdout)
 
 BOOST_AUTO_TEST_CASE(subprocess_terminate)
 {
-#if (BOOST_OS_LINUX && (BOOST_VERSION >= 106500))
+#if ((BOOST_OS_LINUX || BOOST_OS_MACOS) && (BOOST_VERSION >= 106500))
     auto dummy_callb = [](const std::string &) {};
 
     if (!bin_exists("/bin/sleep"))
@@ -107,7 +115,7 @@ BOOST_AUTO_TEST_CASE(subprocess_terminate)
 
 BOOST_AUTO_TEST_CASE(subprocess_non_existing_path)
 {
-#if (BOOST_OS_LINUX && (BOOST_VERSION >= 106500))
+#if ((BOOST_OS_MACOS || BOOST_OS_LINUX) && (BOOST_VERSION >= 106500))
     auto dummy_callb = [](const std::string &) {};
     const std::string path = "/nonexistingpath";
     if (bin_exists(path))

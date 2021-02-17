@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,6 +9,7 @@
 
 #include "serialize.h"
 
+#include <atomic>
 #include <stdlib.h>
 #include <string>
 
@@ -42,12 +43,17 @@ inline bool MoneyRange(const CAmount &nValue) { return (nValue >= 0 && nValue <=
 class CFeeRate
 {
 private:
-    CAmount nSatoshisPerK; // unit is satoshis-per-1,000-bytes
+    std::atomic<int64_t> nSatoshisPerK; // unit is satoshis-per-1,000-bytes
 public:
     CFeeRate() : nSatoshisPerK(0) {}
-    explicit CFeeRate(const CAmount &_nSatoshisPerK) : nSatoshisPerK(_nSatoshisPerK) {}
+    explicit CFeeRate(const CAmount _nSatoshisPerK) : nSatoshisPerK(_nSatoshisPerK) {}
     CFeeRate(const CAmount &nFeePaid, size_t nSize);
-    CFeeRate(const CFeeRate &other) { nSatoshisPerK = other.nSatoshisPerK; }
+    CFeeRate(const CFeeRate &other) { nSatoshisPerK = other.nSatoshisPerK.load(); }
+    CFeeRate &operator=(const CFeeRate other)
+    {
+        nSatoshisPerK = other.nSatoshisPerK.load();
+        return *this;
+    }
     CAmount GetFee(size_t size) const; // unit returned is satoshis
     CAmount GetFeePerK() const { return GetFee(1000); } // satoshis-per-1000-bytes
     /** Dust is too small to be spendable.  It is either set via the txDust tweak or proportional to the cost to

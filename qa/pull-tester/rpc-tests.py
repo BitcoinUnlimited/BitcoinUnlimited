@@ -143,7 +143,7 @@ for arg in sys.argv[1:]:
                 passOn = '--help'
                 showHelp = True
             else:
-                if passOn is not '--help':
+                if passOn != '--help':
                     passOn += " " + arg
         # add it to double_opts only for validation
         double_opts.add(arg)
@@ -197,6 +197,7 @@ if ENABLE_ZMQ:
 #Tests
 testScripts = [ RpcTest(t) for t in [
     Disabled('sigchecks_inputstandardness_activation', 'Already activated, and mempool bad sigcheck mempool cleanup removed so test will fail'),
+    'finalizeblock',
     'txindex',
     Disabled('schnorr-activation', 'Need to be updated to work with BU'),
     'schnorrsig',
@@ -250,7 +251,7 @@ testScripts = [ RpcTest(t) for t in [
     'disablewallet',
     'sendheaders',
     'keypool',
-    Disabled('prioritise_transaction', "TODO"),
+    'prioritise_transaction',
     Disabled('invalidblockrequest', "TODO"),
     'invalidtxrequest',
     'abandonconflict',
@@ -263,8 +264,7 @@ testScripts = [ RpcTest(t) for t in [
     'graphene_stage2',
     'thinblocks',
     Disabled('checkdatasig_activation', "CDSV has been already succesfully activated, keep test around as a template for other OP activation"),
-    'xversion_old',
-    'xversion',
+    'extversion',
     'sighashmatch',
     'getlogcategories',
     'getrawtransaction',
@@ -314,12 +314,15 @@ testScriptsElectrum = [ RpcTest(WhenElectrumFound(t)) for t in [
     'electrum_shutdownonerror',
     'electrum_subscriptions',
     'electrum_transaction_get',
+    'electrum_doslimit',
+    'electrum_mempool_chain'
 ] ]
 
 #Enable ZMQ tests
 if ENABLE_ZMQ == 1:
     testScripts.append(RpcTest('zmq_test'))
-
+    testScripts.append(RpcTest('interface_zmq'))
+    testScripts.append(RpcTest('rpc_zmq'))
 
 def show_wrapper_options():
     """ print command line options specific to wrapper """

@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -50,7 +50,7 @@ CBlockLocator CChain::GetLocator(const CBlockIndex *pindex) const
         if (_Contains(pindex))
         {
             // Use O(1) CChain index if possible.
-            pindex = _idx(nHeight);
+            pindex = vChain[nHeight];
         }
         else
         {
@@ -208,4 +208,34 @@ std::string CBlockFileInfo::ToString() const
 {
     return strprintf("CBlockFileInfo(blocks=%u, size=%u, heights=%u...%u, time=%s...%s)", nBlocks, nSize, nHeightFirst,
         nHeightLast, DateTimeStrFormat("%Y-%m-%d", nTimeFirst), DateTimeStrFormat("%Y-%m-%d", nTimeLast));
+}
+
+const CBlockIndex *LastCommonAncestor(const CBlockIndex *pa, const CBlockIndex *pb)
+{
+    if (pa->nHeight > pb->nHeight)
+    {
+        pa = pa->GetAncestor(pb->nHeight);
+    }
+    else if (pb->nHeight > pa->nHeight)
+    {
+        pb = pb->GetAncestor(pa->nHeight);
+    }
+
+    while (pa != pb && pa && pb)
+    {
+        pa = pa->pprev;
+        pb = pb->pprev;
+    }
+
+    // Eventually all chain branches meet at the genesis block.
+    assert(pa == pb);
+    return pa;
+}
+
+bool AreOnTheSameFork(const CBlockIndex *pa, const CBlockIndex *pb)
+{
+    // The common ancestor needs to be either pa (pb is a child of pa) or pb (pa
+    // is a child of pb).
+    const CBlockIndex *pindexCommon = LastCommonAncestor(pa, pb);
+    return pindexCommon == pa || pindexCommon == pb;
 }

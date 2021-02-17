@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -229,13 +229,13 @@ UniValue getpeerinfo(const UniValue &params, bool fHelp)
 
             if (snode)
             {
-                LOCK(snode->cs_xversion);
+                LOCK(snode->cs_extversion);
                 UniValue xmap_enc(UniValue::VOBJ);
-                for (auto kv : snode->xVersion.xmap)
+                for (auto kv : snode->extversion.xmap)
                 {
                     xmap_enc.pushKV(strprintf("%016llx", kv.first), HexStr(kv.second).c_str());
                 }
-                obj.pushKV("xversion_map", xmap_enc);
+                obj.pushKV("extversion_map", xmap_enc);
             }
             ret.push_back(obj);
         }
@@ -722,6 +722,9 @@ UniValue setban(const UniValue &params, bool fHelp)
         bool absolute = false;
         if (params.size() == 4 && params[3].isTrue())
             absolute = true;
+
+        if (absolute == true && banTime < GetTime())
+            throw JSONRPCError(RPC_MISC_ERROR, "Error: Bantime specified is in the past");
 
         std::string userAgent = "unknown";
         CNodeRef bannedNode = FindNodeRef(netAddr);

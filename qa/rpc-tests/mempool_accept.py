@@ -15,6 +15,7 @@ import logging
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
+from test_framework.blocktools import *
 
 import test_framework.cashlib as cashlib
 from test_framework.nodemessages import *
@@ -320,6 +321,16 @@ class MyTest (BitcoinTestFramework):
                 n.generate(1)
                 self.sync_blocks()
 
+    def removeTxPersistFiles(self):
+        for d in ["node%d" % x for x in range(1,5)]:
+            fname = self.options.tmpdir + os.sep + d + os.sep + "regtest" + os.sep + "mempool.dat"
+            if os.path.exists(fname):
+                os.remove(fname)
+            fname = self.options.tmpdir + os.sep + d + os.sep + "regtest" + os.sep + "orphanpool.dat"
+            if os.path.exists(fname):
+                os.remove(fname)
+
+                
     def run_test(self):
         decContext = decimal.getcontext().prec
         decimal.getcontext().prec = 8 + 8  # 8 digits to get to 21million, and each bitcoin is 100 million satoshis
@@ -441,6 +452,141 @@ class MyTest (BitcoinTestFramework):
             end = time.monotonic()
             logging.info("synced %d tx in %s seconds.  Speed %f tx/sec" % (NTX, end - start, float(NTX) / (end - start)))
 
+        # Stop and start 4 nodes with different minlimitertxfee's.  Then send transactions with varying
+        # fees and see if they propagated correctly.
+        self.nodes[0].generate(1) # clean up
+        self.sync_blocks()
+        logging.info("starting mempool limiting tests")
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+        self.removeTxPersistFiles()
+
+        self.nodes = start_nodes(4, self.options.tmpdir, [["-minlimitertxfee=1.0", "-limitfreerelay=0"], ["-minlimitertxfee=2.0", "-limitfreerelay=0"], ["-minlimitertxfee=3.5", "-limitfreerelay=0"], ["-minlimitertxfee=0.0", "-limitfreerelay=0"]])
+        # Now interconnect the nodes
+        interconnect_nodes(self.nodes)
+        self.sync_blocks()
+
+        txId  = self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), "1e-4")
+        waitFor(20, lambda: txId in self.nodes[0].getrawmempool())
+        waitFor(20, lambda: txId in self.nodes[3].getrawmempool())
+
+        try:
+            txObj1 = self.nodes[0].getmempoolentry(txId)
+        except JSONRPCException as e:
+            assert("txn failed to enter mempool: " + str(e.error["message"]))
+        try:
+            txObj2 = self.nodes[1].getmempoolentry(txId)
+            assert 0 # should have failed
+        except JSONRPCException as e:
+            assert e.error["message"] == 'Transaction not in mempool'
+        try:
+            txObj3 = self.nodes[2].getmempoolentry(txId)
+            assert 0 # should have failed
+        except JSONRPCException as e:
+            assert e.error["message"] == 'Transaction not in mempool'
+        try:
+            txObj4 = self.nodes[3].getmempoolentry(txId)
+        except JSONRPCException as e:
+            assert("txn failed to enter mempool: " + str(e.error["message"]))
+
+
+        txId  = self.nodes[1].sendtoaddress(self.nodes[0].getnewaddress(), "1e-4")
+        waitFor(20, lambda: txId in self.nodes[0].getrawmempool())
+        waitFor(20, lambda: txId in self.nodes[1].getrawmempool())
+        waitFor(20, lambda: txId in self.nodes[3].getrawmempool())
+
+        try:
+            txObj1 = self.nodes[0].getmempoolentry(txId)
+        except JSONRPCException as e:
+            assert("txn failed to enter mempool: " + str(e.error["message"]))
+        try:
+            txObj2 = self.nodes[1].getmempoolentry(txId)
+        except JSONRPCException as e:
+            assert("txn failed to enter mempool: " + str(e.error["message"]))
+        try:
+            txObj3 = self.nodes[2].getmempoolentry(txId)
+            assert 0 # should have failed
+        except JSONRPCException as e:
+            assert e.error["message"] == 'Transaction not in mempool'
+        try:
+            txObj4 = self.nodes[3].getmempoolentry(txId)
+        except JSONRPCException as e:
+            assert("txn failed to enter mempool: " + str(e.error["message"]))
+
+        self.nodes[3].set("minlimitertxfee=5")
+        txId  = self.nodes[2].sendtoaddress(self.nodes[0].getnewaddress(), "1e-4")
+        waitFor(20, lambda: txId in self.nodes[0].getrawmempool())
+        waitFor(20, lambda: txId in self.nodes[1].getrawmempool())
+        waitFor(20, lambda: txId in self.nodes[2].getrawmempool())
+
+        try:
+            txObj1 = self.nodes[0].getmempoolentry(txId)
+        except JSONRPCException as e:
+            assert("txn failed to enter mempool: " + str(e.error["message"]))
+        try:
+            txObj2 = self.nodes[1].getmempoolentry(txId)
+        except JSONRPCException as e:
+            assert("txn failed to enter mempool: " + str(e.error["message"]))
+        try:
+            txObj3 = self.nodes[2].getmempoolentry(txId)
+        except JSONRPCException as e:
+            assert("txn failed to enter mempool: " + str(e.error["message"]))
+        try:
+            txObj4 = self.nodes[3].getmempoolentry(txId)
+            assert 0 # should have failed
+        except JSONRPCException as e:
+            assert e.error["message"] == 'Transaction not in mempool'
+
+
+        # Stop and start 4 nodes with different limitfreerelay's.  Then send transactions with varying
+        # fees and see if they propagated correctly.
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+        self.removeTxPersistFiles()
+
+        self.nodes = start_nodes(4, self.options.tmpdir, [["-minlimitertxfee=0.0", "-limitfreerelay=0"], ["-minlimitertxfee=1.0", "-limitfreerelay=1"], ["-minlimitertxfee=2.0", "-limitfreerelay=1"], ["-minlimitertxfee=3.0", "-limitfreerelay=2"]])
+
+        #clear all mempools by mining a block
+        interconnect_nodes(self.nodes)
+        self.nodes[0].generate(1)
+        self.sync_blocks()
+
+        for i in range(100):
+            self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), "1e-4")
+
+        # check all mempools. Nodes 2 and 3 will have had free transactions rate limited with node 2 having
+        # only a max of 10K bytes in the pool and node3 up to 20K bytes in the pool, where as, Nodes 1 and 2 will
+        # have allowed all transactions into their mempools.
+        waitFor(30, lambda: self.nodes[0].getmempoolinfo()["size"] == 100)
+        waitFor(30, lambda: self.nodes[0].getmempoolinfo()["bytes"] > 20000)
+        waitFor(30, lambda: self.nodes[1].getmempoolinfo()["size"] == 100)
+        waitFor(30, lambda: self.nodes[1].getmempoolinfo()["bytes"] > 20000)
+        waitFor(30, lambda: (self.nodes[2].getmempoolinfo()["size"] >= 43) and (self.nodes[2].getmempoolinfo()["size"] <= 45))
+        waitFor(30, lambda: self.nodes[2].getmempoolinfo()["bytes"] < 11000)
+        waitFor(30, lambda: self.nodes[2].getmempoolinfo()["bytes"] > 9750)
+        waitFor(30, lambda: [print("Node 3 mempool, expecting 87: %s" % str(self.nodes[3].getmempoolinfo())), (self.nodes[3].getmempoolinfo()["size"] >= 86) and (self.nodes[3].getmempoolinfo()["size"] <= 90)][-1])
+        waitFor(30, lambda: self.nodes[3].getmempoolinfo()["bytes"] < 22000)
+        waitFor(30, lambda: self.nodes[3].getmempoolinfo()["bytes"] > 19500)
+
+        # stop and start all nodes with mempool persist off and limitfreerelay off but increase the minlimitertxfee to a high
+        # value. This will test the forced reaccepting of wallet transactions even though free transactions are not accepted.
+        # Only the node which had txns sent to its wallet should have its txns reaccepted.
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+        self.nodes = start_nodes(4, self.options.tmpdir, [["-minlimitertxfee=10.0", "-limitfreerelay=0", "-persistmempool=0"], ["-minlimitertxfee=1.0", "-limitfreerelay=0", "-persistmempool=0"], ["-minlimitertxfee=2.0", "-limitfreerelay=0", "-persistmempool=0"], ["-minlimitertxfee=3.0", "-limitfreerelay=0", "-persistmempool=0"]])
+        interconnect_nodes(self.nodes)
+        waitFor(30, lambda: self.nodes[0].getmempoolinfo()["size"] == 100)
+        waitFor(30, lambda: self.nodes[0].getmempoolinfo()["bytes"] > 20000)
+        waitFor(30, lambda: self.nodes[1].getmempoolinfo()["size"] == 0)
+        waitFor(30, lambda: self.nodes[1].getmempoolinfo()["bytes"] == 0)
+        waitFor(30, lambda: self.nodes[2].getmempoolinfo()["size"] == 0)
+        waitFor(30, lambda: self.nodes[2].getmempoolinfo()["bytes"] == 0)
+        waitFor(30, lambda: self.nodes[2].getmempoolinfo()["bytes"] == 0)
+        waitFor(30, lambda: self.nodes[3].getmempoolinfo()["size"] == 0)
+        waitFor(30, lambda: self.nodes[3].getmempoolinfo()["bytes"] == 0)
+        waitFor(30, lambda: self.nodes[3].getmempoolinfo()["bytes"] == 0)
+
+
 
 if __name__ == '__main__':
     env = os.getenv("BITCOIND", None)
@@ -469,6 +615,7 @@ if __name__ == '__main__':
 def Test():
     global BitcoinCli
     t = MyTest(True)
+    t.drop_to_pdb = True
     bitcoinConf = {
         "debug": ["blk", "mempool", "net", "req"],
         "blockprioritysize": 2000000,  # we don't want any transactions rejected due to insufficient fees...

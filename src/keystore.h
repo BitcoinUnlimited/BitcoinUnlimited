@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2017 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -61,10 +61,10 @@ typedef std::set<CScript> WatchOnlySet;
 class CBasicKeyStore : public CKeyStore
 {
 protected:
-    KeyMap mapKeys;
-    WatchKeyMap mapWatchKeys;
-    ScriptMap mapScripts;
-    WatchOnlySet setWatchOnly;
+    KeyMap mapKeys GUARDED_BY(cs_KeyStore);
+    WatchKeyMap mapWatchKeys GUARDED_BY(cs_KeyStore);
+    ScriptMap mapScripts GUARDED_BY(cs_KeyStore);
+    WatchOnlySet setWatchOnly GUARDED_BY(cs_KeyStore);
 
 public:
     bool AddKeyPubKey(const CKey &key, const CPubKey &pubkey);
@@ -78,7 +78,13 @@ public:
         }
         return result;
     }
-    bool _HaveKey(const CKeyID &address) const { return (mapKeys.count(address) > 0); }
+
+    bool _HaveKey(const CKeyID &address) const
+    {
+        AssertLockHeld(cs_KeyStore);
+        return (mapKeys.count(address) > 0);
+    }
+
     void GetKeys(std::set<CKeyID> &setAddress) const
     {
         setAddress.clear();
@@ -99,7 +105,7 @@ public:
             KeyMap::const_iterator mi = mapKeys.find(address);
             if (mi != mapKeys.end())
             {
-                keyOut = mi->second;
+                keyOut = CKey(mi->second);
                 return true;
             }
         }

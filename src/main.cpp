@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -24,6 +24,8 @@
 #include "consensus/validation.h"
 #include "dosman.h"
 #include "expedited.h"
+#include "extversionkeys.h"
+#include "extversionmessage.h"
 #include "hashwrapper.h"
 #include "index/txindex.h"
 #include "init.h"
@@ -55,8 +57,6 @@
 #include "validation/validation.h"
 #include "validationinterface.h"
 #include "versionbits.h"
-#include "xversionkeys.h"
-#include "xversionmessage.h"
 
 #include <algorithm>
 #include <boost/algorithm/hex.hpp>
@@ -271,12 +271,12 @@ std::string FormatStateMessage(const CValidationState &state)
 }
 
 
-bool AreFreeTxnsDisallowed()
+bool AreFreeTxnsAllowed()
 {
     if (GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY) > 0)
-        return false;
+        return true;
 
-    return true;
+    return false;
 }
 
 bool GetTransaction(const uint256 &hash,
@@ -340,6 +340,7 @@ bool GetTransaction(const uint256 &hash,
             }
             txOut = block.vtx.at(pos);
             txTime = block.nTime;
+            hashBlock = pindexSlow->GetBlockHash();
             return true;
         }
     }
@@ -474,7 +475,9 @@ bool CheckAgainstCheckpoint(unsigned int height, const uint256 &hash, const CCha
     if (lkup != ckpt.mapCheckpoints.end()) // this block height is checkpointed
     {
         if (hash != lkup->second) // This block does not match the checkpoint
+        {
             return false;
+        }
     }
     return true;
 }

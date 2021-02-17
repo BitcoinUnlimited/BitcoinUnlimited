@@ -1,9 +1,9 @@
-// Copyright (C) 2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef BITCOIN_XVERSIONMESSAGE_H
-#define BITCOIN_XVERSIONMESSAGE_H
+#ifndef BITCOIN_EXTVERSIONMESSAGE_H
+#define BITCOIN_EXTVERSIONMESSAGE_H
 
 
 #include "protocol.h"
@@ -11,39 +11,23 @@
 #include "sync.h"
 #include "tinyformat.h"
 #include "utilstrencodings.h"
+#include <map>
 #include <string>
-#include <unordered_map>
 #include <vector>
-
-// If this is set to true, the salted hasher will use a fixed hash for testing
-// WARNING: Never set this in live code!
-extern bool xversion_deterministic_hashing;
 
 /** Maximum length of strSubVer in `version` message */
 static const unsigned int MAX_SUBVERSION_LENGTH = 256;
 
-const size_t MAX_XVERSION_MAP_SIZE = 100000;
+const size_t MAX_EXTVERSION_MAP_SIZE = 100000;
 
-
-/*! Salted hashing for the xmap. This is to prevent potential attacks that could require lots of
-  probing in the hash table. */
-class XMapSaltedHasher
-{
-private:
-    uint64_t k0, k1;
-
-public:
-    XMapSaltedHasher();
-    uint64_t operator()(const uint64_t key) const;
-};
-typedef std::unordered_map<uint64_t, std::vector<uint8_t>, XMapSaltedHasher> XVersionMap;
+typedef std::map<uint64_t, std::vector<uint8_t> > ExtversionMap;
 
 class CompactMapSerialization
 {
-    XVersionMap &map;
+    ExtversionMap &map;
 
 public:
-    CompactMapSerialization(XVersionMap &_map) : map(_map) {}
+    CompactMapSerialization(ExtversionMap &_map) : map(_map) {}
     template <typename Stream>
     void Serialize(Stream &s) const
     {
@@ -58,12 +42,12 @@ public:
     template <typename Stream>
     void Unserialize(Stream &s)
     {
-        size_t n = ReadCompactUint64<Stream>(s);
+        size_t n = ReadCompactSizeWithLimit<Stream>(s, std::numeric_limits<uint64_t>::max());
         for (size_t i = 0; i < n; i++)
         {
             uint64_t k;
             std::vector<uint8_t> v;
-            k = ReadCompactUint64<Stream>(s);
+            k = ReadCompactSizeWithLimit<Stream>(s, std::numeric_limits<uint64_t>::max());
             s >> v;
             map[k] = v;
         }
@@ -79,26 +63,26 @@ public:
   but in addition supports an appended
   (key, value) map, with the keys and values being uint64_t values.
 
-  The keys are declared in the xversion_keys.h header file which
+  The keys are declared in the extversion_keys.h header file which
   should obviously be kept in sync between different implementations.
 
   A size of 100kB for the serialized map must not be exceeded.
 
-  FIXME: Auto-generate the xversion_keys.h file to also support non-C++
+  FIXME: Auto-generate the extversion_keys.h file to also support non-C++
   clients and other software decoding these fields.
 */
-class CXVersionMessage
+class CExtversionMessage
 {
 protected:
     // cached values for conversion to uint64 (u64c)
     mutable CCriticalSection cacheProtector;
-    mutable std::unordered_map<uint64_t, uint64_t> cache_u64c;
+    mutable std::map<uint64_t, uint64_t> cache_u64c;
 
 public:
     // extensible map for general settings
-    XVersionMap xmap;
+    ExtversionMap xmap;
 
-    CXVersionMessage() {}
+    CExtversionMessage() {}
     ADD_SERIALIZE_METHODS;
 
     //! Access xmap by given uint64_t key. Non-existent entries will return zero
@@ -107,13 +91,34 @@ public:
     // complement to as_u64c for building map
     void set_u64c(const uint64_t key, const uint64_t val);
 
+    template <typename Stream>
+    const auto CheckSize(Stream &s)
+    {
+        if (s.size() > MAX_EXTVERSION_MAP_SIZE)
+        {
+            throw std::ios_base::failure(
+                strprintf("A version message xmap may be at most %d bytes.", MAX_EXTVERSION_MAP_SIZE));
+        }
+    };
+
+
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
+        // checking the stream size in unserialize (ForRead()) only works when we are unserializing
+        // a stream that only holds this one object in it. This is guaranteed to be the only object
+        // in the stream when unserializing a network message in net_processing but is not
+        // a guarantee of streams in general. If this is not the only object in the stream, this
+        // check might return a false positive with regards to being larger than the max size
+        if (ser_action.ForRead())
+        {
+            CheckSize(s);
+        }
         READWRITE(REF(CompactMapSerialization(xmap)));
-        if (GetSerializeSize(REF(CompactMapSerialization(xmap)), SER_NETWORK, PROTOCOL_VERSION) > MAX_XVERSION_MAP_SIZE)
-            throw std::ios_base::failure(
-                strprintf("A version message xmap might at most be %d bytes.", MAX_XVERSION_MAP_SIZE));
+        if (!ser_action.ForRead())
+        {
+            CheckSize(s);
+        }
     }
 };
 

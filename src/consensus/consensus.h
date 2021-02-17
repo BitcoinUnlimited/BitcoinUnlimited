@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -14,6 +14,7 @@
 // tradeoff between being perfect and changing more code. TODO: remove this entirely
 // static const unsigned int BU_MAX_BLOCK_SIZE = 32000000;
 static const unsigned int BLOCKSTREAM_CORE_MAX_BLOCK_SIZE = 1000000;
+static const unsigned int ONE_MEGABYTE = 1000000;
 /** The maximum allowed number of signature check operations in a 1MB block (network rule), and the suggested max sigops
  * per (MB rounded up) in blocks > 1MB. */
 static const unsigned int MAX_BLOCK_SIGOPS_PER_MB = 20000;
@@ -38,9 +39,13 @@ static const int COINBASE_MATURITY = 100;
 /** per May, 15 '18 upgrade specification the min value for min value for max accepted block size, i.e. EB, is 32 MB
  * (github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/may-2018-hardfork.md#summary)
  */
+// defaults for each chain are set in chainparams but defined here
+static const unsigned int DEFAULT_EXCESSIVE_BLOCK_SIZE = 32 * ONE_MEGABYTE;
+static const unsigned int DEFAULT_EXCESSIVE_BLOCK_SIZE_TESTNET4 = 2 * ONE_MEGABYTE;
+static const unsigned int DEFAULT_EXCESSIVE_BLOCK_SIZE_SCALENET = 256 * ONE_MEGABYTE;
+
 static const unsigned int MIN_EXCESSIVE_BLOCK_SIZE = 32000000;
 static const unsigned int MIN_EXCESSIVE_BLOCK_SIZE_REGTEST = 1000;
-static const unsigned int DEFAULT_EXCESSIVE_BLOCK_SIZE = MIN_EXCESSIVE_BLOCK_SIZE;
 
 /**
  * The ratio between the maximum allowable block size and the maximum allowable
@@ -49,7 +54,7 @@ static const unsigned int DEFAULT_EXCESSIVE_BLOCK_SIZE = MIN_EXCESSIVE_BLOCK_SIZ
 static const int BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO = 141;
 
 static const unsigned int MAY2020_MAX_BLOCK_SIGCHECK_COUNT =
-    MIN_EXCESSIVE_BLOCK_SIZE / BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO;
+    DEFAULT_EXCESSIVE_BLOCK_SIZE / BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO;
 static_assert(MAY2020_MAX_BLOCK_SIGCHECK_COUNT == 226950, "Max block sigcheck value differs from specification");
 
 /** Allowed messages lengths will be this * the excessive block size */

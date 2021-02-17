@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Copyright (c) 2016 Bitcoin Unlimited Developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -58,7 +58,9 @@ static const bool DEFAULT_WHITELISTRELAY = true;
 /** Default for DEFAULT_WHITELISTFORCERELAY. */
 static const bool DEFAULT_WHITELISTFORCERELAY = true;
 /** The maximum size of a blk?????.dat file (since 0.8) */
-static const unsigned int MAX_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
+static const uint64_t MAX_BLOCKFILE_SIZE = 16ULL * 0x8000000ULL; // use a 2 GB file size on not regtest
+static const uint64_t MAX_BLOCKFILE_SIZE_REGTEST = 0x8000000; // 128 MiB on regtest
+extern uint64_t max_blockfile_size;
 
 /** Maximum number of script-checking threads allowed */
 static const int MAX_SCRIPTCHECK_THREADS = 16;
@@ -90,7 +92,7 @@ static const int64_t BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 500000;
 /** Timeout in secs for the initial sync. If we don't receive the first batch of headers */
 static const uint32_t INITIAL_HEADERS_TIMEOUT = 120;
 /** The maximum number of headers in the mapUnconnectedHeaders cache **/
-static const uint32_t MAX_UNCONNECTED_HEADERS = 144;
+static const uint32_t MAX_UNCONNECTED_HEADERS = 2000;
 /** The maximum length of time, in seconds, we keep unconnected headers in the cache **/
 static const uint32_t UNCONNECTED_HEADERS_TIMEOUT = 120;
 /** Maximum number of INV's that can be send in one message */
@@ -192,6 +194,11 @@ static const unsigned int DEFAULT_CHECKLEVEL = 3;
 // Setting the target to > than 550MB will make it likely we can respect the target.
 static const uint64_t MIN_DISK_SPACE_FOR_BLOCK_FILES = 550 * 1024 * 1024;
 
+/** A cache to store headers that have arrived but can not yet be connected **/
+extern CCriticalSection csUnconnectedHeaders;
+extern std::map<uint256, std::pair<CBlockHeader, int64_t> > mapUnConnectedHeaders GUARDED_BY(csUnconnectedHeaders);
+
+
 /** Register with a network node to receive its signals */
 void RegisterNodeSignals(CNodeSignals &nodeSignals);
 /** Unregister a network node */
@@ -245,7 +252,7 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats);
    Determine whether free transactions are subject to rate limiting. If -limitfreerelay is not zero then rate limiting
    for free txns will be in effect. If it is zero, then no free transactions will be allowed to enter the memory pool.
  */
-bool AreFreeTxnsDisallowed();
+bool AreFreeTxnsAllowed();
 
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state);
@@ -306,6 +313,8 @@ static const unsigned int REJECT_ALREADY_KNOWN = 0x101;
 static const unsigned int REJECT_CONFLICT = 0x102;
 /** Transaction cannot be committed on my fork */
 static const unsigned int REJECT_WRONG_FORK = 0x103;
+/** Block conflicts with a transaction already known */
+static const unsigned int REJECT_AGAINST_FINALIZED = 0x104;
 
 // BU cleaning up at destuction time creates many global variable dependencies.  Instead clean up in a function called
 // in main()

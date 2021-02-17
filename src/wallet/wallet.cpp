@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -988,6 +988,16 @@ bool CWallet::AbandonTransaction(const uint256 &hashTx)
     return true;
 }
 
+void CWallet::MarkDoubleSpent(const uint256 &hashTx)
+{
+    LOCK(cs_wallet);
+    if (mapWallet.count(hashTx))
+    {
+        mapWallet[hashTx].fDoubleSpent = true;
+        NotifyTransactionChanged(this, hashTx, CT_UPDATED);
+    }
+}
+
 void CWallet::MarkConflicted(const uint256 &hashBlock, const uint256 &hashTx)
 {
     LOCK(cs_wallet);
@@ -1458,7 +1468,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate)
                 nNow = GetTime();
                 if (pindex) // if pindex is nullptr we are done anyway so no need to show the log
                     LOGA("Still rescanning. At block %d. Progress=%f\n", pindex->nHeight,
-                        Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), pindex));
+                        Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), pindex, false));
             }
         }
         ShowProgress(_("Rescanning..."), 100); // hide progress dialog in GUI
@@ -1499,7 +1509,7 @@ void CWallet::ReacceptWalletTransactions()
     for (std::pair<const int64_t, CTransactionRef> &item : mapSorted)
     {
         CValidationState state;
-        AcceptToMemoryPool(mempool, state, item.second, false, nullptr, false, true, TransactionClass::DEFAULT);
+        AcceptToMemoryPool(mempool, state, item.second, false, nullptr, true, TransactionClass::DEFAULT);
         SyncWithWallets(item.second, nullptr, -1);
     }
     CommitTxToMempool();
@@ -2393,16 +2403,8 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
     else
     {
         txNew.nLockTime = height;
-
-        // Secondly occasionally randomly pick a nLockTime even further back, so
-        // that transactions that are delayed after signing for whatever reason,
-        // e.g. high-latency mix networks and some CoinJoin implementations, have
-        // better privacy.
-        if (GetRandInt(10) == 0)
-            txNew.nLockTime = std::max(0, (int)txNew.nLockTime - GetRandInt(100));
     }
 
-    DbgAssert(txNew.nLockTime <= (unsigned int)chainActive.Height(), txNew.nLockTime = 0);
     assert(txNew.nLockTime < LOCKTIME_THRESHOLD);
 
     {
@@ -2681,7 +2683,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
                         if (AllowFree(dPriority))
                             break;
                     }
-                    if (fSendFreeTransactions && AreFreeTxnsDisallowed())
+                    if (fSendFreeTransactions && !AreFreeTxnsAllowed())
                     {
                         strFailReason =
                             _("You can not send free transactions if you have configured a -limitfreerelay of zero");
@@ -2773,7 +2775,7 @@ bool CWallet::CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey)
             */
 
             // Broadcast
-            if (!wtxNew.AcceptToMemoryPool(AreFreeTxnsDisallowed()))
+            if (!wtxNew.AcceptToMemoryPool(false))
             {
                 // This must not fail. The transaction has already been signed and recorded.
                 LOGA("CommitTransaction(): Error: Transaction not valid\n");
@@ -3840,8 +3842,8 @@ bool CMerkleTx::AcceptToMemoryPool(bool fLimitFree, bool fRejectAbsurdFee)
     CValidationState state;
     // Skip mempool commit because the commit informs the wallet but with the accounts stripped.
     // By not committing inline, the caller wallet code can place this tx into the wallet first
-    bool ret = ::AcceptToMemoryPool(mempool, state, MakeTransactionRef(*this), fLimitFree, nullptr, false,
-        fRejectAbsurdFee, TransactionClass::DEFAULT);
+    bool ret = ::AcceptToMemoryPool(
+        mempool, state, MakeTransactionRef(*this), fLimitFree, nullptr, fRejectAbsurdFee, TransactionClass::DEFAULT);
     if (!ret)
     {
         LOGA("ERROR: Transaction not sent - %s: %s\n", state.GetRejectReason(), EncodeHexTx(*this));

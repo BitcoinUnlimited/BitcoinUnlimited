@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -48,6 +48,7 @@
 #include "txadmission.h"
 #include "txdb.h"
 #include "txmempool.h"
+#include "txorphanpool.h"
 #include "ui_interface.h"
 #include "unlimited.h"
 #include "util.h"
@@ -73,14 +74,15 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/split.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <openssl/crypto.h>
 #include <thread>
 
 #if ENABLE_ZMQ
-#include "zmq/zmqnotificationinterface.h"
+#include <zmq/zmqnotificationinterface.h>
+#include <zmq/zmqrpc.h>
 #endif
 
 using namespace std;
@@ -89,10 +91,6 @@ bool fFeeEstimatesInitialized = false;
 
 /** Has the AppInit2() startup phase returned */
 std::atomic<bool> fAppInit2{false};
-
-#if ENABLE_ZMQ
-static CZMQNotificationInterface *pzmqNotificationInterface = nullptr;
-#endif
 
 #ifdef WIN32
 // Win32 LevelDB doesn't use filedescriptors, and the ones used for
@@ -253,6 +251,7 @@ void Shutdown()
     if (fDumpMempoolLater && GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
     {
         DumpMempool();
+        orphanpool.DumpOrphanPool();
     }
 
     if (fFeeEstimatesInitialized)
@@ -464,6 +463,14 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
     RenameThread("loadblk");
     ScheduleBatchPriority();
 
+    // Allow the calling thread s little time to finish and redraw the QT wallet. For some reason
+    // on windows the launching of this thread will prevent the main wallet window from redrawing, until
+    // this thread has completed.
+    //
+    // TODO: investigate whether this is just a Windows issue.  It seems likely that it is given that this
+    //       thread is scheduled at a lower priority on Linux systems and therefore may not have the issue.
+    MilliSleep(500);
+
     // -reindex
     if (fReindex)
     {
@@ -542,27 +549,9 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
     }
 
     // In case a previous shutdown left the chain in an incorrect state, reconsider
-    // the most work chain.
+    // the most work chain. This needs to be done before we call ActivateBestChain() even
+    // though it is invoked again after ActivateBestChain().
     ReconsiderChainOnStartup();
-
-    // scan for better chains in the block chain database, that are not yet connected in the active best chain
-    uiInterface.InitMessage(_("Activating best chain..."));
-    CValidationState state;
-    if (!ActivateBestChain(state, chainparams))
-    {
-        LOGA("WARNING: ActivateBestChain failed on startup\n");
-    }
-
-    // Reconsider the most work chain if we're not already synced. This is necessary
-    // when switching from an ABC/BCHN client or when a operator failed to upgrade their BU
-    // node before a hardfork. This must be done directly after ActivateBestChain() or
-    // a switch from ABC/BCHN to a BU node may not work because some blocks may have been parked.
-    ReconsiderChainOnStartup();
-
-    // Initialize the atomic flags used for determining whether we are in IBD or whether the chain
-    // is almost synced.
-    IsChainNearlySyncdInit();
-    IsInitialBlockDownloadInit();
 
 #ifdef ENABLE_WALLET
     uiInterface.InitMessage(_("Reaccepting Wallet Transactions"));
@@ -580,8 +569,28 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
     if (GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
     {
         LoadMempool();
+        orphanpool.LoadOrphanPool();
         fDumpMempoolLater = !fRequestShutdown;
     }
+
+    // scan for better chains in the block chain database, that are not yet connected in the active best chain
+    uiInterface.InitMessage(_("Activating best chain..."));
+    CValidationState state;
+    if (!ActivateBestChain(state, chainparams))
+    {
+        LOGA("WARNING: ActivateBestChain failed on startup\n");
+    }
+
+    // Reconsider the most work chain again here if we're not already synced. This is necessary
+    // when switching from an ABC/BCHN client or when a operator failed to upgrade their BU
+    // node before a hardfork. This must be done directly after ActivateBestChain() or
+    // a switch from ABC/BCHN to a BU node may not work because some blocks may have been parked.
+    ReconsiderChainOnStartup();
+
+    // Initialize the atomic flags used for determining whether we are in IBD or whether the chain
+    // is almost synced.
+    IsChainNearlySyncdInit();
+    IsInitialBlockDownloadInit();
 
     // Startup txindex. If we start it earlier and before ActivateBestChain
     // we can end up grinding slowly through ActivateBestChain when txindex still has unfinished
@@ -845,6 +854,11 @@ bool AppInit2(Config &config)
 
     // also see: InitParameterInteraction()
 
+    if (chainparams.NetworkIDString() == "regtest")
+    {
+        max_blockfile_size = MAX_BLOCKFILE_SIZE_REGTEST;
+    }
+
     // if using block pruning, then disable txindex
     if (GetArg("-prune", 0))
     {
@@ -861,7 +875,7 @@ bool AppInit2(Config &config)
     else
     {
         // raise preallocation size of block and undo files
-        blockfile_chunk_size = MAX_BLOCKFILE_SIZE;
+        blockfile_chunk_size = max_blockfile_size;
         // multiply by 8 as this is the same difference between default and max blockfile size
         // we do not have a define max undofile size
         undofile_chunk_size = undofile_chunk_size * 8;
@@ -921,7 +935,7 @@ bool AppInit2(Config &config)
 
     // mempool limits
     int64_t nMempoolSizeMax = GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
-    int64_t nMempoolSizeMin = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000 * 40;
+    int64_t nMempoolSizeMin = 1 << 22;
     if (nMempoolSizeMax < 0 || nMempoolSizeMax < nMempoolSizeMin)
         return InitError(strprintf(_("-maxmempool must be at least %d MB"), std::ceil(nMempoolSizeMin / 1000000.0)));
 
@@ -951,6 +965,9 @@ bool AppInit2(Config &config)
     if (!fDisableWallet)
         RegisterWalletRPCCommands(tableRPC);
 #endif
+#if ENABLE_ZMQ
+    RegisterZMQRPCCommands(tableRPC);
+#endif
 
     nConnectTimeout = GetArg("-timeout", DEFAULT_CONNECT_TIMEOUT);
     if (nConnectTimeout <= 0)
@@ -962,7 +979,7 @@ bool AppInit2(Config &config)
     // a transaction spammer can cheaply fill blocks using
     // 1-satoshi-fee transactions. It should be set above the real
     // cost to you of processing a transaction.
-    ::minRelayTxFee = CFeeRate(dMinLimiterTxFee.Value() * 1000);
+    ::minRelayTxFee = CFeeRate((CAmount)(dMinLimiterTxFee.Value()) * 1000);
 
     // -minrelaytxfee is no longer a command line option however it is still used in Bitcon Core so we want to tell
     // any users that migrate from Core to BU that this option is not used.
@@ -1020,9 +1037,9 @@ bool AppInit2(Config &config)
 
     // BitcoinCash service bit
     nLocalServices |= NODE_BITCOIN_CASH;
-    // we use xversion by default
-    if (GetBoolArg("-use-xversion", DEFAULT_USE_XVERSION))
-        nLocalServices |= NODE_XVERSION;
+    // we use extversion by default
+    if (GetBoolArg("-use-extversion", DEFAULT_USE_EXTVERSION))
+        nLocalServices |= NODE_EXTVERSION;
 
     nMaxTipAge = GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);
 
@@ -1250,7 +1267,6 @@ bool AppInit2(Config &config)
     LOGA("* Using %.1fMiB for in-memory UTXO set\n", nCoinCacheMaxSize * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
-    StartTxAdmission();
 
     while (!fLoaded)
     {
@@ -1276,12 +1292,13 @@ bool AppInit2(Config &config)
 
                 uiInterface.InitMessage(_("Opening UTXO database..."));
                 COverrideOptions overridecache;
-                overridecache.block_size = 128;
+                overridecache.block_size = 4096;
                 pcoinsdbview = new CCoinsViewDB(cacheConfig.nCoinDBCache, false, fReindex, true, &overridecache);
 
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
                 uiInterface.InitMessage(_("Opening Coins Cache database..."));
                 pcoinsTip = new CCoinsViewCache(pcoinscatcher);
+                InitTxAdmission();
 
                 if (fReindex)
                 {
@@ -1393,6 +1410,8 @@ bool AppInit2(Config &config)
             }
         }
     }
+
+    StartTxAdmissionThreads();
 
     // As LoadBlockIndex can take several minutes, it's possible the user
     // requested to kill the GUI during the last operation. If so, exit.

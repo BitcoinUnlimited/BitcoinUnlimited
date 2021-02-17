@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2013 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -41,10 +41,11 @@ public:
         Unconfirmed, /**< Not yet mined into a block **/
         Confirming, /**< Confirmed, but waiting for the recommended number of confirmations **/
         Conflicted, /**< Conflicts with other transaction or mempool **/
+        DoubleSpent, /** Transaction has been double spent */
         /// Generated (mined) transactions
         Immature, /**< Mined but waiting for maturity */
         MaturesWarning, /**< Transaction will likely not mature because no nodes have confirmed */
-        NotAccepted /**< Mined but not accepted */
+        NotAccepted, /**< Mined but not accepted */
     };
 
     /// Transaction counts towards available balance

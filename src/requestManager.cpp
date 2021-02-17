@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2016-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -14,6 +14,7 @@
 #include "consensus/params.h"
 #include "consensus/validation.h"
 #include "dosman.h"
+#include "extversionkeys.h"
 #include "leakybucket.h"
 #include "main.h"
 #include "net.h"
@@ -32,7 +33,6 @@
 #include "validation/validation.h"
 #include "validationinterface.h"
 #include "version.h"
-#include "xversionkeys.h"
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
@@ -46,6 +46,7 @@ using namespace std;
 
 extern CTweak<unsigned int> maxBlocksInTransitPerPeer;
 extern CTweak<unsigned int> blockDownloadWindow;
+extern CTweak<unsigned int> blockLookAheadInterval;
 
 // Request management
 extern CRequestManager requester;
@@ -63,29 +64,6 @@ unsigned int blkReqRetryInterval = MIN_BLK_REQUEST_RETRY_INTERVAL;
 // defined in main.cpp.  should be moved into a utilities file but want to make rebasing easier
 extern bool CanDirectFetch(const Consensus::Params &consensusParams);
 
-/** Find the last common ancestor two blocks have.
- *  Both pa and pb must be non-nullptr. */
-static CBlockIndex *LastCommonAncestor(CBlockIndex *pa, CBlockIndex *pb)
-{
-    if (pa->nHeight > pb->nHeight)
-    {
-        pa = pa->GetAncestor(pb->nHeight);
-    }
-    else if (pb->nHeight > pa->nHeight)
-    {
-        pb = pb->GetAncestor(pa->nHeight);
-    }
-
-    while (pa != pb && pa && pb)
-    {
-        pa = pa->pprev;
-        pb = pb->pprev;
-    }
-
-    // Eventually all chain branches meet at the genesis block.
-    assert(pa == pb);
-    return pa;
-}
 
 static bool IsBlockType(const CInv &obj)
 {
@@ -139,6 +117,7 @@ void CRequestManager::Cleanup()
 
 void CRequestManager::cleanup(OdMap::iterator &itemIt)
 {
+    LOCK(cs_objDownloader);
     CUnknownObj &item = itemIt->second;
     // Because we'll ignore anything deleted from the map, reduce the # of requests in flight by every request we made
     // for this object
@@ -192,8 +171,16 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
         // else the txn already existed so nothing to do
 
         data.priority = max(priority, data.priority);
-        // Got the data, now add the node as a source
-        data.AddSource(from);
+
+        // Got the data, now add the node as a source if we're not already processing
+        // this txn. If we add more sources here while processing a txn then we could
+        // end up with dangling noderefs when the peer tries to disconnect.
+        if (!data.fProcessing)
+            data.AddSource(from);
+        else
+        {
+            LOG(REQ, "Not calling AddSource for %s at %s.  Already processing.\n", obj.ToString(), from->GetLogName());
+        }
     }
     else if (IsBlockType(obj))
     {
@@ -316,6 +303,17 @@ void CRequestManager::ProcessingTxn(const uint256 &hash, CNode *pfrom)
     item->second.fProcessing = true;
     LOG(REQ, "ReqMgr: Processing %s (received from %s).\n", item->second.obj.ToString(),
         pfrom ? pfrom->GetLogName() : "unknown");
+
+    // As a last step we must clear all sources to release the noderef's. If we don't do this
+    // then if the transaction ends up being a double spend, an orphan that is never reclaimed, or
+    // perhaps some other validation failure, it would result in having dangling noderef's which then
+    // prevent a node from fully disconnecting and thus preventing the CNode from calling it's destructor.
+    //
+    // However in the case of blocks we don't do this because if a block fails to validate we
+    // reset the fProcessing flag to false so that we can get another block and check its validity.
+    // This is so that we can prevent a DOS attack where a corrupted block is fed to us in order
+    // to prevent us from downloading the good block.
+    item->second.availableFrom.clear();
 }
 
 void CRequestManager::ProcessingBlock(const uint256 &hash, CNode *pfrom)
@@ -342,6 +340,18 @@ void CRequestManager::BlockRejected(const CInv &obj, CNode *pfrom)
     if (item == mapBlkInfo.end())
         return;
     item->second.fProcessing = false;
+}
+
+void CRequestManager::Downloading(const uint256 &hash, CNode *pfrom)
+{
+    LOCK(cs_objDownloader);
+    OdMap::iterator item = mapBlkInfo.find(hash);
+    if (item == mapBlkInfo.end())
+        return;
+
+    item->second.nDownloadingSince = GetStopwatchMicros();
+    LOG(BLK, "ReqMgr: Downloading %s (received from %s).\n", item->second.obj.ToString(),
+        pfrom ? pfrom->GetLogName() : "unknown");
 }
 
 // Indicate that we got this object.
@@ -633,6 +643,7 @@ void CRequestManager::ResetLastBlockRequestTime(const uint256 &hash)
         CUnknownObj &item = itemIter->second;
         item.outstandingReqs--;
         item.lastRequestTime = 0;
+        item.nDownloadingSince = 0;
     }
 }
 
@@ -693,7 +704,8 @@ void CRequestManager::SendRequests()
             continue;
 
         // if never requested then lastRequestTime==0 so this will always be true
-        if (now - item.lastRequestTime > _blkReqRetryInterval)
+        if ((now - item.lastRequestTime > _blkReqRetryInterval && item.nDownloadingSince == 0) ||
+            (item.nDownloadingSince != 0 && now - item.nDownloadingSince > blockLookAheadInterval.Value()))
         {
             if (!item.availableFrom.empty())
             {
@@ -724,7 +736,9 @@ void CRequestManager::SendRequests()
                     CInv obj = item.obj;
                     item.outstandingReqs++;
                     int64_t then = item.lastRequestTime;
+                    int64_t nDownloadingSincePrev = item.nDownloadingSince;
                     item.lastRequestTime = now;
+                    item.nDownloadingSince = 0;
                     bool fReqBlkResult = false;
 
                     if (fBatchBlockRequests)
@@ -748,6 +762,7 @@ void CRequestManager::SendRequests()
                                 item = itemIter->second;
                                 item.outstandingReqs--;
                                 item.lastRequestTime = then;
+                                item.nDownloadingSince = nDownloadingSincePrev;
                             }
                         }
                     }
@@ -1008,15 +1023,15 @@ void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
 {
     AssertLockHeld(cs_main);
 
-    int nBlocksInFlight = 0;
+    uint64_t nBlocksInFlight = 0;
     {
         LOCK(cs_objDownloader);
         nBlocksInFlight = mapRequestManagerNodeState[pto->GetId()].nBlocksInFlight;
     }
-    if (!pto->fDisconnectRequest && !pto->fDisconnect && !pto->fClient &&
-        nBlocksInFlight < (int)pto->nMaxBlocksInTransit)
+    if (!pto->fDisconnectRequest && !pto->fDisconnect && !pto->fClient && nBlocksInFlight < pto->nMaxBlocksInTransit)
     {
         std::vector<CBlockIndex *> vToDownload;
+
         FindNextBlocksToDownload(pto, pto->nMaxBlocksInTransit.load() - nBlocksInFlight, vToDownload);
         // LOG(REQ, "IBD AskFor %d blocks from peer=%s\n", vToDownload.size(), pto->GetLogName());
         std::vector<CInv> vGetBlocks;
@@ -1067,10 +1082,13 @@ void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
 
 // Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
 // at most count entries.
-void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, std::vector<CBlockIndex *> &vBlocks)
+void CRequestManager::FindNextBlocksToDownload(CNode *node, size_t count, std::vector<CBlockIndex *> &vBlocks)
 {
     if (count == 0)
+    {
         return;
+    }
+    DbgAssert(count <= 128, count = 128);
 
     NodeId nodeid = node->GetId();
     vBlocks.reserve(vBlocks.size() + count);
@@ -1099,7 +1117,8 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
 
     // If the peer reorganized, our previous pindexLastCommonBlock may not be an ancestor
     // of its current tip anymore. Go back enough to fix that.
-    state->pindexLastCommonBlock = LastCommonAncestor(state->pindexLastCommonBlock, state->pindexBestKnownBlock);
+    state->pindexLastCommonBlock =
+        const_cast<CBlockIndex *>(LastCommonAncestor(state->pindexLastCommonBlock, state->pindexBestKnownBlock));
     if (state->pindexLastCommonBlock == state->pindexBestKnownBlock)
         return;
 
@@ -1116,7 +1135,7 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, unsigned int count, 
         // Read up to 128 (or more, if more blocks than that are needed) successors of pindexWalk (towards
         // pindexBestKnownBlock) into vToFetch. We fetch 128, because CBlockIndex::GetAncestor may be as expensive
         // as iterating over ~100 CBlockIndex* entries anyway.
-        int nToFetch = std::min(nMaxHeight - pindexWalk->nHeight, std::max<int>(count - vBlocks.size(), 128));
+        int nToFetch = std::min((size_t)(nMaxHeight - pindexWalk->nHeight), count - vBlocks.size());
         vToFetch.resize(nToFetch);
         pindexWalk = state->pindexBestKnownBlock->GetAncestor(pindexWalk->nHeight + nToFetch);
         vToFetch[nToFetch - 1] = pindexWalk;
@@ -1376,7 +1395,7 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         {
             BLOCK_DOWNLOAD_WINDOW.store(blockDownloadWindow.Value());
         }
-        LOG(THIN | BLK, "BLOCK_DOWNLOAD_WINDOW is %d nMaxBlocksInTransit is %d\n", BLOCK_DOWNLOAD_WINDOW.load(),
+        LOG(THIN | BLK, "BLOCK_DOWNLOAD_WINDOW is %d nMaxBlocksInTransit is %lu\n", BLOCK_DOWNLOAD_WINDOW.load(),
             pnode->nMaxBlocksInTransit.load());
 
         // Update the appropriate response time based on the type of block received.

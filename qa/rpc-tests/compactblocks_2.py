@@ -642,7 +642,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         NetworkThread().start()  # Start up network handling in another thread
 
         # Test logic begins here
-        self.test_node.send_message(msg_xversion(), True)
+        self.test_node.send_message(msg_extversion(), True)
         self.test_node.wait_for_verack()
 
         # We will need UTXOs to construct transactions in later tests.

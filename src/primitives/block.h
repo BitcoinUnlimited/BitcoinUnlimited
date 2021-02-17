@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -8,6 +8,7 @@
 #define BITCOIN_PRIMITIVES_BLOCK_H
 
 #include "primitives/transaction.h"
+#include "protocol.h"
 #include "serialize.h"
 #include "uint256.h"
 class arith_uint256;
@@ -58,6 +59,12 @@ public:
         READWRITE(nNonce);
     }
 
+    bool operator==(const CBlockHeader &b)
+    {
+        return (nVersion == b.nVersion && hashPrevBlock == b.hashPrevBlock && hashMerkleRoot == b.hashMerkleRoot &&
+                nTime == b.nTime && nBits == b.nBits && nNonce == b.nNonce);
+    }
+
     void SetNull()
     {
         nVersion = 0;
@@ -73,7 +80,8 @@ public:
 
     int64_t GetBlockTime() const { return (int64_t)nTime; }
 };
-
+/** The expected size of a serialized block header */
+static const unsigned int SERIALIZED_HEADER_SIZE = ::GetSerializeSize(CBlockHeader(), SER_NETWORK, PROTOCOL_VERSION);
 
 class CBlock : public CBlockHeader
 {
@@ -131,12 +139,17 @@ public:
 
     uint64_t GetHeight() const // Returns the block's height as specified in its coinbase transaction
     {
+        if (nVersion < 2)
+            throw std::runtime_error("Block does not contain height");
         const CScript &sig = vtx[0]->vin[0].scriptSig;
         int numlen = sig[0];
         if (numlen == OP_0)
             return 0;
         if ((numlen >= OP_1) && (numlen <= OP_16))
             return numlen - OP_1 + 1;
+        // Did you call this on a pre BIP34, or it could be a deliberately invalid block
+        if ((int)sig.size() - 1 < numlen)
+            throw std::runtime_error("Invalid block height");
         std::vector<unsigned char> heightScript(numlen);
         copy(sig.begin() + 1, sig.begin() + 1 + numlen, heightScript.begin());
         CScriptNum coinbaseHeight(heightScript, false, numlen);

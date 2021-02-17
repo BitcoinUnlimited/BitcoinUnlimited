@@ -1,12 +1,12 @@
-// Copyright (c) 2019 The Bitcoin Unlimited developers
+// Copyright (c) 2019-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "electrum/electrs.h"
+#include "extversionkeys.h"
+#include "extversionmessage.h"
 #include "test/test_bitcoin.h"
 #include "util.h"
-#include "xversionkeys.h"
-#include "xversionmessage.h"
 
 #include <sstream>
 #include <string>
@@ -33,7 +33,7 @@ BOOST_AUTO_TEST_CASE(issue_1700)
 
     UnsetArg("-electrum.host");
     SetArg("-electrum.port", "24");
-    BOOST_CHECK(electrs_args_has("--electrum-rpc-addr=127.0.0.1:24"));
+    BOOST_CHECK(electrs_args_has("--electrum-rpc-addr=0.0.0.0:24"));
 
     SetArg("-electrum.port", "24");
     SetArg("-electrum.host", "foo");
@@ -41,21 +41,21 @@ BOOST_AUTO_TEST_CASE(issue_1700)
 
     UnsetArg("-electrum.host");
     UnsetArg("-electrum.port");
-    BOOST_CHECK(electrs_args_has("--electrum-rpc-addr=127.0.0.1:50001"));
-    BOOST_CHECK(electrs_args_has("--electrum-rpc-addr=127.0.0.1:60001", "test"));
+    BOOST_CHECK(electrs_args_has("--electrum-rpc-addr=0.0.0.0:50001"));
+    BOOST_CHECK(electrs_args_has("--electrum-rpc-addr=0.0.0.0:60001", "test"));
 }
 
 BOOST_AUTO_TEST_CASE(rawargs)
 {
-    BOOST_CHECK(electrs_args_has("--txid-limit=500"));
-    BOOST_CHECK(!electrs_args_has("--txid-limit=42"));
+    BOOST_CHECK(electrs_args_has("--network=bitcoin"));
+    BOOST_CHECK(!electrs_args_has("--network=scalenet"));
 
-    // Test that we override txid-limit and append server-banner
-    mapMultiArgs["-electrum.rawarg"].push_back("--txid-limit=42");
+    // Test that we override network and append server-banner
+    mapMultiArgs["-electrum.rawarg"].push_back("--network=scalenet");
     mapMultiArgs["-electrum.rawarg"].push_back("--server-banner=\"Hello World!\"");
 
-    BOOST_CHECK(!electrs_args_has("--txid-limit=500"));
-    BOOST_CHECK(electrs_args_has("--txid-limit=42"));
+    BOOST_CHECK(!electrs_args_has("--network=bitcoin"));
+    BOOST_CHECK(electrs_args_has("--network=scalenet"));
     BOOST_CHECK(electrs_args_has("--server-banner=\"Hello World!\""));
 
     mapMultiArgs.clear();
@@ -78,54 +78,68 @@ BOOST_AUTO_TEST_CASE(rawargs_verboseness)
     Logging::LogToggleCategory(ELECTRUM, false);
 }
 
-static void call_setter(std::unique_ptr<CXVersionMessage> &ver)
+static void call_setter(std::unique_ptr<CExtversionMessage> &ver)
 {
     constexpr char network[] = "main";
-    ver.reset(new CXVersionMessage);
-    set_xversion_flags(*ver, network);
+    ver.reset(new CExtversionMessage);
+    set_extversion_flags(*ver, network);
 }
 
-BOOST_AUTO_TEST_CASE(electrum_xversion)
+BOOST_AUTO_TEST_CASE(electrum_extversion)
 {
     constexpr uint64_t PORT = 2020;
+    constexpr uint64_t WS_PORT = 2021;
     constexpr uint64_t NOT_SET = 0;
 
     UnsetArg("-electrum");
     UnsetArg("-electrum.host");
+    UnsetArg("-electrum.ws.host");
     std::stringstream ss;
     ss << PORT;
     SetArg("-electrum.port", ss.str());
+    std::stringstream ss2;
+    ss2 << WS_PORT;
+    SetArg("-electrum.ws.port", ss2.str());
 
-    std::unique_ptr<CXVersionMessage> ver;
+    std::unique_ptr<CExtversionMessage> ver;
 
     // Electrum server not enabled
     call_setter(ver);
     BOOST_CHECK_EQUAL(NOT_SET, ver->as_u64c(XVer::BU_ELECTRUM_SERVER_PORT_TCP));
+    BOOST_CHECK_EQUAL(NOT_SET, ver->as_u64c(XVer::BU_ELECTRUM_WS_SERVER_PORT_TCP));
     BOOST_CHECK_EQUAL(NOT_SET, ver->as_u64c(XVer::BU_ELECTRUM_SERVER_PROTOCOL_VERSION));
 
     // Electrum server enabled, but host is localhost
     SetArg("-electrum", "1");
     SetArg("-electrum.host", "127.0.0.1");
+    SetArg("-electrum.ws.host", "127.0.0.1");
     call_setter(ver);
     BOOST_CHECK_EQUAL(NOT_SET, ver->as_u64c(XVer::BU_ELECTRUM_SERVER_PORT_TCP));
+    BOOST_CHECK_EQUAL(NOT_SET, ver->as_u64c(XVer::BU_ELECTRUM_WS_SERVER_PORT_TCP));
     BOOST_CHECK_EQUAL(NOT_SET, ver->as_u64c(XVer::BU_ELECTRUM_SERVER_PROTOCOL_VERSION));
 
     // Electrum server enabled, but host is private network
     SetArg("-electrum.host", "192.168.1.42");
+    SetArg("-electrum.ws.host", "192.168.1.42");
     call_setter(ver);
     BOOST_CHECK_EQUAL(NOT_SET, ver->as_u64c(XVer::BU_ELECTRUM_SERVER_PORT_TCP));
+    BOOST_CHECK_EQUAL(NOT_SET, ver->as_u64c(XVer::BU_ELECTRUM_WS_SERVER_PORT_TCP));
     BOOST_CHECK_EQUAL(NOT_SET, ver->as_u64c(XVer::BU_ELECTRUM_SERVER_PROTOCOL_VERSION));
 
     // Electrum server enabled and on public network
     SetArg("-electrum.host", "8.8.8.8");
+    SetArg("-electrum.ws.host", "1.1.1.1");
     call_setter(ver);
     BOOST_CHECK_EQUAL(PORT, ver->as_u64c(XVer::BU_ELECTRUM_SERVER_PORT_TCP));
-    BOOST_CHECK_EQUAL(1400000, ver->as_u64c(XVer::BU_ELECTRUM_SERVER_PROTOCOL_VERSION));
+    BOOST_CHECK_EQUAL(WS_PORT, ver->as_u64c(XVer::BU_ELECTRUM_WS_SERVER_PORT_TCP));
+    BOOST_CHECK_EQUAL(1040300, ver->as_u64c(XVer::BU_ELECTRUM_SERVER_PROTOCOL_VERSION));
 
     // Special case: Listen on all IP's is treated as public
     SetArg("-electrum.host", "0.0.0.0");
+    SetArg("-electrum.ws.host", "0.0.0.0");
     call_setter(ver);
     BOOST_CHECK_EQUAL(PORT, ver->as_u64c(XVer::BU_ELECTRUM_SERVER_PORT_TCP));
+    BOOST_CHECK_EQUAL(WS_PORT, ver->as_u64c(XVer::BU_ELECTRUM_WS_SERVER_PORT_TCP));
 }
 
 // Test case for gitlab issue #2221, passing boolean parameters did not work.

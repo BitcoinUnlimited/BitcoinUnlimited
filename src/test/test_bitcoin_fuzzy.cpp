@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -14,6 +14,7 @@
 #include "coins.h"
 #include "compressor.h"
 #include "consensus/merkle.h"
+#include "extversionmessage.h"
 #include "net.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
@@ -27,7 +28,6 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 #include "version.h"
-#include "xversionmessage.h"
 
 #include <cstdio>
 #include <stdint.h>
@@ -576,9 +576,6 @@ int main(int argc, char **argv)
 {
     ECCVerifyHandle globalVerifyHandle;
 
-    /* Make a couple things determinstic for fuzzing */
-    xversion_deterministic_hashing = true;
-
     FuzzDeserNet<CBlock> fuzz_cblock("cblock");
     FuzzDeserNet<CTransaction> fuzz_ctransaction("ctransaction");
     FuzzDeserNet<CBlockLocator> fuzz_cblocklocator("cblocklocator");
@@ -615,7 +612,7 @@ int main(int argc, char **argv)
     FuzzAPICIblt fuzz_api_iblt;
     FuzzAPICGrapheneSet fuzz_api_graphene_set;
 
-    FuzzDeserNet<CXVersionMessage> fuzz_cxversionmessage("cxversionmessage");
+    FuzzDeserNet<CExtversionMessage> fuzz_CExtversionMessage("CExtversionMessage");
 
     // command line arguments can be used to constrain more and
     // more specifically to a particular test

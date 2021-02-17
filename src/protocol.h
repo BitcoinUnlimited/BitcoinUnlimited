@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Copyright (C) 2020 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -320,10 +320,7 @@ extern const char *SENDCMPCT;
  * Cash specific version information extending NetMsgType::VERSION
  * @since protocol version FIXME.
  */
-
-extern const char *XVERSION_OLD;
-extern const char *XVERACK_OLD;
-extern const char *XVERSION;
+extern const char *EXTVERSION;
 
 extern const char *XUPDATE;
 
@@ -410,8 +407,8 @@ enum
     // See BIP159 for details on how this is implemented.
     NODE_NETWORK_LIMITED = (1 << 10),
 
-    // indicates if node is using xversion
-    NODE_XVERSION = (1 << 11),
+    // indicates if node is using extversion
+    NODE_EXTVERSION = (1 << 11),
 };
 
 /** A CService with information about it as peer */

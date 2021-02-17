@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -16,14 +16,32 @@
 class CCoinsViewCache;
 
 /** Default for -blockmaxsize and -blockminsize, which control the range of sizes the mining code will create **/
-static const unsigned int DEFAULT_BLOCK_MAX_SIZE = 8000000;
+// this is now set in chain params
+static const unsigned int DEFAULT_BLOCK_MAX_SIZE_REGTEST = 1000;
+static const unsigned int DEFAULT_BLOCK_MAX_SIZE = 8 * ONE_MEGABYTE;
+static const unsigned int DEFAULT_BLOCK_MAX_SIZE_TESTNET4 = 2 * ONE_MEGABYTE;
+static const unsigned int DEFAULT_BLOCK_MAX_SIZE_SCALENET = 256 * ONE_MEGABYTE;
 static const unsigned int DEFAULT_BLOCK_MIN_SIZE = 0;
-
+// Maximum number of mining candidates that this node will remember simultaneously
+static const unsigned int DEFAULT_MAX_MINING_CANDIDATES = 10;
+// Send an existing mining candidate if a request comes in within this many seconds of its construction
+static const unsigned int DEFAULT_MIN_CANDIDATE_INTERVAL = 30;
 /** Default for -blockprioritysize, a 5% maximum space for zero/low-fee transactions **/
 static const unsigned int DEFAULT_BLOCK_PRIORITY_SIZE = DEFAULT_BLOCK_MAX_SIZE / 20;
 
 /** The maximum size for transactions we're willing to relay/mine */
 static const unsigned int MAX_STANDARD_TX_SIZE = 100000;
+
+/**
+ * Biggest 'standard' txin is a 15-of-15 P2SH multisig with compressed
+ * keys (remember the 520 byte limit on redeemScript size). That works
+ * out to a (15*(33+1))+3=513 byte redeemScript, 513+1+15*(73+1)+3=1627
+ * bytes of scriptSig, which we round off to 1650 bytes for some minor
+ * future-proofing. That's also enough to spend a 20-of-20 CHECKMULTISIG
+ * scriptPubKey, though such a scriptPubKey is not considered standard.
+ */
+static constexpr unsigned int MAX_TX_IN_SCRIPT_SIG_SIZE = 1650;
+
 /** Maximum number of signature check operations in an IsStandard() P2SH script */
 static const unsigned int MAX_P2SH_SIGOPS = 15;
 /** The maximum number of sigops we're willing to relay/mine in a single tx */

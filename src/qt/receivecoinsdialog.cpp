@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -73,6 +73,10 @@ ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, cons
 
     // initialize freeze
     nFreezeLockTime = CScriptNum(0);
+
+    // Temporarily disable the freeze coin check box in the wallet.
+    // TODO: determine whether to competely remove the freeze feature.
+    ui->freezeCheck->setEnabled(false);
 }
 
 void ReceiveCoinsDialog::setModel(WalletModel *_model)

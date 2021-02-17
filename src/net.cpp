@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2021 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -23,6 +23,7 @@
 #include "consensus/consensus.h"
 #include "crypto/common.h"
 #include "dosman.h"
+#include "extversionkeys.h"
 #include "hashwrapper.h"
 #include "iblt.h"
 #include "primitives/transaction.h"
@@ -30,7 +31,6 @@
 #include "ui_interface.h"
 #include "unlimited.h"
 #include "utilstrencodings.h"
-#include "xversionkeys.h"
 
 extern CTweak<bool> ignoreNetTimeouts;
 
@@ -82,6 +82,8 @@ extern CTweak<bool> ignoreNetTimeouts;
 extern std::atomic<bool> fRescan;
 extern bool fReindex;
 extern CTxMemPool mempool;
+extern CTweak<uint64_t> grapheneMinVersionSupported;
+extern CTweak<uint64_t> grapheneMaxVersionSupported;
 
 bool ShutdownRequested();
 
@@ -141,6 +143,7 @@ extern CCriticalSection cs_vUseDNSSeeds;
 extern CSemaphore *semOutbound;
 extern CSemaphore *semOutboundAddNode; // BU: separate semaphore for -addnodes
 std::condition_variable messageHandlerCondition;
+std::mutex wakeableDelayMutex;
 
 // BU  Connection Slot mitigation - used to determine how many connection attempts over time
 extern std::map<CNetAddr, ConnectionHistory> mapInboundConnectionTracker;
@@ -655,6 +658,34 @@ static bool IsPriorityMsg(std::string strCommand)
         return false;
     }
 }
+
+void CNode::LookAhead()
+{
+    AssertLockHeld(cs_vRecvMsg);
+    if (fDownloading.load())
+        return;
+
+    // Do lookahead for block downloads.  If it is a block or thintype block then get the blockhash
+    // and indicate we are downloading it so that we don't re-request the block prematurely.
+    const std::string &strCommand = msg.hdr.GetCommand();
+    if (strCommand == NetMsgType::BLOCK || strCommand == NetMsgType::GRAPHENEBLOCK ||
+        strCommand == NetMsgType::CMPCTBLOCK || strCommand == NetMsgType::XTHINBLOCK ||
+        strCommand == NetMsgType::THINBLOCK)
+    {
+        if (msg.nDataPos >= SERIALIZED_HEADER_SIZE)
+        {
+            CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+            ss.append(msg.vRecv, SERIALIZED_HEADER_SIZE);
+
+            CBlockHeader header;
+            ss >> header;
+            requester.Downloading(header.GetHash(), this);
+
+            fDownloading.store(true);
+        }
+    }
+}
+
 bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
 {
     AssertLockHeld(cs_vRecvMsg);
@@ -663,9 +694,16 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
         // Absorb network data.
         int handled;
         if (!msg.in_data)
+        {
             handled = msg.readHeader(pch, nBytes);
+        }
         else
+        {
             handled = msg.readData(pch, nBytes);
+
+            // Do a lookahead to determine if we need to set the downloading flag.
+            LookAhead();
+        }
 
         if (handled < 0)
             return false;
@@ -718,11 +756,9 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                     }
                 }
             }
-
             if (fSendLowPriority)
             {
-                if (strCommand == NetMsgType::VERSION || strCommand == NetMsgType::XVERSION ||
-                    strCommand == NetMsgType::XVERSION_OLD || strCommand == NetMsgType::XVERACK_OLD ||
+                if (strCommand == NetMsgType::VERSION || strCommand == NetMsgType::EXTVERSION ||
                     strCommand == NetMsgType::VERACK)
                 {
                     vRecvMsg_handshake.push_back(std::move(msg));
@@ -734,6 +770,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
                 msg = CNetMessage(GetMagic(Params()), SER_NETWORK, nRecvVersion);
             }
             messageHandlerCondition.notify_one();
+            fDownloading.store(false);
         }
     }
 
@@ -897,8 +934,6 @@ int SocketSendData(CNode *pnode, bool fSendTwo = false) EXCLUSIVE_LOCKS_REQUIRED
 
     return progress;
 }
-
-extern list<CNode *> vNodesDisconnected;
 
 #if 0 // Not currenly used
 static bool ReverseCompareNodeMinPingTime(const CNodeRef &a, const CNodeRef &b)
@@ -1208,8 +1243,9 @@ void CleanupDisconnectedNodes()
     //
     // Disconnect nodes
     //
+    list<CNode *> vNodesDisconnectedCopy;
     {
-        LOCK(cs_vNodes);
+        LOCK2(cs_vNodes, cs_vNodesDisconnected);
         // Disconnect unused nodes
         vector<CNode *> vNodesCopy = vNodes;
         for (CNode *pnode : vNodesCopy)
@@ -1235,36 +1271,38 @@ void CleanupDisconnectedNodes()
                 vNodesDisconnected.push_back(pnode);
             }
         }
+        vNodesDisconnectedCopy = vNodesDisconnected;
     }
+
+    // Delete disconnected nodes
+    for (CNode *pnode : vNodesDisconnectedCopy)
     {
-        // Delete disconnected nodes
-        list<CNode *> vNodesDisconnectedCopy = vNodesDisconnected;
-        for (CNode *pnode : vNodesDisconnectedCopy)
+        // wait until threads are done using it
+        if (pnode->GetRefCount() <= 0)
         {
-            // wait until threads are done using it
-            if (pnode->GetRefCount() <= 0)
+            bool fDelete = false;
             {
-                bool fDelete = false;
+                TRY_LOCK(pnode->cs_vSend, lockSend);
+                if (lockSend)
                 {
-                    TRY_LOCK(pnode->cs_vSend, lockSend);
-                    if (lockSend)
+                    TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
+                    if (lockRecv)
                     {
-                        TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                        if (lockRecv)
-                        {
-                            TRY_LOCK(pnode->cs_inventory, lockInv);
-                            if (lockInv)
-                                fDelete = true;
-                        }
+                        TRY_LOCK(pnode->cs_inventory, lockInv);
+                        if (lockInv)
+                            fDelete = true;
                     }
                 }
-                if (fDelete)
+            }
+            if (fDelete)
+            {
                 {
+                    LOCK(cs_vNodesDisconnected);
                     vNodesDisconnected.remove(pnode);
-                    // no need to remove from vNodes. we know pnode has already been removed from vNodes since that
-                    // occurred prior to insertion into vNodesDisconnected
-                    delete pnode;
                 }
+                // no need to remove from vNodes. we know pnode has already been removed from vNodes since that
+                // occurred prior to insertion into vNodesDisconnected
+                delete pnode;
             }
         }
     }
@@ -1992,6 +2030,8 @@ void static ProcessOneShot()
 
 void ThreadOpenConnections()
 {
+    nMinXthinNodes = GetArg("-min-xthin-nodes", MIN_XTHIN_NODES);
+
     // Connect to all "connect" peers
     if (mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0)
     {
@@ -2067,7 +2107,6 @@ void ThreadOpenConnections()
             // have not yet connected to enough XTHIN nodes.
             if (!fReindex)
             {
-                nMinXthinNodes = GetArg("-min-xthin-nodes", MIN_XTHIN_NODES);
                 if (nOutbound >= nMaxOutConnections && nThinBlockCapable <= min(nMinXthinNodes, nMaxOutConnections) &&
                     nDisconnects < MAX_DISCONNECTS && IsThinBlocksEnabled() && IsChainNearlySyncd())
                 {
@@ -2457,9 +2496,6 @@ static bool threadProcessMessages(CNode *pnode)
 
 void ThreadMessageHandler()
 {
-    std::mutex condition_mutex;
-    std::unique_lock<std::mutex> lock(condition_mutex);
-
     while (shutdown_threads.load() == false)
     {
         // Start or Stop threads as determined by the numMsgHandlerThreads tweak
@@ -2576,6 +2612,7 @@ void ThreadMessageHandler()
 
         if (fSleep)
         {
+            std::unique_lock<std::mutex> lock(wakeableDelayMutex);
             messageHandlerCondition.wait_until(lock, std::chrono::steady_clock::now() + std::chrono::milliseconds(10));
         }
     }
@@ -2875,7 +2912,7 @@ void NetCleanup()
     {
         CleanupDisconnectedNodes();
         {
-            LOCK(cs_vNodes);
+            LOCK2(cs_vNodes, cs_vNodesDisconnected);
             if ((vNodes.size() == 0) && (vNodesDisconnected.size() == 0))
                 break; // every node is properly disconnected
         }
@@ -2884,7 +2921,7 @@ void NetCleanup()
 
 
     {
-        LOCK(cs_vNodes);
+        LOCK2(cs_vNodes, cs_vNodesDisconnected);
         if (!((vNodes.size() == 0) && (vNodesDisconnected.size() == 0)))
         {
             LOG(NET, "Some node objects were not properly cleaned up.\n");
@@ -3207,7 +3244,7 @@ bool CAddrDB::Read(CAddrMan &addr, CDataStream &ssPeers)
 unsigned int ReceiveFloodSize() { return 1000 * GetArg("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER); }
 unsigned int SendBufferSize() { return 1000 * GetArg("-maxsendbuffer", DEFAULT_MAXSENDBUFFER); }
 CNode::CNode(SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn, bool fInboundIn)
-    : xVersionEnabled(false), skipChecksum(false), ssSend(SER_NETWORK, INIT_PROTO_VERSION), id(connmgr->NextNodeId()),
+    : extversionEnabled(false), skipChecksum(false), ssSend(SER_NETWORK, INIT_PROTO_VERSION), id(connmgr->NextNodeId()),
       addrKnown(5000, 0.001)
 {
     nServices = 0;
@@ -3476,64 +3513,48 @@ void CNode::DisconnectIfBanned()
     }
 }
 
-void CNode::ReadConfigFromXVersion_OLD()
+void CNode::ReadConfigFromExtversion()
 {
-    xVersionEnabled = true;
-    LOCK(cs_xversion);
-    skipChecksum = (xVersion.as_u64c(XVer::BU_MSG_IGNORE_CHECKSUM_OLD) == 1);
+    extversionEnabled = true;
+    LOCK(cs_extversion);
+    skipChecksum = (extversion.as_u64c(XVer::BU_MSG_IGNORE_CHECKSUM) == 1);
     if (addrFromPort == 0)
     {
-        addrFromPort = xVersion.as_u64c(XVer::BU_LISTEN_PORT_OLD) & 0xffff;
+        addrFromPort = extversion.as_u64c(XVer::BU_LISTEN_PORT) & 0xffff;
     }
 
-    uint64_t num = xVersion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT_OLD);
+    uint64_t num = extversion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT);
     if (num)
         nLimitAncestorCount = num; // num == 0 means the field was not provided.
-    num = xVersion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT_OLD);
+    num = extversion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT);
     if (num)
         nLimitAncestorSize = num;
 
-    num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT_OLD);
+    num = extversion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT);
     if (num)
         nLimitDescendantCount = num;
-    num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT_OLD);
+    num = extversion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT);
     if (num)
         nLimitDescendantSize = num;
 
-    canSyncMempoolWithPeers = (xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_OLD) == 1);
-    nMempoolSyncMinVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED_OLD);
-    nMempoolSyncMaxVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED_OLD);
-    txConcat = xVersion.as_u64c(XVer::BU_TXN_CONCATENATION_OLD);
-}
+    canSyncMempoolWithPeers = (extversion.as_u64c(XVer::BU_MEMPOOL_SYNC) == 1);
+    nMempoolSyncMinVersionSupported = extversion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED);
+    nMempoolSyncMaxVersionSupported = extversion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED);
+    txConcat = extversion.as_u64c(XVer::BU_TXN_CONCATENATION);
+    minGrapheneVersion = extversion.as_u64c(XVer::BU_GRAPHENE_MIN_VERSION_SUPPORTED);
+    maxGrapheneVersion = extversion.as_u64c(XVer::BU_GRAPHENE_MAX_VERSION_SUPPORTED);
 
-void CNode::ReadConfigFromXVersion()
-{
-    xVersionEnabled = true;
-    LOCK(cs_xversion);
-    skipChecksum = (xVersion.as_u64c(XVer::BU_MSG_IGNORE_CHECKSUM) == 1);
-    if (addrFromPort == 0)
     {
-        addrFromPort = xVersion.as_u64c(XVer::BU_LISTEN_PORT) & 0xffff;
+        uint64_t selfMax = grapheneMaxVersionSupported.Value();
+        uint64_t selfMin = grapheneMinVersionSupported.Value();
+
+        uint64_t upper = (uint64_t)std::min(maxGrapheneVersion.load(), selfMax);
+        uint64_t lower = (uint64_t)std::max(minGrapheneVersion.load(), selfMin);
+        if (lower > upper)
+            negotiatedGrapheneVersion = GRAPHENE_NO_VERSION_SUPPORTED;
+        else
+            negotiatedGrapheneVersion = upper;
     }
-
-    uint64_t num = xVersion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT);
-    if (num)
-        nLimitAncestorCount = num; // num == 0 means the field was not provided.
-    num = xVersion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT);
-    if (num)
-        nLimitAncestorSize = num;
-
-    num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT);
-    if (num)
-        nLimitDescendantCount = num;
-    num = xVersion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT);
-    if (num)
-        nLimitDescendantSize = num;
-
-    canSyncMempoolWithPeers = (xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC) == 1);
-    nMempoolSyncMinVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED);
-    nMempoolSyncMaxVersionSupported = xVersion.as_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED);
-    txConcat = xVersion.as_u64c(XVer::BU_TXN_CONCATENATION);
 }
 
 

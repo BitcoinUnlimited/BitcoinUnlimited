@@ -65,11 +65,11 @@ class GrapheneBlockTest(BitcoinTestFramework):
 
     def assert_success(self):
         # Nodes 0 and 1 should have received one block from node 2.
-        assert '1 inbound and 0 outbound graphene blocks' in self.extract_stats_fields(self.nodes[0])['summary']
-        assert '1 inbound and 0 outbound graphene blocks' in self.extract_stats_fields(self.nodes[1])['summary']
+        assert '1 inbound and 0 outbound graphene blocks' in self.extract_stats_fields(self.nodes[0])['summary'], "actually " + str(self.extract_stats_fields(self.nodes[1]))
+        assert '1 inbound and 0 outbound graphene blocks' in self.extract_stats_fields(self.nodes[1])['summary'], "actually " + str(self.extract_stats_fields(self.nodes[1]))
 
         # Node 2 should have sent a block to the two other nodes
-        assert '0 inbound and 2 outbound graphene blocks' in self.extract_stats_fields(self.nodes[2])['summary']
+        assert '0 inbound and 2 outbound graphene blocks' in self.extract_stats_fields(self.nodes[2])['summary'], "actually " + str(self.extract_stats_fields(self.nodes[2]))
 
     def assert_failure(self):
         try:

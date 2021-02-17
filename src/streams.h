@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2018 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -142,6 +142,8 @@ public:
             vch.insert(it, first, last);
     }
 
+    // Append data from one datastream to this one.
+    void append(CDataStream &ss, const unsigned int nChars) { vch.insert(vch.end(), ss.begin(), ss.begin() + nChars); }
     void insert(iterator it, std::string::iterator first, std::string::iterator last)
     {
         if (last == first)

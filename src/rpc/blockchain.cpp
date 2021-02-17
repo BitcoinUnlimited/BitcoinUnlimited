@@ -1,6 +1,6 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2015-2019 The Bitcoin Unlimited developers
+// Copyright (c) 2015-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -184,6 +184,25 @@ UniValue getbestblockhash(const UniValue &params, bool fHelp)
     return chainActive.Tip()->GetBlockHash().GetHex();
 }
 
+UniValue getfinalizedblockhash(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+    {
+        throw std::runtime_error("getfinalizedblockhash\n"
+                                 "\nReturns the hash of the currently finalized block\n"
+                                 "\nResult:\n"
+                                 "\"hex\"      (string) the block hash hex encoded\n");
+    }
+
+    LOCK(cs_main);
+    const CBlockIndex *blockIndexFinalized = GetFinalizedBlock();
+    if (blockIndexFinalized)
+    {
+        return blockIndexFinalized->GetBlockHash().GetHex();
+    }
+    return UniValue(UniValue::VSTR);
+}
+
 UniValue getdifficulty(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -236,11 +255,9 @@ void entryToJSON(UniValue &info, const CTxMemPoolEntry &e)
     info.pushKV("modifiedfee", ValueFromAmount(e.GetModifiedFee()));
     info.pushKV("time", e.GetTime());
     info.pushKV("height", (int)e.GetHeight());
+    info.pushKV("doublespent", (e.dsproof == 1 ? true : false));
     info.pushKV("startingpriority", e.GetPriority(e.GetHeight()));
     info.pushKV("currentpriority", e.GetPriority(chainActive.Height()));
-    info.pushKV("descendantcount", e.GetCountWithDescendants());
-    info.pushKV("descendantsize", e.GetSizeWithDescendants());
-    info.pushKV("descendantfees", e.GetModFeesWithDescendants());
     info.pushKV("ancestorcount", e.GetCountWithAncestors());
     info.pushKV("ancestorsize", e.GetSizeWithAncestors());
     info.pushKV("ancestorfees", e.GetModFeesWithAncestors());
@@ -397,7 +414,7 @@ UniValue getmempoolancestors(const UniValue &params, bool fHelp)
     CTxMemPool::setEntries setAncestors;
     uint64_t noLimit = std::numeric_limits<uint64_t>::max();
     std::string dummy;
-    mempool._CalculateMemPoolAncestors(*it, setAncestors, noLimit, noLimit, noLimit, noLimit, dummy, nullptr, false);
+    mempool._CalculateMemPoolAncestors(*it, setAncestors, noLimit, noLimit, dummy, nullptr, false);
 
     if (!fVerbose)
     {
@@ -519,6 +536,10 @@ UniValue getmempoolentry(const UniValue &params, bool fHelp)
     {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction not in mempool");
     }
+
+    // Update the ancestor chain state if this transaction is part of
+    // an unconfirmed chain
+    mempool.UpdateTxnChainState(it);
 
     const CTxMemPoolEntry &e = *it;
     UniValue info(UniValue::VOBJ);
@@ -1238,8 +1259,8 @@ UniValue getblockchaininfo(const UniValue &params, bool fHelp)
     obj.pushKV("bestblockhash", chainActive.Tip()->GetBlockHash().GetHex());
     obj.pushKV("difficulty", (double)GetDifficulty());
     obj.pushKV("mediantime", (int64_t)chainActive.Tip()->GetMedianTimePast());
-    obj.pushKV(
-        "verificationprogress", Checkpoints::GuessVerificationProgress(Params().Checkpoints(), chainActive.Tip()));
+    obj.pushKV("verificationprogress",
+        Checkpoints::GuessVerificationProgress(Params().Checkpoints(), chainActive.Tip(), !fCheckpointsEnabled));
     obj.pushKV("initialblockdownload", IsInitialBlockDownload());
     obj.pushKV("chainwork", chainActive.Tip()->nChainWork.GetHex());
     obj.pushKV("size_on_disk", CalculateCurrentUsage());
@@ -1435,8 +1456,7 @@ UniValue mempoolInfoToJSON()
     ret.pushKV("usage", (int64_t)mempool.DynamicMemoryUsage());
     size_t maxmempool = GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
     ret.pushKV("maxmempool", (int64_t)maxmempool);
-    int64_t minfee =
-        std::max((int64_t)::minRelayTxFee.GetFeePerK(), (int64_t)mempool.GetMinFee(maxmempool).GetFeePerK());
+    int64_t minfee = (int64_t)::minRelayTxFee.GetFeePerK();
     ret.pushKV("mempoolminfee", ValueFromAmount(minfee));
     double smoothedTps = 0.0, instantaneousTps = 0.0, peakTps = 0.0;
     mempool.GetTransactionRateStatistics(smoothedTps, instantaneousTps, peakTps);
@@ -1531,6 +1551,53 @@ UniValue invalidateblock(const UniValue &params, bool fHelp)
     LOCK(cs_main);
 
     InvalidateBlock(state, Params().GetConsensus(), pblockindex);
+
+    if (state.IsValid())
+    {
+        ActivateBestChain(state, Params());
+    }
+
+    if (!state.IsValid())
+    {
+        throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
+    }
+
+    return NullUniValue;
+}
+
+UniValue finalizeblock(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+    {
+        throw std::runtime_error("finalizeblock \"blockhash\"\n"
+
+                                 "\nTreats a block as final. It cannot be reorged. Any chain\n"
+                                 "that does not contain this block is invalid. Used on a less\n"
+                                 "work chain, it can effectively PUTS YOU OUT OF CONSENSUS.\n"
+                                 "USE WITH CAUTION!\n"
+                                 "\nResult:\n"
+                                 "\nExamples:\n" +
+                                 HelpExampleCli("finalizeblock", "\"blockhash\"") +
+                                 HelpExampleRpc("finalizeblock", "\"blockhash\""));
+    }
+
+    std::string strHash = params[0].get_str();
+    uint256 hash(uint256S(strHash));
+    CValidationState state;
+
+    {
+        CBlockIndex *pblockindex;
+        {
+            READLOCK(cs_mapBlockIndex);
+            if (mapBlockIndex.count(hash) == 0)
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+            }
+
+            pblockindex = mapBlockIndex[hash];
+        }
+        FinalizeBlockAndInvalidate(state, pblockindex);
+    }
 
     if (state.IsValid())
     {
@@ -2141,6 +2208,24 @@ UniValue savemempool(const UniValue &params, bool fHelp)
     return NullUniValue;
 }
 
+UniValue saveorphanpool(const UniValue &params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+    {
+        throw std::runtime_error("saveorphanpool\n"
+                                 "\nDumps the orphanpool to disk.\n"
+                                 "\nExamples:\n" +
+                                 HelpExampleCli("saveorphanpool", "") + HelpExampleRpc("saveorphanpool", ""));
+    }
+
+    if (!orphanpool.DumpOrphanPool())
+    {
+        throw JSONRPCError(RPC_MISC_ERROR, "Unable to dump orphanpool to disk");
+    }
+
+    return NullUniValue;
+}
+
 UniValue getchaintxstats(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() > 2)
@@ -2250,12 +2335,15 @@ static const CRPCCommand commands[] = {
     {"blockchain", "evicttransaction", &evicttransaction, true}, {"blockchain", "getrawmempool", &getrawmempool, true},
     {"blockchain", "getraworphanpool", &getraworphanpool, true}, {"blockchain", "gettxout", &gettxout, true},
     {"blockchain", "gettxoutsetinfo", &gettxoutsetinfo, true}, {"blockchain", "savemempool", &savemempool, true},
-    {"blockchain", "verifychain", &verifychain, true}, {"blockchain", "getblockstats", &getblockstats, true},
+    {"blockchain", "saveorphanpool", &saveorphanpool, true}, {"blockchain", "verifychain", &verifychain, true},
+    {"blockchain", "getblockstats", &getblockstats, true},
 
     /* Not shown in help */
     {"hidden", "invalidateblock", &invalidateblock, true}, {"hidden", "reconsiderblock", &reconsiderblock, true},
     {"hidden", "rollbackchain", &rollbackchain, true},
     {"hidden", "reconsidermostworkchain", &reconsidermostworkchain, true},
+    {"hidden", "finalizeblock", &finalizeblock, true},
+    {"hidden", "getfinalizedblockhash", &getfinalizedblockhash, true},
 };
 
 void RegisterBlockchainRPCCommands(CRPCTable &table)

@@ -20,8 +20,8 @@ the usage of the absolute path.
 ## To Build
 
 ```bash
-git clone https://github.com/BitcoinUnlimited/BitcoinUnlimited.git
-cd BitcoinUnlimited
+git clone https://gitlab.com/bitcoinunlimited/BCHUnlimited.git
+cd BCHUnlimited/
 ./autogen.sh
 ./configure
 make

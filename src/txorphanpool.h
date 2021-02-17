@@ -1,4 +1,4 @@
-// Copyright (c) 2018 The Bitcoin Unlimited developers
+// Copyright (c) 2018-2019 The Bitcoin Unlimited developers
 // Copyright (c) 2018 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -73,6 +73,17 @@ public:
         READLOCK(cs_orphanpool);
         return nBytesOrphanPool;
     }
+
+private:
+    //! Return all the orphan pool data structures so they can be saved to disk
+    std::vector<CTxOrphanPool::COrphanTx> AllTxOrphanPoolInfo() const;
+
+public:
+    //! Load the orphan pool from disk
+    bool LoadOrphanPool();
+
+    //! Save the orphan pool to disk
+    bool DumpOrphanPool();
 };
 extern CTxOrphanPool orphanpool;
 

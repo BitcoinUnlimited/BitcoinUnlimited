@@ -20,11 +20,13 @@ static uint256 xpeditedBlkSent[NUM_XPEDITED_STORE];
 // zeros on construction)
 static int xpeditedBlkSendPos = 0;
 
+
 bool CheckAndRequestExpeditedBlocks(CNode *pfrom)
 {
     if (pfrom->nVersion >= EXPEDITED_VERSION)
     {
-        for (std::string &strAddr : mapMultiArgs["-expeditedblock"])
+        // take a copy of this string since we may modify it
+        for (std::string strAddr : mapMultiArgs["-expeditedblock"])
         {
             std::string strListeningPeerIP;
             std::string strPeerIP = pfrom->addr.ToString();

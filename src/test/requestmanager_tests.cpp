@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2019 The Bitcoin Unlimited Developers
+// Copyright (c) 2016-2020 The Bitcoin Unlimited Developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -32,6 +32,19 @@
 #include <boost/test/unit_test.hpp>
 #include <sstream>
 #include <string>
+
+extern CTweak<uint64_t> grapheneMaxVersionSupported;
+
+class CRequestManagerTest
+{
+private:
+    CRequestManager *_rman;
+
+public:
+    CRequestManagerTest(CRequestManager *r) { _rman = r; }
+    std::map<uint256, CUnknownObj> GetMapTxnInfo() { return _rman->mapTxnInfo; }
+    std::map<uint256, CUnknownObj> GetMapBlkInfo() { return _rman->mapBlkInfo; }
+};
 
 // Cleanup all maps
 static void CleanupAll(std::vector<CNode *> &vPeers)
@@ -116,6 +129,8 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     dummyNodeGraphene.nServices &= ~NODE_XTHIN;
     dummyNodeGraphene.fSupportsCompactBlocks = false;
     dummyNodeGraphene.id = 2;
+    // This dummy node does not exchange a simulated extversion so jam in graphene supported version.
+    dummyNodeGraphene.negotiatedGrapheneVersion = grapheneMaxVersionSupported.Value();
     dummyNodeCmpct.nVersion = MIN_PEER_PROTO_VERSION;
     SetConnected(dummyNodeCmpct);
     dummyNodeCmpct.nServices &= ~NODE_GRAPHENE;
@@ -890,5 +905,48 @@ BOOST_AUTO_TEST_CASE(blockrequest_tests)
     vNodes.erase(remove(vNodes.begin(), vNodes.end(), &dummyNodeNone), vNodes.end());
     vNodes.erase(remove(vNodes.begin(), vNodes.end(), &dummyNodeCmpct), vNodes.end());
     vNodes.erase(remove(vNodes.begin(), vNodes.end(), &dummyNodeXthin), vNodes.end());
+}
+
+BOOST_AUTO_TEST_CASE(askfor_tests)
+{
+    CAddress addr1(ipaddress(0xa0b0c001, 10000));
+    CAddress addr2(ipaddress(0xa0b0c002, 10001));
+
+    // create nodes
+    CNode dummyNode1(INVALID_SOCKET, addr1, "", true);
+    CNode dummyNode2(INVALID_SOCKET, addr2, "", true);
+
+    CRequestManager rman;
+    CRequestManagerTest rman_access(&rman);
+    std::map<uint256, CUnknownObj> mapTxn;
+    std::map<uint256, CUnknownObj> mapBlk;
+
+    /*** tests for transactions ***/
+    uint256 hash_txn = GetRandHash();
+    CInv inv_txn(MSG_TX, hash_txn);
+
+    rman.AskFor(inv_txn, &dummyNode1);
+    mapTxn = rman_access.GetMapTxnInfo();
+    BOOST_CHECK(mapTxn[inv_txn.hash].availableFrom.size() == 1);
+
+    // all sources should be removed and no new ones added.
+    rman.ProcessingTxn(inv_txn.hash, &dummyNode1);
+    rman.AskFor(inv_txn, &dummyNode2);
+    mapTxn = rman_access.GetMapTxnInfo();
+    BOOST_CHECK(mapTxn[inv_txn.hash].availableFrom.size() == 0);
+
+    /*** tests for blocks ***/
+    uint256 hash_block = GetRandHash();
+    CInv inv_block(MSG_BLOCK, hash_block);
+
+    rman.AskFor(inv_block, &dummyNode1);
+    mapBlk = rman_access.GetMapBlkInfo();
+    BOOST_CHECK(mapBlk[inv_block.hash].availableFrom.size() == 1);
+
+    // blocks are handled differently than transactions. A new source should have been added.
+    rman.ProcessingBlock(inv_block.hash, &dummyNode1);
+    rman.AskFor(inv_block, &dummyNode2);
+    mapBlk = rman_access.GetMapBlkInfo();
+    BOOST_CHECK(mapBlk[inv_block.hash].availableFrom.size() == 2); // should add another source
 }
 BOOST_AUTO_TEST_SUITE_END()
