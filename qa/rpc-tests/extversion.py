@@ -62,13 +62,16 @@ class ExtversionTest(BitcoinTestFramework):
         logging.info("Testing extversion handling")
 
         # test regular set up including extversion
+        testStringKey = 18446744073709551600; # a large number that requires uint64_t
+        testStringvalue = 1844674407370955161; # a large number that requires uint64_t
+
         conn = self.restart_node()
         nt = NetworkThread()
         nt.start()
         logging.info("sent version")
         conn.wait_for(lambda : conn.remote_extversion)
         logging.info("sent extversion")
-        conn.send_message(msg_extversion({1000 : b"test string"}))
+        conn.send_message(msg_extversion({1234 : testStringvalue, testStringKey : b"test string"}))
         conn.wait_for_verack()
         logging.info("sent verack")
         conn.send_message(msg_verack())
@@ -89,11 +92,11 @@ class ExtversionTest(BitcoinTestFramework):
         assert "extversion_map" in peer_info[0]
         xv_map = peer_info[0]["extversion_map"]
 
-        assert len(xv_map) == 1
-        assert unhexlify(list(xv_map.values())[0]) == b"test string"
+        assert len(xv_map) == 2
+        assert unhexlify(list(xv_map.values())[1]) == b"test string"
 
         # send xupdate to test what would happen if someone tries to update non-chaneable key
-        conn.send_message(msg_xupdate({1000 : b"test string changed"}))
+        conn.send_message(msg_xupdate({testStringKey : b"test string changed"}))
         # some arbitrary sleep time
         time.sleep(3);
 
@@ -103,8 +106,8 @@ class ExtversionTest(BitcoinTestFramework):
         assert len(peer_info) == 1
         assert "extversion_map" in peer_info[0]
         xv_map = peer_info[0]["extversion_map"]
-        assert len(xv_map) == 1
-        assert unhexlify(list(xv_map.values())[0]) == b"test string"
+        assert len(xv_map) == 2
+        assert unhexlify(list(xv_map.values())[1]) == b"test string"
 
         # send xupdate to test what would happen if someone tries to update a non-existant key
         conn.send_message(msg_xupdate({1111 : b"bad string"}))
@@ -116,7 +119,7 @@ class ExtversionTest(BitcoinTestFramework):
         assert len(peer_info) == 1
         assert "extversion_map" in peer_info[0]
         xv_map = peer_info[0]["extversion_map"]
-        assert len(xv_map) == 1
+        assert len(xv_map) == 2
 
         # TODO appent to this test to test a changeable key once one has been implemented in the node
 

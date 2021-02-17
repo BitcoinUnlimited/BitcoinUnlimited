@@ -42,12 +42,12 @@ public:
     template <typename Stream>
     void Unserialize(Stream &s)
     {
-        size_t n = ReadCompactUint64<Stream>(s);
+        size_t n = ReadCompactSizeWithLimit<Stream>(s, std::numeric_limits<uint64_t>::max());
         for (size_t i = 0; i < n; i++)
         {
             uint64_t k;
             std::vector<uint8_t> v;
-            k = ReadCompactUint64<Stream>(s);
+            k = ReadCompactSizeWithLimit<Stream>(s, std::numeric_limits<uint64_t>::max());
             s >> v;
             map[k] = v;
         }

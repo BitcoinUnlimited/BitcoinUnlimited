@@ -26,7 +26,7 @@ uint64_t CExtversionMessage::as_u64c(const uint64_t k) const
         try
         {
             CDataStream s(vec, SER_NETWORK, PROTOCOL_VERSION);
-            s >> COMPACTSIZE(v);
+            v = ReadCompactSizeWithLimit(s, std::numeric_limits<uint64_t>::max());
         }
         catch (...)
         {
@@ -42,7 +42,7 @@ uint64_t CExtversionMessage::as_u64c(const uint64_t k) const
 void CExtversionMessage::set_u64c(const uint64_t key, const uint64_t val)
 {
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
-    s << COMPACTSIZE(val);
+    WriteCompactSize(s, val);
 
     std::vector<uint8_t> vec;
     vec.insert(vec.begin(), s.begin(), s.end());
