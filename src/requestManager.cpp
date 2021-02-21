@@ -1136,6 +1136,10 @@ void CRequestManager::FindNextBlocksToDownload(CNode *node, size_t count, std::v
         // pindexBestKnownBlock) into vToFetch. We fetch 128, because CBlockIndex::GetAncestor may be as expensive
         // as iterating over ~100 CBlockIndex* entries anyway.
         int nToFetch = std::min((size_t)(nMaxHeight - pindexWalk->nHeight), count - vBlocks.size());
+        if (nToFetch == 0)
+        {
+            break;
+        }
         vToFetch.resize(nToFetch);
         pindexWalk = state->pindexBestKnownBlock->GetAncestor(pindexWalk->nHeight + nToFetch);
         vToFetch[nToFetch - 1] = pindexWalk;
