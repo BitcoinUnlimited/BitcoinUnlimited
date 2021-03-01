@@ -553,15 +553,17 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
     // though it is invoked again after ActivateBestChain().
     ReconsiderChainOnStartup();
 
+    // If we don't already have one, get an initial snapshot state to use for tx acceptance
+    {
+        TxAdmissionPause pause;
+    }
+
 #ifdef ENABLE_WALLET
     uiInterface.InitMessage(_("Reaccepting Wallet Transactions"));
     if (pwalletMain)
     {
-        {
-            TxAdmissionPause pause; // Get an initial state to use during wallet tx acceptance
-            // Add wallet transactions that aren't already in a block to mapTransactions
-            pwalletMain->ReacceptWalletTransactions();
-        }
+        // Add wallet transactions that aren't already in a block to mapTransactions
+        pwalletMain->ReacceptWalletTransactions();
     }
 #endif
 
