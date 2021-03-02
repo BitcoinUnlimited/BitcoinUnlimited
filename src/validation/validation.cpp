@@ -695,43 +695,38 @@ bool InitBlockIndex(const CChainParams &chainparams)
 
     LOGA("Initializing databases...\n");
 
-    // Only add the genesis block if not reindexing (in which case we reuse the one already on disk)
-    bool fReindexing = false;
-    pblocktree->ReadReindexing(fReindexing);
-    if (!fReindexing)
+    try
     {
-        try
+        CBlock &block = const_cast<CBlock &>(chainparams.GenesisBlock());
+        // Start new block file
+        unsigned int nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
+        CDiskBlockPos blockPos;
+        CValidationState state;
+        if (!FindBlockPos(state, blockPos, nBlockSize + 8, 0, block.GetBlockTime()))
         {
-            CBlock &block = const_cast<CBlock &>(chainparams.GenesisBlock());
-            // Start new block file
-            unsigned int nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
-            CDiskBlockPos blockPos;
-            CValidationState state;
-            if (!FindBlockPos(state, blockPos, nBlockSize + 8, 0, block.GetBlockTime()))
-            {
-                return error("LoadBlockIndex(): FindBlockPos failed");
-            }
-            if (!WriteBlockToDisk(block, blockPos, chainparams.MessageStart()))
-            {
-                return error("LoadBlockIndex(): writing genesis block to disk failed");
-            }
-            CBlockIndex *pindex = AddToBlockIndex(block);
-            if (!ReceivedBlockTransactions(block, state, pindex, blockPos))
-            {
-                return error("LoadBlockIndex(): genesis block not accepted");
-            }
-            if (!ActivateBestChain(state, chainparams, &block, false))
-            {
-                return error("LoadBlockIndex(): genesis block cannot be activated");
-            }
-            // Force a chainstate write so that when we VerifyDB in a moment, it doesn't check stale data
-            return FlushStateToDisk(state, FLUSH_STATE_ALWAYS);
+            return error("LoadBlockIndex(): FindBlockPos failed");
         }
-        catch (const std::runtime_error &e)
+        if (!WriteBlockToDisk(block, blockPos, chainparams.MessageStart()))
         {
-            return error("LoadBlockIndex(): failed to initialize block database: %s", e.what());
+            return error("LoadBlockIndex(): writing genesis block to disk failed");
         }
+        CBlockIndex *pindex = AddToBlockIndex(block);
+        if (!ReceivedBlockTransactions(block, state, pindex, blockPos))
+        {
+            return error("LoadBlockIndex(): genesis block not accepted");
+        }
+        if (!ActivateBestChain(state, chainparams, &block, false))
+        {
+            return error("LoadBlockIndex(): genesis block cannot be activated");
+        }
+        // Force a chainstate write so that when we VerifyDB in a moment, it doesn't check stale data
+        return FlushStateToDisk(state, FLUSH_STATE_ALWAYS);
     }
+    catch (const std::runtime_error &e)
+    {
+        return error("LoadBlockIndex(): failed to initialize block database: %s", e.what());
+    }
+
     return true;
 }
 

@@ -1354,18 +1354,17 @@ bool AppInit2(Config &config)
                     LOGA("Prune: pruned datadir may not have more than %d blocks; only checking available blocks",
                         MIN_BLOCKS_TO_KEEP);
                 }
-
+                CBlockIndex *tip = chainActive.Tip();
+                // we intentionally do not check if tip is a nullptr here
+                // ActivateBestChain has already been called in either LoadBlockIndex or InitBlockIndex, if tip
+                // is nullptr here then there is a critical error somewhere
+                if (tip->nTime > GetAdjustedTime() + 2 * 60 * 60)
                 {
-                    LOCK(cs_main);
-                    CBlockIndex *tip = chainActive.Tip();
-                    if (tip && tip->nTime > GetAdjustedTime() + 2 * 60 * 60)
-                    {
-                        strLoadError = _("The block database contains a block which appears to be from the future. "
-                                         "This may be due to your computer's date and time being set incorrectly. "
-                                         "Only rebuild the block database if you are sure that your computer's date "
-                                         "and time are correct");
-                        break;
-                    }
+                    strLoadError = _("The block database contains a block which appears to be from the future. "
+                                     "This may be due to your computer's date and time being set incorrectly. "
+                                     "Only rebuild the block database if you are sure that your computer's date "
+                                     "and time are correct");
+                    break;
                 }
                 if (!CVerifyDB().VerifyDB(chainparams, pcoinsdbview, GetArg("-checklevel", DEFAULT_CHECKLEVEL),
                         GetArg("-checkblocks", DEFAULT_CHECKBLOCKS)))
