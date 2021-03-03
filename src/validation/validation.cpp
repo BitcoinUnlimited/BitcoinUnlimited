@@ -3290,18 +3290,6 @@ bool ConnectTip(CValidationState &state,
         nTime3 = GetStopwatchMicros();
         nTimeConnectTotal += nTime3 - nTime2;
         LOG(BENCH, "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
-
-        // Search orphan queue for anything that is no longer an orphan due to tx in this block
-        // or any tx that has a parent in the mempool, since commited tx may now make that tx available
-        // for mempool admission based on a reduction of mempool ancestors.
-        std::vector<uint256> vWhatChanged;
-        mempool.queryHashes(vWhatChanged);
-        vWhatChanged.reserve(vWhatChanged.size() + pblock->vtx.size());
-        for (unsigned int j = 0; j < pblock->vtx.size(); j++)
-        {
-            vWhatChanged.push_back(pblock->vtx[j]->GetHash());
-        }
-        ProcessOrphans(vWhatChanged);
     }
 
     int64_t nTime4 = GetStopwatchMicros();
@@ -3328,10 +3316,25 @@ bool ConnectTip(CValidationState &state,
         // confirmed transactions are removed from the mempool.
         mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload(),
             (unconfPushAction.Value() == 0) ? nullptr : &txChanges);
+
+        orphanpool.RemoveForBlock(pblock->vtx);
+
+        // Search orphan queue for anything that is no longer an orphan due to tx in this block
+        // or any tx that has a parent in the mempool, since commited tx may now make that tx available
+        // for mempool admission based on a reduction of mempool ancestors.
+        std::vector<uint256> vWhatChanged;
+        mempool.queryHashes(vWhatChanged);
+        vWhatChanged.reserve(vWhatChanged.size() + pblock->vtx.size());
+        for (unsigned int j = 0; j < pblock->vtx.size(); j++)
+        {
+            vWhatChanged.push_back(pblock->vtx[j]->GetHash());
+        }
+        ProcessOrphans(vWhatChanged);
     }
     else
     {
         mempool.clear();
+        orphanpool.clear();
     }
     // Update chainActive & related variables.
     UpdateTip(pindexNew);

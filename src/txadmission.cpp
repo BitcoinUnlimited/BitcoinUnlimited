@@ -1405,19 +1405,22 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue)
 
     // First delete the orphans before enqueuing them otherwise we may end up putting them
     // in the queue twice.
+    if (!mapEnqueue.empty())
     {
-        WRITELOCK(orphanpool.cs_orphanpool);
-        for (auto it = mapEnqueue.begin(); it != mapEnqueue.end(); it++)
         {
-            // If the orphan was not erased then it must already have been erased/enqueued by another thread
-            // so do not enqueue this orphan again.
-            if (!orphanpool.EraseOrphanTx(it->first))
-                it = mapEnqueue.erase(it);
+            WRITELOCK(orphanpool.cs_orphanpool);
+            for (auto it = mapEnqueue.begin(); it != mapEnqueue.end(); it++)
+            {
+                // If the orphan was not erased then it must already have been erased/enqueued by another thread
+                // so do not enqueue this orphan again.
+                if (!orphanpool.EraseOrphanTx(it->first))
+                    it = mapEnqueue.erase(it);
+            }
+            orphanpool.EraseOrphansByTime();
         }
-        orphanpool.EraseOrphansByTime();
+        for (auto &it : mapEnqueue)
+            EnqueueTxForAdmission(it.second);
     }
-    for (auto &it : mapEnqueue)
-        EnqueueTxForAdmission(it.second);
 }
 
 
