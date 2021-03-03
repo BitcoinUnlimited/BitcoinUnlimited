@@ -74,6 +74,18 @@ public:
         return nBytesOrphanPool;
     }
 
+    //! Remove all orphans from the pool that are in this group of transactions
+    void RemoveForBlock(const std::vector<CTransactionRef> &vtx);
+
+    //! Clear the orphan pool
+    void clear()
+    {
+        WRITELOCK(cs_orphanpool);
+        mapOrphanTransactions.clear();
+        mapOrphanTransactionsByPrev.clear();
+        nBytesOrphanPool = 0;
+    }
+
 private:
     //! Return all the orphan pool data structures so they can be saved to disk
     std::vector<CTxOrphanPool::COrphanTx> AllTxOrphanPoolInfo() const;
