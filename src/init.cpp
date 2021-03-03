@@ -559,10 +559,10 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
     }
 
 #ifdef ENABLE_WALLET
-    uiInterface.InitMessage(_("Reaccepting Wallet Transactions"));
     if (pwalletMain)
     {
         // Add wallet transactions that aren't already in a block to mapTransactions
+        uiInterface.InitMessage(_("Reaccepting Wallet Transactions"));
         pwalletMain->ReacceptWalletTransactions();
     }
 #endif
@@ -570,8 +570,50 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
     // Load the mempool if necessary
     if (GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
     {
+        uiInterface.InitMessage(_("Loading Mempool"));
         LoadMempool();
+
+        uiInterface.InitMessage(_("Loading Orphanpool"));
         orphanpool.LoadOrphanPool();
+
+        // Wait for transactions to finish loading but dont' wait forever
+        size_t nInQ = 0;
+        size_t nDeferQ = 0;
+        size_t nCommitQ = 0;
+        int nIterations = 0;
+        while (1)
+        {
+            {
+                LOCK(csTxInQ);
+                nInQ = txInQ.size();
+                nDeferQ = txDeferQ.size();
+            }
+            {
+                boost::unique_lock<boost::mutex> lock(csCommitQ);
+                nCommitQ = txCommitQ->size();
+            }
+            if (nInQ == 0 && nDeferQ == 0 && nCommitQ == 0)
+                break;
+
+            MilliSleep(1000);
+            nIterations++;
+            if (nIterations > 120)
+            {
+                LOGA("Clearing Queues because they are not empty: txInq %d, txDeferQ %d, txCommitQ %d\n", nInQ, nDeferQ,
+                    nCommitQ);
+                {
+                    LOCK(csTxInQ);
+                    while (!txInQ.empty())
+                        txInQ.pop();
+                    while (!txDeferQ.empty())
+                        txDeferQ.pop();
+                }
+                {
+                    boost::unique_lock<boost::mutex> lock(csCommitQ);
+                    txCommitQ->clear();
+                }
+            }
+        }
         fDumpMempoolLater = !fRequestShutdown;
     }
 
