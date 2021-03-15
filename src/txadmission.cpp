@@ -93,6 +93,9 @@ void StartTxAdmissionThreads()
 
     // Start tx commitment thread
     threadGroup.create_thread(&ThreadCommitToMempool);
+
+    // Start mempool transaction rate statistics processing thread
+    threadGroup.create_thread(&ThreadUpdateTransactionRateStatistics);
 }
 
 void StopTxAdmission()

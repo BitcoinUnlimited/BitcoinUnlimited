@@ -630,6 +630,7 @@ CTxMemPool::CTxMemPool() : nTransactionsUpdated(0), m_dspStorage(new DoubleSpend
 
     minerPolicyEstimator = new CBlockPolicyEstimator(minRelayTxFee);
 
+    nBackloggedTxCountForThroughputRate = 0;
     nTxPerSec = 0;
     nInstantaneousTxPerSec = 0;
     nPeakRate = 0;
@@ -1645,26 +1646,29 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint> *pvNoSpends
         LOG(MEMPOOL, "Removed %u txn\n", nTxnRemoved);
 }
 
-void CTxMemPool::UpdateTransactionsPerSecond()
+void ThreadUpdateTransactionRateStatistics()
 {
-    std::lock_guard<std::mutex> lock(cs_txPerSec);
-
-    UpdateTransactionsPerSecondImpl(true, lock);
+    while (shutdown_threads.load() == false)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(TX_RATE_UPDATE_FREQUENCY_MILLIS));
+        mempool.UpdateTransactionRateStatistics();
+    }
 }
 
+void CTxMemPool::UpdateTransactionsPerSecond() { nBackloggedTxCountForThroughputRate++; }
 void CTxMemPool::GetTransactionRateStatistics(double &smoothedTps, double &instantaneousTps, double &peakTps)
 {
     std::lock_guard<std::mutex> lock(cs_txPerSec);
-
-    UpdateTransactionsPerSecondImpl(false, lock);
 
     smoothedTps = nTxPerSec;
     instantaneousTps = nInstantaneousTxPerSec;
     peakTps = nPeakRate;
 }
 
-void CTxMemPool::UpdateTransactionsPerSecondImpl(bool fAddTxn, const std::lock_guard<std::mutex> &lock)
+void CTxMemPool::UpdateTransactionRateStatistics()
 {
+    std::lock_guard<std::mutex> lock(cs_txPerSec);
+
     static uint64_t nCount = 0;
     static int64_t nLastTime = GetTime();
 
@@ -1679,6 +1683,7 @@ void CTxMemPool::UpdateTransactionsPerSecondImpl(bool fAddTxn, const std::lock_g
         nTxPerSec = 0;
         nInstantaneousTxPerSec = 0;
         nCount = 0;
+        nBackloggedTxCountForThroughputRate.exchange(0);
         return;
     }
 
@@ -1692,12 +1697,13 @@ void CTxMemPool::UpdateTransactionsPerSecondImpl(bool fAddTxn, const std::lock_g
             nTxPerSec = 0;
     }
 
-    // Add the new tx to the rate
-    if (fAddTxn)
+    // Extract the backlogged transaction count and reset to 0
+    uint64_t nPending = nBackloggedTxCountForThroughputRate.exchange(0);
+    if (nPending > 0)
     {
-        nCount++;
-        // The amount that the new tx will add to the tx rate
-        nTxPerSec += 1 / TX_RATE_SMOOTHING_SEC;
+        nCount += nPending;
+        // The amount that the pending txns will add to the tx rate
+        nTxPerSec += nPending / TX_RATE_SMOOTHING_SEC;
     }
 
     // Calculate the peak rate if we've gone more that 1 second beyond the last sample time.

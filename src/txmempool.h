@@ -44,11 +44,17 @@ static const uint32_t MEMPOOL_HEIGHT = 0x7FFFFFFF;
 static const double TX_RATE_SMOOTHING_SEC = 60;
 /** Sample resolution in milliseconds over which to compute the instantaneous transaction rate */
 static const int TX_RATE_RESOLUTION_MILLIS = 1000;
+/** Update frequency in milliseconds when the statistics will be recomputed
+    This must be <= TX_RATE_RESOLUTION_MILLIS */
+static const int TX_RATE_UPDATE_FREQUENCY_MILLIS = 250;
 
 /** If our indicated (and possibly dirty) number of ancestors in a transaction chain is less than
   * this value then we'll immediately update the correct and current ancestor chain state
   */
 static const uint32_t MAX_UPDATED_CHAIN_STATE = 500;
+
+/** Transaction rate statisics update thread */
+void ThreadUpdateTransactionRateStatistics();
 
 /** Dump the mempool to disk. */
 bool DumpMempool();
@@ -436,6 +442,13 @@ private:
     double nInstantaneousTxPerSec GUARDED_BY(cs_txPerSec); //! instantaneous (1-second resolution) txns per second
     double nPeakRate GUARDED_BY(cs_txPerSec); //! peak rate since startup for txns per second
 
+    /**
+     * Independent atomic so that we can keep a backlog count of transactions that have been added since the last
+     * transaction per second rate update calculation without blocking on the lock taken to do that calculation.
+     * This is intended to reduce bottlenecking on the cs_txPerSec lock in high-throughput situations
+     */
+    std::atomic<uint64_t> nBackloggedTxCountForThroughputRate;
+
 public:
     static const int ROLLING_FEE_HALFLIFE = 60 * 60 * 12; // public only for testing
 
@@ -707,9 +720,18 @@ public:
     void UpdateTransactionsPerSecond();
 
     /** Obtain current transaction rate statistics
-     *  Will cause statistics to be updated before they are returned
+     * Takes a lock on cs_txPerSec
      */
     void GetTransactionRateStatistics(double &smoothedTps, double &instantaneousTps, double &peakTps);
+
+    /** Calculates updated transaction rate statistics by
+     * 1. Decay the prior smoothed transaction rate by the time passed since last update
+     * 2. Add transactions that have occurred since the last update to the smoothed transaction rate
+     * 3. Adjust the instantaneous transaction rate if the minimum resoultion period has passed
+     * 4. Update the peak transaction rate if the new instantaneous rate exceeds the prior peak value
+     * Takes a lock on cs_txPerSec
+     */
+    void UpdateTransactionRateStatistics();
 
     unsigned long size() const
     {
@@ -760,13 +782,6 @@ private:
     void _UpdateForRemoveFromMempool(const setEntries &entriesToRemove);
     /** Sever link between specified transaction and direct children. */
     void UpdateChildrenForRemoval(txiter entry);
-
-    /** Internal implementation of transaction per sec rate update logic
-     *  Requires that the cs_txPerSec lock be held by the calling method
-     */
-    void UpdateTransactionsPerSecondImpl(bool fAddTxn, const std::lock_guard<std::mutex> &lock)
-        EXCLUSIVE_LOCKS_REQUIRED(cs_txPerSec);
-
 
     /** Remove a transaction from the mempool
      */
