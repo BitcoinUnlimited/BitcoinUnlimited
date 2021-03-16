@@ -573,7 +573,7 @@ std::tuple<bool, opcodetype, StackDataType, ScriptError> ScriptMachine::Peek()
     else if (vchPushValue.size() > MAX_SCRIPT_ELEMENT_SIZE)
         set_error(&err, SCRIPT_ERR_PUSH_SIZE);
     pc = oldpc;
-    bool fExec = !count(vfExec.begin(), vfExec.end(), false);
+    bool fExec = vfExec.all_true();
     return std::tuple<bool, opcodetype, StackDataType, ScriptError>(fExec, opcode, vchPushValue, err);
 }
 
@@ -638,7 +638,7 @@ bool ScriptMachine::Step()
     try
     {
         {
-            bool fExec = !count(vfExec.begin(), vfExec.end(), false);
+            bool fExec = vfExec.all_true();
 
             //
             // Read instruction
@@ -815,7 +815,7 @@ bool ScriptMachine::Step()
                 {
                     if (vfExec.empty())
                         return set_error(serror, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
-                    vfExec.back() = !vfExec.back();
+                    vfExec.toggle_top();
                 }
                 break;
 
