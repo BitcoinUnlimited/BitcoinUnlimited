@@ -144,10 +144,10 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
         throw std::runtime_error(
             "getrawtransaction \"txid\" ( verbose \"blockhash\" )\n"
 
-            "\nNOTE: By default this function only works for mempool transactions. If the -txindex option is\n"
-            "enabled, it also works for blockchain transactions. If the block which contains the transaction\n"
-            "is known, its hash can be provided even for nodes without -txindex. Note that if a blockhash is\n"
-            "provided, only that block will be searched and if the transaction is in the mempool or other\n"
+            "\nNOTE: By default this function only works for mempool or orphanpool transactions. If the -txindex "
+            "option is enabled, it also works for blockchain transactions. If the block which contains the "
+            "transaction is known, its hash can be provided even for nodes without -txindex. Note that if a blockhash "
+            "is provided, only that block will be searched and if the transaction is in the mempool or other\n"
             "blocks, or if this node does not have the given block available, the transaction will not be found.\n"
             "DEPRECATED: for now, it also works for transactions with unspent outputs.\n"
 
