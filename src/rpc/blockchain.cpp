@@ -727,18 +727,19 @@ static UniValue getblock(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 3)
         throw runtime_error(
-            "getblock hash_or_height ( verbose ) ( listtransactions )\n"
-            "\nIf verbose is false, returns a string that is serialized, hex-encoded data for block 'hash'.\n"
-            "If verbose is true, returns an Object with information about block <hash>.\n"
-            "If listtransactions is true, a list of the IDs of all the transactions included in the block will be "
-            "shown.\n"
+            "getblock hash_or_height ( verbosity ) ( tx_count )\n"
+            "\nIf verbosity is 0, returns a string that is serialized, hex-encoded data for block 'hash'.\n"
+            "If verbosity is 1, returns the block header with a list of transaction hashes in the block\n"
+            "If verbosity is 2, returns the block header with a list of all decoded transaction details in the block\n"
+            "If tx_count is true, returns a block header with a count of all transactions in the block.\n"
             "\nArguments:\n"
-            "1. \"hash_or_height\" (string|numeric, required) The block hash or height\n"
-            "2. verbose            (boolean, optional, default=true) true for a json object, false for the hex encoded "
-            "data\n"
-            "3. listtransactions   (boolean, optional, default=true) true to get a list of all txns, false to get just "
-            "txns count\n"
-            "\nResult (for verbose = true, listtransactions = true):\n"
+            "1. \"hash_or_height\"      (string|numeric, required) The block hash or height.\n"
+            "2. \"verbosity\"           (numeric, optional, default=1) 0 for hex-encoded data, 1 \n"
+            "                          for a block header with list of txn hashes, and 2 for a block header with \n"
+            "                          detailed transaction data.\n"
+            "3. \"tx_count\"            (boolean, optional, default=false true to get a block header with a count of \n"
+            "                          of transactions in the block.\n"
+            "\nResult (for verbosity = 1, tx_count = false):\n"
             "{\n"
             "  \"hash\" : \"hash\",     (string) the block hash (same as provided)\n"
             "  \"confirmations\" : n,   (numeric) The number of confirmations, or -1 if the block is not on the main "
@@ -762,7 +763,11 @@ static UniValue getblock(const UniValue &params, bool fHelp)
             "  \"previousblockhash\" : \"hash\",  (string) The hash of the previous block\n"
             "  \"nextblockhash\" : \"hash\"       (string) The hash of the next block\n"
             "}\n"
-            "\nResult (for verbose=false):\n"
+            "\nResult (for verbosity = 2, tx_count = false):\n"
+            "{\n"
+            "Same as for verbosity = 1 but with all the un-encoded details of each transaction\n"
+            "}\n"
+            "\nResult (for verbosity=0):\n"
             "\"data\"             (string) A string that is serialized, hex-encoded data for block 'hash'.\n"
             "\nExamples:\n" +
             HelpExampleCli("getblock", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\"") +
@@ -828,20 +833,23 @@ static UniValue getblock(const UniValue &params, bool fHelp)
 
     DbgAssert(pindex != nullptr, throw std::runtime_error(__func__));
 
-    bool fVerbose = true;
+    int nVerbose = 1;
     bool fListTxns = true;
     if (params.size() > 1)
     {
-        fVerbose = is_param_trueish(params[1]);
+        if (params[1].isNum())
+            nVerbose = params[1].get_int();
+        else
+            nVerbose = is_param_trueish(params[1]);
     }
     if (params.size() == 3)
     {
-        fListTxns = is_param_trueish(params[2]);
+        fListTxns = !(is_param_trueish(params[2]));
     }
 
     const CBlock block = GetBlockChecked(pindex);
 
-    if (!fVerbose)
+    if (nVerbose == 0 && fListTxns == true)
     {
         CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
         ssBlock << block;
@@ -849,7 +857,13 @@ static UniValue getblock(const UniValue &params, bool fHelp)
         return strHex;
     }
 
-    return blockToJSON(block, pindex, false, fListTxns);
+    bool fVerbose = false;
+    if (nVerbose == 1)
+        fVerbose = false;
+    else if (nVerbose == 2)
+        fVerbose = true;
+
+    return blockToJSON(block, pindex, fVerbose, fListTxns);
 }
 
 static void ApplyStats(CCoinsStats &stats,
