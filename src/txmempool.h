@@ -251,25 +251,6 @@ struct mempoolentry_txid
     result_type operator()(const CTxMemPoolEntry &entry) const { return entry.GetTx().GetHash(); }
 };
 
-/** \class CompareTxMemPoolEntryByScore
- *
- *  Sort by score of entry ((fee+delta)/size) in descending order
- */
-class CompareTxMemPoolEntryByScore
-{
-public:
-    bool operator()(const CTxMemPoolEntry &a, const CTxMemPoolEntry &b) const
-    {
-        double f1 = (double)a.GetModifiedFee() * b.GetTxSize();
-        double f2 = (double)b.GetModifiedFee() * a.GetTxSize();
-        if (f1 == f2)
-        {
-            return b.GetTx().GetHash() < a.GetTx().GetHash();
-        }
-        return f1 > f2;
-    }
-};
-
 class CompareTxMemPoolEntryByEntryTime
 {
 public:
@@ -310,9 +291,6 @@ struct descendant_score
 {
 };
 struct entry_time
-{
-};
-struct mining_score
 {
 };
 struct ancestor_score
@@ -461,10 +439,6 @@ public:
             boost::multi_index::ordered_non_unique<boost::multi_index::tag<entry_time>,
                 boost::multi_index::identity<CTxMemPoolEntry>,
                 CompareTxMemPoolEntryByEntryTime>,
-            // sorted by score (for mining prioritization)
-            boost::multi_index::ordered_unique<boost::multi_index::tag<mining_score>,
-                boost::multi_index::identity<CTxMemPoolEntry>,
-                CompareTxMemPoolEntryByScore>,
             // sorted by fee rate with ancestors
             boost::multi_index::ordered_non_unique<boost::multi_index::tag<ancestor_score>,
                 boost::multi_index::identity<CTxMemPoolEntry>,
@@ -855,8 +829,9 @@ struct TxCoinAgePriorityCompare
 {
     bool operator()(const TxCoinAgePriority &a, const TxCoinAgePriority &b)
     {
+        // Reverse order to make sort less than
         if (a.first == b.first)
-            return CompareTxMemPoolEntryByScore()(*(b.second), *(a.second)); // Reverse order to make sort less than
+            return CompareTxMemPoolEntryByAncestorFee()(*(b.second), *(a.second));
         return a.first < b.first;
     }
 };
