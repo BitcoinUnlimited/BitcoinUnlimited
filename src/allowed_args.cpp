@@ -671,10 +671,6 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
         .addArg("xthinbloomfiltersize=<n>", requiredInt,
             strprintf(_("The maximum xthin bloom filter size that our node will accept in Bytes (default: %u)"),
                     SMALLEST_MAX_BLOOM_FILTER_SIZE))
-        .addArg("use-bloom-filter-targeting", optionalBool,
-            _("Enable thin block bloom filter targeting which helps to keep the size of bloom filters to a minumum "
-              "although it can impact performance. (default: %d)"),
-            DEFAULT_BLOOM_FILTER_TARGETING)
         .addArg("use-grapheneblocks", optionalBool,
             strprintf(_("Enable graphene to speed up the relay of blocks (default: %d)"), DEFAULT_USE_GRAPHENE_BLOCKS))
         .addArg("use-compactblocks", optionalBool,
@@ -692,8 +688,6 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
 static void addBlockCreationOptions(AllowedArgs &allowedArgs)
 {
     allowedArgs.addHeader(_("Block creation options:"))
-        .addArg("blockminsize=<n>", requiredInt,
-            strprintf(_("Set minimum block size in bytes (default: %u)"), DEFAULT_BLOCK_MIN_SIZE))
         .addArg("blockmaxsize=<n>", requiredInt,
             strprintf("Set maximum block size in bytes (default: %d)", DEFAULT_BLOCK_MAX_SIZE))
         .addArg("blockprioritysize=<n>", requiredInt,

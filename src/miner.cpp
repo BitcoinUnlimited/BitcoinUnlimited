@@ -88,7 +88,7 @@ BlockAssembler::BlockAssembler(const CChainParams &_chainparams)
 
     // Minimum block size you want to create; block will be filled with free transactions
     // until there are no more or the block reaches this size:
-    nBlockMinSize = GetArg("-blockminsize", DEFAULT_BLOCK_MIN_SIZE);
+    nBlockMinSize = GetArg("-blockprioritysize", DEFAULT_BLOCK_PRIORITY_SIZE);
     nBlockMinSize = std::min(nBlockMaxSize, nBlockMinSize);
 }
 
