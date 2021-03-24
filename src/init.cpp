@@ -487,6 +487,9 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
             LOGA("Reindexing block file blk%05u.dat...\n", (unsigned int)nFile);
             LoadExternalBlockFile(chainparams, file, &pos);
             nFile++;
+
+            if (fRequestShutdown)
+                return;
         }
         pblocktree->WriteReindexing(false);
         fReindex = false;
@@ -494,6 +497,8 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
         // To avoid ending up in a situation without genesis block, re-try initializing (no-op if reindexing worked):
         InitBlockIndex(chainparams);
     }
+    if (fRequestShutdown)
+        return;
 
     // hardcoded $DATADIR/bootstrap.dat
     fs::path pathBootstrap = GetDataDir() / "bootstrap.dat";
@@ -512,6 +517,8 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
             LOGA("Warning: Could not open bootstrap file %s\n", pathBootstrap.string());
         }
     }
+    if (fRequestShutdown)
+        return;
 
     // -loadblock=
     for (const fs::path &path : vImportFiles)
@@ -527,6 +534,9 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
         {
             LOGA("Warning: Could not open blocks file %s\n", path.string());
         }
+
+        if (fRequestShutdown)
+            return;
     }
 
     if (GetBoolArg("-stopafterblockimport", DEFAULT_STOPAFTERBLOCKIMPORT))
@@ -566,6 +576,8 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
         pwalletMain->ReacceptWalletTransactions();
     }
 #endif
+    if (fRequestShutdown)
+        return;
 
     // Load the mempool if necessary
     if (GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
@@ -616,6 +628,8 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
         }
         fDumpMempoolLater = !fRequestShutdown;
     }
+    if (fRequestShutdown)
+        return;
 
     // scan for better chains in the block chain database, that are not yet connected in the active best chain
     uiInterface.InitMessage(_("Activating best chain..."));
@@ -624,12 +638,16 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
     {
         LOGA("WARNING: ActivateBestChain failed on startup\n");
     }
+    if (fRequestShutdown)
+        return;
 
     // Reconsider the most work chain again here if we're not already synced. This is necessary
     // when switching from an ABC/BCHN client or when a operator failed to upgrade their BU
     // node before a hardfork. This must be done directly after ActivateBestChain() or
     // a switch from ABC/BCHN to a BU node may not work because some blocks may have been parked.
     ReconsiderChainOnStartup();
+    if (fRequestShutdown)
+        return;
 
     // Initialize the atomic flags used for determining whether we are in IBD or whether the chain
     // is almost synced.
