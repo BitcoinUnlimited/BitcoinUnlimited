@@ -724,11 +724,21 @@ int main(int argc, char *argv[])
 
     /// 7. Determine availability of data directory and parse bitcoin.conf
     /// - Do not call GetDataDir(true) before this step finishes
-    if (!fs::is_directory(GetDataDir(false)))
+    fs::path dataDir;
+    std::string msg;
+    try
     {
-        QMessageBox::critical(
-            0, QObject::tr(PACKAGE_NAME), QObject::tr("Error: Specified data directory \"%1\" does not exist.")
-                                              .arg(QString::fromStdString(mapArgs["-datadir"])));
+        dataDir = GetDataDir(false);
+    }
+    catch (const std::exception &e)
+    {
+        msg = strprintf("%s", e.what());
+        fprintf(stderr, "\n\n************************\n%s\n", e.what());
+    }
+
+    if (!fs::is_directory(dataDir))
+    {
+        QMessageBox::critical(0, QObject::tr(PACKAGE_NAME), QObject::tr("%1").arg(QString::fromStdString(msg)));
         return EXIT_FAILURE;
     }
     try

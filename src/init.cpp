@@ -301,7 +301,7 @@ void Shutdown()
     {
         fs::remove(GetPidFile());
     }
-    catch (const fs::filesystem_error &e)
+    catch (const std::exception &e)
     {
         LOGA("%s: Unable to remove pidfile: %s\n", __func__, e.what());
     }

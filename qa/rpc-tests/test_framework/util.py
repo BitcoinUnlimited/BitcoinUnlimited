@@ -25,6 +25,7 @@ import pprint
 import random
 import shutil
 import subprocess
+import tempfile
 import time
 import re
 import urllib.parse as urlparse
@@ -682,6 +683,36 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
         coverage.write_all_rpc_commands(COVERAGE_DIR, proxy)
 
     return test_node.TestNode(proxy, datadir)
+
+def start_node_and_raise_on_init_error(i, dirname, expected_msg, extra_args=None, binary=None, stdout_l=None, stderr_l=None):
+    """
+    Start a bitcoind and raise AssertionError if there's no init error
+    """
+    datadir = os.path.join(dirname, "node"+str(i))
+    if binary is None:
+        binary = os.getenv("BITCOIND", "bitcoind")
+    # RPC tests still depend on free transactions
+    args = [ binary, "-datadir="+datadir, "-rest", "-mocktime="+str(get_mocktime()) ]
+    if extra_args is not None: args.extend(extra_args)
+    if stderr_l is None:
+        stderr_l = tempfile.NamedTemporaryFile(delete=False)
+    if stdout_l is None:
+        stdout_l = tempfile.NamedTemporaryFile(delete=False)
+
+    # add environment variable LIBC_FATAL_STDERR_=1 so that libc errors are written to stderr and not the terminal
+    subp_env = dict(os.environ, LIBC_FATAL_STDERR_="1")
+
+    try:
+        logging.debug("Start {} and  waiting for a failure\n".format(binary))
+        bitcoind_process = subprocess.Popen(args, env=subp_env, stdout=stdout_l, stderr=stderr_l)
+        ret = bitcoind_process.wait(3)
+        stderr_l.seek(0)
+        stderr = stderr_l.read().decode('utf-8').strip()
+        if re.search(expected_msg, stderr, flags=re.MULTILINE) is None:
+            raise AssertionError('Expected error message "{}" is not contained in stderr:\n"{}"'.format(expected_msg, stderr))
+    except subprocess.TimeoutExpired:
+        do_and_ignore_failure(lambda x: bitcoind_process.kill())
+
 
 def start_nodes(num_nodes, dirname, extra_args=None, rpchost=None, binary=None,timewait=None):
     """
