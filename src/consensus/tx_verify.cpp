@@ -49,7 +49,7 @@ std::pair<int, int64_t> CalculateSequenceLocks(const CTransactionRef tx,
     int nMinHeight = -1;
     int64_t nMinTime = -1;
 
-    // tx.nVersion is signed integer so requires cast to unsigned otherwise
+    // tx->nVersion is signed integer so requires cast to unsigned otherwise
     // we would be doing a signed comparison and half the range of nVersion
     // wouldn't support BIP 68.
     bool fEnforceBIP68 = static_cast<uint32_t>(tx->nVersion) >= 2 && flags & LOCKTIME_VERIFY_SEQUENCE;
@@ -197,10 +197,12 @@ bool CheckTransaction(const CTransactionRef tx, CValidationState &state)
 
     // Sigops moved to ContextualCheckTransaction because the consensus rule goes away after may2020 fork
 
-    // Size limits
-    // BU: size limits removed
-    // if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
-    //    return state.DoS(100, false, REJECT_INVALID, "bad-txns-oversize");
+    // Size limit
+    if (tx->GetTxSize() > maxTxSize.Value())
+    {
+        return state.DoS(100, false, REJECT_INVALID, "bad-txns-oversize");
+    }
+
 
     // Check for negative or overflow output values
     CAmount nValueOut = 0;
@@ -215,15 +217,6 @@ bool CheckTransaction(const CTransactionRef tx, CValidationState &state)
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-txouttotal-toolarge");
     }
 
-    // Check for duplicate inputs
-    std::set<COutPoint> vInOutPoints;
-    for (const CTxIn &txin : tx->vin)
-    {
-        if (vInOutPoints.count(txin.prevout))
-            return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputs-duplicate");
-        vInOutPoints.insert(txin.prevout);
-    }
-
     if (tx->IsCoinBase())
     {
         // BU convert 100 to a constant so we can use it during generation
@@ -232,9 +225,49 @@ bool CheckTransaction(const CTransactionRef tx, CValidationState &state)
     }
     else
     {
-        for (const CTxIn &txin : tx->vin)
-            if (txin.prevout.IsNull())
-                return state.DoS(10, false, REJECT_INVALID, "bad-txns-prevout-null");
+        // Check for duplicate inputs.
+        // Simply checking every pair is O(n^2).
+        // Sorting a vector and checking adjacent elements is O(n log n).
+        // However, the vector requires a memory allocation, copying and sorting.
+        // This is significantly slower for small transactions. The crossover point
+        // was measured to be a vin.size() of about 120 on x86-64.
+        if (tx->vin.size() < 120)
+        {
+            for (size_t i = 0; i < tx->vin.size(); ++i)
+            {
+                if (tx->vin[i].prevout.IsNull())
+                {
+                    return state.DoS(10, false, REJECT_INVALID, "bad-txns-prevout-null");
+                }
+                for (size_t j = i + 1; j < tx->vin.size(); ++j)
+                {
+                    if (tx->vin[i].prevout == tx->vin[j].prevout)
+                    {
+                        return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputs-duplicate");
+                    }
+                }
+            }
+        }
+        else
+        {
+            std::vector<const COutPoint *> sortedPrevOuts(tx->vin.size());
+            for (size_t i = 0; i < tx->vin.size(); ++i)
+            {
+                if (tx->vin[i].prevout.IsNull())
+                {
+                    return state.DoS(10, false, REJECT_INVALID, "bad-txns-prevout-null");
+                }
+                sortedPrevOuts[i] = &tx->vin[i].prevout;
+            }
+            std::sort(sortedPrevOuts.begin(), sortedPrevOuts.end(),
+                [](const COutPoint *a, const COutPoint *b) { return *a < *b; });
+            auto it = std::adjacent_find(sortedPrevOuts.begin(), sortedPrevOuts.end(),
+                [](const COutPoint *a, const COutPoint *b) { return *a == *b; });
+            if (it != sortedPrevOuts.end())
+            {
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputs-duplicate");
+            }
+        }
     }
 
     return true;

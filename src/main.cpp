@@ -291,6 +291,16 @@ bool GetTransaction(const uint256 &hash,
 
     CTransactionRef ptx;
     {
+        READLOCK(orphanpool.cs_orphanpool);
+        auto mi = orphanpool.mapOrphanTransactions.find(hash);
+        if (mi != orphanpool.mapOrphanTransactions.end())
+        {
+            txTime = mi->second.nEntryTime;
+            ptx = mi->second.ptx;
+        }
+    }
+    if (!ptx)
+    {
         READLOCK(mempool.cs_txmempool);
         CTxMemPool::txiter entryPtr = mempool.mapTx.find(hash);
         if (entryPtr != mempool.mapTx.end())

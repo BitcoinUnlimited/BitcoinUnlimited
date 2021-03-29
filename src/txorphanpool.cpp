@@ -135,6 +135,15 @@ void CTxOrphanPool::QueryHashes(std::vector<uint256> &vHashes)
         vHashes.push_back(it.first);
 }
 
+void CTxOrphanPool::RemoveForBlock(const std::vector<CTransactionRef> &vtx)
+{
+   WRITELOCK(cs_orphanpool);
+   for (const auto &tx : vtx)
+   {
+       EraseOrphanTx(tx->GetHash());
+   }
+}
+
 std::vector<CTxOrphanPool::COrphanTx> CTxOrphanPool::AllTxOrphanPoolInfo() const
 {
     AssertLockHeld(orphanpool.cs_orphanpool);

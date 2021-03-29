@@ -301,7 +301,7 @@ void Shutdown()
     {
         fs::remove(GetPidFile());
     }
-    catch (const fs::filesystem_error &e)
+    catch (const std::exception &e)
     {
         LOGA("%s: Unable to remove pidfile: %s\n", __func__, e.what());
     }
@@ -487,6 +487,9 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
             LOGA("Reindexing block file blk%05u.dat...\n", (unsigned int)nFile);
             LoadExternalBlockFile(chainparams, file, &pos);
             nFile++;
+
+            if (fRequestShutdown)
+                return;
         }
         pblocktree->WriteReindexing(false);
         fReindex = false;
@@ -494,6 +497,8 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
         // To avoid ending up in a situation without genesis block, re-try initializing (no-op if reindexing worked):
         InitBlockIndex(chainparams);
     }
+    if (fRequestShutdown)
+        return;
 
     // hardcoded $DATADIR/bootstrap.dat
     fs::path pathBootstrap = GetDataDir() / "bootstrap.dat";
@@ -512,6 +517,8 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
             LOGA("Warning: Could not open bootstrap file %s\n", pathBootstrap.string());
         }
     }
+    if (fRequestShutdown)
+        return;
 
     // -loadblock=
     for (const fs::path &path : vImportFiles)
@@ -527,6 +534,9 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
         {
             LOGA("Warning: Could not open blocks file %s\n", path.string());
         }
+
+        if (fRequestShutdown)
+            return;
     }
 
     if (GetBoolArg("-stopafterblockimport", DEFAULT_STOPAFTERBLOCKIMPORT))
@@ -553,25 +563,73 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
     // though it is invoked again after ActivateBestChain().
     ReconsiderChainOnStartup();
 
+    // If we don't already have one, get an initial snapshot state to use for tx acceptance
+    {
+        TxAdmissionPause pause;
+    }
+
 #ifdef ENABLE_WALLET
-    uiInterface.InitMessage(_("Reaccepting Wallet Transactions"));
     if (pwalletMain)
     {
-        {
-            TxAdmissionPause pause; // Get an initial state to use during wallet tx acceptance
-            // Add wallet transactions that aren't already in a block to mapTransactions
-            pwalletMain->ReacceptWalletTransactions();
-        }
+        // Add wallet transactions that aren't already in a block to mapTransactions
+        uiInterface.InitMessage(_("Reaccepting Wallet Transactions"));
+        pwalletMain->ReacceptWalletTransactions();
     }
 #endif
+    if (fRequestShutdown)
+        return;
 
     // Load the mempool if necessary
     if (GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
     {
+        uiInterface.InitMessage(_("Loading Mempool"));
         LoadMempool();
+
+        uiInterface.InitMessage(_("Loading Orphanpool"));
         orphanpool.LoadOrphanPool();
+
+        // Wait for transactions to finish loading but dont' wait forever
+        size_t nInQ = 0;
+        size_t nDeferQ = 0;
+        size_t nCommitQ = 0;
+        int nIterations = 0;
+        while (1)
+        {
+            {
+                LOCK(csTxInQ);
+                nInQ = txInQ.size();
+                nDeferQ = txDeferQ.size();
+            }
+            {
+                boost::unique_lock<boost::mutex> lock(csCommitQ);
+                nCommitQ = txCommitQ->size();
+            }
+            if (nInQ == 0 && nDeferQ == 0 && nCommitQ == 0)
+                break;
+
+            MilliSleep(1000);
+            nIterations++;
+            if (nIterations > 120)
+            {
+                LOGA("Clearing Queues because they are not empty: txInq %d, txDeferQ %d, txCommitQ %d\n", nInQ, nDeferQ,
+                    nCommitQ);
+                {
+                    LOCK(csTxInQ);
+                    while (!txInQ.empty())
+                        txInQ.pop();
+                    while (!txDeferQ.empty())
+                        txDeferQ.pop();
+                }
+                {
+                    boost::unique_lock<boost::mutex> lock(csCommitQ);
+                    txCommitQ->clear();
+                }
+            }
+        }
         fDumpMempoolLater = !fRequestShutdown;
     }
+    if (fRequestShutdown)
+        return;
 
     // scan for better chains in the block chain database, that are not yet connected in the active best chain
     uiInterface.InitMessage(_("Activating best chain..."));
@@ -580,12 +638,16 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
     {
         LOGA("WARNING: ActivateBestChain failed on startup\n");
     }
+    if (fRequestShutdown)
+        return;
 
     // Reconsider the most work chain again here if we're not already synced. This is necessary
     // when switching from an ABC/BCHN client or when a operator failed to upgrade their BU
     // node before a hardfork. This must be done directly after ActivateBestChain() or
     // a switch from ABC/BCHN to a BU node may not work because some blocks may have been parked.
     ReconsiderChainOnStartup();
+    if (fRequestShutdown)
+        return;
 
     // Initialize the atomic flags used for determining whether we are in IBD or whether the chain
     // is almost synced.
@@ -1354,18 +1416,17 @@ bool AppInit2(Config &config)
                     LOGA("Prune: pruned datadir may not have more than %d blocks; only checking available blocks",
                         MIN_BLOCKS_TO_KEEP);
                 }
-
+                CBlockIndex *tip = chainActive.Tip();
+                // we intentionally do not check if tip is a nullptr here
+                // ActivateBestChain has already been called in either LoadBlockIndex or InitBlockIndex, if tip
+                // is nullptr here then there is a critical error somewhere
+                if (tip->nTime > GetAdjustedTime() + 2 * 60 * 60)
                 {
-                    LOCK(cs_main);
-                    CBlockIndex *tip = chainActive.Tip();
-                    if (tip && tip->nTime > GetAdjustedTime() + 2 * 60 * 60)
-                    {
-                        strLoadError = _("The block database contains a block which appears to be from the future. "
-                                         "This may be due to your computer's date and time being set incorrectly. "
-                                         "Only rebuild the block database if you are sure that your computer's date "
-                                         "and time are correct");
-                        break;
-                    }
+                    strLoadError = _("The block database contains a block which appears to be from the future. "
+                                     "This may be due to your computer's date and time being set incorrectly. "
+                                     "Only rebuild the block database if you are sure that your computer's date "
+                                     "and time are correct");
+                    break;
                 }
                 if (!CVerifyDB().VerifyDB(chainparams, pcoinsdbview, GetArg("-checklevel", DEFAULT_CHECKLEVEL),
                         GetArg("-checkblocks", DEFAULT_CHECKBLOCKS)))

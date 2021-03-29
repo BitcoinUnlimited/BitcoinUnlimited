@@ -695,43 +695,38 @@ bool InitBlockIndex(const CChainParams &chainparams)
 
     LOGA("Initializing databases...\n");
 
-    // Only add the genesis block if not reindexing (in which case we reuse the one already on disk)
-    bool fReindexing = false;
-    pblocktree->ReadReindexing(fReindexing);
-    if (!fReindexing)
+    try
     {
-        try
+        CBlock &block = const_cast<CBlock &>(chainparams.GenesisBlock());
+        // Start new block file
+        unsigned int nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
+        CDiskBlockPos blockPos;
+        CValidationState state;
+        if (!FindBlockPos(state, blockPos, nBlockSize + 8, 0, block.GetBlockTime()))
         {
-            CBlock &block = const_cast<CBlock &>(chainparams.GenesisBlock());
-            // Start new block file
-            unsigned int nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
-            CDiskBlockPos blockPos;
-            CValidationState state;
-            if (!FindBlockPos(state, blockPos, nBlockSize + 8, 0, block.GetBlockTime()))
-            {
-                return error("LoadBlockIndex(): FindBlockPos failed");
-            }
-            if (!WriteBlockToDisk(block, blockPos, chainparams.MessageStart()))
-            {
-                return error("LoadBlockIndex(): writing genesis block to disk failed");
-            }
-            CBlockIndex *pindex = AddToBlockIndex(block);
-            if (!ReceivedBlockTransactions(block, state, pindex, blockPos))
-            {
-                return error("LoadBlockIndex(): genesis block not accepted");
-            }
-            if (!ActivateBestChain(state, chainparams, &block, false))
-            {
-                return error("LoadBlockIndex(): genesis block cannot be activated");
-            }
-            // Force a chainstate write so that when we VerifyDB in a moment, it doesn't check stale data
-            return FlushStateToDisk(state, FLUSH_STATE_ALWAYS);
+            return error("LoadBlockIndex(): FindBlockPos failed");
         }
-        catch (const std::runtime_error &e)
+        if (!WriteBlockToDisk(block, blockPos, chainparams.MessageStart()))
         {
-            return error("LoadBlockIndex(): failed to initialize block database: %s", e.what());
+            return error("LoadBlockIndex(): writing genesis block to disk failed");
         }
+        CBlockIndex *pindex = AddToBlockIndex(block);
+        if (!ReceivedBlockTransactions(block, state, pindex, blockPos))
+        {
+            return error("LoadBlockIndex(): genesis block not accepted");
+        }
+        if (!ActivateBestChain(state, chainparams, &block, false))
+        {
+            return error("LoadBlockIndex(): genesis block cannot be activated");
+        }
+        // Force a chainstate write so that when we VerifyDB in a moment, it doesn't check stale data
+        return FlushStateToDisk(state, FLUSH_STATE_ALWAYS);
     }
+    catch (const std::runtime_error &e)
+    {
+        return error("LoadBlockIndex(): failed to initialize block database: %s", e.what());
+    }
+
     return true;
 }
 
@@ -3290,18 +3285,6 @@ bool ConnectTip(CValidationState &state,
         nTime3 = GetStopwatchMicros();
         nTimeConnectTotal += nTime3 - nTime2;
         LOG(BENCH, "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
-
-        // Search orphan queue for anything that is no longer an orphan due to tx in this block
-        // or any tx that has a parent in the mempool, since commited tx may now make that tx available
-        // for mempool admission based on a reduction of mempool ancestors.
-        std::vector<uint256> vWhatChanged;
-        mempool.queryHashes(vWhatChanged);
-        vWhatChanged.reserve(vWhatChanged.size() + pblock->vtx.size());
-        for (unsigned int j = 0; j < pblock->vtx.size(); j++)
-        {
-            vWhatChanged.push_back(pblock->vtx[j]->GetHash());
-        }
-        ProcessOrphans(vWhatChanged);
     }
 
     int64_t nTime4 = GetStopwatchMicros();
@@ -3328,10 +3311,25 @@ bool ConnectTip(CValidationState &state,
         // confirmed transactions are removed from the mempool.
         mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload(),
             (unconfPushAction.Value() == 0) ? nullptr : &txChanges);
+
+        orphanpool.RemoveForBlock(pblock->vtx);
+
+        // Search orphan queue for anything that is no longer an orphan due to tx in this block
+        // or any tx that has a parent in the mempool, since commited tx may now make that tx available
+        // for mempool admission based on a reduction of mempool ancestors.
+        std::vector<uint256> vWhatChanged;
+        mempool.queryHashes(vWhatChanged);
+        vWhatChanged.reserve(vWhatChanged.size() + pblock->vtx.size());
+        for (unsigned int j = 0; j < pblock->vtx.size(); j++)
+        {
+            vWhatChanged.push_back(pblock->vtx[j]->GetHash());
+        }
+        ProcessOrphans(vWhatChanged);
     }
     else
     {
         mempool.clear();
+        orphanpool.clear();
     }
     // Update chainActive & related variables.
     UpdateTip(pindexNew);

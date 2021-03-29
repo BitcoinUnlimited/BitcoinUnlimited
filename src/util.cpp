@@ -676,10 +676,10 @@ const fs::path &GetDataDir(bool fNetSpecific)
     if (mapArgs.count("-datadir"))
     {
         path = fs::system_complete(mapArgs["-datadir"]);
-        if (!fs::is_directory(path))
+        if (!fs::exists(path) || !fs::is_directory(path))
         {
             std::stringstream err;
-            err << "datadir path " << path << " is not a directory";
+            err << "datadir path " << path << " is not a directory or it does not exist";
             throw std::invalid_argument(err.str());
         }
     }
