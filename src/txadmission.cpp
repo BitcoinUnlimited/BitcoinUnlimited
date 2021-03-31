@@ -441,6 +441,11 @@ void ThreadTxAdmission()
             }
         }
 
+        // Deactivate intelligent forwarding if the May 2021 fork is active. This will
+        // make all transactions be forwarded to all peers.
+        if (may152021.ActiveonNextBlock())
+            unconfPushAction.Set(0);
+
         {
             CORRAL(txProcessingCorral, CORRAL_TX_PROCESSING);
 
@@ -585,6 +590,11 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     // other threads running txadmission and to ensure that the mempool state is current.
     CORRAL(txProcessingCorral, CORRAL_TX_PAUSE);
     CommitTxToMempool();
+
+    // Deactivate intelligent forwarding if the May 2021 fork is active. This will
+    // make all transactions be forwarded to all peers.
+    if (may152021.ActiveOnNextBlock())
+        unconfPushAction.Set(0);
 
     CTxProperties txProperties;
     // If mempool policy aware relay is on, then supply a structure to gather the needed data,
@@ -1175,11 +1185,13 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
         // Calculate in-mempool ancestors, up to the BCH default limit. We don't need to calculate
         // them any further.
-        size_t nLimitAncestors = GetArg("-limitancestorcount", BCH_DEFAULT_ANCESTOR_LIMIT);
-        size_t nLimitAncestorSize = GetArg("-limitancestorsize", BCH_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
-        std::string errString;
-        CTxMemPool::setEntries setAncestors;
+        if (unconfPushAction.Value != 0)
         {
+            size_t nLimitAncestors = GetArg("-limitancestorcount", BCH_DEFAULT_ANCESTOR_LIMIT);
+            size_t nLimitAncestorSize = GetArg("-limitancestorsize", BCH_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
+            std::string errString;
+            CTxMemPool::setEntries setAncestors;
+
             READLOCK(pool.cs_txmempool);
             bool ret =
                 pool._CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize, errString);
