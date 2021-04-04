@@ -3353,6 +3353,12 @@ bool ConnectTip(CValidationState &state,
     LOG(BENCH, "  - Connect postprocess: %.2fms [%.2fs]\n", (nTime6 - nTime5) * 0.001, nTimePostConnect * 0.000001);
     LOG(BENCH, "- Connect block: %.2fms [%.2fs]\n", (nTime6 - nTime1) * 0.001, nTimeTotal * 0.000001);
 
+    // Deactivate intelligent forwarding if the May 2021 fork is active. This will
+    // cause chains of any length to be forwarded to all peers by default.
+    if (IsMay2021Next(chainparams.GetConsensus(), chainActive.Tip()) ||
+        IsMay2021Enabled(chainparams.GetConsensus(), chainActive.Tip()))
+        unconfPushAction.Set(0);
+
     // If some kind of unconfirmed push is turned on, then do the forwarding.
     if (!IsInitialBlockDownload() && !fReindex && unconfPushAction.Value() != 0)
         ForwardAcceptableTransactions(txChanges);

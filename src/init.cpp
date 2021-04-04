@@ -1110,6 +1110,13 @@ bool AppInit2(Config &config)
         return InitError(
             strprintf(_("-xthinbloomfiltersize must be at least %d Bytes"), SMALLEST_MAX_BLOOM_FILTER_SIZE));
 
+    // Deactivate intelligent forwarding if the May 2021 fork is active. This will
+    // cause chains of any length to be forwarded to all peers by default.
+    if (IsMay2021Next(chainparams.GetConsensus(), chainActive.Tip()) ||
+        IsMay2021Enabled(chainparams.GetConsensus(), chainActive.Tip()))
+        unconfPushAction.Set(0);
+
+
     // ********************************************************* Step 4: application initialization: dir lock,
     // daemonize, pidfile, debug log
 
