@@ -285,7 +285,9 @@ bool GetTransaction(const uint256 &hash,
     const Consensus::Params &consensusParams,
     uint256 &hashBlock,
     bool fAllowSlow,
-    const CBlockIndex *blockIndex)
+    const CBlockIndex *blockIndex,
+    bool *fInMemPool,
+    bool *fInOrphanPool)
 {
     const CBlockIndex *pindexSlow = blockIndex;
 
@@ -297,9 +299,12 @@ bool GetTransaction(const uint256 &hash,
         {
             txTime = mi->second.nEntryTime;
             ptx = mi->second.ptx;
+            if (fInOrphanPool)
+                *fInOrphanPool = true;
         }
     }
-    if (!ptx)
+    // Check the mempool even if we already have it in the orphanpool
+    // just in case it's in both pools.
     {
         READLOCK(mempool.cs_txmempool);
         CTxMemPool::txiter entryPtr = mempool.mapTx.find(hash);
@@ -307,14 +312,11 @@ bool GetTransaction(const uint256 &hash,
         {
             txTime = entryPtr->GetTime();
             ptx = entryPtr->GetSharedTx();
+            if (fInMemPool)
+                *fInMemPool = true;
         }
     }
-    if (ptx)
-    {
-        txOut = ptx;
-        return true;
-    }
-
+    // Check for it in a block even though it may also still be in one of the pools
     if (g_txindex)
     {
         int32_t time = -1;
@@ -324,6 +326,12 @@ bool GetTransaction(const uint256 &hash,
                 txTime = time;
             return true;
         }
+    }
+
+    if (ptx)
+    {
+        txOut = ptx;
+        return true;
     }
 
     if (blockIndex == nullptr)
