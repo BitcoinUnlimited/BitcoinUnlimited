@@ -260,6 +260,67 @@ class MyTest (BitcoinTestFramework):
             waitFor(DELAY_TIME, lambda: self.nodes[1].getbestblockhash() == blk)
             count+=1
 
+        # Test the mempool push de-activation at forktime. When the fork is activated then
+        # we should be able to push chains of any length.
+        # Move our clocktime to be ahead of the may-2021 forktime and then mine blocks to
+        # get to the point where the next block should be the fork block. We start allowing
+        # unlimited chains when the next block will activate the fork.
+        logging.info("deep unconfirmed chain fork activation - step 1")
+        connect_nodes(self.nodes[1], 3)
+        self.nodes[0].setmocktime(1621080000)
+        self.nodes[1].setmocktime(1621080000)
+        self.nodes[2].setmocktime(1621080000)
+        self.nodes[3].setmocktime(1621080000)
+        self.nodes[2].generate(6)
+        self.sync_all()
+
+        bal = self.nodes[2].getbalance()
+        addr = self.nodes[2].getnewaddress()
+
+        txhex = []
+        num_txns_in_chain=60
+        for i in range(0,num_txns_in_chain):
+          try:
+            txhex.append(self.nodes[2].sendtoaddress(addr, bal-1))  # enough so that it uses all UTXO, but has fee left over
+            logging.info("%d: sizes %d, %d, %d, %d" % (i,self.nodes[0].getmempoolinfo()["size"],self.nodes[1].getmempoolinfo()["size"],self.nodes[2].getmempoolinfo()["size"],self.nodes[3].getmempoolinfo()["size"]))
+          except JSONRPCException as e: # an exception you don't catch is a testing error
+              print(str(e))
+              raise
+
+        self.sync_all()
+        logging.info("%d: sizes %d, %d, %d, %d" % (i,self.nodes[0].getmempoolinfo()["size"],self.nodes[1].getmempoolinfo()["size"],self.nodes[2].getmempoolinfo()["size"],self.nodes[3].getmempoolinfo()["size"]))
+        waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == num_txns_in_chain)
+        waitFor(DELAY_TIME, lambda: self.nodes[1].getmempoolinfo()["size"] == num_txns_in_chain)
+        waitFor(DELAY_TIME, lambda: self.nodes[2].getmempoolinfo()["size"] == num_txns_in_chain)
+        waitFor(DELAY_TIME, lambda: self.nodes[3].getmempoolinfo()["size"] == num_txns_in_chain)
+
+        # generate another block which will be the first fork block. Make sure
+        # we can still send unlimited chains
+        logging.info("deep unconfirmed chain fork activation - step 2")
+        self.nodes[2].set("mining.blockSize=100000")
+        self.nodes[2].generate(1)
+        self.sync_all()
+
+        bal = self.nodes[2].getbalance()
+        addr = self.nodes[2].getnewaddress()
+
+        txhex = []
+        num_txns_in_chain=60
+        for i in range(0,num_txns_in_chain):
+          try:
+            txhex.append(self.nodes[2].sendtoaddress(addr, bal-1))  # enough so that it uses all UTXO, but has fee left over
+            logging.info("%d: sizes %d, %d, %d, %d" % (i,self.nodes[0].getmempoolinfo()["size"],self.nodes[1].getmempoolinfo()["size"],self.nodes[2].getmempoolinfo()["size"],self.nodes[3].getmempoolinfo()["size"]))
+          except JSONRPCException as e: # an exception you don't catch is a testing error
+              print(str(e))
+              raise
+
+        self.sync_all()
+        logging.info("%d: sizes %d, %d, %d, %d" % (i,self.nodes[0].getmempoolinfo()["size"],self.nodes[1].getmempoolinfo()["size"],self.nodes[2].getmempoolinfo()["size"],self.nodes[3].getmempoolinfo()["size"]))
+        waitFor(DELAY_TIME, lambda: self.nodes[0].getmempoolinfo()["size"] == num_txns_in_chain)
+        waitFor(DELAY_TIME, lambda: self.nodes[1].getmempoolinfo()["size"] == num_txns_in_chain)
+        waitFor(DELAY_TIME, lambda: self.nodes[2].getmempoolinfo()["size"] == num_txns_in_chain)
+        waitFor(DELAY_TIME, lambda: self.nodes[3].getmempoolinfo()["size"] == num_txns_in_chain)
+
 if __name__ == '__main__':
     t = MyTest()
     t.main (None, { "blockprioritysize": 2000000, "keypool":5 })
