@@ -13,6 +13,8 @@
 #include <map>
 #include <string>
 
+#include <boost/optional.hpp>
+
 namespace Consensus
 {
 enum DeploymentPos
@@ -164,6 +166,10 @@ struct Params
     int may2020Height;
     /** Nov 15, 2020 MTP activation time will be 12:00:00 UTC */
     uint64_t nov2020ActivationTime;
+    /** Nov 15, 2020 actication height */
+    boost::optional<int> nov2020Height;
+    /** May 15, 2021 MTP activation time will be 12:00:00 UTC */
+    uint64_t may2021ActivationTime;
 };
 } // namespace Consensus
 

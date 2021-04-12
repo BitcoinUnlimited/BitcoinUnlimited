@@ -187,19 +187,14 @@ bool CBlockIndex::IsforkActiveOnNextBlock(int time) const
     return false;
 }
 
-/* return true only if 1st condition is true (Median past time >= fork time)
- * and not the 2nd, i.e. we are at precisely [x-1,x-1]
+/* return true only if we current block is the activation blocl (i.e. [x-1,x-1])
  * state: fork enabled but not activated */
 bool CBlockIndex::forkAtNextBlock(int time) const
 {
     if (time == 0)
         return false;
 
-    // if the fork is already activated
-    if (forkActivated(time))
-        return false;
-
-    if (GetMedianTimePast() >= time)
+    if (GetMedianTimePast() >= time && (pprev && pprev->GetMedianTimePast() < time))
         return true;
     return false;
 }

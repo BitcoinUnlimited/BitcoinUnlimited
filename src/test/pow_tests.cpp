@@ -762,6 +762,8 @@ BOOST_AUTO_TEST_CASE(asert_activation_anchor_test)
     Consensus::Params params(Params().GetConsensus());
     params.daaHeight = 2016;
     const int64_t activationTime = params.nov2020ActivationTime;
+    // clear hard-coded nov 2020 activation height so that we can perform these below tests
+    params.nov2020Height.reset();
     CBlockHeader blkHeaderDummy;
 
     // an arbitrary compact target for our chain (based on BCH chain ~ Aug 10 2020).
@@ -808,7 +810,7 @@ BOOST_AUTO_TEST_CASE(asert_activation_anchor_test)
 
     // If we consult DAA, then it uses cw144 which returns a significantly lower target because
     // we have been mining too fast by a ratio 600/500 for a whole day.
-    BOOST_CHECK(!IsNov2020Enabled(params, pindexPreActivation));
+    BOOST_CHECK(!IsNov2020Activated(params, pindexPreActivation));
     BOOST_CHECK_EQUAL(GetNextWorkRequired(pindexPreActivation, &blkHeaderDummy, params), 0x180236e1);
 
     // ASERT has never run yet, so cache is unpopulated.
@@ -822,7 +824,7 @@ BOOST_AUTO_TEST_CASE(asert_activation_anchor_test)
     // Create an activating block with expected solvetime, taking the cw144 difficulty we just
     // saw. Since solvetime is expected the next target is unchanged.
     CBlockIndex indexActivation0 = GetBlockIndex(pindexPreActivation, 600, 0x180236e1);
-    BOOST_CHECK(IsNov2020Enabled(params, &indexActivation0));
+    BOOST_CHECK(IsNov2020Activated(params, &indexActivation0));
     BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation0, &blkHeaderDummy, params), 0x180236e1);
     // second call will have used anchor cache, shouldn't change anything
     BOOST_CHECK_EQUAL(GetASERTAnchorBlockCache(), &indexActivation0);
@@ -833,7 +835,7 @@ BOOST_AUTO_TEST_CASE(asert_activation_anchor_test)
 
     // Create an activating block with 0 solvetime, which will drop target by ~415/416.
     CBlockIndex indexActivation1 = GetBlockIndex(pindexPreActivation, 0, 0x18023456);
-    BOOST_CHECK(IsNov2020Enabled(params, &indexActivation1));
+    BOOST_CHECK(IsNov2020Activated(params, &indexActivation1));
     // cache will be stale here, and we should get the right result regardless:
     BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation1, &blkHeaderDummy, params), 0x180232fd);
     // second call will have used anchor cache, shouldn't change anything
@@ -847,14 +849,14 @@ BOOST_AUTO_TEST_CASE(asert_activation_anchor_test)
     // Try activation with expected solvetime, which will keep target the same.
     uint32_t anchorBits2 = 0x180210fe;
     CBlockIndex indexActivation2 = GetBlockIndex(pindexPreActivation, 600, anchorBits2);
-    BOOST_CHECK(IsNov2020Enabled(params, &indexActivation2));
+    BOOST_CHECK(IsNov2020Activated(params, &indexActivation2));
     BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation2, &blkHeaderDummy, params), anchorBits2);
     BOOST_CHECK_EQUAL(GetASERTAnchorBlockCache(), &indexActivation2);
 
     // Try a three-month solvetime which will cause us to hit powLimit.
     uint32_t anchorBits3 = 0x18034567;
     CBlockIndex indexActivation3 = GetBlockIndex(pindexPreActivation, 86400 * 90, anchorBits3);
-    BOOST_CHECK(IsNov2020Enabled(params, &indexActivation2));
+    BOOST_CHECK(IsNov2020Activated(params, &indexActivation2));
     BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation3, &blkHeaderDummy, params), 0x1d00ffff);
     // If the next block jumps back in time, we get back our original difficulty level.
     CBlockIndex indexActivation3_return = GetBlockIndex(&indexActivation3, -86400 * 90 + 2 * 600, anchorBits3);
@@ -868,7 +870,7 @@ BOOST_AUTO_TEST_CASE(asert_activation_anchor_test)
     CBlockIndex indexActivation4 = GetBlockIndex(pindexPreActivation, 0, 0x18011111);
     indexActivation4.nTime = activationTime;
     BOOST_CHECK_EQUAL(indexActivation4.GetMedianTimePast(), activationTime);
-    BOOST_CHECK(IsNov2020Enabled(params, &indexActivation4));
+    BOOST_CHECK(IsNov2020Activated(params, &indexActivation4));
     BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation4, &blkHeaderDummy, params), 0x18010db3);
     BOOST_CHECK_EQUAL(GetASERTAnchorBlockCache(), &indexActivation4);
 
