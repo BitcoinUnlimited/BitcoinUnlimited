@@ -124,7 +124,23 @@ bool IsMay2020Activated(const Consensus::Params &consensusparams, const CBlockIn
     return IsMay2020Activated(consensusparams, pindexTip->nHeight);
 }
 
-bool IsNov2020Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
+bool IsNov2020Activated(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
+{
+    if (pindexTip == nullptr)
+    {
+        return false;
+    }
+    if (consensusparams.nov2020Height)
+    {
+        return pindexTip->nHeight >= consensusparams.nov2020Height;
+    }
+    else
+    {
+        return pindexTip->IsforkActiveOnNextBlock(NOV2020_ACTIVATION_TIME);
+    }
+}
+
+bool IsMay2021Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
 {
     if (pindexTip == nullptr)
     {
@@ -133,7 +149,7 @@ bool IsNov2020Enabled(const Consensus::Params &consensusparams, const CBlockInde
     return pindexTip->IsforkActiveOnNextBlock(miningForkTime.Value());
 }
 
-bool IsNov2020Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
+bool IsMay2021Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
 {
     if (pindexTip == nullptr)
     {

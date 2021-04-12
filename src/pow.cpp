@@ -20,7 +20,7 @@ void ResetASERTAnchorBlockCache() noexcept { cachedAnchor = nullptr; }
 const CBlockIndex *GetASERTAnchorBlockCache() noexcept { return cachedAnchor.load(); }
 /**
  * Returns a pointer to the anchor block used for ASERT.
- * As anchor we use the first block for which IsNov2020Enabled() returns true.
+ * As anchor we use the first block for which IsNov2020Activated() returns true.
  * This block happens to be the last block which was mined under the old DAA
  * rules.
  *
@@ -28,9 +28,9 @@ const CBlockIndex *GetASERTAnchorBlockCache() noexcept { return cachedAnchor.loa
  * the anchor block is deeply buried, and behind a hard-coded checkpoint.
  *
  * Preconditions: - pindex must not be nullptr
- *                - pindex must satisfy: IsNov2020Enabled(params, pindex) == true
+ *                - pindex must satisfy: IsNov2020Activated(params, pindex) == true
  * Postcondition: Returns a pointer to the first (lowest) block for which
- *                IsNov2020Enabled is true, and for which IsNov2020Enabled(pprev)
+ *                IsNov2020Activated is true, and for which IsNov2020ACtivated(pprev)
  *                is false (or for which pprev is nullptr). The return value may
  *                be pindex itself.
  */
@@ -53,24 +53,24 @@ static const CBlockIndex *GetASERTAnchorBlock(const CBlockIndex *const pindex, c
     {
         return lastCached;
     }
-    // Slow path: walk back until we find the first ancestor for which IsNov2020Enabled() == true.
+    // Slow path: walk back until we find the first ancestor for which IsNov2020Activated() == true.
     const CBlockIndex *anchor = pindex;
 
     while (anchor->pprev)
     {
-        // first, skip backwards testing IsNov2020Enabled
+        // first, skip backwards testing IsNov2020Activated
         // The below code leverages CBlockIndex::pskip to walk back efficiently.
-        if ((anchor->pskip != nullptr) && IsNov2020Enabled(params, anchor->pskip))
+        if ((anchor->pskip != nullptr) && IsNov2020Activated(params, anchor->pskip))
         {
             // skip backward
             anchor = anchor->pskip;
             continue; // continue skipping
         }
         // cannot skip here, walk back by 1
-        if (!IsNov2020Enabled(params, anchor->pprev))
+        if (!IsNov2020Activated(params, anchor->pprev))
         {
             // found it -- highest block where Axion is not enabled is anchor->pprev, and
-            // anchor points to the first block for which IsNov2020Enabled() == true
+            // anchor points to the first block for which IsNov2020Activated() == true
             break;
         }
         anchor = anchor->pprev;
@@ -323,7 +323,7 @@ uint32_t GetNextWorkRequired(const CBlockIndex *pindexPrev, const CBlockHeader *
         return pindexPrev->nBits;
     }
 
-    if (IsNov2020Enabled(params, pindexPrev))
+    if (IsNov2020Activated(params, pindexPrev))
     {
         const CBlockIndex *panchorBlock = GetASERTAnchorBlock(pindexPrev, params);
         return GetNextASERTWorkRequired(pindexPrev, pblock, params, panchorBlock);

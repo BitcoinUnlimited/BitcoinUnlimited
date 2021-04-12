@@ -20,9 +20,7 @@
 
 #include "chainparamsseeds.h"
 
-// Next protocol upgrade will be activated once MTP >= Nov 15 12:00:00 UTC 2020
-const uint64_t NOV2020_ACTIVATION_TIME = 1605441600;
-uint64_t nMiningForkTime = NOV2020_ACTIVATION_TIME;
+uint64_t nMiningForkTime = MAY2021_ACTIVATION_TIME;
 
 CBlock CreateGenesisBlock(CScript prefix,
     const std::string &comment,
@@ -143,8 +141,14 @@ public:
         consensus.nov2019Height = 609135;
         // May, 15 2020 hard fork
         consensus.may2020Height = 635258;
-        // Nov 15, 2020 12:00:00 UTC protocol upgrade¶
+        // Nov 15, 2020 12:00:00 UTC protocol upgrade
+        // we need to let this one around because scalenet is still used for asert activation
         consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
+        // Nov 15, 2020 hard fork
+        consensus.nov2020Height = 661647;
+
+        // May 15, 2021 12:00:00 UTC protocol upgrade
+        consensus.may2021ActivationTime = MAY2021_ACTIVATION_TIME;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -200,6 +204,9 @@ public:
         fTestnetToBeDeprecatedFieldRPC = false;
 
         // clang-format off
+        // checkpoint related to various network upgrades need to be the first block
+        // for which the new rules are enforced, hence activation height + 1, where activation
+        // height is the first block for which MTP <= upgrade activation time
         checkpointData = CCheckpointData();
         MapCheckpoints &checkpoints = checkpointData.mapCheckpoints;
         checkpoints[ 11111] = uint256S("0x0000000069e244f73d78e8fd29ba2fd2ed618bd6fa2ee92559f542fdb26e7c1d");
@@ -302,8 +309,11 @@ public:
         consensus.nov2019Height = 0;
         // May, 15 2020 hard fork
         consensus.may2020Height = 0;
-        // Nov, 15 2019 12:00:00 UTC fork activation time
-        consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
+        // Nov, 15 2020 hard fork
+        consensus.nov2020Height = 0;
+
+        // May 15, 2021 12:00:00 UTC protocol upgrade
+        consensus.may2021ActivationTime = MAY2021_ACTIVATION_TIME;
 
         vFixedSeeds.clear();
         vSeeds.clear();
@@ -380,8 +390,13 @@ public:
         // May, 15 2020 hard fork
         consensus.may2020Height = 1378461;
         // Nov 15, 2020 12:00:00 UTC protocol upgrade¶
+        // we need to let this one around because scalenet is still used for asert activation
         consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
+        // Nov 15, 2020 hard fork¶
+        consensus.nov2020Height = 142148;
 
+        // May 15, 2021 12:00:00 UTC protocol upgrade
+        consensus.may2021ActivationTime = MAY2021_ACTIVATION_TIME;
 
         pchMessageStart[0] = 0x0b;
         pchMessageStart[1] = 0x11;
@@ -434,6 +449,9 @@ public:
         fTestnetToBeDeprecatedFieldRPC = true;
 
         // clang-format off
+        // checkpoint related to various network upgrades need to be the first block
+        // for which the new rules are enforced, hence activation height + 1, where activation
+        // height is the first block for which MTP <= upgrade activation time
         checkpointData = CCheckpointData();
         MapCheckpoints &checkpoints = checkpointData.mapCheckpoints;
         checkpoints[546]     = uint256S("0x000000002a936ca763904c3c35fce2f3556c559c0214345d31b1bcebf76acb70");
@@ -450,7 +468,7 @@ public:
         // Nov 15th 2019 activate Schnorr Multisig, minimal data
         checkpoints[1341712] = uint256S("0x00000000fffc44ea2e202bd905a9fbbb9491ef9e9d5a9eed4039079229afa35b");
         // May 15th 2020 activate op_reverse, SigCheck
-        checkpoints[1378461] = uint256S("0x0000000099f5509b5f36b1926bcf82b21d936ebeadee811030dfbbb7fae915d7");
+        checkpoints[1378462] = uint256S("0x0000000099f5509b5f36b1926bcf82b21d936ebeadee811030dfbbb7fae915d7");
         // Nov 15th 2020 new aserti3-2d DAA
         checkpoints[1421482] = uint256S("0x0000000023e0680a8a062b3cc289a4a341124ce7fcb6340ede207e194d73b60a");
 
@@ -511,7 +529,13 @@ public:
         // May, 15 2020 hard fork
         consensus.may2020Height = 0;
         // Nov 15, 2020 12:00:00 UTC protocol upgrade¶
+        // we need to let this one around because scalenet is still used for asert activation
         consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
+        // Nov 15, 2020 upgrade
+        // FIXME regtest ASERT activation by time?
+
+        // May 15, 2021 12:00:00 UTC protocol upgrade
+        consensus.may2021ActivationTime = MAY2021_ACTIVATION_TIME;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;
@@ -614,7 +638,13 @@ public:
         consensus.may2020Height = 0;
 
         // Nov 15, 2020 12:00:00 UTC protocol upgrade
+        // we need to let this one around because scalenet is still used for asert activation
         consensus.nov2020ActivationTime = 1605441600;
+        // Nov 15, 2020 hard fork¶
+        consensus.nov2020Height = 16844;
+
+        // May 15, 2021 12:00:00 UTC protocol upgrade
+        consensus.may2021ActivationTime = MAY2021_ACTIVATION_TIME;
 
         pchMessageStart[0] = 0xcd;
         pchMessageStart[1] = 0x22;
@@ -738,7 +768,17 @@ public:
         consensus.may2020Height = 0;
 
         // Nov 15, 2020 12:00:00 UTC protocol upgrade
+        // we need to let this one around because scalenet is still used for asert activation
         consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
+        // Nov 15, 2020 hard fork¶
+        // ScaleNet has no hard-coded anchor block because will be expected to
+        // reorg back down to height 10,000, before ASERT activated, once we have it reorged
+        // at least one we should probably came up with an activation height around 10006 or so
+        // for now just we just avoid to initialize the optional nov2020Height so that we can
+        // switch back to MTP activation for this chain
+
+        // May 15, 2021 12:00:00 UTC protocol upgrade
+        consensus.may2021ActivationTime = MAY2021_ACTIVATION_TIME;
 
         pchMessageStart[0] = 0xba;
         pchMessageStart[1] = 0xc2;
