@@ -15,7 +15,6 @@
 #include "init.h"
 #include "main.h"
 #include "net.h"
-#include "parallel.h"
 #include "policy/mempool.h"
 #include "requestManager.h"
 #include "respend/respenddetector.h"

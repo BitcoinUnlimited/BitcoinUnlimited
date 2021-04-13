@@ -7,12 +7,12 @@
 #include "consensus/tx_verify.h"
 #include "key.h"
 #include "keystore.h"
-#include "parallel.h"
 #include "policy/policy.h"
 #include "script/ismine.h"
 #include "script/script_error.h"
 #include "script/sign.h"
 #include "test/test_bitcoin.h"
+#include "validation/parallel.h"
 
 #include <vector>
 

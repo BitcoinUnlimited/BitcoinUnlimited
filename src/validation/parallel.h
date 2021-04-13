@@ -145,9 +145,6 @@ public:
     CCriticalSection cs_blockvalidationthread;
 
 private:
-    /** txn hashes that are in the previous block */
-    CCriticalSection cs_previousblock;
-    std::vector<uint256> vPreviousBlock;
     /** Vector of script check queues */
     std::vector<CCheckQueue<CScriptCheck> *> vQueues;
     /** Number of threads */
@@ -241,9 +238,6 @@ public:
 
     /** Update the nMostWorkOurFork when a new header arrives */
     uint32_t MaxWorkChainBeingProcessed();
-
-    /** Clear orphans from the orphan cache that are no longer needed */
-    void ClearOrphanCache(const CBlockRef pblock);
 
     /** Process a block message */
     void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, CBlockRef pblock, const CInv &inv);

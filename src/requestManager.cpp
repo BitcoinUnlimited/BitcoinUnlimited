@@ -19,7 +19,6 @@
 #include "main.h"
 #include "net.h"
 #include "nodestate.h"
-#include "parallel.h"
 #include "primitives/block.h"
 #include "rpc/server.h"
 #include "stat.h"

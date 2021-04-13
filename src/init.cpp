@@ -33,7 +33,6 @@
 #include "main.h"
 #include "miner.h"
 #include "net.h"
-#include "parallel.h"
 #include "policy/fees.h"
 #include "policy/mempool.h"
 #include "policy/policy.h"

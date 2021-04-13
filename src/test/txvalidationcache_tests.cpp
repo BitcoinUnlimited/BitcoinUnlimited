@@ -9,7 +9,6 @@
 #include "keystore.h"
 #include "main.h"
 #include "miner.h"
-#include "parallel.h"
 #include "pubkey.h"
 #include "random.h"
 #include "script/standard.h"
@@ -19,6 +18,7 @@
 #include "txorphanpool.h"
 #include "utiltime.h"
 #include "validation/forks.h"
+#include "validation/parallel.h"
 
 #include <boost/test/unit_test.hpp>
 
