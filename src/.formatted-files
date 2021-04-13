@@ -135,8 +135,6 @@ nodestate.cpp
 nodestate.h
 noui.cpp
 noui.h
-parallel.cpp
-parallel.h
 pow.cpp
 pow.h
 prevector.h
@@ -190,6 +188,8 @@ utiltime.cpp
 utiltime.h
 validation/forks.cpp
 validation/forks.h
+validation/parallel.cpp
+validation/parallel.h
 validation/validation.cpp
 validation/validation.h
 validation/verifydb.cpp

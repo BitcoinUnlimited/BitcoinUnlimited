@@ -461,33 +461,6 @@ uint32_t CParallelValidation::MaxWorkChainBeingProcessed()
     return nMaxWork;
 }
 
-void CParallelValidation::ClearOrphanCache(const CBlockRef pblock)
-{
-    if (!IsInitialBlockDownload())
-    {
-        WRITELOCK(orphanpool.cs_orphanpool);
-        {
-            // Erase any orphans that may have been in the previous block and arrived
-            // after the previous block had already been processed.
-            LOCK(cs_previousblock);
-            for (uint256 &hash : vPreviousBlock)
-            {
-                orphanpool.EraseOrphanTx(hash);
-            }
-            vPreviousBlock.clear();
-
-            // Erase orphans from the current block that were already received.
-            for (auto &tx : pblock->vtx)
-            {
-                uint256 hash = tx->GetHash();
-                vPreviousBlock.push_back(hash);
-                orphanpool.EraseOrphanTx(hash);
-            }
-        }
-    }
-}
-
-
 //  HandleBlockMessage launches a HandleBlockMessageThread.  And HandleBlockMessageThread processes each block and
 //  updates the UTXO if the block has been accepted and the tip updated. We cleanup and release the semaphore after
 //  the thread has finished.
@@ -658,9 +631,6 @@ void HandleBlockMessageThread(CNodeRef noderef, const string strCommand, CBlockR
 
         // Increment block counter
         pfrom->firstBlock += 1;
-
-        // Erase any txns from the orphan cache, which were in this block, and that are now no longer needed.
-        PV->ClearOrphanCache(pblock);
 
         // If chain is nearly caught up then flush the state after a block is finished processing and the
         // performance timings have been updated.  This way we don't include the flush time in our time to

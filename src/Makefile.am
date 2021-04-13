@@ -190,7 +190,6 @@ BITCOIN_CORE_H = \
   netaddress.h \
   netbase.h \
   noui.h \
-  parallel.h \
   policy/fees.h \
   policy/policy.h \
   policy/mempool.h \
@@ -240,6 +239,7 @@ BITCOIN_CORE_H = \
   utilmoneystr.h \
   utiltime.h \
   validation/forks.h \
+  validation/parallel.h \
   validation/validation.h \
   validation/verifydb.h \
   validationinterface.h \
@@ -307,7 +307,6 @@ libbitcoin_server_a_SOURCES = \
   net_processing.cpp \
   nodestate.cpp \
   noui.cpp \
-  parallel.cpp \
   policy/fees.cpp \
   policy/policy.cpp \
   pow.cpp \
@@ -338,6 +337,7 @@ libbitcoin_server_a_SOURCES = \
   utilprocess.cpp \
   requestManager.cpp \
   validation/forks.cpp \
+  validation/parallel.cpp \
   validation/validation.cpp \
   validation/verifydb.cpp \
   validationinterface.cpp \

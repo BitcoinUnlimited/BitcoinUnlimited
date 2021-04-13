@@ -27,7 +27,6 @@
 #include "leakybucket.h"
 #include "miner.h"
 #include "net.h"
-#include "parallel.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
 #include "requestManager.h"

@@ -17,7 +17,6 @@
 #include "hashwrapper.h"
 #include "main.h"
 #include "net.h"
-#include "parallel.h"
 #include "policy/policy.h"
 #include "pow.h"
 #include "primitives/transaction.h"

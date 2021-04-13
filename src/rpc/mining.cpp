@@ -17,7 +17,6 @@
 #include "main.h"
 #include "miner.h"
 #include "net.h"
-#include "parallel.h"
 #include "pow.h"
 #include "rpc/server.h"
 #include "txadmission.h"

@@ -137,11 +137,22 @@ void CTxOrphanPool::QueryHashes(std::vector<uint256> &vHashes)
 
 void CTxOrphanPool::RemoveForBlock(const std::vector<CTransactionRef> &vtx)
 {
-   WRITELOCK(cs_orphanpool);
-   for (const auto &tx : vtx)
-   {
-       EraseOrphanTx(tx->GetHash());
-   }
+    WRITELOCK(cs_orphanpool);
+    // Erase any orphans that may have been in the previous block and arrived
+    // after the previous block had already been processed.
+    for (uint256 &hash : vPreviousBlock)
+    {
+        EraseOrphanTx(hash);
+    }
+    vPreviousBlock.clear();
+
+    // Erase orphans from the current block that were already received.
+    for (auto &tx : vtx)
+    {
+        const uint256 &hash = tx->GetHash();
+        vPreviousBlock.push_back(hash);
+        EraseOrphanTx(hash);
+    }
 }
 
 std::vector<CTxOrphanPool::COrphanTx> CTxOrphanPool::AllTxOrphanPoolInfo() const

@@ -17,13 +17,19 @@
 
 class CTxOrphanPool
 {
+public:
+    CSharedCriticalSection cs_orphanpool;
+
 private:
     //! Used in EraseOrphansByTime() to track when the last time was we checked the cache for anything to delete
-    int64_t nLastOrphanCheck;
+    int64_t nLastOrphanCheck GUARDED_BY(cs_orphanpool);
+
+    //! txn hashes that are in the previous block
+    std::vector<uint256> vPreviousBlock GUARDED_BY(cs_orphanpool);
 
 public:
     //! Current in memory footprint of all txns in the orphan pool.
-    uint64_t nBytesOrphanPool;
+    uint64_t nBytesOrphanPool GUARDED_BY(cs_orphanpool);
 
     struct COrphanTx
     {
@@ -33,7 +39,6 @@ public:
         uint64_t nOrphanTxSize;
     };
 
-    CSharedCriticalSection cs_orphanpool;
     std::map<uint256, COrphanTx> mapOrphanTransactions GUARDED_BY(cs_orphanpool);
     std::map<uint256, std::set<uint256> > mapOrphanTransactionsByPrev GUARDED_BY(cs_orphanpool);
 

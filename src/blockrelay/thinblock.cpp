@@ -19,7 +19,6 @@
 #include "expedited.h"
 #include "extversionkeys.h"
 #include "net.h"
-#include "parallel.h"
 #include "policy/policy.h"
 #include "pow.h"
 #include "requestManager.h"

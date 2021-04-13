@@ -15,7 +15,6 @@
 #include "core_io.h"
 #include "init.h"
 #include "main.h"
-#include "parallel.h"
 #include "policy/fees.h"
 #include "streams.h"
 #include "timedata.h"
