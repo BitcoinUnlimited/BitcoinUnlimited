@@ -229,6 +229,12 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
         return Invalid;
     }
 
+    if (m_spender1 == m_spender2)
+    {
+        LOG(DSPROOF, "Warning:  Spenders in a dsproof must not be the same");
+        return Invalid;
+    }
+
     // check if ordering is proper. By convention, the first tx must have the smaller hash.
     int diff = m_spender1.hashOutputs.Compare(m_spender2.hashOutputs);
     if (diff == 0)
