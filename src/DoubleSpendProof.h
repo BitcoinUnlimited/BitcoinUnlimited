@@ -53,6 +53,13 @@ public:
         uint32_t txVersion = 0, outSequence = 0, lockTime = 0;
         uint256 hashPrevOutputs, hashSequence, hashOutputs;
         std::vector<std::vector<uint8_t> > pushData;
+        bool operator==(const Spender &o) const
+        {
+            return txVersion == o.txVersion && outSequence == o.outSequence && lockTime == o.lockTime &&
+                   hashPrevOutputs == o.hashPrevOutputs && hashSequence == o.hashSequence &&
+                   hashOutputs == o.hashOutputs && pushData == o.pushData;
+        }
+        bool operator!=(const Spender &o) const { return !(*this == o); }
     };
 
     const Spender &spender1() const { return m_spender1; }

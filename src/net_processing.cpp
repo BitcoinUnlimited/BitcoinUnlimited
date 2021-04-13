@@ -2060,7 +2060,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 LOG(DSPROOF, "Failure handling double spend proof. Peer: %d Reason: %s\n", pfrom->GetId(), e.what());
                 if (!dspHash.IsNull())
                     mempool.doubleSpendProofStorage()->markProofRejected(dspHash);
-                dosMan.Misbehaving(pfrom->GetId(), 10);
                 return false;
             }
         }
