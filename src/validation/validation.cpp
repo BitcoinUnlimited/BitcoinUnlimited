@@ -3355,8 +3355,7 @@ bool ConnectTip(CValidationState &state,
 
     // Deactivate intelligent forwarding if the May 2021 fork is active. This will
     // cause chains of any length to be forwarded to all peers by default.
-    if (IsMay2021Next(chainparams.GetConsensus(), chainActive.Tip()) ||
-        IsMay2021Enabled(chainparams.GetConsensus(), chainActive.Tip()))
+    if (IsMay2021Enabled(chainparams.GetConsensus(), chainActive.Tip()))
         unconfPushAction.Set(0);
 
     // If some kind of unconfirmed push is turned on, then do the forwarding.
