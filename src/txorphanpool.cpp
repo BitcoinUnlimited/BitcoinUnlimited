@@ -82,7 +82,11 @@ void CTxOrphanPool::EraseOrphansByTime()
     // every time a tx enters the mempool but just once every 5 minutes is good enough.
     if (GetTime() < nLastOrphanCheck + 5 * 60)
         return;
-    int64_t nOrphanTxCutoffTime = GetTime() - GetArg("-orphanpoolexpiry", DEFAULT_ORPHANPOOL_EXPIRY) * 60 * 60;
+    int64_t nOrphanTxCutoffTime = 0;
+    if (unconfPushAction.Value() > 0)
+        nOrphanTxCutoffTime = GetTime() - GetArg("-orphanpoolexpiry", DEFAULT_ORPHANPOOL_EXPIRY) * 60 * 60;
+    else
+        nOrphanTxCutoffTime = GetTime() - GetArg("-orphanpoolexpiry", 4) * 60 * 60;
     std::map<uint256, COrphanTx>::iterator iter = mapOrphanTransactions.begin();
     while (iter != mapOrphanTransactions.end())
     {
