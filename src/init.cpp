@@ -473,6 +473,8 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
     // -reindex
     if (fReindex)
     {
+        SetRPCWarmupFinished();
+
         CImportingNow imp;
         int nFile = 0;
         while (true)
@@ -503,6 +505,8 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
     fs::path pathBootstrap = GetDataDir() / "bootstrap.dat";
     if (fs::exists(pathBootstrap))
     {
+        SetRPCWarmupFinished();
+
         FILE *file = fsbridge::fopen(pathBootstrap, "rb");
         if (file)
         {
