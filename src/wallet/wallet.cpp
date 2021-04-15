@@ -1453,12 +1453,17 @@ int CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate)
                                                                            dProgressStart) /
                                                                        (dProgressTip - dProgressStart) * 100))));
 
-            CBlock block;
-            ReadBlockFromDisk(block, pindex, Params().GetConsensus());
-            int txIdx = 0;
-            for (const auto &ptx : block.vtx)
+            CBlockRef pblock = ReadBlockFromDisk(pindex, Params().GetConsensus());
+            if (!pblock)
             {
-                if (AddToWalletIfInvolvingMe(ptx, &block, fUpdate, txIdx))
+                LOGA("ERROR: Could not read block from disk\n");
+                fRescan = false;
+                return 0;
+            }
+            int txIdx = 0;
+            for (const auto &ptx : pblock->vtx)
+            {
+                if (AddToWalletIfInvolvingMe(ptx, pblock.get(), fUpdate, txIdx))
                     ret++;
                 txIdx++;
             }

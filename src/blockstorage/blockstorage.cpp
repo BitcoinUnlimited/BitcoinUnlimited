@@ -6,6 +6,7 @@
 
 #include "blockstorage.h"
 
+#include "blockcache.h"
 #include "blockleveldb.h"
 #include "chainparams.h"
 #include "dbwrapper.h"
@@ -383,15 +384,16 @@ void SyncStorage(const CChainParams &chainparams)
             // Update the block data
             if (index->nStatus & BLOCK_HAVE_DATA && !index->GetBlockPos().IsNull())
             {
-                CBlock block_seq;
-                if (!ReadBlockFromDiskSequential(block_seq, index->GetBlockPos(), chainparams.GetConsensus()))
+                CBlockRef pblock_seq;
+                pblock_seq = ReadBlockFromDiskSequential(index->GetBlockPos(), chainparams.GetConsensus());
+                if (!pblock_seq)
                 {
                     LOGA("SyncStorage(): critical error, failure to read block data from sequential files \n");
                     assert(false);
                 }
-                unsigned int nBlockSize = ::GetSerializeSize(block_seq, SER_DISK, CLIENT_VERSION);
+                unsigned int nBlockSize = ::GetSerializeSize(*pblock_seq, SER_DISK, CLIENT_VERSION);
                 index->nDataPos = nBlockSize;
-                if (!pblockdb->WriteBlock(block_seq))
+                if (!pblockdb->WriteBlock(*pblock_seq))
                 {
                     LOGA("critical error, failed to write block to db, asserting false \n");
                     assert(false);
@@ -457,8 +459,14 @@ void SyncStorage(const CChainParams &chainparams)
         delete pblockdbsync;
 }
 
-bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos, const CMessageHeader::MessageStartChars &messageStart)
+bool WriteBlockToDisk(const CBlock &block,
+    CDiskBlockPos &pos,
+    const CMessageHeader::MessageStartChars &messageStart,
+    const int *pHeight)
 {
+    if (pHeight)
+        blockcache.AddBlock(MakeBlockRef(block), *pHeight);
+
     if (!pblockdb)
     {
         return WriteBlockToDiskSequential(block, pos, messageStart);
@@ -466,33 +474,46 @@ bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos, const CMessageHea
     return pblockdb->WriteBlock(block);
 }
 
-bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex, const Consensus::Params &consensusParams)
+CBlockRef ReadBlockFromDisk(const CBlockIndex *pindex, const Consensus::Params &consensusParams)
 {
+    // First check the in memory cache
+    CBlockRef pblock = blockcache.GetBlock(pindex->GetBlockHash());
+    if (pblock)
+    {
+        LOG(THIN | GRAPHENE | CMPCT | BLK, "Retrieved block from memory cache: %s\n",
+            pblock->GetHash().ToString().c_str());
+        return pblock;
+    }
     if (!pblockdb)
     {
-        if (!ReadBlockFromDiskSequential(block, pindex->GetBlockPos(), consensusParams))
+        pblock = ReadBlockFromDiskSequential(pindex->GetBlockPos(), consensusParams);
+
+        if (!pblock)
         {
-            return false;
+            return nullptr;
         }
-        if (block.GetHash() != pindex->GetBlockHash())
+        if (pblock->GetHash() != pindex->GetBlockHash())
         {
-            return error("ReadBlockFromDisk(CBlock&, CBlockIndex*): GetHash() doesn't match index for %s at %s",
+            LOGA("ERROR: ReadBlockFromDisk(CBlockRef, CBlockIndex*): GetHash() doesn't match index for %s at %s",
                 pindex->ToString(), pindex->GetBlockPos().ToString());
+            return nullptr;
         }
-        return true;
+        return pblock;
     }
-    block.SetNull();
-    if (!pblockdb->ReadBlock(pindex, block))
+
+    std::shared_ptr<CBlock> pblockRef = MakeBlockRef(CBlock());
+    if (!pblockdb->ReadBlock(pindex, *pblockRef))
     {
         LOGA("failed to read block with hash %s from leveldb \n", pindex->GetBlockHash().GetHex().c_str());
-        return false;
+        return nullptr;
     }
-    if (block.GetHash() != pindex->GetBlockHash())
+    if (pblockRef->GetHash() != pindex->GetBlockHash())
     {
-        return error("ReadBlockFromDisk(CBlock&, CBlockIndex*): GetHash() doesn't match index for %s at %s",
+        LOGA("ERROR: ReadBlockFromDisk(CBlock&, CBlockIndex*): GetHash() doesn't match index for %s at %s",
             pindex->ToString(), pindex->GetBlockPos().ToString());
+        return nullptr;
     }
-    return true;
+    return pblockRef;
 }
 
 bool WriteUndoToDisk(const CBlockUndo &blockundo,

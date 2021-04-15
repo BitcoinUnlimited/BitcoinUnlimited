@@ -33,8 +33,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/unordered_map.hpp>
-
 class ValidationResourceTracker;
 class CBlockIndex;
 class CBlockTreeDB;
@@ -129,7 +127,7 @@ struct BlockHasher
 
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
-typedef boost::unordered_map<uint256, CBlockIndex *, BlockHasher> BlockMap;
+typedef std::unordered_map<uint256, CBlockIndex *, BlockHasher> BlockMap;
 extern CSharedCriticalSection cs_mapBlockIndex;
 extern BlockMap mapBlockIndex;
 

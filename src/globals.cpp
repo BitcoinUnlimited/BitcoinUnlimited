@@ -14,6 +14,7 @@
 #include "blockrelay/graphene.h"
 #include "blockrelay/mempool_sync.h"
 #include "blockrelay/thinblock.h"
+#include "blockstorage/blockcache.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "clientversion.h"
@@ -209,6 +210,7 @@ int interruptIntervals[] = {30, 30 * 12, 30 * 12 * 24, 30 * 12 * 24 * 30};
 std::chrono::milliseconds statMinInterval(10000);
 boost::asio::io_service stat_io_service;
 
+CBlockCache blockcache;
 CTxMemPool mempool;
 CTxOrphanPool orphanpool;
 

@@ -112,32 +112,36 @@ bool WriteBlockToDiskSequential(const CBlock &block,
     return true;
 }
 
-bool ReadBlockFromDiskSequential(CBlock &block, const CDiskBlockPos &pos, const Consensus::Params &consensusParams)
+CBlockRef ReadBlockFromDiskSequential(const CDiskBlockPos &pos, const Consensus::Params &consensusParams)
 {
-    block.SetNull();
     // Open history file to read
     CAutoFile filein(OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION);
     if (filein.IsNull())
     {
-        return error("ReadBlockFromDisk: OpenBlockFile failed for %s", pos.ToString());
+        LOGA("ERROR: ReadBlockFromDisk: OpenBlockFile failed for %s", pos.ToString());
+        return nullptr;
     }
 
     // Read block
+    std::shared_ptr<CBlock> pblock = MakeBlockRef(CBlock());
     try
     {
-        filein >> block;
+        filein >> *pblock;
     }
     catch (const std::exception &e)
     {
-        return error("%s: Deserialize or I/O error - %s at %s", __func__, e.what(), pos.ToString());
+        LOGA("Error - %s: Deserialize or I/O error - %s at %s", __func__, e.what(), pos.ToString());
+        return nullptr;
     }
 
     // Check the header
-    if (!CheckProofOfWork(block.GetHash(), block.nBits, consensusParams))
+    if (!CheckProofOfWork(pblock->GetHash(), pblock->nBits, consensusParams))
     {
-        return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
+        LOGA("ERROR: ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
+        return nullptr;
     }
-    return true;
+
+    return pblock;
 }
 
 /* Calculate the amount of disk space the block & undo files currently use */

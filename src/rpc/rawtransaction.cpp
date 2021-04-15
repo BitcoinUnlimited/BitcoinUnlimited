@@ -398,12 +398,12 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
     if (!pblockindex)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
 
-    CBlock block;
-    if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
+    CBlockRef pblock = ReadBlockFromDisk(pblockindex, Params().GetConsensus());
+    if (!pblock)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
 
     UniValue resultSet(UniValue::VOBJ);
-    for (auto tx : block.vtx)
+    for (auto tx : pblock->vtx)
     {
         if (has_protocol)
         {
@@ -426,7 +426,7 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
 
         UniValue result(UniValue::VOBJ);
         result.pushKV("hex", strHex);
-        TxToJSON(*tx, 0, block.GetHash(), result); // txTime is 0 because block time will used
+        TxToJSON(*tx, 0, pblock->GetHash(), result); // txTime is 0 because block time will used
         resultSet.pushKV(tx->GetHash().ToString(), result);
     }
     return resultSet;
@@ -576,13 +576,13 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
             // we are now past the tip
             break;
         }
-        CBlock block;
-        if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
+        CBlockRef pblock = ReadBlockFromDisk(pblockindex, Params().GetConsensus());
+        if (!pblock)
         {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
         }
         UniValue blockResults(UniValue::VOBJ);
-        for (auto tx : block.vtx)
+        for (auto tx : pblock->vtx)
         {
             if (has_protocol)
             {
@@ -603,10 +603,10 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
             }
             UniValue txDetails(UniValue::VOBJ);
             txDetails.pushKV("hex", strHex);
-            TxToJSON(*tx, 0, block.GetHash(), txDetails); // txTime can be 0 because block time overrides
+            TxToJSON(*tx, 0, pblock->GetHash(), txDetails); // txTime can be 0 because block time overrides
             blockResults.pushKV(tx->GetHash().ToString(), txDetails);
         }
-        resultSet.pushKV(block.GetHash().GetHex(), blockResults);
+        resultSet.pushKV(pblock->GetHash().GetHex(), blockResults);
         fetched++;
     }
 
@@ -692,19 +692,19 @@ UniValue gettxoutproof(const UniValue &params, bool fHelp)
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Transaction index corrupt");
     }
 
-    CBlock block;
-    if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
+    CBlockRef pblock = ReadBlockFromDisk(pblockindex, Params().GetConsensus());
+    if (!pblock)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
 
     unsigned int ntxFound = 0;
-    for (const auto &tx : block.vtx)
+    for (const auto &tx : pblock->vtx)
         if (setTxids.count(tx->GetHash()))
             ntxFound++;
     if (ntxFound != setTxids.size())
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "(Not all) transactions not found in specified block");
 
     CDataStream ssMB(SER_NETWORK, PROTOCOL_VERSION);
-    CMerkleBlock mb(block, setTxids);
+    CMerkleBlock mb(*pblock, setTxids);
     ssMB << mb;
     std::string strHex = HexStr(ssMB.begin(), ssMB.end());
     return strHex;
@@ -757,8 +757,8 @@ UniValue gettxoutproofs(const UniValue &params, bool fHelp)
     if (!pblockindex)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
 
-    CBlock block;
-    if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
+    CBlockRef pblock = ReadBlockFromDisk(pblockindex, Params().GetConsensus());
+    if (!pblock)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
 
     UniValue resultSet(UniValue::VOBJ);
@@ -766,7 +766,7 @@ UniValue gettxoutproofs(const UniValue &params, bool fHelp)
     bool ntxFound = false;
     for (const auto &txid : setTxids)
     {
-        for (const auto &tx : block.vtx)
+        for (const auto &tx : pblock->vtx)
         {
             if (setTxids.count(tx->GetHash()))
             {
@@ -781,7 +781,7 @@ UniValue gettxoutproofs(const UniValue &params, bool fHelp)
         std::set<uint256> setTxid;
         setTxid.insert(txid);
         CDataStream ssMB(SER_NETWORK, PROTOCOL_VERSION);
-        CMerkleBlock mb(block, setTxid);
+        CMerkleBlock mb(*pblock, setTxid);
         ssMB << mb;
         std::string strHex = HexStr(ssMB.begin(), ssMB.end());
         resultSet.pushKV(txid.ToString(), strHex);

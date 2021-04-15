@@ -421,9 +421,10 @@ bool CompactReRequest::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         if (hdr->nHeight < (chainActive.Tip()->nHeight - (int)thinrelay.MAX_THINTYPE_BLOCKS_IN_FLIGHT))
             return error(CMPCT, "getblocktxn request too far from the tip");
 
-        CBlock block;
+        CBlockRef pblock;
         const Consensus::Params &consensusParams = Params().GetConsensus();
-        if (!ReadBlockFromDisk(block, hdr, consensusParams))
+        pblock = ReadBlockFromDisk(hdr, consensusParams);
+        if (!pblock)
         {
             // We do not assign misbehavior for not being able to read a block from disk because we already
             // know that the block is in the block index from the step above. Secondly, a failure to read may
@@ -431,7 +432,7 @@ bool CompactReRequest::HandleMessage(CDataStream &vRecv, CNode *pfrom)
             return error("Cannot load block from disk -- Block txn request possibly received before assembled");
         }
 
-        CompactReReqResponse compactReqResponse(block, compactReRequest.indexes);
+        CompactReReqResponse compactReqResponse(*pblock, compactReRequest.indexes);
         pfrom->PushMessage(NetMsgType::BLOCKTXN, compactReqResponse);
         pfrom->txsSent += compactReRequest.indexes.size();
     }

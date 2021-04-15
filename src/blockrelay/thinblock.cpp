@@ -435,9 +435,9 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         if (hdr->nHeight < (chainActive.Tip()->nHeight - (int)thinrelay.MAX_THINTYPE_BLOCKS_IN_FLIGHT))
             return error(THIN, "get_xblocktx request too far from the tip");
 
-        CBlock block;
         const Consensus::Params &consensusParams = Params().GetConsensus();
-        if (!ReadBlockFromDisk(block, hdr, consensusParams))
+        CBlockRef pblock = ReadBlockFromDisk(hdr, consensusParams);
+        if (!pblock)
         {
             // We do not assign misbehavior for not being able to read a block from disk because we already
             // know that the block is in the block index from the step above. Secondly, a failure to read may
@@ -446,11 +446,11 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
         }
         else
         {
-            for (unsigned int i = 0; i < block.vtx.size(); i++)
+            for (unsigned int i = 0; i < pblock->vtx.size(); i++)
             {
-                uint64_t cheapHash = block.vtx[i]->GetHash().GetCheapHash();
+                uint64_t cheapHash = pblock->vtx[i]->GetHash().GetCheapHash();
                 if (thinRequestBlockTx.setCheapHashesToRequest.count(cheapHash))
-                    vTx.push_back(*block.vtx[i]);
+                    vTx.push_back(*(pblock->vtx[i]));
             }
         }
     }

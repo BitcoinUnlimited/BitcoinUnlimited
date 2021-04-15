@@ -70,13 +70,13 @@ bool TxIndex::Init()
 
 bool TxIndex::WriteGenesisTransaction()
 {
-    CBlock block;
-    if (!ReadBlockFromDisk(block, chainActive.Genesis(), Params().GetConsensus()))
+    CBlockRef pblock = ReadBlockFromDisk(chainActive.Genesis(), Params().GetConsensus());
+    if (!pblock)
     {
         FatalError("%s: Failed to read block %s from disk", __func__, chainActive.Genesis()->GetBlockHash().ToString());
         return false;
     }
-    if (!WriteBlock(block, chainActive.Genesis()))
+    if (!WriteBlock(*pblock, chainActive.Genesis()))
     {
         FatalError("%s: Failed to write block %s to tx index database", __func__,
             chainActive.Genesis()->GetBlockHash().ToString());
@@ -156,13 +156,13 @@ void TxIndex::ThreadSync()
                 last_locator_write_time = current_time;
             }
 
-            CBlock block;
-            if (!ReadBlockFromDisk(block, pindex, consensus_params))
+            CBlockRef pblock = ReadBlockFromDisk(pindex, consensus_params);
+            if (!pblock)
             {
                 FatalError("%s: Failed to read block %s from disk", __func__, pindex->GetBlockHash().ToString());
                 return;
             }
-            if (!WriteBlock(block, pindex))
+            if (!WriteBlock(*pblock, pindex))
             {
                 FatalError(
                     "%s: Failed to write block %s to tx index database", __func__, pindex->GetBlockHash().ToString());
