@@ -443,9 +443,9 @@ class WalletTest (BitcoinTestFramework):
             self.node_args = [['-usehd=0', m], ['-usehd=0', m], ['-usehd=0', m]]
             self.nodes = start_nodes(3, self.options.tmpdir, self.node_args)
             # wait for blockchain to catch up
-            waitFor(60, lambda : [block_count] * 3 == [self.nodes[i].getblockcount() for i in range(3)])
+            waitFor(120, lambda : [block_count] * 3 == [self.nodes[i].getblockcount() for i in range(3)])
             # wait for wallet to catch up to blockchain
-            waitFor(60, lambda : balance_nodes == [self.nodes[i].getbalance() for i in range(3)], lambda: print("balances: " + str([self.nodes[i].getbalance() for i in range(3)]) + " expecting: " + str(balance_nodes)))
+            waitFor(120, lambda : balance_nodes == [self.nodes[i].getbalance() for i in range(3)], lambda: print("balances: " + str([self.nodes[i].getbalance() for i in range(3)]) + " expecting: " + str(balance_nodes)))
 
         # Exercise listsinceblock with the last two blocks
         coinbase_tx_1 = self.nodes[0].listsinceblock(blocks[0])
