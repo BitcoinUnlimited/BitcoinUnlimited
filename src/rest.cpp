@@ -224,7 +224,6 @@ static bool rest_block(HTTPRequest *req, const std::string &strURIPart, bool sho
     if (!ParseHashStr(hashStr, hash))
         return RESTERR(req, HTTP_BAD_REQUEST, "Invalid hash: " + hashStr);
 
-    CBlock block;
     CBlockIndex *pblockindex = LookupBlockIndex(hash);
     if (!pblockindex)
         return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
@@ -232,11 +231,12 @@ static bool rest_block(HTTPRequest *req, const std::string &strURIPart, bool sho
     if (IsBlockPruned(pblockindex))
         return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not available (pruned data)");
 
-    if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
+    CBlockRef pblock = ReadBlockFromDisk(pblockindex, Params().GetConsensus());
+    if (!pblock)
         return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
 
     CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
-    ssBlock << block;
+    ssBlock << *pblock;
 
     switch (rf)
     {
@@ -258,7 +258,7 @@ static bool rest_block(HTTPRequest *req, const std::string &strURIPart, bool sho
 
     case RF_JSON:
     {
-        UniValue objBlock = blockToJSON(block, pblockindex, showTxDetails);
+        UniValue objBlock = blockToJSON(*pblock, pblockindex, showTxDetails);
         string strJSON = objBlock.write() + "\n";
         req->WriteHeader("Content-Type", "application/json");
         req->WriteReply(HTTP_OK, strJSON);

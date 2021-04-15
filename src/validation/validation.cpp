@@ -7,6 +7,7 @@
 #include "validation.h"
 
 #include "blockrelay/blockrelay_common.h"
+#include "blockstorage/blockcache.h"
 #include "blockstorage/blockstorage.h"
 #include "blockstorage/sequential_files.h"
 #include "checkpoints.h"
@@ -1861,7 +1862,7 @@ bool AcceptBlock(const CBlock &block,
         }
         if (dbp == nullptr)
         {
-            if (!WriteBlockToDisk(block, blockPos, chainparams.MessageStart()))
+            if (!WriteBlockToDisk(block, blockPos, chainparams.MessageStart(), &nHeight))
             {
                 AbortNode(state, "Failed to write block");
             }
@@ -3099,7 +3100,7 @@ void UpdateTip(CBlockIndex *pindexNew)
     }
 }
 
-static void ResubmitTransactions(CBlock *block = nullptr)
+static void ResubmitTransactions(CBlockRef pblock = nullptr)
 {
     // To be very safe let's force everything in the mempool to be re-admitted.  This reduces this rare case
     // quickly to a very common operation mode.  If we do not do this, we must guarantee that all tx coming from
@@ -3116,10 +3117,10 @@ static void ResubmitTransactions(CBlock *block = nullptr)
     DbgAssert(txProcessingCorral.region() != CORRAL_TX_COMMITMENT, LOGA("Resubmit transactions during tx commitment"));
     LOG(MEMPOOL, "Clearing mempool and resubmitting transactions");
     {
-        if (block)
+        if (pblock)
         {
             // Resubmit the block first
-            for (const auto &ptx : block->vtx)
+            for (const auto &ptx : pblock->vtx)
             {
                 if (!ptx->IsCoinBase())
                 {
@@ -3152,14 +3153,14 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
     // Read block from disk.
-    CBlock block;
-    if (!ReadBlockFromDisk(block, pindexDelete, consensusParams))
+    CBlockRef pblock = ReadBlockFromDisk(pindexDelete, consensusParams);
+    if (!pblock)
         return AbortNode(state, "DisconnectTip(): Failed to read block");
     // Apply the block atomically to the chain state.
     int64_t nStart = GetStopwatchMicros();
     {
         CCoinsViewCache view(pcoinsTip);
-        if (DisconnectBlock(block, pindexDelete, view) != DISCONNECT_OK)
+        if (DisconnectBlock(*pblock, pindexDelete, view) != DISCONNECT_OK)
             return error("DisconnectTip(): DisconnectBlock %s failed", pindexDelete->GetBlockHash().ToString());
         bool result = view.Flush();
         assert(result);
@@ -3185,7 +3186,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     UpdateTip(pindexDelete->pprev);
     // Let wallets know transactions went from 1-confirmed to
     // 0-confirmed or conflicted:
-    for (const auto &ptx : block.vtx)
+    for (const auto &ptx : pblock->vtx)
     {
         SyncWithWallets(ptx, nullptr, -1);
     }
@@ -3203,7 +3204,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     }
     else
     {
-        ResubmitTransactions(&block);
+        ResubmitTransactions(pblock);
     }
 
     return true;
@@ -3238,12 +3239,13 @@ bool ConnectTip(CValidationState &state,
 
     // Read block from disk.
     int64_t nTime1 = GetStopwatchMicros();
-    CBlock block;
+    CBlockRef pblockRef;
     if (!pblock)
     {
-        if (!ReadBlockFromDisk(block, pindexNew, chainparams.GetConsensus()))
+        pblockRef = ReadBlockFromDisk(pindexNew, chainparams.GetConsensus());
+        if (!pblockRef)
             return AbortNode(state, "ConnectTip(): Failed to read block");
-        pblock = &block;
+        pblock = pblockRef.get();
     }
     // Apply the block atomically to the chain state.
     int64_t nTime2 = GetStopwatchMicros();
@@ -3356,6 +3358,10 @@ bool ConnectTip(CValidationState &state,
     // If some kind of unconfirmed push is turned on, then do the forwarding.
     if (!IsInitialBlockDownload() && !fReindex && unconfPushAction.Value() != 0)
         ForwardAcceptableTransactions(txChanges);
+
+    // When we're in IBD or reindexing then once the block is connected we don't need it in the cache anymore.
+    if (IsInitialBlockDownload())
+        blockcache.EraseBlock(pblock->GetHash());
 
     return true;
 }
@@ -3844,12 +3850,8 @@ bool ProcessNewBlock(CValidationState &state,
         CInv inv(MSG_BLOCK, hash);
         if (!ret)
         {
-            // BU TODO: if block comes out of order (before its parent) this will happen.  We should cache the block
-            // until the parents arrive.
-
             // If the block was not accepted then reset the fProcessing flag to false.
             requester.BlockRejected(inv, pfrom);
-
             return error("%s: AcceptBlock FAILED", __func__);
         }
         else

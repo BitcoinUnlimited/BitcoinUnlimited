@@ -188,8 +188,8 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                 if (fSend && mi->nStatus & BLOCK_HAVE_DATA)
                 {
                     // Send block from disk
-                    CBlock block;
-                    if (!ReadBlockFromDisk(block, mi, consensusParams))
+                    CBlockRef pblock = ReadBlockFromDisk(mi, consensusParams);
+                    if (!pblock)
                     {
                         // its possible that I know about it but haven't stored it yet
                         LOG(THIN, "unable to load block %s from disk\n",
@@ -201,19 +201,19 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                         if (inv.type == MSG_BLOCK)
                         {
                             pfrom->blocksSent += 1;
-                            pfrom->PushMessage(NetMsgType::BLOCK, block);
+                            pfrom->PushMessage(NetMsgType::BLOCK, *pblock);
                         }
                         else if (inv.type == MSG_CMPCT_BLOCK)
                         {
                             LOG(CMPCT, "Sending compactblock via getdata message\n");
-                            SendCompactBlock(MakeBlockRef(block), pfrom, inv);
+                            SendCompactBlock(pblock, pfrom, inv);
                         }
                         else // MSG_FILTERED_BLOCK)
                         {
                             LOCK(pfrom->cs_filter);
                             if (pfrom->pfilter)
                             {
-                                CMerkleBlock merkleBlock(block, *pfrom->pfilter);
+                                CMerkleBlock merkleBlock(*pblock, *pfrom->pfilter);
                                 pfrom->PushMessage(NetMsgType::MERKLEBLOCK, merkleBlock);
                                 pfrom->blocksSent += 1;
                                 // CMerkleBlock just contains hashes, so also push any transactions in the block the
@@ -228,7 +228,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                                 for (PairType &pair : merkleBlock.vMatchedTxn)
                                 {
                                     pfrom->txsSent += 1;
-                                    pfrom->PushMessage(NetMsgType::TX, block.vtx[pair.first]);
+                                    pfrom->PushMessage(NetMsgType::TX, pblock->vtx[pair.first]);
                                 }
                             }
                             // else
@@ -1561,9 +1561,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 return error("Peer %srequested nonexistent block %s", pfrom->GetLogName(), inv.hash.ToString());
             }
 
-            CBlock block;
             const Consensus::Params &consensusParams = Params().GetConsensus();
-            if (!ReadBlockFromDisk(block, invIndex, consensusParams))
+            CBlockRef pblock = ReadBlockFromDisk(invIndex, consensusParams);
+            if (!pblock)
             {
                 // We don't have the block yet, although we know about it.
                 return error(
@@ -1571,7 +1571,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
             else
             {
-                SendXThinBlock(MakeBlockRef(block), pfrom, inv);
+                SendXThinBlock(pblock, pfrom, inv);
             }
         }
     }
@@ -1597,16 +1597,16 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             return error("Peer %srequested nonexistent block %s", pfrom->GetLogName(), inv.hash.ToString());
         }
 
-        CBlock block;
         const Consensus::Params &consensusParams = Params().GetConsensus();
-        if (!ReadBlockFromDisk(block, invIndex, consensusParams))
+        CBlockRef pblock = ReadBlockFromDisk(invIndex, consensusParams);
+        if (!pblock)
         {
             // We don't have the block yet, although we know about it.
             return error("Peer %s requested block %s that cannot be read", pfrom->GetLogName(), inv.hash.ToString());
         }
         else
         {
-            SendXThinBlock(MakeBlockRef(block), pfrom, inv);
+            SendXThinBlock(pblock, pfrom, inv);
         }
     }
     else if (strCommand == NetMsgType::XPEDITEDREQUEST)

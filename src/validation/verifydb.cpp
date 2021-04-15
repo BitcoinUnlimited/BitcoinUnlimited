@@ -52,15 +52,15 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
                 break;
             }
         }
-        CBlock block;
         // check level 0: read from disk
-        if (!ReadBlockFromDisk(block, pindex, chainparams.GetConsensus()))
+        CBlockRef pblock = ReadBlockFromDisk(pindex, chainparams.GetConsensus());
+        if (!pblock)
             return error("VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s", pindex->nHeight,
                 pindex->GetBlockHash().ToString());
-        nBlockSizeAtChainTip.store(block.GetBlockSize());
+        nBlockSizeAtChainTip.store(pblock->GetBlockSize());
 
         // check level 1: verify block validity
-        if (nCheckLevel >= 1 && !CheckBlock(block, state))
+        if (nCheckLevel >= 1 && !CheckBlock(*pblock, state))
             return error(
                 "VerifyDB(): *** found bad block at %d, hash=%s\n", pindex->nHeight, pindex->GetBlockHash().ToString());
         // check level 2: verify undo validity
@@ -79,7 +79,7 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
         if (nCheckLevel >= 3 && pindex == pindexState &&
             (int64_t)(coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <= nCoinCacheMaxSize)
         {
-            DisconnectResult res = DisconnectBlock(block, pindex, coins);
+            DisconnectResult res = DisconnectBlock(*pblock, pindex, coins);
             if (res == DISCONNECT_FAILED)
             {
                 return error("VerifyDB(): *** irrecoverable inconsistency in block data at %d, hash=%s",
@@ -92,7 +92,7 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
                 pindexFailure = pindex;
             }
             else
-                nGoodTransactions += block.vtx.size();
+                nGoodTransactions += pblock->vtx.size();
         }
         if (ShutdownRequested())
             return true;
@@ -116,11 +116,11 @@ bool CVerifyDB::VerifyDB(const CChainParams &chainparams, CCoinsView *coinsview,
                 std::max(1, std::min(99, 100 - (int)(((double)(chainActive.Height() - pindex->nHeight)) /
                                                      (double)nCheckDepth * 50))));
             pindex = chainActive.Next(pindex);
-            CBlock block;
-            if (!ReadBlockFromDisk(block, pindex, chainparams.GetConsensus()))
+            CBlockRef pblock = ReadBlockFromDisk(pindex, chainparams.GetConsensus());
+            if (!pblock)
                 return error("VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s", pindex->nHeight,
                     pindex->GetBlockHash().ToString());
-            if (!ConnectBlock(block, state, pindex, coins, chainparams))
+            if (!ConnectBlock(*pblock, state, pindex, coins, chainparams))
                 return error("VerifyDB(): *** found unconnectable block at %d, hash=%s", pindex->nHeight,
                     pindex->GetBlockHash().ToString());
         }

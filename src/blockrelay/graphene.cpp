@@ -1423,20 +1423,20 @@ bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainPa
         return error("invalid GET_GRAPHENE message type=%u hash=%s", inv.type, inv.hash.ToString());
     }
 
-    CBlock block;
     {
         auto *hdr = LookupBlockIndex(inv.hash);
         if (!hdr)
             return error("Peer %s requested nonexistent block %s", pfrom->GetLogName(), inv.hash.ToString());
 
         const Consensus::Params &consensusParams = Params().GetConsensus();
-        if (!ReadBlockFromDisk(block, hdr, consensusParams))
+        CBlockRef pblock = ReadBlockFromDisk(hdr, consensusParams);
+        if (!pblock)
         {
             // We don't have the block yet, although we know about it.
             return error("Peer %s requested block %s that cannot be read", pfrom->GetLogName(), inv.hash.ToString());
         }
         else
-            SendGrapheneBlock(MakeBlockRef(block), pfrom, inv, mempoolinfo);
+            SendGrapheneBlock(pblock, pfrom, inv, mempoolinfo);
     }
 
     return true;
@@ -1711,9 +1711,9 @@ std::vector<CTransaction> TransactionsFromBlockByCheapHash(std::set<uint64_t> &v
         if (hdr->nHeight < (chainActive.Tip()->nHeight - (int)thinrelay.MAX_THINTYPE_BLOCKS_IN_FLIGHT))
             throw std::runtime_error("get_grblocktx request too far from the tip");
 
-        CBlock block;
         const Consensus::Params &consensusParams = Params().GetConsensus();
-        if (!ReadBlockFromDisk(block, hdr, consensusParams))
+        CBlockRef pblock = ReadBlockFromDisk(hdr, consensusParams);
+        if (!pblock)
         {
             // We do not assign misbehavior for not being able to read a block from disk because we already
             // know that the block is in the block index from the step above. Secondly, a failure to read may
@@ -1723,7 +1723,7 @@ std::vector<CTransaction> TransactionsFromBlockByCheapHash(std::set<uint64_t> &v
         }
         else
         {
-            for (auto &tx : block.vtx)
+            for (auto &tx : pblock->vtx)
             {
                 uint64_t cheapHash = GetShortID(pfrom->gr_shorttxidk0.load(), pfrom->gr_shorttxidk1.load(),
                     tx->GetHash(), NegotiateGrapheneVersion(pfrom));

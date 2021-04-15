@@ -693,8 +693,8 @@ static CBlock GetBlockChecked(const CBlockIndex *pblockindex)
     if (IsBlockPruned(pblockindex))
         throw JSONRPCError(RPC_MISC_ERROR, "Block not available (pruned data)");
 
-    CBlock block;
-    if (!ReadBlockFromDisk(block, pblockindex, Params().GetConsensus()))
+    CBlockRef pblock = ReadBlockFromDisk(pblockindex, Params().GetConsensus());
+    if (!pblock)
     {
         // Block not found on disk. This could be because we have the block
         // header in our index but don't have the block (for example if a
@@ -703,7 +703,7 @@ static CBlock GetBlockChecked(const CBlockIndex *pblockindex)
         // block).
         throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
     }
-    return block;
+    return *pblock;
 }
 
 static CBlockUndo GetUndoChecked(const CBlockIndex *pblockindex)

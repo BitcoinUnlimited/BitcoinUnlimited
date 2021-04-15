@@ -40,14 +40,19 @@ static const uint8_t MAX_THINTYPE_OBJECT_REQUESTS = 100;
 // How many peers are connected before we start looking for slow peers to disconnect.
 static const uint32_t BEGIN_PRUNING_PEERS = 4;
 
+// How many blocks forward to download during IBD
+static const uint32_t DEFAULT_BLOCK_DOWNLOAD_WINDOW = 1024;
+
 // When should I request a tx from someone else (in microseconds). cmdline/bitcoin.conf: -txretryinterval
 extern unsigned int txReqRetryInterval;
 extern unsigned int MIN_TX_REQUEST_RETRY_INTERVAL;
 static const unsigned int DEFAULT_MIN_TX_REQUEST_RETRY_INTERVAL = 5 * 1000 * 1000;
+
 // When should I request a block from someone else (in microseconds). cmdline/bitcoin.conf: -blkretryinterval
 extern unsigned int blkReqRetryInterval;
 extern unsigned int MIN_BLK_REQUEST_RETRY_INTERVAL;
 static const unsigned int DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL = 5 * 1000 * 1000;
+
 // Which peers have mempool synchronization in-flight?
 extern std::map<NodeId, CMempoolSyncState> mempoolSyncRequested;
 extern uint64_t lastMempoolSync;
@@ -179,7 +184,7 @@ public:
      *  Larger windows tolerate larger download speed differences between peer, but increase the potential
      *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
      *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
-    std::atomic<unsigned int> BLOCK_DOWNLOAD_WINDOW{1024};
+    std::atomic<unsigned int> BLOCK_DOWNLOAD_WINDOW{DEFAULT_BLOCK_DOWNLOAD_WINDOW};
 
     // Request a single block.
     bool RequestBlock(CNode *pfrom, CInv obj);

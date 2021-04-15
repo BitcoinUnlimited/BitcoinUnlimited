@@ -12,6 +12,7 @@
 #include "blockrelay/graphene.h"
 #include "blockrelay/mempool_sync.h"
 #include "blockrelay/thinblock.h"
+#include "blockstorage/blockcache.h"
 #include "blockstorage/blockstorage.h"
 #include "blockstorage/sequential_files.h"
 #include "chainparams.h"
@@ -338,17 +339,17 @@ bool GetTransaction(const uint256 &hash,
 
     if (pindexSlow)
     {
-        CBlock block;
-        if (ReadBlockFromDisk(block, pindexSlow, consensusParams))
+        CBlockRef pblock = ReadBlockFromDisk(pindexSlow, consensusParams);
+        if (pblock)
         {
             bool ctor_enabled = pindexSlow->nHeight >= consensusParams.nov2018Height;
-            int64_t pos = FindTxPosition(block, hash, ctor_enabled);
+            int64_t pos = FindTxPosition(*pblock, hash, ctor_enabled);
             if (pos == TX_NOT_FOUND)
             {
                 return false;
             }
-            txOut = block.vtx.at(pos);
-            txTime = block.nTime;
+            txOut = pblock->vtx.at(pos);
+            txTime = pblock->nTime;
             hashBlock = pindexSlow->GetBlockHash();
             return true;
         }
@@ -618,15 +619,16 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
                     while (range.first != range.second)
                     {
                         std::multimap<uint256, CDiskBlockPos>::iterator it = range.first;
-                        if (ReadBlockFromDiskSequential(block, it->second, chainparams.GetConsensus()))
+                        CBlockRef pblock = ReadBlockFromDiskSequential(it->second, chainparams.GetConsensus());
+                        if (pblock)
                         {
-                            LOGA("%s: Processing out of order child %s of %s\n", __func__, block.GetHash().ToString(),
+                            LOGA("%s: Processing out of order child %s of %s\n", __func__, pblock->GetHash().ToString(),
                                 head.ToString());
                             CValidationState dummy;
-                            if (ProcessNewBlock(dummy, chainparams, nullptr, &block, true, &it->second, false))
+                            if (ProcessNewBlock(dummy, chainparams, nullptr, pblock.get(), true, &it->second, false))
                             {
                                 nLoaded++;
-                                queue.push_back(block.GetHash());
+                                queue.push_back(pblock->GetHash());
                             }
                         }
                         range.first++;
