@@ -1175,11 +1175,13 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
         // Calculate in-mempool ancestors, up to the BCH default limit. We don't need to calculate
         // them any further.
-        size_t nLimitAncestors = GetArg("-limitancestorcount", BCH_DEFAULT_ANCESTOR_LIMIT);
-        size_t nLimitAncestorSize = GetArg("-limitancestorsize", BCH_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
-        std::string errString;
-        CTxMemPool::setEntries setAncestors;
+        if (unconfPushAction.Value() != 0)
         {
+            size_t nLimitAncestors = GetArg("-limitancestorcount", BCH_DEFAULT_ANCESTOR_LIMIT);
+            size_t nLimitAncestorSize = GetArg("-limitancestorsize", BCH_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
+            std::string errString;
+            CTxMemPool::setEntries setAncestors;
+
             READLOCK(pool.cs_txmempool);
             bool ret =
                 pool._CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize, errString);
