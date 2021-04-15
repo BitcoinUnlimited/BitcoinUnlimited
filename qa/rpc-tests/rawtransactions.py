@@ -95,10 +95,16 @@ class RawTransactionsTest(BitcoinTestFramework):
         gottx = self.nodes[0].getrawtransaction(tx, True, block1)
         assert_equal(gottx['txid'], tx)
         assert_equal(gottx['in_active_chain'], True)
+        assert_equal(gottx['in_mempool'], False)
+        assert_equal(gottx['in_orphanpool'], False)
+        assert_equal(gottx['blockhash'], block1)
         # We should not have the 'in_active_chain' flag when we don't provide a block
         gottx = self.nodes[0].getrawtransaction(tx, True)
         assert_equal(gottx['txid'], tx)
         assert 'in_active_chain' not in gottx
+        assert_equal(gottx['in_mempool'], False)
+        assert_equal(gottx['in_orphanpool'], False)
+        assert_equal(gottx['blockhash'], block1)
         # We should not get the tx if we provide an unrelated block
         assert_raises_rpc_error(-5, "No such transaction found", self.nodes[0].getrawtransaction, tx, True, block2)
         # An invalid block hash should raise the correct errors
@@ -290,7 +296,26 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         # 4. valid parameters - supply txid and 1 for verbose.
         # We only check the "hex" field of the output so we don't need to update this test every time the output format changes.
-        assert_equal(self.nodes[0].getrawtransaction(txHash, 1)["hex"], rawTxSigned['hex'])
+        txn = self.nodes[0].getrawtransaction(txid, 1)
+        assert_equal(txn["hex"], signedtxn['hex'])
+        assert_equal(txn['in_mempool'], True)
+        assert_equal(txn['in_orphanpool'], False)
+
+        # 4a. valid parameters - supply a txid that is in the orphanpool
+        unknown_txid = "c5c6ef8d06b90564e6c5451d7650b8dfc44349bee73ad85519bec3d24a680f23"
+        address1 = self.nodes[0].getaddressforms(self.nodes[0].getnewaddress())["legacy"]
+        address2 = self.nodes[0].getaddressforms(self.nodes[0].getnewaddress())["legacy"]
+        outputs = {address1 : 49, address2 : 1}
+        inputs = []
+        inputs.append({ "txid" : unknown_txid, "vout" : 0})
+        raw_orphan = createrawtransaction(inputs, outputs) # creating an orphan tx
+        signedtxn_orphan = self.nodes[0].signrawtransaction(raw_orphan)
+        orphan_txid = self.nodes[0].sendrawtransaction(signedtxn_orphan["hex"], True, "standard", True)
+
+        txn_orphan = self.nodes[0].getrawtransaction(orphan_txid, 1)
+        assert_equal(txn_orphan["hex"], signedtxn_orphan['hex'])
+        assert_equal(txn_orphan['in_mempool'], False)
+        assert_equal(txn_orphan['in_orphanpool'], True)
 
         # 5. valid parameters - supply txid and True for non-verbose
         assert_equal(self.nodes[0].getrawtransaction(txHash, True)["hex"], rawTxSigned['hex'])

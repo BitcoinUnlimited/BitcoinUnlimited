@@ -244,7 +244,10 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
     CTransactionRef tx;
     int64_t txTime = GetTime(); // Will be overwritten by GetTransaction if we have a better value
     uint256 hash_block;
-    if (!GetTransaction(hash, tx, txTime, Params().GetConsensus(), hash_block, true, blockindex))
+    bool fInMemPool = false;
+    bool fInOrphanPool = false;
+    if (!GetTransaction(
+            hash, tx, txTime, Params().GetConsensus(), hash_block, true, blockindex, &fInMemPool, &fInOrphanPool))
     {
         std::string errmsg;
         if (blockindex)
@@ -279,6 +282,9 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
     UniValue result(UniValue::VOBJ);
     if (blockindex)
         result.pushKV("in_active_chain", in_active_chain);
+    result.pushKV("in_mempool", fInMemPool);
+    result.pushKV("in_orphanpool", fInOrphanPool);
+
     TxToJSON(*tx, txTime, hash_block, result);
     return result;
 }
