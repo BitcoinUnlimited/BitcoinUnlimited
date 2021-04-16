@@ -640,9 +640,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 {
     const CChainParams &chainparams = Params();
     bool may2020Enabled = IsMay2020Activated(chainparams.GetConsensus(), chainActive.Tip());
-    bool may2021Enabled = false; // Default to false for now, later change to folllowing:
-    // bool may2021Enabled = IsMay2021Activated(chainparams.GetConsensus(), chainActive.Tip());
-    // FIXME: Awaiting merge of https://gitlab.com/bitcoinunlimited/BCHUnlimited/-/merge_requests/2452
+    bool may2021Enabled = IsMay2021Enabled(chainparams.GetConsensus(), chainActive.Tip());
 
     if (isRespend)
         *isRespend = false;
