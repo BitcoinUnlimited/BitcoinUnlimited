@@ -63,7 +63,7 @@ bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType)
     return whichType != TX_NONSTANDARD;
 }
 
-bool IsStandardTx(const CTransactionRef tx, std::string &reason)
+bool IsStandardTx(const CTransactionRef tx, std::string &reason, bool allowMultipleOpReturn)
 {
     if (tx->nVersion > CTransaction::MAX_STANDARD_VERSION || tx->nVersion < 1)
     {
@@ -103,6 +103,7 @@ bool IsStandardTx(const CTransactionRef tx, std::string &reason)
     }
 
     unsigned int nDataOut = 0;
+    CScript::size_type nDataSize = 0;
     txnouttype whichType;
     for (const CTxOut &txout : tx->vout)
     {
@@ -113,7 +114,10 @@ bool IsStandardTx(const CTransactionRef tx, std::string &reason)
         }
 
         if ((whichType == TX_NULL_DATA) || (whichType == TX_LABELPUBLIC))
+        {
             nDataOut++;
+            nDataSize += txout.scriptPubKey.size();
+        }
         else if ((whichType == TX_MULTISIG) && (!fIsBareMultisigStd))
         {
             reason = "bare-multisig";
@@ -126,10 +130,17 @@ bool IsStandardTx(const CTransactionRef tx, std::string &reason)
         }
     }
 
-    // only one OP_RETURN txout is permitted
-    if (nDataOut > 1)
+    // only one OP_RETURN txout is permitted until after May 2021 network upgrade
+    if (!allowMultipleOpReturn && nDataOut > 1)
     {
         reason = "multi-op-return";
+        return false;
+    }
+
+    // total size of all OP_RETURNs combined must be less than maximum allowed size
+    if (nDataSize > nMaxDatacarrierBytes)
+    {
+        reason = "oversize-op-return";
         return false;
     }
 

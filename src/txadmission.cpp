@@ -640,6 +640,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 {
     const CChainParams &chainparams = Params();
     bool may2020Enabled = IsMay2020Activated(chainparams.GetConsensus(), chainActive.Tip());
+    bool may2021Enabled = IsMay2021Enabled(chainparams.GetConsensus(), chainActive.Tip());
+
     if (isRespend)
         *isRespend = false;
     unsigned int nSigOps = 0;
@@ -697,7 +699,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     {
         fRequireStandard = false;
     }
-    if (fRequireStandard && !IsStandardTx(tx, reason))
+    if (fRequireStandard && !IsStandardTx(tx, reason, may2021Enabled))
     {
         if (debugger)
         {
