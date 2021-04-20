@@ -66,7 +66,7 @@ Thanks to everyone who directly contributed to this release:
 - Nicolai Skye
 - Peter Tschipper
 
-We have backported a change from Bitcoin Cash Node.
+We have backported an amount of changes from other projects, namely Bitcoin Cash Nodes
 
 Following all the indirect contributors whose work has been imported via the above backports:
 
