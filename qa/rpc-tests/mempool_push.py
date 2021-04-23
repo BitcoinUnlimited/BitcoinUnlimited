@@ -21,6 +21,7 @@ BCH_UNCONF_SIZE_KB = 101
 BCH_UNCONF_SIZE = BCH_UNCONF_SIZE_KB*1000
 DELAY_TIME = 120
 
+
 class MyTest (BitcoinTestFramework):
 
     def setup_network(self, split=False):
@@ -267,6 +268,7 @@ class MyTest (BitcoinTestFramework):
         # unlimited chains when the next block will activate the fork.
         logging.info("deep unconfirmed chain fork activation - step 1")
         connect_nodes(self.nodes[1], 3)
+        
         self.nodes[0].setmocktime(1621080000)
         self.nodes[1].setmocktime(1621080000)
         self.nodes[2].setmocktime(1621080000)
@@ -320,6 +322,29 @@ class MyTest (BitcoinTestFramework):
         waitFor(DELAY_TIME, lambda: self.nodes[1].getmempoolinfo()["size"] == num_txns_in_chain)
         waitFor(DELAY_TIME, lambda: self.nodes[2].getmempoolinfo()["size"] == num_txns_in_chain)
         waitFor(DELAY_TIME, lambda: self.nodes[3].getmempoolinfo()["size"] == num_txns_in_chain)
+
+        # restart the nodes and check whether the uncofirmed
+        # push action is set properly
+        stop_nodes(self.nodes)
+        wait_bitcoinds()
+        MAY2021_START_TIME = 162108000
+        mempoolConf = [
+            ["-consensus.forkMay2021Time=%d" % (MAY2021_START_TIME), "-mocktime=1621080000"],
+            ["-consensus.forkMay2021Time=%d" % (MAY2021_START_TIME), "-mocktime=1621080001"],
+            ["-consensus.forkMay2021Time=%d" % (MAY2021_START_TIME), "-mocktime=1621080002"],
+            ["-consensus.forkMay2021Time=%d" % (MAY2021_START_TIME), "-mocktime=1621080003"],
+            ]
+
+        self.nodes = start_nodes(4, self.options.tmpdir, mempoolConf)
+        connect_nodes_full(self.nodes)
+        self.is_network_split=False
+        self.sync_blocks()
+
+        waitFor(DELAY_TIME, lambda: "0" in str(self.nodes[0].get("net.unconfChainResendAction")))
+        waitFor(DELAY_TIME, lambda: "0" in str(self.nodes[1].get("net.unconfChainResendAction")))
+        waitFor(DELAY_TIME, lambda: "0" in str(self.nodes[2].get("net.unconfChainResendAction")))
+        waitFor(DELAY_TIME, lambda: "0" in str(self.nodes[3].get("net.unconfChainResendAction")))
+
 
 if __name__ == '__main__':
     t = MyTest()
