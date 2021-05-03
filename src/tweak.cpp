@@ -115,10 +115,40 @@ UniValue settweak(const UniValue &params, bool fHelp)
     {
         string s = params[i].get_str();
         size_t split = s.find("=");
+        if (s.substr(s.length()-1, s.length()) == "=")
+        {
+            i++;
+            if (i >= params.size())
+                throw runtime_error("Invalid assignment format, missing =");
+            else
+            {
+                s = s + params[i].get_str();
+                split = s.find("=");
+            }
+        }
         if (split == std::string::npos)
         {
-            throw runtime_error("Invalid assignment format, missing =");
+            i++;
+            if (i >= params.size())
+                throw runtime_error("Invalid assignment format, missing =");
+            else
+            {
+                s = s + params[i].get_str();
+                split = s.find("=");
+                if (s.substr(s.length()-1, s.length()) == "=")
+                {
+                    i++;
+                    if (i >= params.size())
+                        throw runtime_error("Invalid assignment format, missing =");
+                    else
+                    {
+                        s = s + params[i].get_str();
+                        split = s.find("=");
+                    }
+                }
+            }
         }
+
         std::string name = s.substr(0, split);
         std::string value = s.substr(split + 1);
 
@@ -145,9 +175,38 @@ UniValue settweak(const UniValue &params, bool fHelp)
     {
         string s = params[i].get_str();
         size_t split = s.find("=");
+        if (s.substr(s.length()-1, s.length()) == "=")
+        {
+            i++;
+            if (i >= params.size())
+                throw runtime_error("Invalid assignment format, missing =");
+            else
+            {
+                s = s + params[i].get_str();
+                split = s.find("=");
+            }
+        }
         if (split == std::string::npos)
         {
-            throw runtime_error("Invalid assignment format, missing =");
+            i++;
+            if (i >= params.size())
+                throw runtime_error("Invalid assignment format, missing =");
+            else
+            {
+                s = s + params[i].get_str();
+                split = s.find("=");
+                if (s.substr(s.length()-1, s.length()) == "=")
+                {
+                    i++;
+                    if (i >= params.size())
+                        throw runtime_error("Invalid assignment format, missing =");
+                    else
+                    {
+                        s = s + params[i].get_str();
+                        split = s.find("=");
+                    }
+                }
+            }
         }
         std::string name = s.substr(0, split);
         std::string value = s.substr(split + 1);
