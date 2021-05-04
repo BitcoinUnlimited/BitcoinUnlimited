@@ -120,4 +120,17 @@ void CBlockCache::_CalculateDownloadWindow(CBlockRef pblock)
         else
             requester.BLOCK_DOWNLOAD_WINDOW.store(nIncrement); // make sure we don't go to zero
     }
+    else
+    {
+        if (cache.size() > 0)
+        {
+            const uint64_t nAvgBlockSizeInCache = nBytesCache / cache.size();
+            if (nAvgBlockSizeInCache > 0)
+            {
+                uint64_t nWindow = nMaxSizeCache / nAvgBlockSizeInCache;
+                nWindow = std::min(nWindow, (uint64_t)DEFAULT_BLOCK_DOWNLOAD_WINDOW);
+                requester.BLOCK_DOWNLOAD_WINDOW.store(nWindow);
+            }
+        }
+    }
 }

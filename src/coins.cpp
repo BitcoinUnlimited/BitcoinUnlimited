@@ -423,8 +423,8 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
     if (nTrimmed > 0)
     {
         LOG(COINDB, "Trimmed %d by coin height\n", nTrimmedByHeight);
-        LOG(COINDB, "Trimmed %ld from the CoinsViewCache, current size after trim: %ld and usage %ld bytes\n", nTrimmed,
-            cacheCoins.size(), cachedCoinsUsage);
+        LOG(COINDB, "Trimmed %ld from the CoinsViewCache, current size after trim: %ld and dynamic usage %ld bytes\n",
+            nTrimmed, cacheCoins.size(), _DynamicMemoryUsage());
     }
 
     // If we're not trimming anything then gradually walk the trim height backwards from the tip.  This is to adjust

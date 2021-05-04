@@ -679,7 +679,7 @@ void CNode::LookAhead()
 
             CBlockHeader header;
             ss >> header;
-            requester.Downloading(header.GetHash(), this);
+            requester.Downloading(header.GetHash(), this, msg.hdr.nMessageSize);
 
             fDownloading.store(true);
         }

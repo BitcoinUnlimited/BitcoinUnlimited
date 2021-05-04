@@ -73,7 +73,7 @@ static bool IsBlockType(const CInv &obj)
 // Constructor for CRequestManagerNodeState struct
 CRequestManagerNodeState::CRequestManagerNodeState()
 {
-    nDownloadingSince = 0;
+    nDownloadingFromPeerSince = 0;
     nBlocksInFlight = 0;
     nNumRequests = 0;
     nLastRequest = 0;
@@ -156,9 +156,7 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
             return;
         }
 
-        uint256 temp = obj.hash;
-        OdMap::value_type v(temp, CUnknownObj());
-        std::pair<OdMap::iterator, bool> result = mapTxnInfo.insert(v);
+        std::pair<OdMap::iterator, bool> result = mapTxnInfo.emplace(obj.hash, CUnknownObj());
         OdMap::iterator &item = result.first;
         CUnknownObj &data = item->second;
         data.obj = obj;
@@ -183,9 +181,7 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
     }
     else if (IsBlockType(obj))
     {
-        uint256 temp = obj.hash;
-        OdMap::value_type v(temp, CUnknownObj());
-        std::pair<OdMap::iterator, bool> result = mapBlkInfo.insert(v);
+        std::pair<OdMap::iterator, bool> result = mapBlkInfo.emplace(obj.hash, CUnknownObj());
         OdMap::iterator &item = result.first;
         CUnknownObj &data = item->second;
         data.obj = obj;
@@ -208,7 +204,7 @@ void CRequestManager::AskFor(const std::vector<CInv> &objArray, CNode *from, uns
 {
     // In order to maintain locking order, we must lock cs_objDownloader first and before possibly taking cs_vNodes.
     // Also, locking here prevents anyone from asking again for any of these objects again before we've notified the
-    // request manager of them all. In addition this helps keep blocks batached and requests for batches of blocks
+    // request manager of them all. In addition this helps keep blocks batched and requests for batches of blocks
     // in a better order.
     LOCK(cs_objDownloader);
     for (auto &inv : objArray)
@@ -341,14 +337,14 @@ void CRequestManager::BlockRejected(const CInv &obj, CNode *pfrom)
     item->second.fProcessing = false;
 }
 
-void CRequestManager::Downloading(const uint256 &hash, CNode *pfrom)
+void CRequestManager::Downloading(const uint256 &hash, CNode *pfrom, unsigned int nSize)
 {
     LOCK(cs_objDownloader);
     OdMap::iterator item = mapBlkInfo.find(hash);
     if (item == mapBlkInfo.end())
         return;
 
-    item->second.nDownloadingSince = GetStopwatchMicros();
+    item->second.nDownloadingSince = GetStopwatchMicros() + (nSize * 5);
     LOG(BLK, "ReqMgr: Downloading %s (received from %s).\n", item->second.obj.ToString(),
         pfrom ? pfrom->GetLogName() : "unknown");
 }
@@ -508,7 +504,7 @@ bool CUnknownObj::AddSource(CNode *from)
         {
             if (i->desirability < req.desirability)
             {
-                availableFrom.insert(i, req);
+                availableFrom.emplace(i, req);
                 return true;
             }
         }
@@ -697,7 +693,7 @@ void CRequestManager::SendRequests()
         ++sendBlkIter; // move it forward up here in case we need to erase the item we are working with.
         CUnknownObj &item = itemIter->second;
 
-        // If we've already received the item and it's in processing then skip it here so we don't
+        // If we've already downloaded the block and it's processing then return here so we don't
         // end up re-requesting it again.
         if (item.fProcessing)
             continue;
@@ -717,10 +713,16 @@ void CRequestManager::SendRequests()
                     if (next.noderef.get() != nullptr)
                     {
                         // Do not request from this node if it was disconnected
-                        if (next.noderef.get()->fDisconnect)
+                        if (next.noderef.get()->fDisconnect || next.noderef.get()->fDisconnectRequest)
                         {
                             next.noderef.~CNodeRef(); // force the loop to get another node
                         }
+                        // Do not request or re-request another block from a peer for which we are currently downloading
+                        // a
+                        // block and are beyond the download limit.
+                        else if (next.noderef.get()->fDownloading && item.nDownloadingSince != 0 &&
+                                 now - item.nDownloadingSince > blockLookAheadInterval.Value())
+                            next.noderef.~CNodeRef(); // force the loop to get another node
                     }
                 }
 
@@ -729,14 +731,23 @@ void CRequestManager::SendRequests()
                     // If item.lastRequestTime is true then we've requested at least once and we'll try a re-request
                     if (item.lastRequestTime)
                     {
-                        LOG(REQ, "Block request timeout for %s.  Retrying\n", item.obj.ToString().c_str());
+                        LOG(REQ, "Block took longer than %6.2f secs. Request timeout for %s.  Retrying\n",
+                            ((double)(now - item.lastRequestTime) / 1000000), item.obj.ToString());
                     }
 
                     CInv obj = item.obj;
                     item.outstandingReqs++;
                     int64_t then = item.lastRequestTime;
                     int64_t nDownloadingSincePrev = item.nDownloadingSince;
-                    item.lastRequestTime = now;
+                    {
+                        LOCK(next.noderef.get()->cs_nAvgBlkResponseTime);
+                        std::map<NodeId, CRequestManagerNodeState>::iterator it =
+                            mapRequestManagerNodeState.find(next.noderef.get()->GetId());
+                        DbgAssert(it != mapRequestManagerNodeState.end(), return );
+                        CRequestManagerNodeState *state = &it->second;
+                        item.lastRequestTime =
+                            now + (next.noderef.get()->nAvgBlkResponseTime * 1000000 * 5 * state->nBlocksInFlight);
+                    }
                     item.nDownloadingSince = 0;
                     bool fReqBlkResult = false;
 
@@ -871,7 +882,8 @@ void CRequestManager::SendRequests()
                         item.availableFrom.pop_front();
                         if (next.noderef.get() != nullptr)
                         {
-                            if (next.noderef.get()->fDisconnect) // Node was disconnected so we can't request from it
+                            // Node was disconnected so we can't request from it
+                            if (next.noderef.get()->fDisconnect || next.noderef.get()->fDisconnectRequest)
                             {
                                 next.noderef.~CNodeRef(); // force the loop to get another node
                             }
@@ -1247,7 +1259,7 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash)
         // Add queued block to nodestate and add iterator for queued block to mapBlocksInFlight
         int64_t nNow = GetStopwatchMicros();
         QueuedBlock newentry = {hash, nNow};
-        std::list<QueuedBlock>::iterator it2 = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
+        std::list<QueuedBlock>::iterator it2 = state->vBlocksInFlight.emplace(state->vBlocksInFlight.end(), newentry);
         mapBlocksInFlight[hash][nodeid] = it2;
 
         // Increment blocks in flight for this node and if applicable the time we started downloading.
@@ -1255,7 +1267,7 @@ void CRequestManager::MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash)
         if (state->nBlocksInFlight == 1)
         {
             // We're starting a block download (batch) from this peer.
-            state->nDownloadingSince = GetStopwatchMicros();
+            state->nDownloadingFromPeerSince = GetStopwatchMicros();
         }
     }
 }
@@ -1292,11 +1304,13 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         uint8_t blockRange = 50;
         {
             LOCK(pnode->cs_nAvgBlkResponseTime);
-            if (pnode->nAvgBlkResponseTime < 0)
-                pnode->nAvgBlkResponseTime = 0.0;
             if (pnode->nAvgBlkResponseTime > 0)
                 pnode->nAvgBlkResponseTime -= (pnode->nAvgBlkResponseTime / blockRange);
             pnode->nAvgBlkResponseTime += nResponseTime / blockRange;
+            if (pnode->nAvgBlkResponseTime < 0)
+            {
+                pnode->nAvgBlkResponseTime = nResponseTime / blockRange;
+            }
 
             // Protect nOverallAverageResponseTime and nIterations with cs_overallaverage.
             static CCriticalSection cs_overallaverage;
@@ -1317,6 +1331,10 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                         nOverallAverageResponseTime -= (nOverallAverageResponseTime / nOverallRange);
                     }
                     nOverallAverageResponseTime += nResponseTime / nOverallRange;
+                    if (nOverallAverageResponseTime < 0)
+                    {
+                        nOverallAverageResponseTime = nResponseTime / nOverallRange;
+                    }
                 }
                 else
                 {
@@ -1334,12 +1352,12 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
                 // block queue does not drain; in that event we would end up waiting for 10 minutes before finally
                 // disconnecting.
                 //
-                // We disconnect a peer only if their average response time is more than 4 times the overall average.
+                // We disconnect a peer only if their average response time is more than 5 times the overall average.
                 static int nStartDisconnections GUARDED_BY(cs_overallaverage) = BEGIN_PRUNING_PEERS;
                 if (!pnode->fDisconnectRequest &&
                     (nOutbound >= nMaxOutConnections - 1 || nOutbound >= nStartDisconnections) &&
                     IsInitialBlockDownload() && nIterations > nOverallRange &&
-                    pnode->nAvgBlkResponseTime > nOverallAverageResponseTime * 4)
+                    pnode->nAvgBlkResponseTime > nOverallAverageResponseTime * 5)
                 {
                     LOG(IBD, "disconnecting %s because too slow , overall avg %d peer avg %d\n", pnode->GetLogName(),
                         nOverallAverageResponseTime, pnode->nAvgBlkResponseTime);
@@ -1377,10 +1395,25 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
             {
                 pnode->nMaxBlocksInTransit.store(24);
             }
-            else
+            else if (pnode->nAvgBlkResponseTime < 2.7)
             {
                 pnode->nMaxBlocksInTransit.store(16);
             }
+            else if (pnode->nAvgBlkResponseTime < 3.5)
+            {
+                pnode->nMaxBlocksInTransit.store(8);
+            }
+            else if (pnode->nAvgBlkResponseTime < 4.3)
+            {
+                pnode->nMaxBlocksInTransit.store(4);
+            }
+            else if (pnode->nAvgBlkResponseTime < 5.3)
+            {
+                pnode->nMaxBlocksInTransit.store(2);
+            }
+            else
+                pnode->nMaxBlocksInTransit.store(1);
+
 
             LOG(THIN | BLK, "Average block response time is %.2f seconds for %s\n", pnode->nAvgBlkResponseTime,
                 pnode->GetLogName());
@@ -1424,7 +1457,8 @@ bool CRequestManager::MarkBlockAsReceived(const uint256 &hash, CNode *pnode)
         if (state->vBlocksInFlight.begin() == itInFlight->second)
         {
             // First block on the queue was received, update the start download time for the next one
-            state->nDownloadingSince = std::max(state->nDownloadingSince, (int64_t)GetStopwatchMicros());
+            state->nDownloadingFromPeerSince =
+                std::max(state->nDownloadingFromPeerSince, (int64_t)GetStopwatchMicros());
         }
         // In order to prevent a dangling iterator we must erase from vBlocksInFlight after mapBlockInFlight
         // however that will invalidate the iterator held by mapBlocksInFlight. Use a temporary to work around this.
@@ -1506,7 +1540,7 @@ void CRequestManager::DisconnectOnDownloadTimeout(CNode *pnode, const Consensus:
     if (!pnode->fDisconnect && mapRequestManagerNodeState[nodeid].vBlocksInFlight.size() > 0)
     {
         if (nNow >
-            mapRequestManagerNodeState[nodeid].nDownloadingSince +
+            mapRequestManagerNodeState[nodeid].nDownloadingFromPeerSince +
                 consensusParams.nPowTargetSpacing * (BLOCK_DOWNLOAD_TIMEOUT_BASE + BLOCK_DOWNLOAD_TIMEOUT_PER_PEER))
         {
             LOGA("Timeout downloading block %s from peer %s, disconnecting\n",

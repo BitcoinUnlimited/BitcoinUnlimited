@@ -33,7 +33,7 @@ private:
     int64_t nMaxSizeCache GUARDED_BY(cs_blockcache) = 0;
 
     /** how much to increment or decrement the cache size at one time */
-    const uint64_t nIncrement = 50;
+    const uint64_t nIncrement = 1;
 
 public:
     CBlockCache(){};
