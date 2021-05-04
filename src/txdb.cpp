@@ -190,7 +190,9 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
     size_t changed = 0;
     size_t nBatchWrites = 0;
     size_t batch_size = nMaxDBBatchSize;
+    size_t spent_coins = 0;
 
+    LOG(COINDB, "starting Commiting process\n");
     for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();)
     {
         if (it->second.flags & CCoinsCacheEntry::DIRTY)
@@ -200,6 +202,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
             if (it->second.coin.IsSpent())
             {
                 batch.Erase(entry);
+                spent_coins++;
 
                 // Update the usage of the child cache before deleting the entry in the child cache
                 nChildCachedCoinsUsage -= nUsage;
@@ -245,8 +248,9 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins,
         _WriteBestBlock(hashBlock);
 
     bool ret = db.WriteBatch(batch);
-    LOG(COINDB, "Committing %u changed transactions (out of %u) to coin database with %u batch writes...\n",
-        (unsigned int)changed, (unsigned int)count, (unsigned int)nBatchWrites);
+    LOG(COINDB,
+        "Committing %u changed transactions (out of %u) to coin database with %u batch writes and %u spent coins...\n",
+        (unsigned int)changed, (unsigned int)count, (unsigned int)nBatchWrites, (unsigned int)spent_coins);
 
     return ret;
 }

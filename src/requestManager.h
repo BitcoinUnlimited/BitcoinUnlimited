@@ -125,7 +125,7 @@ struct CRequestManagerNodeState
     std::list<QueuedBlock> vBlocksInFlight;
 
     // When the first entry in vBlocksInFlight started downloading. Don't care when vBlocksInFlight is empty.
-    int64_t nDownloadingSince;
+    int64_t nDownloadingFromPeerSince;
 
     // How many blocks are currently in flight and requested by this node.
     uint64_t nBlocksInFlight;
@@ -209,7 +209,7 @@ public:
     void UpdateTxnResponseTime(const CInv &obj, CNode *pfrom);
 
     // Indicate that we got this object
-    void Downloading(const uint256 &hash, CNode *pfrom);
+    void Downloading(const uint256 &hash, CNode *pfrom, unsigned int nSize);
 
     // Indicate that we are processing this transaction
     void ProcessingTxn(const uint256 &hash, CNode *pfrom);
