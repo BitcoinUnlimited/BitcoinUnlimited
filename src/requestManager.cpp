@@ -185,12 +185,16 @@ void CRequestManager::AskFor(const CInv &obj, CNode *from, unsigned int priority
         OdMap::iterator &item = result.first;
         CUnknownObj &data = item->second;
         data.obj = obj;
-        // if (result.second)  // means this was inserted rather than already existed
-        // { } nothing to do
         data.priority = max(priority, data.priority);
         if (data.AddSource(from))
         {
             // LOG(BLK, "%s available at %s\n", obj.ToString().c_str(), from->addrName.c_str());
+        }
+
+        if (result.second)
+        {
+            nBlocksAskedFor++;
+            data.nEntryTime = GetStopwatchMicros() + nBlocksAskedFor;
         }
     }
     else
@@ -675,7 +679,7 @@ void CRequestManager::SendRequests()
     // asking for one at time. We can do this because there will be no XTHIN requests possible during
     // this time.
     bool fBatchBlockRequests = IsInitialBlockDownload();
-    std::map<CNodeRef, std::vector<CInv>, CompareIteratorByNodeRef> mapBatchBlockRequests;
+    std::map<CNodeRef, std::map<int64_t, CInv, std::less<int64_t> >, CompareIteratorByNodeRef> mapBatchBlockRequests;
 
     // Batch any transaction requests when possible. The process of batching and requesting batched transactions
     // is simlilar to batched block requests, however, we don't make the distinction of whether we're in the process
@@ -715,14 +719,15 @@ void CRequestManager::SendRequests()
                         // Do not request from this node if it was disconnected
                         if (next.noderef.get()->fDisconnect || next.noderef.get()->fDisconnectRequest)
                         {
-                            next.noderef.~CNodeRef(); // force the loop to get another node
+                            continue;
                         }
                         // Do not request or re-request another block from a peer for which we are currently downloading
-                        // a
-                        // block and are beyond the download limit.
+                        // a block and are beyond the download limit.
                         else if (next.noderef.get()->fDownloading && item.nDownloadingSince != 0 &&
                                  now - item.nDownloadingSince > blockLookAheadInterval.Value())
-                            next.noderef.~CNodeRef(); // force the loop to get another node
+                        {
+                            continue;
+                        }
                     }
                 }
 
@@ -743,7 +748,11 @@ void CRequestManager::SendRequests()
                         LOCK(next.noderef.get()->cs_nAvgBlkResponseTime);
                         std::map<NodeId, CRequestManagerNodeState>::iterator it =
                             mapRequestManagerNodeState.find(next.noderef.get()->GetId());
-                        DbgAssert(it != mapRequestManagerNodeState.end(), return );
+                        if (it == mapRequestManagerNodeState.end())
+                        {
+                            mapBatchBlockRequests.erase(next.noderef);
+                            continue;
+                        }
                         CRequestManagerNodeState *state = &it->second;
                         item.lastRequestTime =
                             now + (next.noderef.get()->nAvgBlkResponseTime * 1000000 * 5 * state->nBlocksInFlight);
@@ -753,7 +762,7 @@ void CRequestManager::SendRequests()
 
                     if (fBatchBlockRequests)
                     {
-                        mapBatchBlockRequests[next.noderef].emplace_back(obj);
+                        mapBatchBlockRequests[next.noderef].emplace(item.nEntryTime, obj);
                     }
                     else
                     {
@@ -774,22 +783,13 @@ void CRequestManager::SendRequests()
                                 item.lastRequestTime = then;
                                 item.nDownloadingSince = nDownloadingSincePrev;
                             }
-                        }
-                    }
 
-                    // If there was a request then release the ref otherwise put the item back into the list so
-                    // we don't lose the block source.
-                    if (fReqBlkResult)
-                    {
-                        next.noderef.~CNodeRef();
-                    }
-                    else
-                    {
-                        // We never asked for the block, typically because the graphene block timer hasn't timed out
-                        // yet but we only have sources for an xthinblock. When this happens we add the node back to
-                        // the end of the list so that we don't lose the source, when/if the graphene timer has
-                        // a time out and we are then ready to ask for an xthinblock.
-                        item.availableFrom.push_back(next);
+                            // We never asked for the block, typically because the graphene block timer hasn't timed out
+                            // yet but we only have sources for an xthinblock. When this happens we add the node back to
+                            // the end of the list so that we don't lose the source, when/if the graphene timer has
+                            // a time out and we are then ready to ask for an xthinblock.
+                            item.availableFrom.push_back(next);
+                        }
                     }
                 }
                 else
@@ -816,12 +816,16 @@ void CRequestManager::SendRequests()
         {
             for (auto iter : mapBatchBlockRequests)
             {
-                for (auto &inv : iter.second)
+                // iterate through the second map and create the inv message
+                std::vector<CInv> vInv;
+                for (auto mi : iter.second)
                 {
-                    MarkBlockAsInFlight(iter.first.get()->GetId(), inv.hash);
+                    const uint256 &hash = mi.second.hash;
+                    MarkBlockAsInFlight(iter.first.get()->GetId(), hash);
+                    vInv.push_back(mi.second);
                 }
-                iter.first.get()->PushMessage(NetMsgType::GETDATA, iter.second);
-                LOG(REQ, "Sent batched request with %d blocks to node %s\n", iter.second.size(),
+                iter.first.get()->PushMessage(NetMsgType::GETDATA, vInv);
+                LOG(REQ, "Sent batched request with %d blocks to node %s\n", vInv.size(),
                     iter.first.get()->GetLogName());
             }
         }
@@ -885,7 +889,7 @@ void CRequestManager::SendRequests()
                             // Node was disconnected so we can't request from it
                             if (next.noderef.get()->fDisconnect || next.noderef.get()->fDisconnectRequest)
                             {
-                                next.noderef.~CNodeRef(); // force the loop to get another node
+                                continue;
                             }
                         }
                     }
@@ -1078,7 +1082,6 @@ void CRequestManager::RequestNextBlocksToDownload(CNode *pto)
                 }
             }
             vGetBlocks.swap(vToFetchNew);
-
             if (!IsInitialBlockDownload())
             {
                 AskFor(vGetBlocks, pto);
@@ -1482,6 +1485,10 @@ void CRequestManager::MapBlocksInFlightErase(const uint256 &hash, NodeId nodeid)
     if (itHash != mapBlocksInFlight.end())
     {
         itHash->second.erase(nodeid);
+
+        // Special case which would be triggered during a sudden disconnect of all peers.
+        if (itHash->second.empty())
+            mapBlocksInFlight.erase(hash);
     }
 }
 

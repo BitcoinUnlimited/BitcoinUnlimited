@@ -608,7 +608,7 @@ public:
     NodeId GetId() const { return id; }
     int GetRefCount()
     {
-        assert(nRefCount >= 0);
+        DbgAssert(nRefCount >= 0, );
         return nRefCount;
     }
 
