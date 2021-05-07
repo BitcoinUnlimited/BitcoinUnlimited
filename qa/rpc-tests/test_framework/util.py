@@ -36,9 +36,11 @@ from . import test_node
 from .portseed import (
         PORT_RANGE,
         PortSeed,
-        remap_ports,
-        fixup_ports_in_configfile,
+        electrum_monitoring_port,
+        electrum_rpc_port,
+        electrum_ws_port,
         p2p_port,
+        remap_ports,
         rpc_port)
 
 from . import coverage
@@ -386,7 +388,11 @@ def initialize_datadir(dirname, n, bitcoinConfDict=None, wallet=None, bins=None)
     rpc_u, rpc_p = rpc_auth_pair(n)
     defaults = {"server":1, "discover":0, "regtest":1,"rpcuser":"rt","rpcpassword":"rt",
                 "port":p2p_port(n),"rpcport":str(rpc_port(n)),"listenonion":0,"maxlimitertxfee":0,"usecashaddr":1,
-                "rpcuser":rpc_u, "rpcpassword":rpc_p, "bindallorfail" : 1, "minlimitertxfee":0, "limitfreerelay":15}
+                "rpcuser":rpc_u, "rpcpassword":rpc_p, "bindallorfail" : 1, "minlimitertxfee":0, "limitfreerelay":15,
+                "electrum.port": electrum_rpc_port(n),
+                "electrum.ws.port": electrum_ws_port(n),
+                "electrum.monitoring.port": electrum_monitoring_port(n)
+                }
 
     # switch off default IPv6 listening port (for travis)
     if UtilOptions.no_ipv6_rpc_listen:
@@ -510,7 +516,6 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
                     do_and_ignore_failure(lambda x: bitcoind_processes[i].kill())
                     traceback.print_exc(file=sys.stdout)
                     remap_ports(i)
-                    fixup_ports_in_configfile(i)
             else:
                 raise Exception("Couldn't start bitcoind even with retries on different ports (initialize_chain).")
 
@@ -619,7 +624,6 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
             do_and_ignore_failure(lambda x: bitcoind_processes[i].kill())
             # commented out because looks like an error: traceback.print_exc(file=sys.stdout)
             remap_ports(i)
-            fixup_ports_in_configfile(i)
     else:
         raise Exception("Couldn't start bitcoind even with retries on different ports (start_node).")
 
@@ -706,7 +710,6 @@ def start_nodes(num_nodes, dirname, extra_args=None, rpchost=None, binary=None,t
                 do_and_ignore_failure(lambda x: bitcoind_processes[workingOn].kill())
                 # commented out because looks like an error: traceback.print_exc(file=sys.stdout)
                 remap_ports(workingOn)
-                fixup_ports_in_configfile(workingOn)
                 del bitcoind_processes[workingOn]
 
     if retry == 4:

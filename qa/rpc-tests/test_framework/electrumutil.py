@@ -18,9 +18,15 @@ from test_framework.mininode import (
 from test_framework.util import assert_equal, p2p_port
 from test_framework.blocktools import create_coinbase, create_block, \
     create_transaction, pad_tx
+from test_framework.portseed import electrum_rpc_port
 import time
 
-ELECTRUM_PORT = None
+ERROR_CODE_INVALID_REQUEST = -32600
+ERROR_CODE_METHOD_NOT_FOUND = -32601
+ERROR_CODE_INVALID_PARAMS = -32602
+ERROR_CODE_INTERNAL_ERROR = -32603
+ERROR_CODE_NOT_FOUND = -32004
+ERROR_CODE_TIMEOUT = -32005
 
 class ElectrumTestFramework(BitcoinTestFramework):
 
@@ -91,12 +97,7 @@ def compare(node, key, expected, is_debug_data = False):
 
 def bitcoind_electrum_args():
     import random
-    global ELECTRUM_PORT
-    ELECTRUM_PORT = random.randint(40000, 60000)
     return ["-electrum=1", "-debug=electrum", "-debug=rpc",
-            "-electrum.port=" + str(ELECTRUM_PORT),
-            "-electrum.monitoring.port=" + str(random.randint(40000, 60000)),
-            "-electrum.ws.port=" + str(random.randint(40000, 60000)),
             "-electrum.rawarg=--cashaccount-activation-height=1",
             "-electrum.rawarg=--wait-duration-secs=1"]
 
@@ -111,14 +112,15 @@ class ElectrumConnection:
     def __init__(self, loop = None):
         self.cli = TestClient(loop)
 
-    async def connect(self):
+    async def connect(self, node_index = 0):
         connect_timeout = 30
         import time
         start = time.time()
+
         while True:
             try:
                 await self.cli.connect(ServerInfo(None,
-                    ip_addr = "127.0.0.1", ports = ELECTRUM_PORT))
+                    ip_addr = "127.0.0.1", ports = electrum_rpc_port(n = node_index)))
                 self.cli.is_connected = True
                 break
 
