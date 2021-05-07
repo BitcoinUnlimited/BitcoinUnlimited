@@ -164,17 +164,38 @@ build-debian:
 
 build-debian-electrscash:
     stage: build
-    extends: .cache-debian
+    cache:
+      paths:
+        # Paths from Cargo Book, section "Caching the Cargo home in CI"
+        - cargohome/bin
+        - cargohome/registry/index
+        - cargohome/registry/cache
+        - cargohome/git/db
+
     needs: [build-debian-deps]
+
+    variables:
+      CARGO_HOME: ${CI_PROJECT_DIR}/cargohome
+
+    before_script:
+      - mkdir -p cargohome
+      - mkdir -p build
+
     script:
-        - mkdir build;
-        - export PATH=$PATH:`pwd`/depends/x86_64-unknown-linux-gnu/native/bin # for cargo
+        # add cargo to PATH
+        - export PATH=$PATH:`pwd`/depends/x86_64-unknown-linux-gnu/native/bin
+
+        # Prepare make file
         - ./autogen.sh > /dev/null
         - cd build
-        - ../configure --cache-file=config.cache --prefix=$PWD/../depends/x86_64-unknown-linux-gnu > /dev/null
+        - ../configure --cache-file=config.cache
+            --prefix=$PWD/../depends/x86_64-unknown-linux-gnu > /dev/null
+
         - make electrscash
+
     dependencies:
         - build-debian-deps
+
     artifacts:
         paths:
             - ./build/src/electrscash
