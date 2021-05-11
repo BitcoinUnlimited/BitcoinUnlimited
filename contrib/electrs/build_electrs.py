@@ -107,8 +107,13 @@ def cargo_run(args):
     logging.info("Running %s", args)
     assert cargo is not None
 
+    cargo_env = os.environ.copy()
+    if 'CARGO_HOME' in cargo_env:
+        logging.info("CARGO_HOME is set to {}".format(cargo_env['CARGO_HOME']))
+
     p = subprocess.Popen(args, cwd = ELECTRS_DIR,
-        stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        stdout = subprocess.PIPE, stderr = subprocess.PIPE,
+        env = cargo_env)
 
     q = Queue()
     Thread(target = output_reader, args = [p.stdout, q]).start()
