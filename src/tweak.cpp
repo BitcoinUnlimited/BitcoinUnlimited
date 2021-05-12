@@ -93,6 +93,25 @@ UniValue gettweak(const UniValue &params, bool fHelp)
 
     return ret;
 }
+
+// Helper function for formatting when setting tweak. This helps to remove
+// any white spaces between the "=" and the param key or value.
+static void SearchAndCombine(size_t &split, std::string &s, unsigned int &i, const UniValue &params)
+{
+    split = s.find("=");
+    if (split == s.length() - 1)
+    {
+        i++;
+        if (i >= params.size())
+            throw runtime_error("Invalid assignment format, missing =");
+        else
+        {
+            s = s + params[i].get_str();
+            split = s.find("=");
+        }
+    }
+}
+
 // RPC Set a particular tweak
 UniValue settweak(const UniValue &params, bool fHelp)
 {
@@ -115,10 +134,32 @@ UniValue settweak(const UniValue &params, bool fHelp)
     {
         string s = params[i].get_str();
         size_t split = s.find("=");
+
+        // This first if statement covers a special case where we want to return a paramenter to its default
+        // setting. Here we have not supplied a value to a key/value pair, such as "set mining.vote=".
+        if (split == s.length() - 1)
+        {
+            i++;
+            if (i < params.size())
+            {
+                s = s + params[i].get_str();
+                split = s.find("=");
+            }
+        }
+
+        // If we haven't found the "=" then combine the strings.
         if (split == std::string::npos)
         {
-            throw runtime_error("Invalid assignment format, missing =");
+            i++;
+            if (i >= params.size())
+                throw runtime_error("Invalid assignment format, missing =");
+            else
+            {
+                s = s + params[i].get_str();
+                SearchAndCombine(split, s, i, params);
+            }
         }
+
         std::string name = s.substr(0, split);
         std::string value = s.substr(split + 1);
 
@@ -145,9 +186,30 @@ UniValue settweak(const UniValue &params, bool fHelp)
     {
         string s = params[i].get_str();
         size_t split = s.find("=");
+
+        // This first if statement covers a special case where we want to return a parameter to its default
+        // setting. Here we have not supplied a value to a key/value pair, such as "set mining.vote=".
+        if (split == s.length() - 1)
+        {
+            i++;
+            if (i < params.size())
+            {
+                s = s + params[i].get_str();
+                split = s.find("=");
+            }
+        }
+
+        // If we haven't found the "=" then combine the strings.
         if (split == std::string::npos)
         {
-            throw runtime_error("Invalid assignment format, missing =");
+            i++;
+            if (i >= params.size())
+                throw runtime_error("Invalid assignment format, missing =");
+            else
+            {
+                s = s + params[i].get_str();
+                SearchAndCombine(split, s, i, params);
+            }
         }
         std::string name = s.substr(0, split);
         std::string value = s.substr(split + 1);
