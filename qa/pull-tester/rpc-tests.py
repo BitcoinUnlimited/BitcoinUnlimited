@@ -385,7 +385,8 @@ def runtests():
 
         # check for explicit tests
         if showHelp:
-            tests_to_run = [ testScripts[0] ]
+            show_wrapper_options()
+            quit()
         else:
             for o in opts:
                 if not o.startswith('-'):
