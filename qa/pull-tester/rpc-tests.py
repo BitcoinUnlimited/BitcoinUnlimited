@@ -316,7 +316,8 @@ testScriptsElectrum = [ RpcTest(WhenElectrumFound(t)) for t in [
     'electrum_subscriptions',
     'electrum_transaction_get',
     'electrum_doslimit',
-    'electrum_mempool_chain'
+    'electrum_mempool_chain',
+    'electrum_blockchain_utxo'
 ] ]
 
 #Enable ZMQ tests

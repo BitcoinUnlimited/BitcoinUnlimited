@@ -72,6 +72,8 @@ class ElectrumTestFramework(BitcoinTestFramework):
         self.p2p.send_blocks_and_test(blocks, n)
         assert_equal(blocks[-1].hash, n.getbestblockhash())
 
+        self.sync_height()
+
         # Return coinbases for spending later
         return [b.vtx[0] for b in blocks]
 
