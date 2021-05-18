@@ -127,17 +127,7 @@ bool validate(const TxoGroup &grp, const CAmount targetValue)
         txIn[count] = CTxIn(tmp.tx->GetHash(), tmp.i);
     }
 
-    size_t limitAncestorCount = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
-    size_t limitAncestorSize = GetArg("-limitancestorsize", BU_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
-    std::string errString;
-
-    READLOCK(mempool.cs_txmempool);
-    bool ret = mempool.ValidateMemPoolAncestors(txIn, limitAncestorCount, limitAncestorSize, errString);
-    if (!ret)
-    {
-        LOG(SELECTCOINS, "CoinSelection eliminated a solution, error: %s\n", errString.c_str());
-    }
-    return ret;
+    return true;
 }
 
 // Select coins.

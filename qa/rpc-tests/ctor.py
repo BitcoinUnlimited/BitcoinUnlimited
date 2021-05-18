@@ -316,7 +316,7 @@ class CtorTest (BitcoinTestFramework):
 
 
 if __name__ == '__main__':
-    result = CtorTest().main (bitcoinConfDict={"keypool": 5, "limitdescendantsize": 50,
+    result = CtorTest().main (bitcoinConfDict={"keypool": 5,
                                      "use-thinblocks": 1,
                                      "use-grapheneblocks": 0,
                                      "consensus.enableCanonicalTxOrder" : 0})
@@ -329,7 +329,6 @@ def Test():
     t.drop_to_pdb=True
     bitcoinConf = {
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
-        "limitdescendantsize": 50, # allow lots of child tx so we can tease apart ctor vs dependent order
         "use-thinblocks": 1,
         "use-grapheneblocks": 0,
         "consensus.enableCanonicalTxOrder" : 0,

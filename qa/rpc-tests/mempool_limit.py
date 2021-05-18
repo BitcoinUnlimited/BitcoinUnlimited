@@ -20,10 +20,6 @@ class MempoolLimitTest(BitcoinTestFramework):
         ["-maxmempool=5",
          "-spendzeroconfchange=0",
          "-minlimitertxfee=2",
-         "-limitdescendantcount=25",
-         "-limitancestorcount=25",
-         "-limitancestorsize=101",
-         "-limitdescendantsize=101",
          "-debug"]))
         self.is_network_split = False
         self.sync_all()

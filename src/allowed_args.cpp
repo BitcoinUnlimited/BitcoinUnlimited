@@ -556,21 +556,6 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
 #endif
         .addDebugArg("stopafterblockimport", optionalBool,
             strprintf("Stop running after importing blocks from disk (default: %u)", DEFAULT_STOPAFTERBLOCKIMPORT))
-        .addDebugArg("limitancestorcount=<n>", requiredInt,
-            strprintf("Do not accept transactions if number of in-mempool ancestors is <n> or more (default: %u)",
-                         BU_DEFAULT_ANCESTOR_LIMIT))
-        .addDebugArg(
-            "limitancestorsize=<n>", requiredInt, strprintf("Do not accept transactions whose size with all in-mempool "
-                                                            "ancestors exceeds <n> kilobytes (default: %u)",
-                                                      BU_DEFAULT_ANCESTOR_SIZE_LIMIT))
-        .addDebugArg(
-            "limitdescendantcount=<n>", requiredInt, strprintf("Do not accept transactions if any ancestor would have "
-                                                               "<n> or more in-mempool descendants (default: %u)",
-                                                         BU_DEFAULT_DESCENDANT_LIMIT))
-        .addDebugArg("limitdescendantsize=<n>", requiredInt,
-            strprintf("Do not accept transactions if any ancestor would have more than <n> kilobytes of in-mempool "
-                      "descendants (default: %u).",
-                         BU_DEFAULT_DESCENDANT_SIZE_LIMIT))
         .addArg("debug=<category>", optionalStr,
             strprintf(_("Output debugging information (default: %u, supplying <category> is optional)"), 0) + ". " +
                 _("If <category> is not supplied or if <category> = 1, output all debugging information. ") +

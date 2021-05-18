@@ -425,8 +425,6 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
     uint256 hash;
 
     // Create a chain of 50 unconfirmed transactions
-    SetArg("-limitancestorcount", std::to_string(50));
-    SetArg("-limitdescendantcount", std::to_string(50));
     for (int i = 1; i <= 50; i++)
     {
         CMutableTransaction tx;
@@ -456,9 +454,6 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
         prevout = tx.GetHash();
     }
 
-    SetArg("-limitancestorcount", std::to_string(52));
-    SetArg("-limitdescendantcount", std::to_string(52));
-
     // Add one more which should should work because the limit is now 52
     {
         CMutableTransaction tx;
@@ -480,7 +475,7 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
         prevout = tx.GetHash();
     }
 
-    // Now try to add a tx with multiple inputs.  It should fail
+    // Now try to add a tx with multiple inputs.  It should pass
     {
         CMutableTransaction tx;
         tx.vin.resize(2);
@@ -507,8 +502,8 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
         vchSig1.push_back((unsigned char)sighashType);
         tx.vin[1].scriptSig << vchSig1;
 
-        ToMemPool(tx, "bad-txn-too-many-inputs");
-        BOOST_CHECK(!ToMemPool(tx, "bad-txn-too-many-inputs"));
+        BOOST_CHECK(ToMemPool(tx));
+        prevout = tx.GetHash();
     }
 
     // Now try to add a tx with only one input. It should succeed.

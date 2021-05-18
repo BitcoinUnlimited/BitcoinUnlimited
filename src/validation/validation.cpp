@@ -32,7 +32,6 @@
 #include <boost/scope_exit.hpp>
 #include <unordered_set>
 
-extern CTweak<unsigned int> unconfPushAction;
 extern CTweak<int> maxReorgDepth;
 void ProcessOrphans(std::vector<uint256> &vWorkQueue);
 static bool FinalizeBlockInternal(CValidationState &state, const CBlockIndex *pindex);
@@ -3306,14 +3305,10 @@ bool ConnectTip(CValidationState &state,
     // be no transactions in the mempool during initial sync, and also there is no need then to parse through each
     // blocks transactions in removeForBlock() looking for transactions to remove.
     std::list<CTransactionRef> txConflicted;
-    std::vector<CTxChange> txChanges;
     if (!IsInitialBlockDownload() && !fReindex)
     {
-        // txChanges: only if some unconfirmed tx push is turned on, track what transactions may need to be pushed while
-        // confirmed transactions are removed from the mempool.
-        mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload(),
-            (unconfPushAction.Value() == 0) ? nullptr : &txChanges);
-
+        // remove confirmed transactions are removed from the mempool and orphanpool.
+        mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload());
         orphanpool.RemoveForBlock(pblock->vtx);
 
         // Search orphan queue for anything that is no longer an orphan due to tx in this block
@@ -3354,15 +3349,6 @@ bool ConnectTip(CValidationState &state,
     nTimeTotal += nTime6 - nTime1;
     LOG(BENCH, "  - Connect postprocess: %.2fms [%.2fs]\n", (nTime6 - nTime5) * 0.001, nTimePostConnect * 0.000001);
     LOG(BENCH, "- Connect block: %.2fms [%.2fs]\n", (nTime6 - nTime1) * 0.001, nTimeTotal * 0.000001);
-
-    // Deactivate intelligent forwarding if the May 2021 fork is active. This will
-    // cause chains of any length to be forwarded to all peers by default.
-    if (IsMay2021Enabled(chainparams.GetConsensus(), chainActive.Tip()))
-        unconfPushAction.Set(0);
-
-    // If some kind of unconfirmed push is turned on, then do the forwarding.
-    if (!IsInitialBlockDownload() && !fReindex && unconfPushAction.Value() != 0)
-        ForwardAcceptableTransactions(txChanges);
 
     // When we're in IBD or reindexing then once the block is connected we don't need it in the cache anymore.
     if (IsInitialBlockDownload())

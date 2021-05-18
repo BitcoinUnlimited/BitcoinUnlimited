@@ -264,73 +264,6 @@ bool CTxMemPool::_CalculateMemPoolAncestors(const CTxMemPoolEntry &entry,
     return true;
 }
 
-bool CTxMemPool::ValidateMemPoolAncestors(const std::vector<CTxIn> &txIn,
-    uint64_t limitAncestorCount,
-    uint64_t limitAncestorSize,
-    std::string &errString)
-{
-    AssertLockHeld(cs_txmempool);
-    setEntries parentHashes;
-    setEntries setAncestors;
-    int mySizeEstimate = 0; // we don't know our own tx size yet: entry.GetTxSize();
-
-    // Get parents of this transaction that are in the mempool
-    // GetMemPoolParents() is only valid for entries in the mempool, so we
-    // iterate mapTx to find parents.
-    for (unsigned int i = 0; i < txIn.size(); i++)
-    {
-        txiter piter = mapTx.find(txIn[i].prevout.hash);
-        if (piter != mapTx.end())
-        {
-            parentHashes.insert(piter);
-            if (parentHashes.size() + 1 > limitAncestorCount) // If we found it in the mempool, its unconfirmed
-            {
-                errString =
-                    strprintf("too many unconfirmed parents: %u [limit: %u]", parentHashes.size(), limitAncestorCount);
-                return false;
-            }
-        }
-    }
-
-    size_t totalSizeWithAncestors = mySizeEstimate;
-
-    while (!parentHashes.empty())
-    {
-        txiter stageit = *parentHashes.begin();
-
-        setAncestors.insert(stageit);
-        totalSizeWithAncestors += stageit->GetTxSize();
-
-        if (totalSizeWithAncestors > limitAncestorSize)
-        {
-            errString =
-                strprintf(" %u exceeds ancestor size limit [limit: %u]", totalSizeWithAncestors, limitAncestorSize);
-            return false;
-        }
-
-        const setEntries &setMemPoolParents = GetMemPoolParents(stageit);
-        for (const txiter &phash : setMemPoolParents)
-        {
-            // If this is a new ancestor, add it.
-            if (setAncestors.count(phash) == 0)
-            {
-                parentHashes.insert(phash);
-            }
-            if (parentHashes.size() + setAncestors.size() > limitAncestorCount)
-            {
-                errString = strprintf("too many unconfirmed ancestors (%u+%u) [limit: %u]", parentHashes.size(),
-                    setAncestors.size(), limitAncestorCount);
-                return false;
-            }
-        }
-
-        parentHashes.erase(stageit); // BU: Fix use after free bug by moving this last
-    }
-
-    return true;
-}
-
-
 void CTxMemPool::_UpdateAncestorsOf(bool add, txiter it)
 {
     AssertWriteLockHeld(cs_txmempool);
@@ -930,8 +863,7 @@ void CTxMemPool::_removeConflicts(const CTransaction &tx, std::list<CTransaction
 void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
     uint64_t nBlockHeight,
     std::list<CTransactionRef> &conflicts,
-    bool fCurrentEstimate,
-    std::vector<CTxChange> *txChanges)
+    bool fCurrentEstimate)
 {
     WRITELOCK(cs_txmempool);
 
@@ -1019,7 +951,6 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
 
     // For every chain tip walk through their decendants finding any transaction that have more than one parent.
     // These will then need to be considered as chain tips.
-    CTxMemPool::TxMempoolOriginalStateMap changeSet;
     mapEntryHistory mapAdditionalChainTips;
     for (auto iter : mapTxnChainTips)
     {
@@ -1028,11 +959,6 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
         _CalculateDescendants(iter.first, setDescendants, &mapTxnChainTips);
         for (txiter dit : setDescendants)
         {
-            // If long chain transaction forwarding is turned on, get the original descendant state
-            // and save it for later comparison.
-            if (txChanges && changeSet.count(dit) == 0)
-                changeSet.insert({dit, TxMempoolOriginalState(dit)});
-
             // Add a new chaintip if there is more than 1 parent.
             if (GetMemPoolParents(dit).size() > 1)
             {
@@ -1046,19 +972,6 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
 
     // Update ancestor state for remaining chains
     UpdateTxnChainState(mapTxnChainTips);
-
-    // After the updates are complete then process changeSet into a list of tx and mempool changes
-    // and sort into dependency order.
-    if (!changeSet.empty())
-    {
-        txChanges->reserve(changeSet.size());
-        for (auto &mc : changeSet)
-        {
-            txChanges->push_back(CTxChange(mc.second));
-        }
-        sort(txChanges->begin(), txChanges->end(),
-            [](const CTxChange &a, const CTxChange &b) { return a.now.countWithAncestors < b.now.countWithAncestors; });
-    }
 
     // Remove conflicting tx
     for (const auto &tx : vtx)
