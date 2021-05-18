@@ -122,32 +122,30 @@ class MempoolPersistTest(BitcoinTestFramework):
         self.sync_blocks()
 
         #create coins that we can use for creating multi input transactions
-        BCH_UNCONF_DEPTH = 50
+        CHAIN_DEPTH = 55
         DELAY_TIME = 240
         self.relayfee = self.nodes[1].getnetworkinfo()['relayfee']
-        utxo_count = BCH_UNCONF_DEPTH * 3 + 1
+        utxo_count = CHAIN_DEPTH * 3 + 1
         startHeight = self.nodes[1].getblockcount()
         logging.info("Starting at %d blocks" % startHeight)
         utxos = create_confirmed_utxos(self.relayfee, self.nodes[1], utxo_count)
         startHeight = self.nodes[1].getblockcount()
         logging.info("Initial sync to %d blocks" % startHeight)
 
-        # create multi input transactions that are chained. This will cause any transactions that are greater
-        # than the BCH default chain limit to be prevented from entering the mempool, however they will enter the
-        # orphanpool instead.
+        # create a chain of orphans that we can store and resurrect.
         tx_amount = 0
-        for i in range(1, BCH_UNCONF_DEPTH + 6):
+        for i in range(1, CHAIN_DEPTH + 1):
           try:
               inputs = []
               inputs.append(utxos.pop())
               if (i == 1):
-                inputs.append(utxos.pop())
+                inputs.append({"txid" : self.nodes[0].getbestblockhash(), "vout" : 0})
               else:
                 inputs.append({ "txid" : txid, "vout" : 0})
 
               outputs = {}
               if (i == 1):
-                tx_amount = inputs[0]["amount"] + inputs[1]["amount"] - self.relayfee
+                tx_amount = 5 - self.relayfee
               else:
                 tx_amount = inputs[0]["amount"] + tx_amount - self.relayfee
               outputs[self.nodes[1].getnewaddress()] = tx_amount
@@ -161,14 +159,18 @@ class MempoolPersistTest(BitcoinTestFramework):
               raise
 
         waitFor(DELAY_TIME, lambda: self.nodes[0].getorphanpoolinfo()["size"] == 0, lambda: print (getNodeInfo(self.nodes[0])))
-        waitFor(DELAY_TIME, lambda: self.nodes[1].getorphanpoolinfo()["size"] == 5, lambda: print (getNodeInfo(self.nodes[1])))
+        waitFor(DELAY_TIME, lambda: self.nodes[1].getorphanpoolinfo()["size"] == 55, lambda: print (getNodeInfo(self.nodes[1])))
+        waitFor(DELAY_TIME, lambda: self.nodes[1].getmempoolinfo()["size"] == 0, lambda: print (getNodeInfo(self.nodes[1])))
+        waitFor(DELAY_TIME, lambda: self.nodes[1].getmempoolinfo()["size"] == 0, lambda: print (getNodeInfo(self.nodes[1])))
 
         #stop and start nodes and verify that the orphanpool was resurrected
         stop_nodes(self.nodes)
         wait_bitcoinds()
         self.nodes = start_nodes(2, self.options.tmpdir)
         waitFor(DELAY_TIME, lambda: self.nodes[0].getorphanpoolinfo()["size"] == 0, lambda: print (getNodeInfo(self.nodes[0])))
-        waitFor(DELAY_TIME, lambda: self.nodes[1].getorphanpoolinfo()["size"] == 5, lambda: print (getNodeInfo(self.nodes[1])))
+        waitFor(DELAY_TIME, lambda: self.nodes[1].getorphanpoolinfo()["size"] == 55, lambda: print (getNodeInfo(self.nodes[1])))
+        waitFor(DELAY_TIME, lambda: self.nodes[1].getmempoolinfo()["size"] == 0, lambda: print (getNodeInfo(self.nodes[1])))
+        waitFor(DELAY_TIME, lambda: self.nodes[1].getmempoolinfo()["size"] == 0, lambda: print (getNodeInfo(self.nodes[1])))
 
         orphanpooldat0 = os.path.join(self.options.tmpdir, 'node0', 'regtest', 'orphanpool.dat')
         orphanpooldat1 = os.path.join(self.options.tmpdir, 'node1', 'regtest', 'orphanpool.dat')
@@ -182,7 +184,10 @@ class MempoolPersistTest(BitcoinTestFramework):
         stop_nodes(self.nodes)
         wait_bitcoinds()
         self.nodes = start_nodes(2, self.options.tmpdir)
-        waitFor(10, lambda: len(self.nodes[1].getraworphanpool()) == 5)
+        waitFor(10, lambda: len(self.nodes[0].getraworphanpool()) == 0)
+        waitFor(10, lambda: len(self.nodes[1].getraworphanpool()) == 55)
+        waitFor(DELAY_TIME, lambda: self.nodes[1].getmempoolinfo()["size"] == 0, lambda: print (getNodeInfo(self.nodes[1])))
+        waitFor(DELAY_TIME, lambda: self.nodes[1].getmempoolinfo()["size"] == 0, lambda: print (getNodeInfo(self.nodes[1])))
 
         logging.info("Prevent bitcoind from writing orphanpool.dat to disk. Verify that `saveorphanpool` fails")
         # try to dump orphanpool content on a directory rather than a file

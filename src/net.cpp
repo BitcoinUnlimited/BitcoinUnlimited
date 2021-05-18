@@ -2953,7 +2953,7 @@ void NetCleanup()
 }
 
 
-void RelayTransaction(const CTransactionRef ptx, const CTxProperties *txProperties)
+void RelayTransaction(const CTransactionRef ptx)
 {
     if (ptx->GetTxSize() > maxTxSize.Value())
     {
@@ -2981,12 +2981,6 @@ void RelayTransaction(const CTransactionRef ptx, const CTxProperties *txProperti
     for (CNode *pnode : vNodes)
     {
         if (!pnode->fRelayTxes)
-        {
-            continue;
-        }
-        // If the transaction won't be acceptable to the target node, then don't send it.  This avoids poisoning
-        // the node against this tx (via the node's alreadyHave() logic), so that it can be sent later.
-        if (txProperties && (!pnode->IsTxAcceptable(*txProperties)))
         {
             continue;
         }
@@ -3522,20 +3516,6 @@ void CNode::ReadConfigFromExtversion()
     {
         addrFromPort = extversion.as_u64c(XVer::BU_LISTEN_PORT) & 0xffff;
     }
-
-    uint64_t num = extversion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT);
-    if (num)
-        nLimitAncestorCount = num; // num == 0 means the field was not provided.
-    num = extversion.as_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT);
-    if (num)
-        nLimitAncestorSize = num;
-
-    num = extversion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT);
-    if (num)
-        nLimitDescendantCount = num;
-    num = extversion.as_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT);
-    if (num)
-        nLimitDescendantSize = num;
 
     canSyncMempoolWithPeers = (extversion.as_u64c(XVer::BU_MEMPOOL_SYNC) == 1);
     nMempoolSyncMinVersionSupported = extversion.as_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED);

@@ -554,16 +554,6 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED, mempoolSyncMaxVersionSupported.Value());
             xver.set_u64c(XVer::BU_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED, mempoolSyncMinVersionSupported.Value());
             xver.set_u64c(XVer::BU_XTHIN_VERSION, 2); // xthin version
-
-            size_t nLimitAncestors = GetArg("-limitancestorcount", BU_DEFAULT_ANCESTOR_LIMIT);
-            size_t nLimitAncestorSize = GetArg("-limitancestorsize", BU_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
-            size_t nLimitDescendants = GetArg("-limitdescendantcount", BU_DEFAULT_DESCENDANT_LIMIT);
-            size_t nLimitDescendantSize = GetArg("-limitdescendantsize", BU_DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000;
-
-            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_COUNT_LIMIT, nLimitAncestors);
-            xver.set_u64c(XVer::BU_MEMPOOL_ANCESTOR_SIZE_LIMIT, nLimitAncestorSize);
-            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_COUNT_LIMIT, nLimitDescendants);
-            xver.set_u64c(XVer::BU_MEMPOOL_DESCENDANT_SIZE_LIMIT, nLimitDescendantSize);
             xver.set_u64c(XVer::BU_TXN_CONCATENATION, 1);
 
             electrum::set_extversion_flags(xver, chainparams.NetworkIDString());

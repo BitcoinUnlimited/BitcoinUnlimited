@@ -25,8 +25,6 @@
 
 class CAutoFile;
 class CBlockIndex;
-class TxMempoolOriginalState;
-class CTxChange;
 class DoubleSpendProofStorage;
 class DoubleSpendProof;
 
@@ -453,8 +451,6 @@ public:
         bool operator()(const txiter &a, const txiter &b) const { return a->GetTx().GetHash() < b->GetTx().GetHash(); }
     };
     typedef std::set<txiter, CompareIteratorByHash> setEntries;
-    typedef std::map<CTxMemPool::txiter, TxMempoolOriginalState, CTxMemPool::CompareIteratorByHash>
-        TxMempoolOriginalStateMap;
     typedef std::map<txiter, ancestor_state, CTxMemPool::CompareIteratorByHash> mapEntryHistory;
 
     /** Return the set of mempool parents for this entry */
@@ -556,8 +552,7 @@ public:
     void removeForBlock(const std::vector<CTransactionRef> &vtx,
         uint64_t nBlockHeight,
         std::list<CTransactionRef> &conflicted,
-        bool fCurrentEstimate = true,
-        std::vector<CTxChange> *txChange = nullptr);
+        bool fCurrentEstimate = true);
     void clear();
     void _clear(); // lock free
     /** Return the transaction ids for every transaction in the mempool */
@@ -638,13 +633,6 @@ public:
      *  all in-mempool descendants of anything already in it.  */
     void _CalculateDescendants(txiter it, setEntries &setDescendants, mapEntryHistory *mapTxnChainTips = nullptr);
 
-    /** Similar to CalculateMemPoolAncestors, except only requires the inputs and just returns true/false depending on
-     * whether the input set conforms to the passed limits */
-    bool ValidateMemPoolAncestors(const std::vector<CTxIn> &txIn,
-        uint64_t limitAncestorCount,
-        uint64_t limitAncestorSize,
-        std::string &errString);
-
     /** For a given transaction, which may be part of a chain of unconfirmed transactions, find all
      *  the associated transaction chaintips, if any.
      */
@@ -660,19 +648,6 @@ public:
      *  or prioritise a transaction.
      */
     void UpdateTxnChainState(txiter it);
-
-    /** Get tx properties, returns true if tx in mempool and fills fields */
-    bool GetTxProperties(const uint256 &hash, CTxProperties *txProps) const
-    {
-        DbgAssert(txProps, return false);
-        READLOCK(cs_txmempool);
-        auto entryPtr = mapTx.find(hash);
-        if (entryPtr == mapTx.end())
-            return false;
-        txProps->countWithAncestors = entryPtr->GetCountWithAncestors();
-        txProps->sizeWithAncestors = entryPtr->GetSizeWithAncestors();
-        return true;
-    }
 
     /** Remove transactions from the mempool until its dynamic size is <= sizelimit.
       *  pvNoSpendsRemaining, if set, will be populated with the list of outpoints
@@ -763,48 +738,6 @@ private:
 
     /** Temporary storage for double spend proofs */
     std::unique_ptr<DoubleSpendProofStorage> m_dspStorage;
-};
-
-/** This internal class holds the original state of mempool state values.
-*/
-class TxMempoolOriginalState
-{
-public:
-    /** remember the prior values so we can determine if the change is material for a particular node */
-    CTxProperties prior;
-    CTxMemPool::txiter txEntry;
-
-    TxMempoolOriginalState(CTxMemPool::txiter &entry)
-    {
-        txEntry = entry;
-        prior.countWithAncestors = txEntry->GetCountWithAncestors();
-        prior.sizeWithAncestors = txEntry->GetSizeWithAncestors();
-    }
-};
-
-
-/** This class tracks changes to the mempool that may allow this transaction to be accepted into other node's
-    mempools.
-*/
-class CTxChange
-{
-public:
-    /** remember the prior values so we can determine if the change is material for a particular node */
-
-    CTxProperties prior;
-    CTxProperties now;
-    CTransactionRef tx;
-
-    CTxChange(TxMempoolOriginalState &mc)
-    {
-        // Extract the relevant fields and the transaction reference from the mempool entry so that use of this
-        // structure does not require the mempool to remain unchanged.
-        prior = mc.prior;
-
-        now.countWithAncestors = mc.txEntry->GetCountWithAncestors();
-        now.sizeWithAncestors = mc.txEntry->GetSizeWithAncestors();
-        tx = mc.txEntry->GetSharedTx();
-    }
 };
 
 /**

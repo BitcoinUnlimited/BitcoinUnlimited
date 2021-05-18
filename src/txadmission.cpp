@@ -470,15 +470,11 @@ void ThreadTxAdmission()
                 {
                     std::vector<COutPoint> vCoinsToUncache;
                     bool isRespend = false;
-                    CTxProperties txProperties;
-                    // If mempool policy aware relay is on, then supply a structure to gather the needed data,
-                    // otherwise nullptr turns it off.
-                    CTxProperties *txProps = (unconfPushAction.Value() == 0) ? nullptr : &txProperties;
                     if (ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, tx, true, &fMissingInputs, false,
-                            TransactionClass::DEFAULT, vCoinsToUncache, &isRespend, nullptr, txProps))
+                            TransactionClass::DEFAULT, vCoinsToUncache, &isRespend, nullptr))
                     {
                         acceptedSomething = true;
-                        RelayTransaction(tx, txProps);
+                        RelayTransaction(tx);
 
                         // LOG(MEMPOOL, "Accepted tx: peer=%s: accepted %s onto Q\n", txd.nodeName,
                         //     tx->GetHash().ToString());
@@ -586,10 +582,6 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     CORRAL(txProcessingCorral, CORRAL_TX_PAUSE);
     CommitTxToMempool();
 
-    CTxProperties txProperties;
-    // If mempool policy aware relay is on, then supply a structure to gather the needed data,
-    // otherwise nullptr turns it off.
-    CTxProperties *txProps = (unconfPushAction.Value() == 0) ? nullptr : &txProperties;
     {
         // This lock is here to serialize AcceptToMemoryPool(). This must be done because
         // we do not enqueue the transaction prior to calling this function, as we do with
@@ -601,7 +593,7 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
         bool isRespend = false;
         bool missingInputs = false;
         res = ParallelAcceptToMemoryPool(txHandlerSnap, pool, state, tx, fLimitFree, &missingInputs, fRejectAbsurdFee,
-            allowedTx, vCoinsToUncache, &isRespend, nullptr, txProps);
+            allowedTx, vCoinsToUncache, &isRespend, nullptr);
 
         // Uncache any coins for txns that failed to enter the mempool but were NOT orphan txns
         if (isRespend || (!res && !missingInputs))
@@ -618,7 +610,7 @@ bool AcceptToMemoryPool(CTxMemPool &pool,
     }
     if (res)
     {
-        RelayTransaction(tx, txProps);
+        RelayTransaction(tx);
         LimitMempoolSize(mempool, GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
             GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
     }
@@ -635,8 +627,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     TransactionClass allowedTx,
     std::vector<COutPoint> &vCoinsToUncache,
     bool *isRespend,
-    CValidationDebugger *debugger,
-    CTxProperties *txProps)
+    CValidationDebugger *debugger)
 {
     const CChainParams &chainparams = Params();
     bool may2020Enabled = IsMay2020Activated(chainparams.GetConsensus(), chainActive.Tip());
@@ -1174,92 +1165,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                     strprintf("%d > %d", nFees, std::max((int64_t)1L, maxTxFee.Value()) * 10000));
             }
         }
-
-        // Calculate in-mempool ancestors, up to the BCH default limit. We don't need to calculate
-        // them any further.
-        if (unconfPushAction.Value() != 0)
-        {
-            size_t nLimitAncestors = GetArg("-limitancestorcount", BCH_DEFAULT_ANCESTOR_LIMIT);
-            size_t nLimitAncestorSize = GetArg("-limitancestorsize", BCH_DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000;
-            std::string errString;
-            CTxMemPool::setEntries setAncestors;
-
-            READLOCK(pool.cs_txmempool);
-            bool ret =
-                pool._CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize, errString);
-            if ((!ret || setAncestors.size() >= BCH_DEFAULT_ANCESTOR_LIMIT) && restrictInputs.Value() == true)
-            {
-                if (tx->vin.size() > 1)
-                {
-                    // this is effectively "missing inputs" since they are not usable due to unconf depth and size, so
-                    // set the flag so that this tx gets on the orphan queue
-                    *pfMissingInputs = true;
-
-                    if (debugger)
-                    {
-                        debugger->AddInvalidReason("bad-txn-too-many-inputs");
-                        debugger->standard = false;
-                    }
-                    else
-                    {
-                        return state.DoS(0, false, REJECT_MULTIPLE_INPUTS, "bad-txn-too-many-inputs");
-                    }
-                }
-            }
-
-            if (txProps)
-            {
-                // In general restrict inputs will always be true. Only if we're doing some sort
-                // of testing on mainnet would we turn this off, therefore the calculation of mempool
-                // ancestors is straightforward since there will only ever be one parent for chains
-                // longer than the BCH_DEFAULT_ANCESTOR_LIMIT.
-                if (restrictInputs.Value() == true)
-                {
-                    if (setAncestors.size() >= BCH_DEFAULT_ANCESTOR_LIMIT)
-                    {
-                        CTxMemPool::setEntries setParents = pool.GetMemPoolParents(*tx);
-                        DbgAssert(setParents.size() == 1, return false); // we should only have 1 parent
-                        txProps->countWithAncestors = 1;
-                        txProps->sizeWithAncestors = tx->GetTxSize();
-                        for (auto parent : setParents)
-                        {
-                            txProps->countWithAncestors += parent->GetCountWithAncestors();
-                            txProps->sizeWithAncestors += parent->GetSizeWithAncestors();
-                        }
-                    }
-                    else
-                    {
-                        // If we are < the BCH_DEFAULT_ANCESTOR_LIMIT then we could have multiple parents
-                        // so we have to count up the values manually.
-                        txProps->countWithAncestors = setAncestors.size() + 1;
-                        uint64_t size = tx->GetTxSize();
-                        for (auto ancestor : setAncestors)
-                        {
-                            size += ancestor->GetTxSize();
-                        }
-                        txProps->sizeWithAncestors = size;
-                    }
-                }
-                else
-                {
-                    // we have to calculate all ancestors, this would only happen in test mode when
-                    // we don't want to restrict inputs
-                    uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
-                    std::string dummy2;
-                    CTxMemPool::setEntries setAncestorsTest;
-                    pool._CalculateMemPoolAncestors(entry, setAncestorsTest, nNoLimit, nNoLimit, dummy2);
-
-                    txProps->countWithAncestors = setAncestorsTest.size() + 1;
-                    uint64_t size = tx->GetTxSize();
-                    for (auto ancestor : setAncestorsTest)
-                    {
-                        size += ancestor->GetTxSize();
-                    }
-                    txProps->sizeWithAncestors = size;
-                }
-            }
-        }
-
 
         // Check again against just the consensus-critical mandatory script
         // verification flags, in case of bugs in the standard flags that cause

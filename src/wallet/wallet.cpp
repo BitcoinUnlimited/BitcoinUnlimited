@@ -1528,9 +1528,7 @@ bool CWalletTx::RelayWalletTransaction()
         if (GetDepthInMainChain() == 0 && !isAbandoned() && InMempool())
         {
             // LOGA("Relaying wtx %s\n", GetHash().ToString());
-            CTxProperties txProps;
-            mempool.GetTxProperties(GetHash(), &txProps);
-            RelayTransaction(MakeTransactionRef((CTransaction) * this), &txProps);
+            RelayTransaction(MakeTransactionRef((CTransaction) * this));
             return true;
         }
     }

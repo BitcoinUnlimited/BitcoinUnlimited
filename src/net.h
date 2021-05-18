@@ -343,27 +343,14 @@ public:
     // All of the following variables should be atomics. They are potentially dynamic values because
     // of the XUPDATE message which can modify these values at any time.
 
-    /** This node's max acceptable number ancestor transactions.  Used to decide whether this node will accept a
-     * particular transaction. */
-    std::atomic<size_t> nLimitAncestorCount{BCH_DEFAULT_ANCESTOR_LIMIT};
-    /** This node's max acceptable sum of all ancestor transaction sizes.  Used to decide whether this node will accept
-     * a particular transaction. */
-    std::atomic<size_t> nLimitAncestorSize{BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000};
-    /** This node's max acceptable number of descendants.  Used to decide whether this node will accept a particular
-     * transaction. */
-    std::atomic<size_t> nLimitDescendantCount{BCH_DEFAULT_DESCENDANT_LIMIT};
-    /** This node's max acceptable sum of all descendant transaction sizes.  Used to decide whether this node will
-     * accept a particular transaction. */
-    std::atomic<size_t> nLimitDescendantSize{BCH_DEFAULT_DESCENDANT_SIZE_LIMIT * 1000};
     /** Does this node support mempool synchronization? */
     std::atomic<bool> canSyncMempoolWithPeers{false};
     /** Minimum supported mempool synchronization version */
     std::atomic<uint64_t> nMempoolSyncMinVersionSupported{0};
     /** Maximum supported mempool synchronization version */
     std::atomic<uint64_t> nMempoolSyncMaxVersionSupported{0};
-    /** Tx concatenation supported (set by xversion) */
+    /** Tx concatenation supported (set by extversion) */
     std::atomic<bool> txConcat{false};
-    /** set to true if this node support xVersion */
     /** set to true if this node support extversion */
     std::atomic<bool> extversionEnabled{false};
     /** set to true if the next expected message is extversion */
@@ -610,21 +597,6 @@ public:
     {
         assert(nRefCount >= 0);
         return nRefCount;
-    }
-
-    /** Returns true if a transaction with the passed properties will likely get accepted into this node's mempool */
-    bool IsTxAcceptable(const CTxProperties &props)
-    {
-        // Checking the descendants makes no sense -- the target node can't have descendants in its mempool if it
-        // doesn't have this transaction!
-        if ((extversionEnabled && props.countWithAncestors > nLimitAncestorCount) ||
-            (!extversionEnabled && props.countWithAncestors > BCH_DEFAULT_ANCESTOR_LIMIT))
-            return false;
-        if ((extversionEnabled && props.sizeWithAncestors > nLimitAncestorSize) ||
-            (!extversionEnabled && props.sizeWithAncestors > BCH_DEFAULT_ANCESTOR_SIZE_LIMIT * 1000))
-            return false;
-
-        return true;
     }
 
     /** Updates node configuration variables based on extversion data in the extversion member variable */
@@ -1088,7 +1060,7 @@ private:
 typedef std::vector<CNodeRef> VNodeRefs;
 
 class CTransaction;
-void RelayTransaction(const CTransactionRef ptx, const CTxProperties *txproperties = nullptr);
+void RelayTransaction(const CTransactionRef ptx);
 
 /** Access to the (IP) address database (peers.dat) */
 class CAddrDB

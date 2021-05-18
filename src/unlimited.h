@@ -78,11 +78,6 @@ extern unsigned int excessiveAcceptDepth;
 extern unsigned int maxMessageSizeMultiplier;
 extern bool fCanonicalTxsOrder;
 
-/** This function searches the mempool for transactions that are recently acceptable into the mempools of other
-nodes and forwards any found to those nodes.
-*/
-void ForwardAcceptableTransactions(const std::vector<CTxChange> &changeSet);
-
 // Fork configuration
 /** This specifies the MTP time of the next fork */
 extern uint64_t nMiningForkTime;
@@ -281,7 +276,6 @@ std::string ForkTimeValidator(const uint64_t &value, uint64_t *item, bool valida
 
 extern CTweak<unsigned int> maxTxSize;
 extern CTweak<uint64_t> coinbaseReserve;
-extern CTweak<unsigned int> unconfPushAction;
 extern CTweakRef<uint64_t> miningBlockSize;
 extern CTweakRef<uint64_t> ebTweak;
 extern CTweak<uint64_t> maxMiningCandidates;

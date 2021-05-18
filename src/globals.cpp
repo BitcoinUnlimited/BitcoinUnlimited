@@ -406,18 +406,6 @@ CTweak<unsigned int> numMsgHandlerThreads("net.msgHandlerThreads",
 CTweak<unsigned int> numTxAdmissionThreads("net.txAdmissionThreads",
     "Max transaction mempool admission threads Auto detection is zero (default: 0).",
     0);
-CTweak<unsigned int> unconfPushAction("net.unconfChainResendAction",
-    "Action to take when this node thinks that a peer will now accept a previously unacceptable unconfirmed "
-    "transaction (default: 2) "
-    "0: do not resend, 1: send an INV, 2: send the TX (default: 2)",
-    2);
-CTweak<bool> restrictInputs("net.restrictInputs",
-    strprintf("Restrict max inputs to 1 for unconfirmed transaction chains that are longer than %d or larger than %d KB"
-              "(default: true)",
-                                BCH_DEFAULT_ANCESTOR_LIMIT,
-                                BCH_DEFAULT_ANCESTOR_SIZE_LIMIT),
-    true);
-
 CTweak<CAmount> maxTxFee("wallet.maxTxFee",
     strprintf("Maximum total fees to use in a single wallet transaction or raw transaction; setting this too low may "
               "abort large transactions (default: %d)",
