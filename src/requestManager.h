@@ -98,6 +98,7 @@ public:
     unsigned int outstandingReqs;
     ObjectSourceList availableFrom;
     unsigned int priority;
+    int64_t nEntryTime;
 
     CUnknownObj()
     {
@@ -107,6 +108,7 @@ public:
         outstandingReqs = 0;
         lastRequestTime = 0;
         priority = 0;
+        nEntryTime = 0;
     }
 
     bool AddSource(CNode *from); // returns true if the source did not already exist
@@ -150,7 +152,7 @@ protected:
 
     friend class CRequestManagerTest;
 
-    // maps and iterators all GUARDED_BY cs_objDownloader
+    // The following are GUARDED_BY cs_objDownloader
     typedef std::map<uint256, CUnknownObj> OdMap;
     OdMap mapTxnInfo;
     OdMap mapBlkInfo;
@@ -158,6 +160,7 @@ protected:
     std::map<NodeId, CRequestManagerNodeState> mapRequestManagerNodeState;
     OdMap::iterator sendIter;
     OdMap::iterator sendBlkIter;
+    int64_t nBlocksAskedFor = 0;
     CCriticalSection cs_objDownloader;
 
     int inFlight;
