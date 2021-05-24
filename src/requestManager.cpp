@@ -912,17 +912,13 @@ void CRequestManager::SendRequests()
                                 {
                                     next.noderef.get()->PushMessage(
                                         NetMsgType::GETDATA, mapBatchTxnRequests[next.noderef]);
-                                    LOG(REQ, "Sent batched request with %d transations to node %s\n",
+                                    LOG(REQ, "Sent batched request with %d transactions to node %s\n",
                                         mapBatchTxnRequests[next.noderef].size(), next.noderef.get()->GetLogName());
                                 }
                                 ENTER_CRITICAL_SECTION(cs_objDownloader);
 
                                 mapBatchTxnRequests.erase(next.noderef);
                             }
-
-                            // Now that we've completed setting up our request for this transaction
-                            // we're done with this node, for this item, and can delete it.
-                            next.noderef.~CNodeRef();
                         }
 
                         inFlight++;
@@ -947,7 +943,7 @@ void CRequestManager::SendRequests()
             for (auto iter : mapBatchTxnRequests)
             {
                 iter.first.get()->PushMessage(NetMsgType::GETDATA, iter.second);
-                LOG(REQ, "Sent batched request with %d transations to node %s\n", iter.second.size(),
+                LOG(REQ, "Sent batched request with %d transactions to node %s\n", iter.second.size(),
                     iter.first.get()->GetLogName());
             }
         }
