@@ -17,7 +17,10 @@
 
 #ifdef DEBUG_LOCKORDER // this ifdef covers the rest of the file
 #ifdef __linux__
+// clang-format off
+#include <unistd.h>
 #include <sys/syscall.h>
+// clang-format on
 inline uint64_t getTid(void)
 {
     // "native" thread id used so the number correlates with what is shown in gdb
