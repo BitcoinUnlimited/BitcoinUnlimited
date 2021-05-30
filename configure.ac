@@ -977,6 +977,15 @@ else
   fi
 fi
 
+if test "x$use_zmq" = xyes; then
+  dnl Assume libzmq was built for static linking
+  case $host in
+    *mingw*)
+      ZMQ_CFLAGS="$ZMQ_CFLAGS -DZMQ_STATIC"
+    ;;
+  esac
+fi
+
 save_CXXFLAGS="${CXXFLAGS}"
 CXXFLAGS="${CXXFLAGS} ${CRYPTO_CFLAGS} ${SSL_CFLAGS}"
 AC_CHECK_DECLS([EVP_MD_CTX_new],,,[AC_INCLUDES_DEFAULT
