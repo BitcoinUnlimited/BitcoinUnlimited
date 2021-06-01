@@ -393,7 +393,7 @@ public:
         // we need to let this one around because scalenet is still used for asert activation
         consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
         // Nov 15, 2020 hard fork¶
-        consensus.nov2020Height = 142148;
+        consensus.nov2020Height = 1421481;
 
         // May 15, 2021 12:00:00 UTC protocol upgrade
         consensus.may2021ActivationTime = MAY2021_ACTIVATION_TIME;
@@ -468,7 +468,7 @@ public:
         // Nov 15th 2019 activate Schnorr Multisig, minimal data
         checkpoints[1341712] = uint256S("0x00000000fffc44ea2e202bd905a9fbbb9491ef9e9d5a9eed4039079229afa35b");
         // May 15th 2020 activate op_reverse, SigCheck
-        checkpoints[1378462] = uint256S("0x0000000099f5509b5f36b1926bcf82b21d936ebeadee811030dfbbb7fae915d7");
+        checkpoints[1378461] = uint256S("0x0000000099f5509b5f36b1926bcf82b21d936ebeadee811030dfbbb7fae915d7");
         // Nov 15th 2020 new aserti3-2d DAA
         checkpoints[1421482] = uint256S("0x0000000023e0680a8a062b3cc289a4a341124ce7fcb6340ede207e194d73b60a");
 
