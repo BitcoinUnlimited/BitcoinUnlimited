@@ -788,7 +788,7 @@ void BitcoinGUI::setNumBlocks(int count, const QDateTime &blockDate, double nVer
         prevBlocks = count;
 
 #ifdef ENABLE_WALLET
-        if (walletFrame)
+        if (walletFrame && secs >= 90 * 60)
         {
             walletFrame->showOutOfSyncWarning(true);
             modalOverlay->showHide();
