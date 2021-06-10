@@ -44,11 +44,14 @@ extern CTweak<uint64_t> syncMempoolWithPeers;
 extern CTweak<uint32_t> randomlyDontInv;
 extern CTweak<uint32_t> doubleSpendProofs;
 extern CTweak<bool> extVersionEnabled;
+extern CTweak<bool> allowp2pTxVal;
 
 /** How many inbound connections will we track before pruning entries */
 const uint32_t MAX_INBOUND_CONNECTIONS_TRACKED = 10000;
 /** maximum size (in bytes) of a batched set of transactions */
 static const uint32_t MAX_TXN_BATCH_SIZE = 10000;
+
+extern std::string DebuggerToString(CValidationDebugger &debugger);
 
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams)
@@ -2053,6 +2056,56 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 return false;
             }
         }
+    }
+
+    else if (strCommand == NetMsgType::REQTXVAL)
+    {
+        if (allowp2pTxVal.Value() == false)
+        {
+            return true;
+        }
+        uint64_t nonce;
+        CTransaction tx;
+        vRecv >> nonce;
+        vRecv >> tx;
+        CTransactionRef ptx(MakeTransactionRef(std::move(tx)));
+        const uint256 &hashTx = ptx->GetHash();
+
+        bool fOverrideFees = false;
+        TransactionClass txClass = TransactionClass::DEFAULT;
+
+        CCoinsViewCache &view = *pcoinsTip;
+        bool fHaveChain = false;
+        {
+            for (size_t i = 0; !fHaveChain && i < tx.vout.size(); i++)
+            {
+                CoinAccessor existingCoin(view, COutPoint(hashTx, i));
+                fHaveChain = !existingCoin->IsSpent();
+            }
+        }
+        bool fHaveMempool = mempool.exists(hashTx);
+        CValidationDebugger debugger;
+        if (fHaveMempool)
+        {
+            std::string err = "transaction already in mempool";
+            pfrom->PushMessage(NetMsgType::RESTXVAL, nonce, err);
+            return true;
+        }
+        else if (fHaveChain)
+        {
+            std::string err = "transaction already in block chain";
+            pfrom->PushMessage(NetMsgType::RESTXVAL, nonce, err);
+            return true;
+        }
+        CValidationState state;
+        bool fMissingInputs = false;
+        std::vector<COutPoint> vCoinsToUncache;
+        bool isRespend = false;
+        ParallelAcceptToMemoryPool(txHandlerSnap, mempool, state, std::move(ptx), AreFreeTxnsAllowed(), &fMissingInputs,
+            fOverrideFees, txClass, vCoinsToUncache, &isRespend, &debugger);
+
+        std::string result = DebuggerToString(debugger);
+        pfrom->PushMessage(NetMsgType::RESTXVAL, nonce, result);
     }
 
     else if (strCommand == NetMsgType::REJECT)
