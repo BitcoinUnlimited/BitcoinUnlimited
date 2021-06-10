@@ -71,6 +71,9 @@ const char *GETBLOCKTXN = "getblocktxn";
 const char *BLOCKTXN = "blocktxn";
 
 const char *DSPROOF = "dsproof-beta";
+
+const char *REQTXVAL = "req-txval";
+const char *RESTXVAL = "res-txval";
 };
 
 static const char *ppszTypeName[] = {
@@ -96,7 +99,7 @@ const static std::string allNetMessageTypes[] = {
     NetMsgType::MEMPOOLSYNCTX, NetMsgType::GET_MEMPOOLSYNC, NetMsgType::GET_MEMPOOLSYNCTX, NetMsgType::XPEDITEDREQUEST,
     NetMsgType::XPEDITEDBLK, NetMsgType::XPEDITEDTXN, NetMsgType::EXTVERSION, NetMsgType::XUPDATE,
     NetMsgType::SENDCMPCT, NetMsgType::CMPCTBLOCK, NetMsgType::GETBLOCKTXN, NetMsgType::BLOCKTXN, NetMsgType::DSPROOF,
-
+    NetMsgType::REQTXVAL, NetMsgType::RESTXVAL,
 };
 const static std::vector<std::string> allNetMessageTypesVec(allNetMessageTypes,
     allNetMessageTypes + ARRAYLEN(allNetMessageTypes));

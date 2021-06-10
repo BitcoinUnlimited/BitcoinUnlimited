@@ -844,12 +844,12 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 {
                     if (debugger)
                     {
-                        debugger->AddInvalidReason("Inputs are missing");
+                        debugger->AddInvalidReason("inputs-are-missing");
                         return false;
                     }
                     else
                     {
-                        state.SetDebugMessage("Inputs are missing");
+                        state.SetDebugMessage("inputs-are-missing");
                         return false; // state.Invalid(false, REJECT_MISSING_INPUTS, "bad-txns-missing-inputs", "Inputs
                         // unavailable in ParallelAcceptToMemoryPool", false);
                     }

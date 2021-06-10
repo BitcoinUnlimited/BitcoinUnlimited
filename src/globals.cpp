@@ -406,6 +406,13 @@ CTweak<unsigned int> numMsgHandlerThreads("net.msgHandlerThreads",
 CTweak<unsigned int> numTxAdmissionThreads("net.txAdmissionThreads",
     "Max transaction mempool admission threads Auto detection is zero (default: 0).",
     0);
+
+CTweak<bool> allowp2pTxVal(
+    "net.allowp2pTxVal",
+    strprintf(
+        "allow requests to check if a transaction would be accepted into the mempool via p2p message (default: false)"),
+    false);
+
 CTweak<CAmount> maxTxFee("wallet.maxTxFee",
     strprintf("Maximum total fees to use in a single wallet transaction or raw transaction; setting this too low may "
               "abort large transactions (default: %d)",

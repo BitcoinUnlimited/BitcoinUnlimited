@@ -347,6 +347,18 @@ extern const char *BLOCKTXN;
  * Double spend proof
  */
 extern const char *DSPROOF;
+
+/**
+ * Contains a request to get validation information about a tx
+ * A p2p message for the validaterawtransaction rpc request
+ */
+extern const char *REQTXVAL;
+
+/**
+ * Contains a response with validation information about a tx
+ * A p2p message for the validaterawtransaction rpc response
+ */
+extern const char *RESTXVAL;
 };
 
 

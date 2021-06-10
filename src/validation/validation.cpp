@@ -1032,7 +1032,10 @@ bool CheckInputs(const CTransactionRef &tx,
                 debugger->AddInputCheckError(state.GetRejectReason());
                 debugger->FinishCheckInputSession();
             }
-            return false;
+            else
+            {
+                return false;
+            }
         }
         if (pvChecks)
             pvChecks->reserve(tx->vin.size());

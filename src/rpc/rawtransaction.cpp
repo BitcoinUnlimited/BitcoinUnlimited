@@ -1547,6 +1547,49 @@ void InputDebuggerToJSON(const CInputDebugger &input, UniValue &result)
     result.pushKV("inputs", uv_vdata);
 }
 
+UniValue DebuggerToJSON(CValidationDebugger &debugger)
+{
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("txid", debugger.txid);
+    result.pushKV("isValid", debugger.IsValid());
+    result.pushKV("isMineable", debugger.mineable);
+    result.pushKV("isFutureMineable", debugger.futureMineable);
+    result.pushKV("isStandard", debugger.standard);
+
+    UniValue uv_txmetadata(UniValue::VOBJ);
+    std::map<std::string, std::string>::iterator it;
+    for (it = debugger.txMetadata.begin(); it != debugger.txMetadata.end(); ++it)
+    {
+        uv_txmetadata.pushKV(it->first, it->second);
+    }
+    result.pushKV("metadata", uv_txmetadata);
+
+    UniValue uv_errors(UniValue::VARR);
+    std::vector<std::string> strRejectReasons = debugger.GetRejectReasons();
+    for (auto &error : strRejectReasons)
+    {
+        uv_errors.push_back(error);
+    }
+    result.pushKV("errors", uv_errors);
+
+    UniValue uv_inputCheck1(UniValue::VOBJ);
+    CInputDebugger input1 = debugger.GetInputCheck1();
+    InputDebuggerToJSON(input1, uv_inputCheck1);
+    result.pushKV("inputs_flags", uv_inputCheck1);
+
+    UniValue uv_inputCheck2(UniValue::VOBJ);
+    CInputDebugger input2 = debugger.GetInputCheck2();
+    InputDebuggerToJSON(input2, uv_inputCheck2);
+    result.pushKV("inputs_mandatoryFlags", uv_inputCheck2);
+    return result;
+}
+
+std::string DebuggerToString(CValidationDebugger &debugger)
+{
+    UniValue result = DebuggerToJSON(debugger);
+    return result.write(2);
+}
+
 UniValue validaterawtransaction(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 3)
@@ -1679,7 +1722,6 @@ UniValue validaterawtransaction(const UniValue &params, bool fHelp)
             fHaveChain = !existingCoin->IsSpent();
         }
     }
-    UniValue result(UniValue::VOBJ);
     bool fHaveMempool = mempool.exists(hashTx);
     CValidationDebugger debugger;
     if (!fHaveMempool && !fHaveChain)
@@ -1696,38 +1738,7 @@ UniValue validaterawtransaction(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "transaction already in block chain");
     }
 
-    result.pushKV("txid", debugger.txid);
-    result.pushKV("isValid", debugger.IsValid());
-    result.pushKV("isMineable", debugger.mineable);
-    result.pushKV("isFutureMineable", debugger.futureMineable);
-    result.pushKV("isStandard", debugger.standard);
-
-    UniValue uv_txmetadata(UniValue::VOBJ);
-    std::map<std::string, std::string>::iterator it;
-    for (it = debugger.txMetadata.begin(); it != debugger.txMetadata.end(); ++it)
-    {
-        uv_txmetadata.pushKV(it->first, it->second);
-    }
-    result.pushKV("metadata", uv_txmetadata);
-
-    UniValue uv_errors(UniValue::VARR);
-    std::vector<std::string> strRejectReasons = debugger.GetRejectReasons();
-    for (auto &error : strRejectReasons)
-    {
-        uv_errors.push_back(error);
-    }
-    result.pushKV("errors", uv_errors);
-
-    UniValue uv_inputCheck1(UniValue::VOBJ);
-    CInputDebugger input1 = debugger.GetInputCheck1();
-    InputDebuggerToJSON(input1, uv_inputCheck1);
-    result.pushKV("inputs_flags", uv_inputCheck1);
-
-    UniValue uv_inputCheck2(UniValue::VOBJ);
-    CInputDebugger input2 = debugger.GetInputCheck2();
-    InputDebuggerToJSON(input2, uv_inputCheck2);
-    result.pushKV("inputs_mandatoryFlags", uv_inputCheck2);
-    return result;
+    return DebuggerToJSON(debugger);
 }
 
 UniValue enqueuerawtransaction(const UniValue &params, bool fHelp)

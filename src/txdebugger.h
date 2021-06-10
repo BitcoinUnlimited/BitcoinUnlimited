@@ -140,9 +140,9 @@ public:
         strRejectReasons.clear();
         txMetadata.clear();
         txid = "";
-        mineable = true;
-        futureMineable = true;
-        standard = true;
+        mineable = false;
+        futureMineable = false;
+        standard = false;
         inputSession = 1;
         inputsCheck1.SetNull();
         inputsCheck2.SetNull();
