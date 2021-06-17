@@ -56,10 +56,11 @@ check-formatting:
     extends: .cache-linting
     needs: []
     script:
-        - export LINTER_DEB_URL=https://www.bitcoinunlimited.info/depends-sources/
-        - curl --location $LINTER_DEB_URL/libllvm3.8_3.8.1-27ubuntu1_amd64.deb -o llvm-3.8.deb;
-        - curl --location $LINTER_DEB_URL/clang-format-3.8_3.8.1-27ubuntu1_amd64.deb -o clang-format-3.8.deb;
-        - dpkg -i llvm-3.8.deb clang-format-3.8.deb;
+        - apt-get install -y wget gpg-agent
+        - wget https://apt.llvm.org/llvm.sh
+        - chmod +x llvm.sh
+        - ./llvm.sh 12
+        - apt-get install clang-format-12
         - ./autogen.sh
         - ./configure --with-incompatible-bdb --enable-glibc-back-compat --enable-reduce-exports
         - make check-formatting
