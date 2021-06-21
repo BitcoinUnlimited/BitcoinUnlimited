@@ -129,6 +129,7 @@ class FuzzDeserNet : public FuzzTestNet
 {
 public:
     FuzzDeserNet(std::string classname) : FuzzTestNet(classname + "_deser") {}
+
 protected:
     void run(const bool produce_output)
     {
@@ -148,6 +149,7 @@ class FuzzBlockMerkleRoot : FuzzTestNet
 {
 public:
     FuzzBlockMerkleRoot() : FuzzTestNet("cblockmerkleroot_deser") {}
+
 protected:
     void run(const bool produce_output)
     {
@@ -169,6 +171,7 @@ class FuzzCMessageHeader : FuzzTestNet
 {
 public:
     FuzzCMessageHeader() : FuzzTestNet("cmessageheader_deser") {}
+
 protected:
     void run(const bool produce_output)
     {
@@ -190,6 +193,7 @@ class FuzzCTxOutCompressor : FuzzTestNet
 {
 public:
     FuzzCTxOutCompressor() : FuzzTestNet("ctxoutcompressor_deser") {}
+
 protected:
     void run(const bool produce_output)
     {
@@ -211,6 +215,7 @@ class FuzzWildmatch : FuzzTest
 {
 public:
     FuzzWildmatch() : FuzzTest("wildmatch") {}
+
 protected:
     void run(const bool produce_output)
     {
@@ -233,6 +238,7 @@ class FuzzCashAddrEncDec : FuzzTest
 {
 public:
     FuzzCashAddrEncDec() : FuzzTest("cashaddr_encdec") {}
+
 protected:
     void run(const bool produce_output)
     {
@@ -259,6 +265,7 @@ class FuzzCashAddrDecode : FuzzTest
 {
 public:
     FuzzCashAddrDecode() : FuzzTest("cashaddr_decode") {}
+
 protected:
     void run(const bool produce_output)
     {
@@ -283,6 +290,7 @@ class FuzzParseMoney : FuzzTest
 {
 public:
     FuzzParseMoney() : FuzzTest("parsemoney") {}
+
 protected:
     void run(const bool produce_output)
     {
@@ -307,6 +315,7 @@ class FuzzParseFixedPoint : FuzzTest
 {
 public:
     FuzzParseFixedPoint() : FuzzTest("parsefixedpoint") {}
+
 protected:
     void run(const bool produce_output)
     {
@@ -334,6 +343,7 @@ class FuzzVerifyScript : FuzzTestNet
 {
 public:
     FuzzVerifyScript() : FuzzTestNet("verifyscript") {}
+
 protected:
     void run(const bool produce_output)
     {
@@ -386,6 +396,7 @@ class FuzzTester : public FuzzTest
 {
 public:
     FuzzTester() : FuzzTest("tester") {}
+
 protected:
     void run(const bool produce_output)
     {
@@ -409,6 +420,7 @@ class FuzzAPICIblt : FuzzTestNet
 {
 public:
     FuzzAPICIblt() : FuzzTestNet("api_iblt") {}
+
 protected:
     void run(const bool produce_output)
     {
@@ -507,6 +519,7 @@ class FuzzAPICGrapheneSet : FuzzTestNet
 {
 public:
     FuzzAPICGrapheneSet() : FuzzTestNet("api_graphene_set") {}
+
 protected:
     void run(const bool produce_output)
     {

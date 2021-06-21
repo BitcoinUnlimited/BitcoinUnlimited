@@ -17,7 +17,7 @@ class QValueComboBox;
 QT_END_NAMESPACE
 
 /** Widget for entering bitcoin amounts.
-  */
+ */
 class BitcoinAmountField : public QWidget
 {
     Q_OBJECT

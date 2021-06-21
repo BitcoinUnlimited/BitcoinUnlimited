@@ -1041,13 +1041,17 @@ UniValue estimatesmartfee(const UniValue &params, bool fHelp)
 static const CRPCCommand commands[] = {
     //  category              name                      actor (function)         okSafeMode
     //  --------------------- ------------------------  -----------------------  ----------
-    {"mining", "getnetworkhashps", &getnetworkhashps, true}, {"mining", "getmininginfo", &getmininginfo, true},
+    {"mining", "getnetworkhashps", &getnetworkhashps, true},
+    {"mining", "getmininginfo", &getmininginfo, true},
     {"mining", "prioritisetransaction", &prioritisetransaction, true},
-    {"mining", "getblocktemplate", &getblocktemplate, true}, {"mining", "submitblock", &submitblock, true},
+    {"mining", "getblocktemplate", &getblocktemplate, true},
+    {"mining", "submitblock", &submitblock, true},
 
-    {"generating", "generate", &generate, true}, {"generating", "generatetoaddress", &generatetoaddress, true},
+    {"generating", "generate", &generate, true},
+    {"generating", "generatetoaddress", &generatetoaddress, true},
 
-    {"util", "estimatefee", &estimatefee, true}, {"util", "estimatesmartfee", &estimatesmartfee, true},
+    {"util", "estimatefee", &estimatefee, true},
+    {"util", "estimatesmartfee", &estimatesmartfee, true},
 };
 
 void RegisterMiningRPCCommands(CRPCTable &table)

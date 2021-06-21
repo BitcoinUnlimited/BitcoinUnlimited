@@ -148,8 +148,9 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                             if (mi->nStatus & BLOCK_EXCESSIVE)
                                 fSend = false;
                             if (!fSend)
-                                LOG(NET, "%s: ignoring request from peer=%s for excessive block of height %d not on "
-                                         "the main chain\n",
+                                LOG(NET,
+                                    "%s: ignoring request from peer=%s for excessive block of height %d not on "
+                                    "the main chain\n",
                                     __func__, pfrom->GetLogName(), mi->nHeight);
                         }
                         // TODO: in the future we can throttle old block requests by setting send=false if we are out
@@ -621,8 +622,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
 
         if (pfrom->addrFromPort != 0)
         {
-            LOG(NET, "Encountered odd node that sent BUVERSION before XVERSION. Ignoring duplicate addrFromPort "
-                     "setting. peer=%s version=%s\n",
+            LOG(NET,
+                "Encountered odd node that sent BUVERSION before XVERSION. Ignoring duplicate addrFromPort "
+                "setting. peer=%s version=%s\n",
                 pfrom->GetLogName(), pfrom->cleanSubVer);
         }
 
@@ -954,8 +956,9 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
                 }
                 else
                 {
-                    LOG(NET, "skipping request of block %s.  already have: %d  importing: %d  reindex: %d  "
-                             "isChainNearlySyncd: %d\n",
+                    LOG(NET,
+                        "skipping request of block %s.  already have: %d  importing: %d  reindex: %d  "
+                        "isChainNearlySyncd: %d\n",
                         inv.hash.ToString(), fAlreadyHaveBlock, fImporting, fReindex, IsChainNearlySyncd());
                 }
             }
@@ -2386,8 +2389,9 @@ bool ProcessMessages(CNode *pfrom)
             if (strstr(e.what(), "end of data"))
             {
                 // Allow exceptions from under-length message on vRecv
-                LOG(NET, "%s(%s, %u bytes): Exception '%s' caught, normally caused by a message being shorter than "
-                         "its stated length\n",
+                LOG(NET,
+                    "%s(%s, %u bytes): Exception '%s' caught, normally caused by a message being shorter than "
+                    "its stated length\n",
                     __func__, SanitizeString(strCommand), nMessageSize, e.what());
             }
             else if (strstr(e.what(), "size too large"))

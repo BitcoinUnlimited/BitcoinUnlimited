@@ -11,9 +11,9 @@
 #include "streams.h"
 
 /**
-* Default constructor initializes CBanDB file path based on user specified
-* data directory.
-*/
+ * Default constructor initializes CBanDB file path based on user specified
+ * data directory.
+ */
 CBanDB::CBanDB()
 {
     // initialize the CBanDB file path based on user specified data directory
@@ -21,11 +21,11 @@ CBanDB::CBanDB()
 }
 
 /**
-* Writes the the passed in banmap_t to disk
-*
-* @param[in] banSet  The banmap_t to write to disk
-* @return true if banlist successfully written to disk, otherwise false
-*/
+ * Writes the the passed in banmap_t to disk
+ *
+ * @param[in] banSet  The banmap_t to write to disk
+ * @return true if banlist successfully written to disk, otherwise false
+ */
 bool CBanDB::Write(const banmap_t &banSet)
 {
     // Generate random temporary filename
@@ -67,11 +67,11 @@ bool CBanDB::Write(const banmap_t &banSet)
 }
 
 /**
-* Reads the banlist from disk and stores in the passed in banmap_t
-*
-* @param[in,out] banSet  The banmap_t to which ban entries are added
-* @return true if banlist successfully read from disk, otherwise false
-*/
+ * Reads the banlist from disk and stores in the passed in banmap_t
+ *
+ * @param[in,out] banSet  The banmap_t to which ban entries are added
+ * @return true if banlist successfully read from disk, otherwise false
+ */
 bool CBanDB::Read(banmap_t &banSet)
 {
     // open input file, and associate with CAutoFile

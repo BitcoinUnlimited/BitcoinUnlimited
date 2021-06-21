@@ -180,8 +180,9 @@ CAmount TxConfirmStats::EstimateMedianVal(int confTarget,
         median = minTxFee;
     }
 
-    LOG(ESTIMATEFEE, "%3d: For conf success > %4.2f need >: %12.5g from bucket %8g  Cur Bucket "
-                     "stats %6.2f%%  %8.1f/(%.1f+%d mempool)\n",
+    LOG(ESTIMATEFEE,
+        "%3d: For conf success > %4.2f need >: %12.5g from bucket %8g  Cur Bucket "
+        "stats %6.2f%%  %8.1f/(%.1f+%d mempool)\n",
         confTarget, successBreakPoint, median, buckets[selectedBucket], 100 * nConf / (totalNum + extraNum), nConf,
         totalNum, extraNum);
 

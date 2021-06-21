@@ -12,11 +12,11 @@
 
 
 /**
-* Maintain validation-specific state about nodes, instead
-* of by CNode's own locks. This simplifies asynchronous operation, where
-* processing of incoming data is done after the ProcessMessage call returns,
-* and we're no longer holding the node's locks.
-*/
+ * Maintain validation-specific state about nodes, instead
+ * of by CNode's own locks. This simplifies asynchronous operation, where
+ * processing of incoming data is done after the ProcessMessage call returns,
+ * and we're no longer holding the node's locks.
+ */
 struct CNodeState
 {
     //! The peer's address

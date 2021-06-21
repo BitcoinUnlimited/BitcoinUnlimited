@@ -337,9 +337,10 @@ UniValue getrawmempool(const UniValue &params, bool fHelp)
             "\nResult: (for verbose = true):\n"
             "{                           (json object)\n"
             "  \"transactionid\" : {       (json object)\n" +
-            EntryDescriptionString() + "  }, ...\n"
-                                       "}\n"
-                                       "\nExamples\n" +
+            EntryDescriptionString() +
+            "  }, ...\n"
+            "}\n"
+            "\nExamples\n" +
             HelpExampleCli("getrawmempool", "true") + HelpExampleRpc("getrawmempool", "true"));
 
     LOCK(cs_main);
@@ -386,9 +387,10 @@ UniValue getmempoolancestors(const UniValue &params, bool fHelp)
             "\nResult (for verbose=true):\n"
             "{                           (json object)\n"
             "  \"transactionid\" : {       (json object)\n" +
-            EntryDescriptionString() + "  }, ...\n"
-                                       "}\n"
-                                       "\nExamples\n" +
+            EntryDescriptionString() +
+            "  }, ...\n"
+            "}\n"
+            "\nExamples\n" +
             HelpExampleCli("getmempoolancestors", "\"mytxid\"") + HelpExampleRpc("getmempoolancestors", "\"mytxid\""));
     }
 
@@ -455,9 +457,10 @@ UniValue getmempooldescendants(const UniValue &params, bool fHelp)
             "\nResult (for verbose=true):\n"
             "{                           (json object)\n"
             "  \"transactionid\" : {       (json object)\n" +
-            EntryDescriptionString() + "  }, ...\n"
-                                       "}\n"
-                                       "\nExamples\n" +
+            EntryDescriptionString() +
+            "  }, ...\n"
+            "}\n"
+            "\nExamples\n" +
             HelpExampleCli("getmempooldescendants", "\"mytxid\"") +
             HelpExampleRpc("getmempooldescendants", "\"mytxid\""));
     }
@@ -516,8 +519,9 @@ UniValue getmempoolentry(const UniValue &params, bool fHelp)
                             "1. \"txid\"                   (string, required) The transaction id (must be in mempool)\n"
                             "\nResult:\n"
                             "{                           (json object)\n" +
-                            EntryDescriptionString() + "}\n"
-                                                       "\nExamples\n" +
+                            EntryDescriptionString() +
+                            "}\n"
+                            "\nExamples\n" +
                             HelpExampleCli("getmempoolentry", "\"mytxid\"") +
                             HelpExampleRpc("getmempoolentry", "\"mytxid\""));
     }
@@ -989,19 +993,19 @@ UniValue evicttransaction(const UniValue &params, bool fHelp)
 UniValue gettxout(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 3)
-        throw runtime_error(
-            "gettxout \"txid\" n ( includemempool )\n"
-            "\nReturns details about an unspent transaction output.\n"
-            "\nArguments:\n"
-            "1. \"txid\"       (string, required) The transaction id\n"
-            "2. n              (numeric, required) vout value\n"
-            "3. includemempool  (boolean, optional) Whether to included the mem pool\n"
-            "\nResult:\n"
-            "{\n"
-            "  \"bestblock\" : \"hash\",    (string) the block hash\n"
-            "  \"confirmations\" : n,       (numeric) The number of confirmations\n"
-            "  \"value\" : x.xxx,           (numeric) The transaction value in " +
-            CURRENCY_UNIT + "\n"
+        throw runtime_error("gettxout \"txid\" n ( includemempool )\n"
+                            "\nReturns details about an unspent transaction output.\n"
+                            "\nArguments:\n"
+                            "1. \"txid\"       (string, required) The transaction id\n"
+                            "2. n              (numeric, required) vout value\n"
+                            "3. includemempool  (boolean, optional) Whether to included the mem pool\n"
+                            "\nResult:\n"
+                            "{\n"
+                            "  \"bestblock\" : \"hash\",    (string) the block hash\n"
+                            "  \"confirmations\" : n,       (numeric) The number of confirmations\n"
+                            "  \"value\" : x.xxx,           (numeric) The transaction value in " +
+                            CURRENCY_UNIT +
+                            "\n"
                             "  \"scriptPubKey\" : {         (json object)\n"
                             "     \"asm\" : \"code\",       (string) \n"
                             "     \"hex\" : \"hex\",        (string) \n"
@@ -1018,8 +1022,9 @@ UniValue gettxout(const UniValue &params, bool fHelp)
 
                             "\nExamples:\n"
                             "\nGet unspent transactions\n" +
-            HelpExampleCli("listunspent", "") + "\nView the details\n" + HelpExampleCli("gettxout", "\"txid\" 1") +
-            "\nAs a json rpc call\n" + HelpExampleRpc("gettxout", "\"txid\", 1"));
+                            HelpExampleCli("listunspent", "") + "\nView the details\n" +
+                            HelpExampleCli("gettxout", "\"txid\" 1") + "\nAs a json rpc call\n" +
+                            HelpExampleRpc("gettxout", "\"txid\", 1"));
 
     LOCK(cs_main); // for pcoinsTip
 
@@ -1080,12 +1085,14 @@ UniValue verifychain(const UniValue &params, bool fHelp)
                             "\nVerifies blockchain database.\n"
                             "\nArguments:\n"
                             "1. checklevel   (numeric, optional, 0-4, default=" +
-                            strprintf("%d", nCheckLevel) + ") How thorough the block verification is.\n"
-                                                           "2. numblocks    (numeric, optional, default=" +
-                            strprintf("%d", nCheckDepth) + ", 0=all) The number of blocks to check.\n"
-                                                           "\nResult:\n"
-                                                           "true|false       (boolean) Verified or not\n"
-                                                           "\nExamples:\n" +
+                            strprintf("%d", nCheckLevel) +
+                            ") How thorough the block verification is.\n"
+                            "2. numblocks    (numeric, optional, default=" +
+                            strprintf("%d", nCheckDepth) +
+                            ", 0=all) The number of blocks to check.\n"
+                            "\nResult:\n"
+                            "true|false       (boolean) Verified or not\n"
+                            "\nExamples:\n" +
                             HelpExampleCli("verifychain", "") + HelpExampleRpc("verifychain", ""));
 
     LOCK(cs_main);
@@ -1719,9 +1726,10 @@ UniValue rollbackchain(const UniValue &params, bool fHelp)
                             " blocks allowed)\n"
                             "2. override      (boolean, optional, default=false) rollback more than the \
                             allowed default limit of " +
-                            std::to_string(nDefaultRollbackLimit) + " blocks)\n"
-                                                                    "\nResult:\n"
-                                                                    "\nExamples:\n" +
+                            std::to_string(nDefaultRollbackLimit) +
+                            " blocks)\n"
+                            "\nResult:\n"
+                            "\nExamples:\n" +
                             HelpExampleCli("rollbackchain", "\"501245\"") +
                             HelpExampleCli("rollbackchain", "\"495623 true\"") +
                             HelpExampleRpc("rollbackchain", "\"blockheight\""));
@@ -1905,7 +1913,7 @@ static inline bool SetHasKeys(const std::set<T> &set)
     return false;
 }
 template <typename T, typename Tk, typename... Args>
-static inline bool SetHasKeys(const std::set<T> &set, const Tk &key, const Args &... args)
+static inline bool SetHasKeys(const std::set<T> &set, const Tk &key, const Args &...args)
 {
     return (set.count(key) != 0) || SetHasKeys(set, args...);
 }
@@ -2334,22 +2342,31 @@ static const CRPCCommand commands[] = {
     //  --------------------- ------------------------  -----------------------  ----------
     {"blockchain", "getblockchaininfo", &getblockchaininfo, true},
     {"blockchain", "getchaintxstats", &getchaintxstats, true},
-    {"blockchain", "getbestblockhash", &getbestblockhash, true}, {"blockchain", "getblockcount", &getblockcount, true},
-    {"blockchain", "getblock", &getblock, true}, {"blockchain", "getblockhash", &getblockhash, true},
-    {"blockchain", "getblockheader", &getblockheader, true}, {"blockchain", "getchaintips", &getchaintips, true},
+    {"blockchain", "getbestblockhash", &getbestblockhash, true},
+    {"blockchain", "getblockcount", &getblockcount, true},
+    {"blockchain", "getblock", &getblock, true},
+    {"blockchain", "getblockhash", &getblockhash, true},
+    {"blockchain", "getblockheader", &getblockheader, true},
+    {"blockchain", "getchaintips", &getchaintips, true},
     {"blockchain", "getdifficulty", &getdifficulty, true},
     {"blockchain", "getmempoolancestors", &getmempoolancestors, true},
     {"blockchain", "getmempooldescendants", &getmempooldescendants, true},
-    {"blockchain", "getmempoolentry", &getmempoolentry, true}, {"blockchain", "getmempoolinfo", &getmempoolinfo, true},
+    {"blockchain", "getmempoolentry", &getmempoolentry, true},
+    {"blockchain", "getmempoolinfo", &getmempoolinfo, true},
     {"blockchain", "getorphanpoolinfo", &getorphanpoolinfo, true},
-    {"blockchain", "evicttransaction", &evicttransaction, true}, {"blockchain", "getrawmempool", &getrawmempool, true},
-    {"blockchain", "getraworphanpool", &getraworphanpool, true}, {"blockchain", "gettxout", &gettxout, true},
-    {"blockchain", "gettxoutsetinfo", &gettxoutsetinfo, true}, {"blockchain", "savemempool", &savemempool, true},
-    {"blockchain", "saveorphanpool", &saveorphanpool, true}, {"blockchain", "verifychain", &verifychain, true},
+    {"blockchain", "evicttransaction", &evicttransaction, true},
+    {"blockchain", "getrawmempool", &getrawmempool, true},
+    {"blockchain", "getraworphanpool", &getraworphanpool, true},
+    {"blockchain", "gettxout", &gettxout, true},
+    {"blockchain", "gettxoutsetinfo", &gettxoutsetinfo, true},
+    {"blockchain", "savemempool", &savemempool, true},
+    {"blockchain", "saveorphanpool", &saveorphanpool, true},
+    {"blockchain", "verifychain", &verifychain, true},
     {"blockchain", "getblockstats", &getblockstats, true},
 
     /* Not shown in help */
-    {"hidden", "invalidateblock", &invalidateblock, true}, {"hidden", "reconsiderblock", &reconsiderblock, true},
+    {"hidden", "invalidateblock", &invalidateblock, true},
+    {"hidden", "reconsiderblock", &reconsiderblock, true},
     {"hidden", "rollbackchain", &rollbackchain, true},
     {"hidden", "reconsidermostworkchain", &reconsidermostworkchain, true},
     {"hidden", "finalizeblock", &finalizeblock, true},

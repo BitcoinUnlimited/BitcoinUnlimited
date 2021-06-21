@@ -260,4 +260,4 @@ void set_extversion_flags(CExtversionMessage &xver, const std::string &network)
         xver.set_u64c(XVer::BU_ELECTRUM_SERVER_PROTOCOL_VERSION, electrum_protocol_version);
     }
 }
-} // ns electrum
+} // namespace electrum

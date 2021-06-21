@@ -464,7 +464,8 @@ static const CRPCCommand commands[] = {
     //  --------------------- ------------------------  -----------------------  ----------
     {"control", "getinfo", &getinfo, true}, /* uses wallet if enabled */
     {"util", "validateaddress", &validateaddress, true}, /* uses wallet if enabled */
-    {"util", "createmultisig", &createmultisig, true}, {"util", "verifymessage", &verifymessage, true},
+    {"util", "createmultisig", &createmultisig, true},
+    {"util", "verifymessage", &verifymessage, true},
     {"util", "logline", &logline, true},
 
     /* Not shown in help */

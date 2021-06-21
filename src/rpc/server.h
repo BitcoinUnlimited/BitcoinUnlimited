@@ -27,7 +27,7 @@ namespace RPCServer
 void OnStarted(boost::function<void()> slot);
 void OnStopped(boost::function<void()> slot);
 void OnPreCommand(boost::function<void(const CRPCCommand &)> slot);
-}
+} // namespace RPCServer
 
 class CBlockIndex;
 class CNetAddr;
@@ -158,9 +158,9 @@ public:
     UniValue execute(const std::string &method, const UniValue &params) const;
 
     /**
-    * Returns a list of registered commands
-    * @returns List of registered commands.
-    */
+     * Returns a list of registered commands
+     * @returns List of registered commands.
+     */
     std::vector<std::string> listCommands() const;
 
 

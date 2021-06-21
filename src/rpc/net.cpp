@@ -806,12 +806,18 @@ UniValue clearbanned(const UniValue &params, bool fHelp)
 static const CRPCCommand commands[] = {
     //  category              name                      actor (function)         okSafeMode
     //  --------------------- ------------------------  -----------------------  ----------
-    {"network", "getconnectioncount", &getconnectioncount, true}, {"network", "ping", &ping, true},
-    {"network", "getpeerinfo", &getpeerinfo, true}, {"network", "addnode", &addnode, true},
-    {"network", "disconnectnode", &disconnectnode, true}, {"network", "getaddednodeinfo", &getaddednodeinfo, true},
-    {"network", "getnettotals", &getnettotals, true}, {"network", "getnetworkinfo", &getnetworkinfo, true},
-    {"network", "setban", &setban, true}, {"network", "listbanned", &listbanned, true},
-    {"network", "clearblockstats", &clearblockstats, true}, {"network", "clearbanned", &clearbanned, true},
+    {"network", "getconnectioncount", &getconnectioncount, true},
+    {"network", "ping", &ping, true},
+    {"network", "getpeerinfo", &getpeerinfo, true},
+    {"network", "addnode", &addnode, true},
+    {"network", "disconnectnode", &disconnectnode, true},
+    {"network", "getaddednodeinfo", &getaddednodeinfo, true},
+    {"network", "getnettotals", &getnettotals, true},
+    {"network", "getnetworkinfo", &getnetworkinfo, true},
+    {"network", "setban", &setban, true},
+    {"network", "listbanned", &listbanned, true},
+    {"network", "clearblockstats", &clearblockstats, true},
+    {"network", "clearbanned", &clearbanned, true},
 };
 
 void RegisterNetRPCCommands(CRPCTable &table)

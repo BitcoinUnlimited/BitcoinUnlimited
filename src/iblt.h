@@ -225,6 +225,7 @@ public:
 
     // Returns true if any elements have been inserted into the IBLT since creation or reset
     inline bool isModified() { return is_modified; }
+
 protected:
     void _insert(int plusOrMinus, uint64_t k, const std::vector<uint8_t> &v);
 

@@ -176,8 +176,9 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &sta
     uint32_t expectedNbits = GetNextWorkRequired(pindexPrev, &block, consensusParams);
     if (block.nBits != expectedNbits)
     {
-        return state.DoS(100, error("%s: incorrect proof of work. Height %d, Block nBits 0x%x, expected 0x%x", __func__,
-                                  nHeight, block.nBits, expectedNbits),
+        return state.DoS(100,
+            error("%s: incorrect proof of work. Height %d, Block nBits 0x%x, expected 0x%x", __func__, nHeight,
+                block.nBits, expectedNbits),
             REJECT_INVALID, "bad-diffbits");
     }
 
@@ -188,8 +189,9 @@ bool ContextualCheckBlockHeader(const CBlockHeader &block, CValidationState &sta
         // then we are on the wrong fork so ignore
         if (!CheckAgainstCheckpoint(nHeight, block.GetHash(), chainparams))
         {
-            return state.DoS(0, error("%s: invalid header at checkpoint (height %d) (hash %s)", __func__, nHeight,
-                                    block.GetHash().ToString()),
+            return state.DoS(0,
+                error("%s: invalid header at checkpoint (height %d) (hash %s)", __func__, nHeight,
+                    block.GetHash().ToString()),
                 REJECT_CHECKPOINT, "bad-header-at-checkpoint");
         }
         READLOCK(cs_mapBlockIndex);
@@ -273,8 +275,9 @@ bool AcceptBlockHeader(const CBlockHeader &block,
         CBlockIndex *pindexPrev = LookupBlockIndex(block.hashPrevBlock);
         if (!pindexPrev)
         {
-            return state.DoS(10, error("%s: previous block %s not found while accepting %s", __func__,
-                                     block.hashPrevBlock.ToString(), hash.ToString()),
+            return state.DoS(10,
+                error("%s: previous block %s not found while accepting %s", __func__, block.hashPrevBlock.ToString(),
+                    hash.ToString()),
                 0, "bad-prevblk");
         }
 
@@ -1129,9 +1132,9 @@ bool CheckInputs(const CTransactionRef &tx,
                                 }
                                 else
                                 {
-                                    return state.Invalid(
-                                        false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)",
-                                                                       ScriptErrorString(scriptError)));
+                                    return state.Invalid(false, REJECT_NONSTANDARD,
+                                        strprintf(
+                                            "non-mandatory-script-verify-flag (%s)", ScriptErrorString(scriptError)));
                                 }
                             }
                             // update the error message to reflect the mandatory violation.
@@ -1157,9 +1160,9 @@ bool CheckInputs(const CTransactionRef &tx,
                             }
                             else
                             {
-                                return state.Invalid(
-                                    false, REJECT_INVALID, strprintf("upgrade-conditional-script-failure (%s)",
-                                                               ScriptErrorString(check.GetScriptError())));
+                                return state.Invalid(false, REJECT_INVALID,
+                                    strprintf("upgrade-conditional-script-failure (%s)",
+                                        ScriptErrorString(check.GetScriptError())));
                             }
                         }
 
@@ -1641,11 +1644,11 @@ bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIn
                               scriptSigHex = HexStr(
                                   scriptSig.begin(), scriptSig.begin() + std::min(expect.size(), scriptSig.size()));
 
-            return state.DoS(100, error("%s: block height not correctly encoded in coinbase, expected minimally-encoded"
-                                        " height %d (script hex: %s), instead got hex: %s, block is %s, parent block is"
-                                        " %s, pprev is %s",
-                                      __func__, nHeight, expectHex, scriptSigHex, hashHex, hashpHex,
-                                      pindexPrev->phashBlock->ToString()),
+            return state.DoS(100,
+                error("%s: block height not correctly encoded in coinbase, expected minimally-encoded"
+                      " height %d (script hex: %s), instead got hex: %s, block is %s, parent block is"
+                      " %s, pprev is %s",
+                    __func__, nHeight, expectHex, scriptSigHex, hashHex, hashpHex, pindexPrev->phashBlock->ToString()),
                 REJECT_INVALID, "bad-cb-height");
         }
     }
@@ -2333,8 +2336,9 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
                         {
                             return false;
                         }
-                        return state.DoS(100, error("%s: block %s inputs missing/spent in tx %d %s", __func__,
-                                                  block.GetHash().ToString(), i, tx.GetHash().ToString()),
+                        return state.DoS(100,
+                            error("%s: block %s inputs missing/spent in tx %d %s", __func__, block.GetHash().ToString(),
+                                i, tx.GetHash().ToString()),
                             REJECT_INVALID, "bad-txns-inputs-missingorspent");
                     }
                 }
@@ -2342,8 +2346,9 @@ bool ConnectBlockDependencyOrdering(const CBlock &block,
 
                 if (!SequenceLocks(txref, nLockTimeFlags, &prevheights, *pindex))
                 {
-                    return state.DoS(100, error("%s: block %s contains a non-BIP68-final transaction", __func__,
-                                              block.GetHash().ToString()),
+                    return state.DoS(100,
+                        error("%s: block %s contains a non-BIP68-final transaction", __func__,
+                            block.GetHash().ToString()),
                         REJECT_INVALID, "bad-txns-nonfinal");
                 }
 
@@ -2520,7 +2525,7 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                 {
                     return state.DoS(100,
                         error("%s: block %s lexical misordering tx %d (%s < %s)", __func__, block.GetHash().ToString(),
-                                         i, curTxHash.ToString(), prevTxHash.ToString()),
+                            i, curTxHash.ToString(), prevTxHash.ToString()),
                         REJECT_INVALID, "bad-txn-order");
                 }
                 prevTxHash = curTxHash;
@@ -2577,8 +2582,9 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
                         {
                             return false;
                         }
-                        return state.DoS(100, error("%s: block %s inputs missing/spent in tx %d %s", __func__,
-                                                  block.GetHash().ToString(), i, tx.GetHash().ToString()),
+                        return state.DoS(100,
+                            error("%s: block %s inputs missing/spent in tx %d %s", __func__, block.GetHash().ToString(),
+                                i, tx.GetHash().ToString()),
                             REJECT_INVALID, "bad-txns-inputs-missingorspent");
                     }
                 }
@@ -2586,8 +2592,9 @@ bool ConnectBlockCanonicalOrdering(const CBlock &block,
 
                 if (!SequenceLocks(txref, nLockTimeFlags, &prevheights, *pindex))
                 {
-                    return state.DoS(100, error("%s: block %s contains a non-BIP68-final transaction", __func__,
-                                              block.GetHash().ToString()),
+                    return state.DoS(100,
+                        error("%s: block %s contains a non-BIP68-final transaction", __func__,
+                            block.GetHash().ToString()),
                         REJECT_INVALID, "bad-txns-nonfinal");
                 }
 
@@ -2784,8 +2791,9 @@ bool ConnectBlock(const CBlock &block,
 
     CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
     if (block.vtx[0]->GetValueOut() > blockReward)
-        return state.DoS(100, error("ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)",
-                                  block.vtx[0]->GetValueOut(), blockReward),
+        return state.DoS(100,
+            error("ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)", block.vtx[0]->GetValueOut(),
+                blockReward),
             REJECT_INVALID, "bad-cb-amount");
 
     if (fJustCheck)
@@ -3135,12 +3143,14 @@ static void ResubmitTransactions(CBlockRef pblock = nullptr)
         }
 
         // Resubmit and clear the mempool
-        mempool._forEachThenClear([](const auto &entry) {
-            CTxInputData txd;
-            txd.tx = entry.GetSharedTx();
-            txd.nodeName = "rollback";
-            EnqueueTxForAdmission(txd);
-        });
+        mempool._forEachThenClear(
+            [](const auto &entry)
+            {
+                CTxInputData txd;
+                txd.tx = entry.GetSharedTx();
+                txd.nodeName = "rollback";
+                EnqueueTxForAdmission(txd);
+            });
 
         // Resumbit and clear all txns currently in the txCommitQ and txCommitQFinal
         mempool.ResubmitCommitQ();
@@ -3929,9 +3939,10 @@ static bool FinalizeBlockInternal(CValidationState &state, const CBlockIndex *pi
         LOCK(cs_main); // for pindexFinalized
         if (pindexFinalized && !AreOnTheSameFork(pindex, pindexFinalized))
         {
-            return state.DoS(20, error("%s: Trying to finalize block %s which conflicts "
-                                       "with already finalized block",
-                                     __func__, pindex->GetBlockHash().ToString()),
+            return state.DoS(20,
+                error("%s: Trying to finalize block %s which conflicts "
+                      "with already finalized block",
+                    __func__, pindex->GetBlockHash().ToString()),
                 REJECT_AGAINST_FINALIZED, "bad-fork-prior-finalized");
         }
 

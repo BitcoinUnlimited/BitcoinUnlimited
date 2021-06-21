@@ -496,12 +496,12 @@ WId BitcoinApplication::getMainWinId() const
 
 const char *APP_SETTINGS_MIGRATED_FLAG = "fMigrated";
 /**
-* Checks to see if Qt App Settings have already had migration performed, based
-* on the presence of setting `fMigrated` with a value of true.
-* @param[in] to      App settings to check for prior migration and writability
-* @param[in] from    App settings to check for keys to migrate
-* @return true if migration is possible and not yet performed, otherwise false
-*/
+ * Checks to see if Qt App Settings have already had migration performed, based
+ * on the presence of setting `fMigrated` with a value of true.
+ * @param[in] to      App settings to check for prior migration and writability
+ * @param[in] from    App settings to check for keys to migrate
+ * @return true if migration is possible and not yet performed, otherwise false
+ */
 bool CanMigrateQtAppSettings(const QSettings &to, const QSettings &from)
 {
     // first check to see if the desired settings are already marked as migrated
@@ -520,13 +520,13 @@ bool CanMigrateQtAppSettings(const QSettings &to, const QSettings &from)
 }
 
 /**
-* Create a backup of Qt App Settings
-* Backup will only be performed if there are settings to backup and the backup
-* location is writable.
-* @param[in] source      App settings to be backed up
-* @param[in] backupName  Backup location name
-* @return true if backup was successful or there were no settings to backup, otherwise false
-*/
+ * Create a backup of Qt App Settings
+ * Backup will only be performed if there are settings to backup and the backup
+ * location is writable.
+ * @param[in] source      App settings to be backed up
+ * @param[in] backupName  Backup location name
+ * @return true if backup was successful or there were no settings to backup, otherwise false
+ */
 bool BackupQtAppSettings(const QSettings &source, const QString &backupName)
 {
     // parameter saftey check
@@ -563,18 +563,18 @@ bool BackupQtAppSettings(const QSettings &source, const QString &backupName)
 }
 
 /**
-* Migrates Qt App Settings from a previously installed alternate client
-* implementation (Core, XT, Classic, pre-1.0.1 BU).
-* Migration will only be performed if there are alternate settings and a prior
-* migration has not been performed.
-* @param[in] oldOrg    Org name to migrate settings from
-* @param[in] oldApp    App name to migrate settings from
-* @param[in] newOrg    Org name to migrate settings to
-* @param[in] newApp    App name to migrate settings to
-* @return true if migration was performed, otherwise false
-* @see CanMigrateQtAppSettings()
-* @see BackupQtAppSettings()
-*/
+ * Migrates Qt App Settings from a previously installed alternate client
+ * implementation (Core, XT, Classic, pre-1.0.1 BU).
+ * Migration will only be performed if there are alternate settings and a prior
+ * migration has not been performed.
+ * @param[in] oldOrg    Org name to migrate settings from
+ * @param[in] oldApp    App name to migrate settings from
+ * @param[in] newOrg    Org name to migrate settings to
+ * @param[in] newApp    App name to migrate settings to
+ * @return true if migration was performed, otherwise false
+ * @see CanMigrateQtAppSettings()
+ * @see BackupQtAppSettings()
+ */
 bool TryMigrateQtAppSettings(const QString &oldOrg, const QString &oldApp, const QString &newOrg, const QString &newApp)
 {
     // parameter saftey checks

@@ -96,7 +96,6 @@
 #include <openssl/rand.h>
 #include <set>
 #include <thread>
-#include <thread>
 #include <vector>
 // std::scopted_lock not available until c++17, use boost for now
 #include <boost/thread/mutex.hpp>
@@ -242,7 +241,7 @@ void LogInit()
     }
     LOGA("List of enabled categories: %s\n", LogGetAllString(true));
 }
-}
+} // namespace Logging
 
 const char *const BITCOIN_CONF_FILENAME = "bitcoin.conf";
 const char *const BITCOIN_PID_FILENAME = "bitcoind.pid";

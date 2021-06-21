@@ -29,8 +29,8 @@ uint64_t blockfile_chunk_size = DEFAULT_BLOCKFILE_CHUNK_SIZE;
 uint64_t undofile_chunk_size = DEFAULT_UNDOFILE_CHUNK_SIZE;
 
 /**
-  * Config param to determine what DB type we are using
-  */
+ * Config param to determine what DB type we are using
+ */
 BlockDBMode BLOCK_DB_MODE = DEFAULT_BLOCK_DB_MODE;
 
 void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache,
@@ -749,8 +749,9 @@ bool FlushStateToDiskInternal(CValidationState &state,
 
         nSizeAfterLastFlush = pcoinsTip->DynamicMemoryUsage();
     }
-    if (fDoFullFlush || fFlushForPrune || ((mode == FLUSH_STATE_ALWAYS || mode == FLUSH_STATE_PERIODIC) &&
-                                              nNow > nLastSetChain + (int64_t)DATABASE_WRITE_INTERVAL * 1000000))
+    if (fDoFullFlush || fFlushForPrune ||
+        ((mode == FLUSH_STATE_ALWAYS || mode == FLUSH_STATE_PERIODIC) &&
+            nNow > nLastSetChain + (int64_t)DATABASE_WRITE_INTERVAL * 1000000))
     {
         // Update best block in wallet (so we can detect restored wallets).
         GetMainSignals().SetBestChain(chainActive.GetLocator());

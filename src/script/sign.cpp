@@ -339,7 +339,7 @@ public:
     }
 };
 const DummySignatureChecker dummyChecker;
-}
+} // namespace
 
 const BaseSignatureChecker &DummySignatureCreator::Checker() const { return dummyChecker; }
 bool DummySignatureCreator::CreateSig(std::vector<unsigned char> &vchSig,

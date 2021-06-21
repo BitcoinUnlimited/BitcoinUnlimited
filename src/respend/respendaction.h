@@ -42,6 +42,6 @@ inline RespendAction::~RespendAction() {}
 // shared_ptr, instead of unique_ptr, for unit testing
 typedef std::shared_ptr<RespendAction> RespendActionPtr;
 
-} // ns respend
+} // namespace respend
 
 #endif

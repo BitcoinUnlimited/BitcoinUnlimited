@@ -353,8 +353,9 @@ void CCoinsViewCache::Trim(size_t nTrimSize) const
     CCoinsMap::iterator iter = cacheCoins.begin();
     while (!fDone && _DynamicMemoryUsage() > nTrimSize)
     {
-        LOG(COINDB, "cacheCoinsUsage at start: %d total dynamic usage: %d trim to size: %d nBestCoinHeight: %d "
-                    "trim height:%d\n",
+        LOG(COINDB,
+            "cacheCoinsUsage at start: %d total dynamic usage: %d trim to size: %d nBestCoinHeight: %d "
+            "trim height:%d\n",
             cachedCoinsUsage, _DynamicMemoryUsage(), nTrimSize, nBestCoinHeight, nTrimHeight);
 
         iter = cacheCoins.begin();

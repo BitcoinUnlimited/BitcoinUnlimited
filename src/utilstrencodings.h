@@ -31,12 +31,12 @@ enum SafeChars
 };
 
 /**
-* Remove unsafe chars. Safe chars chosen to allow simple messages/URLs/email
-* addresses, but avoid anything even possibly remotely dangerous like & or >
-* @param[in] str    The string to sanitize
-* @param[in] rule   The set of safe chars to choose (default: least restrictive)
-* @return           A new string without unsafe chars
-*/
+ * Remove unsafe chars. Safe chars chosen to allow simple messages/URLs/email
+ * addresses, but avoid anything even possibly remotely dangerous like & or >
+ * @param[in] str    The string to sanitize
+ * @param[in] rule   The set of safe chars to choose (default: least restrictive)
+ * @return           A new string without unsafe chars
+ */
 std::string SanitizeString(const std::string &str, int rule = SAFE_CHARS_DEFAULT);
 std::string GetHex(const unsigned char *data, unsigned int len); // convert the passed binary data into a hex string
 std::vector<unsigned char> ParseHex(const char *psz);

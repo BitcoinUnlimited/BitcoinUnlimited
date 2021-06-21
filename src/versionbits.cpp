@@ -318,7 +318,7 @@ public:
     VersionBitsConditionChecker(Consensus::DeploymentPos id_) : id(id_) {}
     uint32_t Mask(const Consensus::Params &params) const { return ((uint32_t)1) << params.vDeployments[id].bit; }
 };
-}
+} // namespace
 
 ThresholdState VersionBitsState(const CBlockIndex *pindexPrev,
     const Consensus::Params &params,

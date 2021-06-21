@@ -109,7 +109,7 @@ public:
     CCoinsMap &map() const { return cacheCoins; }
     size_t &usage() const { return cachedCoinsUsage; }
 };
-}
+} // namespace
 
 BOOST_FIXTURE_TEST_SUITE(coins_tests, BasicTestingSetup)
 
@@ -642,7 +642,7 @@ void CheckAddCoinBase(CAmount base_value,
 // while still verifying that the CoinsViewCache::AddCoin implementation
 // ignores base values.
 template <typename... Args>
-void CheckAddCoin(Args &&... args)
+void CheckAddCoin(Args &&...args)
 {
     for (CAmount base_value : {ABSENT, PRUNED, VALUE1})
         CheckAddCoinBase(base_value, std::forward<Args>(args)...);

@@ -3,8 +3,6 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "versionbits.h"
-#include "chain.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "consensus/params.h"
@@ -12,6 +10,7 @@
 #include "random.h"
 #include "test/test_bitcoin.h"
 #include "validation/validation.h"
+#include "versionbits.h"
 
 #include <boost/test/unit_test.hpp>
 

@@ -47,8 +47,8 @@ static const int TX_RATE_RESOLUTION_MILLIS = 1000;
 static const int TX_RATE_UPDATE_FREQUENCY_MILLIS = 250;
 
 /** If our indicated (and possibly dirty) number of ancestors in a transaction chain is less than
-  * this value then we'll immediately update the correct and current ancestor chain state
-  */
+ * this value then we'll immediately update the correct and current ancestor chain state
+ */
 static const uint32_t MAX_UPDATED_CHAIN_STATE = 500;
 
 /** Transaction rate statisics update thread */
@@ -230,6 +230,7 @@ struct update_fee_delta
 {
     update_fee_delta(int64_t _feeDelta) : feeDelta(_feeDelta) {}
     void operator()(CTxMemPoolEntry &e) const { e.UpdateFeeDelta(feeDelta); }
+
 private:
     int64_t feeDelta;
 };
@@ -238,6 +239,7 @@ struct update_lock_points
 {
     update_lock_points(const LockPoints &_lp) : lp(_lp) {}
     void operator()(CTxMemPoolEntry &e) const { e.UpdateLockPoints(lp); }
+
 private:
     const LockPoints &lp;
 };
@@ -428,8 +430,7 @@ private:
 public:
     static const int ROLLING_FEE_HALFLIFE = 60 * 60 * 12; // public only for testing
 
-    typedef boost::multi_index_container<
-        CTxMemPoolEntry,
+    typedef boost::multi_index_container<CTxMemPoolEntry,
         boost::multi_index::indexed_by<
             // sorted by txid
             boost::multi_index::ordered_unique<mempoolentry_txid>,
@@ -650,9 +651,9 @@ public:
     void UpdateTxnChainState(txiter it);
 
     /** Remove transactions from the mempool until its dynamic size is <= sizelimit.
-      *  pvNoSpendsRemaining, if set, will be populated with the list of outpoints
-      *  which are not in mempool which no longer have any spends in this mempool.
-      */
+     *  pvNoSpendsRemaining, if set, will be populated with the list of outpoints
+     *  which are not in mempool which no longer have any spends in this mempool.
+     */
     void TrimToSize(size_t sizelimit,
         std::vector<COutPoint> *pvNoSpendsRemaining = nullptr,
         bool fDeterministic = false);

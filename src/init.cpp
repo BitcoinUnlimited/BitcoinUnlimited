@@ -27,7 +27,6 @@
 #include "fs.h"
 #include "httprpc.h"
 #include "httpserver.h"
-#include "httpserver.h"
 #include "index/txindex.h"
 #include "key.h"
 #include "main.h"
@@ -1512,7 +1511,7 @@ bool AppInit2(Config &config)
     }
 
 
-// ********************************************************* Step 7: load wallet
+    // ********************************************************* Step 7: load wallet
 
 #ifdef ENABLE_WALLET
 

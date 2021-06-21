@@ -605,10 +605,11 @@ BOOST_AUTO_TEST_CASE(test_FormatSubVersion)
         "-uacomment=Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt4"};
     ParseParameters(5, (char **)argv_test2, AllowedArgs::Bitcoind());
     BOOST_CHECK_EQUAL(FormatSubVersion("Test", 99900, BUComments),
-        std::string("/Test:0.9.99(EB1; AD40; " + arch + "; Commenttttttttttttttttttttttttttttttttttttttttt1; "
-                                                        "Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt2; "
-                                                        "Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt3; "
-                                                        "Commenttttttttttttttttttttttttttttttttttttttttttt)/"));
+        std::string("/Test:0.9.99(EB1; AD40; " + arch +
+                    "; Commenttttttttttttttttttttttttttttttttttttttttt1; "
+                    "Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt2; "
+                    "Commenttttttttttttttttttttttttttttttttttttttttttttttttttttt3; "
+                    "Commenttttttttttttttttttttttttttttttttttttttttttt)/"));
 
     std::string subver = FormatSubVersion("Test", 99900, BUComments);
     BOOST_CHECK_EQUAL(subver.size(), MAX_SUBVERSION_LENGTH);

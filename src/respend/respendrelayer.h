@@ -38,6 +38,6 @@ private:
     CTransactionRef pRespend;
 };
 
-} // ns respend
+} // namespace respend
 
 #endif

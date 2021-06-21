@@ -57,7 +57,7 @@ enum DeploymentPos
     DEPLOYMENT_UNASSIGNED_BIT_26,
     DEPLOYMENT_UNASSIGNED_BIT_27,
     DEPLOYMENT_TESTDUMMY, // bit 28 - used for deployment testing purposes
-    // bip135 end
+                          // bip135 end
     MAX_VERSION_BITS_DEPLOYMENTS
 };
 

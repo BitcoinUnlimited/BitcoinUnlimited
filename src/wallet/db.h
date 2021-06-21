@@ -104,6 +104,7 @@ protected:
 
     explicit CDB(const std::string &strFilename, const char *pszMode = "r+", bool fFlushOnCloseIn = true);
     ~CDB() { Close(); }
+
 public:
     void Flush();
     void Close();

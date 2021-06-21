@@ -1053,6 +1053,7 @@ public:
     }
     // Assignment -- destroys any reference to the current node and adds a ref to the new one
     CNodeRef &operator=(const CNodeRef &other) { return operator=(other._pnode); }
+
 private:
     CNode *_pnode;
 };

@@ -90,9 +90,9 @@ public:
  * signatureCache outside of VerifySignature to avoid the atomic operation per
  * call overhead associated with local static variables even though
  * signatureCache could be made local to VerifySignature.
-*/
+ */
 static CSignatureCache signatureCache;
-}
+} // namespace
 
 // To be called once in AppInit2/TestingSetup to initialize the signatureCache
 void InitSignatureCache()

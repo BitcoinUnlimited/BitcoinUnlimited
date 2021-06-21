@@ -22,7 +22,7 @@ private:
 public:
     void interrupt_all() { shutdown_threads.store(true); }
     template <class Fn, class... Args>
-    void create_thread(Fn &&f, Args &&... args)
+    void create_thread(Fn &&f, Args &&...args)
     {
         std::lock_guard<std::mutex> lock(cs_threads);
         threads.push_back(std::thread(f, args...));

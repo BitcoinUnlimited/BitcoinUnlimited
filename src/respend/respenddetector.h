@@ -47,6 +47,6 @@ private:
     int dsproof = -1;
 };
 
-} // ns respend
+} // namespace respend
 
 #endif

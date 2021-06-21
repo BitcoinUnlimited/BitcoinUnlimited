@@ -111,4 +111,4 @@ double ElectrumRPCInfo::GetIndexingProgress(int64_t index_height) const
     return (double(index_height) / double(tip_height)) * 100.;
 }
 
-} // ns electrum
+} // namespace electrum

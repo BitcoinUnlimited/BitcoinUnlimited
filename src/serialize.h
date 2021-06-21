@@ -150,7 +150,8 @@ inline uint64_t ser_readdata64(Stream &s)
 }
 inline uint64_t ser_double_to_uint64(double x)
 {
-    union {
+    union
+    {
         double x;
         uint64_t y;
     } tmp;
@@ -159,7 +160,8 @@ inline uint64_t ser_double_to_uint64(double x)
 }
 inline uint32_t ser_float_to_uint32(float x)
 {
-    union {
+    union
+    {
         float x;
         uint32_t y;
     } tmp;
@@ -168,7 +170,8 @@ inline uint32_t ser_float_to_uint32(float x)
 }
 inline double ser_uint64_to_double(uint64_t y)
 {
-    union {
+    union
+    {
         double x;
         uint64_t y;
     } tmp;
@@ -177,7 +180,8 @@ inline double ser_uint64_to_double(uint64_t y)
 }
 inline float ser_uint32_to_float(uint32_t y)
 {
-    union {
+    union
+    {
         float x;
         uint32_t y;
     } tmp;
@@ -1100,7 +1104,7 @@ void SerializeMany(Stream &s, Arg &&arg)
 }
 
 template <typename Stream, typename Arg, typename... Args>
-void SerializeMany(Stream &s, Arg &&arg, Args &&... args)
+void SerializeMany(Stream &s, Arg &&arg, Args &&...args)
 {
     ::Serialize(s, std::forward<Arg>(arg));
     ::SerializeMany(s, std::forward<Args>(args)...);
@@ -1118,20 +1122,20 @@ inline void UnserializeMany(Stream &s, Arg &arg)
 }
 
 template <typename Stream, typename Arg, typename... Args>
-inline void UnserializeMany(Stream &s, Arg &arg, Args &... args)
+inline void UnserializeMany(Stream &s, Arg &arg, Args &...args)
 {
     ::Unserialize(s, arg);
     ::UnserializeMany(s, args...);
 }
 
 template <typename Stream, typename... Args>
-inline void SerReadWriteMany(Stream &s, CSerActionSerialize ser_action, Args &&... args)
+inline void SerReadWriteMany(Stream &s, CSerActionSerialize ser_action, Args &&...args)
 {
     ::SerializeMany(s, std::forward<Args>(args)...);
 }
 
 template <typename Stream, typename... Args>
-inline void SerReadWriteMany(Stream &s, CSerActionUnserialize ser_action, Args &... args)
+inline void SerReadWriteMany(Stream &s, CSerActionUnserialize ser_action, Args &...args)
 {
     ::UnserializeMany(s, args...);
 }

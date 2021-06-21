@@ -10,7 +10,8 @@
 // NOTE: netaddress.h includes serialize.h which is required for serialization macros
 #include "netaddress.h" // for CSubNet
 
-typedef enum BanReason {
+typedef enum BanReason
+{
     BanReasonUnknown = 0,
     BanReasonNodeMisbehaving = 1,
     BanReasonManuallyAdded = 2,

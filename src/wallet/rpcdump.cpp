@@ -11,7 +11,6 @@
 #include "main.h"
 #include "merkleblock.h"
 #include "rpc/server.h"
-#include "rpc/server.h"
 #include "script/script.h"
 #include "script/standard.h"
 #include "sync.h"
@@ -851,10 +850,10 @@ UniValue dumpwallet(const UniValue &params, bool fHelp)
             {
                 file << "change=1";
             }
-            file << strprintf(
-                " # addr=%s%s\n", strAddr, (pwalletMain->mapKeyMetadata[keyid].hdKeypath.size() > 0 ?
-                                                   " hdkeypath=" + pwalletMain->mapKeyMetadata[keyid].hdKeypath :
-                                                   ""));
+            file << strprintf(" # addr=%s%s\n", strAddr,
+                (pwalletMain->mapKeyMetadata[keyid].hdKeypath.size() > 0 ?
+                        " hdkeypath=" + pwalletMain->mapKeyMetadata[keyid].hdKeypath :
+                        ""));
         }
     }
     file << "\n";

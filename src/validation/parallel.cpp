@@ -526,8 +526,9 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
                     else if (miLargestBlock != mapBlockValidationThreads.end())
                     {
                         Quit(miLargestBlock); // terminate the script queue thread
-                        LOG(PARALLEL, "Too many blocks being validated, interrupting thread with blockhash %s "
-                                      "and previous blockhash %s\n",
+                        LOG(PARALLEL,
+                            "Too many blocks being validated, interrupting thread with blockhash %s "
+                            "and previous blockhash %s\n",
                             (*miLargestBlock).second.hash.ToString(),
                             (*miLargestBlock).second.hashPrevBlock.ToString());
                     }

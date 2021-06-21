@@ -93,8 +93,9 @@ std::pair<int, int64_t> CalculateSequenceLocks(const CTransactionRef tx,
             // smallest allowed timestamp of the block containing the
             // txout being spent, which is the median time past of the
             // block prior.
-            nMinTime = std::max(nMinTime, nCoinTime + (int64_t)((txin.nSequence & CTxIn::SEQUENCE_LOCKTIME_MASK)
-                                                                << CTxIn::SEQUENCE_LOCKTIME_GRANULARITY) -
+            nMinTime = std::max(nMinTime, nCoinTime +
+                                              (int64_t)((txin.nSequence & CTxIn::SEQUENCE_LOCKTIME_MASK)
+                                                        << CTxIn::SEQUENCE_LOCKTIME_GRANULARITY) -
                                               1);
         }
         else

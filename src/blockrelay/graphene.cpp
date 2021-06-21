@@ -37,8 +37,8 @@ CGrapheneBlock::CGrapheneBlock(const CBlockRef pblock,
     bool _computeOptimized)
     : // Use cryptographically strong pseudorandom number because
       // we will extract SipHash secret key from this
-      sipHashNonce(GetRand(std::numeric_limits<uint64_t>::max())),
-      nSize(0), nWaitingFor(0), shorttxidk0(0), shorttxidk1(0), version(_version), computeOptimized(_computeOptimized)
+      sipHashNonce(GetRand(std::numeric_limits<uint64_t>::max())), nSize(0), nWaitingFor(0), shorttxidk0(0),
+      shorttxidk1(0), version(_version), computeOptimized(_computeOptimized)
 {
     header = pblock->GetBlockHeader();
     nBlockTxs = pblock->vtx.size();
@@ -192,8 +192,9 @@ bool CGrapheneBlock::ValidateAndRecontructBlock(uint256 blockhash,
     float nCompressionRatio = 0.0;
     if (GetSize() + nSizeGrapheneBlockTx > 0)
         nCompressionRatio = (float)blockSize / ((float)GetSize() + (float)nSizeGrapheneBlockTx);
-    LOG(GRAPHENE, "Reassembled grblktx for %s (%d bytes). Message was %d bytes (graphene block) and %d bytes "
-                  "(re-requested tx), compression ratio %3.2f, peer=%s\n",
+    LOG(GRAPHENE,
+        "Reassembled grblktx for %s (%d bytes). Message was %d bytes (graphene block) and %d bytes "
+        "(re-requested tx), compression ratio %3.2f, peer=%s\n",
         pblock->GetHash().ToString(), blockSize, GetSize(), nSizeGrapheneBlockTx, nCompressionRatio,
         pfrom->GetLogName());
 
@@ -454,8 +455,9 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
             requester.AlreadyReceived(pfrom, inv);
 
             thinrelay.ClearAllBlockData(pfrom, grapheneBlock->header.GetHash());
-            LOG(GRAPHENE, "Received grapheneblock but returning because we already have block data %s from peer %s hop"
-                          " %d size %d bytes\n",
+            LOG(GRAPHENE,
+                "Received grapheneblock but returning because we already have block data %s from peer %s hop"
+                " %d size %d bytes\n",
                 inv.hash.ToString(), pfrom->GetLogName(), nHops, grapheneBlock->GetSize());
             return true;
         }

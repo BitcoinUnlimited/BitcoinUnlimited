@@ -244,7 +244,8 @@ public:
 
 private:
 #pragma pack(push, 1)
-    union direct_or_indirect {
+    union direct_or_indirect
+    {
         char direct[sizeof(T) * N];
         struct
         {

@@ -137,10 +137,10 @@ inline void LogToggleCategory(uint64_t category, bool on)
 }
 
 /**
-* Get a category associated with a string.
-* @param[in] label string
-* returns category
-*/
+ * Get a category associated with a string.
+ * @param[in] label string
+ * returns category
+ */
 uint64_t LogFindCategory(const std::string label);
 
 /**
@@ -168,7 +168,7 @@ void LogInit();
  * @param[in] All parameters are "printf like".
  */
 template <typename T1, typename... Args>
-inline void LogStdout(const char *fmt, const T1 &v1, const Args &... args)
+inline void LogStdout(const char *fmt, const T1 &v1, const Args &...args)
 {
     try
     {
@@ -195,7 +195,7 @@ inline void LogStdout(const std::string &str)
  * @param[in] All parameters are "printf like args".
  */
 template <typename T1, typename... Args>
-inline void LogWrite(const char *fmt, const T1 &v1, const Args &... args)
+inline void LogWrite(const char *fmt, const T1 &v1, const Args &...args)
 {
     try
     {
@@ -215,7 +215,7 @@ inline void LogWrite(const std::string &str)
 {
     LogPrintStr(str); // No formatting for a simple string
 }
-}
+} // namespace Logging
 
 // Logging API:
 //
@@ -247,14 +247,14 @@ void LogFlush();
 
 /** Get format string from VA_ARGS for error reporting */
 template <typename... Args>
-std::string FormatStringFromLogArgs(const char *fmt, const Args &... args)
+std::string FormatStringFromLogArgs(const char *fmt, const Args &...args)
 {
     return fmt;
 }
 
 
 template <typename... Args>
-bool error(const char *fmt, const Args &... args)
+bool error(const char *fmt, const Args &...args)
 {
     LogPrintStr("ERROR: " + tfm::format(fmt, args...) + "\n");
     return false;
@@ -262,7 +262,7 @@ bool error(const char *fmt, const Args &... args)
 
 
 template <typename... Args>
-inline bool error(uint64_t ctgr, const char *fmt, const Args &... args)
+inline bool error(uint64_t ctgr, const char *fmt, const Args &...args)
 {
     if (Logging::LogAcceptCategory(ctgr))
         LogPrintStr("ERROR: " + tfm::format(fmt, args...) + "\n");

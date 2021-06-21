@@ -26,7 +26,7 @@ class QTableView;
 QT_END_NAMESPACE
 
 /** Widget that shows a list of sending or receiving addresses.
-  */
+ */
 class AddressBookPage : public QDialog
 {
     Q_OBJECT

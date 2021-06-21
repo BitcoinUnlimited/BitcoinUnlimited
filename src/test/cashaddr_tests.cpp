@@ -47,8 +47,12 @@ bool CaseInsensitiveEqual(const std::string &s1, const std::string &s2)
 BOOST_AUTO_TEST_CASE(cashaddr_testvectors_valid)
 {
     static const std::string CASES[] = {
-        "prefix:x64nx6hz", "PREFIX:X64NX6HZ", "p:gpf8m4h7", "bitcoincash:qpzry9x8gf2tvdw0s3jn54khce6mua7lcw20ayyn",
-        "bchtest:testnetaddress4d6njnut", "bchreg:555555555555555555555555555555555555555555555udxmlmrz",
+        "prefix:x64nx6hz",
+        "PREFIX:X64NX6HZ",
+        "p:gpf8m4h7",
+        "bitcoincash:qpzry9x8gf2tvdw0s3jn54khce6mua7lcw20ayyn",
+        "bchtest:testnetaddress4d6njnut",
+        "bchreg:555555555555555555555555555555555555555555555udxmlmrz",
     };
 
     for (const std::string &str : CASES)
@@ -64,9 +68,16 @@ BOOST_AUTO_TEST_CASE(cashaddr_testvectors_valid)
 BOOST_AUTO_TEST_CASE(cashaddr_testvectors_invalid)
 {
     static const std::string CASES[] = {
-        "prefix:x32nx6hz", "prEfix:x64nx6hz", "prefix:x64nx6Hz", "pref1x:6m8cxv73", "prefix:", ":u9wsx07j",
+        "prefix:x32nx6hz",
+        "prEfix:x64nx6hz",
+        "prefix:x64nx6Hz",
+        "pref1x:6m8cxv73",
+        "prefix:",
+        ":u9wsx07j",
         "bchreg:555555555555555555x55555555555555555555555555udxmlmrz",
-        "bchreg:555555555555555555555555555555551555555555555udxmlmrz", "pre:fix:x32nx6hz", "prefixx64nx6hz",
+        "bchreg:555555555555555555555555555555551555555555555udxmlmrz",
+        "pre:fix:x32nx6hz",
+        "prefixx64nx6hz",
     };
 
     for (const std::string &str : CASES)
@@ -95,9 +106,13 @@ BOOST_AUTO_TEST_CASE(cashaddr_rawencode)
 BOOST_AUTO_TEST_CASE(cashaddr_testvectors_noprefix)
 {
     static const std::pair<std::string, std::string> CASES[] = {
-        {"bitcoincash", "qpzry9x8gf2tvdw0s3jn54khce6mua7lcw20ayyn"}, {"prefix", "x64nx6hz"}, {"PREFIX", "X64NX6HZ"},
-        {"p", "gpf8m4h7"}, {"bitcoincash", "qpzry9x8gf2tvdw0s3jn54khce6mua7lcw20ayyn"},
-        {"bchtest", "testnetaddress4d6njnut"}, {"bchreg", "555555555555555555555555555555555555555555555udxmlmrz"},
+        {"bitcoincash", "qpzry9x8gf2tvdw0s3jn54khce6mua7lcw20ayyn"},
+        {"prefix", "x64nx6hz"},
+        {"PREFIX", "X64NX6HZ"},
+        {"p", "gpf8m4h7"},
+        {"bitcoincash", "qpzry9x8gf2tvdw0s3jn54khce6mua7lcw20ayyn"},
+        {"bchtest", "testnetaddress4d6njnut"},
+        {"bchreg", "555555555555555555555555555555555555555555555udxmlmrz"},
     };
 
     for (const std::pair<std::string, std::string> &c : CASES)
