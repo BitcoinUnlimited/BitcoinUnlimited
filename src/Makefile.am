@@ -771,7 +771,7 @@ endif
 
 check-formatting:
 	@echo "Checking source formatting style..."
-	(cd $(top_srcdir)/src; ../contrib/devtools/clang-format.py check clang-format-3.8 `cat ./.formatted-files`)
+	(cd $(top_srcdir)/src; ../contrib/devtools/clang-format.py check clang-format-12 `cat ./.formatted-files`)
 
 %.pb.cc %.pb.h: %.proto
 	@test -f $(PROTOC)
