@@ -265,20 +265,21 @@ static void addConfigurationLocationOptions(AllowedArgs &allowedArgs)
 static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
 {
     allowedArgs.addHeader(_("General options:"))
-        .addArg("alertnotify=<cmd>", requiredStr, _("Execute command when a relevant alert is received or we see a "
-                                                    "really long fork (%s in cmd is replaced by message)"))
+        .addArg("alertnotify=<cmd>", requiredStr,
+            _("Execute command when a relevant alert is received or we see a "
+              "really long fork (%s in cmd is replaced by message)"))
         .addArg("blocknotify=<cmd>", requiredStr,
             _("Execute command when the best block changes (%s in cmd is replaced by block hash)"))
         .addDebugArg("blocksonly", optionalBool,
             strprintf(_("Whether to operate in a blocks only mode (default: %u)"), DEFAULT_BLOCKSONLY))
         .addArg("useblockdb", optionalBool,
             strprintf(_("Which method to store blocks on disk (default: %u) 0 = sequential files, 1 = blockdb"),
-                    DEFAULT_BLOCK_DB_MODE))
+                DEFAULT_BLOCK_DB_MODE))
         .addArg("checkblocks=<n>", requiredInt,
             strprintf(_("How many blocks to check at startup (default: %u, 0 = all)"), DEFAULT_CHECKBLOCKS))
         .addArg("checklevel=<n>", requiredInt,
             strprintf(
-                    _("How thorough the block verification of -checkblocks is (0-4, default: %u)"), DEFAULT_CHECKLEVEL))
+                _("How thorough the block verification of -checkblocks is (0-4, default: %u)"), DEFAULT_CHECKLEVEL))
         .addDebugArg("dumpforks", optionalBool, _("Dump built-in fork deployment data in CSV format and exit"));
 
 #ifndef WIN32
@@ -287,24 +288,26 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
 #endif
 
     allowedArgs
-        .addArg("dbcache=<n>", requiredInt, strprintf(_("Set database cache size in megabytes (%d to %d, default: %d)"),
-                                                nMinDbCache, nMaxDbCache, nDefaultDbCache))
+        .addArg("dbcache=<n>", requiredInt,
+            strprintf(_("Set database cache size in megabytes (%d to %d, default: %d)"), nMinDbCache, nMaxDbCache,
+                nDefaultDbCache))
         .addArg("loadblock=<file>", requiredStr, _("Imports blocks from external blk000??.dat file on startup"))
         .addArg("maxorphantx=<n>", requiredInt,
             strprintf(_("Keep at most <n> unconnectable transactions in memory (default: %u)"),
-                    DEFAULT_MAX_ORPHAN_TRANSACTIONS))
+                DEFAULT_MAX_ORPHAN_TRANSACTIONS))
         .addArg("maxmempool=<n>", requiredInt,
             strprintf(
-                    _("Keep the transaction memory pool below <n> megabytes (default: %u)"), DEFAULT_MAX_MEMPOOL_SIZE))
+                _("Keep the transaction memory pool below <n> megabytes (default: %u)"), DEFAULT_MAX_MEMPOOL_SIZE))
         .addArg("mempoolexpiry=<n>", requiredInt,
             strprintf(_("Do not keep transactions in the mempool longer than <n> hours (default: %u)"),
-                    DEFAULT_MEMPOOL_EXPIRY))
+                DEFAULT_MEMPOOL_EXPIRY))
         .addArg("orphanpoolexpiry=<n>", requiredInt,
             strprintf(_("Do not keep transactions in the orphanpool longer than <n> hours (default: %u)"),
-                    DEFAULT_ORPHANPOOL_EXPIRY))
-        .addArg("par=<n>", requiredInt, strprintf(_("Set the number of script verification threads (%u to %d, 0 = "
-                                                    "auto, <0 = leave that many cores free, default: %d)"),
-                                            -GetNumCores(), MAX_SCRIPTCHECK_THREADS, DEFAULT_SCRIPTCHECK_THREADS))
+                DEFAULT_ORPHANPOOL_EXPIRY))
+        .addArg("par=<n>", requiredInt,
+            strprintf(_("Set the number of script verification threads (%u to %d, 0 = "
+                        "auto, <0 = leave that many cores free, default: %d)"),
+                -GetNumCores(), MAX_SCRIPTCHECK_THREADS, DEFAULT_SCRIPTCHECK_THREADS))
         .addArg("parallel={true,false,0,1}", optionalBool,
             strprintf(_("Turn Parallel Block Validation on or off (default: %u)"), true))
 #ifndef WIN32
@@ -312,17 +315,17 @@ static void addGeneralOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
 #endif
         .addArg("persistmempool={true,false,0,1}", optionalBool,
             strprintf(_("Whether to save the mempool on shutdown and load on restart (default: %u)"),
-                    DEFAULT_PERSIST_MEMPOOL))
+                DEFAULT_PERSIST_MEMPOOL))
         .addArg("prune=<n>", requiredInt,
             strprintf(_("Reduce storage requirements by pruning (deleting) old blocks. This mode is incompatible with "
                         "-txindex and -rescan. "
                         "Warning: Reverting this setting requires re-downloading the entire blockchain. "
                         "(default: 0 = disable pruning blocks, >%u = target size in MiB to use for block files)"),
-                    MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024))
+                MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024))
         .addArg("reindex", optionalBool, _("Rebuild block chain index from current blk000??.dat files on startup"))
         .addArg("txindex", optionalBool,
             strprintf(_("Maintain a full transaction index, used by the getrawtransaction rpc call (default: %u)"),
-                    DEFAULT_TXINDEX));
+                DEFAULT_TXINDEX));
 }
 
 static void addConnectionOptions(AllowedArgs &allowedArgs)
@@ -333,21 +336,23 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
             strprintf(_("Threshold for disconnecting misbehaving peers (default: %u)"), DEFAULT_BANSCORE_THRESHOLD))
         .addArg("bantime=<n>", requiredInt,
             strprintf(_("Number of seconds to keep misbehaving peers from reconnecting (default: %u)"),
-                    DEFAULT_MISBEHAVING_BANTIME))
+                DEFAULT_MISBEHAVING_BANTIME))
         .addArg("bind=<addr>", requiredStr,
             _("Bind to given address and always listen on it. Use [host]:port notation for IPv6"))
-        .addArg("bindallorfail", optionalBool, strprintf(_("Bind all ports (P2P as well RPC) or fail to start. This is "
-                                                           "used for RPC testing, but might find other uses.")))
+        .addArg("bindallorfail", optionalBool,
+            strprintf(_("Bind all ports (P2P as well RPC) or fail to start. This is "
+                        "used for RPC testing, but might find other uses.")))
         .addArg("bitnodes", optionalBool,
             _("Query for peer addresses via Bitnodes API, if low on addresses (default: 1 unless -connect)"))
         .addArg("blkretryinterval", requiredInt,
             strprintf(_("Time to wait before requesting a block from a different peer, in microseconds (default: %u)"),
-                    DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL))
+                DEFAULT_MIN_BLK_REQUEST_RETRY_INTERVAL))
         .addArg("connect=<ip>", optionalStr, _("Connect only to the specified node(s)"))
         .addArg("discover", optionalBool,
             _("Discover own IP addresses (default: 1 when listening and no -externalip or -proxy)"))
-        .addArg("dns", optionalBool, _("Allow DNS lookups for -addnode, -seednode and -connect") + " " +
-                                         strprintf(_("(default: %u)"), DEFAULT_NAME_LOOKUP))
+        .addArg("dns", optionalBool,
+            _("Allow DNS lookups for -addnode, -seednode and -connect") + " " +
+                strprintf(_("(default: %u)"), DEFAULT_NAME_LOOKUP))
         .addArg("dnsseed", optionalBool,
             _("Query for peer addresses via DNS lookup, if low on addresses (default: 1 unless -connect)"))
         .addArg("externalip=<ip>", requiredStr, _("Specify your own public address"))
@@ -363,15 +368,15 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
         .addArg("maxoutconnections=<n>", requiredInt,
             strprintf(_("Initiate at most <n> connections to peers (default: %u).  If this number is higher than "
                         "--maxconnections, it will be reduced to --maxconnections"),
-                    DEFAULT_MAX_OUTBOUND_CONNECTIONS))
+                DEFAULT_MAX_OUTBOUND_CONNECTIONS))
         .addArg("maxreceivebuffer=<n>", requiredInt,
             strprintf(
-                    _("Maximum per-connection receive buffer, <n>*1000 bytes (default: %u)"), DEFAULT_MAXRECEIVEBUFFER))
+                _("Maximum per-connection receive buffer, <n>*1000 bytes (default: %u)"), DEFAULT_MAXRECEIVEBUFFER))
         .addArg("maxsendbuffer=<n>", requiredInt,
             strprintf(_("Maximum per-connection send buffer, <n>*1000 bytes (default: %u)"), DEFAULT_MAXSENDBUFFER))
         .addArg("min-xthin-nodes=<n>", requiredInt,
-            strprintf(_("Minimum number of xthin nodes to automatically find and connect (default: %d)"),
-                    MIN_XTHIN_NODES))
+            strprintf(
+                _("Minimum number of xthin nodes to automatically find and connect (default: %d)"), MIN_XTHIN_NODES))
         .addArg("onion=<ip:port>", requiredStr,
             strprintf(_("Use separate SOCKS5 proxy to reach peers via Tor hidden services (default: %s)"), "-proxy"))
         .addArg("onlynet=<net>", requiredStr, _("Only connect to nodes in network <net> (ipv4, ipv6 or onion)"))
@@ -379,52 +384,54 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
             strprintf(_("Relay non-P2SH multisig (default: %u)"), DEFAULT_PERMIT_BAREMULTISIG))
         .addArg("peerbloomfilters", optionalBool,
             strprintf(_("Support filtering of blocks and transaction with bloom filters (default: %u)"),
-                    DEFAULT_PEERBLOOMFILTERS))
+                DEFAULT_PEERBLOOMFILTERS))
         .addDebugArg("enforcenodebloom", optionalBool,
             strprintf("Enforce minimum protocol version to limit use of bloom filters (default: %u)", 0))
-        .addArg(
-            "port=<port>", requiredInt, strprintf(_("Listen for connections on <port> (default: %u, "
-                                                    "testnet: %u, testnet4: %u, scalenet: %u, nol: %u, regtest: %u)"),
-                                            DEFAULT_MAINNET_PORT, DEFAULT_TESTNET_PORT, DEFAULT_TESTNET4_PORT,
-                                            DEFAULT_SCALENET_PORT, DEFAULT_NOLNET_PORT, DEFAULT_REGTESTNET_PORT))
+        .addArg("port=<port>", requiredInt,
+            strprintf(_("Listen for connections on <port> (default: %u, "
+                        "testnet: %u, testnet4: %u, scalenet: %u, nol: %u, regtest: %u)"),
+                DEFAULT_MAINNET_PORT, DEFAULT_TESTNET_PORT, DEFAULT_TESTNET4_PORT, DEFAULT_SCALENET_PORT,
+                DEFAULT_NOLNET_PORT, DEFAULT_REGTESTNET_PORT))
         .addArg("proxy=<ip:port>", requiredStr, _("Connect through SOCKS5 proxy"))
-        .addArg(
-            "proxyrandomize", optionalBool,
+        .addArg("proxyrandomize", optionalBool,
             strprintf(
                 _("Randomize credentials for every proxy connection. This enables Tor stream isolation (default: %u)"),
                 DEFAULT_PROXYRANDOMIZE))
         .addArg("seednode=<ip>", requiredStr, _("Connect to a node to retrieve peer addresses, and disconnect"))
         .addArg("timeout=<n>", requiredInt,
             strprintf(
-                    _("Specify connection timeout in milliseconds (minimum: 1, default: %d)"), DEFAULT_CONNECT_TIMEOUT))
+                _("Specify connection timeout in milliseconds (minimum: 1, default: %d)"), DEFAULT_CONNECT_TIMEOUT))
         .addArg("torcontrol=<ip>:<port>", requiredStr,
             strprintf(_("Tor control port to use if onion listening enabled (default: %s)"), DEFAULT_TOR_CONTROL))
         .addArg("torpassword=<pass>", requiredStr, _("Tor control port password (default: empty)"))
         .addArg("txretryinterval", requiredInt,
             strprintf(_("Time to wait before requesting a tx from a different peer, in microseconds (default: %u)"),
-                    DEFAULT_MIN_TX_REQUEST_RETRY_INTERVAL))
+                DEFAULT_MIN_TX_REQUEST_RETRY_INTERVAL))
 #if USE_UPNP
         .addArg("upnp", optionalBool, _("Use UPnP to map the listening port (default: 1 when listening and no -proxy)"),
             upnpParamOptional)
 #else
         .addArg("upnp", optionalBool, _("Use UPnP to map the listening port (default: 0)"), upnpParamOptional)
 #endif
-        .addArg("usednsseed=<host>", requiredStr, _("Add a custom DNS seed to use.  If at least one custom DNS seed "
-                                                    "is set, the default DNS seeds will be ignored."))
+        .addArg("usednsseed=<host>", requiredStr,
+            _("Add a custom DNS seed to use.  If at least one custom DNS seed "
+              "is set, the default DNS seeds will be ignored."))
         .addArg("whitebind=<addr>", requiredStr,
             _("Bind to given address and whitelist peers connecting to it. Use [host]:port notation for IPv6"))
         .addArg("whitelist=<netmask>", requiredStr,
             _("Whitelist peers connecting from the given netmask or IP address. Can be specified multiple times.") +
-                " " + _("Whitelisted peers cannot be DoS banned and their transactions are always relayed, even if "
-                        "they are already in the mempool, useful e.g. for a gateway"))
-        .addArg("whitelistrelay", optionalBool, strprintf(_("Accept relayed transactions received from whitelisted "
-                                                            "peers even when not relaying transactions (default: %d)"),
-                                                    DEFAULT_WHITELISTRELAY))
-        .addArg("whitelistforcerelay", optionalBool, strprintf(_("Force relay of transactions from whitelisted peers "
-                                                                 "even they violate local relay policy (default: %d)"),
-                                                         DEFAULT_WHITELISTFORCERELAY))
-        .addArg(
-            "maxuploadtarget=<n>", requiredInt,
+                " " +
+                _("Whitelisted peers cannot be DoS banned and their transactions are always relayed, even if "
+                  "they are already in the mempool, useful e.g. for a gateway"))
+        .addArg("whitelistrelay", optionalBool,
+            strprintf(_("Accept relayed transactions received from whitelisted "
+                        "peers even when not relaying transactions (default: %d)"),
+                DEFAULT_WHITELISTRELAY))
+        .addArg("whitelistforcerelay", optionalBool,
+            strprintf(_("Force relay of transactions from whitelisted peers "
+                        "even they violate local relay policy (default: %d)"),
+                DEFAULT_WHITELISTFORCERELAY))
+        .addArg("maxuploadtarget=<n>", requiredInt,
             strprintf(
                 _("Tries to keep outbound traffic under the given target (in MiB per 24h), 0 = no limit (default: %d)"),
                 DEFAULT_MAX_UPLOAD_TARGET));
@@ -438,42 +445,40 @@ static void addWalletOptions(AllowedArgs &allowedArgs)
             walletParamOptional)
         .addArg("keypool=<n>", requiredInt,
             strprintf(_("Set key pool size to <n> (default: %u)"), DEFAULT_KEYPOOL_SIZE), walletParamOptional)
-        .addArg(
-            "fallbackfee=<amt>", requiredAmount,
+        .addArg("fallbackfee=<amt>", requiredAmount,
             strprintf(
                 _("A fee rate (in %s/kB) that will be used when fee estimation has insufficient data (default: %s)"),
                 CURRENCY_UNIT, FormatMoney(DEFAULT_FALLBACK_FEE)),
             walletParamOptional)
-        .addArg(
-            "mintxfee=<amt>", requiredAmount,
+        .addArg("mintxfee=<amt>", requiredAmount,
             strprintf(
                 _("Fees (in %s/kB) smaller than this are considered zero fee for transaction creation (default: %s)"),
                 CURRENCY_UNIT, FormatMoney(DEFAULT_TRANSACTION_MINFEE)),
             walletParamOptional)
         .addArg("paytxfee=<amt>", requiredAmount,
             strprintf(_("Fee (in %s/kB) to add to transactions you send (default: %s)"), CURRENCY_UNIT,
-                    FormatMoney(DEFAULT_TRANSACTION_FEE)))
+                FormatMoney(DEFAULT_TRANSACTION_FEE)))
         .addArg("rescan", optionalBool, _("Rescan the block chain for missing wallet transactions on startup"),
             walletParamOptional)
         .addArg("salvagewallet", optionalBool,
             _("Attempt to recover private keys from a corrupt wallet.dat on startup"), walletParamOptional)
         .addArg("sendfreetransactions", optionalBool,
             strprintf(_("Send transactions as zero-fee transactions if possible (default: %u)"),
-                    DEFAULT_SEND_FREE_TRANSACTIONS),
+                DEFAULT_SEND_FREE_TRANSACTIONS),
             walletParamOptional)
         .addArg("spendzeroconfchange", optionalBool,
-            strprintf(_("Spend unconfirmed change when sending transactions (default: %u)"),
-                    DEFAULT_SPEND_ZEROCONF_CHANGE),
+            strprintf(
+                _("Spend unconfirmed change when sending transactions (default: %u)"), DEFAULT_SPEND_ZEROCONF_CHANGE),
             walletParamOptional)
         .addArg("txconfirmtarget=<n>", requiredInt,
             strprintf(_("If paytxfee is not set, include enough fee so transactions begin confirmation on average "
                         "within n blocks (default: %u)"),
-                    DEFAULT_TX_CONFIRM_TARGET),
+                DEFAULT_TX_CONFIRM_TARGET),
             walletParamOptional)
         .addArg("maxtxfee=<amt>", requiredAmount,
             strprintf(_("Maximum total fees (in %s) to use in a single wallet transaction; setting this too low may "
                         "abort large transactions (default: %s)"),
-                    CURRENCY_UNIT, FormatMoney(DEFAULT_TRANSACTION_MAXFEE)),
+                CURRENCY_UNIT, FormatMoney(DEFAULT_TRANSACTION_MAXFEE)),
             walletParamOptional)
         .addArg("upgradewallet", optionalInt, _("Upgrade wallet to latest format on startup"), walletParamOptional)
         .addArg("usehd", optionalBool,
@@ -530,16 +535,16 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addDebugArg("checkblockindex", optionalBool,
             strprintf("Do a full consistency check for mapBlockIndex, setBlockIndexCandidates, chainActive and "
                       "mapBlocksUnlinked occasionally (default: %u)",
-                         false))
+                false))
         .addDebugArg(
             "checkmempool=<n>", requiredInt, strprintf("Run checks every <n> transactions (default: %u)", false))
         .addDebugArg("checkpoints", optionalBool,
-            strprintf("Disable expensive verification for known chain history (default: %u)",
-                         DEFAULT_CHECKPOINTS_ENABLED))
+            strprintf(
+                "Disable expensive verification for known chain history (default: %u)", DEFAULT_CHECKPOINTS_ENABLED))
 #ifdef ENABLE_WALLET
         .addDebugArg("dblogsize=<n>", requiredInt,
             strprintf("Flush wallet database activity from memory to disk log every <n> megabytes (default: %u)",
-                         DEFAULT_WALLET_DBLOGSIZE),
+                DEFAULT_WALLET_DBLOGSIZE),
             walletParamOptional)
 #endif
         .addDebugArg("disablesafemode", optionalBool,
@@ -564,7 +569,7 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addArg("gen", optionalBool, strprintf(_("Generate coins (default: %u)"), DEFAULT_GENERATE))
         .addArg("genproclimit=<n>", requiredInt,
             strprintf(_("Set the number of threads for coin generation if enabled (-1 = all cores, default: %d)"),
-                    DEFAULT_GENERATE_THREADS))
+                DEFAULT_GENERATE_THREADS))
         .addArg(
             "logips", optionalBool, strprintf(_("Include IP addresses in debug output (default: %u)"), DEFAULT_LOGIPS))
         .addArg("logtimestamps", optionalBool,
@@ -574,24 +579,24 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addDebugArg("mocktime=<n>", requiredInt, "Replace actual time with <n> seconds since epoch (default: 0)")
         .addDebugArg("limitfreerelay=<n>", optionalInt,
             strprintf("Continuously rate-limit free transactions to <n>*1000 bytes per minute (default: %u)",
-                         DEFAULT_LIMITFREERELAY))
-        .addDebugArg(
-            "limitrespendrelay=<n>", optionalInt, strprintf("Continuously rate-limit relaying of double spend"
-                                                            " transactions to <n>*1000 bytes per minute (default: %u)",
-                                                      respend::DEFAULT_LIMITRESPENDRELAY))
+                DEFAULT_LIMITFREERELAY))
+        .addDebugArg("limitrespendrelay=<n>", optionalInt,
+            strprintf("Continuously rate-limit relaying of double spend"
+                      " transactions to <n>*1000 bytes per minute (default: %u)",
+                respend::DEFAULT_LIMITRESPENDRELAY))
         .addDebugArg("relaypriority", optionalBool,
-            strprintf("Require high priority for relaying free or low-fee transactions (default: %u)",
-                         DEFAULT_RELAYPRIORITY))
+            strprintf(
+                "Require high priority for relaying free or low-fee transactions (default: %u)", DEFAULT_RELAYPRIORITY))
         .addDebugArg("maxsigcachesize=<n>", requiredInt,
             strprintf("Limit size of signature cache to <n> MiB (default: %u)", DEFAULT_MAX_SIG_CACHE_SIZE))
         .addArg("printtoconsole", optionalBool, _("Send trace/debug info to console instead of debug.log file"))
         .addDebugArg("printpriority", optionalBool,
-            strprintf("Log transaction priority and fee per kB when mining blocks (default: %u)",
-                         DEFAULT_PRINTPRIORITY))
+            strprintf(
+                "Log transaction priority and fee per kB when mining blocks (default: %u)", DEFAULT_PRINTPRIORITY))
         .addDebugArg("printtologfile", optionalBool, "Write log to debug.log")
         .addDebugArg("finalizationdelay=<n>", requiredInt,
             strprintf("Minimum time between a block header received and the block finalization <n> (default: %u)",
-                         DEFAULT_MIN_FINALIZATION_DELAY))
+                DEFAULT_MIN_FINALIZATION_DELAY))
 #ifdef ENABLE_WALLET
         .addDebugArg("privdb", optionalBool,
             strprintf("Sets the DB_PRIVATE flag in the wallet db environment (default: %u)", DEFAULT_WALLET_PRIVDB),
@@ -602,7 +607,7 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addArg("maxtipage=<n>", requiredInt,
             strprintf(_("Maximum time since the last block was mined in seconds before we consider ourselves still in "
                         "IBD <n> (default: %u)"),
-                    DEFAULT_MAX_TIP_AGE));
+                DEFAULT_MAX_TIP_AGE));
 }
 
 static void addNodeRelayOptions(AllowedArgs &allowedArgs)
@@ -611,23 +616,23 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
         .addDebugArg("acceptnonstdtxn", optionalBool,
             strprintf("Relay and mine \"non-standard\" transactions (%sdefault: %u)", "testnet/regtest only; ", true))
         .addArg("bytespersigop=<n>", requiredInt,
-            strprintf(_("Minimum bytes per sigop in transactions we relay and mine (default: %u)"),
-                    DEFAULT_BYTES_PER_SIGOP))
+            strprintf(
+                _("Minimum bytes per sigop in transactions we relay and mine (default: %u)"), DEFAULT_BYTES_PER_SIGOP))
         .addArg("datacarrier", optionalBool,
             strprintf(_("Relay and mine data carrier transactions (default: %u)"), DEFAULT_ACCEPT_DATACARRIER))
         .addArg("datacarriersize=<n>", requiredInt,
             strprintf(_("Maximum size of data in data carrier transactions we relay and mine (default: %u)"),
-                    MAX_OP_RETURN_RELAY))
+                MAX_OP_RETURN_RELAY))
         .addArg("dustthreshold=<amt>", requiredAmount,
             strprintf(_("Dust Threshold (in satoshis) defines the minimum quantity an output may contain for the "
                         "transaction to be considered standard, and therefore relayable. (default: %s)"),
-                    DEFAULT_DUST_THRESHOLD))
+                DEFAULT_DUST_THRESHOLD))
         .addArg("excessiveacceptdepth=<n>", requiredInt,
             strprintf(_("Excessive blocks are accepted if this many blocks are mined on top of them (default: %u)"),
-                    DEFAULT_EXCESSIVE_ACCEPT_DEPTH))
+                DEFAULT_EXCESSIVE_ACCEPT_DEPTH))
         .addArg("excessiveblocksize=<n>", requiredInt,
             strprintf(_("Blocks above this size in bytes are considered excessive.  (default: %u)"),
-                    DEFAULT_EXCESSIVE_BLOCK_SIZE))
+                DEFAULT_EXCESSIVE_BLOCK_SIZE))
         .addArg("expeditedblock=<host>", requiredStr,
             _("Request expedited blocks from this host whenever we are connected to it"))
         .addArg("maxexpeditedblockrecipients=<n>", requiredInt,
@@ -637,37 +642,37 @@ static void addNodeRelayOptions(AllowedArgs &allowedArgs)
         .addArg("minrelaytxfee=<amt>", requiredAmount,
             strprintf(_("Fees (in %s/kB) smaller than this are considered zero fee for relaying, mining and "
                         "transaction creation (default: %s)"),
-                    CURRENCY_UNIT, FormatMoney(DEFAULT_MIN_RELAY_TX_FEE)))
+                CURRENCY_UNIT, FormatMoney(DEFAULT_MIN_RELAY_TX_FEE)))
         .addArg("receiveavg-<n>", requiredInt,
             strprintf(_("The average rate that data can be received in kB/s (default: %u)"), DEFAULT_AVE_RECV))
         .addArg("receiveburst=<n>", requiredInt,
             strprintf(_("The maximum rate that data can be received in kB/s.  If there has been a period of lower "
                         "than average data rates, the client may receive extra data to bring the average back to "
                         "'-receiveavg' but the data rate will not exceed this parameter (default: %u)"),
-                    DEFAULT_MAX_RECV_BURST))
+                DEFAULT_MAX_RECV_BURST))
         .addArg("sendavg-<n>", requiredInt,
             strprintf(_("The average rate that data can be sent in kB/s (default: %u)"), DEFAULT_AVE_SEND))
         .addArg("sendburst-<n>", requiredInt,
             strprintf(_("The maximum rate that data can be sent in kB/s.  If there has been a period of lower than "
                         "average data rates, the client may send extra data to bring the average back to '-receiveavg' "
                         "but the data rate will not exceed this parameter (default: %u)"),
-                    DEFAULT_MAX_SEND_BURST))
+                DEFAULT_MAX_SEND_BURST))
         .addArg("use-thinblocks", optionalBool, _("Enable thin blocks to speed up the relay of blocks (default: 1)"))
         .addArg("xthinbloomfiltersize=<n>", requiredInt,
             strprintf(_("The maximum xthin bloom filter size that our node will accept in Bytes (default: %u)"),
-                    SMALLEST_MAX_BLOOM_FILTER_SIZE))
+                SMALLEST_MAX_BLOOM_FILTER_SIZE))
         .addArg("use-grapheneblocks", optionalBool,
             strprintf(_("Enable graphene to speed up the relay of blocks (default: %d)"), DEFAULT_USE_GRAPHENE_BLOCKS))
         .addArg("use-compactblocks", optionalBool,
-            strprintf(_("Enable compact blocks to speed up the relay of blocks (default: %d)"),
-                    DEFAULT_USE_COMPACT_BLOCKS))
+            strprintf(
+                _("Enable compact blocks to speed up the relay of blocks (default: %d)"), DEFAULT_USE_COMPACT_BLOCKS))
         .addArg("use-extversion", optionalBool,
             strprintf(_("Enable extended versioning during node handshake (extversion) (default: %d)"),
-                    DEFAULT_USE_EXTVERSION))
+                DEFAULT_USE_EXTVERSION))
         .addArg("preferential-timer=<millisec>", requiredInt,
             strprintf(_("Set graphene, thinblock and compactblock preferential timer duration (default: %u). Use 0 to "
                         "disable it."),
-                    DEFAULT_PREFERENTIAL_TIMER));
+                DEFAULT_PREFERENTIAL_TIMER));
 }
 
 static void addBlockCreationOptions(AllowedArgs &allowedArgs)
@@ -677,7 +682,7 @@ static void addBlockCreationOptions(AllowedArgs &allowedArgs)
             strprintf("Set maximum block size in bytes (default: %d)", DEFAULT_BLOCK_MAX_SIZE))
         .addArg("blockprioritysize=<n>", requiredInt,
             strprintf(_("Set maximum size of high-priority/low-fee transactions in bytes (default: %d)"),
-                    DEFAULT_BLOCK_PRIORITY_SIZE))
+                DEFAULT_BLOCK_PRIORITY_SIZE))
         .addArg("blockversion=<n>", requiredInt, _("Generated block version number.  Value must be an integer"));
 }
 
@@ -699,9 +704,9 @@ static void addRpcServerOptions(AllowedArgs &allowedArgs)
         .addArg("rpcport=<port>", requiredInt,
             strprintf(_("Listen for JSON-RPC connections on <port> (default: %u, testnet: %u, testnet4: %u, scalenet: "
                         "%u, nol: %u, regtest: %u)"),
-                    BaseParams(CBaseChainParams::MAIN).RPCPort(), BaseParams(CBaseChainParams::TESTNET).RPCPort(),
-                    BaseParams(CBaseChainParams::TESTNET4).RPCPort(), BaseParams(CBaseChainParams::SCALENET).RPCPort(),
-                    BaseParams(CBaseChainParams::UNL).RPCPort(), BaseParams(CBaseChainParams::REGTEST).RPCPort()))
+                BaseParams(CBaseChainParams::MAIN).RPCPort(), BaseParams(CBaseChainParams::TESTNET).RPCPort(),
+                BaseParams(CBaseChainParams::TESTNET4).RPCPort(), BaseParams(CBaseChainParams::SCALENET).RPCPort(),
+                BaseParams(CBaseChainParams::UNL).RPCPort(), BaseParams(CBaseChainParams::REGTEST).RPCPort()))
         .addArg("rpcallowip=<ip>", requiredStr,
             _("Allow JSON-RPC connections from specified source. Valid for <ip> are a single IP (e.g. 1.2.3.4), a "
               "network/netmask (e.g. 1.2.3.4/255.255.255.0) or a network/CIDR (e.g. 1.2.3.4/24). This option can be "
@@ -729,11 +734,13 @@ static void addElectrumOptions(AllowedArgs &allowedArgs)
             "(example: -electrum.rawarg=\"--server-banner=\\\"Welcome to my server!\\\"\"). "
             "This option can be specified multiple times.")
         .addArg("electrum.ws.host", requiredStr, "Host electrum Websocket listens on (default: all interfaces")
-        .addArg("electrum.ws.port", requiredStr, "Port electrum Websocket listens on (default: mainnet 50003, testnet: "
-                                                 "60003, testnet4: 62003, scalenet: 63003")
+        .addArg("electrum.ws.port", requiredStr,
+            "Port electrum Websocket listens on (default: mainnet 50003, testnet: "
+            "60003, testnet4: 62003, scalenet: 63003")
         .addArg("electrum.shutdownonerror", optionalBool, "Shutdown if the electrum server exits unexpectedly")
-        .addArg("electrum.blocknotify", optionalBool, "Instantly notify electrum server of new blocks. "
-                                                      "Must only be used with ElectrsCash 2.0.0 or later")
+        .addArg("electrum.blocknotify", optionalBool,
+            "Instantly notify electrum server of new blocks. "
+            "Must only be used with ElectrsCash 2.0.0 or later")
         .addDebugArg("electrum.exec", requiredStr, "Path to electrum daemon executable")
         .addDebugArg("electrum.monitoring.port", requiredStr, "Port to bind monitoring service")
         .addDebugArg("electrum.monitoring.host", requiredStr, "Host to bind monitoring service")
@@ -756,7 +763,7 @@ static void addUiOptions(AllowedArgs &allowedArgs)
         .addArg("resetguisettings", optionalBool, _("Reset all settings changes made over the GUI"))
         .addDebugArg("uiplatform=<platform>", requiredStr,
             strprintf("Select platform to customize UI for (one of windows, macosx, other; default: %s)",
-                         DEFAULT_UIPLATFORM));
+                DEFAULT_UIPLATFORM));
 }
 
 static void addTweaks(AllowedArgs &allowedArgs, CTweakMap *pTweaks)
@@ -820,16 +827,17 @@ BitcoinCli::BitcoinCli() : AllowedArgs(true)
         .addArg("rpcport=<port>", requiredInt,
             strprintf(_("Connect to JSON-RPC on <port> (default: %u, testnet: %u, testnet4: %u, scalenet: %u, nol: %u, "
                         "regtest: %u)"),
-                    BaseParams(CBaseChainParams::MAIN).RPCPort(), BaseParams(CBaseChainParams::TESTNET).RPCPort(),
-                    BaseParams(CBaseChainParams::TESTNET4).RPCPort(), BaseParams(CBaseChainParams::SCALENET).RPCPort(),
-                    BaseParams(CBaseChainParams::UNL).RPCPort(), BaseParams(CBaseChainParams::REGTEST).RPCPort()))
+                BaseParams(CBaseChainParams::MAIN).RPCPort(), BaseParams(CBaseChainParams::TESTNET).RPCPort(),
+                BaseParams(CBaseChainParams::TESTNET4).RPCPort(), BaseParams(CBaseChainParams::SCALENET).RPCPort(),
+                BaseParams(CBaseChainParams::UNL).RPCPort(), BaseParams(CBaseChainParams::REGTEST).RPCPort()))
         .addArg("rpcwait", optionalBool, _("Wait for RPC server to start"))
         .addArg("rpcuser=<user>", requiredStr, _("Username for JSON-RPC connections"))
         .addArg("rpcpassword=<pw>", requiredStr, _("Password for JSON-RPC connections"))
         .addArg("rpcclienttimeout=<n>", requiredInt,
             strprintf(_("Timeout during HTTP requests (default: %d)"), DEFAULT_HTTP_CLIENT_TIMEOUT))
-        .addArg("stdin", optionalBool, _("Read extra arguments from standard input, one per line until EOF/Ctrl-D "
-                                         "(recommended for sensitive information such as passphrases)"));
+        .addArg("stdin", optionalBool,
+            _("Read extra arguments from standard input, one per line until EOF/Ctrl-D "
+              "(recommended for sensitive information such as passphrases)"));
 }
 
 BitcoinBench::BitcoinBench() : AllowedArgs(true)
@@ -848,7 +856,7 @@ BitcoinBench::BitcoinBench() : AllowedArgs(true)
         .addArg("-printer=(console|plot)", ::AllowedArgs::requiredStr,
             strprintf("Choose printer format. console: print data to console. plot: Print results as HTML graph "
                       "(default: %s)",
-                    DEFAULT_BENCH_PRINTER))
+                DEFAULT_BENCH_PRINTER))
         .addArg("-plot-plotlyurl=<uri>", ::AllowedArgs::requiredInt,
             strprintf("URL to use for plotly.js (default: %s)", DEFAULT_PLOT_PLOTLYURL))
         .addArg("-plot-width=<x>", ::AllowedArgs::requiredInt,

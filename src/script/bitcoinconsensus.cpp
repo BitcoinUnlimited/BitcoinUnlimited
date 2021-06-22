@@ -47,6 +47,7 @@ public:
 
     int GetVersion() const { return m_version; }
     int GetType() const { return m_type; }
+
 private:
     const int m_type;
     const int m_version;
@@ -67,7 +68,7 @@ struct ECCryptoClosure
 };
 
 ECCryptoClosure instance_of_eccryptoclosure;
-}
+} // namespace
 
 static int verify_script(const unsigned char *scriptPubKey,
     unsigned int scriptPubKeyLen,

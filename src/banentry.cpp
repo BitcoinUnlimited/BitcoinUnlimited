@@ -7,8 +7,8 @@
 #include "banentry.h"
 
 /**
-* Default constructor initializes all member variables to "null" equivalents
-*/
+ * Default constructor initializes all member variables to "null" equivalents
+ */
 CBanEntry::CBanEntry()
 {
     // set all member variables to null equivalents
@@ -16,11 +16,11 @@ CBanEntry::CBanEntry()
 }
 
 /**
-* This constructor initializes all member variables to "null" equivalents,
-* except for the ban creation time, which is set to the value passed in.
-*
-* @param[in] nCreateTimeIn Creation time to initialize this CBanEntry to
-*/
+ * This constructor initializes all member variables to "null" equivalents,
+ * except for the ban creation time, which is set to the value passed in.
+ *
+ * @param[in] nCreateTimeIn Creation time to initialize this CBanEntry to
+ */
 CBanEntry::CBanEntry(int64_t nCreateTimeIn)
 {
     // set all member variables to null equivalents
@@ -29,8 +29,8 @@ CBanEntry::CBanEntry(int64_t nCreateTimeIn)
 }
 
 /**
-* Set all member variables to their "null" equivalent values
-*/
+ * Set all member variables to their "null" equivalent values
+ */
 void CBanEntry::SetNull()
 {
     nVersion = CBanEntry::CURRENT_VERSION;
@@ -41,10 +41,10 @@ void CBanEntry::SetNull()
 }
 
 /**
-* Converts the BanReason to a human readable string representation.
-*
-* @return Human readable string representation of the BanReason
-*/
+ * Converts the BanReason to a human readable string representation.
+ *
+ * @return Human readable string representation of the BanReason
+ */
 std::string CBanEntry::banReasonToString()
 {
     switch (banReason)

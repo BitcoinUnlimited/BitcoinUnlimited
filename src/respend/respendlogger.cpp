@@ -40,4 +40,4 @@ void RespendLogger::Trigger(CTxMemPool &pool)
 
     LOG(RESPEND, msg.c_str(), orig, respend, newConflict ? "yes" : "no", equivalent ? "yes" : "no", valid);
 }
-}
+} // namespace respend

@@ -207,14 +207,14 @@ private:
      */
     inline std::array<uint32_t, 8> compute_hashes(const Element &e) const
     {
-        return {{(uint32_t)(((uint64_t)hash_function.template operator() < 0 > (e) * (uint64_t)nSize) >> 32),
-            (uint32_t)(((uint64_t)hash_function.template operator() < 1 > (e) * (uint64_t)nSize) >> 32),
-            (uint32_t)(((uint64_t)hash_function.template operator() < 2 > (e) * (uint64_t)nSize) >> 32),
-            (uint32_t)(((uint64_t)hash_function.template operator() < 3 > (e) * (uint64_t)nSize) >> 32),
-            (uint32_t)(((uint64_t)hash_function.template operator() < 4 > (e) * (uint64_t)nSize) >> 32),
-            (uint32_t)(((uint64_t)hash_function.template operator() < 5 > (e) * (uint64_t)nSize) >> 32),
-            (uint32_t)(((uint64_t)hash_function.template operator() < 6 > (e) * (uint64_t)nSize) >> 32),
-            (uint32_t)(((uint64_t)hash_function.template operator() < 7 > (e) * (uint64_t)nSize) >> 32)}};
+        return {{(uint32_t)(((uint64_t)hash_function.template operator()<0>(e) * (uint64_t)nSize) >> 32),
+            (uint32_t)(((uint64_t)hash_function.template operator()<1>(e) * (uint64_t)nSize) >> 32),
+            (uint32_t)(((uint64_t)hash_function.template operator()<2>(e) * (uint64_t)nSize) >> 32),
+            (uint32_t)(((uint64_t)hash_function.template operator()<3>(e) * (uint64_t)nSize) >> 32),
+            (uint32_t)(((uint64_t)hash_function.template operator()<4>(e) * (uint64_t)nSize) >> 32),
+            (uint32_t)(((uint64_t)hash_function.template operator()<5>(e) * (uint64_t)nSize) >> 32),
+            (uint32_t)(((uint64_t)hash_function.template operator()<6>(e) * (uint64_t)nSize) >> 32),
+            (uint32_t)(((uint64_t)hash_function.template operator()<7>(e) * (uint64_t)nSize) >> 32)}};
     }
 
     /* end
@@ -381,19 +381,19 @@ public:
             }
 
             /** Swap with the element at the location that was
-            * not the last one looked at. Example:
-            *
-            * 1) On first iteration, last_loc == invalid(), find returns last, so
-            *    last_loc defaults to locs[0].
-            * 2) On further iterations, where last_loc == locs[k], last_loc will
-            *    go to locs[k+1 % 8], i.e., next of the 8 indicies wrapping around
-            *    to 0 if needed.
-            *
-            * This prevents moving the element we just put in.
-            *
-            * The swap is not a move -- we must switch onto the evicted element
-            * for the next iteration.
-            */
+             * not the last one looked at. Example:
+             *
+             * 1) On first iteration, last_loc == invalid(), find returns last, so
+             *    last_loc defaults to locs[0].
+             * 2) On further iterations, where last_loc == locs[k], last_loc will
+             *    go to locs[k+1 % 8], i.e., next of the 8 indicies wrapping around
+             *    to 0 if needed.
+             *
+             * This prevents moving the element we just put in.
+             *
+             * The swap is not a move -- we must switch onto the evicted element
+             * for the next iteration.
+             */
             last_loc = locs[(1 + (std::find(locs.begin(), locs.end(), last_loc) - locs.begin())) & 7];
             std::swap(vTable[last_loc], e);
             // Can't std::swap a std::vector<bool>::reference and a bool&.

@@ -158,7 +158,7 @@ public:
     }
 };
 
-} // end anon namespace
+} // namespace
 
 // WARNING: Never use this to signal errors in a signature hash function. This is here solely for legacy reasons!
 const uint256 SIGNATURE_HASH_ERROR(uint256S("0000000000000000000000000000000000000000000000000000000000000001"));

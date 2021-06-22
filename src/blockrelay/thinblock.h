@@ -285,6 +285,7 @@ private:
 protected:
     //! Virtual method so it can be overridden for better unit testing
     virtual int64_t getTimeForStats() { return GetTimeMillis(); }
+
 public:
     void UpdateInBound(uint64_t nThinBlockSize, uint64_t nOriginalBlockSize);
     void UpdateOutBound(uint64_t nThinBlockSize, uint64_t nOriginalBlockSize);

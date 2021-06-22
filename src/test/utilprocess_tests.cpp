@@ -2,8 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "utilprocess.h"
 #include "test/test_bitcoin.h"
+#include "utilprocess.h"
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/predef/os.h>
 #include <boost/test/unit_test.hpp>
@@ -92,16 +92,18 @@ BOOST_AUTO_TEST_CASE(subprocess_terminate)
     int termination_signal = -1;
 
     SubProcess p("/bin/sleep", {"30"}, dummy_callb, dummy_callb);
-    std::thread t([&]() {
-        try
+    std::thread t(
+        [&]()
         {
-            p.Run();
-        }
-        catch (const subprocess_error &e)
-        {
-            termination_signal = e.termination_signal;
-        }
-    });
+            try
+            {
+                p.Run();
+            }
+            catch (const subprocess_error &e)
+            {
+                termination_signal = e.termination_signal;
+            }
+        });
     while (!p.IsRunning())
     {
         std::this_thread::yield();

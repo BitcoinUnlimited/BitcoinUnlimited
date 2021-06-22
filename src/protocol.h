@@ -359,7 +359,7 @@ extern const char *REQTXVAL;
  * A p2p message for the validaterawtransaction rpc response
  */
 extern const char *RESTXVAL;
-};
+}; // namespace NetMsgType
 
 
 /* Get a vector of all valid message types (see above) */

@@ -82,7 +82,8 @@ static void CheckSignatureEncodingWithSigHashType(const valtype &vchSig, uint32_
 
         // If we have strict encoding, we prevent the use of undefined flags.
         std::array<SigHashType, 2> undefSigHashes{
-            SigHashType(sigHash.getRawSigHashType() | 0x20), sigHash.withBaseType(BaseSigHashType::UNSUPPORTED),
+            SigHashType(sigHash.getRawSigHashType() | 0x20),
+            sigHash.withBaseType(BaseSigHashType::UNSUPPORTED),
         };
 
         for (SigHashType undefSigHash : undefSigHashes)

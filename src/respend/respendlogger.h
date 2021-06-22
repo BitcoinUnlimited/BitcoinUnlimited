@@ -26,6 +26,7 @@ public:
     void Trigger(CTxMemPool &pool) override;
 
     void SetValid(bool v) override { valid = v ? "yes" : "no"; }
+
 private:
     std::string orig;
     std::string respend;
@@ -34,6 +35,6 @@ private:
     bool newConflict; // TX has at least 1 output that's not respent earlier
 };
 
-} // ns respend
+} // namespace respend
 
 #endif

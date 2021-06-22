@@ -78,7 +78,7 @@ public:
     }
 
     template <typename... Args>
-    CDataStream(int nTypeIn, int nVersionIn, Args &&... args)
+    CDataStream(int nTypeIn, int nVersionIn, Args &&...args)
     {
         Init(nTypeIn, nVersionIn);
         ::SerializeMany(*this, std::forward<Args>(args)...);

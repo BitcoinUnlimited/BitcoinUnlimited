@@ -649,23 +649,25 @@ void HTTPRequest::WriteReply(int nStatus, const std::string &strReply)
     assert(evb);
     evbuffer_add(evb, strReply.data(), strReply.size());
     auto req_copy = req;
-    HTTPEvent *ev = new HTTPEvent(eventBase, true, [req_copy, nStatus] {
-        evhttp_send_reply(req_copy, nStatus, nullptr, nullptr);
-        // Re-enable reading from the socket. This is the second part of the libevent
-        // workaround above.
-        if (event_get_version_number() >= 0x02010600 && event_get_version_number() < 0x02020001)
+    HTTPEvent *ev = new HTTPEvent(eventBase, true,
+        [req_copy, nStatus]
         {
-            evhttp_connection *conn = evhttp_request_get_connection(req_copy);
-            if (conn)
+            evhttp_send_reply(req_copy, nStatus, nullptr, nullptr);
+            // Re-enable reading from the socket. This is the second part of the libevent
+            // workaround above.
+            if (event_get_version_number() >= 0x02010600 && event_get_version_number() < 0x02020001)
             {
-                bufferevent *bev = evhttp_connection_get_bufferevent(conn);
-                if (bev)
+                evhttp_connection *conn = evhttp_request_get_connection(req_copy);
+                if (conn)
                 {
-                    bufferevent_enable(bev, EV_READ | EV_WRITE);
+                    bufferevent *bev = evhttp_connection_get_bufferevent(conn);
+                    if (bev)
+                    {
+                        bufferevent_enable(bev, EV_READ | EV_WRITE);
+                    }
                 }
             }
-        }
-    });
+        });
     ev->trigger(nullptr);
     replySent = true;
     req = nullptr; // transferred back to main thread

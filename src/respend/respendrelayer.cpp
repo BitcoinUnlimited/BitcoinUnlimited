@@ -58,7 +58,7 @@ private:
     std::mutex cs_relayLimiter;
 };
 
-} // ns anon
+} // namespace
 
 RespendRelayer::RespendRelayer() : interesting(false), valid(false) {}
 bool RespendRelayer::AddOutpointConflict(const COutPoint &,
@@ -134,4 +134,4 @@ void RespendRelayer::Trigger(CTxMemPool &pool)
         broadcastDspInv(ptx, dsp.GetHash());
 }
 
-} // ns respend
+} // namespace respend

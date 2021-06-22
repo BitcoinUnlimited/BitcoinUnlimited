@@ -30,7 +30,9 @@ RecentRequestsTableModel::RecentRequestsTableModel(CWallet *wallet, WalletModel 
     connect(walletModel->getOptionsModel(), SIGNAL(displayUnitChanged(int)), this, SLOT(updateDisplayUnit()));
 }
 
-RecentRequestsTableModel::~RecentRequestsTableModel() { /* Intentionally left empty */}
+RecentRequestsTableModel::~RecentRequestsTableModel()
+{ /* Intentionally left empty */
+}
 int RecentRequestsTableModel::rowCount(const QModelIndex &parent) const
 {
     Q_UNUSED(parent);

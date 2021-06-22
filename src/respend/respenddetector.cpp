@@ -175,4 +175,4 @@ bool RespendDetector::IsInteresting() const
 }
 
 int RespendDetector::GetDsproof() const { return dsproof; }
-} // ns respend
+} // namespace respend

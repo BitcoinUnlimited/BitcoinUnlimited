@@ -3,12 +3,12 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "respend/respendrelayer.h"
 #include "DoubleSpendProofStorage.h"
 #include "key.h"
 #include "keystore.h"
 #include "net.h"
 #include "random.h"
+#include "respend/respendrelayer.h"
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/sign.h"

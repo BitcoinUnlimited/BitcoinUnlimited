@@ -43,6 +43,7 @@ public:
     float getSmoothedTpsAverage_Sampled() const { return fSmoothedTpsAverage_Sampled; }
     float getSmoothedTpsAverage_Displayed() const { return fSmoothedTpsAverage_Displayed; }
     QString getDisplayWindowLabelText() const { return displayWindowLabelText; }
+
 private:
     void paintPath(QPainterPath &avgPath, QPainterPath &peakPath);
     size_t getSamplesInDisplayWindow() const;

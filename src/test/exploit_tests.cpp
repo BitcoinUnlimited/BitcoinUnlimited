@@ -16,7 +16,6 @@
 #include "requestManager.h"
 #include "serialize.h"
 #include "streams.h"
-#include "streams.h"
 #include "txmempool.h"
 #include "uint256.h"
 #include "unlimited.h"

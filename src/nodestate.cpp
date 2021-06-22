@@ -10,8 +10,8 @@
 extern std::atomic<int> nPreferredDownload;
 
 /**
-* Default constructor initializing all local member variables to "null" values
-*/
+ * Default constructor initializing all local member variables to "null" values
+ */
 CNodeState::CNodeState(CAddress addrIn, std::string addrNameIn) : address(addrIn), name(addrNameIn)
 {
     pindexBestKnownBlock = nullptr;
@@ -28,11 +28,11 @@ CNodeState::CNodeState(CAddress addrIn, std::string addrNameIn) : address(addrIn
 }
 
 /**
-* Gets the CNodeState for the specified NodeId.
-*
-* @param[in] pnode  The NodeId to return CNodeState* for
-* @return CNodeState* matching the NodeId, or nullptr if NodeId is not matched
-*/
+ * Gets the CNodeState for the specified NodeId.
+ *
+ * @param[in] pnode  The NodeId to return CNodeState* for
+ * @return CNodeState* matching the NodeId, or nullptr if NodeId is not matched
+ */
 CNodeState *CState::_GetNodeState(const NodeId id)
 {
 // no need to lock explictly here cause CNodeStateAccessor
@@ -52,11 +52,11 @@ CNodeState *CState::_GetNodeState(const NodeId id)
 }
 
 /**
-* Initialize the CNodeState for the specified NodeId.
-*
-* @param[in] pnode  The NodeId
-* @return none
-*/
+ * Initialize the CNodeState for the specified NodeId.
+ *
+ * @param[in] pnode  The NodeId
+ * @return none
+ */
 void CState::InitializeNodeState(const CNode *pnode)
 {
     LOCK(cs_cstate);
@@ -65,11 +65,11 @@ void CState::InitializeNodeState(const CNode *pnode)
 }
 
 /**
-* Remove the CNodeState for the specified NodeId.
-*
-* @param[in] pnode  The NodeId
-* @return none
-*/
+ * Remove the CNodeState for the specified NodeId.
+ *
+ * @param[in] pnode  The NodeId
+ * @return none
+ */
 void CState::RemoveNodeState(const NodeId id)
 {
     LOCK2(cs_cstate, requester.cs_objDownloader);

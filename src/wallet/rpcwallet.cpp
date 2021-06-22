@@ -408,9 +408,10 @@ UniValue sendtoaddress(const UniValue &params, bool fHelp)
         throw runtime_error(
             "sendtoaddress \"bitcoinaddress\" amount ( \"comment\" \"comment-to\" subtractfeefromamount )\n"
             "\nSend an amount to a given address.\n" +
-            HelpRequiringPassphrase() + "\nArguments:\n"
-                                        "1. \"bitcoinaddress\"  (string, required) The bitcoin address to send to.\n"
-                                        "2. \"amount\"      (numeric or string, required) The amount in " +
+            HelpRequiringPassphrase() +
+            "\nArguments:\n"
+            "1. \"bitcoinaddress\"  (string, required) The bitcoin address to send to.\n"
+            "2. \"amount\"      (numeric or string, required) The amount in " +
             CURRENCY_UNIT +
             " to send. eg 0.1\n"
             "3. \"comment\"     (string, optional) A comment used to store what the transaction is for. \n"
@@ -682,9 +683,10 @@ UniValue getreceivedbyaddress(const UniValue &params, bool fHelp)
                             "at least this many times.\n"
                             "\nResult:\n"
                             "amount   (numeric) The total amount in " +
-                            CURRENCY_UNIT + " received at this address.\n"
-                                            "\nExamples:\n"
-                                            "\nThe amount from transactions with at least 1 confirmation\n" +
+                            CURRENCY_UNIT +
+                            " received at this address.\n"
+                            "\nExamples:\n"
+                            "\nThe amount from transactions with at least 1 confirmation\n" +
                             HelpExampleCli("getreceivedbyaddress", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\"") +
                             "\nThe amount including unconfirmed transactions, zero confirmations\n" +
                             HelpExampleCli("getreceivedbyaddress", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\" 0") +
@@ -745,9 +747,10 @@ UniValue getreceivedbyaccount(const UniValue &params, bool fHelp)
             "times.\n"
             "\nResult:\n"
             "amount              (numeric) The total amount in " +
-            CURRENCY_UNIT + " received for this account.\n"
-                            "\nExamples:\n"
-                            "\nAmount received by the default account with at least 1 confirmation\n" +
+            CURRENCY_UNIT +
+            " received for this account.\n"
+            "\nExamples:\n"
+            "\nAmount received by the default account with at least 1 confirmation\n" +
             HelpExampleCli("getreceivedbyaccount", "\"\"") +
             "\nAmount received at the tabby account including unconfirmed amounts with zero confirmations\n" +
             HelpExampleCli("getreceivedbyaccount", "\"tabby\" 0") +
@@ -843,9 +846,10 @@ UniValue getbalance(const UniValue &params, bool fHelp)
                             "addresses (see 'importaddress')\n"
                             "\nResult:\n"
                             "amount              (numeric) The total amount in " +
-                            CURRENCY_UNIT + " received for this account.\n"
-                                            "\nExamples:\n"
-                                            "\nThe total amount in the wallet\n" +
+                            CURRENCY_UNIT +
+                            " received for this account.\n"
+                            "\nExamples:\n"
+                            "\nThe total amount in the wallet\n" +
                             HelpExampleCli("getbalance", "") +
                             "\nThe total amount in the wallet at least 5 blocks confirmed\n" +
                             HelpExampleCli("getbalance", "\"*\" 6") + "\nAs a json rpc call\n" +
@@ -940,14 +944,15 @@ UniValue movecmd(const UniValue &params, bool fHelp)
             "2. \"toaccount\"     (string, required) The name of the account to move funds to. May be the default "
             "account using \"\".\n"
             "3. amount            (numeric) Quantity of " +
-            CURRENCY_UNIT + " to move between accounts.\n"
-                            "4. minconf           (numeric, optional, default=1) Only use funds with at least this "
-                            "many confirmations.\n"
-                            "5. \"comment\"       (string, optional) An optional comment, stored in the wallet only.\n"
-                            "\nResult:\n"
-                            "true|false           (boolean) true if successful.\n"
-                            "\nExamples:\n"
-                            "\nMove 0.01 " +
+            CURRENCY_UNIT +
+            " to move between accounts.\n"
+            "4. minconf           (numeric, optional, default=1) Only use funds with at least this "
+            "many confirmations.\n"
+            "5. \"comment\"       (string, optional) An optional comment, stored in the wallet only.\n"
+            "\nResult:\n"
+            "true|false           (boolean) true if successful.\n"
+            "\nExamples:\n"
+            "\nMove 0.01 " +
             CURRENCY_UNIT + " from the default account to the account named tabby\n" +
             HelpExampleCli("move", "\"\" \"tabby\" 0.01") + "\nMove 0.01 " + CURRENCY_UNIT +
             " timotei to akiko with a comment and funds have 6 confirmations\n" +
@@ -1638,12 +1643,13 @@ UniValue listtransactions(const UniValue &params, bool fHelp)
             "                                                associated with an address, transaction id and block "
             "details\n"
             "    \"amount\": x.xxx,          (numeric) The amount in " +
-            CURRENCY_UNIT + ". This is negative for the 'send' category, and for the\n"
-                            "                                         'move' category for moves outbound. It is "
-                            "positive for the 'receive' category,\n"
-                            "                                         and for the 'move' category for inbound funds.\n"
-                            "    \"vout\": n,                (numeric) the vout value\n"
-                            "    \"fee\": x.xxx,             (numeric) The amount of the fee in " +
+            CURRENCY_UNIT +
+            ". This is negative for the 'send' category, and for the\n"
+            "                                         'move' category for moves outbound. It is "
+            "positive for the 'receive' category,\n"
+            "                                         and for the 'move' category for inbound funds.\n"
+            "    \"vout\": n,                (numeric) the vout value\n"
+            "    \"fee\": x.xxx,             (numeric) The amount of the fee in " +
             CURRENCY_UNIT +
             ". This is negative and only available for the \n"
             "                                         'send' category of transactions.\n"
@@ -1786,12 +1792,13 @@ UniValue listtransactionsfrom(const UniValue &params, bool fHelp)
             "                                                associated with an address, transaction id and block "
             "details\n"
             "    \"amount\": x.xxx,          (numeric) The amount in " +
-            CURRENCY_UNIT + ". This is negative for the 'send' category, and for the\n"
-                            "                                         'move' category for moves outbound. It is "
-                            "positive for the 'receive' category,\n"
-                            "                                         and for the 'move' category for inbound funds.\n"
-                            "    \"vout\": n,                (numeric) the vout value\n"
-                            "    \"fee\": x.xxx,             (numeric) The amount of the fee in " +
+            CURRENCY_UNIT +
+            ". This is negative for the 'send' category, and for the\n"
+            "                                         'move' category for moves outbound. It is "
+            "positive for the 'receive' category,\n"
+            "                                         and for the 'move' category for inbound funds.\n"
+            "    \"vout\": n,                (numeric) the vout value\n"
+            "    \"fee\": x.xxx,             (numeric) The amount of the fee in " +
             CURRENCY_UNIT +
             ". This is negative and only available for the \n"
             "                                         'send' category of transactions.\n"
@@ -1993,11 +2000,12 @@ UniValue listsinceblock(const UniValue &params, bool fHelp)
             "    \"category\":\"send|receive\",     (string) The transaction category. 'send' has negative amounts, "
             "'receive' has positive amounts.\n"
             "    \"amount\": x.xxx,          (numeric) The amount in " +
-            CURRENCY_UNIT + ". This is negative for the 'send' category, and for the 'move' category for moves \n"
-                            "                                          outbound. It is positive for the 'receive' "
-                            "category, and for the 'move' category for inbound funds.\n"
-                            "    \"vout\" : n,               (numeric) the vout value\n"
-                            "    \"fee\": x.xxx,             (numeric) The amount of the fee in " +
+            CURRENCY_UNIT +
+            ". This is negative for the 'send' category, and for the 'move' category for moves \n"
+            "                                          outbound. It is positive for the 'receive' "
+            "category, and for the 'move' category for inbound funds.\n"
+            "    \"vout\" : n,               (numeric) the vout value\n"
+            "    \"fee\": x.xxx,             (numeric) The amount of the fee in " +
             CURRENCY_UNIT +
             ". This is negative and only available for the 'send' category of transactions.\n"
             "    \"confirmations\": n,       (numeric) The number of confirmations for the transaction. Available for "
@@ -2503,10 +2511,11 @@ UniValue lockunspent(const UniValue &params, bool fHelp)
                                           "\"[{\\\"txid\\\":"
                                           "\\\"a08e6907dbbd3d809776dbfc5d82e371b764ed838b5655e72f463568df1aadf0\\\","
                                           "\\\"vout\\\":1}]\"") +
-            "\nAs a json rpc call\n" + HelpExampleRpc("lockunspent", "false, "
-                                                                     "\"[{\\\"txid\\\":"
-                                                                     "\\\"a08e6907dbbd3d809776dbfc5d82e371b764ed838b565"
-                                                                     "5e72f463568df1aadf0\\\",\\\"vout\\\":1}]\""));
+            "\nAs a json rpc call\n" +
+            HelpExampleRpc("lockunspent", "false, "
+                                          "\"[{\\\"txid\\\":"
+                                          "\\\"a08e6907dbbd3d809776dbfc5d82e371b764ed838b565"
+                                          "5e72f463568df1aadf0\\\",\\\"vout\\\":1}]\""));
 
     LOCK(pwalletMain->cs_wallet);
 
@@ -2614,10 +2623,11 @@ UniValue settxfee(const UniValue &params, bool fHelp)
                             "\nSet the transaction fee per kB. Overwrites the paytxfee parameter.\n"
                             "\nArguments:\n"
                             "1. amount         (numeric or sting, required) The transaction fee in " +
-                            CURRENCY_UNIT + "/kB\n"
-                                            "\nResult\n"
-                                            "true|false        (boolean) Returns true if successful\n"
-                                            "\nExamples:\n" +
+                            CURRENCY_UNIT +
+                            "/kB\n"
+                            "\nResult\n"
+                            "true|false        (boolean) Returns true if successful\n"
+                            "\nExamples:\n" +
                             HelpExampleCli("settxfee", "0.00001") + HelpExampleRpc("settxfee", "0.00001"));
 
     LOCK(pwalletMain->cs_wallet);
@@ -2645,20 +2655,23 @@ UniValue getwalletinfo(const UniValue &params, bool fHelp)
             CURRENCY_UNIT +
             "\n"
             "  \"unconfirmed_balance\": xxx, (numeric) the total unconfirmed balance of the wallet in " +
-            CURRENCY_UNIT + "\n"
-                            "  \"immature_balance\": xxxxxx, (numeric) the total immature balance of the wallet in " +
-            CURRENCY_UNIT + "\n"
-                            "  \"txcount\": xxxxxxx,         (numeric) the total number of transactions in the wallet\n"
-                            "  \"keypoololdest\": xxxxxx,    (numeric) the timestamp (seconds since GMT epoch) of the "
-                            "oldest pre-generated key in the key pool\n"
-                            "  \"keypoolsize\": xxxx,        (numeric) how many new keys are pre-generated\n"
-                            "  \"unlocked_until\": ttt,      (numeric) the timestamp in seconds since epoch (midnight "
-                            "Jan 1 1970 GMT) that the wallet is unlocked for transfers, or 0 if the wallet is locked\n"
-                            "  \"paytxfee\": x.xxxx,         (numeric) the transaction fee configuration, set in " +
-            CURRENCY_UNIT + "/kB\n"
-                            "  \"hdmasterkeyid\": \"<hash160>\", (hex string) the Hash160 of the hd master pubkey\n"
-                            "}\n"
-                            "\nExamples:\n" +
+            CURRENCY_UNIT +
+            "\n"
+            "  \"immature_balance\": xxxxxx, (numeric) the total immature balance of the wallet in " +
+            CURRENCY_UNIT +
+            "\n"
+            "  \"txcount\": xxxxxxx,         (numeric) the total number of transactions in the wallet\n"
+            "  \"keypoololdest\": xxxxxx,    (numeric) the timestamp (seconds since GMT epoch) of the "
+            "oldest pre-generated key in the key pool\n"
+            "  \"keypoolsize\": xxxx,        (numeric) how many new keys are pre-generated\n"
+            "  \"unlocked_until\": ttt,      (numeric) the timestamp in seconds since epoch (midnight "
+            "Jan 1 1970 GMT) that the wallet is unlocked for transfers, or 0 if the wallet is locked\n"
+            "  \"paytxfee\": x.xxxx,         (numeric) the transaction fee configuration, set in " +
+            CURRENCY_UNIT +
+            "/kB\n"
+            "  \"hdmasterkeyid\": \"<hash160>\", (hex string) the Hash160 of the hd master pubkey\n"
+            "}\n"
+            "\nExamples:\n" +
             HelpExampleCli("getwalletinfo", "") + HelpExampleRpc("getwalletinfo", ""));
 
     LOCK(pwalletMain->cs_wallet);
@@ -2734,13 +2747,14 @@ UniValue listunspent(const UniValue &params, bool fHelp)
             "account\n"
             "    \"scriptPubKey\" : \"key\", (string) the script key\n"
             "    \"amount\" : x.xxx,         (numeric) the transaction amount in " +
-            CURRENCY_UNIT + "\n"
-                            "    \"confirmations\" : n       (numeric) The number of confirmations\n"
-                            "  }\n"
-                            "  ,...\n"
-                            "]\n"
+            CURRENCY_UNIT +
+            "\n"
+            "    \"confirmations\" : n       (numeric) The number of confirmations\n"
+            "  }\n"
+            "  ,...\n"
+            "]\n"
 
-                            "\nExamples\n" +
+            "\nExamples\n" +
             HelpExampleCli("listunspent", "") +
             HelpExampleCli("listunspent", "6 9999999 "
                                           "\"[\\\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\\\","

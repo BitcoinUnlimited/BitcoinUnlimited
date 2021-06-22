@@ -28,7 +28,7 @@ bool IsTxIndexReady()
 }
 
 template <typename... Args>
-static void FatalError(const char *fmt, const Args &... args)
+static void FatalError(const char *fmt, const Args &...args)
 {
     std::string strMessage = tfm::format(fmt, args...);
     LOGA("*** %s\n", strMessage);

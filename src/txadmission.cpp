@@ -1082,10 +1082,10 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
                 // Gradually choke off the nFreeLimit as well but leave at least nMinLimitFreeRelay
                 // So that some free transactions can still get through
-                nFreeLimit = std::min(
-                    nFreeLimit, ((double)nLimitFreeRelay - ((double)(nLimitFreeRelay - nMinLimitFreeRelay) *
-                                                               (double)(poolBytes - nLargestBlockSeen) /
-                                                               (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1)))));
+                nFreeLimit = std::min(nFreeLimit,
+                    ((double)nLimitFreeRelay -
+                        ((double)(nLimitFreeRelay - nMinLimitFreeRelay) * (double)(poolBytes - nLargestBlockSeen) /
+                            (nLargestBlockSeen * (MAX_BLOCK_SIZE_MULTIPLIER - 1)))));
                 if (nFreeLimit < nMinLimitFreeRelay)
                     nFreeLimit = nMinLimitFreeRelay;
             }
@@ -1240,8 +1240,9 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     }
     uint64_t interval = (GetStopwatch() - start) / 1000;
     // typically too much logging, but useful when optimizing tx validation
-    LOG(BENCH, "ValidateTransaction, time: %d, tx: %s, len: %d, sigops: %llu (legacy: %u), sighash: %llu, Vin: "
-               "%llu, Vout: %llu\n",
+    LOG(BENCH,
+        "ValidateTransaction, time: %d, tx: %s, len: %d, sigops: %llu (legacy: %u), sighash: %llu, Vin: "
+        "%llu, Vout: %llu\n",
         interval, tx->GetHash().ToString(), nSize, resourceTracker.GetSigOps(), (unsigned int)nSigOps,
         resourceTracker.GetSighashBytes(), tx->vin.size(), tx->vout.size());
     nTxValidationTime << interval;

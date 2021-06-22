@@ -126,6 +126,7 @@ public:
     uint64_t DefaultExcessiveBlockSize() const { return nDefaultExcessiveBlockSize; }
     uint64_t MinMaxBlockSize() const { return nMinMaxBlockSize; }
     uint64_t DefaultMaxBlockMiningSize() const { return nDefaultMaxBlockMiningSize; }
+
 protected:
     CChainParams() {}
     Consensus::Params consensus;

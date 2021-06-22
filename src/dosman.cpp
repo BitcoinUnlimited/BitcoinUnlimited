@@ -15,11 +15,11 @@ CDoSManager::CDoSManager() : setBannedIsDirty(false), nBanThreshold(DEFAULT_BANS
  */
 void CDoSManager::HandleCommandLine() { nBanThreshold = GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD); }
 /**
-* Checks if this CNetAddr is in the whitelist
-*
-* @param[in] addr  The address to check
-* @return true if address is in the whitelist, otherwise false
-*/
+ * Checks if this CNetAddr is in the whitelist
+ *
+ * @param[in] addr  The address to check
+ * @return true if address is in the whitelist, otherwise false
+ */
 bool CDoSManager::IsWhitelistedRange(const CNetAddr &addr)
 {
     LOCK(cs_vWhitelistedRange);
@@ -32,10 +32,10 @@ bool CDoSManager::IsWhitelistedRange(const CNetAddr &addr)
 }
 
 /**
-* Add this CSubNet to the whitelist
-*
-* @param[in] subnet  The subnet to add to the whitelist
-*/
+ * Add this CSubNet to the whitelist
+ *
+ * @param[in] subnet  The subnet to add to the whitelist
+ */
 void CDoSManager::AddWhitelistedRange(const CSubNet &subnet)
 {
     LOCK(cs_vWhitelistedRange);
@@ -43,9 +43,9 @@ void CDoSManager::AddWhitelistedRange(const CSubNet &subnet)
 }
 
 /**
-* Remove all in-memory ban entries
-* Marks the in-memory banlist as dirty
-*/
+ * Remove all in-memory ban entries
+ * Marks the in-memory banlist as dirty
+ */
 void CDoSManager::ClearBanned()
 {
     LOCK(cs_setBanned);
@@ -55,11 +55,11 @@ void CDoSManager::ClearBanned()
 }
 
 /**
-* Check to see if this CNetAddr is currently banned
-*
-* @param[in] ip  The address to check
-* @return true if address currently banned, otherwise false
-*/
+ * Check to see if this CNetAddr is currently banned
+ *
+ * @param[in] ip  The address to check
+ * @return true if address currently banned, otherwise false
+ */
 bool CDoSManager::IsBanned(CNetAddr ip)
 {
     LOCK(cs_setBanned);
@@ -78,11 +78,11 @@ bool CDoSManager::IsBanned(CNetAddr ip)
 }
 
 /**
-* Check if this CSubNet is currently banned
-*
-* @param[in] subnet  The subnet to check
-* @return true if subnet currently banned, otherwise false
-*/
+ * Check if this CSubNet is currently banned
+ *
+ * @param[in] subnet  The subnet to check
+ * @return true if subnet currently banned, otherwise false
+ */
 bool CDoSManager::IsBanned(CSubNet subnet)
 {
     LOCK(cs_setBanned);
@@ -100,14 +100,14 @@ bool CDoSManager::IsBanned(CSubNet subnet)
 }
 
 /**
-* Add this CNetAddr to the banlist for the specified duration
-* Marks the in-memory banlist as dirty
-*
-* @param[in] addr            The address to ban
-* @param[in] banReason       The reason for banning this address
-* @param[in] bantimeoffset   The duration of the ban in seconds, either a duration or an absolute time
-* @param[in] sinceUnixEpoch  Whether or not the bantimeoffset is a relative duration, or absolute time
-*/
+ * Add this CNetAddr to the banlist for the specified duration
+ * Marks the in-memory banlist as dirty
+ *
+ * @param[in] addr            The address to ban
+ * @param[in] banReason       The reason for banning this address
+ * @param[in] bantimeoffset   The duration of the ban in seconds, either a duration or an absolute time
+ * @param[in] sinceUnixEpoch  Whether or not the bantimeoffset is a relative duration, or absolute time
+ */
 void CDoSManager::Ban(const CNetAddr &addr,
     const std::string &userAgent,
     const BanReason &banReason,
@@ -119,14 +119,14 @@ void CDoSManager::Ban(const CNetAddr &addr,
 }
 
 /**
-* Add this CSubNet to the banlist for the specified duration
-* Marks the in-memory banlist as dirty
-*
-* @param[in] addr            The subnet to ban
-* @param[in] banReason       The reason for banning this subnet
-* @param[in] bantimeoffset   The duration of the ban in seconds, either a duration or an absolute time
-* @param[in] sinceUnixEpoch  Whether or not the bantimeoffset is a relative duration, or absolute time
-*/
+ * Add this CSubNet to the banlist for the specified duration
+ * Marks the in-memory banlist as dirty
+ *
+ * @param[in] addr            The subnet to ban
+ * @param[in] banReason       The reason for banning this subnet
+ * @param[in] bantimeoffset   The duration of the ban in seconds, either a duration or an absolute time
+ * @param[in] sinceUnixEpoch  Whether or not the bantimeoffset is a relative duration, or absolute time
+ */
 void CDoSManager::Ban(const CSubNet &subNet,
     const std::string &userAgent,
     const BanReason &banReason,
@@ -153,12 +153,12 @@ void CDoSManager::Ban(const CSubNet &subNet,
 }
 
 /**
-* Remove this CNetAddr from the banlist
-* Marks the in-memory banlist as dirty if address was found and removed
-*
-* @param[in] addr  The address to unban
-* @return true if address was in the ban list and was removed, otherwise false
-*/
+ * Remove this CNetAddr from the banlist
+ * Marks the in-memory banlist as dirty if address was found and removed
+ *
+ * @param[in] addr  The address to unban
+ * @return true if address was in the ban list and was removed, otherwise false
+ */
 bool CDoSManager::Unban(const CNetAddr &addr)
 {
     CSubNet subNet(addr);
@@ -166,12 +166,12 @@ bool CDoSManager::Unban(const CNetAddr &addr)
 }
 
 /**
-* Remove this CSubNet from the banlist
-* Marks the in-memory banlist as dirty if subnet was found and removed
-*
-* @param[in] subNet  The subnet to unban
-* @return true if subnet was in the ban list and was removed, otherwise false
-*/
+ * Remove this CSubNet from the banlist
+ * Marks the in-memory banlist as dirty if subnet was found and removed
+ *
+ * @param[in] subNet  The subnet to unban
+ * @return true if subnet was in the ban list and was removed, otherwise false
+ */
 bool CDoSManager::Unban(const CSubNet &subNet)
 {
     LOCK(cs_setBanned);
@@ -187,11 +187,11 @@ bool CDoSManager::Unban(const CSubNet &subNet)
 }
 
 /**
-* Copies current in-memory banlist to the passed in banmap_t
-* Intended to allow read-only actions on the banlist without holding the lock
-*
-* @param[in,out] banMap  The banlist copy
-*/
+ * Copies current in-memory banlist to the passed in banmap_t
+ * Intended to allow read-only actions on the banlist without holding the lock
+ *
+ * @param[in,out] banMap  The banlist copy
+ */
 void CDoSManager::GetBanned(banmap_t &banMap)
 {
     LOCK(cs_setBanned);
@@ -200,11 +200,11 @@ void CDoSManager::GetBanned(banmap_t &banMap)
 }
 
 /**
-* Copies current in-memory banlist to the passed in banmap_t
-* Intended to allow read-only actions on the banlist without holding the lock
-*
-* @param[in,out] banMap  The banlist copy
-*/
+ * Copies current in-memory banlist to the passed in banmap_t
+ * Intended to allow read-only actions on the banlist without holding the lock
+ *
+ * @param[in,out] banMap  The banlist copy
+ */
 void CDoSManager::GetBannedInternal(banmap_t &banMap) EXCLUSIVE_LOCKS_REQUIRED(cs_setBanned)
 {
     // Ensure lock is held externally as it is required for this internal version of the method
@@ -215,9 +215,9 @@ void CDoSManager::GetBannedInternal(banmap_t &banMap) EXCLUSIVE_LOCKS_REQUIRED(c
 }
 
 /**
-* Iterates the in-memory banlist and removes any ban entries where the ban has expired
-* Marks the in-memory banlist as dirty if any entries were removed
-*/
+ * Iterates the in-memory banlist and removes any ban entries where the ban has expired
+ * Marks the in-memory banlist as dirty if any entries were removed
+ */
 void CDoSManager::SweepBanned()
 {
     LOCK(cs_setBanned);
@@ -225,12 +225,12 @@ void CDoSManager::SweepBanned()
 }
 
 /**
-* Iterates the in-memory banlist and removes any ban entries where the ban has expired
-* Marks the in-memory banlist as dirty if any entries were removed
-*
-* This is the internal version of the function which requres a lock is held externally
-* This helps avoid taking recursive locks internally
-*/
+ * Iterates the in-memory banlist and removes any ban entries where the ban has expired
+ * Marks the in-memory banlist as dirty if any entries were removed
+ *
+ * This is the internal version of the function which requres a lock is held externally
+ * This helps avoid taking recursive locks internally
+ */
 void CDoSManager::SweepBannedInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_setBanned)
 {
     // Ensure lock is held externally as it is required for this internal version of the method
@@ -254,10 +254,10 @@ void CDoSManager::SweepBannedInternal() EXCLUSIVE_LOCKS_REQUIRED(cs_setBanned)
 }
 
 /**
-* Check if the current banlist has changes not written to disk
-*
-* @return true if the in-memory banlist has changes not written to disk, otherwise false
-*/
+ * Check if the current banlist has changes not written to disk
+ *
+ * @return true if the in-memory banlist has changes not written to disk, otherwise false
+ */
 bool CDoSManager::BannedSetIsDirty()
 {
     LOCK(cs_setBanned);
@@ -338,8 +338,8 @@ void CDoSManager::Misbehaving(NodeId nodeid, int howmuch)
 
 
 /**
-* Write in-memory banmap to disk
-*/
+ * Write in-memory banmap to disk
+ */
 void CDoSManager::DumpBanlist()
 {
     int64_t nStart = GetTimeMillis();
@@ -373,8 +373,8 @@ void CDoSManager::DumpBanlist()
 }
 
 /**
-* Read banmap from disk into memory
-*/
+ * Read banmap from disk into memory
+ */
 void CDoSManager::LoadBanlist()
 {
     uiInterface.InitMessage(_("Loading banlist..."));

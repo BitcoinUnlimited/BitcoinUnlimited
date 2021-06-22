@@ -56,7 +56,7 @@ void HandleError(const leveldb::Status &status);
  * specific database.
  */
 const std::vector<unsigned char> &GetObfuscateKey(const CDBWrapper &w);
-};
+}; // namespace dbwrapper_private
 
 /** Batch of changes queued to be written to a CDBWrapper */
 class CDBBatch

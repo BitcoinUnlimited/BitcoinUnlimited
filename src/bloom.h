@@ -188,6 +188,7 @@ public:
 
     //! for testing only
     unsigned vDataSize() const { return data.size(); }
+
 private:
     int nEntriesPerGeneration;
     int nEntriesThisGeneration;

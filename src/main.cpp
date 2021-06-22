@@ -170,7 +170,7 @@ void FinalizeNode(NodeId nodeid)
     nodestate.RemoveNodeState(nodeid);
 }
 
-} // anon namespace
+} // namespace
 
 
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats)

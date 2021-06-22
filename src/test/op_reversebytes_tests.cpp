@@ -129,7 +129,9 @@ BOOST_AUTO_TEST_CASE(op_reversebytes_random_and_palindrome)
 
     // Prepare a couple of interesting script flags.
     std::vector<uint32_t> flaglist({
-        SCRIPT_VERIFY_NONE, STANDARD_SCRIPT_VERIFY_FLAGS, MANDATORY_SCRIPT_VERIFY_FLAGS,
+        SCRIPT_VERIFY_NONE,
+        STANDARD_SCRIPT_VERIFY_FLAGS,
+        MANDATORY_SCRIPT_VERIFY_FLAGS,
     });
     for (uint32_t flagindex = 0; flagindex < 32; ++flagindex)
     {

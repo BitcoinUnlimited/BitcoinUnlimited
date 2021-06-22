@@ -26,7 +26,6 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/assign/list_of.hpp>
-#include <boost/assign/list_of.hpp>
 #include <boost/test/unit_test.hpp>
 
 #include <univalue.h>
@@ -386,27 +385,29 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.vout.resize(3);
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("646578784062697477617463682e636f2092c558ed52c56d");
     t.vout[1].scriptPubKey = CScript() << OP_RETURN << ParseHex("8dd14ca76226bc936a84820d898443873eb03d8854b21fa3");
-    t.vout[2].scriptPubKey = CScript() << OP_RETURN << ParseHex("952b99a2981873e74509281730d78a21786d34a38bd1ebab"
-                                                                "822fad42278f7f4420db6ab1fd2b6826148d4f73bb41ec2d"
-                                                                "40a6d5793d66e17074a0c56a8a7df21062308f483dd6e38d"
-                                                                "53609d350038df0a1b2a9ac8332016e0b904f66880dd0108"
-                                                                "81c4e8074cce8e4ad6c77cb3460e01bf0e7e811b5f945f83"
-                                                                "732ba6677520a893d75d9a966cb8f85dc301656b1635c631"
-                                                                "f5d00d4adf73f2dd112ca75cf19754651909becfbe65aed1");
+    t.vout[2].scriptPubKey = CScript() << OP_RETURN
+                                       << ParseHex("952b99a2981873e74509281730d78a21786d34a38bd1ebab"
+                                                   "822fad42278f7f4420db6ab1fd2b6826148d4f73bb41ec2d"
+                                                   "40a6d5793d66e17074a0c56a8a7df21062308f483dd6e38d"
+                                                   "53609d350038df0a1b2a9ac8332016e0b904f66880dd0108"
+                                                   "81c4e8074cce8e4ad6c77cb3460e01bf0e7e811b5f945f83"
+                                                   "732ba6677520a893d75d9a966cb8f85dc301656b1635c631"
+                                                   "f5d00d4adf73f2dd112ca75cf19754651909becfbe65aed1");
     BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY,
         t.vout[0].scriptPubKey.size() + t.vout[1].scriptPubKey.size() + t.vout[2].scriptPubKey.size());
     BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason, false));
     BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason, true));
 
     // MAX_OP_RETURN_RELAY+1-byte TX_NULL_DATA in multiple outputs (non-standard)
-    t.vout[2].scriptPubKey = CScript() << OP_RETURN << ParseHex("952b99a2981873e74509281730d78a21786d34a38bd1ebab"
-                                                                "822fad42278f7f4420db6ab1fd2b6826148d4f73bb41ec2d"
-                                                                "40a6d5793d66e17074a0c56a8a7df21062308f483dd6e38d"
-                                                                "53609d350038df0a1b2a9ac8332016e0b904f66880dd0108"
-                                                                "81c4e8074cce8e4ad6c77cb3460e01bf0e7e811b5f945f83"
-                                                                "732ba6677520a893d75d9a966cb8f85dc301656b1635c631"
-                                                                "f5d00d4adf73f2dd112ca75cf19754651909becfbe65aed1"
-                                                                "3a");
+    t.vout[2].scriptPubKey = CScript() << OP_RETURN
+                                       << ParseHex("952b99a2981873e74509281730d78a21786d34a38bd1ebab"
+                                                   "822fad42278f7f4420db6ab1fd2b6826148d4f73bb41ec2d"
+                                                   "40a6d5793d66e17074a0c56a8a7df21062308f483dd6e38d"
+                                                   "53609d350038df0a1b2a9ac8332016e0b904f66880dd0108"
+                                                   "81c4e8074cce8e4ad6c77cb3460e01bf0e7e811b5f945f83"
+                                                   "732ba6677520a893d75d9a966cb8f85dc301656b1635c631"
+                                                   "f5d00d4adf73f2dd112ca75cf19754651909becfbe65aed1"
+                                                   "3a");
     BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY + 1,
         t.vout[0].scriptPubKey.size() + t.vout[1].scriptPubKey.size() + t.vout[2].scriptPubKey.size());
     BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason, false));
@@ -429,15 +430,16 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason, true));
 
     // Check that 1 pub label and 1 normal data is not allowed
-    t.vout[1].scriptPubKey = CScript() << OP_RETURN << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
-                                                                "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
-                                                                "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
-                                                                "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
-                                                                "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
-                                                                "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
-                                                                "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
-                                                                "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef7105"
-                                                                "2312");
+    t.vout[1].scriptPubKey = CScript() << OP_RETURN
+                                       << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                   "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                   "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                   "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef7105"
+                                                   "2312");
     BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason, false));
     BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason, true));
     t.vout.resize(1);
@@ -466,18 +468,21 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     // after the May 2021 Network Upgrade.
     t.vout.resize(2);
     t.vout[1].nValue = 0;
-    t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"
-                                                                "a67962e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548");
-    t.vout[1].scriptPubKey = CScript() << OP_RETURN << ParseHex("271967f1a67130b7105cd6a828e03909a67962e0ea1f61de"
-                                                                "b649f6bc3f4cef3877696e646578");
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN
+                                       << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"
+                                                   "a67962e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548");
+    t.vout[1].scriptPubKey = CScript() << OP_RETURN
+                                       << ParseHex("271967f1a67130b7105cd6a828e03909a67962e0ea1f61de"
+                                                   "b649f6bc3f4cef3877696e646578");
     BOOST_CHECK_EQUAL(t.vout[0].scriptPubKey.size() + t.vout[1].scriptPubKey.size(), 90);
     BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason, false));
     BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason, true));
 
     // Max user provided payload size + 1 in multiple outputs is non-standard
     // even after the May 2021 Network Upgrade.
-    t.vout[1].scriptPubKey = CScript() << OP_RETURN << ParseHex("271967f1a67130b7105cd6a828e03909a67962e0ea1f61de"
-                                                                "b649f6bc3f4cef3877696e64657878");
+    t.vout[1].scriptPubKey = CScript() << OP_RETURN
+                                       << ParseHex("271967f1a67130b7105cd6a828e03909a67962e0ea1f61de"
+                                                   "b649f6bc3f4cef3877696e64657878");
     BOOST_CHECK_EQUAL(t.vout[0].scriptPubKey.size() + t.vout[1].scriptPubKey.size(), 91);
     BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason, false));
     BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason, true));
@@ -488,29 +493,31 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
 
     // MAX_OP_RETURN_RELAY-byte TX_NULL_DATA (standard)
     nMaxDatacarrierBytes = MAX_OP_RETURN_RELAY;
-    t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
-                                                                "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
-                                                                "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
-                                                                "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
-                                                                "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
-                                                                "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
-                                                                "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
-                                                                "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef7105"
-                                                                "2312acbd");
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN
+                                       << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                   "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                   "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                   "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef7105"
+                                                   "2312acbd");
     BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY, t.vout[0].scriptPubKey.size());
     BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason, false));
     BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason, true));
 
     // MAX_OP_RETURN_RELAY+1-byte TX_NULL_DATA (non-standard)
-    t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
-                                                                "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
-                                                                "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
-                                                                "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
-                                                                "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
-                                                                "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
-                                                                "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
-                                                                "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef7105"
-                                                                "2312acbdab");
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN
+                                       << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                   "e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a671"
+                                                   "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                   "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38ce"
+                                                   "30b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef7105"
+                                                   "2312acbdab");
     BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY + 1, t.vout[0].scriptPubKey.size());
     BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason, false));
     BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason, true));

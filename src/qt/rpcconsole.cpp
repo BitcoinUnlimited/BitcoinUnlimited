@@ -11,7 +11,6 @@
 #include "ui_debugwindow.h"
 
 #include "bantablemodel.h"
-#include "bantablemodel.h"
 #include "clientmodel.h"
 #include "dosman.h"
 #include "guiutil.h"
@@ -61,7 +60,7 @@ const struct
     {"cmd-error", ":/icons/tx_output"}, {"misc", ":/icons/tx_inout"}, {nullptr, nullptr}};
 
 /* Object for executing console RPC commands in a separate thread.
-*/
+ */
 class RPCExecutor : public QObject
 {
     Q_OBJECT
@@ -89,6 +88,7 @@ public:
     ~QtRPCTimerBase() {}
 private Q_SLOTS:
     void timeout() { func(); }
+
 private:
     QTimer timer;
     boost::function<void(void)> func;
@@ -597,9 +597,10 @@ void RPCConsole::clear(bool clearHistory)
                 "b { color: #006060; } ")
             .arg(fixedFontInfo.family(), QString("%1pt").arg(consoleFontSize)));
 
-    message(CMD_REPLY, (tr("Welcome to the %1 RPC console.").arg(tr(PACKAGE_NAME)) + "<br>" +
-                           tr("Use up and down arrows to navigate history, and <b>Ctrl-L</b> to clear screen.") +
-                           "<br>" + tr("Type <b>help</b> for an overview of available commands.")),
+    message(CMD_REPLY,
+        (tr("Welcome to the %1 RPC console.").arg(tr(PACKAGE_NAME)) + "<br>" +
+            tr("Use up and down arrows to navigate history, and <b>Ctrl-L</b> to clear screen.") + "<br>" +
+            tr("Type <b>help</b> for an overview of available commands.")),
         true);
 }
 

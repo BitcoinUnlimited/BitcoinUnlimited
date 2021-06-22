@@ -150,6 +150,7 @@ public:
 
     //! Get best block at the time this cursor was created
     const uint256 &GetBestBlock() const { return hashBlock; }
+
 private:
     uint256 hashBlock;
 };

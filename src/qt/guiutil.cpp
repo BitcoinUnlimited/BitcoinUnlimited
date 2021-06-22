@@ -811,8 +811,9 @@ bool SetStartOnSystemStartup(bool fAutoStart)
             optionFile << "Name=Bitcoin\n";
         else
             optionFile << strprintf("Name=Bitcoin (%s)\n", chain);
-        optionFile << "Exec=" << pszExePath << strprintf(" -min -testnet=%d -regtest=%d\n",
-                                                   GetBoolArg("-testnet", false), GetBoolArg("-regtest", false));
+        optionFile << "Exec=" << pszExePath
+                   << strprintf(" -min -testnet=%d -regtest=%d\n", GetBoolArg("-testnet", false),
+                          GetBoolArg("-regtest", false));
         optionFile << "Terminal=false\n";
         optionFile << "Hidden=false\n";
         optionFile.close();

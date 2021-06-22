@@ -78,33 +78,35 @@ bool ElectrumServer::Start(const std::string &path, const std::vector<std::strin
     std::unique_lock<std::mutex> lock(process_cs);
     process.reset(new SubProcess(path, args, callb_logger, callb_logger));
 
-    process_thread = std::thread([this]() {
-        LOGA("Electrum: Starting server");
-        try
+    process_thread = std::thread(
+        [this]()
         {
-            this->process->Run();
-        }
-        catch (const subprocess_error &e)
-        {
-            LOGA("Electrum: Server not running: %s, exit status %d, termination signal %d", e.what(), e.exit_status,
-                e.termination_signal);
-        }
-        catch (...)
-        {
-            LOGA("Electrum: Unknown error running server");
-        }
-        this->started = false;
+            LOGA("Electrum: Starting server");
+            try
+            {
+                this->process->Run();
+            }
+            catch (const subprocess_error &e)
+            {
+                LOGA("Electrum: Server not running: %s, exit status %d, termination signal %d", e.what(), e.exit_status,
+                    e.termination_signal);
+            }
+            catch (...)
+            {
+                LOGA("Electrum: Unknown error running server");
+            }
+            this->started = false;
 
-        if (!stop_requested && GetBoolArg("-electrum.shutdownonerror", false))
-        {
-            // The electrum server exit was not initiated by us, so it
-            // must have stopped due to some error.
+            if (!stop_requested && GetBoolArg("-electrum.shutdownonerror", false))
+            {
+                // The electrum server exit was not initiated by us, so it
+                // must have stopped due to some error.
 
-            LOGA("Electrum: Bitcoin Unlimited is configured to exit when "
-                 "electrum exits on error. Initiating shutdown.");
-            StartShutdown();
-        }
-    });
+                LOGA("Electrum: Bitcoin Unlimited is configured to exit when "
+                     "electrum exits on error. Initiating shutdown.");
+                StartShutdown();
+            }
+        });
     started = startup_check(*process);
     return started;
 }
@@ -194,4 +196,4 @@ ElectrumServer &ElectrumServer::Instance()
     return instance;
 }
 
-} // ns electrum
+} // namespace electrum

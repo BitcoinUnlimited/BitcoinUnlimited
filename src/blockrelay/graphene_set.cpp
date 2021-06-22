@@ -196,7 +196,8 @@ double CGrapheneSet::BruteForceSymDiff(uint64_t nBlockTxs,
     if (nReceiverPoolTx > LARGE_MEM_POOL_SIZE)
         throw std::runtime_error("Receiver mempool is too large for optimization");
 
-    auto fpr = [nReceiverExcessTxs](uint64_t a) {
+    auto fpr = [nReceiverExcessTxs](uint64_t a)
+    {
         if (nReceiverExcessTxs == 0)
             return FILTER_FPR_MAX;
 
@@ -205,10 +206,11 @@ double CGrapheneSet::BruteForceSymDiff(uint64_t nBlockTxs,
         return _fpr < FILTER_FPR_MAX ? _fpr : FILTER_FPR_MAX;
     };
 
-    auto F = [nBlockTxs, fpr](
-        uint64_t a) { return floor(FILTER_CELL_SIZE * (-1 / LN2SQUARED * nBlockTxs * log(fpr(a)) / 8)); };
+    auto F = [nBlockTxs, fpr](uint64_t a)
+    { return floor(FILTER_CELL_SIZE * (-1 / LN2SQUARED * nBlockTxs * log(fpr(a)) / 8)); };
 
-    auto L = [nChecksumBits](uint64_t a) {
+    auto L = [nChecksumBits](uint64_t a)
+    {
         uint8_t n_iblt_hash = CIblt::OptimalNHash(a);
         float iblt_overhead = CIblt::OptimalOverhead(a);
         uint64_t padded_cells = (int)(iblt_overhead * a);
@@ -664,5 +666,5 @@ uint8_t CGrapheneSet::NChecksumBits(size_t nIbltEntries,
     return (uint8_t)std::max((double)MIN_CHECKSUM_BITS,
         std::ceil(std::log2(nIbltEntries * (1 - std::pow(1 - bloomFPR * (nIbltHashFuncs / (double)nIbltEntries),
                                                     nReceiverUniverseItems))) -
-                                 std::log2(fUncheckedErrorTol)));
+                  std::log2(fUncheckedErrorTol)));
 }

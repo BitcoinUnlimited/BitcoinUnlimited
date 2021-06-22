@@ -2,12 +2,12 @@
 // Copyright (c) 2018-2020 The Bitcoin Unlimited developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#include "respend/respenddetector.h"
 #include "DoubleSpendProofStorage.h"
 #include "key.h"
 #include "keystore.h"
 #include "primitives/transaction.h"
 #include "respend/respendaction.h"
+#include "respend/respenddetector.h"
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/sign.h"
@@ -61,7 +61,7 @@ public:
     std::shared_ptr<DummyRespendAction> dummyaction;
 };
 
-} // ns anon
+} // namespace
 
 BOOST_FIXTURE_TEST_SUITE(respenddetector_tests, RespendFixture);
 

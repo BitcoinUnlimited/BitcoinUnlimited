@@ -277,7 +277,7 @@ CTweakRef<std::string> bip135VoteTweak("mining.vote",
 
 CTweak<uint64_t> pruneIntervalTweak("prune.pruneInterval",
     strprintf("How much block data (in MiB) is written to disk before trying to prune our block storage (default: %ld)",
-                                        DEFAULT_PRUNE_INTERVAL),
+        DEFAULT_PRUNE_INTERVAL),
     DEFAULT_PRUNE_INTERVAL);
 
 CTweak<uint32_t> netMagic("net.magic", "network prefix override. if 0 (default), do not override.", 0);
@@ -295,7 +295,7 @@ CTweak<bool> ignoreNetTimeouts("net.ignoreTimeouts",
     false);
 CTweakRef<bool> displayArchInSubver("net.displayArchInSubver",
     strprintf("Show box architecture, 32/64bit, in node user agent string (subver) (true/false - default: %d)",
-                                        fDisplayArchInSubver),
+        fDisplayArchInSubver),
     &fDisplayArchInSubver);
 
 CTweak<bool> doubleSpendProofs("net.doubleSpendProofs",
@@ -304,7 +304,7 @@ CTweak<bool> doubleSpendProofs("net.doubleSpendProofs",
 
 CTweak<uint64_t> coinbaseReserve("mining.coinbaseReserve",
     strprintf("How much space to reserve for the coinbase transaction, in bytes (default: %d)",
-                                     DEFAULT_COINBASE_RESERVE_SIZE),
+        DEFAULT_COINBASE_RESERVE_SIZE),
     DEFAULT_COINBASE_RESERVE_SIZE);
 CTweak<uint64_t> maxMiningCandidates("mining.maxCandidates",
     strprintf("How many simultaneous block candidates to track (default: %d)", DEFAULT_MAX_MINING_CANDIDATES),
@@ -312,7 +312,7 @@ CTweak<uint64_t> maxMiningCandidates("mining.maxCandidates",
 
 CTweak<uint64_t> minMiningCandidateInterval("mining.minCandidateInterval",
     strprintf("Reuse a block candidate if requested within this many seconds (default: %d)",
-                                                DEFAULT_MIN_CANDIDATE_INTERVAL),
+        DEFAULT_MIN_CANDIDATE_INTERVAL),
     DEFAULT_MIN_CANDIDATE_INTERVAL);
 
 CTweakRef<std::string> miningCommentTweak("mining.comment", "Include this text in a block's coinbase.", &minerComment);
@@ -320,7 +320,7 @@ CTweakRef<std::string> miningCommentTweak("mining.comment", "Include this text i
 CTweakRef<uint64_t> miningBlockSize("mining.blockSize",
     strprintf("Maximum block size in bytes.  The maximum block size returned from 'getblocktemplate' will be this "
               "value minus mining.coinbaseReserve (default: %d)",
-                                        maxGeneratedBlock),
+        maxGeneratedBlock),
     &maxGeneratedBlock,
     &MiningBlockSizeValidator);
 CTweakRef<unsigned int> maxDataCarrierTweak("mining.dataCarrierSize",
@@ -336,13 +336,13 @@ CTweakRef<uint64_t> miningForkTime("consensus.forkMay2021Time",
 
 CTweak<uint64_t> maxScriptOps("consensus.maxScriptOps",
     strprintf("Maximum number of script operations allowed.  Stack pushes are excepted (default: %ld)",
-                                  MAX_OPS_PER_SCRIPT),
+        MAX_OPS_PER_SCRIPT),
     MAX_OPS_PER_SCRIPT);
 
 CTweak<uint64_t> maxSigChecks("consensus.maxBlockSigChecks",
     strprintf("Consensus parameter specifying the maximum sigchecks in a block.  Use for testing only! (default for "
               "mainnet: %ld)",
-                                  MAY2020_MAX_BLOCK_SIGCHECK_COUNT),
+        MAY2020_MAX_BLOCK_SIGCHECK_COUNT),
     MAY2020_MAX_BLOCK_SIGCHECK_COUNT);
 
 CTweak<bool> unsafeGetBlockTemplate("mining.unsafeGetBlockTemplate",
@@ -374,12 +374,12 @@ CTweakRef<int> minXthinNodesTweak("net.minXthinNodes",
 // When should I request a tx from someone else (in microseconds). cmdline/bitcoin.conf: -txretryinterval
 CTweakRef<unsigned int> triTweak("net.txRetryInterval",
     strprintf("How long to wait in microseconds before requesting a transaction from another source (default: %d)",
-                                     MIN_TX_REQUEST_RETRY_INTERVAL),
+        MIN_TX_REQUEST_RETRY_INTERVAL),
     &MIN_TX_REQUEST_RETRY_INTERVAL);
 // When should I request a block from someone else (in microseconds). cmdline/bitcoin.conf: -blkretryinterval
 CTweakRef<unsigned int> briTweak("net.blockRetryInterval",
     strprintf("How long to wait in microseconds before requesting a block from another source (default: %d)",
-                                     MIN_BLK_REQUEST_RETRY_INTERVAL),
+        MIN_BLK_REQUEST_RETRY_INTERVAL),
     &MIN_BLK_REQUEST_RETRY_INTERVAL);
 
 CTweak<unsigned int> blockLookAheadInterval("test.blockLookAheadInterval",
@@ -392,8 +392,7 @@ CTweakRef<std::string> subverOverrideTweak("net.subversionOverride",
     &subverOverride,
     &SubverValidator);
 
-CTweakRef<bool> enableCanonicalTxOrder(
-    "consensus.enableCanonicalTxOrder",
+CTweakRef<bool> enableCanonicalTxOrder("consensus.enableCanonicalTxOrder",
     strprintf(
         "True if canonical transaction ordering is enabled.  Reflects the actual state so may be switched on or off by"
         " fork time flags and blockchain reorganizations (true/false - default: %d)",
@@ -407,8 +406,7 @@ CTweak<unsigned int> numTxAdmissionThreads("net.txAdmissionThreads",
     "Max transaction mempool admission threads Auto detection is zero (default: 0).",
     0);
 
-CTweak<bool> allowp2pTxVal(
-    "net.allowp2pTxVal",
+CTweak<bool> allowp2pTxVal("net.allowp2pTxVal",
     strprintf(
         "allow requests to check if a transaction would be accepted into the mempool via p2p message (default: false)"),
     false);
@@ -416,7 +414,7 @@ CTweak<bool> allowp2pTxVal(
 CTweak<CAmount> maxTxFee("wallet.maxTxFee",
     strprintf("Maximum total fees to use in a single wallet transaction or raw transaction; setting this too low may "
               "abort large transactions (default: %d)",
-                             DEFAULT_TRANSACTION_MAXFEE),
+        DEFAULT_TRANSACTION_MAXFEE),
     DEFAULT_TRANSACTION_MAXFEE);
 
 /** Number of blocks that can be requested at any given time from a single peer. */
@@ -506,8 +504,9 @@ CTweak<bool> syncMempoolWithPeers("net.syncMempoolWithPeers", "Synchronize mempo
 /** This setting specifies the minimum supported mempool sync version (inclusive).
  *  The actual version used will be negotiated between sender and receiver.
  */
-std::string memSyncMinVerStr = "Minimum mempool sync version supported (default: " +
-                               std::to_string(DEFAULT_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED) + ")";
+std::string memSyncMinVerStr =
+    "Minimum mempool sync version supported (default: " + std::to_string(DEFAULT_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED) +
+    ")";
 CTweak<uint64_t> mempoolSyncMinVersionSupported("net.mempoolSyncMinVersionSupported",
     memSyncMinVerStr,
     DEFAULT_MEMPOOL_SYNC_MIN_VERSION_SUPPORTED);
@@ -515,8 +514,9 @@ CTweak<uint64_t> mempoolSyncMinVersionSupported("net.mempoolSyncMinVersionSuppor
 /** This setting specifies the maximum supported mempool sync version (inclusive).
  *  The actual version used will be negotiated between sender and receiver.
  */
-std::string memSyncMaxVerStr = "Maximum mempool sync version supported (default: " +
-                               std::to_string(DEFAULT_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED) + ")";
+std::string memSyncMaxVerStr =
+    "Maximum mempool sync version supported (default: " + std::to_string(DEFAULT_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED) +
+    ")";
 CTweak<uint64_t> mempoolSyncMaxVersionSupported("net.mempoolSyncMaxVersionSupported",
     memSyncMaxVerStr,
     DEFAULT_MEMPOOL_SYNC_MAX_VERSION_SUPPORTED);
@@ -530,7 +530,7 @@ during reindexing by allowing the size to be set to low and random values.
 CTweak<uint64_t> reindexTypicalBlockSize("reindex.typicalBlockSize",
     strprintf("Set larger than the typical block size.  The block data file's RAM buffer will initally be 2x this size "
               "(default: %d)",
-                                             TYPICAL_BLOCK_SIZE),
+        TYPICAL_BLOCK_SIZE),
     TYPICAL_BLOCK_SIZE);
 
 /** This is the initial size of CFileBuffer's RAM buffer during reindex.  A
@@ -541,7 +541,7 @@ during reindexing by allowing the size to be set to low and random values.
 */
 CTweak<uint64_t> checkScriptDays("blockchain.checkScriptDays",
     strprintf("The number of days in the past we check scripts during initial block download (default: %d)",
-                                     DEFAULT_CHECKPOINT_DAYS),
+        DEFAULT_CHECKPOINT_DAYS),
     DEFAULT_CHECKPOINT_DAYS);
 
 /** depth at which we mark blocks as final */
@@ -565,17 +565,17 @@ CTweak<double> dMaxLimiterTxFee("maxlimitertxfee",
 CTweak<double> dMinLimiterTxFee("minlimitertxfee",
     strprintf("Fees (in satoshi/byte) smaller than this are considered "
               "zero fee and subject to -limitfreerelay (default: %.4f)",
-                                    DEFAULT_MINLIMITERTXFEE),
+        DEFAULT_MINLIMITERTXFEE),
     DEFAULT_MINLIMITERTXFEE);
 
 /** Disable reconsidermostworkchain during initial bootstrap when chain is not synced.
-  * This is for testing purpose only and hence it is disabled by default.
-  * This tweak will be useful during multiple clients interop network upgrade tests.
-  * During this tests  official testnet is forked via invalidate block, that means that
-  * if for what ever reason you need to restart your client during the test, you need to
-  * rollbackchain and then reconsiderblock the first block of the forked testnet. This is because
-  * if more than 1 block at time have to be invalidated so that the utxo may get undone correctly.
-  */
+ * This is for testing purpose only and hence it is disabled by default.
+ * This tweak will be useful during multiple clients interop network upgrade tests.
+ * During this tests  official testnet is forked via invalidate block, that means that
+ * if for what ever reason you need to restart your client during the test, you need to
+ * rollbackchain and then reconsiderblock the first block of the forked testnet. This is because
+ * if more than 1 block at time have to be invalidated so that the utxo may get undone correctly.
+ */
 CTweak<bool> avoidReconsiderMostWorkChain("test.avoidReconsiderMostWorkChain",
     "Disable reconsidermostworkchain during initial bootstrap when chain is not synced (default: false)",
     false);

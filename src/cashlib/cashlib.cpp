@@ -60,7 +60,8 @@ struct ForkDeploymentInfo
 struct ForkDeploymentInfo VersionBitsDeploymentInfo[Consensus::MAX_VERSION_BITS_DEPLOYMENTS];
 
 // Must match the equivalent object in calling language code
-typedef enum {
+typedef enum
+{
     AddrBlockchainBCH = 1,
     AddrBlockchainBCHtestnet = 2,
     AddrBlockchainBCHregtest = 3,
@@ -128,7 +129,7 @@ bool DecodeHexTx(CTransaction &tx, const std::string &strHexTx)
     return true;
 }
 #endif
-}
+} // namespace
 
 /** Convert binary data to a hex string.  The provided result buffer must be 2*length+1 bytes.
  */

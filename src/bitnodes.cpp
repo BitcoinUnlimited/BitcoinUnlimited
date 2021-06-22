@@ -148,7 +148,7 @@ public:
             request_ << "\r\n";
             boost::asio::async_write(socket_, boost::asio::buffer(request_.str()),
                 boost::bind(&client::handle_write, this, boost::asio::placeholders::error,
-                                         boost::asio::placeholders::bytes_transferred));
+                    boost::asio::placeholders::bytes_transferred));
         }
         else
         {
@@ -162,7 +162,7 @@ public:
         {
             boost::asio::async_read_until(socket_, response_, "\r\n\r\n",
                 boost::bind(&client::handle_read_status_and_headers, this, boost::asio::placeholders::error,
-                                              boost::asio::placeholders::bytes_transferred));
+                    boost::asio::placeholders::bytes_transferred));
         }
         else
         {
@@ -198,7 +198,7 @@ public:
             // Read until EOF
             boost::asio::async_read(socket_, response_, boost::asio::transfer_at_least(1),
                 boost::bind(&client::handle_read, this, boost::asio::placeholders::error,
-                                        boost::asio::placeholders::bytes_transferred));
+                    boost::asio::placeholders::bytes_transferred));
         }
         else
         {
@@ -223,7 +223,7 @@ public:
             // Read until EOF.
             boost::asio::async_read(socket_, response_, boost::asio::transfer_at_least(1),
                 boost::bind(&client::handle_read, this, boost::asio::placeholders::error,
-                                        boost::asio::placeholders::bytes_transferred));
+                    boost::asio::placeholders::bytes_transferred));
         }
         else
         {
@@ -237,6 +237,7 @@ public:
     }
 
     std::string getContent() const { return content_; }
+
 private:
     boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket_;
     boost::asio::streambuf response_;
@@ -276,7 +277,7 @@ bool GetLeaderboardFromBitnodes(vector<string> &vIPs)
 #if (BOOST_VERSON >= 105900)
                         | boost::asio::ssl::context::no_tlsv1_1
 #endif
-            );
+        );
 
         ctx.set_default_verify_paths();
         client c(io_service, ctx, iterator, cert_hostname, url_host, url_path, timeout);

@@ -126,7 +126,7 @@ public:
     const DoubleSpendProof::Spender &m_spender;
     const int64_t m_amount;
 };
-}
+} // namespace
 
 // static
 DoubleSpendProof DoubleSpendProof::create(const CTransaction &t1, const CTransaction &t2, CTxMemPool &pool)

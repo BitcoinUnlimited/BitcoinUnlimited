@@ -9,7 +9,6 @@
 #endif
 
 #include "chainparams.h"
-#include "chainparams.h"
 #include "clientversion.h"
 #include "config.h"
 #include "forks_csv.h"

@@ -31,6 +31,6 @@ private:
     double GetIndexingProgress(int64_t index_height) const;
 };
 
-} // ns electrum
+} // namespace electrum
 
 #endif
