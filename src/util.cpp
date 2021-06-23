@@ -400,7 +400,7 @@ static std::string LogTimestampStr(const std::string &str, std::string &logbuf)
         int64_t nTimeMicros = GetLogTimeMicros();
         if (fLogTimestamps)
         {
-            logbuf = DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nTimeMicros / 1000000);
+            logbuf = FormatISO8601DateTime(nTimeMicros / 1000000);
             if (fLogTimeMicros)
                 logbuf += strprintf(".%06d", nTimeMicros % 1000000);
         }
