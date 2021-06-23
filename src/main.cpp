@@ -587,7 +587,7 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
                     LookupBlockIndex(block.hashPrevBlock) == nullptr)
                 {
                     LOG(REINDEX, "%s: Out of order block %s (created %s), parent %s not known\n", __func__,
-                        hash.ToString(), DateTimeStrFormat("%Y-%m-%d", block.nTime), block.hashPrevBlock.ToString());
+                        hash.ToString(), FormatISO8601Date(block.nTime), block.hashPrevBlock.ToString());
                     if (dbp)
                         mapBlocksUnknownParent.insert(std::make_pair(block.hashPrevBlock, *dbp));
                     continue;

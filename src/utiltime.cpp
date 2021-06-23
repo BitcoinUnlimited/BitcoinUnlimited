@@ -8,12 +8,13 @@
 #include "config/bitcoin-config.h"
 #endif
 
+#include "tinyformat.h"
 #include "utiltime.h"
 
 #include <atomic>
-
-#include <boost/date_time/posix_time/posix_time.hpp>
+#include <cassert>
 #include <chrono>
+#include <ctime>
 #include <thread>
 
 #ifdef WIN32
@@ -42,9 +43,8 @@ int64_t GetTimeMillis()
     if (mocktime)
         return mocktime * 1000;
 
-    int64_t now = (boost::posix_time::microsec_clock::universal_time() -
-                   boost::posix_time::ptime(boost::gregorian::date(1970, 1, 1)))
-                      .total_milliseconds();
+    std::chrono::time_point<std::chrono::system_clock> clock_now = std::chrono::system_clock::now();
+    int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(clock_now.time_since_epoch()).count();
     assert(now > 0);
     return now;
 }
@@ -56,10 +56,8 @@ int64_t GetTimeMicros()
     {
         return mocktime * 1000000;
     }
-
-    int64_t now = (boost::posix_time::microsec_clock::universal_time() -
-                   boost::posix_time::ptime(boost::gregorian::date(1970, 1, 1)))
-                      .total_microseconds();
+    std::chrono::time_point<std::chrono::system_clock> clock_now = std::chrono::system_clock::now();
+    int64_t now = std::chrono::duration_cast<std::chrono::microseconds>(clock_now.time_since_epoch()).count();
     assert(now > 0);
     return now;
 }
@@ -87,9 +85,8 @@ uint64_t GetStopwatch()
 /** Return a time useful for the debug log */
 int64_t GetLogTimeMicros()
 {
-    int64_t now = (boost::posix_time::microsec_clock::universal_time() -
-                   boost::posix_time::ptime(boost::gregorian::date(1970, 1, 1)))
-                      .total_microseconds();
+    std::chrono::time_point<std::chrono::system_clock> clock_now = std::chrono::system_clock::now();
+    int64_t now = std::chrono::duration_cast<std::chrono::microseconds>(clock_now.time_since_epoch()).count();
     assert(now > 0);
     return now;
 }
@@ -103,12 +100,35 @@ void MilliSleep(int64_t n)
 #endif
 }
 
-std::string DateTimeStrFormat(const char *pszFormat, int64_t nTime)
+std::string FormatISO8601DateTime(int64_t nTime)
 {
-    // std::locale takes ownership of the pointer
-    std::locale loc(std::locale::classic(), new boost::posix_time::time_facet(pszFormat));
-    std::stringstream ss;
-    ss.imbue(loc);
-    ss << boost::posix_time::from_time_t(nTime);
-    return ss.str();
+    struct tm ts;
+    time_t time_val = nTime;
+#ifdef HAVE_GMTIME_R
+    if (gmtime_r(&time_val, &ts) == nullptr)
+    {
+#else
+    if (gmtime_s(&ts, &time_val) != 0)
+    {
+#endif
+        return {};
+    }
+    return strprintf("%04i-%02i-%02i %02i:%02i:%02i", ts.tm_year + 1900, ts.tm_mon + 1, ts.tm_mday, ts.tm_hour,
+        ts.tm_min, ts.tm_sec);
+}
+
+std::string FormatISO8601Date(int64_t nTime)
+{
+    struct tm ts;
+    time_t time_val = nTime;
+#ifdef HAVE_GMTIME_R
+    if (gmtime_r(&time_val, &ts) == nullptr)
+    {
+#else
+    if (gmtime_s(&ts, &time_val) != 0)
+    {
+#endif
+        return {};
+    }
+    return strprintf("%04i-%02i-%02i", ts.tm_year + 1900, ts.tm_mon + 1, ts.tm_mday);
 }

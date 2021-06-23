@@ -24,7 +24,6 @@
 #include <stdint.h>
 
 #include <boost/algorithm/string.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <univalue.h>
 
@@ -34,18 +33,40 @@ using namespace std;
 void EnsureWalletIsUnlocked();
 bool EnsureWalletIsAvailable(bool avoidException);
 
-std::string static EncodeDumpTime(int64_t nTime) { return DateTimeStrFormat("%Y-%m-%dT%H:%M:%SZ", nTime); }
+// we cannot use FormatISO8601DateTime to encode because we need to include T and Z in the datetime
+std::string static EncodeDumpTime(int64_t nTime)
+{
+    struct tm ts;
+    time_t time_val = nTime;
+#ifdef HAVE_GMTIME_R
+    if (gmtime_r(&time_val, &ts) == nullptr)
+    {
+#else
+    if (gmtime_s(&ts, &time_val) != 0)
+    {
+#endif
+        return {};
+    }
+    return strprintf("%04i-%02i-%02iT%02i:%02i:%02iZ", ts.tm_year + 1900, ts.tm_mon + 1, ts.tm_mday, ts.tm_hour,
+        ts.tm_min, ts.tm_sec);
+}
 int64_t static DecodeDumpTime(const std::string &str)
 {
-    static const boost::posix_time::ptime epoch = boost::posix_time::from_time_t(0);
-    static const std::locale loc(std::locale::classic(), new boost::posix_time::time_input_facet("%Y-%m-%dT%H:%M:%SZ"));
+    struct std::tm tm;
     std::istringstream iss(str);
+    static const std::locale loc(std::locale::classic());
     iss.imbue(loc);
-    boost::posix_time::ptime ptime(boost::date_time::not_a_date_time);
-    iss >> ptime;
-    if (ptime.is_not_a_date_time())
+    iss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
+    std::time_t time;
+    if (iss.fail())
+    {
         return 0;
-    return (ptime - epoch).total_seconds();
+    }
+    else
+    {
+        time = mktime(&tm);
+    }
+    return (int64_t)time;
 }
 
 std::string static EncodeDumpString(const std::string &str)
