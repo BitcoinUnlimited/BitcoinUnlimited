@@ -9,11 +9,9 @@
 #include "uint256.h"
 
 #include <boost/assert.hpp>
-#include <boost/assign/std/vector.hpp> // for 'operator+=()'
 #include <boost/test/unit_test.hpp>
 
 using namespace std;
-using namespace boost::assign; // bring 'operator+=()' into scope
 using namespace boost::filesystem;
 
 // Test if a string consists entirely of null characters

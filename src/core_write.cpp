@@ -16,8 +16,6 @@
 #include "utilstrencodings.h"
 #include <univalue.h>
 
-#include <boost/assign/list_of.hpp>
-
 using namespace std;
 
 string FormatScript(const CScript &script)
@@ -67,19 +65,21 @@ string FormatScript(const CScript &script)
     return ret.substr(0, ret.size() - 1);
 }
 
-const map<unsigned char, string> mapSigHashTypes = boost::assign::map_list_of((unsigned char)SIGHASH_ALL,
-    std::string("ALL"))((unsigned char)(SIGHASH_ALL | SIGHASH_ANYONECANPAY),
-    std::string("ALL|ANYONECANPAY"))((unsigned char)(SIGHASH_ALL | SIGHASH_FORKID), std::string("ALL|FORKID"))(
-    (unsigned char)(SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_ANYONECANPAY),
-    std::string("ALL|FORKID|ANYONECANPAY"))((unsigned char)SIGHASH_NONE, std::string("NONE"))(
-    (unsigned char)(SIGHASH_NONE | SIGHASH_ANYONECANPAY),
-    std::string("NONE|ANYONECANPAY"))((unsigned char)(SIGHASH_NONE | SIGHASH_FORKID), std::string("NONE|FORKID"))(
-    (unsigned char)(SIGHASH_NONE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY),
-    std::string("NONE|FORKID|ANYONECANPAY"))((unsigned char)SIGHASH_SINGLE, std::string("SINGLE"))(
-    (unsigned char)(SIGHASH_SINGLE | SIGHASH_ANYONECANPAY),
-    std::string("SINGLE|ANYONECANPAY"))((unsigned char)(SIGHASH_SINGLE | SIGHASH_FORKID), std::string("SINGLE|FORKID"))(
-    (unsigned char)(SIGHASH_SINGLE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY),
-    std::string("SINGLE|FORKID|ANYONECANPAY"));
+const map<unsigned char, string> mapSigHashTypes = {
+    {(unsigned char)SIGHASH_ALL, std::string("ALL")},
+    {(unsigned char)(SIGHASH_ALL | SIGHASH_ANYONECANPAY), std::string("ALL|ANYONECANPAY")},
+    {(unsigned char)(SIGHASH_ALL | SIGHASH_FORKID), std::string("ALL|FORKID")},
+    {(unsigned char)(SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_ANYONECANPAY), std::string("ALL|FORKID|ANYONECANPAY")},
+    {(unsigned char)SIGHASH_NONE, std::string("NONE")},
+    {(unsigned char)(SIGHASH_NONE | SIGHASH_ANYONECANPAY), std::string("NONE|ANYONECANPAY")},
+    {(unsigned char)(SIGHASH_NONE | SIGHASH_FORKID), std::string("NONE|FORKID")},
+    {(unsigned char)(SIGHASH_NONE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY), std::string("NONE|FORKID|ANYONECANPAY")},
+    {(unsigned char)SIGHASH_SINGLE, std::string("SINGLE")},
+    {(unsigned char)(SIGHASH_SINGLE | SIGHASH_ANYONECANPAY), std::string("SINGLE|ANYONECANPAY")},
+    {(unsigned char)(SIGHASH_SINGLE | SIGHASH_FORKID), std::string("SINGLE|FORKID")},
+    {(unsigned char)(SIGHASH_SINGLE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY),
+        std::string("SINGLE|FORKID|ANYONECANPAY")},
+};
 
 /**
  * Create the assembly string representation of a CScript object.

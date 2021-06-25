@@ -21,7 +21,6 @@
 
 #include <stdint.h>
 
-#include <boost/assign/list_of.hpp> // for 'map_list_of()'
 #include <boost/filesystem.hpp>
 #include <boost/test/unit_test.hpp>
 
