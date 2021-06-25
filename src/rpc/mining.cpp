@@ -30,7 +30,6 @@
 #include <cstdlib>
 #include <stdint.h>
 
-#include <boost/assign/list_of.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include <univalue.h>
@@ -989,7 +988,7 @@ UniValue estimatefee(const UniValue &params, bool fHelp)
                             "\nExample:\n" +
                             HelpExampleCli("estimatefee", "6"));
 
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VNUM));
+    RPCTypeCheck(params, {UniValue::VNUM});
 
     int nBlocks = params[0].get_int();
     if (nBlocks < 1)
@@ -1024,7 +1023,7 @@ UniValue estimatesmartfee(const UniValue &params, bool fHelp)
                             "\nExample:\n" +
                             HelpExampleCli("estimatesmartfee", "6"));
 
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VNUM));
+    RPCTypeCheck(params, {UniValue::VNUM});
 
     int nBlocks = params[0].get_int();
     if (nBlocks < 1)

@@ -24,7 +24,6 @@
 
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
-#include <boost/assign/list_of.hpp>
 #include <boost/test/unit_test.hpp>
 
 #include <univalue.h>

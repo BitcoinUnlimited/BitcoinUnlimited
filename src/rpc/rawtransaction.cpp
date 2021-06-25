@@ -37,7 +37,6 @@
 #include <stdint.h>
 
 #include <boost/algorithm/string.hpp>
-#include <boost/assign/list_of.hpp>
 
 #include <univalue.h>
 
@@ -881,7 +880,7 @@ UniValue createrawtransaction(const UniValue &params, bool fHelp)
                 "\"[{\\\"txid\\\":\\\"myid\\\",\\\"vout\\\":0}]\", \"{\\\"data\\\":\\\"00010203\\\"}\""));
 
     LOCK(cs_main);
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VARR)(UniValue::VOBJ)(UniValue::VNUM), true);
+    RPCTypeCheck(params, {UniValue::VARR, UniValue::VOBJ, UniValue::VNUM}, true);
     if (params[0].isNull() || params[1].isNull())
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, arguments 1 and 2 must be non-null");
 
@@ -1024,7 +1023,7 @@ UniValue decoderawtransaction(const UniValue &params, bool fHelp)
                             HelpExampleRpc("decoderawtransaction", "\"hexstring\""));
 
     LOCK(cs_main);
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR));
+    RPCTypeCheck(params, {UniValue::VSTR});
 
     CTransaction tx;
 
@@ -1060,7 +1059,7 @@ UniValue decodescript(const UniValue &params, bool fHelp)
                             HelpExampleCli("decodescript", "\"hexstring\"") +
                             HelpExampleRpc("decodescript", "\"hexstring\""));
 
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR));
+    RPCTypeCheck(params, {UniValue::VSTR});
 
     UniValue r(UniValue::VOBJ);
     CScript script;
@@ -1168,7 +1167,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
 #else
     LOCK(cs_main);
 #endif
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VARR)(UniValue::VARR)(UniValue::VSTR), true);
+    RPCTypeCheck(params, {UniValue::VSTR, UniValue::VARR, UniValue::VARR, UniValue::VSTR}, true);
 
     vector<unsigned char> txData(ParseHexV(params[0], "argument 1"));
     CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION);
@@ -1252,8 +1251,8 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
 
             UniValue prevOut = p.get_obj();
 
-            RPCTypeCheckObj(prevOut, boost::assign::map_list_of("txid", UniValue::VSTR)("vout", UniValue::VNUM)(
-                                         "scriptPubKey", UniValue::VSTR));
+            RPCTypeCheckObj(
+                prevOut, {{"txid", UniValue::VSTR}, {"vout", UniValue::VNUM}, {"scriptPubKey", UniValue::VSTR}});
 
             uint256 txid = ParseHashO(prevOut, "txid");
 
@@ -1289,8 +1288,8 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             // given), add redeemScript to the tempKeystore so it can be signed:
             if (fGivenKeys && scriptPubKey.IsPayToScriptHash())
             {
-                RPCTypeCheckObj(prevOut, boost::assign::map_list_of("txid", UniValue::VSTR)("vout", UniValue::VNUM)(
-                                             "scriptPubKey", UniValue::VSTR)("redeemScript", UniValue::VSTR));
+                RPCTypeCheckObj(prevOut, {{"txid", UniValue::VSTR}, {"vout", UniValue::VNUM},
+                                             {"scriptPubKey", UniValue::VSTR}, {"redeemScript", UniValue::VSTR}});
                 UniValue v = find_value(prevOut, "redeemScript");
                 if (!v.isNull())
                 {
@@ -1439,7 +1438,7 @@ UniValue sendrawtransaction(const UniValue &params, bool fHelp)
             "\nSend the transaction (signed hex)\n" + HelpExampleCli("sendrawtransaction", "\"signedhex\"") +
             "\nAs a json rpc call\n" + HelpExampleRpc("sendrawtransaction", "\"signedhex\""));
 
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VBOOL)(UniValue::VSTR));
+    RPCTypeCheck(params, {UniValue::VSTR, UniValue::VBOOL, UniValue::VSTR});
 
     // parse hex string from parameter
     CTransaction tx;
@@ -1665,7 +1664,7 @@ UniValue validaterawtransaction(const UniValue &params, bool fHelp)
             "\nAs a json rpc call\n" + HelpExampleRpc("validaterawtransaction", "\"signedhex\""));
     }
 
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VBOOL)(UniValue::VSTR));
+    RPCTypeCheck(params, {UniValue::VSTR, UniValue::VBOOL, UniValue::VSTR});
 
     // parse hex string from parameter
     CTransaction tx;
@@ -1762,7 +1761,7 @@ UniValue enqueuerawtransaction(const UniValue &params, bool fHelp)
             "\nSend the transaction (signed hex)\n" + HelpExampleCli("enqueuerawtransaction", "\"signedhex\"") +
             "\nAs a json rpc call\n" + HelpExampleRpc("enqueuerawtransaction", "\"signedhex\""));
 
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR));
+    RPCTypeCheck(params, {UniValue::VSTR});
 
     CTransaction tx;
     if (!DecodeHexTx(tx, params[0].get_str())) // parse hex string from parameter

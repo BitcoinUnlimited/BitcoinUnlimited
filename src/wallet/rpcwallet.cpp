@@ -22,9 +22,6 @@
 #include "walletdb.h"
 
 #include <stdint.h>
-
-#include <boost/assign/list_of.hpp>
-
 #include <univalue.h>
 
 using namespace std;
@@ -2520,9 +2517,9 @@ UniValue lockunspent(const UniValue &params, bool fHelp)
     LOCK(pwalletMain->cs_wallet);
 
     if (params.size() == 1)
-        RPCTypeCheck(params, boost::assign::list_of(UniValue::VBOOL));
+        RPCTypeCheck(params, {UniValue::VBOOL});
     else
-        RPCTypeCheck(params, boost::assign::list_of(UniValue::VBOOL)(UniValue::VARR));
+        RPCTypeCheck(params, {UniValue::VBOOL, UniValue::VARR});
 
     bool fUnlock = params[0].get_bool();
 
@@ -2541,7 +2538,7 @@ UniValue lockunspent(const UniValue &params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, expected object");
         const UniValue &o = output.get_obj();
 
-        RPCTypeCheckObj(o, boost::assign::map_list_of("txid", UniValue::VSTR)("vout", UniValue::VNUM));
+        RPCTypeCheckObj(o, {{"txid", UniValue::VSTR}, {"vout", UniValue::VNUM}});
 
         string txid = find_value(o, "txid").get_str();
         if (!IsHex(txid))
@@ -2763,7 +2760,7 @@ UniValue listunspent(const UniValue &params, bool fHelp)
                                           "\"[\\\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\\\","
                                           "\\\"1LtvqCaApEdUGFkpKMM4MstjcaL4dKg8SP\\\"]\""));
 
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VNUM)(UniValue::VNUM)(UniValue::VARR));
+    RPCTypeCheck(params, {UniValue::VNUM, UniValue::VNUM, UniValue::VARR});
 
     int nMinDepth = 1;
     if (params.size() > 0)
@@ -2881,7 +2878,7 @@ UniValue fundrawtransaction(const UniValue &params, bool fHelp)
             HelpExampleCli("signrawtransaction", "\"fundedtransactionhex\"") + "\nSend the transaction\n" +
             HelpExampleCli("sendrawtransaction", "\"signedtransactionhex\""));
 
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VBOOL));
+    RPCTypeCheck(params, {UniValue::VSTR, UniValue::VBOOL});
 
     // parse hex string from parameter
     CTransaction origTx;
