@@ -1304,10 +1304,10 @@ echo "  target os     = $TARGET_OS"
 echo "  build os      = $BUILD_OS"
 echo
 echo "  CC            = $CC"
-echo "  CFLAGS        = $CFLAGS"
+echo "  CFLAGS        = $PTHREAD_CFLAGS $CFLAGS"
 echo "  CPPFLAGS      = $CPPFLAGS"
 echo "  CXX           = $CXX"
 echo "  CXXFLAGS      = $CXXFLAGS"
-echo "  LDFLAGS       = $LDFLAGS"
+echo "  LDFLAGS       = $PTHREAD_LIBS $LDFLAGS"
 echo "  ARFLAGS       = $ARFLAGS"
 echo
