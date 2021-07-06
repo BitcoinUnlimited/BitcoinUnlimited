@@ -173,24 +173,27 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
     {
         // Include in description public label if it exists. If there are multiple outputs then
         // only show the public label associated with this output we are viewing.
-        std::string labelPublic;
-        CTxDestination address = DecodeDestination(rec->addresses.begin()->first);
-        for (const CTxOut &txout : wtx.vout)
+        if (!wtx.IsCoinBase())
         {
-            std::string tmp_labelPublic = getLabelPublic(txout.scriptPubKey);
-            if (!tmp_labelPublic.empty())
-                labelPublic = tmp_labelPublic;
-
-            CTxDestination txout_address;
-            if (ExtractDestination(txout.scriptPubKey, txout_address))
+            std::string labelPublic;
+            CTxDestination address = DecodeDestination(rec->addresses.begin()->first);
+            for (const CTxOut &txout : wtx.vout)
             {
-                if (address == txout_address)
+                std::string tmp_labelPublic = getLabelPublic(txout.scriptPubKey);
+                if (!tmp_labelPublic.empty())
+                    labelPublic = tmp_labelPublic;
+
+                CTxDestination txout_address;
+                if (ExtractDestination(txout.scriptPubKey, txout_address))
                 {
-                    // Include in description public label if it exists
-                    if (!labelPublic.empty())
+                    if (address == txout_address)
                     {
-                        strHTML += "<b>" + tr("Public label:") + "</b> " + labelPublic.c_str() + "<br>";
-                        labelPublic.clear();
+                        // Include in description public label if it exists
+                        if (!labelPublic.empty())
+                        {
+                            strHTML += "<b>" + tr("Public label:") + "</b> " + labelPublic.c_str() + "<br>";
+                            labelPublic.clear();
+                        }
                     }
                 }
             }
