@@ -566,10 +566,6 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
                 _("If <category> is not supplied or if <category> = 1, output all debugging information. ") +
                 _("<category> can be:") + " " + debugCategories + ". " +
                 _("Multiple debug categories can be separated by comma."))
-        .addArg("gen", optionalBool, strprintf(_("Generate coins (default: %u)"), DEFAULT_GENERATE))
-        .addArg("genproclimit=<n>", requiredInt,
-            strprintf(_("Set the number of threads for coin generation if enabled (-1 = all cores, default: %d)"),
-                DEFAULT_GENERATE_THREADS))
         .addArg(
             "logips", optionalBool, strprintf(_("Include IP addresses in debug output (default: %u)"), DEFAULT_LOGIPS))
         .addArg("logtimestamps", optionalBool,
