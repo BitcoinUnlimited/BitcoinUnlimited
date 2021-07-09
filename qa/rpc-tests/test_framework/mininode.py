@@ -63,7 +63,8 @@ mininode_socket_map = dict()
 # This is what a callback should look like for NodeConn
 # Reimplement the on_* functions to provide handling for events
 class NodeConnCB(object):
-    def __init__(self):
+    def __init__(self, extversion=None):
+        """Pass None to not use extversion.  Pass a msg_extversion object to use that.  Pass True to use extversion, but your derived class will issue the message"""
         self.verack_received = False
         self.xverack_received = False
         self.xver = {}
@@ -72,6 +73,7 @@ class NodeConnCB(object):
         # before acquiring the global lock and delivering the next message.
         self.deliver_sleep_time = None
         self.disconnected = False
+        self.extversion = extversion
 
     def set_deliver_sleep_time(self, value):
         with mininode_lock:
@@ -114,8 +116,14 @@ class NodeConnCB(object):
                 traceback.print_exc()
 
     def on_version(self, conn, message):
-        if message.nVersion >= 209:
-            conn.send_message(msg_verack())
+        # Note, send a verack IF extversion is not being used.  Otherwise send extversion
+        if self.extversion == None:
+            if message.nVersion >= 209:
+                conn.send_message(msg_verack())
+        else:
+            if type(self.extversion) == msg_extversion:
+                conn.send_message(self.extversion)
+        
         conn.ver_send = min(MY_VERSION, message.nVersion)
         if message.nVersion < 209:
             conn.ver_recv = conn.ver_send
@@ -177,8 +185,9 @@ class NodeConnCB(object):
         self.xverack_received = True
 
     def on_extversion(self, conn, message):
+        # reply with a verack since we got both the version and extversion messages
         conn.xver = message
-
+        conn.send_message(msg_verack())
 
 # More useful callbacks and functions for NodeConnCB's which have a single NodeConn
 

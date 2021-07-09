@@ -59,6 +59,8 @@ UniValue GetServicesNames(uint64_t services)
         servicesNames.push_back("CF");
     if (services & NODE_NETWORK_LIMITED)
         servicesNames.push_back("NETWORK_LIMITED");
+    if (services & NODE_EXTVERSION)
+        servicesNames.push_back("EXTVERSION");
 
     return servicesNames;
 }
