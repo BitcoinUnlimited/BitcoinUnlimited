@@ -112,12 +112,10 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
     int nHeightEnd = 0;
     int nHeight = 0;
 
-    { // Don't keep cs_main locked
-        LOCK(cs_main);
-        nHeightStart = chainActive.Height();
-        nHeight = nHeightStart;
-        nHeightEnd = nHeightStart + nGenerate;
-    }
+    nHeightStart = chainActive.Height();
+    nHeight = nHeightStart;
+    nHeightEnd = nHeightStart + nGenerate;
+
     unsigned int nExtraNonce = 0;
     UniValue blockHashes(UniValue::VARR);
     while (nHeight < nHeightEnd)
@@ -129,11 +127,9 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
         }
         if (!pblocktemplate.get())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
+
         CBlock *pblock = &pblocktemplate->block;
-        {
-            // LOCK(cs_main);
-            IncrementExtraNonce(pblock, nExtraNonce);
-        }
+        IncrementExtraNonce(pblock, nExtraNonce);
         while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount &&
                !CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus()))
         {
@@ -170,7 +166,6 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
     }
 
     CValidationState state;
-    LOCK(cs_main);
     FlushStateToDisk(state, FLUSH_STATE_ALWAYS); // we made lots of blocks
     CBlockIndex *pindexNewTip = chainActive.Tip();
     uiInterface.NotifyBlockTip(false, pindexNewTip, false);
@@ -259,10 +254,6 @@ UniValue getmininginfo(const UniValue &params, bool fHelp)
             "  \"currentblocktx\": nnn,     (numeric) The last block transaction\n"
             "  \"difficulty\": xxx.xxxxx    (numeric) The current difficulty\n"
             "  \"errors\": \"...\"          (string) Current errors\n"
-            "  \"generate\": true|false     (boolean) If the generation is on or off (see getgenerate or setgenerate "
-            "calls)\n"
-            "  \"genproclimit\": n          (numeric) The processor limit for generation. -1 if no generation. (see "
-            "getgenerate or setgenerate calls)\n"
             "  \"pooledtx\": n              (numeric) The size of the mem pool\n"
             "  \"testnet\": true|false      (boolean) If using testnet or not\n"
             "  \"chain\": \"xxxx\",         (string) current network name as defined in BIP70 (main, test, regtest)\n"
@@ -279,12 +270,10 @@ UniValue getmininginfo(const UniValue &params, bool fHelp)
     obj.pushKV("currentblocktx", (uint64_t)nLastBlockTx);
     obj.pushKV("difficulty", (double)GetDifficulty());
     obj.pushKV("errors", GetWarnings("statusbar"));
-    obj.pushKV("genproclimit", (int)GetArg("-genproclimit", DEFAULT_GENERATE_THREADS));
     obj.pushKV("networkhashps", getnetworkhashps(params, false));
     obj.pushKV("pooledtx", (uint64_t)mempool.size());
     obj.pushKV("testnet", Params().TestnetToBeDeprecatedFieldRPC());
     obj.pushKV("chain", Params().NetworkIDString());
-    obj.pushKV("generate", getgenerate(params, false));
     return obj;
 }
 

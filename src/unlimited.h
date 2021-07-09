@@ -148,18 +148,6 @@ extern int chainContainsExcessive(const CBlockIndex *blk, unsigned int goBack = 
 // Given an invalid block, find all chains containing this block and mark all children invalid
 void MarkAllContainingChainsInvalid(CBlockIndex *invalidBlock);
 
-//// Internal CPU miner
-
-static const bool DEFAULT_GENERATE = false;
-static const int DEFAULT_GENERATE_THREADS = 1;
-
-// Run the miner threads
-extern void GenerateBitcoins(bool fGenerate, int nThreads, const CChainParams &chainparams);
-
-// Internal CPU miner RPC calls
-extern UniValue getgenerate(const UniValue &params, bool fHelp);
-extern UniValue setgenerate(const UniValue &params, bool fHelp);
-
 // RPC calls
 
 // RPC Get a particular tweak
