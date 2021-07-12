@@ -89,6 +89,7 @@ class ExtversionTest(BitcoinTestFramework):
 
         peer_info = node.getpeerinfo()
         assert len(peer_info) == 1
+        assert 'EXTVERSION' in peer_info[0]['servicesnames']
         assert "extversion_map" in peer_info[0]
         xv_map = peer_info[0]["extversion_map"]
 
@@ -148,3 +149,11 @@ class ExtversionTest(BitcoinTestFramework):
 if __name__ == '__main__':
     xvt = ExtversionTest()
     xvt.main()
+
+def Test():
+    t = ExtversionTest()
+    bitcoinConf = {
+        "debug": ["rpc","net", "blk", "thin", "mempool", "req", "bench", "evict"]
+    }
+    flags = standardFlags()
+    t.main(flags, bitcoinConf, None)

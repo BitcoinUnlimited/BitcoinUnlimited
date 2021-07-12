@@ -18,8 +18,9 @@ REQ_BLOCK = 8
 
 
 class BUProtocolHandler(NodeConnCB):
-    def __init__(self):
-        NodeConnCB.__init__(self)
+    def __init__(self, extversion=None):
+        """extversion: Pass a msg_extversion object to autoreply. Pass True to handle sending extversion yourself.  Pass None to automatically reply with verack"""
+        NodeConnCB.__init__(self,extversion)
         self.connection = None
         self.last_inv = []
         self.last_headers = None
@@ -49,8 +50,7 @@ class BUProtocolHandler(NodeConnCB):
             self.last_headers = None
 
     def on_version(self, conn, message):
-        if message.nVersion >= 209:
-            conn.send_message(msg_verack())
+        NodeConnCB.on_version(self, conn, message)
         conn.ver_send = min(MY_VERSION, message.nVersion)
         if message.nVersion < 209:
             conn.ver_recv = conn.ver_send
@@ -61,7 +61,7 @@ class BUProtocolHandler(NodeConnCB):
         self.verack_received = True
 
     def on_extversion(self, conn, message):
-        self.show_debug_msg("extversion received\n")
+        NodeConnCB.on_extversion(self, conn, message)
         self.remote_extversion = message
 
     def add_connection(self, conn):
