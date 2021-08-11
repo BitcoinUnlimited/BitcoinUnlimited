@@ -617,9 +617,10 @@ void BlockAssembler::addPriorityTxs(std::vector<const CTxMemPoolEntry *> *vtxe)
     }
     std::make_heap(vecPriority.begin(), vecPriority.end(), pricomparer);
 
+    // Try adding txns from the priority queue to fill the blockprioritysize
     CTxMemPool::txiter iter;
     while (!vecPriority.empty() && !blockFinished)
-    { // add a tx from priority queue to fill the blockprioritysize
+    {
         iter = vecPriority.front().second;
         actualPriority = vecPriority.front().first;
         std::pop_heap(vecPriority.begin(), vecPriority.end(), pricomparer);
@@ -643,14 +644,14 @@ void BlockAssembler::addPriorityTxs(std::vector<const CTxMemPoolEntry *> *vtxe)
         // If this tx fits in the block add it, otherwise keep looping
         if (TestForBlock(iter))
         {
-            AddToBlock(vtxe, iter);
-
             // If now that this txs is added we've surpassed our desired priority size
             // or have dropped below the AllowFreeThreshold, then we're done adding priority txs
-            if (nBlockSize >= nBlockPrioritySize || !AllowFree(actualPriority))
+            if (nBlockSize + iter->GetTxSize() > nBlockPrioritySize || !AllowFree(actualPriority))
             {
                 return;
             }
+            AddToBlock(vtxe, iter);
+
 
             // This tx was successfully added, so
             // add transactions that depend on this one to the priority queue to try again
