@@ -172,13 +172,15 @@ class MiningTest (BitcoinTestFramework):
         # and be mineable.
         self.nodes[0].set("minlimitertxfee=1000")
         self.nodes[1].set("minlimitertxfee=1000")
+
         txid3 = self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
         txid4 = self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 1)
         self.sync_all()
- 
+
         assert_equal(self.nodes[0].getmempoolinfo()["size"], 4)
         assert_equal(self.nodes[1].getmempoolinfo()["size"], 4)
         assert_equal(str(self.nodes[0].getnetworkinfo()["relayfee"]), "0.01000000")
+
         #only tx1 and tx2 should have been mined since there is not enough space
         # in the priority area for all 4 free txns.
         # txid1 has the highest priority and is chosen first
@@ -186,6 +188,7 @@ class MiningTest (BitcoinTestFramework):
         #   and therefore txid2 is chosen. 
         self.nodes[0].generate(1)
         self.sync_all()
+
         assert(txid1 not in self.nodes[0].getrawmempool())
         assert(txid2 not in self.nodes[0].getrawmempool())
         assert(txid3 in self.nodes[0].getrawmempool())

@@ -14,14 +14,15 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 
 class TweakTest (BitcoinTestFramework):
+    def __init__(self):
+        self.num_nodes = 1
 
-    def setup_chain(self,bitcoinConfDict=None, wallets=None):
-        print("Initializing test directory "+self.options.tmpdir)
-        initialize_chain(self.options.tmpdir)
-
-    def setup_network(self, split=False):
-        self.nodes = start_nodes(1, self.options.tmpdir)
-        self.is_network_split=False
+    #def setup_chain(self,bitcoinConfDict=None, wallets=None):
+    #    print("Initializing test directory "+self.options.tmpdir)
+    #    initialize_chain(self.options.tmpdir)
+    #def setup_network(self, split=False):
+    #    self.nodes = start_nodes(1, self.options.tmpdir)
+    #    self.is_network_split=False
 
     def run_test (self):
         # note that these tests rely on tweaks that may be changed or removed.

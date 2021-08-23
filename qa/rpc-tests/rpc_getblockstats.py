@@ -10,6 +10,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
     assert_raises_rpc_error,
+    standardFlags
 )
 import json
 import os
@@ -57,21 +58,21 @@ class GetblockstatsTest(BitcoinTestFramework):
         return stats
 
     def generate_test_data(self, filename):
-        mocktime = 1525107225
+        mocktime = 1627137636
         self.nodes[0].setmocktime(mocktime)
         self.nodes[0].generate(101)
 
         subtractfeefromamount = True
-        self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 10, "", "", subtractfeefromamount)
+        self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 1, "", "", subtractfeefromamount)
         self.nodes[0].generate(1)
         self.sync_all()
 
-        self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 10, "", "", subtractfeefromamount)
+        self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 1, "", "", subtractfeefromamount)
         subtractfeefromamount = False
-        self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 10, "", "", subtractfeefromamount)
+        self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 1, "", "", subtractfeefromamount)
         self.nodes[0].settxfee(0.003)
         subtractfeefromamount = True
-        self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 1, "", "", subtractfeefromamount)
+        self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 0.1, "", "", subtractfeefromamount)
         self.sync_all()
         self.nodes[0].generate(1)
 
@@ -95,6 +96,7 @@ class GetblockstatsTest(BitcoinTestFramework):
             json.dump(to_dump, f, sort_keys=True, indent=2, default=EncodeDecimal)
 
     def load_test_data(self, filename):
+        logging.info("Loading test data from: ", filename)
         with open(filename, 'r') as f:
             d = json.load(f, parse_float=decimal.Decimal)
             blocks = d['blocks']
@@ -116,7 +118,7 @@ class GetblockstatsTest(BitcoinTestFramework):
         else:
             self.load_test_data(test_data)
 
-        self.sync_all()
+        self.sync_blocks()
         stats = self.get_stats()
 
         # Make sure all valid statistics are included but nothing else is
@@ -188,3 +190,12 @@ class GetblockstatsTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     GetblockstatsTest().main()
+
+def Test():
+    t = GetblockstatsTest()
+    t.drop_to_pdb = True
+    bitcoinConf = {
+        "debug": ["rpc","net", "blk", "thin", "mempool", "req", "bench", "evict"]
+    }
+    flags = standardFlags()
+    t.main(flags, bitcoinConf, None)

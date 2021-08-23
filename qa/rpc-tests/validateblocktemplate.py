@@ -198,7 +198,7 @@ class ValidateblocktemplateTest(BitcoinTestFramework):
         op1 = OP_1.toBin()
 
         logging.info("inputs below outputs")
-        tx6 = create_transaction(prev_block.vtx[0], 0, op1, [out_value + 1000])
+        tx6 = create_transaction(prev_block.vtx[0], 0, op1, [out_value + COINBASE_REWARD*COIN])
         block = create_block(tip, coinbase, next_time, [tx6])
         block.nVersion = 0x20000000
         block.rehash()

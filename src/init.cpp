@@ -917,7 +917,7 @@ bool AppInit2(Config &config)
 
     // also see: InitParameterInteraction()
 
-    if (chainparams.NetworkIDString() == "regtest")
+    if (chainparams.NetworkIDString() == CBaseChainParams::REGTEST)
     {
         max_blockfile_size = MAX_BLOCKFILE_SIZE_REGTEST;
     }
@@ -941,7 +941,8 @@ bool AppInit2(Config &config)
         blockfile_chunk_size = max_blockfile_size;
         // multiply by 8 as this is the same difference between default and max blockfile size
         // we do not have a define max undofile size
-        undofile_chunk_size = undofile_chunk_size * 8;
+        if (chainparams.NetworkIDString() != CBaseChainParams::REGTEST)
+            undofile_chunk_size = undofile_chunk_size * 8;
     }
 
     // Make sure enough file descriptors are available

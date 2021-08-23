@@ -35,7 +35,7 @@ from test_framework.script import (
     OP_TRUE,
 )
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_raises_rpc_error, p2p_port, waitFor
+from test_framework.util import assert_raises_rpc_error, p2p_port, waitFor, standardFlags
 import logging
 
 # this is the errror you get when minimal push errors are detected during mempool admission
@@ -183,3 +183,13 @@ class MinimaldataTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     MinimaldataTest().main()
+
+# Create a convenient function for an interactive python debugging session
+def Test():
+    t = MinimaldataTest()
+    t.drop_to_pdb = True
+    bitcoinConf = {
+        "debug": ["blk", "mempool", "net", "req"],
+    }
+    flags = standardFlags()
+    t.main(flags, bitcoinConf, None)

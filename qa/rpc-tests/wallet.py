@@ -67,15 +67,15 @@ class WalletTest (BitcoinTestFramework):
         self.nodes[0].generate(1)
 
         walletinfo = self.nodes[0].getwalletinfo()
-        assert_equal(walletinfo['immature_balance'], 50)
+        assert_equal(walletinfo['immature_balance'], COINBASE_REWARD)
         assert_equal(walletinfo['balance'], 0)
 
         self.sync_blocks()
         self.nodes[1].generate(101)
         self.sync_blocks()
 
-        assert_equal(self.nodes[0].getbalance(), 50)
-        assert_equal(self.nodes[1].getbalance(), 50)
+        assert_equal(self.nodes[0].getbalance(), COINBASE_REWARD)
+        assert_equal(self.nodes[1].getbalance(), COINBASE_REWARD)
         assert_equal(self.nodes[2].getbalance(), 0)
 
         # Check that only first and second nodes have UTXOs
@@ -85,8 +85,9 @@ class WalletTest (BitcoinTestFramework):
 
         # Send 21 BTC from 0 to 2 using sendtoaddress call.
         # Second transaction will be child of first, and will require a fee
-        self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 11)
-        self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 10)
+        self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 5)
+        self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 4)
+        SentAmt = 9
 
         walletinfo = self.nodes[0].getwalletinfo()
         assert_equal(walletinfo['immature_balance'], 0)
@@ -110,8 +111,8 @@ class WalletTest (BitcoinTestFramework):
 
         # node0 should end up with 100 btc in block rewards plus fees, but
         # minus the 21 plus fees sent to node2
-        assert_equal(self.nodes[0].getbalance(), 100-21)
-        assert_equal(self.nodes[2].getbalance(), 21)
+        assert_equal(self.nodes[0].getbalance(), (COINBASE_REWARD*2)-SentAmt)
+        assert_equal(self.nodes[2].getbalance(), SentAmt)
 
         # Node0 should have two unspent outputs.
         # Create a couple of transactions to send them to node2, submit them through
@@ -138,42 +139,42 @@ class WalletTest (BitcoinTestFramework):
         self.sync_all()
 
         assert_equal(self.nodes[0].getbalance(), 0)
-        assert_equal(self.nodes[2].getbalance(), 100)
-        assert_equal(self.nodes[2].getbalance("from1"), 100-21)
+        assert_equal(self.nodes[2].getbalance(), COINBASE_REWARD*2)
+        assert_equal(self.nodes[2].getbalance("from1"), COINBASE_REWARD*2-SentAmt)
 
-        # Send 10 BTC normal
+        # Send 5 BTC normal
         address = self.nodes[0].getnewaddress("test")
         fee_per_byte = Decimal('0.001') / 1000
         self.nodes[2].settxfee(fee_per_byte * 1000)
-        txid = self.nodes[2].sendtoaddress(address, 10, "", "", False)
+        txid = self.nodes[2].sendtoaddress(address, 5, "", "", False)
         self.nodes[2].generate(1)
-        self.sync_all()
-        node_2_bal = self.check_fee_amount(self.nodes[2].getbalance(), Decimal('90'), fee_per_byte, count_bytes(self.nodes[2].getrawtransaction(txid)))
-        assert_equal(self.nodes[0].getbalance(), Decimal('10'))
+        self.sync_blocks()
+        node_2_bal = self.check_fee_amount(self.nodes[2].getbalance(), 2*COINBASE_REWARD - Decimal('5'), fee_per_byte, count_bytes(self.nodes[2].getrawtransaction(txid)))
+        assert_equal(self.nodes[0].getbalance(), Decimal('5'))
 
-        # Send 10 BTC with subtract fee from amount
-        txid = self.nodes[2].sendtoaddress(address, 10, "", "", True)
+        # Send 5 BTC with subtract fee from amount
+        txid = self.nodes[2].sendtoaddress(address, 5, "", "", True)
         self.nodes[2].generate(1)
-        self.sync_all()
-        node_2_bal -= Decimal('10')
+        self.sync_blocks()
+        node_2_bal -= Decimal('5')
         assert_equal(self.nodes[2].getbalance(), node_2_bal)
-        node_0_bal = self.check_fee_amount(self.nodes[0].getbalance(), Decimal('20'), fee_per_byte, count_bytes(self.nodes[2].getrawtransaction(txid)))
+        node_0_bal = self.check_fee_amount(self.nodes[0].getbalance(), Decimal('10'), fee_per_byte, count_bytes(self.nodes[2].getrawtransaction(txid)))
 
-        # Sendmany 10 BTC
-        txid = self.nodes[2].sendmany('from1', {address: 10}, 0, "", [])
+        # Sendmany 2 BTC
+        txid = self.nodes[2].sendmany('from1', {address: 2}, 0, "", [])
         self.nodes[2].generate(1)
-        self.sync_all()
-        node_0_bal += Decimal('10')
-        node_2_bal = self.check_fee_amount(self.nodes[2].getbalance(), node_2_bal - Decimal('10'), fee_per_byte, count_bytes(self.nodes[2].getrawtransaction(txid)))
+        self.sync_blocks()
+        node_0_bal += Decimal('2')
+        node_2_bal = self.check_fee_amount(self.nodes[2].getbalance(), node_2_bal - Decimal('2'), fee_per_byte, count_bytes(self.nodes[2].getrawtransaction(txid)))
         assert_equal(self.nodes[0].getbalance(), node_0_bal)
 
-        # Sendmany 10 BTC with subtract fee from amountd
-        txid = self.nodes[2].sendmany('from1', {address: 10}, 0, "", [address])
+        # Sendmany 1 BTC with subtract fee from amountd
+        txid = self.nodes[2].sendmany('from1', {address: 1}, 0, "", [address])
         self.nodes[2].generate(1)
-        self.sync_all()
-        node_2_bal -= Decimal('10')
+        self.sync_blocks()
+        node_2_bal -= Decimal('1')
         assert_equal(self.nodes[2].getbalance(), node_2_bal)
-        node_0_bal = self.check_fee_amount(self.nodes[0].getbalance(), node_0_bal + Decimal('10'), fee_per_byte, count_bytes(self.nodes[2].getrawtransaction(txid)))
+        node_0_bal = self.check_fee_amount(self.nodes[0].getbalance(), node_0_bal + Decimal('1'), fee_per_byte, count_bytes(self.nodes[2].getrawtransaction(txid)))
 
         # Test ResendWalletTransactions:
         # Create a couple of transactions, then start up a fourth
@@ -204,7 +205,7 @@ class WalletTest (BitcoinTestFramework):
         #4. check if recipient (node0) can list the zero value tx
         usp = self.nodes[1].listunspent()
         inputs = [{"txid":usp[0]['txid'], "vout":usp[0]['vout']}]
-        outputs = {self.nodes[1].getnewaddress(): 49.998, self.nodes[0].getnewaddress(): 11.11}
+        outputs = {self.nodes[1].getnewaddress(): COINBASE_REWARD - Decimal('0.002'), self.nodes[0].getnewaddress(): 11.11}
 
         rawTx = self.nodes[1].createrawtransaction(inputs, outputs).replace("c0833842", "00000000") #replace 11.11 with 0.0 (int32)
         decRawTx = self.nodes[1].decoderawtransaction(rawTx)
@@ -336,41 +337,42 @@ class WalletTest (BitcoinTestFramework):
         bal = self.nodes[2].getbalance()
         addrs = [ self.nodes[1].getnewaddress() for i in range(0,21)]
         pks   = [ self.nodes[1].dumpprivkey(x) for x in addrs]
+        SendQty = Decimal("0.1")
         for a in addrs:
-            self.nodes[0].sendtoaddress(a, 1)
+            self.nodes[0].sendtoaddress(a, SendQty)
         self.nodes[0].generate(1)
         sync_blocks(self.nodes)
         self.nodes[2].importprivatekeys(pks[0], pks[1])
         waitForRescan(self.nodes[2])
-        assert(bal + 2 == self.nodes[2].getbalance())
+        assert(bal + 2*SendQty == self.nodes[2].getbalance())
         self.nodes[2].importprivatekeys("rescan", pks[2], pks[3])
         waitForRescan(self.nodes[2])
-        assert(bal + 4 == self.nodes[2].getbalance())
+        assert(bal + 4*SendQty == self.nodes[2].getbalance())
         self.nodes[2].importprivatekeys("no-rescan", pks[4], pks[5])
         time.sleep(1)
-        assert(bal + 4 == self.nodes[2].getbalance())  # since the recan didn't happen, there won't be a balance change
+        assert(bal + 4*SendQty == self.nodes[2].getbalance())  # since the recan didn't happen, there won't be a balance change
         self.nodes[2].importaddresses("rescan") # force a rescan although we imported nothing
         waitForRescan(self.nodes[2])
-        assert(bal + 6 == self.nodes[2].getbalance())
+        assert(bal + 6*SendQty == self.nodes[2].getbalance())
 
         # import 5 addresses each (bug fix check)
         self.nodes[2].importaddresses(addrs[6], addrs[7], addrs[8], addrs[9], addrs[10])  # import watch only addresses
         waitForRescan(self.nodes[2])
-        assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
-        assert(bal + 11 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+        assert(bal + 6*SendQty == self.nodes[2].getbalance()) # since watch only, won't show in balance
+        assert(bal + 11*SendQty == self.nodes[2].getbalance("*",1,True)) # show the full balance
 
         self.nodes[2].importaddresses("rescan", addrs[11], addrs[12], addrs[13], addrs[14], addrs[15])  # import watch only addresses
         waitForRescan(self.nodes[2])
-        assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
-        assert(bal + 16 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+        assert(bal + 6*SendQty == self.nodes[2].getbalance()) # since watch only, won't show in balance
+        assert(bal + 16*SendQty == self.nodes[2].getbalance("*",1,True)) # show the full balance
 
         self.nodes[2].importaddresses("no-rescan", addrs[16], addrs[17], addrs[18], addrs[19], addrs[20])  # import watch only addresses
         time.sleep(1)
-        assert(bal + 6 == self.nodes[2].getbalance()) # since watch only, won't show in balance
-        assert(bal + 16 == self.nodes[2].getbalance("*",1,True)) # show the full balance, will be same because no rescan
+        assert(bal + 6*SendQty == self.nodes[2].getbalance()) # since watch only, won't show in balance
+        assert(bal + 16*SendQty == self.nodes[2].getbalance("*",1,True)) # show the full balance, will be same because no rescan
         self.nodes[2].importaddresses("rescan") # force a rescan although we imported nothing
         waitForRescan(self.nodes[2])
-        assert(bal + 21 == self.nodes[2].getbalance("*",1,True)) # show the full balance
+        assert(bal + 21*SendQty == self.nodes[2].getbalance("*",1,True)) # show the full balance
 
         # verify that none of the importaddress calls added the address with a label (bug fix check)
         txns = self.nodes[2].listreceivedbyaddress(0, True, True)
@@ -452,7 +454,7 @@ class WalletTest (BitcoinTestFramework):
         assert_equal(coinbase_tx_1["lastblock"], blocks[1])
         assert_equal(len(coinbase_tx_1["transactions"]), 1)
         assert_equal(coinbase_tx_1["transactions"][0]["blockhash"], blocks[1])
-        assert_equal(coinbase_tx_1["transactions"][0]["satoshi"], Decimal('2500000000'))
+        assert_equal(coinbase_tx_1["transactions"][0]["satoshi"], int(COINBASE_REWARD/2*BTC))
         assert_equal(len(self.nodes[0].listsinceblock(blocks[1])["transactions"]), 0)
 
 

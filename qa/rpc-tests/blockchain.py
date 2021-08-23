@@ -35,6 +35,7 @@ class BlockchainTest(BitcoinTestFramework):
 
     def setup_chain(self):
         logging.info ("Initializing test directory " + self.options.tmpdir)
+        self.node_opts = ["-debug=all,-event"]
         initialize_chain(self.options.tmpdir)
 
     def setup_network(self, split=False):
@@ -51,9 +52,66 @@ class BlockchainTest(BitcoinTestFramework):
         self._test_gettxoutsetinfo()
         self._test_getblockheader()
         self._test_getblock()
+        self._forking_test()
         self._test_rollbackchain_and_reconsidermostworkchain()
         self._test_transaction_pools()
         self.nodes[0].verifychain(4, 0)
+
+
+    def _forking_test(self):
+        LONGER = 5
+        if True:
+            self.nodes[1].generate(10*LONGER)
+            nblocks = self.nodes[1].getblockcount()
+            node2 = start_node(2, self.options.tmpdir, self.node_opts)
+            self.nodes.append(node2)
+            node2 = self.nodes[2]
+            connect_nodes(node2, 0)
+            node3 = start_node(3, self.options.tmpdir, self.node_opts)
+            self.nodes.append(node3)
+            connect_nodes(node3, 2)  # Connect node 3 only to the new node
+            connect_nodes(node3, 1)  # Connect node 3 only to the new node
+            logging.info("syncing nodes 0, 2 and 3 to node 1")
+            waitFor(30, lambda: node2.getblockcount() == nblocks, 2.0)
+            waitFor(30, lambda: node3.getblockcount() == nblocks, 2.0)
+            waitFor(30, lambda: self.nodes[0].getblockcount() == nblocks, 2.0)
+
+        # sort of simultaneously create blocks (we'd need to have an async generate to really do so,
+        # but this is likely to generate on another node before it has a chance to sync
+        for i in range(0,5):
+            for n in self.nodes:
+                n.generate(1)
+
+        besthashes = [x.getbestblockhash() for x in self.nodes]
+        print("Node tips: ", besthashes)
+        # now force convergence
+        self.nodes[1].generate(6)
+        count = self.nodes[1].getblockcount()
+        bestblockhash = self.nodes[1].getbestblockhash()
+        waitFor(30, lambda: self.nodes[0].getblockcount() == count)
+        waitFor(30, lambda: self.nodes[2].getblockcount() == count)
+        waitFor(30, lambda: self.nodes[3].getblockcount() == count)
+        waitFor(30, lambda: self.nodes[0].getbestblockhash() == bestblockhash)
+        waitFor(30, lambda: self.nodes[2].getbestblockhash() == bestblockhash)
+
+        logging.info("Forced fork")
+        # create a fork by partitioning the network
+        # node2 and 3 are only connected to 0 and 1 via a bidirectional connection to 0
+        disconnect_nodes(node2, 0)
+        disconnect_nodes(node3, 1)
+
+        winningHashes = self.nodes[0].generate(5)
+        losingHashes = self.nodes[3].generate(4)
+
+        assert self.nodes[0].getbestblockhash() != self.nodes[3].getbestblockhash()
+        assert self.nodes[0].getblockcount() == 1 + self.nodes[3].getblockcount()
+
+        # reconnect
+        connect_nodes(node2, 0)
+
+        # now nodes 2 and 3 should reorganize to the longer (more work) side
+        waitFor(30, lambda: self.nodes[2].getbestblockhash() == winningHashes[-1])
+        waitFor(30, lambda: self.nodes[3].getbestblockhash() == winningHashes[-1])
 
     def _test_getblockchaininfo(self):
         logging.info("Test getblockchaininfo")
@@ -98,7 +156,7 @@ class BlockchainTest(BitcoinTestFramework):
         node = self.nodes[0]
         res = node.gettxoutsetinfo()
 
-        assert_equal(res['total_amount'], Decimal('8725.00000000'))
+        assert_equal(res['total_amount'], COINBASE_REWARD*150 + COINBASE_REWARD/2*49)
         assert_equal(res['transactions'], 200)
         assert_equal(res['height'], 200)
         assert_equal(res['txouts'], 200)
@@ -358,3 +416,18 @@ class BlockchainTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     BlockchainTest().main()
+
+def TestOnce():
+    t = BlockchainTest()
+    t.drop_to_pdb = True
+    bitcoinConf = {
+        "debug": ["rpc", "net", "blk", "thin", "mempool", "req", "bench", "evict"],
+    }
+    flags = standardFlags()
+    t.main(flags, bitcoinConf, None)
+
+
+def Test():
+    for i in range(100):
+        print("\n\nTest iteration: ", i)
+        TestOnce()

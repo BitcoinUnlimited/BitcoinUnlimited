@@ -86,7 +86,7 @@ passOn = ""
 showHelp = False  # if we need to print help
 p = re.compile("^--")
 p_parallel = re.compile('^-parallel=')
-run_parallel = 4
+run_parallel = 3
 
 # some of the single-dash options applicable only to this runner script
 # are also allowed in double-dash format (but are not passed on to the
@@ -203,7 +203,7 @@ testScripts = [ RpcTest(t) for t in [
     Disabled('schnorr-activation', 'Need to be updated to work with BU'),
     'schnorrsig',
     'segwit_recovery',
-    'bip135basic',
+    Disabled('bip135basic', "having trouble on gitlab"),
     'ctor',
     'mining_ctor',
     Disabled('nov152018_forkactivation','Nov 2018 already activated'),
@@ -272,7 +272,7 @@ testScripts = [ RpcTest(t) for t in [
     'minimaldata',
     'schnorrmultisig',
     'uptime',
-    'op_reversebytes'
+    'op_reversebytes',
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [

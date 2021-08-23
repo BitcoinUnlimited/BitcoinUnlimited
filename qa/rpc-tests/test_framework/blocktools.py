@@ -9,7 +9,7 @@ import random
 
 from .mininode import *
 from .script import CScript, OP_TRUE, OP_CHECKSIG, OP_DROP, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG, OP_RETURN, OP_NOP
-from .util import BTC
+from .util import BTC, COINBASE_REWARD
 
 # Minimum size a transaction can have.
 MIN_TX_SIZE = 100
@@ -71,7 +71,7 @@ def create_coinbase(height, pubkey = None, scriptPubKey = None):
     coinbase.vin.append(CTxIn(COutPoint(0, 0xffffffff),
                 ser_string(serialize_script_num(height)), 0xffffffff))
     coinbaseoutput = CTxOut()
-    coinbaseoutput.nValue = 50 * COIN
+    coinbaseoutput.nValue = int(COINBASE_REWARD) * COIN
     halvings = int(height/150) # regtest
     coinbaseoutput.nValue >>= halvings
     if (pubkey != None):
