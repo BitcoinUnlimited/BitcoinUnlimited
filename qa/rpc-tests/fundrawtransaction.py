@@ -49,19 +49,27 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.nodes[0].generate(121)
         self.sync_blocks()
 
+        assert self.nodes[3].getbalance() == Decimal("0")
+
         watchonly_address = self.nodes[0].getnewaddress()
         watchonly_pubkey = self.nodes[0].validateaddress(watchonly_address)["pubkey"]
-        watchonly_amount = Decimal(200)
+        watchonly_amount = Decimal(COINBASE_REWARD/10)  # Arbitrary but should ofc be less then the balance!
         self.nodes[3].importpubkey(watchonly_pubkey, "", True)
-        watchonly_txid = self.nodes[0].sendtoaddress(watchonly_address, watchonly_amount)
-        self.nodes[0].sendtoaddress(self.nodes[3].getnewaddress(), watchonly_amount / 10)
 
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 1.5)
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 1.0)
         self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 5.0)
 
+        self.nodes[0].sendtoaddress(self.nodes[3].getnewaddress(), watchonly_amount/2)
+        watchonly_txid = self.nodes[0].sendtoaddress(watchonly_address, watchonly_amount)
+
         self.nodes[0].generate(1)
         self.sync_blocks()
+
+        # Node 3 sees what we sent it
+        assert self.nodes[3].getbalance("*") == watchonly_amount/2
+        # Node 3 sees the watch only amount and what we sent it
+        assert self.nodes[3].getbalance("*",1,True) == watchonly_amount + watchonly_amount/2
 
         ###############
         # simple test #
@@ -529,7 +537,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.sync_all()
 
         # make sure funds are received at node1
-        assert_equal(oldBalance+Decimal('51.10000000'), self.nodes[0].getbalance())
+        assert_equal(oldBalance+COINBASE_REWARD+Decimal('1.10000000'), self.nodes[0].getbalance())
 
 
         ###############################################
@@ -571,13 +579,13 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.nodes[1].sendtoaddress(self.nodes[0].getnewaddress(), self.nodes[1].getbalance(), "", "", True)
         self.sync_all()
         self.nodes[0].generate(1)
-        self.sync_all()
+        self.sync_blocks()
 
         for i in range(0,20):
             self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 0.01)
         self.sync_all()
         self.nodes[0].generate(1)
-        self.sync_all()
+        self.sync_blocks()
 
         #fund a tx with ~20 small inputs
         oldBalance = self.nodes[0].getbalance()
@@ -591,7 +599,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.sync_all()
         self.nodes[0].generate(1)
         self.sync_all()
-        assert_equal(oldBalance+Decimal('50.19000000'), self.nodes[0].getbalance()) #0.19+block reward
+        assert_equal(oldBalance+COINBASE_REWARD+Decimal('0.19000000'), self.nodes[0].getbalance()) #0.19+block reward
 
         #####################################################
         # test fundrawtransaction with OP_RETURN and no vin #
@@ -614,8 +622,22 @@ class RawTransactionsTest(BitcoinTestFramework):
         # test a fundrawtransaction using only watchonly #
         ##################################################
 
+        # Node 3 sees what we sent it
+        node3Bal = self.nodes[3].getbalance("*")
+        # Node 3 sees the watch only amount and what we sent it
+        node3WatchAndBal = self.nodes[3].getbalance("*",1,True)
+        watchOnlyBal = node3WatchAndBal - node3Bal
+
+        if watchOnlyBal < watchonly_amount:
+            assert watchOnlyBal == 0  # Because if it was spent it should have been spent to change
+            # Ok create a new watchonly tx
+            watchonly_txid = self.nodes[0].sendtoaddress(watchonly_address, watchonly_amount)
+            self.nodes[0].generate(1)
+            self.sync_blocks()
+
+
         inputs = []
-        outputs = {self.nodes[2].getnewaddress() : watchonly_amount / 2}
+        outputs = {self.nodes[2].getnewaddress() : watchonly_amount - 1 }
         rawtx = self.nodes[3].createrawtransaction(inputs, outputs)
 
         result = self.nodes[3].fundrawtransaction(rawtx, True)
@@ -628,6 +650,7 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         ###############################################################
         # test fundrawtransaction using the entirety of watched funds #
+        # and another utxo to supply the fee                          #
         ###############################################################
 
         inputs = []
@@ -641,7 +664,6 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         assert_greater_than(result["fee"], 0)
         assert_greater_than(result["changepos"], -1)
-        assert_equal(result["fee"] + res_dec["vout"][result["changepos"]]["value"], watchonly_amount / 10)
 
         signedtx = self.nodes[3].signrawtransaction(result["hex"])
         assert(not signedtx["complete"])
@@ -650,20 +672,20 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.nodes[0].enqueuerawtransaction(signedtx["hex"],"flush")
 
         self.nodes[0].generate(1)
-        self.sync_all()
+        self.sync_blocks()
 
         ################################
         # Test no address reuse occurs #
         ################################
 
         inputs = []
-        outputs = {self.nodes[2].getnewaddress() : 1}
+        outputs = {self.nodes[2].getnewaddress() : Decimal("1.23456") }
         rawtx = self.nodes[3].createrawtransaction(inputs, outputs)
         result3 = self.nodes[3].fundrawtransaction(rawtx)
         res_dec = self.nodes[0].decoderawtransaction(result3["hex"])
         changeaddress = ""
         for out in res_dec['vout']:
-            if out['value'] > 1.0:
+            if out['value'] != Decimal("1.23456"):
                 changeaddress += out['scriptPubKey']['addresses'][0]
         assert(changeaddress != "")
         nextaddr = self.nodes[3].getnewaddress()

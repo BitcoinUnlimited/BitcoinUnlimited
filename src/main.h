@@ -57,7 +57,7 @@ static const bool DEFAULT_WHITELISTRELAY = true;
 static const bool DEFAULT_WHITELISTFORCERELAY = true;
 /** The maximum size of a blk?????.dat file (since 0.8) */
 static const uint64_t MAX_BLOCKFILE_SIZE = 16ULL * 0x8000000ULL; // use a 2 GB file size on not regtest
-static const uint64_t MAX_BLOCKFILE_SIZE_REGTEST = 0x8000000; // 128 MiB on regtest
+static const uint64_t MAX_BLOCKFILE_SIZE_REGTEST = 0x2000000ULL; // 32 MiB on regtest
 extern uint64_t max_blockfile_size;
 
 /** Maximum number of script-checking threads allowed */

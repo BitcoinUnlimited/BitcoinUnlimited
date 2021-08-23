@@ -105,7 +105,7 @@ class ZMQTest (BitcoinTestFramework):
             for t in wallet:
                 inputs.append({ "txid" : t["txid"], "vout" : t["vout"]})
                 num_coins += 1
-            outputs = { self.nodes[0].getnewaddress() : num_coins * 49.95 }
+            outputs = { self.nodes[0].getnewaddress() : num_coins * COINBASE_REWARD-Decimal("0.05") }
             rawtx   = self.nodes[0].createrawtransaction(inputs, outputs)
             rawtx   = self.nodes[0].signrawtransaction(rawtx)
             try:

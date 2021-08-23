@@ -9,6 +9,7 @@ from codecs import encode
 from threading import RLock
 from io import BytesIO
 import copy
+from test_framework.schnorr import sign
 from test_framework.siphash import siphash256
 import test_framework.util as util
 

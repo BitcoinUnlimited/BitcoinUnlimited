@@ -659,3 +659,12 @@ class CompactBlocksTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     CompactBlocksTest().main()
+
+def Test():
+    t = CompactBlocksTest()
+    t.drop_to_pdb = True
+    bitcoinConf = {
+        "debug": ["rpc","net", "blk", "thin", "mempool", "req", "bench", "evict"]
+    }
+    flags = standardFlags()
+    t.main(flags, bitcoinConf, None)

@@ -871,6 +871,7 @@ if __name__ == '__main__':
 
 def Test():
     t = SendHeadersTest()
+    t.drop_to_pdb = True
     bitcoinConf = {
         "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
         "blockprioritysize": 2000000  # we don't want any transactions rejected due to insufficient fees...

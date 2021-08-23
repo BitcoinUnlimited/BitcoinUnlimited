@@ -36,7 +36,8 @@ from .util import (
     check_json_precision,
     initialize_chain_clean,
     PortSeed,
-    UtilOptions
+    UtilOptions,
+    COINBASE_REWARD
 )
 
 
@@ -61,7 +62,7 @@ class BitcoinTestFramework(object):
     def run_test(self):
         for node in self.nodes:
             assert_equal(node.getblockcount(), 200)
-            assert_equal(node.getbalance(), 25*50)
+            assert_equal(node.getbalance(), 25*COINBASE_REWARD)
 
     def add_options(self, parser):
         pass
@@ -81,6 +82,9 @@ class BitcoinTestFramework(object):
         if self.setup_clean_chain:
             initialize_chain_clean(self.options.tmpdir, self.num_nodes, bitcoinConfDict, wallets)
         else:
+            # Make sure we get the right bitcoind for each node
+            if self.bins is None:
+                self.bins = [self.bitcoindBin] * 10
             initialize_chain(self.options.tmpdir,bitcoinConfDict, wallets, self.bins)
 
     def setup_nodes(self):
@@ -267,7 +271,6 @@ class BitcoinTestFramework(object):
         PortSeed.n = self.options.port_seed
 
         os.environ['PATH'] = self.options.srcdir + ":" + os.path.join(self.options.srcdir, "qt") + ":" + os.environ['PATH']
-
         self.bitcoindBin = os.path.join(self.options.srcdir, "bitcoind")
 
         check_json_precision()
