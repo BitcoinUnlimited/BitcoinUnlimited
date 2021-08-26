@@ -12,7 +12,6 @@
 #include <string>
 
 class Config;
-class CWallet;
 
 void StartShutdown();
 bool ShutdownRequested();

@@ -203,7 +203,7 @@ testScripts = [ RpcTest(t) for t in [
     Disabled('schnorr-activation', 'Need to be updated to work with BU'),
     'schnorrsig',
     'segwit_recovery',
-    Disabled('bip135basic', "having trouble on gitlab"),
+    'bip135basic',
     'ctor',
     'mining_ctor',
     Disabled('nov152018_forkactivation','Nov 2018 already activated'),
@@ -449,8 +449,8 @@ def runtests():
 
         if len(tests_to_run) > 1 and run_parallel:
             # Populate cache
-            subprocess.check_output([RPC_TESTS_DIR + 'create_cache.py'] + [flags]+
-                                    (["--no-ipv6-rpc-listen"] if option_passed("no-ipv6-rpc-listen") else []))
+            cCargs = [RPC_TESTS_DIR + 'create_cache.py'] + [x.strip() for x in flags.split()] + (["--no-ipv6-rpc-listen"] if option_passed("no-ipv6-rpc-listen") else [])
+            subprocess.check_output(cCargs)
 
         tests_to_run = list(map(str,tests_to_run))
         max_len_name = len(max(tests_to_run, key=len))
