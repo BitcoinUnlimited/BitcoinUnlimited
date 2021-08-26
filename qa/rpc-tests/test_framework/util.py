@@ -518,7 +518,8 @@ def initialize_chain(test_dir,bitcoinConfDict=None,wallets=None, bins=None):
                     traceback.print_exc(file=sys.stdout)
                     remap_ports(i)
             else:
-                raise Exception("Couldn't start bitcoind even with retries on different ports (initialize_chain).")
+                logging.error("Couldn't start bitcoind (%s) even with retries on different ports (initialize_chain)." % args)
+                raise Exception("Couldn't start bitcoind (%s) even with retries on different ports (initialize_chain)." % args)
 
         rpcs = []
         logging.info("  connecting to bitcoinds")
