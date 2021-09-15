@@ -595,19 +595,19 @@ std::set<uint64_t> CGrapheneBlock::UpdateResolvedTxsAndIdentifyMissing(
 
 bool CGrapheneBlock::process(CNode *pfrom, std::string strCommand, std::shared_ptr<CBlockThinRelay> pblock)
 {
-    // In PV we must prevent two graphene blocks from simulaneously processing that were recieved from the
-    // same peer. This would only happen as in the example of an expedited block coming in
-    // after an graphene request, because we would never explicitly request two graphene blocks from the same peer.
-    if (PV->IsAlreadyValidating(pfrom->id, pblock->GetHash()))
-    {
-        LOGA("Not processing this grapheneblock from %s because %s is already validating in another thread\n",
-            pfrom->GetLogName(), pblock->GetHash().ToString().c_str());
-        return false;
-    }
-
     DbgAssert(pblock->grapheneblock != nullptr, return false);
     DbgAssert(pblock->grapheneblock.get() == this, return false);
     std::shared_ptr<CGrapheneBlock> grapheneBlock = pblock->grapheneblock;
+
+    // In PV we must prevent two graphene blocks from simulaneously processing that were recieved from the
+    // same peer. This would only happen as in the example of an expedited block coming in
+    // after an graphene request, because we would never explicitly request two graphene blocks from the same peer.
+    if (PV->IsAlreadyValidating(pfrom->id, grapheneBlock->header.GetHash()))
+    {
+        LOGA("Not processing this grapheneblock from %s because %s is already validating in another thread\n",
+            pfrom->GetLogName(), grapheneBlock->header.GetHash().ToString().c_str());
+        return false;
+    }
 
     pblock->nVersion = header.nVersion;
     pblock->nBits = header.nBits;
