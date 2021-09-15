@@ -4,7 +4,7 @@
 
 
 #if defined(HAVE_CONFIG_H)
-#include "config/bitcoin-config.h"
+#include "bitcoin-config.h"
 #endif
 
 #include "allowed_args.h"

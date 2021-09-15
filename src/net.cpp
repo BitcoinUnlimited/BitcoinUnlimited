@@ -5,7 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #if defined(HAVE_CONFIG_H)
-#include "config/bitcoin-config.h"
+#include "bitcoin-config.h"
 #endif
 
 // must include first to ensure FD_SETSIZE is correctly set
