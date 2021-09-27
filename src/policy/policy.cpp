@@ -63,7 +63,7 @@ bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType)
     return whichType != TX_NONSTANDARD;
 }
 
-bool IsStandardTx(const CTransactionRef tx, std::string &reason, bool allowMultipleOpReturn)
+bool IsStandardTx(const CTransactionRef tx, std::string &reason)
 {
     if (tx->nVersion > CTransaction::MAX_STANDARD_VERSION || tx->nVersion < 1)
     {
@@ -128,13 +128,6 @@ bool IsStandardTx(const CTransactionRef tx, std::string &reason, bool allowMulti
             reason = "dust";
             return false;
         }
-    }
-
-    // only one OP_RETURN txout is permitted until after May 2021 network upgrade
-    if (!allowMultipleOpReturn && nDataOut > 1)
-    {
-        reason = "multi-op-return";
-        return false;
     }
 
     // total size of all OP_RETURNs combined must be less than maximum allowed size
