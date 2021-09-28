@@ -104,6 +104,7 @@ include_directories( .
   ..
   ../rsm/include
   ../script
+  ../config
   ../secp256k1/include
   ../secp256k1
   ../secp256k1/src
