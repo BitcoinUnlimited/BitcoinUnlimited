@@ -2196,7 +2196,7 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest)
     // part of the chain. But at least 1 transaction, the very last in the chain,
     // will have been removed.
     BOOST_CHECK(pool.size() >= 90 && pool.size() < 100);
-    for (size_t i = 0; i <= vHashes.size() - 10; i++) // first 90 hashes should exist
+    for (size_t i = 0; i < (vHashes.size() - 10); i++) // first 90 hashes should exist
         BOOST_CHECK(pool.exists(vHashes[i]));
     BOOST_CHECK(!pool.exists(tx.GetHash())); // at minimum the last hash should not exist
 }
