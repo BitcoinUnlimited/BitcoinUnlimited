@@ -1,6 +1,6 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: BitcoinUnlimited
-Upstream-Contact: Andrew Stone <g.andrew.stone@gmail.com>
+Upstream-Contact: guanlong huang <gl041188@gmail.com>
 Source: https://github.com/BitcoinUnlimited/BitcoinUnlimited
 
 Files: *
