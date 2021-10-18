@@ -273,6 +273,7 @@ testScripts = [ RpcTest(t) for t in [
     'schnorrmultisig',
     'uptime',
     'op_reversebytes',
+    'bip69',
 ] ]
 
 testScriptsExt = [ RpcTest(t) for t in [
