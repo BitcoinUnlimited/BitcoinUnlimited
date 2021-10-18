@@ -32,7 +32,9 @@
 #include "utilmoneystr.h"
 #include "validation/validation.h"
 
+#include <algorithm>
 #include <assert.h>
+#include <numeric>
 
 #include <boost/algorithm/string/replace.hpp>
 #include <thread>
@@ -64,6 +66,8 @@ CFeeRate CWallet::minTxFee = CFeeRate(DEFAULT_TRANSACTION_MINFEE);
 CFeeRate CWallet::fallbackFee = CFeeRate(DEFAULT_FALLBACK_FEE);
 
 const uint256 CMerkleTx::ABANDON_HASH(uint256S("0000000000000000000000000000000000000000000000000000000000000001"));
+
+extern CTweak<bool> useBIP69;
 
 /** @defgroup mapWallet
  *
@@ -2341,6 +2345,39 @@ bool CWallet::FundTransaction(CMutableTransaction &tx,
     return true;
 }
 
+bool InputSortBIP69(const CTxIn &a, const CTxIn &b)
+{
+    if (a.prevout.hash == b.prevout.hash)
+    {
+        return a.prevout.n < b.prevout.n;
+    }
+    return a.prevout.hash < b.prevout.hash;
+};
+
+bool OutputSortBIP69(const CTxOut &a, const CTxOut &b)
+{
+    if (a.nValue == b.nValue)
+    {
+        return a.scriptPubKey < b.scriptPubKey;
+    }
+    return a.nValue < b.nValue;
+};
+
+// sort might be better than stable_sort for BIP69
+void sortInputsBIP69(std::vector<CTxIn> &vin, std::vector<unsigned int> &inputOrder)
+{
+    std::stable_sort(inputOrder.begin(), inputOrder.end(),
+        [&vin](unsigned int a, unsigned int b) { return InputSortBIP69(vin[a], vin[b]); });
+
+    std::stable_sort(vin.begin(), vin.end(), InputSortBIP69);
+}
+
+void sortOutputsBIP69(std::vector<CTxOut> &vout)
+{
+    // outputs do not need the sort changes tracked
+    std::stable_sort(vout.begin(), vout.end(), OutputSortBIP69);
+}
+
 bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
     CWalletTx &wtxNew,
     CReserveKey &reservekey,
@@ -2628,16 +2665,43 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
                         }
                     }
 
+                    // BIP69
+                    // only use BIP69 when signing otherwise it is not guaranteed that SIGHASH_ALL
+                    // was used
+                    // we do not need these input_order vector if BIP69 is not used
+                    // but we create it anyway to simplify the signing logic later
+                    // should use std::array instead of std::vector but array requires
+                    // vin size to be constexpr
+                    std::vector<unsigned int> inputOrder(txNew.vin.size());
+                    std::iota(inputOrder.begin(), inputOrder.end(), 0);
+                    // public label transactions are order dependent, we can not use BIP69 with them
+                    if (sign && !involvesPublicLabel && useBIP69.Value() == true)
+                    {
+                        sortInputsBIP69(txNew.vin, inputOrder);
+                        sortOutputsBIP69(txNew.vout);
+                    }
+
                     // Sign
                     unsigned int sighashType = SIGHASH_ALL | SIGHASH_FORKID;
-                    int nIn = 0;
+                    size_t nIn = 0;
                     CTransaction txNewConst(txNew);
-                    for (const PAIRTYPE(const CWalletTx *, unsigned int) & coin : setCoins)
+                    while (nIn < setCoins.size())
                     {
-                        bool signSuccess;
+                        // we can either copy the contents of set to a vector for random access or we can iterate from
+                        // begin X times to get the proper coins for the input, i think moving an iterator is faster
+                        // than allocating a vector
+                        auto setCoinsIter = setCoins.begin();
+                        size_t k = inputOrder[nIn];
+                        while (k > 0)
+                        {
+                            ++setCoinsIter;
+                            --k;
+                        }
+                        const PAIRTYPE(const CWalletTx *, unsigned int) &coin = *setCoinsIter;
                         const CScript &scriptPubKey = coin.first->vout[coin.second].scriptPubKey;
                         CAmount amountIn = coin.first->vout[coin.second].nValue;
                         CScript &scriptSigRes = txNew.vin[nIn].scriptSig;
+                        bool signSuccess;
                         if (sign)
                         {
                             signSuccess = ProduceSignature(

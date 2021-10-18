@@ -411,6 +411,10 @@ CTweak<bool> allowp2pTxVal("net.allowp2pTxVal",
         "allow requests to check if a transaction would be accepted into the mempool via p2p message (default: false)"),
     false);
 
+CTweak<bool> useBIP69("wallet.useBIP69",
+    strprintf("sort input and outputs of created transactions in lexicographical order (default: true)"),
+    true);
+
 CTweak<CAmount> maxTxFee("wallet.maxTxFee",
     strprintf("Maximum total fees to use in a single wallet transaction or raw transaction; setting this too low may "
               "abort large transactions (default: %d)",
