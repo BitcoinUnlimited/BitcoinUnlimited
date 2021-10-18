@@ -31,21 +31,28 @@ void ReceiveFreezeDialog::setModel(OptionsModel *_model) { this->model = _model;
 void ReceiveFreezeDialog::on_freezeDateTime_editingFinished()
 {
     if (ui->freezeDateTime->dateTime() > ui->freezeDateTime->minimumDateTime())
+    {
         ui->freezeBlock->clear();
+    }
 }
 
 void ReceiveFreezeDialog::on_freezeBlock_editingFinished()
 {
     if (ui->freezeBlock->value() > 0)
+    {
         ui->freezeDateTime->setDateTime(ui->freezeDateTime->minimumDateTime());
-
+    }
     /* limit check */
     std::string freezeText = ui->freezeBlock->text().toStdString();
     int64_t nFreezeLockTime = 0;
     if (freezeText != "")
+    {
         nFreezeLockTime = std::strtoul(freezeText.c_str(), 0, 10);
+    }
     if (nFreezeLockTime < 1 || nFreezeLockTime > LOCKTIME_THRESHOLD - 1)
+    {
         ui->freezeBlock->clear();
+    }
 }
 
 void ReceiveFreezeDialog::on_resetButton_clicked()
@@ -63,17 +70,25 @@ void ReceiveFreezeDialog::on_ReceiveFreezeDialog_rejected()
 
 void ReceiveFreezeDialog::getFreezeLockTime(CScriptNum &nFreezeLockTime)
 {
-    nFreezeLockTime = CScriptNum(0);
+    nFreezeLockTime = CScriptNum::fromIntUnchecked(0);
 
     // try freezeBlock
     std::string freezeText = ui->freezeBlock->text().toStdString();
     if (freezeText != "")
-        nFreezeLockTime = CScriptNum(std::strtoul(freezeText.c_str(), 0, 10));
-
+    {
+        auto res = CScriptNum::fromInt(std::strtoul(freezeText.c_str(), 0, 10));
+        if (!res)
+        {
+            return;
+        }
+        nFreezeLockTime = *res;
+    }
     else
     {
         // try freezeDateTime
         if (ui->freezeDateTime->dateTime() > ui->freezeDateTime->minimumDateTime())
-            nFreezeLockTime = CScriptNum(ui->freezeDateTime->dateTime().toMSecsSinceEpoch() / 1000);
+        {
+            nFreezeLockTime = CScriptNum::fromIntUnchecked(ui->freezeDateTime->dateTime().toMSecsSinceEpoch() / 1000);
+        }
     }
 }

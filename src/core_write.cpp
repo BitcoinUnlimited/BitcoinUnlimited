@@ -90,11 +90,11 @@ const map<unsigned char, string> mapSigHashTypes = {
  * For example,
  *                                     pass false, or omit the this argument (defaults to false), for scriptPubKeys.
  */
-string ScriptToAsmStr(const CScript &script, const bool fAttemptSighashDecode)
+string ScriptToAsmStr(const CScript &script, const bool fAttemptSighashDecode, bool f64BitNums)
 {
     string str;
     opcodetype opcode;
-    vector<unsigned char> vch;
+    vector<uint8_t> vch;
     CScript::const_iterator pc = script.begin();
     while (pc < script.end())
     {
@@ -107,11 +107,13 @@ string ScriptToAsmStr(const CScript &script, const bool fAttemptSighashDecode)
             str += "[error]";
             return str;
         }
+        size_t const maxScriptNumSize =
+            f64BitNums ? CScriptNum::MAXIMUM_ELEMENT_SIZE_64_BIT : CScriptNum::MAXIMUM_ELEMENT_SIZE_32_BIT;
         if (0 <= opcode && opcode <= OP_PUSHDATA4)
         {
-            if (vch.size() <= static_cast<vector<unsigned char>::size_type>(4))
+            if (vch.size() <= maxScriptNumSize)
             {
-                str += strprintf("%d", CScriptNum(vch, false).getint());
+                str += strprintf("%d", CScriptNum(vch, false, maxScriptNumSize).getint64());
             }
             else
             {

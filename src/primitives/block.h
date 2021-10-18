@@ -153,7 +153,7 @@ public:
         std::vector<unsigned char> heightScript(numlen);
         copy(sig.begin() + 1, sig.begin() + 1 + numlen, heightScript.begin());
         CScriptNum coinbaseHeight(heightScript, false, numlen);
-        return coinbaseHeight.getint();
+        return coinbaseHeight.getint64();
     }
 
     void SetNull()

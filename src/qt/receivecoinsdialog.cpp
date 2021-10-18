@@ -72,7 +72,7 @@ ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, cons
     connect(ui->clearButton, SIGNAL(clicked()), this, SLOT(clear()));
 
     // initialize freeze
-    nFreezeLockTime = CScriptNum(0);
+    nFreezeLockTime = CScriptNum::fromIntUnchecked(0);
 
     // Temporarily disable the freeze coin check box in the wallet.
     // TODO: determine whether to competely remove the freeze feature.
@@ -117,7 +117,7 @@ void ReceiveCoinsDialog::clear()
     ui->reuseAddress->setChecked(false);
     ui->freezeCheck->setChecked(false);
     ui->freezeCheck->setText("Coin &Freeze");
-    nFreezeLockTime = CScriptNum(0);
+    nFreezeLockTime = CScriptNum::fromIntUnchecked(0);
     freezeDialog = nullptr;
     updateDisplayUnit();
 }
@@ -152,7 +152,7 @@ void ReceiveCoinsDialog::on_freezeDialog_hide()
 
         {
             uint64_t height = GetBlockchainHeight();
-            uint64_t freezeHeight = nFreezeLockTime.getint();
+            uint64_t freezeHeight = nFreezeLockTime.getint64();
             uint64_t approxTimeMs =
                 ((freezeHeight - height) * 10 * 60 * 1000) + QDateTime::currentDateTime().toMSecsSinceEpoch();
 
@@ -224,7 +224,8 @@ void ReceiveCoinsDialog::on_receiveButton_clicked()
         else
         {
             /* Generate new receiving address and add to the address table */
-            address = model->getAddressTableModel()->addRow(AddressTableModel::Receive, label, "", CScriptNum(0));
+            address = model->getAddressTableModel()->addRow(
+                AddressTableModel::Receive, label, "", CScriptNum::fromIntUnchecked(0));
         }
     }
     SendCoinsRecipient info(address, label, ui->reqAmount->value(), ui->reqMessage->text(), sFreezeLockTime, "");

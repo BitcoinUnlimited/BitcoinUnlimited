@@ -682,7 +682,7 @@ void IncrementExtraNonce(CBlock *pblock, unsigned int &nExtraNonce)
     unsigned int nHeight = pblock->GetHeight(); // Height first in coinbase required for block.version=2
     CMutableTransaction txCoinbase(*pblock->vtx[0]);
 
-    CScript script = (CScript() << nHeight << CScriptNum(nExtraNonce));
+    CScript script = (CScript() << nHeight << CScriptNum::fromIntUnchecked(nExtraNonce));
     CScript cbFlags;
     {
         LOCK(cs_coinbaseFlags);

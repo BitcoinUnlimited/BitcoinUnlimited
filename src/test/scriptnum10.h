@@ -121,11 +121,14 @@ public:
     static std::vector<unsigned char> serialize(const int64_t &value)
     {
         if (value == 0)
+        {
             return std::vector<unsigned char>();
+        }
 
         std::vector<unsigned char> result;
         const bool neg = value < 0;
-        uint64_t absvalue = neg ? -value : value;
+        // NB: -INT64_MIN in 2's complement is UB, so we must guard against it here.
+        uint64_t absvalue = neg && value != std::numeric_limits<int64_t>::min() ? -value : value;
 
         while (absvalue)
         {

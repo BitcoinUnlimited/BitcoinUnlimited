@@ -315,13 +315,12 @@ bool CheckMinimalPush(const std::vector<uint8_t> &data, opcodetype opcode)
     return true;
 }
 
-bool CScriptNum::IsMinimallyEncoded(const std::vector<uint8_t> &vch, const size_t nMaxNumSize)
+bool CScriptNum::IsMinimallyEncoded(const std::vector<uint8_t> &vch, size_t maxIntegerSize)
 {
-    if (vch.size() > nMaxNumSize)
+    if (vch.size() > maxIntegerSize)
     {
         return false;
     }
-
     if (vch.size() > 0)
     {
         // Check that the number is encoded with the minimum possible number
@@ -343,7 +342,6 @@ bool CScriptNum::IsMinimallyEncoded(const std::vector<uint8_t> &vch, const size_
             }
         }
     }
-
     return true;
 }
 

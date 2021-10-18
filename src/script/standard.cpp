@@ -114,9 +114,9 @@ static bool MatchLabelPublic(const CScript &script, std::vector<valtype> &dataCa
         {
             declaredLen = CScript::DecodeOP_N(opcode);
         }
-        if (dataId.getint() > 0)
+        if (dataId.getint32() > 0)
         {
-            declaredLen = dataId.getint();
+            declaredLen = dataId.getint32();
         }
         if (declaredLen == 0)
         {
@@ -470,7 +470,7 @@ CScript GetScriptLabelPublic(const string &labelPublic)
     {
         // length byte + data (https://en.bitcoin.it/wiki/Script);
         // scriptDataPublic = bytearray((sizeLabelPublic,))+ labelPublic;
-        scriptDataPublic = CScript() << OP_RETURN << CScriptNum(sizeLabelPublic)
+        scriptDataPublic = CScript() << OP_RETURN << CScriptNum::fromIntUnchecked(sizeLabelPublic)
                                      << std::vector<unsigned char>(labelPublic.begin(), labelPublic.end());
     }
     return scriptDataPublic;

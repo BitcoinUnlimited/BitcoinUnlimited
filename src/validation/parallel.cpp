@@ -66,7 +66,7 @@ bool CScriptCheck::operator()()
         // if < 2 scriptsig len is allowed to be 0 (len formula goes negative)
         if ((smRes.consensusSigCheckCount > 1) && ((smRes.consensusSigCheckCount * 43) - 60 > lenScriptSig))
         {
-            error = SIGCHECKS_LIMIT_EXCEEDED;
+            error = SCRIPT_ERR_SIGCHECKS_LIMIT_EXCEEDED;
             LOGA("Sigchecks limit exceeded, with %d sigchecks: min script length (%d) > satisfier script len (%d)",
                 smRes.consensusSigCheckCount, (smRes.consensusSigCheckCount * 43) - 60, lenScriptSig);
             return false;

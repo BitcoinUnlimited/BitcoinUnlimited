@@ -51,7 +51,7 @@ public:
 
     void setModel(WalletModel *model);
 
-    CScriptNum nFreezeLockTime = CScriptNum(0);
+    CScriptNum nFreezeLockTime = CScriptNum::fromIntUnchecked(0);
 
 public Q_SLOTS:
     void clear();

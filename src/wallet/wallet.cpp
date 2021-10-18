@@ -2620,7 +2620,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
                             std::numeric_limits<unsigned int>::max() - 1));
 
                         // If the input is a Freeze CLTV lock-by-blocktime then update the txNew.nLockTime
-                        CScriptNum nFreezeLockTime(0);
+                        CScriptNum nFreezeLockTime = CScriptNum::fromIntUnchecked(0);
                         if (isFreezeCLTV(*this, coin.first->vout[coin.second].scriptPubKey, nFreezeLockTime))
                         {
                             if (nFreezeLockTime.getint64() > LOCKTIME_THRESHOLD)
