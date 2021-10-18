@@ -133,6 +133,11 @@ enum
     // Whether the new OP_REVERSEBYTES opcode can be used.
     SCRIPT_ENABLE_OP_REVERSEBYTES = (1U << 23),
 
+    // Flag that allows us to determine if the script interpreter should allow
+    // 64-bit integer arithmetic and the return of OP_MUL or use the previous
+    // semantics.
+    SCRIPT_64_BIT_INTEGERS = (1U << 24),
+
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);

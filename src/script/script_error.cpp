@@ -41,8 +41,9 @@ const char *ScriptErrorString(const ScriptError serror)
     case SCRIPT_ERR_INVALID_OPERAND_SIZE:
         return "Invalid operand size";
     case SCRIPT_ERR_INVALID_NUMBER_RANGE:
-        return "Given operand is not a number within the valid range "
-               "[-2^31...2^31]";
+        return "Given operand is not a number within the valid range [-2^31 + 1, 2^31 - 1]";
+    case SCRIPT_ERR_INVALID_NUMBER_RANGE_64_BIT:
+        return "Given operand is not a number within the valid range [-2^63 + 1, 2^63 - 1]";
     case SCRIPT_ERR_IMPOSSIBLE_ENCODING:
         return "The requested encoding is impossible to satisfy";
     case SCRIPT_ERR_INVALID_SPLIT_RANGE:
@@ -103,7 +104,7 @@ const char *ScriptErrorString(const ScriptError serror)
         return "Script number overflow";
     case SCRIPT_ERR_NUMBER_BAD_ENCODING:
         return "Non-minimally encoded script number";
-    case SIGCHECKS_LIMIT_EXCEEDED:
+    case SCRIPT_ERR_SIGCHECKS_LIMIT_EXCEEDED:
         return "Validation resources exceeded (SigChecks)";
     case SCRIPT_ERR_UNKNOWN_ERROR:
     case SCRIPT_ERR_ERROR_COUNT:

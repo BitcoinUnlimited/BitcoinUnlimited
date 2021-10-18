@@ -81,7 +81,13 @@ CScript ParseScript(const std::string &s)
         {
             // Number
             int64_t n = atoi64(w);
-            result << n;
+            auto res = CScriptNum::fromInt(n);
+            if (!res)
+            {
+                // std::numeric_limits<int64_t>::min() is not allowed
+                throw std::runtime_error("-9223372036854775808 is a forbidden value");
+            }
+            result << *res;
             continue;
         }
 

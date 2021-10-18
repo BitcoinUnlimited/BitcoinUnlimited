@@ -441,11 +441,11 @@ QString AddressTableModel::labelForFreeze(const QString &address) const
     {
         LOCK(wallet->cs_wallet);
         CTxDestination dest = DecodeDestination(address.toStdString());
-        CScriptNum nFreezeLockTime(0);
+        CScriptNum nFreezeLockTime = CScriptNum::fromIntUnchecked(0);
         if (isFreezeCLTV(*wallet, GetScriptForDestination(dest), nFreezeLockTime))
         {
             if (nFreezeLockTime.getint64() < LOCKTIME_THRESHOLD)
-                return (QString)("Block:") + QString::number(nFreezeLockTime.getint());
+                return (QString)("Block:") + QString::number(nFreezeLockTime.getint64());
             else
                 return QDateTime::fromMSecsSinceEpoch(nFreezeLockTime.getint64() * 1000).toString();
         }

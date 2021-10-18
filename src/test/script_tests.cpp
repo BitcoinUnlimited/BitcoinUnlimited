@@ -72,6 +72,7 @@ static ScriptErrorDesc script_errors[] = {
     {SCRIPT_ERR_PUBKEY_COUNT, "PUBKEY_COUNT"},
     {SCRIPT_ERR_INVALID_OPERAND_SIZE, "OPERAND_SIZE"},
     {SCRIPT_ERR_INVALID_NUMBER_RANGE, "INVALID_NUMBER_RANGE"},
+    {SCRIPT_ERR_INVALID_NUMBER_RANGE_64_BIT, "INVALID_NUMBER_RANGE_64_BIT"},
     {SCRIPT_ERR_INVALID_SPLIT_RANGE, "SPLIT_RANGE"},
     {SCRIPT_ERR_INVALID_BIT_COUNT, "INVALID_BIT_COUNT"},
     {SCRIPT_ERR_VERIFY, "VERIFY"},
@@ -230,7 +231,7 @@ CMutableTransaction BuildCreditingTransaction(const CScript &scriptPubKey, CAmou
     txCredit.vin.resize(1);
     txCredit.vout.resize(1);
     txCredit.vin[0].prevout.SetNull();
-    txCredit.vin[0].scriptSig = CScript() << CScriptNum(0) << CScriptNum(0);
+    txCredit.vin[0].scriptSig = CScript() << CScriptNum::fromIntUnchecked(0) << CScriptNum::fromIntUnchecked(0);
     txCredit.vin[0].nSequence = CTxIn::SEQUENCE_FINAL;
     txCredit.vout[0].scriptPubKey = scriptPubKey;
     txCredit.vout[0].nValue = nValue;
@@ -283,7 +284,7 @@ void DoTest(const CScript &scriptPubKey,
         // Some flags are not purely-restrictive and thus we can't assume
         // anything about what happens when they are flipped. Keep them as-is.
         extra_flags &= ~(SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_ENABLE_REPLAY_PROTECTION |
-                         SCRIPT_ENABLE_SCHNORR_MULTISIG | SCRIPT_ENABLE_OP_REVERSEBYTES);
+                         SCRIPT_ENABLE_SCHNORR_MULTISIG | SCRIPT_ENABLE_OP_REVERSEBYTES | SCRIPT_64_BIT_INTEGERS);
         uint32_t combined_flags = expect ? (flags & ~extra_flags) : (flags | extra_flags);
         // Weed out invalid flag combinations.
         if (combined_flags & SCRIPT_VERIFY_CLEANSTACK)
@@ -1841,6 +1842,28 @@ BOOST_AUTO_TEST_CASE(script_build_2)
                         .Num(1)
                         .PushSigSchnorr(keys.key0)
                         .SetScriptError(SCRIPT_ERR_INVALID_BITFIELD_SIZE));
+    tests.push_back(
+        TestBuilder(CScript() << OP_1 << ToByteVector(keys.pubkey0C) << OP_DUP << OP_2DUP << OP_3DUP << OP_3DUP
+                              << OP_3DUP << OP_3DUP << OP_3DUP << ToByteVector(keys.pubkey1C) << 20 << OP_CHECKMULTISIG,
+            "CHECKMULTISIG 1-of-20 Schnorr, last key", newmultisigflags)
+            .Push("000008")
+            .PushSigSchnorr(keys.key1));
+    tests.push_back(
+        TestBuilder(CScript() << OP_1 << ToByteVector(keys.pubkey0C) << OP_DUP << OP_2DUP << OP_3DUP << OP_3DUP
+                              << OP_3DUP << OP_3DUP << OP_3DUP << ToByteVector(keys.pubkey1C) << 20 << OP_CHECKMULTISIG,
+            "CHECKMULTISIG 1-of-20 Schnorr, last key, wrong endianness", newmultisigflags)
+            .Push("080000")
+            .PushSigSchnorr(keys.key1)
+            .SetScriptError(SCRIPT_ERR_SIG_NULLFAIL));
+    tests.push_back(
+        TestBuilder(CScript() << OP_1 << ToByteVector(keys.pubkey0C) << OP_DUP << OP_2DUP << OP_3DUP << OP_3DUP
+                              << OP_3DUP << OP_3DUP << OP_3DUP << ToByteVector(keys.pubkey1C) << 20 << OP_CHECKMULTISIG,
+            "CHECKMULTISIG 1-of-20 Schnorr, last key, "
+            "truncating zeros not allowed",
+            newmultisigflags)
+            .Push("0800")
+            .PushSigSchnorr(keys.key1)
+            .SetScriptError(SCRIPT_ERR_INVALID_BITFIELD_SIZE));
     tests.push_back(
         TestBuilder(CScript() << OP_1 << ToByteVector(keys.pubkey0C) << OP_DUP << OP_2DUP << OP_3DUP << OP_3DUP
                               << OP_3DUP << OP_3DUP << OP_3DUP << ToByteVector(keys.pubkey1C) << 20 << OP_CHECKMULTISIG,

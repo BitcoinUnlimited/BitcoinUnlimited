@@ -599,7 +599,11 @@ BOOST_AUTO_TEST_CASE(type_conversion_test)
     CheckNum2BinError({{0xab, 0xcd, 0xef, 0x80}, {0x03}}, SCRIPT_ERR_IMPOSSIBLE_ENCODING);
 }
 
-static void CheckDivMod(const valtype &a, const valtype &b, const valtype &divExpected, const valtype &modExpected)
+static void CheckDivMod(const valtype &a,
+    const valtype &b,
+    const valtype &divExpected,
+    const valtype &modExpected,
+    size_t maxIntegerSize)
 {
     // Negative values for division
     CheckBinaryOp(a, b, OP_DIV, divExpected);
@@ -660,7 +664,8 @@ static void CheckDivMod(const valtype &a, const valtype &b, const valtype &divEx
 
     // Modulo identities
     // a % b % b = a % b
-    CheckTestResultForAllFlags({a, b}, CScript() << OP_MOD << CScriptNum(b, true).getint() << OP_MOD, {modExpected});
+    const int32_t bInt = CScriptNum(b, true, maxIntegerSize).getint32();
+    CheckTestResultForAllFlags({a, b}, CScript() << OP_MOD << bInt << OP_MOD, {modExpected});
 }
 
 static void CheckDivModError(const stacktype &original_stack, ScriptError expected_error)
@@ -669,7 +674,7 @@ static void CheckDivModError(const stacktype &original_stack, ScriptError expect
     CheckOpError(original_stack, OP_MOD, expected_error);
 }
 
-BOOST_AUTO_TEST_CASE(div_and_mod_opcode_tests)
+static void div_and_mod_opcode_helper(size_t maxIntegerSize)
 {
     CheckDivModError({}, SCRIPT_ERR_INVALID_STACK_OPERATION);
     CheckDivModError({{}}, SCRIPT_ERR_INVALID_STACK_OPERATION);
@@ -683,30 +688,41 @@ BOOST_AUTO_TEST_CASE(div_and_mod_opcode_tests)
     // 0x185377af % 0x85f41b01 = 0x00830bab
     // 408123311 / -99883777 = -4
     // 408123311 % -99883777 = 8588203
-    CheckDivMod({0xaf, 0x77, 0x53, 0x18}, {0x01, 0x1b, 0xf4, 0x85}, {0x84}, {0xab, 0x0b, 0x83, 0x00});
+    CheckDivMod({0xaf, 0x77, 0x53, 0x18}, {0x01, 0x1b, 0xf4, 0x85}, {0x84}, {0xab, 0x0b, 0x83, 0x00}, maxIntegerSize);
     // 0x185377af / 0x00001b01 = 0xe69d
     // 0x185377af % 0x00001b01 = 0x0212
     // 408123311 / 6913 = 59037
     // 408123311 % 6913 = 530
-    CheckDivMod({0xaf, 0x77, 0x53, 0x18}, {0x01, 0x1b}, {0x9d, 0xe6, 0x00}, {0x12, 0x02});
+    CheckDivMod({0xaf, 0x77, 0x53, 0x18}, {0x01, 0x1b}, {0x9d, 0xe6, 0x00}, {0x12, 0x02}, maxIntegerSize);
 
     // 15/4 = 3 (and negative operands)
-    CheckDivMod({0x0f}, {0x04}, {0x03}, {0x03});
+    CheckDivMod({0x0f}, {0x04}, {0x03}, {0x03}, maxIntegerSize);
     // 15000/4 = 3750 (and negative operands)
-    CheckDivMod({0x98, 0x3a}, {0x04}, {0xa6, 0x0e}, {});
+    CheckDivMod({0x98, 0x3a}, {0x04}, {0xa6, 0x0e}, {}, maxIntegerSize);
     // 15000/4000 = 3 (and negative operands)
-    CheckDivMod({0x98, 0x3a}, {0xa0, 0x0f}, {0x03}, {0xb8, 0x0b});
+    CheckDivMod({0x98, 0x3a}, {0xa0, 0x0f}, {0x03}, {0xb8, 0x0b}, maxIntegerSize);
     // 15000000/4000 = 3750 (and negative operands)
-    CheckDivMod({0xc0, 0xe1, 0xe4, 0x00}, {0xa0, 0x0f}, {0xa6, 0x0e}, {});
+    CheckDivMod({0xc0, 0xe1, 0xe4, 0x00}, {0xa0, 0x0f}, {0xa6, 0x0e}, {}, maxIntegerSize);
     // 15000000/4 = 3750000 (and negative operands)
-    CheckDivMod({0xc0, 0xe1, 0xe4, 0x00}, {0x04}, {0x70, 0x38, 0x39}, {});
+    CheckDivMod({0xc0, 0xe1, 0xe4, 0x00}, {0x04}, {0x70, 0x38, 0x39}, {}, maxIntegerSize);
 
     // 56488123 % 321 = 148 (and negative operands)
-    CheckDivMod({0xbb, 0xf0, 0x5d, 0x03}, {0x41, 0x01}, {0x67, 0xaf, 0x02}, {0x94, 0x00});
+    CheckDivMod({0xbb, 0xf0, 0x5d, 0x03}, {0x41, 0x01}, {0x67, 0xaf, 0x02}, {0x94, 0x00}, maxIntegerSize);
     // 56488123 % 3 = 1 (and negative operands)
-    CheckDivMod({0xbb, 0xf0, 0x5d, 0x03}, {0x03}, {0x3e, 0x50, 0x1f, 0x01}, {0x01});
+    CheckDivMod({0xbb, 0xf0, 0x5d, 0x03}, {0x03}, {0x3e, 0x50, 0x1f, 0x01}, {0x01}, maxIntegerSize);
     // 56488123 % 564881230 = 56488123 (and negative operands)
-    CheckDivMod({0xbb, 0xf0, 0x5d, 0x03}, {0x4e, 0x67, 0xab, 0x21}, {}, {0xbb, 0xf0, 0x5d, 0x03});
+    CheckDivMod({0xbb, 0xf0, 0x5d, 0x03}, {0x4e, 0x67, 0xab, 0x21}, {}, {0xbb, 0xf0, 0x5d, 0x03}, maxIntegerSize);
 }
+
+BOOST_AUTO_TEST_CASE(div_and_mod_opcode_tests_32_bit_integers)
+{
+    div_and_mod_opcode_helper(CScriptNum::MAXIMUM_ELEMENT_SIZE_32_BIT);
+}
+
+BOOST_AUTO_TEST_CASE(div_and_mod_opcode_tests_64_bit_integers)
+{
+    div_and_mod_opcode_helper(CScriptNum::MAXIMUM_ELEMENT_SIZE_64_BIT);
+}
+
 
 BOOST_AUTO_TEST_SUITE_END()
