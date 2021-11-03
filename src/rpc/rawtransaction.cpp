@@ -1196,6 +1196,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     // Fetch previous transactions (inputs):
     CCoinsView viewDummy;
     CCoinsViewCache view(&viewDummy);
+    std::vector<CTxOut> spentCoins; // Used during script evaluation
     {
         READLOCK(mempool.cs_txmempool);
         CCoinsViewCache &viewChain = *pcoinsTip;
@@ -1207,7 +1208,8 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             for (const CTxIn &txin : mergedTx.vin)
             {
                 // Load entries from viewChain into view; can fail.
-                view._AccessCoin(txin.prevout);
+                const Coin &c = view._AccessCoin(txin.prevout);
+                spentCoins.push_back(c.out);
             }
         }
 
@@ -1350,6 +1352,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     // Use CTransaction for the constant parts of the
     // transaction to avoid rehashing.
     const CTransaction txConst(mergedTx);
+    CTransactionRef txref = MakeTransactionRef(txConst);
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++)
     {
@@ -1377,9 +1380,10 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
                     txv.vin[i].scriptSig);
             }
             ScriptError serror = SCRIPT_ERR_OK;
+            MutableTransactionSignatureChecker tsc(&mergedTx, i, amount, SCRIPT_ENABLE_SIGHASH_FORKID);
+            ScriptImportedState sis(&tsc, txref, spentCoins, i, amount);
             if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_SIGHASH_FORKID,
-                    maxScriptOps.Value(),
-                    MutableTransactionSignatureChecker(&mergedTx, i, amount, SCRIPT_ENABLE_SIGHASH_FORKID), &serror))
+                    maxScriptOps.Value(), sis, &serror))
             {
                 TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
             }
@@ -1393,8 +1397,10 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
                     txin.scriptSig, txv.vin[i].scriptSig);
             }
             ScriptError serror = SCRIPT_ERR_OK;
-            if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, maxScriptOps.Value(),
-                    MutableTransactionSignatureChecker(&mergedTx, i, amount, 0), &serror))
+            MutableTransactionSignatureChecker tsc(&mergedTx, i, amount, 0);
+            ScriptImportedState sis(&tsc, txref, spentCoins, i, amount);
+            if (!VerifyScript(
+                    txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, maxScriptOps.Value(), sis, &serror))
             {
                 TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
             }

@@ -41,26 +41,24 @@ struct KeyData {
 
 static void CheckError(uint32_t flags, const stacktype &original_stack,
                        const CScript &script, ScriptError expected) {
-    BaseSignatureChecker sigchecker;
     ScriptError err = SCRIPT_ERR_OK;
     stacktype stack{original_stack};
-    bool r = EvalScript(stack, script, flags, MAXOPS, sigchecker, &err);
+    bool r = EvalScript(stack, script, flags, MAXOPS, fsis, &err);
     BOOST_CHECK(!r);
     BOOST_CHECK_EQUAL(err, expected);
     if (err != expected)
     {
         printf("err\n");
         stacktype stack2{original_stack};
-        r = EvalScript(stack2, script, flags, MAXOPS, sigchecker, &err);
+        r = EvalScript(stack2, script, flags, MAXOPS, fsis, &err);
     }
 }
 
 static void CheckPass(uint32_t flags, const stacktype &original_stack,
                       const CScript &script, const stacktype &expected) {
-    BaseSignatureChecker sigchecker;
     ScriptError err = SCRIPT_ERR_OK;
     stacktype stack{original_stack};
-    bool r = EvalScript(stack, script, flags, MAXOPS, sigchecker, &err);
+    bool r = EvalScript(stack, script, flags, MAXOPS, fsis, &err);
     BOOST_CHECK(r);
     BOOST_CHECK_EQUAL(err, SCRIPT_ERR_OK);
     BOOST_CHECK(stack == expected);

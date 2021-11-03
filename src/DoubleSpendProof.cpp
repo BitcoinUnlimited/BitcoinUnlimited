@@ -338,9 +338,17 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
         inScript << m_spender1.pushData.front();
         inScript << pubkey;
     }
+
+    // DS proofs won't work for complex scripts (non P2PKH), which is good because we aren't storing the tx associated
+    // with the Spender right now anyway.  So giving an empty tx to the verifier is ok,
+    // since OP_PUSH_TX_DATA won't be used.
+    CTransaction noTx;
+    CTransactionRef noTxRef = MakeTransactionRef(noTx);
+
     DSPSignatureChecker checker1(this, m_spender1, amount);
+    ScriptImportedState sis1(&checker1, noTxRef, std::vector<CTxOut>(), m_prevOutIndex, amount);
     ScriptError_t error;
-    if (!VerifyScript(inScript, prevOutScript, 0 /*flags*/, MAX_OPS_PER_SCRIPT, checker1, &error))
+    if (!VerifyScript(inScript, prevOutScript, 0 /*flags*/, MAX_OPS_PER_SCRIPT, sis1, &error))
     {
         LOG(DSPROOF, "DoubleSpendProof failed validating first tx due to %s\n", ScriptErrorString(error));
         return Invalid;
@@ -353,7 +361,8 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
         inScript << pubkey;
     }
     DSPSignatureChecker checker2(this, m_spender2, amount);
-    if (!VerifyScript(inScript, prevOutScript, 0 /*flags*/, MAX_OPS_PER_SCRIPT, checker2, &error))
+    ScriptImportedState sis2(&checker2, noTxRef, std::vector<CTxOut>(), m_prevOutIndex, amount);
+    if (!VerifyScript(inScript, prevOutScript, 0 /*flags*/, MAX_OPS_PER_SCRIPT, sis2, &error))
     {
         LOG(DSPROOF, "DoubleSpendProof failed validating second tx due to %s\n", ScriptErrorString(error));
         return Invalid;

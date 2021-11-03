@@ -48,8 +48,9 @@ bool CScriptCheck::operator()()
 {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
     CachingTransactionSignatureChecker checker(ptxTo, nIn, amount, nFlags, cacheStore);
+    ScriptImportedState sis(&checker, MakeTransactionRef(*ptxTo), spentCoins, nIn, amount);
     ScriptMachineResourceTracker smRes;
-    if (!VerifyScript(scriptSig, scriptPubKey, nFlags, maxOps, checker, &error, &smRes))
+    if (!VerifyScript(scriptSig, scriptPubKey, nFlags, maxOps, sis, &error, &smRes))
     {
         LOGA("Script Error: %s\n", ScriptErrorString(error));
         return false;

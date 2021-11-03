@@ -363,7 +363,7 @@ protected:
         CScript script_sig(scriptsig_raw.begin(), scriptsig_raw.end());
         CScript script_pubkey(scriptpubkey_raw.begin(), scriptpubkey_raw.end());
         const bool result =
-            VerifyScript(script_sig, script_pubkey, flags, MAX_OPS_PER_SCRIPT, BaseSignatureChecker(), &error, &stats);
+            VerifyScript(script_sig, script_pubkey, flags, MAX_OPS_PER_SCRIPT, ScriptImportedState(), &error, &stats);
 
         if (produce_output)
         {

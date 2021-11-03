@@ -85,11 +85,13 @@ static void VerifyScriptBench(benchmark::State &state)
     ssig = CScript() << sig1;
 
     // Benchmark.
+    MutableTransactionSignatureChecker tsc(&txSpend, 0, txCredit.vout[0].nValue);
+    ScriptImportedState sis(&tsc, MakeTransactionRef(txSpend), {txCredit.vout[0]}, 0, txCredit.vout[0].nValue);
     while (state.KeepRunning())
     {
         ScriptError err;
-        bool success = VerifyScript(txSpend.vin[0].scriptSig, txCredit.vout[0].scriptPubKey, flags, MAX_OPS_PER_SCRIPT,
-            MutableTransactionSignatureChecker(&txSpend, 0, txCredit.vout[0].nValue), &err);
+        bool success =
+            VerifyScript(txSpend.vin[0].scriptSig, txCredit.vout[0].scriptPubKey, flags, MAX_OPS_PER_SCRIPT, sis, &err);
         assert(err == SCRIPT_ERR_OK);
         assert(success);
     }
@@ -116,8 +118,7 @@ static void VerifyNestedIfScript(benchmark::State &state)
     {
         auto stack_copy = stack;
         ScriptError error;
-        BaseSignatureChecker sigchecker;
-        bool ret = EvalScript(stack_copy, script, 0, MAX_OPS_PER_SCRIPT, sigchecker, &error);
+        bool ret = EvalScript(stack_copy, script, 0, MAX_OPS_PER_SCRIPT, ScriptImportedState(), &error);
         assert(ret);
     }
 }

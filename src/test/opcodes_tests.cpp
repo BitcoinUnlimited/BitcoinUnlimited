@@ -26,13 +26,11 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack,
     const CScript &script,
     const stacktype &expected)
 {
-    BaseSignatureChecker sigchecker;
-
     for (uint32_t flags : flagset)
     {
         ScriptError err = SCRIPT_ERR_OK;
         stacktype stack{original_stack};
-        bool r = EvalScript(stack, script, flags, MAX_OPS_PER_SCRIPT, sigchecker, &err);
+        bool r = EvalScript(stack, script, flags, MAX_OPS_PER_SCRIPT, ScriptImportedState(), &err);
         BOOST_CHECK(r);
         BOOST_CHECK(stack == expected);
     }
@@ -44,10 +42,9 @@ static void CheckError(uint32_t flags,
     const CScript &script,
     ScriptError expected_error)
 {
-    BaseSignatureChecker sigchecker;
     ScriptError err = SCRIPT_ERR_OK;
     stacktype stack{original_stack};
-    bool r = EvalScript(stack, script, flags, MAX_OPS_PER_SCRIPT, sigchecker, &err);
+    bool r = EvalScript(stack, script, flags, MAX_OPS_PER_SCRIPT, ScriptImportedState(), &err);
     BOOST_CHECK(!r);
     BOOST_CHECK_EQUAL(err, expected_error);
 }

@@ -42,8 +42,11 @@ static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey, bool f
     txTo.vin[0].scriptSig = scriptSig;
     txTo.vout[0].nValue = 1;
 
-    return VerifyScript(scriptSig, scriptPubKey, fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE, MAX_OPS_PER_SCRIPT,
-        MutableTransactionSignatureChecker(&txTo, 0, txFrom.vout[0].nValue), &err);
+    MutableTransactionSignatureChecker tsc(&txTo, 0, txFrom.vout[0].nValue);
+    ScriptImportedState sis(&tsc, MakeTransactionRef(txTo), std::vector<CTxOut>(), 0, txFrom.vout[0].nValue);
+
+    return VerifyScript(
+        scriptSig, scriptPubKey, fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE, MAX_OPS_PER_SCRIPT, sis, &err);
 }
 
 
@@ -116,7 +119,7 @@ BOOST_AUTO_TEST_CASE(sign)
             txTo[i].vin[0].scriptSig = txTo[j].vin[0].scriptSig;
 
             const CTxOut &output = txFrom.vout[txTo[i].vin[0].prevout.n];
-            bool sigOK = CScriptCheck(nullptr, output.scriptPubKey, output.nValue, txTo[i], 0,
+            bool sigOK = CScriptCheck(nullptr, output.scriptPubKey, output.nValue, txTo[i], std::vector<CTxOut>(), 0,
                 SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID, MAX_OPS_PER_SCRIPT,
                 false)();
             if (i == j)

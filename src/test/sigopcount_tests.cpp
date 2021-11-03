@@ -102,8 +102,10 @@ ScriptError VerifyWithFlag(const CTransaction &output, const CMutableTransaction
 {
     ScriptError error;
     CTransaction inputi(input);
-    bool ret = VerifyScript(inputi.vin[0].scriptSig, output.vout[0].scriptPubKey, flags, MAX_OPS_PER_SCRIPT,
-        TransactionSignatureChecker(&inputi, 0, output.vout[0].nValue), &error);
+    TransactionSignatureChecker tsc(&inputi, 0, output.vout[0].nValue);
+    ScriptImportedState sis(&tsc, nullptr, std::vector<CTxOut>(), 0, output.vout[0].nValue);
+    bool ret =
+        VerifyScript(inputi.vin[0].scriptSig, output.vout[0].scriptPubKey, flags, MAX_OPS_PER_SCRIPT, sis, &error);
     BOOST_CHECK_EQUAL((ret == true), (error == SCRIPT_ERR_OK));
 
     return error;
@@ -296,10 +298,9 @@ unsigned int evalForSigChecks(const CScript &scriptSig,
     AlwaysGoodSignatureChecker sigChecker;
     ScriptError serror;
     ScriptMachineResourceTracker tracker;
-    if (checker == nullptr)
-        checker = &sigChecker;
+    ScriptImportedState sis(checker ? checker : &sigChecker, nullptr, std::vector<CTxOut>(), 0, 0);
 
-    bool worked = VerifyScript(scriptSig, scriptPubKey, flags, 0xffffffff, *checker, &serror, &tracker);
+    bool worked = VerifyScript(scriptSig, scriptPubKey, flags, 0xffffffff, sis, &serror, &tracker);
     if (!worked)
     {
         printf("unexpected verify failure: %d: %s\n", (int)serror, ScriptErrorString(serror));
