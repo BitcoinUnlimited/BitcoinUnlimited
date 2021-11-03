@@ -1055,7 +1055,13 @@ bool CheckInputs(const CTransactionRef &tx,
         // this optimisation would allow an invalid chain to be accepted.
         if (fScriptChecks)
         {
-            for (unsigned int i = 0; i < tx->vin.size(); i++)
+            std::vector<CTxOut> spendingCoins;
+            for (size_t i = 0; i < tx->vin.size(); i++)
+            {
+                CoinAccessor coin(inputs, tx->vin[i].prevout);
+                spendingCoins.push_back(coin->out);
+            }
+            for (size_t i = 0; i < tx->vin.size(); i++)
             {
                 const COutPoint &prevout = tx->vin[i].prevout;
                 const CScript &scriptSig = tx->vin[i].scriptSig;
@@ -1096,12 +1102,13 @@ bool CheckInputs(const CTransactionRef &tx,
                 // Verify signature
                 if (pvChecks)
                 {
-                    pvChecks->push_back(
-                        CScriptCheck(resourceTracker, scriptPubKey, amount, *tx, i, flags, maxOps, cacheStore));
+                    pvChecks->push_back(CScriptCheck(
+                        resourceTracker, scriptPubKey, amount, *tx, spendingCoins, i, flags, maxOps, cacheStore));
                 }
                 else
                 {
-                    CScriptCheck check(resourceTracker, scriptPubKey, amount, *tx, i, flags, maxOps, cacheStore);
+                    CScriptCheck check(
+                        resourceTracker, scriptPubKey, amount, *tx, spendingCoins, i, flags, maxOps, cacheStore);
                     if (!check())
                     {
                         ScriptError scriptError = check.GetScriptError();
@@ -1119,8 +1126,8 @@ bool CheckInputs(const CTransactionRef &tx,
                             // arguments; if so, don't trigger DoS protection to
                             // avoid splitting the network between upgraded and
                             // non-upgraded nodes.
-                            CScriptCheck check2(
-                                nullptr, scriptPubKey, amount, *tx, i, mandatoryFlags, maxOps, cacheStore);
+                            CScriptCheck check2(nullptr, scriptPubKey, amount, *tx, spendingCoins, i, mandatoryFlags,
+                                maxOps, cacheStore);
                             if (check2())
                             {
                                 if (debugger)
@@ -1147,7 +1154,7 @@ bool CheckInputs(const CTransactionRef &tx,
                         // Note that this will create strange error messages like
                         // "upgrade-conditional-script-failure (Opcode missing or not
                         // understood)".
-                        CScriptCheck check3(nullptr, scriptPubKey, amount, *tx, i,
+                        CScriptCheck check3(nullptr, scriptPubKey, amount, *tx, spendingCoins, i,
                             mandatoryFlags ^ SCRIPT_ENABLE_OP_REVERSEBYTES, maxOps, cacheStore);
                         if (check3())
                         {

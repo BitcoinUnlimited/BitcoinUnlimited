@@ -92,6 +92,7 @@ protected:
     CScript scriptPubKey;
     CAmount amount;
     const CTransaction *ptxTo;
+    const std::vector<CTxOut> spentCoins; // Must take a copy because this could be a stack item
     unsigned int nIn;
     unsigned int nFlags;
     unsigned int maxOps;
@@ -110,13 +111,14 @@ public:
         const CScript &scriptPubKeyIn,
         const CAmount amountIn,
         const CTransaction &txToIn,
+        const std::vector<CTxOut> &coins,
         unsigned int nInIn,
         unsigned int nFlagsIn,
         unsigned int maxOpsIn,
         bool cacheIn)
         : resourceTracker(resourceTrackerIn), scriptPubKey(scriptPubKeyIn), amount(amountIn), ptxTo(&txToIn),
-          nIn(nInIn), nFlags(nFlagsIn), maxOps(maxOpsIn), cacheStore(cacheIn), error(SCRIPT_ERR_UNKNOWN_ERROR),
-          sighashType(0)
+          spentCoins(coins), nIn(nInIn), nFlags(nFlagsIn), maxOps(maxOpsIn), cacheStore(cacheIn),
+          error(SCRIPT_ERR_UNKNOWN_ERROR), sighashType(0)
     {
     }
 

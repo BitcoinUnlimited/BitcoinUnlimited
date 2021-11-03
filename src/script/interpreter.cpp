@@ -28,17 +28,19 @@ extern uint256 SignatureHashLegacy(const CScript &scriptCode,
 
 using namespace std;
 
-typedef vector<unsigned char> valtype;
+typedef vector<uint8_t> valtype;
 
 bool CastToBool(const valtype &vch)
 {
-    for (unsigned int i = 0; i < vch.size(); i++)
+    for (size_t i = 0; i < vch.size(); i++)
     {
         if (vch[i] != 0)
         {
             // Can be negative zero
             if (i == vch.size() - 1 && vch[i] == 0x80)
+            {
                 return false;
+            }
             return true;
         }
     }
@@ -64,7 +66,9 @@ static uint32_t GetHashType(const valtype &vchSig)
 static inline void popstack(vector<valtype> &stack)
 {
     if (stack.empty())
+    {
         throw runtime_error("popstack(): stack empty");
+    }
     stack.pop_back();
 }
 
@@ -533,22 +537,26 @@ static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags)
     return false;
 }
 
-bool EvalScript(vector<vector<unsigned char> > &stack,
+bool EvalScript(vector<vector<uint8_t> > &stack,
     const CScript &script,
     unsigned int flags,
     unsigned int maxOps,
-    const BaseSignatureChecker &checker,
+    const ScriptImportedState &sis,
     ScriptError *serror,
-    unsigned char *sighashtype)
+    uint32_t *sighashtype)
 {
-    ScriptMachine sm(flags, checker, maxOps, 0xffffffff);
+    ScriptMachine sm(flags, sis, maxOps, 0xffffffff);
     sm.setStack(stack);
     bool result = sm.Eval(script);
     stack = sm.getStack();
     if (serror)
+    {
         *serror = sm.getError();
+    }
     if (sighashtype)
+    {
         *sighashtype = sm.getSigHashType();
+    }
     return result;
 }
 
@@ -569,9 +577,13 @@ std::tuple<bool, opcodetype, StackDataType, ScriptError> ScriptMachine::Peek()
     StackDataType vchPushValue;
     auto oldpc = pc;
     if (!script->GetOp(pc, opcode, vchPushValue))
+    {
         set_error(&err, SCRIPT_ERR_BAD_OPCODE);
+    }
     else if (vchPushValue.size() > MAX_SCRIPT_ELEMENT_SIZE)
+    {
         set_error(&err, SCRIPT_ERR_PUSH_SIZE);
+    }
     pc = oldpc;
     bool fExec = vfExec.all_true();
     return std::tuple<bool, opcodetype, StackDataType, ScriptError>(fExec, opcode, vchPushValue, err);
@@ -632,7 +644,8 @@ bool ScriptMachine::EndStep()
 bool ScriptMachine::Step()
 {
     bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
-    bool const integers64Bit = (flags & SCRIPT_64_BIT_INTEGERS) != 0;
+    const bool integers64Bit = (flags & SCRIPT_64_BIT_INTEGERS) != 0;
+    const bool nativeIntrospection = (flags & SCRIPT_NATIVE_INTROSPECTION) != 0;
 
     const size_t maxIntegerSize =
         integers64Bit ? CScriptNum::MAXIMUM_ELEMENT_SIZE_64_BIT : CScriptNum::MAXIMUM_ELEMENT_SIZE_32_BIT;
@@ -751,8 +764,10 @@ bool ScriptMachine::Step()
                         return set_error(serror, SCRIPT_ERR_NEGATIVE_LOCKTIME);
                     }
 
+                    if (!sis.checker)
+                        return set_error(serror, SCRIPT_ERR_DATA_REQUIRED);
                     // Actually compare the specified lock time with the transaction.
-                    if (!checker.CheckLockTime(nLockTime))
+                    if (!sis.checker->CheckLockTime(nLockTime))
                     {
                         return set_error(serror, SCRIPT_ERR_UNSATISFIED_LOCKTIME);
                     }
@@ -799,8 +814,10 @@ bool ScriptMachine::Step()
                     {
                         break;
                     }
+                    if (!sis.checker)
+                        return set_error(serror, SCRIPT_ERR_DATA_REQUIRED);
                     // Compare the specified sequence number with the input.
-                    if (!checker.CheckSequence(nSequence))
+                    if (!sis.checker->CheckSequence(nSequence))
                     {
                         return set_error(serror, SCRIPT_ERR_UNSATISFIED_LOCKTIME);
                     }
@@ -1528,7 +1545,9 @@ bool ScriptMachine::Step()
                         // serror is set
                         return false;
                     }
-                    bool fSuccess = checker.CheckSig(vchSig, vchPubKey, scriptCode);
+                    if (!sis.checker)
+                        return set_error(serror, SCRIPT_ERR_DATA_REQUIRED);
+                    bool fSuccess = sis.checker->CheckSig(vchSig, vchPubKey, scriptCode);
 
                     if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) && vchSig.size())
                     {
@@ -1668,8 +1687,10 @@ bool ScriptMachine::Step()
                                 return false;
                             }
 
+                            if (!sis.checker)
+                                return set_error(serror, SCRIPT_ERR_DATA_REQUIRED);
                             // Check signature
-                            if (!checker.CheckSig(vchSig, vchPubKey, scriptCode))
+                            if (!sis.checker->CheckSig(vchSig, vchPubKey, scriptCode))
                             {
                                 // This can fail if the signature is empty, which also is a NULLFAIL error as the
                                 // bitfield should have been null in this situation.
@@ -1730,8 +1751,10 @@ bool ScriptMachine::Step()
                                 return false;
                             }
 
+                            if (!sis.checker)
+                                return set_error(serror, SCRIPT_ERR_DATA_REQUIRED);
                             // Check signature
-                            bool fOk = checker.CheckSig(vchSig, vchPubKey, scriptCode);
+                            bool fOk = sis.checker->CheckSig(vchSig, vchPubKey, scriptCode);
 
                             if (fOk)
                             {
@@ -1801,7 +1824,9 @@ bool ScriptMachine::Step()
                         CSHA256().Write(vchMessage.data(), vchMessage.size()).Finalize(vchHash.data());
                         uint256 messagehash(vchHash);
                         CPubKey pubkey(vchPubKey);
-                        fSuccess = checker.VerifySignature(vchSig, pubkey, messagehash);
+                        if (!sis.checker)
+                            return set_error(serror, SCRIPT_ERR_DATA_REQUIRED);
+                        fSuccess = sis.checker->VerifySignature(vchSig, pubkey, messagehash);
                         stats.consensusSigCheckCount += 1; // 2020-05-15 sigchecks consensus rule
                     }
 
@@ -1894,6 +1919,219 @@ bool ScriptMachine::Step()
                     std::reverse(data.begin(), data.end());
                 }
                 break;
+
+                // gitlab.com/GeneralProtocols/research/chips/-/blob/master/CHIP-2021-02-Add-Native-Introspection-Opcodes.md
+                // (TODO: link to reference.cash)
+                // Transaction Introspection Opcodes: see https:
+
+                // Native Introspection opcodes (Nullary, consumes no items)
+                case OP_INPUTINDEX:
+                case OP_ACTIVEBYTECODE:
+                case OP_TXVERSION:
+                case OP_TXINPUTCOUNT:
+                case OP_TXOUTPUTCOUNT:
+                case OP_TXLOCKTIME:
+                {
+                    if (!nativeIntrospection)
+                    {
+                        return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
+                    }
+                    if (!sis.tx)
+                    {
+                        return set_error(serror, SCRIPT_ERR_DATA_REQUIRED);
+                    }
+                    switch (opcode)
+                    {
+                    case OP_INPUTINDEX:
+                    {
+                        const CScriptNum sn = CScriptNum::fromIntUnchecked(sis.nIn);
+                        stack.push_back(sn.getvch());
+                    }
+                    break;
+                    case OP_ACTIVEBYTECODE:
+                    {
+                        // Should be impossible for normal script machine use
+                        if (!script)
+                        {
+                            return set_error(serror, SCRIPT_ERR_DATA_REQUIRED);
+                        }
+                        if (script->size() > MAX_SCRIPT_ELEMENT_SIZE)
+                        {
+                            return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+                        }
+                        stack.emplace_back(pbegincodehash, script->end());
+                    }
+                    break;
+                    case OP_TXVERSION:
+                    {
+                        const CScriptNum sn = CScriptNum::fromIntUnchecked(sis.tx->nVersion);
+                        stack.push_back(sn.getvch());
+                    }
+                    break;
+                    case OP_TXINPUTCOUNT:
+                    {
+                        const CScriptNum sn = CScriptNum::fromIntUnchecked(sis.tx->vin.size());
+                        stack.push_back(sn.getvch());
+                    }
+                    break;
+                    case OP_TXOUTPUTCOUNT:
+                    {
+                        const CScriptNum sn = CScriptNum::fromIntUnchecked(sis.tx->vout.size());
+                        stack.push_back(sn.getvch());
+                    }
+                    break;
+                    case OP_TXLOCKTIME:
+                    {
+                        const CScriptNum sn = CScriptNum::fromIntUnchecked(sis.tx->nLockTime);
+                        stack.push_back(sn.getvch());
+                    }
+                    break;
+
+                    default:
+                        break;
+                    }
+                }
+                break; // end of Native Introspection opcodes (Nullary)
+
+                // Native Introspection opcodes (Unary, consume top item)
+                case OP_UTXOVALUE:
+                case OP_UTXOBYTECODE:
+                case OP_OUTPOINTTXHASH:
+                case OP_OUTPOINTINDEX:
+                case OP_INPUTBYTECODE:
+                case OP_INPUTSEQUENCENUMBER:
+                case OP_OUTPUTVALUE:
+                case OP_OUTPUTBYTECODE:
+                {
+                    if (!nativeIntrospection)
+                    {
+                        return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
+                    }
+                    if (!sis.tx)
+                    {
+                        return set_error(serror, SCRIPT_ERR_DATA_REQUIRED);
+                    }
+                    if (stack.size() < 1)
+                    {
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                    }
+                    const CScriptNum top(stacktop(-1), fRequireMinimal, maxIntegerSize);
+                    // consume top element
+                    popstack(stack);
+
+                    switch (opcode)
+                    {
+                    case OP_UTXOVALUE:
+                    case OP_UTXOBYTECODE:
+                    case OP_OUTPOINTTXHASH:
+                    case OP_OUTPOINTINDEX:
+                    case OP_INPUTBYTECODE:
+                    case OP_INPUTSEQUENCENUMBER:
+                    {
+                        int32_t idx = top.getint32();
+                        if (idx < 0 || size_t(idx) >= sis.tx->vin.size())
+                        {
+                            return set_error(serror, SCRIPT_ERR_INVALID_TX_INPUT_INDEX);
+                        }
+                        const CTxIn &input = sis.tx->vin[idx];
+                        switch (opcode)
+                        {
+                        case OP_UTXOVALUE:
+                        {
+                            const auto bn = CScriptNum::fromInt(sis.spentCoins[idx].nValue);
+                            // This is only false if nVaue is -2^63, should not be possible
+                            if (!bn)
+                            {
+                                return set_error(serror, SCRIPT_ERR_INVALID_NUMBER_RANGE_64_BIT);
+                            }
+                            stack.push_back(bn->getvch());
+                        }
+                        break;
+                        case OP_UTXOBYTECODE:
+                        {
+                            const auto &utxoScript = sis.spentCoins[idx].scriptPubKey;
+                            if (utxoScript.size() > MAX_SCRIPT_ELEMENT_SIZE)
+                            {
+                                return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+                            }
+                            stack.emplace_back(utxoScript.begin(), utxoScript.end());
+                        }
+                        break;
+                        case OP_OUTPOINTTXHASH:
+                        {
+                            const uint256 &hash = input.prevout.hash;
+                            stack.emplace_back(hash.begin(), hash.end());
+                        }
+                        break;
+                        case OP_OUTPOINTINDEX:
+                        {
+                            const CScriptNum sn = CScriptNum::fromIntUnchecked(input.prevout.n);
+                            stack.push_back(sn.getvch());
+                        }
+                        break;
+                        case OP_INPUTBYTECODE:
+                        {
+                            if (input.scriptSig.size() > MAX_SCRIPT_ELEMENT_SIZE)
+                            {
+                                return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+                            }
+                            stack.emplace_back(input.scriptSig.begin(), input.scriptSig.end());
+                        }
+                        break;
+                        case OP_INPUTSEQUENCENUMBER:
+                        {
+                            const CScriptNum sn = CScriptNum::fromIntUnchecked(input.nSequence);
+                            stack.push_back(sn.getvch());
+                        }
+                        break;
+
+                        default:
+                            break;
+                        }
+                    }
+                    break;
+
+                    case OP_OUTPUTVALUE:
+                    case OP_OUTPUTBYTECODE:
+                    {
+                        int32_t idx = top.getint32();
+                        if (idx < 0 || size_t(idx) >= sis.tx->vout.size())
+                        {
+                            return set_error(serror, SCRIPT_ERR_INVALID_TX_OUTPUT_INDEX);
+                        }
+                        const CTxOut &output = sis.tx->vout[idx];
+                        switch (opcode)
+                        {
+                        case OP_OUTPUTVALUE:
+                        {
+                            const auto bn = CScriptNum::fromInt(output.nValue);
+                            // This is only false if nVaue is -2^63, should not be possible
+                            if (!bn)
+                            {
+                                return set_error(serror, SCRIPT_ERR_INVALID_NUMBER_RANGE_64_BIT);
+                            }
+                            stack.push_back(bn->getvch());
+                        }
+                        break;
+                        case OP_OUTPUTBYTECODE:
+                        {
+                            if (output.scriptPubKey.size() > MAX_SCRIPT_ELEMENT_SIZE)
+                            {
+                                return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+                            }
+                            stack.emplace_back(output.scriptPubKey.begin(), output.scriptPubKey.end());
+                        }
+                        break;
+                        default:
+                            break;
+                        }
+                    }
+                    break;
+                    default:
+                        break;
+                    }
+                }
+                break; // end of Native Introspection opcodes (Unary)
 
                 //
                 // Conversion operations
@@ -2003,18 +2241,22 @@ bool BaseSignatureChecker::VerifySignature(const std::vector<uint8_t> &vchSig,
     }
 }
 
-bool TransactionSignatureChecker::CheckSig(const vector<unsigned char> &vchSigIn,
-    const vector<unsigned char> &vchPubKey,
+bool TransactionSignatureChecker::CheckSig(const vector<uint8_t> &vchSigIn,
+    const vector<uint8_t> &vchPubKey,
     const CScript &scriptCode) const
 {
     CPubKey pubkey(vchPubKey);
     if (!pubkey.IsValid())
+    {
         return false;
+    }
 
     // Hash type is one byte tacked on to the end of the signature
     vector<unsigned char> vchSig(vchSigIn);
     if (vchSig.empty())
+    {
         return false;
+    }
     int nHashType = vchSig.back();
     vchSig.pop_back();
 
@@ -2025,9 +2267,13 @@ bool TransactionSignatureChecker::CheckSig(const vector<unsigned char> &vchSigIn
     if (nFlags & SCRIPT_ENABLE_SIGHASH_FORKID)
     {
         if (nHashType & SIGHASH_FORKID)
+        {
             sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, &nHashed);
+        }
         else
+        {
             return false;
+        }
     }
     else
     {
@@ -2037,7 +2283,9 @@ bool TransactionSignatureChecker::CheckSig(const vector<unsigned char> &vchSigIn
     ++nSigops;
 
     if (!VerifySignature(vchSig, pubkey, sighash))
+    {
         return false;
+    }
 
     return true;
 }
@@ -2053,12 +2301,16 @@ bool TransactionSignatureChecker::CheckLockTime(const CScriptNum &nLockTime) con
     // the nLockTime in the transaction.
     if (!((txTo->nLockTime < LOCKTIME_THRESHOLD && nLockTime < LOCKTIME_THRESHOLD) ||
             (txTo->nLockTime >= LOCKTIME_THRESHOLD && nLockTime >= LOCKTIME_THRESHOLD)))
+    {
         return false;
+    }
 
     // Now that we know we're comparing apples-to-apples, the
     // comparison is a simple numeric one.
     if (nLockTime > (int64_t)txTo->nLockTime)
+    {
         return false;
+    }
 
     // Finally the nLockTime feature can be disabled and thus
     // CHECKLOCKTIMEVERIFY bypassed if every txin has been
@@ -2071,7 +2323,9 @@ bool TransactionSignatureChecker::CheckLockTime(const CScriptNum &nLockTime) con
     // inputs, but testing just this input minimizes the data
     // required to prove correct CHECKLOCKTIMEVERIFY execution.
     if (CTxIn::SEQUENCE_FINAL == txTo->vin[nIn].nSequence)
+    {
         return false;
+    }
 
     return true;
 }
@@ -2085,14 +2339,18 @@ bool TransactionSignatureChecker::CheckSequence(const CScriptNum &nSequence) con
     // Fail if the transaction's version number is not set high
     // enough to trigger BIP 68 rules.
     if (static_cast<uint32_t>(txTo->nVersion) < 2)
+    {
         return false;
+    }
 
     // Sequence numbers with their most significant bit set are not
     // consensus constrained. Testing that the transaction's sequence
     // number do not have this bit set prevents using this property
     // to get around a CHECKSEQUENCEVERIFY check.
     if (txToSequence & CTxIn::SEQUENCE_LOCKTIME_DISABLE_FLAG)
+    {
         return false;
+    }
 
     // Mask off any bits that do not have consensus-enforced meaning
     // before doing the integer comparisons
@@ -2125,7 +2383,9 @@ bool TransactionSignatureChecker::CheckSequence(const CScriptNum &nSequence) con
     // Now that we know we're comparing apples-to-apples, the
     // comparison is a simple numeric one.
     if (nSequenceMasked > txToSequenceMasked)
+    {
         return false;
+    }
 
     return true;
 }
@@ -2134,7 +2394,7 @@ bool VerifyScript(const CScript &scriptSig,
     const CScript &scriptPubKey,
     unsigned int flags,
     unsigned int maxOps,
-    const BaseSignatureChecker &checker,
+    const ScriptImportedState &sis,
     ScriptError *serror,
     ScriptMachineResourceTracker *tracker)
 {
@@ -2144,28 +2404,32 @@ bool VerifyScript(const CScript &scriptSig,
     {
         return set_error(serror, SCRIPT_ERR_SIG_PUSHONLY);
     }
-
-    vector<vector<unsigned char> > stackCopy;
-    ScriptMachine sm(flags, checker, maxOps, 0xffffffff);
+    vector<vector<uint8_t> > stackCopy;
+    ScriptMachine sm(flags, sis, maxOps, 0xffffffff);
     if (!sm.Eval(scriptSig))
     {
         if (serror)
+        {
             *serror = sm.getError();
+        }
         return false;
     }
     if (flags & SCRIPT_VERIFY_P2SH)
+    {
         stackCopy = sm.getStack();
-
+    }
     sm.ClearAltStack();
     if (!sm.Eval(scriptPubKey))
     {
         if (serror)
+        {
             *serror = sm.getError();
+        }
         return false;
     }
 
     {
-        const vector<vector<unsigned char> > &smStack = sm.getStack();
+        const vector<vector<uint8_t> > &smStack = sm.getStack();
         if (smStack.empty())
         {
             return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
@@ -2181,8 +2445,9 @@ bool VerifyScript(const CScript &scriptSig,
     {
         // scriptSig must be literals-only or validation fails
         if (!scriptSig.IsPushOnly())
+        {
             return set_error(serror, SCRIPT_ERR_SIG_PUSHONLY);
-
+        }
         // Restore stack.
         sm.setStack(stackCopy);
 
@@ -2207,12 +2472,14 @@ bool VerifyScript(const CScript &scriptSig,
         if (!sm.Eval(pubKey2))
         {
             if (serror)
+            {
                 *serror = sm.getError();
+            }
             return false;
         }
 
         {
-            const vector<vector<unsigned char> > &smStack = sm.getStack();
+            const vector<vector<uint8_t> > &smStack = sm.getStack();
             if (smStack.empty())
             {
                 return set_error(serror, SCRIPT_ERR_EVAL_FALSE);

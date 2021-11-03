@@ -85,7 +85,7 @@ public:
     unsigned char *end() { return &data[WIDTH]; }
     const unsigned char *begin() const { return &data[0]; }
     const unsigned char *end() const { return &data[WIDTH]; }
-    unsigned int size() const { return sizeof(data); }
+    size_t size() const { return sizeof(data); }
     void reverse()
     {
         uint8_t tmp[WIDTH];

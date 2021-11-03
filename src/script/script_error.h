@@ -83,6 +83,11 @@ typedef enum ScriptError_t
     /* Operands checks Bigger Integers (64-bit) */
     SCRIPT_ERR_INVALID_NUMBER_RANGE_64_BIT,
 
+    /* TX introspection */
+    SCRIPT_ERR_DATA_REQUIRED,
+    SCRIPT_ERR_INVALID_TX_INPUT_INDEX,
+    SCRIPT_ERR_INVALID_TX_OUTPUT_INDEX,
+
     SCRIPT_ERR_ERROR_COUNT
 } ScriptError;
 

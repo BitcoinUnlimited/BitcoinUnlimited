@@ -198,6 +198,56 @@ enum opcodetype
     // additional byte string operations
     OP_REVERSEBYTES = 0xbc,
 
+    // gitlab.com/GeneralProtocols/research/chips/-/blob/master/CHIP-2021-02-Add-Native-Introspection-Opcodes.md (TODO:
+    // link to reference.cash)
+    // Transaction Introspection Opcodes: see https:
+
+    // (192) Push the index of the input being evaluated to the stack as a Script Number
+    OP_INPUTINDEX = 0xc0,
+    // (193) Push the full bytecode currently being evaluated to the stack1. For Pay-to-Script-Hash (P2SH)
+    // evaluations, this is the redeem bytecode of the Unspent Transaction Output (UTXO) being spent; for all
+    // other evaluations, this is the locking bytecode of the UTXO being spent.  Note HASH160 this to get the
+    // hash stored in the P2SH constraint script
+    OP_ACTIVEBYTECODE = 0xc1,
+    // (194) Push the version of the current transaction to the stack as a Script Number
+    OP_TXVERSION = 0xc2,
+    // (195) Push the count of inputs in the current transaction to the stack as a Script Number.
+    OP_TXINPUTCOUNT = 0xc3,
+    // (196) Push the count of outputs in the current transaction to the stack as a Script Number.
+    OP_TXOUTPUTCOUNT = 0xc4,
+    // (197) Push the locktime of the current transaction to the stack as a Script Number.
+    OP_TXLOCKTIME = 0xc5,
+    // (198) Pop the top item from the stack as an input index (Script Number). Push the value (in satoshis)
+    // of the Unspent Transaction Output (UTXO) spent by that input to the stack as a Script Number.
+    OP_UTXOVALUE = 0xc6,
+    // (199) Pop the top item from the stack as an input index (Script Number). Push the full locking bytecode of the
+    // Unspent Transaction Output (UTXO) spent by that input to the stack.
+    OP_UTXOBYTECODE = 0xc7,
+    // (200) Pop the top item from the stack as an input index (Script Number). From that input, push the outpoint
+    // transaction hash - the hash of the transaction which created the Unspent Transaction Output (UTXO) which is being
+    // spent - to the stack in OP_HASH256 byte order1.
+    OP_OUTPOINTTXHASH = 0xc8,
+    // (201) Pop the top item from the stack as an input index (Script Number). From that input, push the outpoint index
+    // - the index of the output in the transaction which created the Unspent Transaction Output (UTXO) which is being
+    // spent - to the stack as a Script Number.
+    OP_OUTPOINTINDEX = 0xc9,
+    // (202) Pop the top item from the stack as an input index (Script Number). Push the unlocking bytecode of the input
+    // at that index to the stack.
+    OP_INPUTBYTECODE = 0xca,
+    // (203) Pop the top item from the stack as an input index (Script Number). Push the sequence number of the input at
+    // that index to the stack as a Script Number.
+    OP_INPUTSEQUENCENUMBER = 0xcb,
+    // (204) Pop the top item from the stack as an output index (Script Number). Push the value (in satoshis) of the
+    // output at that index to the stack as a Script Number.
+    OP_OUTPUTVALUE = 0xcc,
+    // (205) Pop the top item from the stack as an output index (Script Number). Push the locking bytecode of the output
+    // at that index to the stack.
+    OP_OUTPUTBYTECODE = 0xcd,
+    // 206
+    OP_NATIVE_INTROSPECTION_RESERVED1 = 0xce,
+    // 207
+    OP_NATIVE_INTROSPECTION_RESERVED2 = 0xcf,
+
     // The first op_code value after all defined opcodes
     FIRST_UNDEFINED_OP_VALUE,
 

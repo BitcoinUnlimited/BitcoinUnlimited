@@ -263,6 +263,52 @@ const char *GetOpName(opcodetype opcode)
     case OP_REVERSEBYTES:
         return "OP_REVERSEBYTES";
 
+    // gitlab.com/GeneralProtocols/research/chips/-/blob/master/CHIP-2021-02-Add-Native-Introspection-Opcodes.md (TODO:
+    // link to reference.cash)
+    // Transaction Introspection Opcodes: see https:
+    case OP_INPUTINDEX:
+        return "OP_INPUTINDEX";
+        break;
+    case OP_ACTIVEBYTECODE:
+        return "OP_ACTIVEBYTECODE";
+        break;
+    case OP_TXVERSION:
+        return "OP_TXVERSION";
+        break;
+    case OP_TXINPUTCOUNT:
+        return "OP_TXINPUTCOUNT";
+        break;
+    case OP_TXOUTPUTCOUNT:
+        return "OP_TXOUTPUTCOUNT";
+        break;
+    case OP_TXLOCKTIME:
+        return "OP_TXLOCKTIME";
+        break;
+    case OP_UTXOVALUE:
+        return "OP_UTXOVALUE";
+        break;
+    case OP_UTXOBYTECODE:
+        return "OP_UTXOBYTECODE";
+        break;
+    case OP_OUTPOINTTXHASH:
+        return "OP_OUTPOINTTXHASH";
+        break;
+    case OP_OUTPOINTINDEX:
+        return "OP_OUTPOINTINDEX";
+        break;
+    case OP_INPUTBYTECODE:
+        return "OP_INPUTBYTECODE";
+        break;
+    case OP_INPUTSEQUENCENUMBER:
+        return "OP_INPUTSEQUENCENUMBER";
+        break;
+    case OP_OUTPUTVALUE:
+        return "OP_OUTPUTVALUE";
+        break;
+    case OP_OUTPUTBYTECODE:
+        return "OP_OUTPUTBYTECODE";
+        break;
+
 
     case OP_INVALIDOPCODE:
         return "OP_INVALIDOPCODE";

@@ -43,20 +43,24 @@ struct KeyData
 
 static void CheckError(uint32_t flags, const stacktype &original_stack, const CScript &script, ScriptError expected)
 {
-    BaseSignatureChecker sigchecker;
     ScriptError err = SCRIPT_ERR_OK;
     stacktype stack{original_stack};
-    bool r = EvalScript(stack, script, flags, MAX_OPS_PER_SCRIPT, sigchecker, &err);
+    // Note that this returns false for CHECKSIG, whereas an empty ScriptImportedState() errors out with missing data
+    BaseSignatureChecker checker;
+    ScriptImportedState sis(&checker, MakeTransactionRef(), std::vector<CTxOut>(), 0, 0);
+    bool r = EvalScript(stack, script, flags, MAX_OPS_PER_SCRIPT, sis, &err);
     BOOST_CHECK(!r);
     BOOST_CHECK_EQUAL(err, expected);
 }
 
 static void CheckPass(uint32_t flags, const stacktype &original_stack, const CScript &script, const stacktype &expected)
 {
-    BaseSignatureChecker sigchecker;
     ScriptError err = SCRIPT_ERR_OK;
     stacktype stack{original_stack};
-    bool r = EvalScript(stack, script, flags, MAX_OPS_PER_SCRIPT, sigchecker, &err);
+    // Note that this returns false for CHECKSIG, whereas an empty ScriptImportedState() errors out with missing data
+    BaseSignatureChecker checker;
+    ScriptImportedState sis(&checker, MakeTransactionRef(), std::vector<CTxOut>(), 0, 0);
+    bool r = EvalScript(stack, script, flags, MAX_OPS_PER_SCRIPT, sis, &err);
     BOOST_CHECK(r);
     BOOST_CHECK_EQUAL(err, SCRIPT_ERR_OK);
     BOOST_CHECK(stack == expected);

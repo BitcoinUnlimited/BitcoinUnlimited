@@ -326,6 +326,7 @@ public:
     ScriptMachine *sm;
     std::shared_ptr<CTransaction> tx;
     std::shared_ptr<BaseSignatureChecker> checker;
+    std::shared_ptr<ScriptImportedState> sis;
     std::shared_ptr<CScript> script;
 
     ~ScriptMachineData()
@@ -343,8 +344,8 @@ public:
 SLAPI void *CreateNoContextScriptMachine(unsigned int flags)
 {
     ScriptMachineData *smd = new ScriptMachineData();
-    smd->checker = std::make_shared<BaseSignatureChecker>();
-    smd->sm = new ScriptMachine(flags, *smd->checker, 0xffffffff, 0xffffffff);
+    smd->sis = std::make_shared<ScriptImportedState>(nullptr, smd->tx, std::vector<CTxOut>(), 0, 0);
+    smd->sm = new ScriptMachine(flags, *smd->sis, 0xffffffff, 0xffffffff);
     return (void *)smd;
 }
 
@@ -355,29 +356,49 @@ SLAPI void *CreateScriptMachine(unsigned int flags,
     unsigned int inputIdx,
     int64_t inputAmount,
     unsigned char *txData,
-    int txbuflen)
+    int txbuflen,
+    unsigned char *coinData,
+    int coinbuflen)
 {
     checkSigInit();
 
     ScriptMachineData *smd = new ScriptMachineData();
-    smd->tx = std::make_shared<CTransaction>();
+    std::shared_ptr<CTransaction> txref = std::make_shared<CTransaction>();
+    std::vector<CTxOut> coins;
 
-    CDataStream ssData((char *)txData, (char *)txData + txbuflen, SER_NETWORK, PROTOCOL_VERSION);
-    try
     {
-        ssData >> *smd->tx;
-    }
-    catch (const std::exception &)
-    {
-        delete smd;
-        return 0;
+        CDataStream ssData((char *)txData, (char *)txData + txbuflen, SER_NETWORK, PROTOCOL_VERSION);
+        try
+        {
+            ssData >> *txref;
+        }
+        catch (const std::exception &)
+        {
+            delete smd;
+            return 0;
+        }
     }
 
+    {
+        CDataStream ssData((char *)coinData, (char *)coinData + coinbuflen, SER_NETWORK, PROTOCOL_VERSION);
+        try
+        {
+            ssData >> coins;
+        }
+        catch (const std::exception &)
+        {
+            delete smd;
+            return 0;
+        }
+    }
+
+    smd->tx = txref;
     // Its ok to get the bare tx pointer: the life of the CTransaction is the same as TransactionSignatureChecker
     smd->checker = std::make_shared<TransactionSignatureChecker>(smd->tx.get(), inputIdx, inputAmount, flags);
+    smd->sis = std::make_shared<ScriptImportedState>(&(*smd->checker), smd->tx, coins, inputIdx, inputAmount);
     // max ops and max sigchecks are set to the maximum value with the intention that the caller will check these if
     // needed because many uses of the script machine are for debugging and experimental scripts.
-    smd->sm = new ScriptMachine(flags, *smd->checker, 0xffffffff, 0xffffffff);
+    smd->sm = new ScriptMachine(flags, *smd->sis, 0xffffffff, 0xffffffff);
     return (void *)smd;
 }
 

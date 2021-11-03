@@ -541,8 +541,15 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
 
     bool fHashSingle = ((nHashType & ~(SIGHASH_ANYONECANPAY | SIGHASH_FORKID)) == SIGHASH_SINGLE);
 
+    std::vector<CTxOut> spendingCoins;
+    for (size_t i = 0; i < mergedTx.vin.size(); i++)
+    {
+        CoinAccessor coin(view, mergedTx.vin[i].prevout);
+        spendingCoins.push_back(coin->out); // If already spent coin->out will be -1 value and an empty script
+    }
+
     // Sign what we can:
-    for (unsigned int i = 0; i < mergedTx.vin.size(); i++)
+    for (size_t i = 0; i < mergedTx.vin.size(); i++)
     {
         CTxIn &txin = mergedTx.vin[i];
         CoinModifier coin(view, txin.prevout);
@@ -566,10 +573,13 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
                 txin.scriptSig, txv.vin[i].scriptSig);
         }
 
+        MutableTransactionSignatureChecker tsc(&mergedTx, i, amount);
+        ScriptImportedState sis(&tsc, MakeTransactionRef(mergedTx), spendingCoins, i, amount);
         // Nothing we are capable of signing can be more than the original 201 ops so using it is fine.
-        if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, MAX_OPS_PER_SCRIPT,
-                MutableTransactionSignatureChecker(&mergedTx, i, amount)))
+        if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, MAX_OPS_PER_SCRIPT, sis))
+        {
             fComplete = false;
+        }
     }
 
     if (fComplete)

@@ -11,6 +11,7 @@
 #include "net.h"
 #include "pubkey.h"
 #include "random.h"
+#include "script/interpreter.h"
 #include "txdb.h"
 #include "txmempool.h"
 
@@ -147,5 +148,15 @@ struct TestMemPoolEntryHelper
 std::ostream &operator<<(std::ostream &os, const uint256 &num);
 
 CService ipaddress(uint32_t i, uint32_t port);
+
+// Has a signature checker that returns false
+class FalseScriptImportedState : public ScriptImportedState
+{
+public:
+    BaseSignatureChecker checker;
+    FalseScriptImportedState() : ScriptImportedState(&checker, CTransactionRef(), std::vector<CTxOut>(), 0, 0) {}
+};
+
+extern FalseScriptImportedState fsis;
 
 #endif

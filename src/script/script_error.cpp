@@ -106,6 +106,12 @@ const char *ScriptErrorString(const ScriptError serror)
         return "Non-minimally encoded script number";
     case SCRIPT_ERR_SIGCHECKS_LIMIT_EXCEEDED:
         return "Validation resources exceeded (SigChecks)";
+    case SCRIPT_ERR_DATA_REQUIRED:
+        return "Introspection data missing";
+    case SCRIPT_ERR_INVALID_TX_INPUT_INDEX:
+        return "Specified transaction input index is out of range";
+    case SCRIPT_ERR_INVALID_TX_OUTPUT_INDEX:
+        return "Specified transaction output index is out of range";
     case SCRIPT_ERR_UNKNOWN_ERROR:
     case SCRIPT_ERR_ERROR_COUNT:
     default:
