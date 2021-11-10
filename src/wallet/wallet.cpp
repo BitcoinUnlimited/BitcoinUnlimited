@@ -2363,19 +2363,36 @@ bool OutputSortBIP69(const CTxOut &a, const CTxOut &b)
     return a.nValue < b.nValue;
 };
 
-// sort might be better than stable_sort for BIP69
 void sortInputsBIP69(std::vector<CTxIn> &vin, std::vector<unsigned int> &inputOrder)
 {
-    std::stable_sort(inputOrder.begin(), inputOrder.end(),
+    std::sort(inputOrder.begin(), inputOrder.end(),
         [&vin](unsigned int a, unsigned int b) { return InputSortBIP69(vin[a], vin[b]); });
 
-    std::stable_sort(vin.begin(), vin.end(), InputSortBIP69);
+    std::sort(vin.begin(), vin.end(), InputSortBIP69);
 }
 
-void sortOutputsBIP69(std::vector<CTxOut> &vout)
+void sortOutputsBIP69(std::vector<CTxOut> &vout, int *pChangePosRet)
 {
+    CTxOut savedChangeOut;
+    if (pChangePosRet)
+    {
+        // Caller has a change position they are keeping track of, so note which CTxOut it is.
+        savedChangeOut = vout[*pChangePosRet];
+    }
+
     // outputs do not need the sort changes tracked
-    std::stable_sort(vout.begin(), vout.end(), OutputSortBIP69);
+    std::sort(vout.begin(), vout.end(), OutputSortBIP69);
+
+    if (pChangePosRet)
+    {
+        // Figure out where the change position ended up after the sort. Note
+        // that std::find is ok here because all CTxOuts that compare equal
+        // are identical and indistinguishable.
+        const auto it = std::find(vout.begin(), vout.end(), savedChangeOut);
+        // ensure that std::sort did not drop the output
+        assert(it != vout.end());
+        *pChangePosRet = it - vout.begin();
+    }
 }
 
 bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
@@ -2678,7 +2695,9 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
                     if (sign && !involvesPublicLabel && useBIP69.Value() == true)
                     {
                         sortInputsBIP69(txNew.vin, inputOrder);
-                        sortOutputsBIP69(txNew.vout);
+                        sortOutputsBIP69(txNew.vout, nChangePosRet >= 0 && unsigned(nChangePosRet) < txNew.vout.size() ?
+                                                         &nChangePosRet :
+                                                         nullptr);
                     }
 
                     // Sign
