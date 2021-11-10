@@ -449,7 +449,7 @@ void UnlimitedSetup(void)
 
     // If the user configures it to 1, assume this means default
     if (miningForkTime.Value() == 1)
-        miningForkTime = Params().GetConsensus().nov2020ActivationTime;
+        miningForkTime = Params().GetConsensus().may2022ActivationTime;
 
     if (maxGeneratedBlock > excessiveBlockSize)
     {

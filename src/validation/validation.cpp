@@ -1965,6 +1965,12 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
         flags |= SCRIPT_ENABLE_OP_REVERSEBYTES;
     }
 
+    if (IsMay2022Enabled(consensusparams, pindex->pprev))
+    {
+        flags |= SCRIPT_64_BIT_INTEGERS;
+        flags |= SCRIPT_NATIVE_INTROSPECTION;
+    }
+
     return flags;
 }
 
