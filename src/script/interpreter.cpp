@@ -1649,8 +1649,8 @@ bool ScriptMachine::Step()
                             return set_error(serror, SCRIPT_ERR_INVALID_BIT_COUNT);
                         }
 
-                        const size_t idxBottomKey = idxTopKey + nKeysCount - 1;
-                        const size_t idxBottomSig = idxTopSig + nSigsCount - 1;
+                        const uint64_t idxBottomKey = idxTopKey + nKeysCount - 1;
+                        const uint64_t idxBottomSig = idxTopSig + nSigsCount - 1;
 
                         int32_t iKey = 0;
                         for (int64_t iSig = 0; iSig < nSigsCount; iSig++, iKey++)
@@ -1885,8 +1885,8 @@ bool ScriptMachine::Step()
                     const valtype &data = stacktop(-2);
 
                     // Make sure the split point is apropriate.
-                    uint64_t position = CScriptNum(stacktop(-1), fRequireMinimal, maxIntegerSize).getint64();
-                    if (position > data.size())
+                    int64_t position = CScriptNum(stacktop(-1), fRequireMinimal, maxIntegerSize).getint64();
+                    if (position < 0 || (uint64_t)position > data.size())
                     {
                         return set_error(serror, SCRIPT_ERR_INVALID_SPLIT_RANGE);
                     }
@@ -1955,11 +1955,13 @@ bool ScriptMachine::Step()
                         {
                             return set_error(serror, SCRIPT_ERR_DATA_REQUIRED);
                         }
-                        if (script->size() > MAX_SCRIPT_ELEMENT_SIZE)
+                        // Subset of script starting at the most recent codeseparator
+                        CScript scriptCode(pbegincodehash, pend);
+                        if (scriptCode.size() > MAX_SCRIPT_ELEMENT_SIZE)
                         {
                             return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
                         }
-                        stack.emplace_back(pbegincodehash, script->end());
+                        stack.emplace_back(scriptCode.begin(), scriptCode.end());
                     }
                     break;
                     case OP_TXVERSION:
