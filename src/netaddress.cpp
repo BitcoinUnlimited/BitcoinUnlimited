@@ -149,15 +149,6 @@ bool CNetAddr::IsLocal() const
 bool CNetAddr::IsMulticast() const { return (IsIPv4() && (GetByte(3) & 0xF0) == 0xE0) || (GetByte(15) == 0xFF); }
 bool CNetAddr::IsValid() const
 {
-    // Cleanup 3-byte shifted addresses caused by garbage in size field
-    // of addr messages from versions before 0.2.9 checksum.
-    // Two consecutive addr messages look like this:
-    // header20 vectorlen3 addr26 addr26 addr26 header20 vectorlen3 addr26 addr26 addr26...
-    // so if the first length field is garbled, it reads the second batch
-    // of addr misaligned by 3 bytes.
-    if (memcmp(ip, pchIPv4 + 3, sizeof(pchIPv4) - 3) == 0)
-        return false;
-
     // unspecified IPv6 address (::/128)
     unsigned char _ipNone[16] = {};
     if (memcmp(ip, _ipNone, 16) == 0)
