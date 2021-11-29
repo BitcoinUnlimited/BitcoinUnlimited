@@ -530,4 +530,97 @@ BOOST_FIXTURE_TEST_CASE(long_unconfirmed_chains, TestChain100Setup)
 
     dMinLimiterTxFee.Set(nTempFee);
 }
+
+BOOST_FIXTURE_TEST_CASE(limitfreerelay, TestChain100Setup)
+{
+    int64_t nStartTime = GetTime();
+    orphanpool.SetLastOrphanCheck(nStartTime);
+    SetMockTime(nStartTime); // Overrides future calls to GetTime()
+
+    mempool.clear();
+    pcoinsTip->Flush();
+
+    bool fSpent = false;
+
+    // Make sure coins are uncached when txns are not accepted into the memory pool
+    // and also verify they are uncached when orphans or txns are evicted from either the
+    // orphan cache or the transaction memory pool.
+    CScript scriptPubKey = CScript() << ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG;
+
+    unsigned int sighashType = SIGHASH_ALL;
+    if (IsUAHFforkActiveOnNextBlock(chainActive.Tip()->nHeight))
+        sighashType |= SIGHASH_FORKID;
+
+    std::vector<CMutableTransaction> spends;
+
+    // Try to add a transaction with that is considered free (the fee is less than the minrelaytxfee)
+    spends.resize(1);
+    spends[0].vin.resize(1);
+    spends[0].vin[0].prevout.hash = coinbaseTxns[0].GetHash();
+    spends[0].vin[0].prevout.n = 0;
+    spends[0].vout.resize(1);
+    spends[0].vout[0].nValue = coinbaseTxns[0].vout[0].nValue;
+    spends[0].vout[0].scriptPubKey = scriptPubKey;
+
+    // Sign:
+    std::vector<unsigned char> vchSig1;
+    uint256 hash1 = SignatureHash(scriptPubKey, spends[0], 0, sighashType, coinbaseTxns[0].vout[0].nValue, 0);
+    BOOST_CHECK(hash1 != SIGNATURE_HASH_ERROR);
+    BOOST_CHECK(coinbaseKey.SignECDSA(hash1, vchSig1));
+    vchSig1.push_back((unsigned char)sighashType);
+    spends[0].vin[0].scriptSig << vchSig1;
+
+    BOOST_CHECK(!ToMemPool(spends[0], "mempool min fee not met"));
+    BOOST_CHECK(!pcoinsTip->HaveCoinInCache(spends[0].vin[0].prevout, fSpent));
+    BOOST_CHECK(fSpent == false);
+
+    // Add a txn, which is not considered free (it has enough fee), to the memory pool.
+    // The coins should be present in the coins cache.
+    spends.resize(2);
+    spends[1].vin.resize(1);
+    spends[1].vin[0].prevout.hash = coinbaseTxns[0].GetHash();
+    spends[1].vin[0].prevout.n = 0;
+    spends[1].vout.resize(1);
+    spends[1].vout[0].nValue = 11 * CENT;
+    spends[1].vout[0].scriptPubKey = scriptPubKey;
+
+    // Sign:
+    std::vector<unsigned char> vchSig2;
+    uint256 hash2 = SignatureHash(scriptPubKey, spends[1], 0, sighashType, coinbaseTxns[0].vout[0].nValue, 0);
+    BOOST_CHECK(hash2 != SIGNATURE_HASH_ERROR);
+    BOOST_CHECK(coinbaseKey.SignECDSA(hash2, vchSig2));
+    vchSig2.push_back((unsigned char)sighashType);
+    spends[1].vin[0].scriptSig << vchSig2;
+
+    BOOST_CHECK(ToMemPool(spends[1]));
+    BOOST_CHECK(pcoinsTip->HaveCoinInCache(spends[1].vin[0].prevout, fSpent));
+    BOOST_CHECK(fSpent == false);
+
+    // Try to accept a free transaction into the mempool when free txns are allowed
+    mempool.clear();
+    pcoinsTip->Flush();
+
+    spends.resize(3);
+    spends[2].vin.resize(1);
+    spends[2].vin[0].prevout.hash = coinbaseTxns[0].GetHash();
+    spends[2].vin[0].prevout.n = 0;
+    spends[2].vout.resize(1);
+    spends[2].vout[0].nValue = coinbaseTxns[0].vout[0].nValue;
+    spends[2].vout[0].scriptPubKey = scriptPubKey;
+
+    // Sign:
+    std::vector<unsigned char> vchSig3;
+    uint256 hash3 = SignatureHash(scriptPubKey, spends[2], 0, sighashType, coinbaseTxns[0].vout[0].nValue, 0);
+    BOOST_CHECK(hash3 != SIGNATURE_HASH_ERROR);
+    BOOST_CHECK(coinbaseKey.SignECDSA(hash3, vchSig3));
+    vchSig3.push_back((unsigned char)sighashType);
+    spends[2].vin[0].scriptSig << vchSig3;
+
+    CValidationState state;
+    bool fMissingInputs = false;
+    bool ret = false;
+    bool fFreeTxnsAllowed = true;
+    ret = AcceptToMemoryPool(mempool, state, MakeTransactionRef(spends[2]), fFreeTxnsAllowed, &fMissingInputs, false);
+    BOOST_CHECK(ret == true);
+}
 BOOST_AUTO_TEST_SUITE_END()
