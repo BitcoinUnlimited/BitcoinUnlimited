@@ -1518,7 +1518,7 @@ void CWallet::ReacceptWalletTransactions()
     for (std::pair<const int64_t, CTransactionRef> &item : mapSorted)
     {
         CValidationState state;
-        AcceptToMemoryPool(mempool, state, item.second, false, nullptr, true, TransactionClass::DEFAULT);
+        AcceptToMemoryPool(mempool, state, item.second, AreFreeTxnsAllowed(), nullptr, true, TransactionClass::DEFAULT);
         SyncWithWallets(item.second, nullptr, -1);
     }
     CommitTxToMempool();
@@ -2861,7 +2861,7 @@ bool CWallet::CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey)
             */
 
             // Broadcast
-            if (!wtxNew.AcceptToMemoryPool(false))
+            if (!wtxNew.AcceptToMemoryPool(AreFreeTxnsAllowed()))
             {
                 // This must not fail. The transaction has already been signed and recorded.
                 LOGA("CommitTransaction(): Error: Transaction not valid\n");
