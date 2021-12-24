@@ -1056,6 +1056,7 @@ bool CheckInputs(const CTransactionRef &tx,
         if (fScriptChecks)
         {
             std::vector<CTxOut> spendingCoins;
+            spendingCoins.reserve(tx->vin.size());
             for (size_t i = 0; i < tx->vin.size(); i++)
             {
                 CoinAccessor coin(inputs, tx->vin[i].prevout);
@@ -3818,14 +3819,18 @@ bool ProcessNewBlock(CValidationState &state,
     LOG(THIN, "Processing new block %s from peer %s.\n", pblock->GetHash().ToString(),
         pfrom ? pfrom->GetLogName() : "myself");
     // Preliminary checks
-    if (!CheckBlockHeader(*pblock, state, true))
-    { // block header is bad
-        // demerit the sender
-        return error("%s: CheckBlockHeader FAILED", __func__);
-    }
+    // only call CheckBlockHeader before CheckBlock if expediting the block, otherwise
+    // ChecBlockHeader is called from within CheckBlock
     if (IsChainNearlySyncd() && !fImporting && !fReindex && connmgr->ExpeditedBlockNodes().size())
+    {
+        if (!CheckBlockHeader(*pblock, state, true))
+        {
+            // block header is bad
+            // demerit the sender
+            return error("%s: CheckBlockHeader FAILED", __func__);
+        }
         SendExpeditedBlock(*pblock, pfrom);
-
+    }
     bool checked = CheckBlock(*pblock, state);
     if (!checked)
     {

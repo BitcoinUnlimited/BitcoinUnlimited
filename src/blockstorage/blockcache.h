@@ -35,8 +35,22 @@ private:
     /** how much to increment or decrement the cache size at one time */
     const uint64_t nIncrement = 1;
 
+    int64_t nMaxMempool;
+
 public:
-    CBlockCache(){};
+    CBlockCache()
+    {
+        // set to 1- for until init is called
+        nMaxMempool = -1;
+    };
+
+    void Init()
+    {
+        if (nMaxMempool < 0)
+        {
+            nMaxMempool = GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
+        }
+    }
 
     /** Add a block to the block cache */
     void AddBlock(CBlockRef pblock, uint64_t nHeight);
