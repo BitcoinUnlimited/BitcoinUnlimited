@@ -92,7 +92,7 @@ protected:
     CScript scriptPubKey;
     CAmount amount;
     const CTransaction *ptxTo;
-    const std::vector<CTxOut> spentCoins; // Must take a copy because this could be a stack item
+    std::vector<CTxOut> spentCoins; // Must take a copy because this could be a stack item
     unsigned int nIn;
     unsigned int nFlags;
     unsigned int maxOps;
@@ -128,14 +128,15 @@ public:
     {
         std::swap(resourceTracker, check.resourceTracker);
         scriptPubKey.swap(check.scriptPubKey);
-        std::swap(ptxTo, check.ptxTo);
         std::swap(amount, check.amount);
+        std::swap(ptxTo, check.ptxTo);
+        std::swap(spentCoins, check.spentCoins);
         std::swap(nIn, check.nIn);
         std::swap(nFlags, check.nFlags);
+        std::swap(maxOps, check.maxOps);
         std::swap(cacheStore, check.cacheStore);
         std::swap(error, check.error);
         std::swap(sighashType, check.sighashType);
-        std::swap(maxOps, check.maxOps);
     }
 
     ScriptError GetScriptError() const { return error; }

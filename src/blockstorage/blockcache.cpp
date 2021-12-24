@@ -14,7 +14,6 @@ void CBlockCache::AddBlock(CBlockRef pblock, uint64_t nHeight)
     // Only add a new cache block if the cache size is large enough. Always limit the newer blocks
     // instead of trimming the older ones then we will never end up using any of the cache for processing blocks
     // but will instead just keep adding and removing blocks that never get used.
-    int64_t nMaxMempool = GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
     nMaxSizeCache = nMaxMempool - mempool.DynamicMemoryUsage();
     if (nMaxSizeCache < 0)
         nMaxSizeCache = nMaxMempool;

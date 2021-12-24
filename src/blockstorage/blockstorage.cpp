@@ -37,6 +37,7 @@ void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache,
     const int64_t &_nBlockDBCache,
     const int64_t &_nBlockUndoDBCache)
 {
+    blockcache.Init();
     if (BLOCK_DB_MODE == SEQUENTIAL_BLOCK_FILES) // BLOCK_DB_MODE 0
     {
         pblocktree = new CBlockTreeDB(_nBlockTreeDBCache, "blocks", false, fReindex);

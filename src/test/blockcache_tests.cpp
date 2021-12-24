@@ -68,6 +68,7 @@ BOOST_FIXTURE_TEST_SUITE(blockcache_tests, TestingSetup)
 BOOST_AUTO_TEST_CASE(cache_tests)
 {
     CBlockCache localcache;
+    localcache.Init();
     IsChainNearlySyncdSet(false);
 
     // Create a new block and add it to the block cache
