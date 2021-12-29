@@ -435,7 +435,7 @@ static bool Socks5(const std::string &strDest, int port, const ProxyCredentials 
     if (!InterruptibleRecv(pchRet1, 2, SOCKS5_RECV_TIMEOUT, hSocket))
     {
         CloseSocket(hSocket);
-        LOGA("Socks5() connect to %s:%d failed: InterruptibleRecv() timeout or other failure\n", strDest, port);
+        LOG(NET, "Socks5() connect to %s:%d failed: InterruptibleRecv() timeout or other failure\n", strDest, port);
         return false;
     }
     if (pchRet1[0] != SOCKSVersion::SOCKS5)
@@ -515,7 +515,7 @@ static bool Socks5(const std::string &strDest, int port, const ProxyCredentials 
     {
         // Failures to connect to a peer that are not proxy errors
         CloseSocket(hSocket);
-        LOGA("Socks5() connect to %s:%d failed: %s\n", strDest, port, Socks5ErrorString(pchRet2[1]));
+        LOG(NET, "Socks5() connect to %s:%d failed: %s\n", strDest, port, Socks5ErrorString(pchRet2[1]));
         return false;
     }
     if (pchRet2[2] != 0x00) // Reserved field must be 0
@@ -570,7 +570,7 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET &hSocketRe
     socklen_t len = sizeof(sockaddr);
     if (!addrConnect.GetSockAddr((struct sockaddr *)&sockaddr, &len))
     {
-        LOGA("Cannot connect to %s: unsupported network\n", addrConnect.ToString());
+        LOG(NET, "Cannot connect to %s: unsupported network\n", addrConnect.ToString());
         return false;
     }
 
@@ -615,7 +615,7 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET &hSocketRe
             }
             if (nRet == SOCKET_ERROR)
             {
-                LOGA("select() for %s failed: %s\n", addrConnect.ToString(), NetworkErrorString(WSAGetLastError()));
+                LOG(NET, "select() for %s failed: %s\n", addrConnect.ToString(), NetworkErrorString(WSAGetLastError()));
                 CloseSocket(hSocket);
                 return false;
             }
@@ -645,7 +645,7 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET &hSocketRe
         else
 #endif
         {
-            LOGA("connect() to %s failed: %s\n", addrConnect.ToString(), NetworkErrorString(WSAGetLastError()));
+            LOG(NET, "connect() to %s failed: %s\n", addrConnect.ToString(), NetworkErrorString(WSAGetLastError()));
             CloseSocket(hSocket);
             return false;
         }
