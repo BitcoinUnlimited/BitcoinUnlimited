@@ -91,7 +91,7 @@ public:
     double fpr = FILTER_FPR_MAX;
 
 public:
-    CGrapheneBlock(const CBlockRef pblock,
+    CGrapheneBlock(const ConstCBlockRef pblock,
         uint64_t nReceiverMemPoolTx,
         uint64_t nSenderMempoolPlusBlock,
         uint64_t _version,
@@ -496,7 +496,7 @@ public:
 };
 
 bool IsGrapheneBlockEnabled();
-void SendGrapheneBlock(CBlockRef pblock, CNode *pfrom, const CInv &inv, const CMemPoolInfo &mempoolinfo);
+void SendGrapheneBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv, const CMemPoolInfo &mempoolinfo);
 bool IsGrapheneBlockValid(CNode *pfrom, const CBlockHeader &header);
 bool HandleGrapheneBlockRequest(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams);
 bool HandleGrapheneBlockRecoveryResponse(CDataStream &vRecv, CNode *pfrom, const CChainParams &chainparams);

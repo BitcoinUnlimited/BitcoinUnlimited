@@ -437,7 +437,7 @@ bool CXRequestThinBlockTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
             return error(THIN, "get_xblocktx request too far from the tip");
 
         const Consensus::Params &consensusParams = Params().GetConsensus();
-        CBlockRef pblock = ReadBlockFromDisk(hdr, consensusParams);
+        ConstCBlockRef pblock = ReadBlockFromDisk(hdr, consensusParams);
         if (!pblock)
         {
             // We do not assign misbehavior for not being able to read a block from disk because we already
@@ -1303,7 +1303,7 @@ void CThinBlockData::FillThinBlockQuickStats(ThinBlockQuickStats &stats)
 }
 
 bool IsThinBlocksEnabled() { return GetBoolArg("-use-thinblocks", true); }
-void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
+void SendXThinBlock(const ConstCBlockRef pblock, CNode *pfrom, const CInv &inv)
 {
     if (inv.type == MSG_XTHINBLOCK)
     {

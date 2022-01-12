@@ -26,7 +26,7 @@ protected:
     void Shutdown();
 
     // CValidationInterface
-    void SyncTransaction(const CTransactionRef &ptx, const CBlock *pblock, int txIndex = -1) override;
+    void SyncTransaction(const CTransactionRef &ptx, const ConstCBlockRef pblock, int txIndex = -1) override;
     void SyncDoubleSpend(const CTransactionRef ptx) override;
     void UpdatedBlockTip(const CBlockIndex *pindex) override;
 

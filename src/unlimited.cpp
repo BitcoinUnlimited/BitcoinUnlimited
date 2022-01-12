@@ -591,12 +591,12 @@ int isChainExcessive(const CBlockIndex *blk, unsigned int goBack)
     return (recentExcessive && !oldExcessive);
 }
 
-bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nTx, uint64_t largestTx)
+bool CheckExcessive(const ConstCBlockRef pblock, uint64_t blockSize, uint64_t nTx, uint64_t largestTx)
 {
     if (blockSize > excessiveBlockSize)
     {
-        LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 "  :too many bytes\n", block.nVersion,
-            block.nTime, blockSize, nTx);
+        LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 "  :too many bytes\n", pblock->nVersion,
+            pblock->nTime, blockSize, nTx);
         return true;
     }
 
@@ -607,7 +607,7 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nTx, uint6
         {
             LOGA("Excessive block: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64
                  " largest TX:%d  :tx too large.  Expected less than: %d\n",
-                block.nVersion, block.nTime, blockSize, nTx, largestTx, maxTxSize.Value());
+                pblock->nVersion, pblock->nTime, blockSize, nTx, largestTx, maxTxSize.Value());
             return true;
         }
     }
@@ -616,12 +616,12 @@ bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nTx, uint6
         // Within a 1MB block transactions can be 1MB, so nothing to check WRT transaction size
     }
 
-    if ((block.nVersion >= 2) && (block.nTime >= 1364140153)) // BIP34 time and block version for use of GetHeight
+    if ((pblock->nVersion >= 2) && (pblock->nTime >= 1364140153)) // BIP34 time and block version for use of GetHeight
         LOGA("Acceptable block %s at %d: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " \n",
-            block.GetHash().ToString(), block.GetHeight(), block.nVersion, block.nTime, blockSize, nTx);
+            pblock->GetHash().ToString(), pblock->GetHeight(), pblock->nVersion, pblock->nTime, blockSize, nTx);
     else
-        LOGA("Acceptable block %s: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " \n", block.GetHash().ToString(),
-            block.nVersion, block.nTime, blockSize, nTx);
+        LOGA("Acceptable block %s: ver:%x time:%d size: %" PRIu64 " Tx:%" PRIu64 " \n", pblock->GetHash().ToString(),
+            pblock->nVersion, pblock->nTime, blockSize, nTx);
     return false;
 }
 
@@ -1779,13 +1779,17 @@ UniValue validateblocktemplate(const UniValue &params, bool fHelp)
     UniValue ret(UniValue::VARR);
     CBlock block;
     if (!DecodeHexBlk(block, params[0].get_str()))
+    {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
-
+    }
+    ConstCBlockRef pblock = std::make_shared<const CBlock>(block);
     CBlockIndex *pindexPrev = nullptr;
 
-    pindexPrev = LookupBlockIndex(block.hashPrevBlock);
+    pindexPrev = LookupBlockIndex(pblock->hashPrevBlock);
     if (!pindexPrev)
+    {
         throw runtime_error("invalid block: unknown parent");
+    }
 
     if (pindexPrev != chainActive.Tip())
     {
@@ -1800,12 +1804,12 @@ UniValue validateblocktemplate(const UniValue &params, bool fHelp)
     {
         LOCK(cs_main); // to freeze the state during block validity test
 
-        if (!TestBlockValidity(state, chainparams, block, pindexPrev, false, true))
+        if (!TestBlockValidity(state, chainparams, pblock, pindexPrev, false, true))
         {
             throw runtime_error(std::string("invalid block: ") + state.GetRejectReason());
         }
 
-        if (block.fExcessive)
+        if (pblock->fExcessive)
         {
             throw runtime_error("invalid block: excessive");
         }

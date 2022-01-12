@@ -143,6 +143,7 @@ BOOST_AUTO_TEST_CASE(buip005)
 BOOST_AUTO_TEST_CASE(excessiveChecks)
 {
     CBlock block;
+    ConstCBlockRef pblock = std::make_shared<const CBlock>(block);
 
     excessiveBlockSize = 16000000; // Ignore excessive block size when checking sigops and block effort
 
@@ -151,13 +152,13 @@ BOOST_AUTO_TEST_CASE(excessiveChecks)
 
     // Within a 1 MB block, a 1MB transaction is not excessive
     BOOST_CHECK_MESSAGE(
-        false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE, 1, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE),
+        false == CheckExcessive(pblock, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE, 1, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE),
         "improper max tx");
 
     // With a > 1 MB block, use the maxTxSize to determine
     BOOST_CHECK_MESSAGE(
-        false == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE + 1, 1, maxTxSize.Value()), "improper max tx");
-    BOOST_CHECK_MESSAGE(true == CheckExcessive(block, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE + 1, 1, maxTxSize.Value() + 1),
+        false == CheckExcessive(pblock, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE + 1, 1, maxTxSize.Value()), "improper max tx");
+    BOOST_CHECK_MESSAGE(true == CheckExcessive(pblock, BLOCKSTREAM_CORE_MAX_BLOCK_SIZE + 1, 1, maxTxSize.Value() + 1),
         "improper max tx");
 }
 

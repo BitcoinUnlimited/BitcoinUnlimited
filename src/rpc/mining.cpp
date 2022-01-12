@@ -128,7 +128,7 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript,
         if (!pblocktemplate.get())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
 
-        CBlock *pblock = &pblocktemplate->block;
+        CBlockRef pblock = pblocktemplate->block;
         IncrementExtraNonce(pblock, nExtraNonce);
         while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount &&
                !CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus()))
@@ -416,7 +416,7 @@ static UniValue MkFullMiningCandidateJson(const std::set<std::string> &setClient
     const unsigned int nTransactionsUpdatedLast)
 {
     bool may2020Enabled = IsMay2020Activated(Params().GetConsensus(), pindexPrev);
-    CBlock *pblock = &pblocktemplate->block; // pointer for convenience
+    CBlockRef pblock = pblocktemplate->block; // pointer for convenience
     UniValue aCaps(UniValue::VARR);
     aCaps.push_back("proposal");
 
@@ -601,7 +601,7 @@ UniValue mkblocktemplate(const UniValue &params,
             if (block.hashPrevBlock != pindexPrev->GetBlockHash())
                 return "inconclusive-not-best-prevblk";
             CValidationState state;
-            TestBlockValidity(state, Params(), block, pindexPrev, false, true);
+            TestBlockValidity(state, Params(), std::make_shared<const CBlock>(block), pindexPrev, false, true);
             return BIP22ValidationResult(state);
         }
 
@@ -761,10 +761,10 @@ UniValue mkblocktemplate(const UniValue &params,
         LOG(RPC, "skipped block template construction tx: %d, last: %d  now:%d start:%d",
             mempool.GetTransactionsUpdated(), nTransactionsUpdatedLast, GetTime(), nStart);
     }
-    CBlock *pblock = &pblocktemplate->block; // pointer for convenience
+    CBlockRef pblock = pblocktemplate->block; // pointer for convenience
 
     // Update nTime
-    UpdateTime(pblock, consensusParams, pindexPrev);
+    UpdateTime(pblock.get(), consensusParams, pindexPrev);
     pblock->nNonce = 0;
 
     if (pblockOut != nullptr)
@@ -918,7 +918,7 @@ UniValue SubmitBlock(CBlock &block)
     // that has more work than our block.
     PV->StopAllValidationThreads(block.GetBlockHeader().nBits);
 
-    bool fAccepted = ProcessNewBlock(state, Params(), nullptr, &block, true, nullptr, false);
+    bool fAccepted = ProcessNewBlock(state, Params(), nullptr, std::make_shared<CBlock>(block), true, nullptr, false);
     UnregisterValidationInterface(&sc);
     if (fBlockPresent)
     {

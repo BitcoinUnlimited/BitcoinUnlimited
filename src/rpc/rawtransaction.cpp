@@ -403,7 +403,7 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
     if (!pblockindex)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
 
-    CBlockRef pblock = ReadBlockFromDisk(pblockindex, Params().GetConsensus());
+    const ConstCBlockRef pblock = ReadBlockFromDisk(pblockindex, Params().GetConsensus());
     if (!pblock)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
 
@@ -581,7 +581,7 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
             // we are now past the tip
             break;
         }
-        CBlockRef pblock = ReadBlockFromDisk(pblockindex, Params().GetConsensus());
+        const ConstCBlockRef pblock = ReadBlockFromDisk(pblockindex, Params().GetConsensus());
         if (!pblock)
         {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
@@ -697,7 +697,7 @@ UniValue gettxoutproof(const UniValue &params, bool fHelp)
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Transaction index corrupt");
     }
 
-    CBlockRef pblock = ReadBlockFromDisk(pblockindex, Params().GetConsensus());
+    const ConstCBlockRef pblock = ReadBlockFromDisk(pblockindex, Params().GetConsensus());
     if (!pblock)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
 
@@ -762,7 +762,7 @@ UniValue gettxoutproofs(const UniValue &params, bool fHelp)
     if (!pblockindex)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
 
-    CBlockRef pblock = ReadBlockFromDisk(pblockindex, Params().GetConsensus());
+    const ConstCBlockRef pblock = ReadBlockFromDisk(pblockindex, Params().GetConsensus());
     if (!pblock)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
 

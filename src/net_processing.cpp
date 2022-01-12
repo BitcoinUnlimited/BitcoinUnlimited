@@ -192,7 +192,7 @@ void static ProcessGetData(CNode *pfrom, const Consensus::Params &consensusParam
                 if (fSend && mi->nStatus & BLOCK_HAVE_DATA)
                 {
                     // Send block from disk
-                    CBlockRef pblock = ReadBlockFromDisk(mi, consensusParams);
+                    const ConstCBlockRef pblock = ReadBlockFromDisk(mi, consensusParams);
                     if (!pblock)
                     {
                         // its possible that I know about it but haven't stored it yet
@@ -1558,7 +1558,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
             }
 
             const Consensus::Params &consensusParams = Params().GetConsensus();
-            CBlockRef pblock = ReadBlockFromDisk(invIndex, consensusParams);
+            const ConstCBlockRef pblock = ReadBlockFromDisk(invIndex, consensusParams);
             if (!pblock)
             {
                 // We don't have the block yet, although we know about it.
@@ -1594,7 +1594,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
         }
 
         const Consensus::Params &consensusParams = Params().GetConsensus();
-        CBlockRef pblock = ReadBlockFromDisk(invIndex, consensusParams);
+        const ConstCBlockRef pblock = ReadBlockFromDisk(invIndex, consensusParams);
         if (!pblock)
         {
             // We don't have the block yet, although we know about it.
@@ -1758,7 +1758,7 @@ bool ProcessMessage(CNode *pfrom, std::string strCommand, CDataStream &vRecv, in
     // Handle full blocks
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) // Ignore blocks received while importing
     {
-        CBlockRef pblock(new CBlock());
+        CBlockRef pblock = MakeBlockRef();
         {
             uint64_t nCheckBlockSize = vRecv.size();
             vRecv >> *pblock;

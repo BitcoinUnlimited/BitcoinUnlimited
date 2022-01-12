@@ -234,7 +234,7 @@ static bool rest_block(HTTPRequest *req, const std::string &strURIPart, bool sho
     if (IsBlockPruned(pblockindex))
         return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not available (pruned data)");
 
-    CBlockRef pblock = ReadBlockFromDisk(pblockindex, Params().GetConsensus());
+    const ConstCBlockRef pblock = ReadBlockFromDisk(pblockindex, Params().GetConsensus());
     if (!pblock)
         return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
 

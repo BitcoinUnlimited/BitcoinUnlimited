@@ -39,8 +39,8 @@ void InitializeBlockStorage(const int64_t &_nBlockTreeDBCache,
 void SyncStorage(const CChainParams &chainparams);
 
 /** Functions for disk access for blocks */
-CBlockRef ReadBlockFromDisk(const CBlockIndex *pindex, const Consensus::Params &consensusParams);
-bool WriteBlockToDisk(const CBlock &block,
+ConstCBlockRef ReadBlockFromDisk(const CBlockIndex *pindex, const Consensus::Params &consensusParams);
+bool WriteBlockToDisk(const ConstCBlockRef pblock,
     CDiskBlockPos &pos,
     const CMessageHeader::MessageStartChars &messageStart,
     const int *pHeight = nullptr);

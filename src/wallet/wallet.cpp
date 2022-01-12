@@ -881,7 +881,10 @@ bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fFromLoadWallet, CWalletD
  * If fUpdate is true, existing transactions will be updated.
  * @return true if the wallet was updated
  */
-bool CWallet::AddToWalletIfInvolvingMe(const CTransactionRef &ptx, const CBlock *pblock, bool fUpdate, int txIndex)
+bool CWallet::AddToWalletIfInvolvingMe(const CTransactionRef &ptx,
+    const ConstCBlockRef pblock,
+    bool fUpdate,
+    int txIndex)
 {
     AssertLockHeld(cs_wallet);
 
@@ -1067,7 +1070,7 @@ void CWallet::MarkConflicted(const uint256 &hashBlock, const uint256 &hashTx)
     }
 }
 
-void CWallet::SyncTransaction(const CTransactionRef &ptx, const CBlock *pblock, int txIdx)
+void CWallet::SyncTransaction(const CTransactionRef &ptx, const ConstCBlockRef pblock, int txIdx)
 {
     LOCK(cs_wallet);
 
@@ -1457,7 +1460,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate)
                                                                            dProgressStart) /
                                                                        (dProgressTip - dProgressStart) * 100))));
 
-            CBlockRef pblock = ReadBlockFromDisk(pindex, Params().GetConsensus());
+            const ConstCBlockRef pblock = ReadBlockFromDisk(pindex, Params().GetConsensus());
             if (!pblock)
             {
                 LOGA("ERROR: Could not read block from disk\n");
@@ -1467,7 +1470,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate)
             int txIdx = 0;
             for (const auto &ptx : pblock->vtx)
             {
-                if (AddToWalletIfInvolvingMe(ptx, pblock.get(), fUpdate, txIdx))
+                if (AddToWalletIfInvolvingMe(ptx, pblock, fUpdate, txIdx))
                     ret++;
                 txIdx++;
             }

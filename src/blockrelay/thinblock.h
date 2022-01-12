@@ -317,7 +317,7 @@ extern CThinBlockData thindata; // Singleton class
 
 
 bool IsThinBlocksEnabled();
-void SendXThinBlock(ConstCBlockRef pblock, CNode *pfrom, const CInv &inv);
+void SendXThinBlock(const ConstCBlockRef pblock, CNode *pfrom, const CInv &inv);
 void RequestThinBlock(CNode *pfrom, const uint256 &hash);
 bool IsThinBlockValid(CNode *pfrom,
     const std::vector<CTransaction> &vMissingTx,

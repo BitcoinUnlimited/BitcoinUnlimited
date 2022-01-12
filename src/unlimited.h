@@ -137,7 +137,7 @@ extern void UnlimitedAcceptBlock(const CBlock &block,
 extern void UnlimitedLogBlock(const CBlock &block, const std::string &hash, uint64_t receiptTime);
 
 // Check whether this block is bigger in some metric than we really want to accept
-extern bool CheckExcessive(const CBlock &block, uint64_t blockSize, uint64_t nTx, uint64_t largestTx);
+extern bool CheckExcessive(const ConstCBlockRef pblock, uint64_t blockSize, uint64_t nTx, uint64_t largestTx);
 
 // Check whether this chain qualifies as excessive.
 extern int isChainExcessive(const CBlockIndex *blk, unsigned int checkDepth = excessiveAcceptDepth);
