@@ -20,6 +20,8 @@ class CValidationInterface;
 class CValidationState;
 class uint256;
 
+typedef std::shared_ptr<const CBlock> ConstCBlockRef;
+
 // These functions dispatch to one or all registered wallets
 
 /** Register a wallet to receive updates from core */
@@ -30,13 +32,13 @@ void UnregisterValidationInterface(CValidationInterface *pwalletIn);
 void UnregisterAllValidationInterfaces();
 /** Push an updated transaction to all registered wallets, pass nullptr if block not known, pass -1 if txIdx not known
  */
-void SyncWithWallets(const CTransactionRef &ptx, const CBlock *pblock, int txIdx);
+void SyncWithWallets(const CTransactionRef &ptx, const ConstCBlockRef pblock, int txIdx);
 
 class CValidationInterface
 {
 protected:
     virtual void UpdatedBlockTip(const CBlockIndex *pindex) {}
-    virtual void SyncTransaction(const CTransactionRef &ptx, const CBlock *pblock, int txIdx) {}
+    virtual void SyncTransaction(const CTransactionRef &ptx, const ConstCBlockRef pblock, int txIdx) {}
     virtual void SyncDoubleSpend(const CTransactionRef ptx) {}
     virtual void SetBestChain(const CBlockLocator &locator) {}
     virtual void UpdatedTransaction(const uint256 &hash) {}
@@ -55,7 +57,7 @@ struct CMainSignals
     /** Notifies listeners of updated block chain tip */
     boost::signals2::signal<void(const CBlockIndex *)> UpdatedBlockTip;
     /** Notifies listeners of updated transaction data (transaction, and optionally the block it is found in. */
-    boost::signals2::signal<void(const CTransactionRef &, const CBlock *, int txIndex)> SyncTransaction;
+    boost::signals2::signal<void(const CTransactionRef &, const ConstCBlockRef, int txIndex)> SyncTransaction;
     /** Notifies listeners of a transaction in the mempool that was double spent. */
     boost::signals2::signal<void(const CTransactionRef)> SyncDoubleSpend;
     /** Notifies listeners of an updated transaction without new data (for now: a coinbase potentially becoming

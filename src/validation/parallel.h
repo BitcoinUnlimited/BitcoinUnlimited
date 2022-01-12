@@ -188,7 +188,7 @@ public:
     /** Initialize mapBlockValidationThreads */
     void InitThread(const boost::thread::id this_id,
         const CNode *pfrom,
-        CBlockRef pblock,
+        ConstCBlockRef pblock,
         const CInv &inv,
         uint64_t blockSize);
 
@@ -196,7 +196,7 @@ public:
     bool Initialize(const boost::thread::id this_id, const CBlockIndex *pindex, const bool fParallel);
 
     /** Cleanup PV threads after one has finished and won the validation race */
-    void Cleanup(const CBlock &block, CBlockIndex *pindex);
+    void Cleanup(const ConstCBlockRef pblock, CBlockIndex *pindex);
 
     /** Send quit to competing threads */
     void QuitCompetingThreads(const uint256 &prevBlockHash);
@@ -243,7 +243,7 @@ public:
     uint32_t MaxWorkChainBeingProcessed();
 
     /** Process a block message */
-    void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, CBlockRef pblock, const CInv &inv);
+    void HandleBlockMessage(CNode *pfrom, const std::string &strCommand, ConstCBlockRef pblock, const CInv &inv);
 
     /** The number of script validation threads */
     unsigned int ThreadCount() { return nThreads; }

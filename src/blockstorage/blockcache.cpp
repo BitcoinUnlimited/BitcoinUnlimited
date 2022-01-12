@@ -7,7 +7,7 @@
 #include "main.h"
 #include "requestManager.h"
 
-void CBlockCache::AddBlock(CBlockRef pblock, uint64_t nHeight)
+void CBlockCache::AddBlock(const ConstCBlockRef pblock, uint64_t nHeight)
 {
     WRITELOCK(cs_blockcache);
 
@@ -33,18 +33,15 @@ void CBlockCache::AddBlock(CBlockRef pblock, uint64_t nHeight)
         requester.BLOCK_DOWNLOAD_WINDOW.load());
 }
 
-CBlockRef CBlockCache::GetBlock(uint256 hash) const
+ConstCBlockRef CBlockCache::GetBlock(uint256 hash) const
 {
-    CBlockRef pblock = nullptr;
+    READLOCK(cs_blockcache);
+    auto iter = cache.find(hash);
+    if (iter != cache.end())
     {
-        READLOCK(cs_blockcache);
-        auto iter = cache.find(hash);
-        if (iter != cache.end())
-        {
-            return iter->second.pblock;
-        }
+        return iter->second.pblock;
     }
-    return pblock;
+    return nullptr;
 }
 
 void CBlockCache::EraseBlock(const uint256 &hash)
@@ -99,7 +96,7 @@ void CBlockCache::_TrimCache()
     }
 }
 
-void CBlockCache::_CalculateDownloadWindow(CBlockRef pblock)
+void CBlockCache::_CalculateDownloadWindow(const ConstCBlockRef pblock)
 {
     AssertWriteLockHeld(cs_blockcache);
 

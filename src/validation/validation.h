@@ -93,7 +93,7 @@ bool ReconsiderBlock(CValidationState &state, CBlockIndex *pindex);
  * held) */
 bool TestBlockValidity(CValidationState &state,
     const CChainParams &chainparams,
-    const CBlock &block,
+    const ConstCBlockRef pblock,
     CBlockIndex *pindexPrev,
     bool fCheckPOW = true,
     bool fCheckMerkleRoot = true);
@@ -113,13 +113,13 @@ bool InvalidateBlock(CValidationState &state, const Consensus::Params &consensus
 void InvalidChainFound(CBlockIndex *pindexNew);
 
 /** Context-dependent validity block checks */
-bool ContextualCheckBlock(const CBlock &block, CValidationState &state, CBlockIndex *pindexPrev);
+bool ContextualCheckBlock(ConstCBlockRef pblock, CValidationState &state, CBlockIndex *pindexPrev);
 
 // BU: returns the blocksize if block is valid.  Otherwise 0
-bool CheckBlock(const CBlock &block, CValidationState &state, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
+bool CheckBlock(ConstCBlockRef pblock, CValidationState &state, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
 
 /** Mark a block as having its data received and checked (up to BLOCK_VALID_TRANSACTIONS). */
-bool ReceivedBlockTransactions(const CBlock &block,
+bool ReceivedBlockTransactions(ConstCBlockRef pblock,
     CValidationState &state,
     CBlockIndex *pindexNew,
     const CDiskBlockPos &pos);
@@ -130,10 +130,10 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
  *  In case pfClean is provided, operation will try to be tolerant about errors, and *pfClean
  *  will be true if no problems were found. Otherwise, the return value will be false in case
  *  of problems. Note that in any case, coins may be modified. */
-DisconnectResult DisconnectBlock(const CBlock &block, const CBlockIndex *pindex, CCoinsViewCache &view);
+DisconnectResult DisconnectBlock(const ConstCBlockRef pblock, const CBlockIndex *pindex, CCoinsViewCache &view);
 
 /** Apply the effects of this block (with given index) on the UTXO set represented by coins */
-bool ConnectBlock(const CBlock &block,
+bool ConnectBlock(ConstCBlockRef pblock,
     CValidationState &state,
     CBlockIndex *pindex,
     CCoinsViewCache &view,
@@ -147,7 +147,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
 /** Find the best known block, and make it the tip of the block chain */
 bool ActivateBestChain(CValidationState &state,
     const CChainParams &chainparams,
-    const CBlock *pblock = nullptr,
+    ConstCBlockRef pblock = nullptr,
     bool fParallel = false,
     CNode *pfrom = nullptr);
 
@@ -172,7 +172,7 @@ bool ActivateBestChain(CValidationState &state,
 bool ProcessNewBlock(CValidationState &state,
     const CChainParams &chainparams,
     CNode *pfrom,
-    const CBlock *pblock,
+    ConstCBlockRef pblock,
     bool fForceProcessing,
     CDiskBlockPos *dbp,
     bool fParallel);

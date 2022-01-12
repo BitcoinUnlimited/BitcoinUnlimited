@@ -42,9 +42,11 @@ int32_t UtilMkBlockTmplVersionBits(int32_t version,
 
 struct CBlockTemplate
 {
-    CBlock block;
+    CBlockRef block;
     std::vector<CAmount> vTxFees;
     std::vector<int64_t> vTxSigOps;
+
+    CBlockTemplate() { block = MakeBlockRef(); }
 };
 
 
@@ -142,7 +144,7 @@ private:
 };
 
 /** Modify the extranonce in a block */
-void IncrementExtraNonce(CBlock *pblock, unsigned int &nExtraNonce);
+void IncrementExtraNonce(CBlockRef pblock, unsigned int &nExtraNonce);
 int64_t UpdateTime(CBlockHeader *pblock, const Consensus::Params &consensusParams, const CBlockIndex *pindexPrev);
 
 // TODO: There is no mining.h

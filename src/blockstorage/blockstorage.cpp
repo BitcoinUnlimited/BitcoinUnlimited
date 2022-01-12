@@ -168,22 +168,23 @@ void SyncStorage(const CChainParams &chainparams)
             CBlockIndex *index;
             if (item.second.GetBlockHash() == chainparams.GetConsensus().hashGenesisBlock)
             {
-                CBlock &block = const_cast<CBlock &>(chainparams.GenesisBlock());
+                CBlock genesis = chainparams.GenesisBlock();
+                const ConstCBlockRef pblock = std::make_shared<const CBlock>(genesis);
                 // Start new block file
-                unsigned int nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
+                unsigned int nBlockSize = ::GetSerializeSize(*pblock, SER_DISK, CLIENT_VERSION);
                 CDiskBlockPos blockPos;
-                if (!FindBlockPos(state, blockPos, nBlockSize + 8, 0, block.GetBlockTime(), false))
+                if (!FindBlockPos(state, blockPos, nBlockSize + 8, 0, pblock->GetBlockTime(), false))
                 {
                     LOGA("SyncStorage(): FindBlockPos failed");
                     assert(false);
                 }
-                if (!WriteBlockToDisk(block, blockPos, chainparams.MessageStart()))
+                if (!WriteBlockToDisk(pblock, blockPos, chainparams.MessageStart()))
                 {
                     LOGA("SyncStorage(): writing genesis block to disk failed");
                     assert(false);
                 }
-                CBlockIndex *pindex = AddToBlockIndex(block);
-                if (!ReceivedBlockTransactions(block, state, pindex, blockPos))
+                CBlockIndex *pindex = AddToBlockIndex(*pblock);
+                if (!ReceivedBlockTransactions(pblock, state, pindex, blockPos))
                 {
                     LOGA("SyncStorage(): genesis block not accepted");
                     assert(false);
@@ -337,23 +338,24 @@ void SyncStorage(const CChainParams &chainparams)
             CBlockIndex *index;
             if (item.second.GetBlockHash() == chainparams.GetConsensus().hashGenesisBlock)
             {
-                CBlock &block = const_cast<CBlock &>(chainparams.GenesisBlock());
+                CBlock genesis = chainparams.GenesisBlock();
+                const ConstCBlockRef pblock = std::make_shared<const CBlock>(genesis);
                 // Start new block file
-                unsigned int nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
+                unsigned int nBlockSize = ::GetSerializeSize(*pblock, SER_DISK, CLIENT_VERSION);
                 CDiskBlockPos blockPos;
                 CValidationState state;
-                if (!FindBlockPos(state, blockPos, nBlockSize + 8, 0, block.GetBlockTime(), false))
+                if (!FindBlockPos(state, blockPos, nBlockSize + 8, 0, pblock->GetBlockTime(), false))
                 {
                     LOGA("SyncStorage(): FindBlockPos failed");
                     assert(false);
                 }
-                if (!WriteBlockToDisk(block, blockPos, chainparams.MessageStart()))
+                if (!WriteBlockToDisk(pblock, blockPos, chainparams.MessageStart()))
                 {
                     LOGA("SyncStorage(): writing genesis block to disk failed");
                     assert(false);
                 }
-                CBlockIndex *pindex = AddToBlockIndex(block);
-                if (!ReceivedBlockTransactions(block, state, pindex, blockPos))
+                CBlockIndex *pindex = AddToBlockIndex(*pblock);
+                if (!ReceivedBlockTransactions(pblock, state, pindex, blockPos))
                 {
                     LOGA("SyncStorage(): genesis block not accepted");
                     assert(false);
@@ -460,25 +462,25 @@ void SyncStorage(const CChainParams &chainparams)
         delete pblockdbsync;
 }
 
-bool WriteBlockToDisk(const CBlock &block,
+bool WriteBlockToDisk(const ConstCBlockRef pblock,
     CDiskBlockPos &pos,
     const CMessageHeader::MessageStartChars &messageStart,
     const int *pHeight)
 {
     if (pHeight)
-        blockcache.AddBlock(MakeBlockRef(block), *pHeight);
+        blockcache.AddBlock(pblock, *pHeight);
 
     if (!pblockdb)
     {
-        return WriteBlockToDiskSequential(block, pos, messageStart);
+        return WriteBlockToDiskSequential(*pblock, pos, messageStart);
     }
-    return pblockdb->WriteBlock(block);
+    return pblockdb->WriteBlock(*pblock);
 }
 
-CBlockRef ReadBlockFromDisk(const CBlockIndex *pindex, const Consensus::Params &consensusParams)
+ConstCBlockRef ReadBlockFromDisk(const CBlockIndex *pindex, const Consensus::Params &consensusParams)
 {
     // First check the in memory cache
-    CBlockRef pblock = blockcache.GetBlock(pindex->GetBlockHash());
+    ConstCBlockRef pblock = blockcache.GetBlock(pindex->GetBlockHash());
     if (pblock)
     {
         LOG(THIN | GRAPHENE | CMPCT | BLK, "Retrieved block from memory cache: %s\n",

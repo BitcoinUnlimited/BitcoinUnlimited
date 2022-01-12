@@ -21,7 +21,7 @@
 std::shared_ptr<CBlock> PrepareBlock(const CScript &coinbase_scriptPubKey, const CChainParams &chainparams)
 {
     std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
-    auto block = std::make_shared<CBlock>(BlockAssembler(chainparams).CreateNewBlock(coinbase_scriptPubKey)->block);
+    CBlockRef block = BlockAssembler(chainparams).CreateNewBlock(coinbase_scriptPubKey)->block;
     block->nTime = chainActive.Tip()->GetMedianTimePast() + 1;
     block->hashMerkleRoot = BlockMerkleRoot(*block);
 
@@ -30,25 +30,22 @@ std::shared_ptr<CBlock> PrepareBlock(const CScript &coinbase_scriptPubKey, const
 
 static CTxIn MineBlock(const CScript &coinbase_scriptPubKey, const CChainParams &chainparams)
 {
-    auto block = PrepareBlock(coinbase_scriptPubKey, chainparams);
+    CBlockRef pblock = PrepareBlock(coinbase_scriptPubKey, chainparams);
 
-    block->nTime = chainActive.Tip()->GetMedianTimePast() + 1;
-    block->hashMerkleRoot = BlockMerkleRoot(*block);
-    while (!CheckProofOfWork(block->GetHash(), block->nBits, chainparams.GetConsensus()))
+    pblock->nTime = chainActive.Tip()->GetMedianTimePast() + 1;
+    pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
+    while (!CheckProofOfWork(pblock->GetHash(), pblock->nBits, chainparams.GetConsensus()))
     {
-        ++block->nNonce;
-        assert(block->nNonce);
+        ++pblock->nNonce;
+        assert(pblock->nNonce);
     }
 
     CValidationState state;
-    // need to copy the object corresponding by the shared_pointer because
-    // ProcessNewBlock accept plain pointer to a block not shared one.
-    auto aux_block = *block;
-    bool processed = ProcessNewBlock(state, chainparams, nullptr, &aux_block, true, nullptr, false);
+    bool processed = ProcessNewBlock(state, chainparams, nullptr, pblock, true, nullptr, false);
     assert(processed);
     assert(state.IsValid());
 
-    return CTxIn{block->vtx[0]->GetHash(), 0};
+    return CTxIn{pblock->vtx[0]->GetHash(), 0};
 }
 
 

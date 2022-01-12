@@ -41,10 +41,10 @@ bool read_block(const std::string &filename, CBlock &block)
     return true;
 }
 
-bool LockAndContextualCheckBlock(CBlock &block, CValidationState &state)
+bool LockAndContextualCheckBlock(const ConstCBlockRef pblock, CValidationState &state)
 {
     LOCK(cs_main);
-    return ContextualCheckBlock(block, state, nullptr);
+    return ContextualCheckBlock(pblock, state, nullptr);
 }
 
 BOOST_FIXTURE_TEST_SUITE(checkblock_tests, BasicTestingSetup) // BU harmonize suite name with filename
@@ -52,9 +52,10 @@ BOOST_FIXTURE_TEST_SUITE(checkblock_tests, BasicTestingSetup) // BU harmonize su
 
 BOOST_AUTO_TEST_CASE(TestBlock)
 {
-    CBlock testblock;
-    bool fReadBlock = read_block("testblock.dat", testblock);
+    CBlock block;
+    bool fReadBlock = read_block("testblock.dat", block);
     BOOST_CHECK_MESSAGE(fReadBlock, "Failed to read testblock.dat");
+    ConstCBlockRef testblock = std::make_shared<const CBlock>(block);
     if (fReadBlock)
     {
         CValidationState state;
@@ -64,14 +65,14 @@ BOOST_AUTO_TEST_CASE(TestBlock)
         BOOST_CHECK_MESSAGE(CheckBlock(testblock, state, false, false), "Basic CheckBlock failed");
         // NOTE: setting of fExcessive was moved from CheckBlock to ContextualCheckBlock in c64d44b7
         BOOST_CHECK_MESSAGE(LockAndContextualCheckBlock(testblock, state), "Contextual CheckBlock failed");
-        BOOST_CHECK_MESSAGE(!testblock.fExcessive,
+        BOOST_CHECK_MESSAGE(!testblock->fExcessive,
             "Block with size " << blockSize << " ought not to have been excessive when excessiveBlockSize is "
                                << excessiveBlockSize);
         excessiveBlockSize = blockSize - 1;
         BOOST_CHECK_MESSAGE(CheckBlock(testblock, state, false, false), "Basic CheckBlock failed");
         // NOTE: setting of fExcessive was moved from CheckBlock to ContextualCheckBlock in c64d44b7
         BOOST_CHECK_MESSAGE(LockAndContextualCheckBlock(testblock, state), "Contextual CheckBlock failed");
-        BOOST_CHECK_MESSAGE(testblock.fExcessive,
+        BOOST_CHECK_MESSAGE(testblock->fExcessive,
             "Block with size " << blockSize << " ought to have been excessive when excessiveBlockSize is "
                                << excessiveBlockSize);
         excessiveBlockSize = DEFAULT_EXCESSIVE_BLOCK_SIZE; // set it back to the default that other tests expect

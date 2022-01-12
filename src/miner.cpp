@@ -191,7 +191,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     // The constructed block template
     std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
 
-    CBlock *pblock = &pblocktemplate->block;
+    CBlockRef pblock = pblocktemplate->block;
 
     // Add dummy coinbase tx as first transaction
     pblock->vtx.emplace_back();
@@ -269,7 +269,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
 
         for (auto &txe : vtxe)
         {
-            pblocktemplate->block.vtx.push_back(txe->GetSharedTx());
+            pblocktemplate->block->vtx.push_back(txe->GetSharedTx());
             pblocktemplate->vTxFees.push_back(txe->GetFee());
             pblocktemplate->vTxSigOps.push_back(txe->GetSigOpCount());
         }
@@ -281,8 +281,8 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
 
         // Fill in header
         pblock->hashPrevBlock = pindexPrev->GetBlockHash();
-        UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
-        pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
+        UpdateTime(pblock.get(), chainparams.GetConsensus(), pindexPrev);
+        pblock->nBits = GetNextWorkRequired(pindexPrev, pblock.get(), chainparams.GetConsensus());
         pblock->nNonce = 0;
         if (!may2020Enabled)
             pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0], STANDARD_SCRIPT_VERIFY_FLAGS);
@@ -296,7 +296,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript &sc
     pblock->fXVal = xvalTweak.Value();
 
     CValidationState state;
-    if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
+    if (!TestBlockValidity(state, chainparams, pblock, pindexPrev, false, false))
     {
         throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s", __func__, FormatStateMessage(state)));
     }
@@ -669,7 +669,7 @@ void BlockAssembler::addPriorityTxs(std::vector<const CTxMemPoolEntry *> *vtxe)
     }
 }
 
-void IncrementExtraNonce(CBlock *pblock, unsigned int &nExtraNonce)
+void IncrementExtraNonce(CBlockRef pblock, unsigned int &nExtraNonce)
 {
     // Update nExtraNonce
     static uint256 hashPrevBlock;

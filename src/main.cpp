@@ -347,7 +347,7 @@ bool GetTransaction(const uint256 &hash,
 
     if (pindexSlow)
     {
-        CBlockRef pblock = ReadBlockFromDisk(pindexSlow, consensusParams);
+        const ConstCBlockRef pblock = ReadBlockFromDisk(pindexSlow, consensusParams);
         if (pblock)
         {
             bool ctor_enabled = pindexSlow->nHeight >= consensusParams.nov2018Height;
@@ -577,19 +577,19 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
                     dbp->nPos = nBlockPos;
                 blkdat.SetLimit(nBlockPos + nSize);
                 blkdat.SetPos(nBlockPos); // Unnecessary, I just got the position
-                CBlock block;
-                blkdat >> block;
+                CBlockRef pblock1 = MakeBlockRef();
+                blkdat >> *pblock1;
                 nRewind = blkdat.GetPos();
 
                 // detect out of order blocks, and store them for later
-                uint256 hash = block.GetHash();
+                const uint256 hash = pblock1->GetHash();
                 if (hash != chainparams.GetConsensus().hashGenesisBlock &&
-                    LookupBlockIndex(block.hashPrevBlock) == nullptr)
+                    LookupBlockIndex(pblock1->hashPrevBlock) == nullptr)
                 {
                     LOG(REINDEX, "%s: Out of order block %s (created %s), parent %s not known\n", __func__,
-                        hash.ToString(), FormatISO8601Date(block.nTime), block.hashPrevBlock.ToString());
+                        hash.ToString(), FormatISO8601Date(pblock1->nTime), pblock1->hashPrevBlock.ToString());
                     if (dbp)
-                        mapBlocksUnknownParent.insert(std::make_pair(block.hashPrevBlock, *dbp));
+                        mapBlocksUnknownParent.insert(std::make_pair(pblock1->hashPrevBlock, *dbp));
                     continue;
                 }
 
@@ -604,7 +604,7 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
                 if (pindex == nullptr || !fHaveData)
                 {
                     CValidationState state;
-                    if (ProcessNewBlock(state, chainparams, nullptr, &block, true, dbp, false))
+                    if (ProcessNewBlock(state, chainparams, nullptr, pblock1, true, dbp, false))
                         nLoaded++;
                     if (state.IsError())
                         break;
@@ -627,16 +627,17 @@ bool LoadExternalBlockFile(const CChainParams &chainparams, FILE *fileIn, CDiskB
                     while (range.first != range.second)
                     {
                         std::multimap<uint256, CDiskBlockPos>::iterator it = range.first;
-                        CBlockRef pblock = ReadBlockFromDiskSequential(it->second, chainparams.GetConsensus());
-                        if (pblock)
+                        const ConstCBlockRef pblock2 =
+                            ReadBlockFromDiskSequential(it->second, chainparams.GetConsensus());
+                        if (pblock2)
                         {
-                            LOGA("%s: Processing out of order child %s of %s\n", __func__, pblock->GetHash().ToString(),
-                                head.ToString());
+                            LOGA("%s: Processing out of order child %s of %s\n", __func__,
+                                pblock2->GetHash().ToString(), head.ToString());
                             CValidationState dummy;
-                            if (ProcessNewBlock(dummy, chainparams, nullptr, pblock.get(), true, &it->second, false))
+                            if (ProcessNewBlock(dummy, chainparams, nullptr, pblock2, true, &it->second, false))
                             {
                                 nLoaded++;
-                                queue.push_back(pblock->GetHash());
+                                queue.push_back(pblock2->GetHash());
                             }
                         }
                         range.first++;

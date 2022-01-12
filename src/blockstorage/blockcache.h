@@ -19,7 +19,7 @@ private:
     {
         int64_t nEntryTime;
         uint64_t nHeight;
-        CBlockRef pblock;
+        ConstCBlockRef pblock;
     };
 
     mutable CSharedCriticalSection cs_blockcache;
@@ -53,10 +53,10 @@ public:
     }
 
     /** Add a block to the block cache */
-    void AddBlock(CBlockRef pblock, uint64_t nHeight);
+    void AddBlock(const ConstCBlockRef pblock, uint64_t nHeight);
 
     /** Find and return a block from the block cache */
-    CBlockRef GetBlock(uint256 hash) const;
+    ConstCBlockRef GetBlock(uint256 hash) const;
 
     /** Remove a block from the block cache */
     void EraseBlock(const uint256 &hash);
@@ -64,7 +64,7 @@ public:
 
 private:
     /** Adjust the block download window */
-    void _CalculateDownloadWindow(CBlockRef pblock);
+    void _CalculateDownloadWindow(const ConstCBlockRef pblock);
 
     /** Trim the cache when necessary */
     void _TrimCache();

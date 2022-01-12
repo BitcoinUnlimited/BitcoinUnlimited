@@ -40,7 +40,7 @@ static void DeserializeAndCheckBlockTest(benchmark::State& state)
         assert(rewound);
 
         CValidationState _state;
-        assert(CheckBlock(block, _state));
+        assert(CheckBlock(std::make_shared<const CBlock>(block), _state));
     }
 }
 

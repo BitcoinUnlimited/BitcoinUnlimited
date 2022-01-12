@@ -34,7 +34,7 @@ static const unsigned int nScriptCheckQueues = 4;
 std::unique_ptr<CParallelValidation> PV;
 
 bool ShutdownRequested();
-static void HandleBlockMessageThread(CNodeRef noderef, const string strCommand, CBlockRef pblock, const CInv inv);
+static void HandleBlockMessageThread(CNodeRef noderef, const string strCommand, ConstCBlockRef pblock, const CInv inv);
 
 static void AddScriptCheckThreads(int i, CCheckQueue<CScriptCheck> *pqueue)
 {
@@ -191,7 +191,7 @@ bool CParallelValidation::Initialize(const boost::thread::id this_id, const CBlo
     return true;
 }
 
-void CParallelValidation::Cleanup(const CBlock &block, CBlockIndex *pindex)
+void CParallelValidation::Cleanup(const ConstCBlockRef pblock, CBlockIndex *pindex)
 {
     // Swap the block index sequence id's such that the winning block has the lowest id and all other id's
     // are still in their same order relative to each other.
@@ -205,7 +205,7 @@ void CParallelValidation::Cleanup(const CBlock &block, CBlockIndex *pindex)
         map<boost::thread::id, CHandleBlockMsgThreads>::iterator mi = mapBlockValidationThreads.begin();
         while (mi != mapBlockValidationThreads.end())
         {
-            if ((*mi).first != this_id && (*mi).second.hashPrevBlock == block.GetBlockHeader().hashPrevBlock)
+            if ((*mi).first != this_id && (*mi).second.hashPrevBlock == pblock->GetBlockHeader().hashPrevBlock)
                 vSequenceId.push_back(make_pair((*mi).second.nSequenceId, (*mi).second.hash));
             mi++;
         }
@@ -224,7 +224,7 @@ void CParallelValidation::Cleanup(const CBlock &block, CBlockIndex *pindex)
                     nId = 1;
                 if ((*riter).first == 0)
                     (*riter).first = 1;
-                LOG(PARALLEL, "swapping sequence id for block %s before %d after %d\n", block.GetHash().ToString(),
+                LOG(PARALLEL, "swapping sequence id for block %s before %d after %d\n", pblock->GetHash().ToString(),
                     pindex->nSequenceId, (*riter).first);
                 pindex->nSequenceId = (*riter).first;
                 (*riter).first = nId;
@@ -333,16 +333,14 @@ void CParallelValidation::WaitForAllValidationThreadsToStop()
 bool CParallelValidation::Enabled() { return GetBoolArg("-parallel", true); }
 void CParallelValidation::InitThread(const boost::thread::id this_id,
     const CNode *pfrom,
-    CBlockRef pblock,
+    ConstCBlockRef pblock,
     const CInv &inv,
     uint64_t blockSize)
 {
-    const CBlockHeader &header = pblock->GetBlockHeader();
-
     LOCK(cs_blockvalidationthread);
     assert(mapBlockValidationThreads.count(this_id) == 0); // this id should not already be in use
     mapBlockValidationThreads.emplace(
-        this_id, CHandleBlockMsgThreads{nullptr, inv.hash, header.hashPrevBlock, header.nBits, header.nBits, INT_MAX,
+        this_id, CHandleBlockMsgThreads{nullptr, inv.hash, pblock->hashPrevBlock, pblock->nBits, pblock->nBits, INT_MAX,
                      GetTimeMillis(), blockSize, false, pfrom->id, false, false});
 
     LOG(PARALLEL, "Launching validation for %s with number of block validation threads running: %d\n",
@@ -465,7 +463,10 @@ uint32_t CParallelValidation::MaxWorkChainBeingProcessed()
 //  HandleBlockMessage launches a HandleBlockMessageThread.  And HandleBlockMessageThread processes each block and
 //  updates the UTXO if the block has been accepted and the tip updated. We cleanup and release the semaphore after
 //  the thread has finished.
-void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strCommand, CBlockRef pblock, const CInv &inv)
+void CParallelValidation::HandleBlockMessage(CNode *pfrom,
+    const string &strCommand,
+    ConstCBlockRef pblock,
+    const CInv &inv)
 {
     // Indicate that the block was received and is about to be processed. Setting the processing flag
     // prevents us from re-requesting the block during the time it is being processed.
@@ -565,7 +566,7 @@ void CParallelValidation::HandleBlockMessage(CNode *pfrom, const string &strComm
     }
 }
 
-void HandleBlockMessageThread(CNodeRef noderef, const string strCommand, CBlockRef pblock, const CInv inv)
+void HandleBlockMessageThread(CNodeRef noderef, const string strCommand, ConstCBlockRef pblock, const CInv inv)
 {
     boost::thread::id this_id(boost::this_thread::get_id());
     CNode *pfrom = noderef.get();
@@ -591,13 +592,13 @@ void HandleBlockMessageThread(CNodeRef noderef, const string strCommand, CBlockR
         const CChainParams &chainparams = Params();
         if (PV->Enabled())
         {
-            ProcessNewBlock(state, chainparams, pfrom, pblock.get(), forceProcessing, nullptr, true);
+            ProcessNewBlock(state, chainparams, pfrom, pblock, forceProcessing, nullptr, true);
         }
         else
         {
             // locking cs_main here prevents any other thread from beginning starting a block validation.
             LOCK(cs_main);
-            ProcessNewBlock(state, chainparams, pfrom, pblock.get(), forceProcessing, nullptr, false);
+            ProcessNewBlock(state, chainparams, pfrom, pblock, forceProcessing, nullptr, false);
         }
 
         if (!state.IsInvalid())

@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE(cache_tests)
     localcache.AddBlock(pNewBlock1, 1);
 
     // Retrieve the block from the cache
-    CBlockRef pBlockCache1 = localcache.GetBlock(pNewBlock1->GetHash());
+    const ConstCBlockRef pBlockCache1 = localcache.GetBlock(pNewBlock1->GetHash());
     if (pBlockCache1)
         BOOST_CHECK(pBlockCache1->GetHash() == pNewBlock1->GetHash());
     else
@@ -90,7 +90,7 @@ BOOST_AUTO_TEST_CASE(cache_tests)
     localcache.AddBlock(pNewBlock3, 3);
 
     // Retrieve block2 from the cache
-    CBlockRef pBlockCache2 = localcache.GetBlock(pNewBlock2->GetHash());
+    const ConstCBlockRef pBlockCache2 = localcache.GetBlock(pNewBlock2->GetHash());
     if (pBlockCache2)
         BOOST_CHECK(pBlockCache2->GetHash() == pNewBlock2->GetHash());
     else
@@ -98,7 +98,7 @@ BOOST_AUTO_TEST_CASE(cache_tests)
             std::string("Could not find block2 in blockcache for ") + HexStr(pNewBlock2->GetHash()));
 
     // Retrieve block3 from the cache
-    CBlockRef pBlockCache3 = localcache.GetBlock(pNewBlock3->GetHash());
+    const ConstCBlockRef pBlockCache3 = localcache.GetBlock(pNewBlock3->GetHash());
     if (pBlockCache3)
         BOOST_CHECK(pBlockCache3->GetHash() == pNewBlock3->GetHash());
     else
@@ -112,7 +112,7 @@ BOOST_AUTO_TEST_CASE(cache_tests)
 
     // Erase a block and check it is erased
     localcache.EraseBlock(pNewBlock1->GetHash());
-    CBlockRef pBlockCacheNull = localcache.GetBlock(pNewBlock1->GetHash());
+    const ConstCBlockRef pBlockCacheNull = localcache.GetBlock(pNewBlock1->GetHash());
     BOOST_CHECK(pBlockCacheNull == nullptr);
 }
 
