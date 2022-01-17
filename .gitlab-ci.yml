@@ -59,7 +59,7 @@ check-formatting:
         - apt-get install -y wget gpg-agent
         - wget https://apt.llvm.org/llvm.sh
         - chmod +x llvm.sh
-        - ./llvm.sh 12
+        - ./llvm.sh 12 all #temp fix see https://github.com/llvm/llvm-project/issues/53234 for more info
         - apt-get install clang-format-12
         - ./autogen.sh
         - ./configure --with-incompatible-bdb --enable-glibc-back-compat --enable-reduce-exports
