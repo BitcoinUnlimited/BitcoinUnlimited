@@ -1146,8 +1146,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
 
         // BU - Xtreme Thinblocks Auto Mempool Limiter - end section
 
-        // BU: we calculate the recommended fee by looking at what's in the mempool.  This starts at 0 though for an
-        // empty mempool.  So set the minimum "absurd" fee to 10000 satoshies per byte.  If for some reason fees rise
+        // We calculate the recommended fee by looking at what's in the mempool.  This starts at 0 though for an
+        // empty mempool.  So set the minimum "absurd" fee to 100 satoshies per byte.  If for some reason fees rise
         // above that, you can specify up to 100x what other txns are paying in the mempool
         if (fRejectAbsurdFee && nFees > std::max((int64_t)100L * nSize, maxTxFee.Value()) * 100)
         {
@@ -1159,7 +1159,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             else
             {
                 return state.Invalid(false, REJECT_HIGHFEE, "absurdly-high-fee",
-                    strprintf("%d > %d", nFees, std::max((int64_t)1L, maxTxFee.Value()) * 10000));
+                    strprintf("%d > %d", nFees, std::max((int64_t)100L * nSize, maxTxFee.Value()) * 100));
             }
         }
 
