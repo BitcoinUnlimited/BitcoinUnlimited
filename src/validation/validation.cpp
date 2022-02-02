@@ -3345,17 +3345,6 @@ bool ConnectTip(CValidationState &state,
         LOG(BENCH, "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
     }
 
-    int64_t nTime4 = GetStopwatchMicros();
-    nTimeFlush += nTime4 - nTime3;
-    LOG(BENCH, "  - Flush: %.2fms [%.2fs]\n", (nTime4 - nTime3) * 0.001, nTimeFlush * 0.000001);
-    // Write the chain state to disk, if necessary, and only during IBD, reindex, or importing.
-    if (!IsChainNearlySyncd() || fReindex || fImporting)
-        if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
-            return false;
-    int64_t nTime5 = GetStopwatchMicros();
-    nTimeChainState += nTime5 - nTime4;
-    LOG(BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
-
     // Remove transactions from the mempool, both those confirmed in the block and conflicting transactions.
     //
     // If we are still in initial block download then skip this step and just clear the mempool. There should
@@ -3387,6 +3376,20 @@ bool ConnectTip(CValidationState &state,
     }
     // Update chainActive & related variables.
     UpdateTip(pindexNew);
+
+    // Write the chain state to disk, if necessary. This should be done after UpdateTip to make sure the tip
+    // is set correctly when calling FlushStateToDisk(); this is because the automatic -dbcache adjustment
+    // mechanism gets triggered when the chain is synced completely detemined by when the best header matches
+    // the chainActive tip.
+    int64_t nTime4 = GetStopwatchMicros();
+    nTimeFlush += nTime4 - nTime3;
+    LOG(BENCH, "  - Flush: %.2fms [%.2fs]\n", (nTime4 - nTime3) * 0.001, nTimeFlush * 0.000001);
+    if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
+        return false;
+    int64_t nTime5 = GetStopwatchMicros();
+    nTimeChainState += nTime5 - nTime4;
+    LOG(BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
+
     // Tell wallet about transactions that went from mempool
     // to conflicted:
     for (const auto &ptx : txConflicted)

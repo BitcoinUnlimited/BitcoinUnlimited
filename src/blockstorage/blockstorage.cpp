@@ -627,9 +627,10 @@ bool FlushStateToDiskInternal(CValidationState &state,
     size_t cacheSize = pcoinsTip->DynamicMemoryUsage();
     static int64_t nSizeAfterLastFlush = 0;
     // The cache is close to the limit. Try to flush and trim.
-    bool fCacheCritical =
-        ((mode == FLUSH_STATE_IF_NEEDED) && (cacheSize > (size_t)nCoinCacheMaxSize)) ||
-        (!GetArg("-dbcache", 0) && cacheSize - nSizeAfterLastFlush > (int64_t)nMaxCacheIncreaseSinceLastFlush);
+    bool fCacheCritical = cacheSize > (size_t)nCoinCacheMaxSize;
+    // Flush more frequently when we have auto cache sizing is being used
+    bool fAutoCache =
+        (!GetArg("-dbcache", 0) && (cacheSize - nSizeAfterLastFlush > (int64_t)nMaxCacheIncreaseSinceLastFlush));
     // It's been a while since we wrote the block index to disk. Do this frequently, so we don't need to redownload
     // after a crash.
     bool fPeriodicWrite =
@@ -639,7 +640,7 @@ bool FlushStateToDiskInternal(CValidationState &state,
     bool fPeriodicFlush =
         mode == FLUSH_STATE_PERIODIC && nNow > nLastFlush + (int64_t)DATABASE_FLUSH_INTERVAL * 1000000;
     // Combine all conditions that result in a full cache flush.
-    bool fDoFullFlush = (mode == FLUSH_STATE_ALWAYS) || fCacheCritical || fPeriodicFlush;
+    bool fDoFullFlush = (mode == FLUSH_STATE_ALWAYS) || fCacheCritical || fAutoCache || fPeriodicFlush;
     // Write blocks and block index to disk.
     if (fDoFullFlush || fPeriodicWrite || fFlushForPrune)
     {
