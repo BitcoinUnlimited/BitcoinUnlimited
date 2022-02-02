@@ -30,7 +30,7 @@ BITCOIN_CLI_NAME=bitcoin-cli
 BITCOIN_TX_NAME=bitcoin-tx
 
 dnl Unless the user specified ARFLAGS, force it to be cr
-AC_ARG_VAR(ARFLAGS, [Flags for the archiver, defaults to <cr> if not set])
+AC_ARG_VAR([ARFLAGS], [Flags for the archiver, defaults to <cr> if not set])
 if test "x${ARFLAGS+set}" != "xset"; then
   ARFLAGS="cr"
 fi
@@ -103,7 +103,7 @@ AC_PATH_PROG(HEXDUMP,hexdump)
 AC_PATH_TOOL(READELF, readelf)
 AC_PATH_TOOL(CPPFILT, c++filt)
 
-AC_ARG_VAR(PYTHONPATH, Augments the default search path for python module files)
+AC_ARG_VAR([PYTHONPATH], Augments the default search path for python module files)
 
 # Enable wallet
 AC_ARG_ENABLE([wallet],
