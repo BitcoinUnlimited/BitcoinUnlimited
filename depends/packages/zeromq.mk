@@ -21,7 +21,7 @@ define $(package)_config_cmds
 endef
 
 define $(package)_build_cmds
-  $(MAKE) src/libzmq.la
+  $(MAKE) -j$(JOBS) src/libzmq.la
 endef
 
 define $(package)_stage_cmds

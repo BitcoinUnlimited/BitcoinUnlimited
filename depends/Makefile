@@ -17,6 +17,7 @@ BASEDIR = $(CURDIR)
 HASH_LENGTH:=11
 DOWNLOAD_CONNECT_TIMEOUT:=10
 DOWNLOAD_RETRIES:=3
+JOBS ?= $(shell echo $$(($(shell nproc 2> /dev/null || sysctl -n hw.ncpu 2> /dev/null || echo 0) + 1)))
 
 host:=$(BUILD)
 ifneq ($(HOST),)

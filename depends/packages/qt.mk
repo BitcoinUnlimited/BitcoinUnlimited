@@ -176,10 +176,10 @@ define $(package)_config_cmds
 endef
 
 define $(package)_build_cmds
-  $(MAKE) -C src $(addprefix sub-,$($(package)_qt_libs)) && \
-  $(MAKE) -C ../qttools/src/linguist/lrelease && \
-  $(MAKE) -C ../qttools/src/linguist/lupdate && \
-  $(MAKE) -C ../qttranslations
+  $(MAKE) -j$(JOBS) -C src $(addprefix sub-,$($(package)_qt_libs)) && \
+  $(MAKE) -j$(JOBS) -C ../qttools/src/linguist/lrelease && \
+  $(MAKE) -j$(JOBS) -C ../qttools/src/linguist/lupdate && \
+  $(MAKE) -j$(JOBS) -C ../qttranslations
 endef
 
 define $(package)_stage_cmds
