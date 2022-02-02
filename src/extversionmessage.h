@@ -92,7 +92,7 @@ public:
     void set_u64c(const uint64_t key, const uint64_t val);
 
     template <typename Stream>
-    const auto CheckSize(Stream &s)
+    auto CheckSize(Stream &s)
     {
         if (s.size() > MAX_EXTVERSION_MAP_SIZE)
         {
