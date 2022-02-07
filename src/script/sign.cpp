@@ -19,8 +19,10 @@ TransactionSignatureCreator::TransactionSignatureCreator(const CKeyStore *keysto
     const CTransaction *txToIn,
     unsigned int nInIn,
     const CAmount &amountIn,
-    uint32_t nHashTypeIn)
+    uint32_t nHashTypeIn,
+    uint32_t nSigTypeIn)
     : BaseSignatureCreator(keystoreIn), txTo(txToIn), nIn(nInIn), amount(amountIn), nHashType(nHashTypeIn),
+      nSigType(nSigTypeIn),
       checker(txTo, nIn, amount, (nHashTypeIn & SIGHASH_FORKID) ? SCRIPT_ENABLE_SIGHASH_FORKID : 0)
 {
 }
@@ -36,8 +38,23 @@ bool TransactionSignatureCreator::CreateSig(std::vector<uint8_t> &vchSig,
     }
 
     uint256 hash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount);
-    if (!key.SignECDSA(hash, vchSig))
+    if (nSigType == SIGTYPE_ECDSA)
     {
+        if (!key.SignECDSA(hash, vchSig))
+        {
+            return false;
+        }
+    }
+    else if (nSigType == SIGTYPE_SCHNORR)
+    {
+        if (!key.SignSchnorr(hash, vchSig))
+        {
+            return false;
+        }
+    }
+    else
+    {
+        LOGA("CreateSig(): Invalid signature type requested \n");
         return false;
     }
     vchSig.push_back((uint8_t)nHashType);
@@ -176,13 +193,14 @@ bool SignSignature(const CKeyStore &keystore,
     CMutableTransaction &txTo,
     unsigned int nIn,
     const CAmount &amount,
-    uint32_t nHashType)
+    uint32_t nHashType,
+    uint32_t nSigType)
 {
     assert(nIn < txTo.vin.size());
     CTxIn &txin = txTo.vin[nIn];
 
     CTransaction txToConst(txTo);
-    TransactionSignatureCreator creator(&keystore, &txToConst, nIn, amount, nHashType);
+    TransactionSignatureCreator creator(&keystore, &txToConst, nIn, amount, nHashType, nSigType);
 
     return ProduceSignature(creator, fromPubKey, txin.scriptSig);
 }
@@ -191,7 +209,8 @@ bool SignSignature(const CKeyStore &keystore,
     const CTransaction &txFrom,
     CMutableTransaction &txTo,
     unsigned int nIn,
-    uint32_t nHashType)
+    uint32_t nHashType,
+    uint32_t nSigType)
 {
     assert(nIn < txTo.vin.size());
     CTxIn &txin = txTo.vin[nIn];

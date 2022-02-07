@@ -20,6 +20,13 @@ class CScript;
 class CTransaction;
 class uint256;
 
+/** Signature types */
+enum
+{
+    SIGTYPE_ECDSA = 0,
+    SIGTYPE_SCHNORR = 1,
+};
+
 /** Signature hash types/flags */
 enum
 {
