@@ -57,6 +57,22 @@ class SignRawTransactionsTest(BitcoinTestFramework):
         # 2) No script verification error occurred
         assert 'errors' not in rawTxSigned_noforkid
 
+        #### Make sure you can sign with schnorr signatures
+        rawTxSigned_schnorr = self.nodes[0].signrawtransaction(rawTx, inputs, privKeys, "ALL|FORKID", "1")
+        rawTxSigned_schnorr2 = self.nodes[0].signrawtransaction(rawTx, inputs, privKeys, "ALL|FORKID", "schnorr")
+        rawTxSigned_schnorr3 = self.nodes[0].signrawtransaction(rawTx, inputs, privKeys, "ALL|FORKID", "SCHNORR")
+        assert_equal(rawTxSigned_schnorr, rawTxSigned_schnorr2)
+        assert_equal(rawTxSigned_schnorr, rawTxSigned_schnorr3)
+        # check that different sig types were used
+        assert_not_equal(rawTxSigned, rawTxSigned_schnorr)
+
+        # 1) The transaction has a complete set of signatures
+        assert 'complete' in rawTxSigned_schnorr
+        assert_equal(rawTxSigned_schnorr['complete'], True)
+
+        # 2) No script verification error occurred
+        assert 'errors' not in rawTxSigned_schnorr
+
 
     def script_verification_error_test(self):
         """Creates and signs a raw transaction with valid (vin 0), invalid (vin 1) and one missing (vin 2) input script.
@@ -112,6 +128,33 @@ class SignRawTransactionsTest(BitcoinTestFramework):
         assert_equal(rawTxSigned['errors'][0]['vout'], inputs[1]['vout'])
         assert_equal(rawTxSigned['errors'][1]['txid'], inputs[2]['txid'])
         assert_equal(rawTxSigned['errors'][1]['vout'], inputs[2]['vout'])
+
+        # now run the same test with schnorr
+        rawTxSigned2 = self.nodes[0].signrawtransaction(rawTx, scripts, privKeys, "ALL|FORKID", "1")
+        # check that different sig types were used
+        assert_not_equal(rawTxSigned, rawTxSigned2)
+
+        # 3) The transaction has no complete set of signatures
+        assert 'complete' in rawTxSigned2
+        assert_equal(rawTxSigned2['complete'], False)
+
+        # 4) Two script verification errors occurred
+        assert 'errors' in rawTxSigned2
+        assert_equal(len(rawTxSigned2['errors']), 2)
+
+        # 5) Script verification errors have certain properties
+        assert 'txid' in rawTxSigned2['errors'][0]
+        assert 'vout' in rawTxSigned2['errors'][0]
+        assert 'scriptSig' in rawTxSigned2['errors'][0]
+        assert 'sequence' in rawTxSigned2['errors'][0]
+        assert 'error' in rawTxSigned2['errors'][0]
+
+        # 6) The verification errors refer to the invalid (vin 1) and missing input (vin 2)
+        assert_equal(rawTxSigned2['errors'][0]['txid'], inputs[1]['txid'])
+        assert_equal(rawTxSigned2['errors'][0]['vout'], inputs[1]['vout'])
+        assert_equal(rawTxSigned2['errors'][1]['txid'], inputs[2]['txid'])
+        assert_equal(rawTxSigned2['errors'][1]['vout'], inputs[2]['vout'])
+
 
     def run_test(self):
         self.successful_signing_test()

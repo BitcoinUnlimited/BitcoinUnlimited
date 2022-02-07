@@ -1101,11 +1101,11 @@ static void TxInErrorToJSON(const CTxIn &txin, UniValue &vErrorsRet, const std::
 
 UniValue signrawtransaction(const UniValue &params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > 4)
+    if (fHelp || params.size() < 1 || params.size() > 5)
         throw runtime_error(
             "signrawtransaction \"hexstring\" ( "
             "[{\"txid\":\"id\",\"vout\":n,\"scriptPubKey\":\"hex\",\"redeemScript\":\"hex\"},...] "
-            "[\"privatekey1\",...] sighashtype )\n"
+            "[\"privatekey1\",...] sighashtype sigtype)\n"
             "\nSign inputs for raw transaction (serialized, hex-encoded).\n"
             "The second optional argument (may be null) is an array of previous transaction outputs that\n"
             "this transaction depends on but may not yet be in the block chain.\n"
@@ -1142,6 +1142,9 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             "       \"ALL|ANYONECANPAY|FORKID\"\n"
             "       \"NONE|FORKID\"\n"
             "       \"SINGLE|ANYONECANPAY\"\n"
+            "5. \"sigtype\"     (string, optional, default=\"0\") The signature type. Must be one of\n"
+            "       \"0\" or \"ECDSA\" to select ECDSA, \n"
+            "       \"1\" or \"Schnorr\" to select Schnorr \n"
 
             "\nResult:\n"
             "{\n"
@@ -1167,7 +1170,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
 #else
     LOCK(cs_main);
 #endif
-    RPCTypeCheck(params, {UniValue::VSTR, UniValue::VARR, UniValue::VARR, UniValue::VSTR}, true);
+    RPCTypeCheck(params, {UniValue::VSTR, UniValue::VARR, UniValue::VARR, UniValue::VSTR, UniValue::VSTR}, true);
 
     vector<unsigned char> txData(ParseHexV(params[0], "argument 1"));
     CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION);
@@ -1346,6 +1349,21 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
 
     bool fHashSingle = ((nHashType & ~(SIGHASH_ANYONECANPAY | SIGHASH_FORKID)) == SIGHASH_SINGLE);
 
+    uint32_t sigType = SIGTYPE_ECDSA;
+    if (params.size() > 4 && !params[4].isNull())
+    {
+        std::string strSigType = params[4].get_str();
+        std::transform(strSigType.begin(), strSigType.end(), strSigType.begin(), ::tolower);
+
+        if (strSigType == "1" || strSigType == "schnorr")
+        {
+            sigType = SIGTYPE_SCHNORR;
+        }
+        else
+        {
+            sigType = SIGTYPE_ECDSA;
+        }
+    }
     // Script verification errors
     UniValue vErrors(UniValue::VARR);
 
@@ -1368,7 +1386,9 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
 
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if (!fHashSingle || (i < mergedTx.vout.size()))
-            SignSignature(keystore, prevPubKey, mergedTx, i, amount, nHashType);
+        {
+            SignSignature(keystore, prevPubKey, mergedTx, i, amount, nHashType, sigType);
+        }
 
         // ... and merge in other signatures:
         if (fForkId)

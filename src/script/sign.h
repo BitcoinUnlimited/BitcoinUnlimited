@@ -46,6 +46,7 @@ class TransactionSignatureCreator : public BaseSignatureCreator
     unsigned int nIn;
     CAmount amount;
     uint32_t nHashType;
+    uint32_t nSigType;
     const TransactionSignatureChecker checker;
 
 public:
@@ -53,7 +54,8 @@ public:
         const CTransaction *txToIn,
         unsigned int nInIn,
         const CAmount &amountIn,
-        uint32_t nHashTypeIn = SIGHASH_ALL);
+        uint32_t nHashTypeIn = SIGHASH_ALL,
+        uint32_t nSigType = SIGTYPE_ECDSA);
     const BaseSignatureChecker &Checker() const { return checker; }
     bool CreateSig(std::vector<unsigned char> &vchSig, const CKeyID &keyid, const CScript &scriptCode) const;
 };
@@ -76,12 +78,14 @@ bool SignSignature(const CKeyStore &keystore,
     CMutableTransaction &txTo,
     unsigned int nIn,
     const CAmount &amount,
-    uint32_t nHashType = SIGHASH_ALL | SIGHASH_FORKID);
+    uint32_t nHashType = SIGHASH_ALL | SIGHASH_FORKID,
+    uint32_t nSigType = SIGTYPE_ECDSA);
 bool SignSignature(const CKeyStore &keystore,
     const CTransaction &txFrom,
     CMutableTransaction &txTo,
     unsigned int nIn,
-    uint32_t nHashType = SIGHASH_ALL | SIGHASH_FORKID);
+    uint32_t nHashType = SIGHASH_ALL | SIGHASH_FORKID,
+    uint32_t nSigType = SIGTYPE_ECDSA);
 
 /** Combine two script signatures using a generic signature checker, intelligently, possibly with OP_0 placeholders. */
 CScript CombineSignatures(const CScript &scriptPubKey,
