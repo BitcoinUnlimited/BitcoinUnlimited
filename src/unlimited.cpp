@@ -1608,7 +1608,7 @@ UniValue submitminingsolution(const UniValue &params, bool fHelp)
         block->hashMerkleRoot = CalculateMerkleRoot(t, merkleProof);
     }
 
-    UniValue uvsub = SubmitBlock(*block); // returns string on failure
+    UniValue uvsub = SubmitBlock(block); // returns string on failure
     RmOldMiningCandidates();
     return uvsub;
 }
