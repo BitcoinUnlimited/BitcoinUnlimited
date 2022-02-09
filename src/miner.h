@@ -151,7 +151,7 @@ int64_t UpdateTime(CBlockHeader *pblock, const Consensus::Params &consensusParam
 // Create mining.h (The next two functions are in mining.cpp) or leave them here ?
 
 /** Submit a mined block */
-UniValue SubmitBlock(CBlock &block);
+UniValue SubmitBlock(ConstCBlockRef pblock);
 /** Make a block template to send to miners. */
 // implemented in mining.cpp
 UniValue mkblocktemplate(const UniValue &params,

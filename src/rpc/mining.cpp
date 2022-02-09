@@ -889,12 +889,12 @@ protected:
     };
 };
 
-UniValue SubmitBlock(CBlock &block)
+UniValue SubmitBlock(ConstCBlockRef pblock)
 {
-    uint256 hash = block.GetHash();
+    const uint256 blockhash = pblock->GetHash();
     bool fBlockPresent = false;
     {
-        CBlockIndex *pindex = LookupBlockIndex(hash);
+        CBlockIndex *pindex = LookupBlockIndex(blockhash);
         READLOCK(cs_mapBlockIndex);
         if (pindex)
         {
@@ -908,17 +908,17 @@ UniValue SubmitBlock(CBlock &block)
     }
 
     CValidationState state;
-    submitblock_StateCatcher sc(block.GetHash());
-    LOG(RPC, "Received block %s via RPC.\n", block.GetHash().ToString());
+    submitblock_StateCatcher sc(blockhash);
+    LOG(RPC, "Received block %s via RPC.\n", blockhash.ToString());
     RegisterValidationInterface(&sc);
 
     // In we are mining our own block or not running in parallel for any reason
     // we must terminate any block validation threads that are currently running,
     // Unless they have more work than our own block or are processing a chain
     // that has more work than our block.
-    PV->StopAllValidationThreads(block.GetBlockHeader().nBits);
+    PV->StopAllValidationThreads(pblock->nBits);
 
-    bool fAccepted = ProcessNewBlock(state, Params(), nullptr, std::make_shared<CBlock>(block), true, nullptr, false);
+    bool fAccepted = ProcessNewBlock(state, Params(), nullptr, pblock, true, nullptr, false);
     UnregisterValidationInterface(&sc);
     if (fBlockPresent)
     {
@@ -954,11 +954,12 @@ UniValue submitblock(const UniValue &params, bool fHelp)
                             "\nExamples:\n" +
                             HelpExampleCli("submitblock", "\"mydata\"") + HelpExampleRpc("submitblock", "\"mydata\""));
 
-    CBlock block;
-    if (!DecodeHexBlk(block, params[0].get_str()))
+    CBlockRef pblock = std::make_shared<CBlock>();
+    if (!DecodeHexBlk(*pblock, params[0].get_str()))
+    {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
-
-    return SubmitBlock(block);
+    }
+    return SubmitBlock(pblock);
 }
 
 UniValue estimatefee(const UniValue &params, bool fHelp)
