@@ -7,7 +7,10 @@
 #ifndef BITCOIN_QT_BITCOINADDRESSVALIDATOR_H
 #define BITCOIN_QT_BITCOINADDRESSVALIDATOR_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QValidator>
+#pragma GCC diagnostic pop
 
 /**
  * Bitcoin address entry widget validator, checks for valid characters and

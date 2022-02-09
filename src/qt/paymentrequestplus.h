@@ -12,9 +12,13 @@
 
 #include <openssl/x509.h>
 
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QByteArray>
 #include <QList>
 #include <QString>
+#pragma GCC diagnostic pop
 
 //
 // Wraps dumb protocol buffer paymentRequest

@@ -4,7 +4,11 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "signverifymessagedialog.h"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include "ui_signverifymessagedialog.h"
+#pragma GCC diagnostic pop
 
 #include "addressbookpage.h"
 #include "guiutil.h"

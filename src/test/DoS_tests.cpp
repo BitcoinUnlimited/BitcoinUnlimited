@@ -451,9 +451,9 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
 
     // Test EraseOrphansByTime():
     {
-        WRITELOCK(orphanpool.cs_orphanpool);
         int64_t nStartTime = GetTime();
         orphanpool.SetLastOrphanCheck(nStartTime);
+        WRITELOCK(orphanpool.cs_orphanpool);
         SetMockTime(nStartTime); // Overrides future calls to GetTime()
         for (int i = 0; i < 50; i++)
         {

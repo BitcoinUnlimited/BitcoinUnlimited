@@ -6,8 +6,11 @@
 #ifndef BITCOIN_QT_TEST_GUIUTILTESTS_H
 #define BITCOIN_QT_TEST_GUIUTILTESTS_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QObject>
 #include <QTest>
+#pragma GCC diagnostic pop
 
 class GUIUtilTests : public QObject {
     Q_OBJECT

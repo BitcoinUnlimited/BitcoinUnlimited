@@ -3,7 +3,11 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "modaloverlay.h"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include "ui_modaloverlay.h"
+#pragma GCC diagnostic pop
 
 #include "guiutil.h"
 #include "main.h"

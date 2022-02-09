@@ -6,7 +6,10 @@
 #ifndef BITCOIN_QT_MACNOTIFICATIONHANDLER_H
 #define BITCOIN_QT_MACNOTIFICATIONHANDLER_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QObject>
+#pragma GCC diagnostic pop
 
 /** Macintosh-specific notification handler (supports UserNotificationCenter and Growl).
  */

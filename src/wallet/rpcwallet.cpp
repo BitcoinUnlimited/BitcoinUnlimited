@@ -86,7 +86,7 @@ void WalletTxToJSON(const CWalletTx &wtx, UniValue &entry)
     entry.pushKV("time", wtx.GetTxTime());
     entry.pushKV("timereceived", (int64_t)wtx.nTimeReceived);
 
-    for (const PAIRTYPE(string, string) & item : wtx.mapValue)
+    for (const PAIRTYPE(const string, string) & item : wtx.mapValue)
     {
         entry.pushKV(item.first, item.second);
     }
@@ -347,7 +347,7 @@ UniValue getaddressesbyaccount(const UniValue &params, bool fHelp)
 
     // Find all addresses that have the given account
     UniValue ret(UniValue::VARR);
-    for (const std::pair<CTxDestination, CAddressBookData> &item : pwalletMain->mapAddressBook)
+    for (const std::pair<const CTxDestination, CAddressBookData> &item : pwalletMain->mapAddressBook)
     {
         const CTxDestination &dest = item.first;
         const std::string &strName = item.second.name;
@@ -1341,7 +1341,7 @@ UniValue ListReceived(const UniValue &params, bool fByAccounts)
     // Reply
     UniValue ret(UniValue::VARR);
     std::map<std::string, tallyitem> mapAccountTally;
-    for (const std::pair<CTxDestination, CAddressBookData> &item : pwalletMain->mapAddressBook)
+    for (const std::pair<const CTxDestination, CAddressBookData> &item : pwalletMain->mapAddressBook)
     {
         const CTxDestination &dest = item.first;
         const std::string &strAccount = item.second.name;
@@ -1923,7 +1923,7 @@ UniValue listaccounts(const UniValue &params, bool fHelp)
             if (params[1].get_bool())
                 includeWatchonly = includeWatchonly | ISMINE_WATCH_ONLY;
 
-        for (const PAIRTYPE(CTxDestination, CAddressBookData) & entry : pwalletMain->mapAddressBook)
+        for (const PAIRTYPE(const CTxDestination, CAddressBookData) & entry : pwalletMain->mapAddressBook)
         {
             if (IsMine(*pwalletMain, entry.first, chainActive.Tip()) & includeWatchonly) // This address belongs to me
                 mapAccountBalances[entry.second.name] = 0;
@@ -1966,7 +1966,7 @@ UniValue listaccounts(const UniValue &params, bool fHelp)
     }
 
     UniValue ret(UniValue::VOBJ);
-    for (const PAIRTYPE(string, CAmount) & accountBalance : mapAccountBalances)
+    for (const PAIRTYPE(const string, CAmount) & accountBalance : mapAccountBalances)
     {
         ret.pushKV(accountBalance.first, ValueFromAmount(accountBalance.second));
     }

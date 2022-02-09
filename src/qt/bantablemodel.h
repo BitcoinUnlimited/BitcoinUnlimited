@@ -8,8 +8,11 @@
 
 #include "net.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QAbstractTableModel>
 #include <QStringList>
+#pragma GCC diagnostic pop
 
 class ClientModel;
 class BanTablePriv;

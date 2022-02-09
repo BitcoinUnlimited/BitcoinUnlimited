@@ -6,8 +6,11 @@
 #ifndef BITCOIN_QT_WALLETFRAME_H
 #define BITCOIN_QT_WALLETFRAME_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QFrame>
 #include <QMap>
+#pragma GCC diagnostic pop
 
 class BitcoinGUI;
 class ClientModel;

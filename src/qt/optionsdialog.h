@@ -6,9 +6,12 @@
 #ifndef BITCOIN_QT_OPTIONSDIALOG_H
 #define BITCOIN_QT_OPTIONSDIALOG_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QDialog>
 #include <QIntValidator>
 #include <QValidator>
+#pragma GCC diagnostic pop
 
 class OptionsModel;
 class QValidatedLineEdit;

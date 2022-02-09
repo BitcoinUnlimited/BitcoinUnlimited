@@ -10,8 +10,11 @@
 #include "blockrelay/graphene.h"
 #include "blockrelay/thinblock.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QDateTime>
 #include <QObject>
+#pragma GCC diagnostic pop
 
 class AddressTableModel;
 class BanTableModel;

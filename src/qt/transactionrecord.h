@@ -10,8 +10,11 @@
 #include "uint256.h"
 #include "wallet/wallet.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QList>
 #include <QString>
+#pragma GCC diagnostic pop
 
 class CWallet;
 class CWalletTx;

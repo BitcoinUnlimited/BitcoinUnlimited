@@ -4,7 +4,11 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "transactiondescdialog.h"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include "ui_transactiondescdialog.h"
+#pragma GCC diagnostic pop
 
 #include "transactiontablemodel.h"
 

@@ -21,11 +21,14 @@
 #include "wallet/wallet.h"
 #endif
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QApplication>
 #include <QCloseEvent>
 #include <QDesktopWidget>
 #include <QPainter>
 #include <QRadialGradient>
+#pragma GCC diagnostic pop
 
 SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) : QWidget(0, f), curAlignment(0)
 {

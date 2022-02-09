@@ -1539,7 +1539,7 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint> *pvNoSpends
         _RemoveStaged(stage);
         if (pvNoSpendsRemaining)
         {
-            for (const CTransactionRef ptx : vTxn)
+            for (const CTransactionRef &ptx : vTxn)
             {
                 for (const CTxIn &txin : ptx->vin)
                 {

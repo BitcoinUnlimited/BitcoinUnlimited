@@ -8,8 +8,11 @@
 
 #include "amount.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QAbstractListModel>
 #include <QString>
+#pragma GCC diagnostic pop
 
 // U+2009 THIN SPACE = UTF-8 E2 80 89
 #define REAL_THIN_SP_CP 0x2009

@@ -6,7 +6,10 @@
 #ifndef BITCOIN_QT_SIGNVERIFYMESSAGEDIALOG_H
 #define BITCOIN_QT_SIGNVERIFYMESSAGEDIALOG_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QDialog>
+#pragma GCC diagnostic pop
 
 class PlatformStyle;
 class WalletModel;

@@ -6,8 +6,11 @@
 #ifndef BITCOIN_QT_QVALUECOMBOBOX_H
 #define BITCOIN_QT_QVALUECOMBOBOX_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QComboBox>
 #include <QVariant>
+#pragma GCC diagnostic pop
 
 /* QComboBox that can be used with QDataWidgetMapper to select ordinal values from a model. */
 class QValueComboBox : public QComboBox

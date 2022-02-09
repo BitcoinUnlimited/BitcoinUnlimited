@@ -6,9 +6,12 @@
 #ifndef BITCOIN_QT_INTRO_H
 #define BITCOIN_QT_INTRO_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QDialog>
 #include <QMutex>
 #include <QThread>
+#pragma GCC diagnostic pop
 
 class FreespaceChecker;
 

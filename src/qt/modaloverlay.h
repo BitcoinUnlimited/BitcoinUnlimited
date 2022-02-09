@@ -5,8 +5,12 @@
 #ifndef BITCOIN_QT_MODALOVERLAY_H
 #define BITCOIN_QT_MODALOVERLAY_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QDateTime>
 #include <QWidget>
+#pragma GCC diagnostic pop
+
 #include <atomic>
 
 //! The required delta of headers to the estimated number of available headers until we show the IBD progress

@@ -6,8 +6,11 @@
 #ifndef BITCOIN_QT_TRAFFICGRAPHWIDGET_H
 #define BITCOIN_QT_TRAFFICGRAPHWIDGET_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QQueue>
 #include <QWidget>
+#pragma GCC diagnostic pop
 
 class ClientModel;
 

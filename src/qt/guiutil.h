@@ -9,6 +9,8 @@
 #include "amount.h"
 #include "fs.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QEvent>
 #include <QHeaderView>
 #include <QMessageBox>
@@ -16,6 +18,7 @@
 #include <QProgressBar>
 #include <QString>
 #include <QTableView>
+#pragma GCC diagnostic pop
 
 class QValidatedLineEdit;
 class SendCoinsRecipient;

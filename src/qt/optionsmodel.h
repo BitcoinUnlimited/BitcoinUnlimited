@@ -8,7 +8,10 @@
 
 #include "amount.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QAbstractListModel>
+#pragma GCC diagnostic pop
 
 QT_BEGIN_NAMESPACE
 class QNetworkProxy;

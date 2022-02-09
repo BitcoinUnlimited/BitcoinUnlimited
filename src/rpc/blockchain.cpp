@@ -880,7 +880,7 @@ static void ApplyStats(CCoinsStats &stats,
     ss << VARINT(
         outputs.begin()->second.nHeight * 2 + outputs.begin()->second.fCoinBase, VarIntMode::NONNEGATIVE_SIGNED);
     stats.nTransactions++;
-    for (const auto output : outputs)
+    for (const auto &output : outputs)
     {
         ss << VARINT(output.first + 1);
         ss << *(const CScriptBase *)(&output.second.out.scriptPubKey);

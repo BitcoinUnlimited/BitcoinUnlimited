@@ -8,7 +8,11 @@
 #endif
 
 #include "askpassphrasedialog.h"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include "ui_askpassphrasedialog.h"
+#pragma GCC diagnostic pop
 
 #include "guiconstants.h"
 #include "walletmodel.h"

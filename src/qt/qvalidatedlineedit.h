@@ -6,7 +6,10 @@
 #ifndef BITCOIN_QT_QVALIDATEDLINEEDIT_H
 #define BITCOIN_QT_QVALIDATEDLINEEDIT_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QLineEdit>
+#pragma GCC diagnostic pop
 
 /** Line edit that can be marked as "invalid" to show input validation feedback. When marked as invalid,
    it will get a red background until it is focused.

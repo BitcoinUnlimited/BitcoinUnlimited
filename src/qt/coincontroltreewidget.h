@@ -6,8 +6,11 @@
 #ifndef BITCOIN_QT_COINCONTROLTREEWIDGET_H
 #define BITCOIN_QT_COINCONTROLTREEWIDGET_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QKeyEvent>
 #include <QTreeWidget>
+#pragma GCC diagnostic pop
 
 class CoinControlTreeWidget : public QTreeWidget
 {

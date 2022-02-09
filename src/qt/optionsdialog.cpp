@@ -8,7 +8,10 @@
 #endif
 
 #include "optionsdialog.h"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include "ui_optionsdialog.h"
+#pragma GCC diagnostic pop
 
 #include "bitcoinunits.h"
 #include "guiutil.h"

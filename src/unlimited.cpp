@@ -1910,9 +1910,18 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
         UniValue node(UniValue::VOBJ);
         disconnected += (inode.fDisconnect) ? 1 : 0;
 
-        node.pushKV("vSendMsg", (int64_t)inode.vSendMsg.size());
-        node.pushKV("vRecvGetData", (int64_t)inode.vRecvGetData.size());
-        node.pushKV("vRecvMsg", (int64_t)inode.vRecvMsg.size() + (int64_t)inode.vRecvMsg_handshake.size());
+        {
+            LOCK(inode.cs_vSend);
+            node.pushKV("vSendMsg", (int64_t)inode.vSendMsg.size());
+        }
+        {
+            LOCK(inode.csRecvGetData);
+            node.pushKV("vRecvGetData", (int64_t)inode.vRecvGetData.size());
+        }
+        {
+            LOCK(inode.cs_vRecvMsg);
+            node.pushKV("vRecvMsg", (int64_t)inode.vRecvMsg.size() + (int64_t)inode.vRecvMsg_handshake.size());
+        }
         {
             LOCK(inode.cs_filter);
             if (inode.pfilter)
@@ -1930,8 +1939,10 @@ extern UniValue getstructuresizes(const UniValue &params, bool fHelp)
             LOCK(inode.cs_vSend);
             node.pushKV("vAddrToSend", (int64_t)inode.vAddrToSend.size());
         }
-
-        node.pushKV("vInventoryToSend", (int64_t)inode.vInventoryToSend.size());
+        {
+            LOCK(inode.cs_inventory);
+            node.pushKV("vInventoryToSend", (int64_t)inode.vInventoryToSend.size());
+        }
         ret.pushKV(inode.addrName, node);
     }
     ret.pushKV("disconnectedNodes", disconnected);

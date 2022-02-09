@@ -5,6 +5,8 @@
 
 #include "notificator.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QApplication>
 #include <QByteArray>
 #include <QIcon>
@@ -15,8 +17,13 @@
 #include <QSystemTrayIcon>
 #include <QTemporaryFile>
 #include <QVariant>
+#pragma GCC diagnostic pop
+
 #ifdef USE_DBUS
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QtDBus>
+#pragma GCC diagnostic pop
 #include <stdint.h>
 #endif
 // Include ApplicationServices.h after QtDbus to avoid redefinition of check().
