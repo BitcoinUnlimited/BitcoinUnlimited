@@ -8,6 +8,8 @@
 
 #include "amount.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QAbstractButton>
 #include <QAction>
 #include <QDialog>
@@ -16,6 +18,7 @@
 #include <QPoint>
 #include <QString>
 #include <QTreeWidgetItem>
+#pragma GCC diagnostic pop
 
 class PlatformStyle;
 class WalletModel;

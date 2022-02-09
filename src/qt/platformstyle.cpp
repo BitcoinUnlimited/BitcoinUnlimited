@@ -7,12 +7,15 @@
 
 #include "guiconstants.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QApplication>
 #include <QColor>
 #include <QIcon>
 #include <QImage>
 #include <QPalette>
 #include <QPixmap>
+#pragma GCC diagnostic pop
 
 static const struct
 {

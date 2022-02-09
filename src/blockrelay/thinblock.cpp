@@ -922,7 +922,7 @@ double CThinBlockData::average(std::map<int64_t, uint64_t> &map)
         return 0.0;
 
     uint64_t accum = 0U;
-    for (std::pair<int64_t, uint64_t> const &ref : map)
+    for (std::pair<const int64_t, uint64_t> const &ref : map)
     {
         // avoid wraparounds
         accum = std::max(accum, accum + ref.second);

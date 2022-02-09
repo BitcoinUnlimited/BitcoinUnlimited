@@ -64,7 +64,11 @@ public:
     void QueryHashes(std::vector<uint256> &vHashes);
 
     //! Set the last orphan check time (used primarily in testing)
-    void SetLastOrphanCheck(int64_t nTime) { nLastOrphanCheck = nTime; }
+    void SetLastOrphanCheck(int64_t nTime)
+    {
+        WRITELOCK(cs_orphanpool);;
+        nLastOrphanCheck = nTime;
+    }
     //! Orphan pool current number of transactions
     uint64_t GetOrphanPoolSize()
     {

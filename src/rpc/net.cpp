@@ -636,7 +636,7 @@ UniValue getnetworkinfo(const UniValue &params, bool fHelp)
     UniValue localAddresses(UniValue::VARR);
     {
         LOCK(cs_mapLocalHost);
-        for (const PAIRTYPE(CNetAddr, LocalServiceInfo) & item : mapLocalHost)
+        for (const PAIRTYPE(const CNetAddr, LocalServiceInfo) & item : mapLocalHost)
         {
             UniValue rec(UniValue::VOBJ);
             rec.pushKV("address", item.first.ToString());

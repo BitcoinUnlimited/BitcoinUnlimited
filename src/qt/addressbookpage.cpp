@@ -8,7 +8,11 @@
 #endif
 
 #include "addressbookpage.h"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include "ui_addressbookpage.h"
+#pragma GCC diagnostic pop
 
 #include "addresstablemodel.h"
 #include "bitcoingui.h"

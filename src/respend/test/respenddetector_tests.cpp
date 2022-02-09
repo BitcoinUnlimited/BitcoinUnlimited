@@ -362,7 +362,10 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
 
     RespendDetector detector(pool, MakeTransactionRef(spend2a), {dummyaction});
     BOOST_CHECK_EQUAL(size_t(1), node.GetInventoryToSendSize());
-    BOOST_CHECK(!node.vInventoryToSend.empty() && 0x94a0 == node.vInventoryToSend.at(0).type);
+    {
+        LOCK(node.cs_inventory);
+        BOOST_CHECK(!node.vInventoryToSend.empty() && 0x94a0 == node.vInventoryToSend.at(0).type);
+    }
     std::list<std::pair<int, int> > dsp_list4 =
         pool.doubleSpendProofStorage()->findOrphans(COutPoint(tx1a.GetHash(), 0));
     BOOST_CHECK(dsp_list4.size() == 0);

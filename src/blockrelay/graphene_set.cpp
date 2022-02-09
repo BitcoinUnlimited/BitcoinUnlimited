@@ -89,8 +89,10 @@ CGrapheneSet::CGrapheneSet(size_t _nReceiverUniverseItems,
     if (ordered)
     {
         std::map<uint256, uint64_t> mapItemHashes;
-        for (const std::pair<uint64_t, uint256> &kv : mapCheapHashes)
+        for (const std::pair<const uint64_t, uint256> &kv : mapCheapHashes)
+        {
             mapItemHashes[kv.second] = kv.first;
+        }
 
         mapCheapHashes.clear();
 

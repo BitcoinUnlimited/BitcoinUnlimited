@@ -4,7 +4,11 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "overviewpage.h"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include "ui_overviewpage.h"
+#pragma GCC diagnostic pop
 
 #include "bitcoinunits.h"
 #include "clientmodel.h"

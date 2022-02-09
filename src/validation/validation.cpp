@@ -427,7 +427,7 @@ bool LoadBlockIndexDB()
     }
     std::vector<fs::path> vIndexFiles;
     std::copy(fs::directory_iterator(path_index), fs::directory_iterator(), std::back_inserter(vIndexFiles));
-    for (const auto path_file : vIndexFiles)
+    for (const auto &path_file : vIndexFiles)
     {
         if (fs::extension(path_file) == ".ldb")
         {
@@ -496,7 +496,7 @@ bool LoadBlockIndexDB()
     std::vector<std::pair<int, CBlockIndex *> > vSortedByHeight;
     vSortedByHeight.reserve(mapBlockIndex.size());
     std::set<int> setBlkDataFiles;
-    for (const std::pair<uint256, CBlockIndex *> &item : mapBlockIndex)
+    for (const std::pair<const uint256, CBlockIndex *> &item : mapBlockIndex)
     {
         CBlockIndex *pindex = item.second;
         vSortedByHeight.push_back(std::make_pair(pindex->nHeight, pindex));
@@ -639,13 +639,15 @@ void UnloadBlockIndex()
     requester.MapBlocksInFlightClear();
     requester.MapNodestateClear();
     mempool.clear();
-
+    {
+        LOCK(csUnconnectedHeaders);
+        mapUnConnectedHeaders.clear();
+    }
     {
         LOCK(cs_main);
         nBlockSequenceId = 1;
         nSyncStarted = 0;
         nLastBlockFile = 0;
-        mapUnConnectedHeaders.clear();
         setBlockIndexCandidates.clear();
         chainActive.SetTip(nullptr);
         pindexBestInvalid = nullptr;

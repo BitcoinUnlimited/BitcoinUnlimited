@@ -10,8 +10,11 @@
 #include "bitcoin-config.h"
 #endif
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QIcon>
 #include <QObject>
+#pragma GCC diagnostic pop
 
 QT_BEGIN_NAMESPACE
 class QSystemTrayIcon;

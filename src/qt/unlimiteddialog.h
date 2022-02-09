@@ -5,9 +5,13 @@
 #ifndef BITCOIN_QT_UNLIMITEDDIALOG_H
 #define BITCOIN_QT_UNLIMITEDDIALOG_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QDataWidgetMapper>
 #include <QDialog>
 #include <QIntValidator>
+#pragma GCC diagnostic pop
+
 class OptionsModel;
 class QValidatedLineEdit;
 class QLineEdit;

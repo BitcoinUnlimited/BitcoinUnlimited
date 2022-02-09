@@ -4,7 +4,11 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "editaddressdialog.h"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include "ui_editaddressdialog.h"
+#pragma GCC diagnostic pop
 
 #include "addresstablemodel.h"
 #include "guiutil.h"

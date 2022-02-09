@@ -8,7 +8,11 @@
 
 #include "amount.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QWidget>
+#pragma GCC diagnostic pop
+
 #include <memory>
 
 class ClientModel;

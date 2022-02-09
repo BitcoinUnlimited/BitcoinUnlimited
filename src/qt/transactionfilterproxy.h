@@ -8,8 +8,11 @@
 
 #include "amount.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QDateTime>
 #include <QSortFilterProxyModel>
+#pragma GCC diagnostic pop
 
 /** Filter the transaction list according to pre-specified rules. */
 class TransactionFilterProxy : public QSortFilterProxyModel

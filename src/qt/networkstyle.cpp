@@ -6,7 +6,10 @@
 #include "networkstyle.h"
 #include "guiconstants.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QApplication>
+#pragma GCC diagnostic pop
 
 static const struct
 {

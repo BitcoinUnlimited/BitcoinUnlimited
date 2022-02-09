@@ -6,8 +6,11 @@
 #ifndef BITCOIN_QT_TRANSACTIONDESC_H
 #define BITCOIN_QT_TRANSACTIONDESC_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QObject>
 #include <QString>
+#pragma GCC diagnostic pop
 
 class TransactionRecord;
 

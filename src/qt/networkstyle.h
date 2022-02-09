@@ -6,9 +6,12 @@
 #ifndef BITCOIN_QT_NETWORKSTYLE_H
 #define BITCOIN_QT_NETWORKSTYLE_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QIcon>
 #include <QPixmap>
 #include <QString>
+#pragma GCC diagnostic pop
 
 /* Coin network-specific GUI style information */
 class NetworkStyle

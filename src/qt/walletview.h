@@ -8,7 +8,10 @@
 
 #include "amount.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QStackedWidget>
+#pragma GCC diagnostic pop
 
 class BitcoinGUI;
 class ClientModel;

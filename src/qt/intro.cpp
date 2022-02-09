@@ -9,7 +9,10 @@
 
 #include "fs.h"
 #include "intro.h"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include "ui_intro.h"
+#pragma GCC diagnostic pop
 
 #include "guiconstants.h"
 #include "guiutil.h"

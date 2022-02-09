@@ -8,8 +8,11 @@
 
 #include "script/script.h" // Freeze CScriptNum
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QAbstractTableModel>
 #include <QStringList>
+#pragma GCC diagnostic pop
 
 class AddressTablePriv;
 class WalletModel;

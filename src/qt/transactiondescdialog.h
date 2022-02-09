@@ -6,7 +6,10 @@
 #ifndef BITCOIN_QT_TRANSACTIONDESCDIALOG_H
 #define BITCOIN_QT_TRANSACTIONDESCDIALOG_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QDialog>
+#pragma GCC diagnostic pop
 
 namespace Ui
 {

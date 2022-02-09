@@ -12,12 +12,15 @@
 
 #include "amount.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QLabel>
 #include <QMainWindow>
 #include <QMap>
 #include <QMenu>
 #include <QPoint>
 #include <QSystemTrayIcon>
+#pragma GCC diagnostic pop
 
 class ClientModel;
 class NetworkStyle;

@@ -6,7 +6,10 @@
 #ifndef BITCOIN_QT_OPENURIDIALOG_H
 #define BITCOIN_QT_OPENURIDIALOG_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QDialog>
+#pragma GCC diagnostic pop
 
 class Config;
 

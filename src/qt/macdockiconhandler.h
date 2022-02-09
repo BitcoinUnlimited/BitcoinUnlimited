@@ -6,7 +6,10 @@
 #ifndef BITCOIN_QT_MACDOCKICONHANDLER_H
 #define BITCOIN_QT_MACDOCKICONHANDLER_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QObject>
+#pragma GCC diagnostic pop
 
 QT_BEGIN_NAMESPACE
 class QIcon;

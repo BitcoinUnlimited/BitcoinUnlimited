@@ -9,7 +9,10 @@
 
 #include "utilitydialog.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include "ui_helpmessagedialog.h"
+#pragma GCC diagnostic pop
 
 #include "bitcoingui.h"
 #include "clientmodel.h"

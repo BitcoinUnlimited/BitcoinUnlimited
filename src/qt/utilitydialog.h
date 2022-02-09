@@ -6,8 +6,11 @@
 #ifndef BITCOIN_QT_UTILITYDIALOG_H
 #define BITCOIN_QT_UTILITYDIALOG_H
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <QDialog>
 #include <QObject>
+#pragma GCC diagnostic pop
 
 class BitcoinGUI;
 class ClientModel;
