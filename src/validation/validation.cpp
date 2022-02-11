@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <boost/scope_exit.hpp>
 #include <unordered_set>
+#include <mutex>
 
 extern CTweak<int> maxReorgDepth;
 void ProcessOrphans(std::vector<uint256> &vWorkQueue);
@@ -3257,7 +3258,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     {
         WRITELOCK(mempool.cs_txmempool);
         mempool._clear();
-        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        std::unique_lock<std::mutex> lock(csCommitQ);
         txCommitQ->clear();
     }
     else

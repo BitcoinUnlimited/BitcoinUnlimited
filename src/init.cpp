@@ -61,6 +61,8 @@
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #endif
+
+#include <mutex>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -602,7 +604,7 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
                 nDeferQ = txDeferQ.size();
             }
             {
-                boost::unique_lock<boost::mutex> lock(csCommitQ);
+                std::unique_lock<std::mutex> lock(csCommitQ);
                 nCommitQ = txCommitQ->size();
             }
             if (nInQ == 0 && nDeferQ == 0 && nCommitQ == 0)
@@ -622,7 +624,7 @@ void ThreadImport(std::vector<fs::path> vImportFiles, uint64_t nTxIndexCache)
                         txDeferQ.pop();
                 }
                 {
-                    boost::unique_lock<boost::mutex> lock(csCommitQ);
+                    std::unique_lock<std::mutex> lock(csCommitQ);
                     txCommitQ->clear();
                 }
             }
