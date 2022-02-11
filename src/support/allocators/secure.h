@@ -38,10 +38,10 @@ struct secure_allocator : public std::allocator<T> {
         typedef secure_allocator<_Other> other;
     };
 
-    T* allocate(std::size_t n, const void* hint = 0)
+    T* allocate(std::size_t n)
     {
         T* p;
-        p = std::allocator<T>::allocate(n, hint);
+        p = std::allocator<T>::allocate(n);
         if (p != nullptr)
             LockedPageManager::Instance().LockRange(p, sizeof(T) * n);
         return p;
