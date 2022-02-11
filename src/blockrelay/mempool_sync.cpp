@@ -14,6 +14,7 @@
 #include "utiltime.h"
 #include "extversionkeys.h"
 
+#include <mutex>
 #include <random>
 
 extern CTxMemPool mempool;
@@ -370,7 +371,7 @@ bool CMempoolSyncTx::HandleMessage(CDataStream &vRecv, CNode *pfrom)
 void GetMempoolTxHashes(std::vector<uint256> &mempoolTxHashes)
 {
     {
-        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        std::unique_lock<std::mutex> lock(csCommitQ);
         for (auto &kv : *txCommitQ)
         {
             mempoolTxHashes.push_back(kv.first);
@@ -400,7 +401,7 @@ CMempoolSyncInfo GetMempoolSyncInfo()
     // in the txCommitQ that have been processed and valid, and which will be in the mempool shortly.
     uint64_t nCommitQ = 0;
     {
-        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        std::unique_lock<std::mutex> lock(csCommitQ);
         nCommitQ = txCommitQ->size();
     }
 
