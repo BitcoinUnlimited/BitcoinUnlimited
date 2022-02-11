@@ -3,11 +3,25 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "util.h"
+
+// those clang pragmas are needed to suppress warning generated
+// by boost library code
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#pragma clang diagnostic ignored "-Wshadow"
+#endif
+
 #include <boost/asio.hpp>
 #include <boost/asio/basic_deadline_timer.hpp>
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/bind/bind.hpp>
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
 #include <iostream>
 #include <istream>
 #include <ostream>
