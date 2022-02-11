@@ -467,7 +467,7 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.vout[1].scriptPubKey = CScript() << OP_RETURN
                                        << ParseHex("271967f1a67130b7105cd6a828e03909a67962e0ea1f61de"
                                                    "b649f6bc3f4cef3877696e646578");
-    BOOST_CHECK_EQUAL(t.vout[0].scriptPubKey.size() + t.vout[1].scriptPubKey.size(), 90);
+    BOOST_CHECK_EQUAL(t.vout[0].scriptPubKey.size() + t.vout[1].scriptPubKey.size(), 90U);
     BOOST_CHECK(IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     // Max user provided payload size + 1 in multiple outputs is non-standard
@@ -475,7 +475,7 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.vout[1].scriptPubKey = CScript() << OP_RETURN
                                        << ParseHex("271967f1a67130b7105cd6a828e03909a67962e0ea1f61de"
                                                    "b649f6bc3f4cef3877696e64657878");
-    BOOST_CHECK_EQUAL(t.vout[0].scriptPubKey.size() + t.vout[1].scriptPubKey.size(), 91);
+    BOOST_CHECK_EQUAL(t.vout[0].scriptPubKey.size() + t.vout[1].scriptPubKey.size(), 91U);
     BOOST_CHECK(!IsStandardTx(MakeTransactionRef(CTransaction(t)), reason));
 
     // Reset datacarriersize back to default [standard] size

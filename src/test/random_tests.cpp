@@ -59,7 +59,7 @@ BOOST_AUTO_TEST_CASE(fastrandom_randbits)
     for (int bits = 0; bits < 63; ++bits) {
         for (int j = 0; j < 1000; ++j) {
             uint64_t rangebits = ctx1.randbits(bits);
-            BOOST_CHECK_EQUAL(rangebits >> bits, 0);
+            BOOST_CHECK_EQUAL(rangebits >> bits, 0ULL);
             uint64_t range = ((uint64_t)1) << bits | rangebits;
             uint64_t rand = ctx2.randrange(range);
             BOOST_CHECK(rand < range);
@@ -117,7 +117,7 @@ BOOST_AUTO_TEST_CASE(shuffle_stat_test)
     }
     BOOST_CHECK(chi_score > 58.1411); // 99.9999% confidence interval
     BOOST_CHECK(chi_score < 210.275);
-    BOOST_CHECK_EQUAL(sum, 12000);
+    BOOST_CHECK_EQUAL(sum, 12000U);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

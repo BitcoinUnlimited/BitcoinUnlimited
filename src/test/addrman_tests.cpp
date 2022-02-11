@@ -179,7 +179,7 @@ BOOST_AUTO_TEST_CASE(addrman_select)
     {
         ports.insert(addrman.Select().GetPort());
     }
-    BOOST_CHECK_EQUAL(ports.size(), 3);
+    BOOST_CHECK_EQUAL(ports.size(), static_cast<unsigned int>(3));
 }
 
 BOOST_AUTO_TEST_CASE(addrman_new_collisions)

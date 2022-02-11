@@ -132,7 +132,7 @@ BOOST_AUTO_TEST_CASE(electrum_extversion)
     call_setter(ver);
     BOOST_CHECK_EQUAL(PORT, ver->as_u64c(XVer::BU_ELECTRUM_SERVER_PORT_TCP));
     BOOST_CHECK_EQUAL(WS_PORT, ver->as_u64c(XVer::BU_ELECTRUM_WS_SERVER_PORT_TCP));
-    BOOST_CHECK_EQUAL(1040300, ver->as_u64c(XVer::BU_ELECTRUM_SERVER_PROTOCOL_VERSION));
+    BOOST_CHECK_EQUAL(1040300ULL, ver->as_u64c(XVer::BU_ELECTRUM_SERVER_PROTOCOL_VERSION));
 
     // Special case: Listen on all IP's is treated as public
     SetArg("-electrum.host", "0.0.0.0");

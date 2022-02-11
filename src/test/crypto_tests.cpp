@@ -502,12 +502,12 @@ BOOST_AUTO_TEST_CASE(chacha20_testvector)
 BOOST_AUTO_TEST_CASE(countbits_tests)
 {
     FastRandomContext ctx;
-    for (int i = 0; i <= 64; ++i)
+    for (unsigned int i = 0; i <= 64; ++i)
     {
         if (i == 0)
         {
             // Check handling of zero.
-            BOOST_CHECK_EQUAL(CountBits(0), 0);
+            BOOST_CHECK_EQUAL(CountBits(0), 0ULL);
         }
         else if (i < 10)
         {

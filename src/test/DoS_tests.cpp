@@ -364,7 +364,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
     {
         WRITELOCK(orphanpool.cs_orphanpool);
         orphanpool.LimitOrphanTxSize(50, 8900);
-        BOOST_CHECK_EQUAL(orphanpool.mapOrphanTransactions.size(), 50);
+        BOOST_CHECK_EQUAL(orphanpool.mapOrphanTransactions.size(), 50UL);
         orphanpool.LimitOrphanTxSize(50, 6300);
         BOOST_CHECK(orphanpool.mapOrphanTransactions.size() <= 49);
         orphanpool.LimitOrphanTxSize(50, 1000);
@@ -441,9 +441,9 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
     {
         WRITELOCK(orphanpool.cs_orphanpool);
         orphanpool.LimitOrphanTxSize(40, 10000000);
-        BOOST_CHECK_EQUAL(orphanpool.mapOrphanTransactions.size(), 40);
+        BOOST_CHECK_EQUAL(orphanpool.mapOrphanTransactions.size(), 40UL);
         orphanpool.LimitOrphanTxSize(10, 10000000);
-        BOOST_CHECK_EQUAL(orphanpool.mapOrphanTransactions.size(), 10);
+        BOOST_CHECK_EQUAL(orphanpool.mapOrphanTransactions.size(), 10UL);
         orphanpool.LimitOrphanTxSize(0, 10000000);
         BOOST_CHECK(orphanpool.mapOrphanTransactions.empty());
         BOOST_CHECK(orphanpool.mapOrphanTransactionsByPrev.empty());

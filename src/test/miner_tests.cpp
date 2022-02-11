@@ -354,7 +354,7 @@ void GenerateBlocks(const CChainParams &chainparams,
 
     printf("mempool size : %ld\n", mempool.size());
     printf("mempool mapTx size : %ld\n", mempool.mapTx.size());
-    printf("Avg Block Size %ld Expected Avg Block Size %ld\n", nTotalBlockSize / nBlockCount,
+    printf("Avg Block Size %ld Expected Avg Block Size %llu\n", nTotalBlockSize / nBlockCount,
         nTotalExpectedBlockSize / nBlockCount);
     printf("Block fill ratio %5.2f\n",
         (double)(nTotalBlockSize / nBlockCount) * 100 / (nTotalExpectedBlockSize / nBlockCount));
@@ -903,7 +903,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     // it into the template because we still check IsFinalTx in CreateNewBlock,
     // but relative locked txs will if inconsistently added to mempool.
     // For now these will still generate a valid template until BIP68 soft fork
-    BOOST_CHECK_EQUAL(pblocktemplate->block->vtx.size(), 3);
+    BOOST_CHECK_EQUAL(pblocktemplate->block->vtx.size(), 3UL);
     // However if we advance height by 1 and time by 512, all of them should be mined
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++)
         chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime += 512; // Trick the MedianTimePast
@@ -911,7 +911,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     SetMockTime(chainActive.Tip()->GetMedianTimePast() + 1);
 
     BOOST_CHECK(pblocktemplate = BlockAssembler(chainparams).CreateNewBlock(scriptPubKey));
-    BOOST_CHECK_EQUAL(pblocktemplate->block->vtx.size(), 5);
+    BOOST_CHECK_EQUAL(pblocktemplate->block->vtx.size(), 5UL);
 
     chainActive.Tip()->nHeight--;
     SetMockTime(0);

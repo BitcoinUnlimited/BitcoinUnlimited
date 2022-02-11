@@ -343,8 +343,8 @@ BOOST_AUTO_TEST_CASE(ccoins_serialization)
     script1 << OP_DUP << OP_HASH160 << ToByteVector(keyid1) << OP_EQUALVERIFY << OP_CHECKSIG;
 
     BOOST_CHECK_EQUAL(cc1.fCoinBase, false);
-    BOOST_CHECK_EQUAL(cc1.nHeight, 203998);
-    BOOST_CHECK_EQUAL(cc1.out.nValue, 60000000000ULL);
+    BOOST_CHECK_EQUAL(cc1.nHeight, static_cast<unsigned int>(203998));
+    BOOST_CHECK_EQUAL(cc1.out.nValue, 60000000000LL);
     BOOST_CHECK_EQUAL(HexStr(cc1.out.scriptPubKey), HexStr(script1));
 
     // Good example
@@ -357,7 +357,7 @@ BOOST_AUTO_TEST_CASE(ccoins_serialization)
     script2 << OP_DUP << OP_HASH160 << ToByteVector(keyid2) << OP_EQUALVERIFY << OP_CHECKSIG;
 
     BOOST_CHECK_EQUAL(cc2.fCoinBase, true);
-    BOOST_CHECK_EQUAL(cc2.nHeight, 120891);
+    BOOST_CHECK_EQUAL(cc2.nHeight, static_cast<unsigned int>(120891));
     BOOST_CHECK_EQUAL(cc2.out.nValue, 110397);
     BOOST_CHECK_EQUAL(HexStr(cc2.out.scriptPubKey), HexStr(script2));
 
@@ -366,9 +366,9 @@ BOOST_AUTO_TEST_CASE(ccoins_serialization)
     Coin cc3;
     ss3 >> cc3;
     BOOST_CHECK_EQUAL(cc3.fCoinBase, false);
-    BOOST_CHECK_EQUAL(cc3.nHeight, 0);
-    BOOST_CHECK_EQUAL(cc3.out.nValue, 0);
-    BOOST_CHECK_EQUAL(cc3.out.scriptPubKey.size(), 0);
+    BOOST_CHECK_EQUAL(cc3.nHeight, static_cast<unsigned int>(0));
+    BOOST_CHECK_EQUAL(cc3.out.nValue, static_cast<unsigned int>(0));
+    BOOST_CHECK_EQUAL(cc3.out.scriptPubKey.size(), static_cast<unsigned int>(0));
 
     // scriptPubKey that ends beyond the end of the stream
     CDataStream ss4(ParseHex("000007"), SER_DISK, CLIENT_VERSION);
