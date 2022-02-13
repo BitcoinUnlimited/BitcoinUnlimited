@@ -12,7 +12,7 @@
 #include "clientversion.h"
 #include "streams.h"
 
-#include<algorithm>
+#include <algorithm>
 
 RecentRequestsTableModel::RecentRequestsTableModel(CWallet *wallet, WalletModel *parent)
     : QAbstractTableModel(parent), walletModel(parent)

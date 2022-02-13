@@ -95,10 +95,10 @@ public:
     void updateEntry(const QString &address, const QString &label, bool isMine, const QString &purpose, int status)
     {
         // Find address / label in model
-        QList<AddressTableEntry>::iterator lower =
-            std::lower_bound(cachedAddressTable.begin(), cachedAddressTable.end(), address, AddressTableEntryLessThan());
-        QList<AddressTableEntry>::iterator upper =
-            std::upper_bound(cachedAddressTable.begin(), cachedAddressTable.end(), address, AddressTableEntryLessThan());
+        QList<AddressTableEntry>::iterator lower = std::lower_bound(
+            cachedAddressTable.begin(), cachedAddressTable.end(), address, AddressTableEntryLessThan());
+        QList<AddressTableEntry>::iterator upper = std::upper_bound(
+            cachedAddressTable.begin(), cachedAddressTable.end(), address, AddressTableEntryLessThan());
         int lowerIndex = (lower - cachedAddressTable.begin());
         int upperIndex = (upper - cachedAddressTable.begin());
         bool inModel = (lower != upper);

@@ -13,9 +13,9 @@
 #include "util.h"
 #include "utiltime.h"
 
+#include <condition_variable>
 #include <mutex>
 #include <shared_mutex>
-#include <condition_variable>
 
 /**
  * Template mixin that adds -Wthread-safety locking

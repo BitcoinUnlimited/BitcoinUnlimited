@@ -15,11 +15,11 @@
 #include "cuckoocache.h"
 #include <boost/thread.hpp>
 
-#include <mutex>
-#include <shared_mutex>
 #include <boost/thread/lock_types.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/shared_mutex.hpp>
+#include <mutex>
+#include <shared_mutex>
 
 
 namespace

@@ -30,8 +30,8 @@
 
 #include <algorithm>
 #include <boost/scope_exit.hpp>
-#include <unordered_set>
 #include <mutex>
+#include <unordered_set>
 
 extern CTweak<int> maxReorgDepth;
 void ProcessOrphans(std::vector<uint256> &vWorkQueue);

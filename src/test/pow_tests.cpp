@@ -27,7 +27,8 @@ BOOST_AUTO_TEST_CASE(get_next_work)
     pindexLast.nHeight = 32255;
     pindexLast.nTime = 1262152739; // Block #32255
     pindexLast.nBits = 0x1d00ffff;
-    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), static_cast<unsigned int>(0x1d00d86a));
+    BOOST_CHECK_EQUAL(
+        CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), static_cast<unsigned int>(0x1d00d86a));
 }
 
 /* Test the constraint on the upper bound for next work */
