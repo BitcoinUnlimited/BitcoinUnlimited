@@ -25,6 +25,7 @@ $(package)_config_opts_debug = -debug
 $(package)_config_opts += -bindir $(build_prefix)/bin
 $(package)_config_opts += -c++std c++11
 $(package)_config_opts += -confirm-license
+$(package)_config_opts += -dbus-runtime
 $(package)_config_opts += -hostprefix $(build_prefix)
 $(package)_config_opts += -no-compile-examples
 $(package)_config_opts += -no-cups
@@ -103,12 +104,8 @@ $(package)_config_opts += -no-feature-vnc
 $(package)_config_opts += -no-feature-wizard
 $(package)_config_opts += -no-feature-xml
 
-
-$(package)_config_opts_darwin = -no-dbus
-$(package)_config_opts_darwin += -no-opengl
-
 ifneq ($(build_os),darwin)
-$(package)_config_opts_darwin += -xplatform macx-clang-linux
+$(package)_config_opts_darwin = -xplatform macx-clang-linux
 $(package)_config_opts_darwin += -device-option MAC_SDK_PATH=$(OSX_SDK)
 $(package)_config_opts_darwin += -device-option MAC_SDK_VERSION=$(OSX_SDK_VERSION)
 $(package)_config_opts_darwin += -device-option CROSS_COMPILE="$(host)-"
@@ -128,12 +125,7 @@ $(package)_config_opts_arm_linux += -platform linux-g++ -xplatform bitcoin-linux
 $(package)_config_opts_i686_linux  = -xplatform linux-g++-32
 $(package)_config_opts_x86_64_linux = -xplatform linux-g++-64
 $(package)_config_opts_aarch64_linux = -xplatform linux-aarch64-gnu-g++
-
-$(package)_config_opts_mingw32 = -no-opengl
-$(package)_config_opts_mingw32 += -no-dbus
-$(package)_config_opts_mingw32 += -xplatform win32-g++
-$(package)_config_opts_mingw32 += -device-option CROSS_COMPILE="$(host)-"
-
+$(package)_config_opts_mingw32  = -no-opengl -xplatform win32-g++ -device-option CROSS_COMPILE="$(host)-"
 $(package)_build_env  = QT_RCC_TEST=1
 $(package)_build_env += QT_RCC_SOURCE_DATE_OVERRIDE=1
 endef
