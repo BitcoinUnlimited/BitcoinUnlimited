@@ -474,8 +474,8 @@ build-osx-depends:
     extends: .cache-osx
     script:
         - mkdir -p depends/sdk-sources; mkdir depends/SDKs
-        - curl --location --fail https://www.bitcoinunlimited.info/sdks/MacOSX10.15.sdk.tar.xz -o ./depends/sdk-sources/MacOSX10.15.sdk.tar.xz
-        - tar -C depends/SDKs -xf depends/sdk-sources/MacOSX10.15.sdk.tar.xz
+        - curl --location --fail https://www.bitcoinunlimited.info/sdks/MacOSX10.14.sdk.tar.xz -o ./depends/sdk-sources/MacOSX10.14.sdk.tar.xz
+        - tar -C depends/SDKs -xf depends/sdk-sources/MacOSX10.14.sdk.tar.xz
         - cd depends
         - make HOST=x86_64-apple-darwin16 -j `nproc` NO_RUST=1
         - ccache --show-stats
