@@ -283,8 +283,8 @@ test-debian-qa-electrscash:
 .debian-clang-env:
     extends: .cache-debian-clang
     variables:
-        CC: clang-9
-        CXX: clang++-9
+        CC: clang-10
+        CXX: clang++-10
 
 build-debian-clang:
     stage: build
