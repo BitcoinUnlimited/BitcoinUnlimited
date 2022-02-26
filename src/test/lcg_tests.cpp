@@ -14,38 +14,38 @@ BOOST_AUTO_TEST_CASE(lcg_test1) {
         MMIXLinearCongruentialGenerator lcg;
         // We want that the first iteration is 0 which is a helpful special
         // case.
-        BOOST_CHECK_EQUAL(lcg.next(), 0x00000000);
+        BOOST_CHECK_EQUAL(lcg.next(), 0x00000000U);
         for (int i = 0; i < 99; i++) {
             lcg.next();
         }
         // Make sure the LCG is producing expected value after many iterations.
         // This ensures mul and add overflows are acting as expected on this
         // architecture.
-        BOOST_CHECK_EQUAL(lcg.next(), 0xf306b780);
+        BOOST_CHECK_EQUAL(lcg.next(), 0xf306b780U);
     }
     {
         MMIXLinearCongruentialGenerator lcg(42);
         // We this also should make first iteration as 0.
-        BOOST_CHECK_EQUAL(lcg.next(), 0x00000000);
+        BOOST_CHECK_EQUAL(lcg.next(), 0x00000000U);
         for (int i = 0; i < 99; i++) {
             lcg.next();
         }
         // Make sure the LCG is producing expected value after many iterations.
         // This ensures mul and add overflows are acting as expected on this
         // architecture.
-        BOOST_CHECK_EQUAL(lcg.next(), 0x3b96faf3);
+        BOOST_CHECK_EQUAL(lcg.next(), 0x3b96faf3U);
     }
     {
         // just some big seed
         MMIXLinearCongruentialGenerator lcg(0xdeadbeef00000000);
-        BOOST_CHECK_EQUAL(lcg.next(), 0xdeadbeef);
+        BOOST_CHECK_EQUAL(lcg.next(), 0xdeadbeefU);
         for (int i = 0; i < 99; i++) {
             lcg.next();
         }
         // Make sure the LCG is producing expected value after many iterations.
         // This ensures mul and add overflows are acting as expected on this
         // architecture.
-        BOOST_CHECK_EQUAL(lcg.next(), 0x6b00b1df);
+        BOOST_CHECK_EQUAL(lcg.next(), 0x6b00b1dfU);
     }
 }
 

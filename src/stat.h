@@ -5,9 +5,23 @@
 #ifndef STAT_H
 #define STAT_H
 
+// those clang pragmas are needed to suppress warning generated
+// by boost library code
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#pragma clang diagnostic ignored "-Wshadow"
+#endif
+
 #include <boost/asio.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/bind/bind.hpp>
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
+
 #include <chrono>
 // c++11 #include <type_traits>
 #include "univalue/include/univalue.h"
@@ -726,6 +740,5 @@ public:
 
 // Get the named statistic.  Returns nullptr if it does not exist
 CStatBase *GetStat(char *name);
-
 
 #endif

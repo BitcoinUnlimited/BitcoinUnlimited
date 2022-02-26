@@ -28,6 +28,7 @@
 #include <QIcon>
 #include <QList>
 
+#include <algorithm>
 // Amount column is right-aligned it contains numbers
 static int column_alignments[] = {
     Qt::AlignLeft | Qt::AlignVCenter, /* status */
@@ -89,9 +90,9 @@ public:
 
         // Find bounds of this transaction in model
         QList<TransactionRecord>::iterator lower =
-            qLowerBound(cachedWallet.begin(), cachedWallet.end(), hash, TxLessThan());
+            std::lower_bound(cachedWallet.begin(), cachedWallet.end(), hash, TxLessThan());
         QList<TransactionRecord>::iterator upper =
-            qUpperBound(cachedWallet.begin(), cachedWallet.end(), hash, TxLessThan());
+            std::upper_bound(cachedWallet.begin(), cachedWallet.end(), hash, TxLessThan());
         int lowerIndex = (lower - cachedWallet.begin());
         int upperIndex = (upper - cachedWallet.begin());
         bool inModel = (lower != upper);

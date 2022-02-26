@@ -213,7 +213,7 @@ BOOST_AUTO_TEST_CASE(iterator_ordering)
 {
     fs::path ph = fs::temp_directory_path() / fs::unique_path();
     CDBWrapper dbw(ph, (1 << 20), true, false, false);
-    for (int x = 0x00; x < 256; ++x)
+    for (unsigned int x = 0x00; x < 256; ++x)
     {
         uint8_t key = x;
         uint32_t value = x * x;
@@ -229,7 +229,7 @@ BOOST_AUTO_TEST_CASE(iterator_ordering)
         else
             seek_start = 0x80;
         it->Seek((uint8_t)seek_start);
-        for (int x = seek_start; x < 256; ++x)
+        for (unsigned int x = seek_start; x < 256; ++x)
         {
             uint8_t key;
             uint32_t value;
@@ -319,7 +319,7 @@ BOOST_AUTO_TEST_CASE(iterator_string_ordering)
         sprintf(buf, "%d", seek_start);
         StringContentsSerializer seek_key(buf);
         it->Seek(seek_key);
-        for (int x = seek_start; x < 10; ++x)
+        for (unsigned int x = seek_start; x < 10; ++x)
         {
             for (int y = 0; y < 10; y++)
             {

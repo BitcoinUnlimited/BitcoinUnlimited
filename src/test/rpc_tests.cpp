@@ -285,13 +285,13 @@ BOOST_AUTO_TEST_CASE(rpc_ban)
     ;
     BOOST_CHECK_NO_THROW(r = CallRPC(string("listbanned")));
     ar = r.get_array();
-    BOOST_CHECK_EQUAL(ar.size(), 0);
+    BOOST_CHECK_EQUAL(ar.size(), 0UL);
 
     // check setting a bantime in the past
     BOOST_CHECK_THROW(r = CallRPC(string("setban 127.0.0.0/24 add 1607000000 true")), runtime_error);
     BOOST_CHECK_NO_THROW(r = CallRPC(string("listbanned")));
     ar = r.get_array();
-    BOOST_CHECK_EQUAL(ar.size(), 0);
+    BOOST_CHECK_EQUAL(ar.size(), 0UL);
 
     // check setting a bantime in the future
     BOOST_CHECK_NO_THROW(r = CallRPC(string("setban 127.0.0.0/24 add 3000000000 true")));
@@ -323,7 +323,7 @@ BOOST_AUTO_TEST_CASE(rpc_ban)
     ;
     BOOST_CHECK_NO_THROW(r = CallRPC(string("listbanned")));
     ar = r.get_array();
-    BOOST_CHECK_EQUAL(ar.size(), 0);
+    BOOST_CHECK_EQUAL(ar.size(), 0UL);
 
     BOOST_CHECK_NO_THROW(r = CallRPC(string("setban 127.0.0.0/255.255.0.0 add")));
     BOOST_CHECK_THROW(r = CallRPC(string("setban 127.0.1.1 add")), runtime_error);
@@ -331,7 +331,7 @@ BOOST_AUTO_TEST_CASE(rpc_ban)
     BOOST_CHECK_NO_THROW(CallRPC(string("clearbanned")));
     BOOST_CHECK_NO_THROW(r = CallRPC(string("listbanned")));
     ar = r.get_array();
-    BOOST_CHECK_EQUAL(ar.size(), 0);
+    BOOST_CHECK_EQUAL(ar.size(), 0UL);
 
 
     BOOST_CHECK_THROW(r = CallRPC(string("setban test add")), runtime_error); // invalid IP

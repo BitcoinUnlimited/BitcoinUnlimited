@@ -283,8 +283,8 @@ test-debian-qa-electrscash:
 .debian-clang-env:
     extends: .cache-debian-clang
     variables:
-        CC: clang-9
-        CXX: clang++-9
+        CC: clang-10
+        CXX: clang++-10
 
 build-debian-clang:
     stage: build
@@ -293,7 +293,7 @@ build-debian-clang:
     script:
         - ./autogen.sh
         - mkdir build; cd build
-        - ../configure --cache-file=config.cache --enable-zmq --with-gui=qt5 --with-incompatible-bdb CPPFLAGS=-DDEBUG_LOCKORDER CXXFLAGS="-std=c++14"
+        - ../configure --cache-file=config.cache --enable-zmq --with-gui=qt5 --with-incompatible-bdb CPPFLAGS=-DDEBUG_LOCKORDER
         - make -j `nproc`
         - ccache --show-stats
     artifacts:
@@ -467,21 +467,21 @@ build-win-32:
             - ccache/
             - depends/sources
             - depends/built
-            - depends/x86_64-apple-darwin11
+            - depends/x86_64-apple-darwin16
 
 build-osx-depends:
     stage: build_depends
     extends: .cache-osx
     script:
         - mkdir -p depends/sdk-sources; mkdir depends/SDKs
-        - curl --location --fail https://www.bitcoinunlimited.info/sdks/MacOSX10.11.sdk.tar.gz -o ./depends/sdk-sources/MacOSX10.11.sdk.tar.gz
-        - tar -C depends/SDKs -xf depends/sdk-sources/MacOSX10.11.sdk.tar.gz
+        - curl --location --fail https://www.bitcoinunlimited.info/sdks/MacOSX10.14.sdk.tar.xz -o ./depends/sdk-sources/MacOSX10.14.sdk.tar.xz
+        - tar -C depends/SDKs -xf depends/sdk-sources/MacOSX10.14.sdk.tar.xz
         - cd depends
-        - make HOST=x86_64-apple-darwin11 -j `nproc` NO_RUST=1
+        - make HOST=x86_64-apple-darwin16 -j `nproc` NO_RUST=1
         - ccache --show-stats
     artifacts:
         paths:
-            - depends/x86_64-apple-darwin11
+            - depends/x86_64-apple-darwin16
             - depends/SDKs
 
 build-osx:
@@ -491,7 +491,7 @@ build-osx:
     script:
         - ./autogen.sh
         - mkdir build; cd build
-        - ../configure --enable-reduce-exports --prefix=$PWD/../depends/x86_64-apple-darwin11
+        - ../configure --enable-reduce-exports --prefix=$PWD/../depends/x86_64-apple-darwin16
         - make -j `nproc`
         - ccache --show-stats
     dependencies:
@@ -500,7 +500,7 @@ build-osx:
         when: on_failure
         paths:
             - build/config.log
-            - depends/x86_64-apple-darwin11/share/config.site
+            - depends/x86_64-apple-darwin16/share/config.site
 
 #Linux32-bit
 .cache-debian-32:

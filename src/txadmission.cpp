@@ -27,12 +27,13 @@
 #include "utiltime.h"
 #include "validation/validation.h"
 #include "validationinterface.h"
-#include <map>
-#include <string>
-#include <vector>
 
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/thread/thread.hpp>
+#include <map>
+#include <mutex>
+#include <string>
+#include <vector>
 
 using namespace std;
 
@@ -53,7 +54,7 @@ void ProcessOrphans(std::vector<uint256> &vWorkQueue);
 
 CTransactionRef CommitQGet(uint256 hash)
 {
-    boost::unique_lock<boost::mutex> lock(csCommitQ);
+    std::unique_lock<std::mutex> lock(csCommitQ);
     std::map<uint256, CTxCommitData>::iterator it = txCommitQ->find(hash);
     if (it == txCommitQ->end())
         return nullptr;
@@ -120,10 +121,10 @@ void FlushTxAdmission()
         } while (!empty);
 
         {
-            boost::unique_lock<boost::mutex> lock(csCommitQ);
+            std::unique_lock<std::mutex> lock(csCommitQ);
             do // wait for the commit thread to commit everything
             {
-                cvCommitQ.timed_wait(lock, boost::posix_time::milliseconds(100));
+                cvCommitQ.wait_for(lock, std::chrono::milliseconds(100));
             } while (!txCommitQ->empty());
         }
 
@@ -134,7 +135,7 @@ void FlushTxAdmission()
                 empty = txInQ.empty() & txDeferQ.empty();
             }
             {
-                boost::unique_lock<boost::mutex> lock(csCommitQ);
+                std::unique_lock<std::mutex> lock(csCommitQ);
                 empty &= txCommitQ->empty();
             }
         }
@@ -201,7 +202,7 @@ unsigned int TxAlreadyHave(const CInv &inv)
         if (recentRejects.contains(inv.hash))
             return 2;
         {
-            boost::unique_lock<boost::mutex> lock(csCommitQ);
+            std::unique_lock<std::mutex> lock(csCommitQ);
             const auto &elem = txCommitQ->find(inv.hash);
             if (elem != txCommitQ->end())
             {
@@ -226,10 +227,10 @@ void ThreadCommitToMempool()
     while (shutdown_threads.load() == false)
     {
         {
-            boost::unique_lock<boost::mutex> lock(csCommitQ);
+            std::unique_lock<std::mutex> lock(csCommitQ);
             do
             {
-                cvCommitQ.timed_wait(lock, boost::posix_time::milliseconds(2000));
+                cvCommitQ.wait_for(lock, std::chrono::milliseconds(2000));
                 if (shutdown_threads.load() == true)
                 {
                     return;
@@ -294,7 +295,7 @@ void CommitTxToMempool()
         WRITELOCK(mempool.cs_txmempool);
 
         {
-            boost::unique_lock<boost::mutex> lock(csCommitQ);
+            std::unique_lock<std::mutex> lock(csCommitQ);
             avgCommitBatchSize = (avgCommitBatchSize * 24 + txCommitQ->size()) / 25;
             txCommitQFinal = txCommitQ;
             txCommitQ = new std::map<uint256, CTxCommitData>();
@@ -1231,7 +1232,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             eData.entry = std::move(entry);
             eData.hash = hash;
 
-            boost::unique_lock<boost::mutex> lock(csCommitQ);
+            std::unique_lock<std::mutex> lock(csCommitQ);
             (*txCommitQ).emplace(eData.hash, eData);
         }
     }

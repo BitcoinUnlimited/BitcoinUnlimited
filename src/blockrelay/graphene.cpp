@@ -23,6 +23,8 @@
 #include "validation/validation.h"
 
 #include <iomanip>
+#include <mutex>
+
 static bool ReconstructBlock(CNode *pfrom,
     std::shared_ptr<CBlockThinRelay> pblock,
     const std::map<uint64_t, CTransactionRef> &mapTxFromPools);
@@ -495,7 +497,7 @@ bool CGrapheneBlock::HandleMessage(CDataStream &vRecv, CNode *pfrom, std::string
 void CGrapheneBlock::FillTxMapFromPools(std::map<uint64_t, CTransactionRef> &mapTxFromPools)
 {
     {
-        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        std::unique_lock<std::mutex> lock(csCommitQ);
         for (auto &kv : *txCommitQ)
         {
             uint64_t cheapHash = GetShortID(shorttxidk0, shorttxidk1, kv.first, version);
@@ -1629,7 +1631,7 @@ CMemPoolInfo GetGrapheneMempoolInfo()
     // in the txCommitQ that have been processed and valid, and which will be in the mempool shortly.
     uint64_t nCommitQ = 0;
     {
-        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        std::unique_lock<std::mutex> lock(csCommitQ);
         nCommitQ = txCommitQ->size();
     }
     return CMemPoolInfo(mempool.size() + orphanpool.GetOrphanPoolSize() + nCommitQ);

@@ -30,6 +30,7 @@
 
 #include <algorithm>
 #include <boost/scope_exit.hpp>
+#include <mutex>
 #include <unordered_set>
 
 extern CTweak<int> maxReorgDepth;
@@ -3257,7 +3258,7 @@ bool DisconnectTip(CValidationState &state, const Consensus::Params &consensusPa
     {
         WRITELOCK(mempool.cs_txmempool);
         mempool._clear();
-        boost::unique_lock<boost::mutex> lock(csCommitQ);
+        std::unique_lock<std::mutex> lock(csCommitQ);
         txCommitQ->clear();
     }
     else

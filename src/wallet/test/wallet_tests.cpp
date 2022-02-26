@@ -363,7 +363,7 @@ BOOST_AUTO_TEST_CASE(ApproximateBestSubset)
     // We need all 100 larger coins and exactly one small coin.
     // Superfluous small coins must be trimmed from the set:
     BOOST_CHECK_EQUAL(nValueRet, 100010 * COIN);
-    BOOST_CHECK_EQUAL(setCoinsRet.size(), 101);
+    BOOST_CHECK_EQUAL(setCoinsRet.size(), 101UL);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

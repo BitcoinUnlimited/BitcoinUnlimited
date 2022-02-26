@@ -38,7 +38,7 @@ void CheckAncestors(MempoolData &expected_result, CTxMemPool &pool)
     BOOST_CHECK_EQUAL(iter->GetCountWithAncestors(), expected_result.nCountWithAncestors);
     BOOST_CHECK_EQUAL(iter->GetSizeWithAncestors(), expected_result.nSizeWithAncestors);
     BOOST_CHECK_EQUAL(iter->GetSigOpCountWithAncestors(), expected_result.nSigopsWithAncestors);
-    BOOST_CHECK_EQUAL(iter->GetModFeesWithAncestors(), expected_result.nFeesWithAncestors);
+    BOOST_CHECK_EQUAL(iter->GetModFeesWithAncestors(), static_cast<long long>(expected_result.nFeesWithAncestors));
     BOOST_CHECK_EQUAL(iter->IsDirty(), expected_result.fDirty);
 }
 
@@ -703,7 +703,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
     // Validate the current state is correct
     /* clang-format off */
-    BOOST_CHECK_EQUAL(pool.size(), 49);
+    BOOST_CHECK_EQUAL(pool.size(), 49UL);
     std::vector<MempoolData> txns_expected =
     {
         // Chain1:
@@ -970,7 +970,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     // Now assume they were mined and do a removeForBlock()
     std::list<CTransactionRef> dummy;
     pool.removeForBlock(vtx, 1, dummy, false);
-    BOOST_CHECK_EQUAL(pool.size(), 41);
+    BOOST_CHECK_EQUAL(pool.size(), 41UL);
 
     // Validate the new state is correct
     //
@@ -1053,7 +1053,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     vtx.push_back(MakeTransactionRef(tx40));
     vtx.push_back(MakeTransactionRef(tx41));
     pool.removeForBlock(vtx, 1, dummy, false);
-    BOOST_CHECK_EQUAL(pool.size(), 39);
+    BOOST_CHECK_EQUAL(pool.size(), 39UL);
 
 
     /* clang-format off */
@@ -1091,7 +1091,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     vtx.push_back(MakeTransactionRef(tx6));
     vtx.push_back(MakeTransactionRef(tx7));
     pool.removeForBlock(vtx, 1, dummy, false);
-    BOOST_CHECK_EQUAL(pool.size(), 36);
+    BOOST_CHECK_EQUAL(pool.size(), 36UL);
 
     /* clang-format off */
     std::vector<MempoolData> txns_result3 =
@@ -1136,7 +1136,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     vtx.push_back(MakeTransactionRef(tx9));
     vtx.push_back(MakeTransactionRef(tx10));
     pool.removeForBlock(vtx, 1, dummy, false);
-    BOOST_CHECK_EQUAL(pool.size(), 33);
+    BOOST_CHECK_EQUAL(pool.size(), 33UL);
 
     /* clang-format off */
     std::vector<MempoolData> txns_result4 =
@@ -1181,7 +1181,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     vtx.push_back(MakeTransactionRef(tx14));
     vtx.push_back(MakeTransactionRef(tx20));
     pool.removeForBlock(vtx, 1, dummy, false);
-    BOOST_CHECK_EQUAL(pool.size(), 30);
+    BOOST_CHECK_EQUAL(pool.size(), 30UL);
 
     /* clang-format off */
     std::vector<MempoolData> txns_result5 =
@@ -1224,7 +1224,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     vtx.push_back(MakeTransactionRef(tx13));
     vtx.push_back(MakeTransactionRef(tx15));
     pool.removeForBlock(vtx, 1, dummy, false);
-    BOOST_CHECK_EQUAL(pool.size(), 27);
+    BOOST_CHECK_EQUAL(pool.size(), 27UL);
 
     /* clang-format off */
     std::vector<MempoolData> txns_result6 =
@@ -1287,7 +1287,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     vtx.push_back(MakeTransactionRef(tx22));
     vtx.push_back(MakeTransactionRef(tx23));
     pool.removeForBlock(vtx, 1, dummy, false);
-    BOOST_CHECK_EQUAL(pool.size(), 25);
+    BOOST_CHECK_EQUAL(pool.size(), 25UL);
 
     /* clang-format off */
     std::vector<MempoolData> txns_result7 =
@@ -1330,7 +1330,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     vtx.push_back(MakeTransactionRef(tx33));
     vtx.push_back(MakeTransactionRef(tx34));
     pool.removeForBlock(vtx, 1, dummy, false);
-    BOOST_CHECK_EQUAL(pool.size(), 22);
+    BOOST_CHECK_EQUAL(pool.size(), 22UL);
 
     /* clang-format off */
     std::vector<MempoolData> txns_result8 =
@@ -1372,7 +1372,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     vtx.push_back(MakeTransactionRef(tx27));
     vtx.push_back(MakeTransactionRef(tx28));
     pool.removeForBlock(vtx, 1, dummy, false);
-    BOOST_CHECK_EQUAL(pool.size(), 18);
+    BOOST_CHECK_EQUAL(pool.size(), 18UL);
 
     /* clang-format off */
     std::vector<MempoolData> txns_result9 =
@@ -1398,7 +1398,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
         {tx38.GetHash(), 7, 725, 7, 3613000},
     };
     pool.removeForBlock(vtx, 1, dummy, false);
-    BOOST_CHECK_EQUAL(pool.size(), 18);
+    BOOST_CHECK_EQUAL(pool.size(), 18UL);
 
     /* clang-format on */
 
@@ -1417,7 +1417,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     vtx.push_back(MakeTransactionRef(tx32));
     vtx.push_back(MakeTransactionRef(tx35));
     pool.removeForBlock(vtx, 1, dummy, false);
-    BOOST_CHECK_EQUAL(pool.size(), 14);
+    BOOST_CHECK_EQUAL(pool.size(), 14UL);
 
     /* clang-format off */
     std::vector<MempoolData> txns_result10 =
@@ -1490,7 +1490,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
     vtx.push_back(MakeTransactionRef(tx48));
     vtx.push_back(MakeTransactionRef(tx49));
     pool.removeForBlock(vtx, 1, dummy, false);
-    BOOST_CHECK_EQUAL(pool.size(), 0);
+    BOOST_CHECK_EQUAL(pool.size(), 0UL);
 
 
     /*
@@ -1700,7 +1700,7 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateChainStateTest)
 
     // Validate the current state is correct
     /* clang-format off */
-    BOOST_CHECK_EQUAL(pool.size(), 49);
+    BOOST_CHECK_EQUAL(pool.size(), 49UL);
     std::vector<MempoolData> txns_fully_updated =
     {
         // Chain1:
@@ -1817,12 +1817,12 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest)
 
     // Nothing in pool, remove should do nothing:
     testPool.removeRecursive(txParent, removed);
-    BOOST_CHECK_EQUAL(removed.size(), 0);
+    BOOST_CHECK_EQUAL(removed.size(), 0UL);
 
     // Just the parent:
     testPool.addUnchecked(txParent.GetHash(), entry.FromTx(txParent));
     testPool.removeRecursive(txParent, removed);
-    BOOST_CHECK_EQUAL(removed.size(), 1);
+    BOOST_CHECK_EQUAL(removed.size(), 1UL);
     removed.clear();
 
     // Parent, children, grandchildren:
@@ -1834,17 +1834,17 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest)
     }
     // Remove Child[0], GrandChild[0] should be removed:
     testPool.removeRecursive(txChild[0], removed);
-    BOOST_CHECK_EQUAL(removed.size(), 2);
+    BOOST_CHECK_EQUAL(removed.size(), 2UL);
     removed.clear();
     // ... make sure grandchild and child are gone:
     testPool.removeRecursive(txGrandChild[0], removed);
-    BOOST_CHECK_EQUAL(removed.size(), 0);
+    BOOST_CHECK_EQUAL(removed.size(), 0UL);
     testPool.removeRecursive(txChild[0], removed);
-    BOOST_CHECK_EQUAL(removed.size(), 0);
+    BOOST_CHECK_EQUAL(removed.size(), 0UL);
     // Remove parent, all children/grandchildren should go:
     testPool.removeRecursive(txParent, removed);
-    BOOST_CHECK_EQUAL(removed.size(), 5);
-    BOOST_CHECK_EQUAL(testPool.size(), 0);
+    BOOST_CHECK_EQUAL(removed.size(), 5UL);
+    BOOST_CHECK_EQUAL(testPool.size(), 0UL);
     removed.clear();
 
     // Add children and grandchildren, but NOT the parent (simulate the parent being in a block)
@@ -1856,8 +1856,8 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest)
     // Now remove the parent, as might happen if a block-re-org occurs but the parent cannot be
     // put into the mempool (maybe because it is non-standard):
     testPool.removeRecursive(txParent, removed);
-    BOOST_CHECK_EQUAL(removed.size(), 6);
-    BOOST_CHECK_EQUAL(testPool.size(), 0);
+    BOOST_CHECK_EQUAL(removed.size(), 6UL);
+    BOOST_CHECK_EQUAL(testPool.size(), 0UL);
     removed.clear();
 }
 
@@ -1926,7 +1926,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest)
     tx5.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx5.vout[0].nValue = 11 * COIN;
     pool.addUnchecked(tx5.GetHash(), entry.Fee(10000LL).Time(GetTime() + 5).FromTx(tx5));
-    BOOST_CHECK_EQUAL(pool.size(), 5);
+    BOOST_CHECK_EQUAL(pool.size(), 5UL);
 
     std::vector<std::string> sortedOrder;
     sortedOrder.resize(5);
@@ -1950,7 +1950,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest)
     uint64_t tx6Size = ::GetSerializeSize(tx6, SER_NETWORK, PROTOCOL_VERSION);
 
     pool.addUnchecked(tx6.GetHash(), entry.Fee(0LL).Time(GetTime() + 6).FromTx(tx6));
-    BOOST_CHECK_EQUAL(pool.size(), 6);
+    BOOST_CHECK_EQUAL(pool.size(), 6UL);
     // Ties are broken by time
     sortedOrder.push_back(tx6.GetHash().ToString());
     CheckSort<ancestor_score>(pool, sortedOrder);
@@ -1969,7 +1969,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest)
 
     // CTxMemPoolEntry entry7(tx7, fee, 2, 10.0, 1, true);
     pool.addUnchecked(tx7.GetHash(), entry.Fee(fee).Time(GetTime() + 7).FromTx(tx7));
-    BOOST_CHECK_EQUAL(pool.size(), 7);
+    BOOST_CHECK_EQUAL(pool.size(), 7UL);
     sortedOrder.insert(sortedOrder.begin() + 1, tx7.GetHash().ToString());
     CheckSort<ancestor_score>(pool, sortedOrder);
 

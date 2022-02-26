@@ -38,16 +38,16 @@ BOOST_AUTO_TEST_CASE(decode1)
 
     stream >> xver;
 
-    BOOST_CHECK_EQUAL(xver.xmap.size(), 5);
+    BOOST_CHECK_EQUAL(xver.xmap.size(), 5UL);
     BOOST_CHECK(xver.xmap[0x11] == std::vector<uint8_t>(1, 0x22));
     BOOST_CHECK(xver.xmap[0x66] == std::vector<uint8_t>());
     BOOST_CHECK(xver.xmap[0x67] == std::vector<uint8_t>(2, 0xff));
-    BOOST_CHECK_EQUAL(xver.as_u64c(0x11), 0x22);
-    BOOST_CHECK_EQUAL(xver.as_u64c(0x33), 0x44);
-    BOOST_CHECK_EQUAL(xver.as_u64c(0x55), 0x66);
-    BOOST_CHECK_EQUAL(xver.as_u64c(0x66), 0x00); // compact size decode failure
-    BOOST_CHECK_EQUAL(xver.as_u64c(0x67), 0x00); // compact size decode failure
-    BOOST_CHECK_EQUAL(xver.as_u64c(0x77), 0x00); // not in map
+    BOOST_CHECK_EQUAL(xver.as_u64c(0x11), 0x22ULL);
+    BOOST_CHECK_EQUAL(xver.as_u64c(0x33), 0x44ULL);
+    BOOST_CHECK_EQUAL(xver.as_u64c(0x55), 0x66ULL);
+    BOOST_CHECK_EQUAL(xver.as_u64c(0x66), 0x00ULL); // compact size decode failure
+    BOOST_CHECK_EQUAL(xver.as_u64c(0x67), 0x00ULL); // compact size decode failure
+    BOOST_CHECK_EQUAL(xver.as_u64c(0x77), 0x00ULL); // not in map
 
     BOOST_CHECK_EQUAL(xmap1.size(), GetSerializeSize(REF(CompactMapSerialization(xver.xmap)), SER_NETWORK, PROTOCOL_VERSION));
 }

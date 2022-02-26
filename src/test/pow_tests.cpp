@@ -27,7 +27,8 @@ BOOST_AUTO_TEST_CASE(get_next_work)
     pindexLast.nHeight = 32255;
     pindexLast.nTime = 1262152739; // Block #32255
     pindexLast.nBits = 0x1d00ffff;
-    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), 0x1d00d86a);
+    BOOST_CHECK_EQUAL(
+        CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), static_cast<unsigned int>(0x1d00d86a));
 }
 
 /* Test the constraint on the upper bound for next work */
@@ -41,7 +42,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_pow_limit)
     pindexLast.nHeight = 2015;
     pindexLast.nTime = 1233061996; // Block #2015
     pindexLast.nBits = 0x1d00ffff;
-    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), 0x1d00ffff);
+    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), 0x1d00ffffU);
 }
 
 /* Test the constraint on the lower bound for actual time taken */
@@ -55,7 +56,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_lower_limit_actual)
     pindexLast.nHeight = 68543;
     pindexLast.nTime = 1279297671; // Block #68543
     pindexLast.nBits = 0x1c05a3f4;
-    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), 0x1c0168fd);
+    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), 0x1c0168fdU);
 }
 
 /* Test the constraint on the upper bound for actual time taken */
@@ -69,7 +70,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_upper_limit_actual)
     pindexLast.nHeight = 46367;
     pindexLast.nTime = 1269211443; // Block #46367
     pindexLast.nBits = 0x1c387f6f;
-    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), 0x1d00e1fd);
+    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), 0x1d00e1fdU);
 }
 
 BOOST_AUTO_TEST_CASE(GetBlockProofEquivalentTime_test)
@@ -254,7 +255,7 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test)
     }
 
     // Check the actual value.
-    BOOST_CHECK_EQUAL(nBits, 0x1c0fe7b1);
+    BOOST_CHECK_EQUAL(nBits, 0x1c0fe7b1U);
 
     // If we dramatically shorten block production, difficulty increases faster.
     for (size_t j = 0; j < 20; i++, j++)
@@ -275,7 +276,7 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test)
     }
 
     // Check the actual value.
-    BOOST_CHECK_EQUAL(nBits, 0x1c0db19f);
+    BOOST_CHECK_EQUAL(nBits, 0x1c0db19fU);
 
     // We start to emit blocks significantly slower. The first block has no
     // impact.
@@ -283,7 +284,7 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test)
     nBits = GetNextCashWorkRequired(&blocks[i++], &blkHeaderDummy, params);
 
     // Check the actual value.
-    BOOST_CHECK_EQUAL(nBits, 0x1c0d9222);
+    BOOST_CHECK_EQUAL(nBits, 0x1c0d9222U);
 
     // If we dramatically slow down block production, difficulty decreases.
     for (size_t j = 0; j < 93; i++, j++)
@@ -305,13 +306,13 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test)
     }
 
     // Check the actual value.
-    BOOST_CHECK_EQUAL(nBits, 0x1c2f13b9);
+    BOOST_CHECK_EQUAL(nBits, 0x1c2f13b9U);
 
     // Due to the window of time being bounded, next block's difficulty actually
     // gets harder.
     blocks[i] = GetBlockIndex(&blocks[i - 1], 6000, nBits);
     nBits = GetNextCashWorkRequired(&blocks[i++], &blkHeaderDummy, params);
-    BOOST_CHECK_EQUAL(nBits, 0x1c2ee9bf);
+    BOOST_CHECK_EQUAL(nBits, 0x1c2ee9bfU);
 
     // And goes down again. It takes a while due to the window being bounded and
     // the skewed block causes 2 blocks to get out of the window.
@@ -334,7 +335,7 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test)
     }
 
     // Check the actual value.
-    BOOST_CHECK_EQUAL(nBits, 0x1d00ffff);
+    BOOST_CHECK_EQUAL(nBits, 0x1d00ffffU);
 
     // Once the difficulty reached the minimum allowed level, it doesn't get any
     // easier.
@@ -811,7 +812,7 @@ BOOST_AUTO_TEST_CASE(asert_activation_anchor_test)
     // If we consult DAA, then it uses cw144 which returns a significantly lower target because
     // we have been mining too fast by a ratio 600/500 for a whole day.
     BOOST_CHECK(!IsNov2020Activated(params, pindexPreActivation));
-    BOOST_CHECK_EQUAL(GetNextWorkRequired(pindexPreActivation, &blkHeaderDummy, params), 0x180236e1);
+    BOOST_CHECK_EQUAL(GetNextWorkRequired(pindexPreActivation, &blkHeaderDummy, params), 0x180236e1U);
 
     // ASERT has never run yet, so cache is unpopulated.
     BOOST_CHECK_EQUAL(GetASERTAnchorBlockCache(), nullptr);
@@ -825,25 +826,25 @@ BOOST_AUTO_TEST_CASE(asert_activation_anchor_test)
     // saw. Since solvetime is expected the next target is unchanged.
     CBlockIndex indexActivation0 = GetBlockIndex(pindexPreActivation, 600, 0x180236e1);
     BOOST_CHECK(IsNov2020Activated(params, &indexActivation0));
-    BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation0, &blkHeaderDummy, params), 0x180236e1);
+    BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation0, &blkHeaderDummy, params), 0x180236e1U);
     // second call will have used anchor cache, shouldn't change anything
     BOOST_CHECK_EQUAL(GetASERTAnchorBlockCache(), &indexActivation0);
-    BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation0, &blkHeaderDummy, params), 0x180236e1);
+    BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation0, &blkHeaderDummy, params), 0x180236e1U);
 
     // Now we'll generate some more activations/anchors, using unique targets for each one
     // (if the algo gets confused between different anchors, we will know).
 
     // Create an activating block with 0 solvetime, which will drop target by ~415/416.
-    CBlockIndex indexActivation1 = GetBlockIndex(pindexPreActivation, 0, 0x18023456);
+    CBlockIndex indexActivation1 = GetBlockIndex(pindexPreActivation, 0, 0x18023456U);
     BOOST_CHECK(IsNov2020Activated(params, &indexActivation1));
     // cache will be stale here, and we should get the right result regardless:
-    BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation1, &blkHeaderDummy, params), 0x180232fd);
+    BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation1, &blkHeaderDummy, params), 0x180232fdU);
     // second call will have used anchor cache, shouldn't change anything
     BOOST_CHECK_EQUAL(GetASERTAnchorBlockCache(), &indexActivation1);
-    BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation1, &blkHeaderDummy, params), 0x180232fd);
+    BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation1, &blkHeaderDummy, params), 0x180232fdU);
     // for good measure, try again with wiped cache
     ResetASERTAnchorBlockCache();
-    BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation1, &blkHeaderDummy, params), 0x180232fd);
+    BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation1, &blkHeaderDummy, params), 0x180232fdU);
     BOOST_CHECK_EQUAL(GetASERTAnchorBlockCache(), &indexActivation1);
 
     // Try activation with expected solvetime, which will keep target the same.
@@ -857,7 +858,7 @@ BOOST_AUTO_TEST_CASE(asert_activation_anchor_test)
     uint32_t anchorBits3 = 0x18034567;
     CBlockIndex indexActivation3 = GetBlockIndex(pindexPreActivation, 86400 * 90, anchorBits3);
     BOOST_CHECK(IsNov2020Activated(params, &indexActivation2));
-    BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation3, &blkHeaderDummy, params), 0x1d00ffff);
+    BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation3, &blkHeaderDummy, params), 0x1d00ffffU);
     // If the next block jumps back in time, we get back our original difficulty level.
     CBlockIndex indexActivation3_return = GetBlockIndex(&indexActivation3, -86400 * 90 + 2 * 600, anchorBits3);
     BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation3_return, &blkHeaderDummy, params), anchorBits3);
@@ -871,7 +872,7 @@ BOOST_AUTO_TEST_CASE(asert_activation_anchor_test)
     indexActivation4.nTime = activationTime;
     BOOST_CHECK_EQUAL(indexActivation4.GetMedianTimePast(), activationTime);
     BOOST_CHECK(IsNov2020Activated(params, &indexActivation4));
-    BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation4, &blkHeaderDummy, params), 0x18010db3);
+    BOOST_CHECK_EQUAL(GetNextWorkRequired(&indexActivation4, &blkHeaderDummy, params), 0x18010db3U);
     BOOST_CHECK_EQUAL(GetASERTAnchorBlockCache(), &indexActivation4);
 
     // Finally create a random chain on top of our second activation, using ASERT targets all the way.
