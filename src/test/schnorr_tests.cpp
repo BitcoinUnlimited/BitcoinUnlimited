@@ -46,12 +46,6 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
     bool r = EvalScript(stack, script, flags, MAXOPS, fsis, &err);
     BOOST_CHECK(!r);
     BOOST_CHECK_EQUAL(err, expected);
-    if (err != expected)
-    {
-        printf("err\n");
-        stacktype stack2{original_stack};
-        r = EvalScript(stack2, script, flags, MAXOPS, fsis, &err);
-    }
 }
 
 static void CheckPass(uint32_t flags, const stacktype &original_stack,
