@@ -23,7 +23,7 @@ packages:
 - "python3-git" # building electrscash
 - "clang" # for rocksdb in electrscash
 - "cmake" # for rocksdb in electrscash
-reference_datetime: "2020-08-20 00:00:00"
+reference_datetime: "2022-01-01 00:00:00"
 remotes:
 - "url": "https://github.com/BitcoinUnlimited/BitcoinUnlimited.git"
   "dir": "bitcoin"
