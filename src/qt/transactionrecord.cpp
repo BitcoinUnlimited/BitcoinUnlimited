@@ -48,6 +48,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
         // Credit
         //
         std::string labelPublic = "";
+        int nIDX = 0;
         for (const CTxOut &txout : wtx.vout)
         {
             isminetype mine = wallet->IsMine(txout);
@@ -55,7 +56,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             {
                 TransactionRecord sub(hash, nTime);
                 CTxDestination address;
-                sub.idx = parts.size(); // sequence number
+                sub.idx = nIDX;
                 sub.credit = txout.nValue;
                 sub.involvesWatchAddress = mine & ISMINE_WATCH_ONLY;
 
@@ -92,7 +93,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
 
                 parts.append(sub);
             }
-
+            ++nIDX;
             labelPublic = "";
         }
     }
