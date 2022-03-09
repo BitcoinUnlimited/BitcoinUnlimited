@@ -102,8 +102,8 @@ ScriptError VerifyWithFlag(const CTransaction &output, const CMutableTransaction
 {
     ScriptError error;
     CTransaction inputi(input);
-    TransactionSignatureChecker tsc(&inputi, 0, output.vout[0].nValue);
-    ScriptImportedState sis(&tsc, nullptr, std::vector<CTxOut>(), 0, output.vout[0].nValue);
+    TransactionSignatureChecker tsc(&inputi, 0, input.vout[0].nValue);
+    ScriptImportedState sis(&tsc, nullptr, std::vector<CTxOut>(), 0, input.vout[0].nValue);
     bool ret =
         VerifyScript(inputi.vin[0].scriptSig, output.vout[0].scriptPubKey, flags, MAX_OPS_PER_SCRIPT, sis, &error);
     BOOST_CHECK_EQUAL((ret == true), (error == SCRIPT_ERR_OK));
