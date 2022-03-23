@@ -704,9 +704,19 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     }
 
     uint32_t featureFlags = 0;
+    // FIXME OP_REVERSEBYTES should be considered as always active and hence
+    // we don't need SCRIPT_ENABLE_OP_REVERSEBYTES, whereas we should unconditionally
+    // add SCRIPT_VERIFY_INPUT_SIGCHECKS to the features flags, for more details see
+    // https://gitlab.com/bitcoinunlimited/BCHUnlimited/-/merge_requests/2622#note_882081432
     if (may2020Enabled)
     {
         featureFlags |= SCRIPT_ENABLE_OP_REVERSEBYTES | SCRIPT_VERIFY_INPUT_SIGCHECKS;
+    }
+
+    if (IsMay2022Enabled(chainparams.GetConsensus(), chainActive.Tip()))
+    {
+        featureFlags |= SCRIPT_64_BIT_INTEGERS;
+        featureFlags |= SCRIPT_NATIVE_INTROSPECTION;
     }
 
     uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;
@@ -1139,7 +1149,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 else
                 {
                     thindata.UpdateMempoolLimiterBytesSaved(nSize);
-                    LOG(MEMPOOL, "AcceptToMemoryPool : min fee not met for %s\n", hash.ToString());
+                    LOG(MEMPOOL, "AcceptToMemoryPool : min fee not met for %s (%d < %d)\n", hash.ToString(),
+                        nModifiedFees, ::minRelayTxFee.GetFee(nSize));
                     return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool min fee not met");
                 }
             }
