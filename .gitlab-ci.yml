@@ -160,6 +160,7 @@ build-debian:
             - ./build/src/bitcoin-tx
             - ./build/src/test/test_bitcoin
             - ./build/src/bench/bench_bitcoin
+            - ./build/src/.libs/libbitcoincash.so*
             - ./build/qa/*
             - ./qa/*
 

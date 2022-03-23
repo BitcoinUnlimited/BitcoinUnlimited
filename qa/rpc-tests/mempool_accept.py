@@ -251,17 +251,20 @@ class MyTest (BitcoinTestFramework):
             # Send two double spending trnasactions using a subprocess. This checks that sendrawtransaction
             # does not allow double spends into the mempool when multiple threads are sending transactions.
             conflict_count = 0;
-            rpc_u, rpc_p = rpc_auth_pair(0)
             gtx = zip(gtx2, gtx3)
             for g in gtx:
                 # send first tx
                 # if datadir is not provided, it assumes ~/.bitcoin so this code may sort of work if you
                 # happen to have a ~/.bitcoin since relevant parameters are overloaded.  But that's ugly,
                 # so supply datadir correctly.
-                p1 = subprocess.Popen([BitcoinCli, "-datadir=" + self.options.tmpdir + os.sep + "node0", "-rpcconnect=127.0.0.1", "-rpcport=" + str(rpc_port(0)), "-rpcuser=" + rpc_u, "-rpcpassword=" + rpc_p, "sendrawtransaction", g[0].toHex()], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                
+                p1 = subprocess.Popen([BitcoinCli, "-datadir=" + self.options.tmpdir + os.sep + "node0",
+                    "-rpcconnect=127.0.0.1", "-rpcport=" + str(rpc_port(0)),
+                    "sendrawtransaction", g[0].toHex()], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
                 # send double spend
-                p2 = subprocess.Popen([BitcoinCli, "-datadir=" + self.options.tmpdir + os.sep + "node0", "-rpcconnect=127.0.0.1", "-rpcport=" + str(rpc_port(0)), "-rpcuser=" + rpc_u, "-rpcpassword=" + rpc_p, "sendrawtransaction", g[1].toHex()], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                p2 = subprocess.Popen([BitcoinCli, "-datadir=" + self.options.tmpdir + os.sep + "node0",
+                    "-rpcconnect=127.0.0.1", "-rpcport=" + str(rpc_port(0)),
+                    "sendrawtransaction", g[1].toHex()], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
                 stdout_data1, stderr_data1 = p1.communicate(timeout=5)
                 stdout_data2, stderr_data2 = p2.communicate(timeout=5)
@@ -270,7 +273,10 @@ class MyTest (BitcoinTestFramework):
                     conflict_count += 1;
                 if (stderr_data2.find("txn-mempool-conflict") >= 0):
                     conflict_count += 1;
-            waitFor(1, lambda: True if conflict_count == NTX else print("num conflicts found:" + str(conflict_count) + ", node0 mempool size:" + str(self.nodes[0].getmempoolinfo()["size"]) + ", node1 mempool size:" + str(self.nodes[1].getmempoolinfo()["size"])))
+            waitFor(1, lambda: True if conflict_count == NTX
+                else print("num conflicts found:" + str(conflict_count)
+                + ", node0 mempool size:" + str(self.nodes[0].getmempoolinfo()["size"])
+                + ", node1 mempool size:" + str(self.nodes[1].getmempoolinfo()["size"])))
 
             waitFor(30, lambda: True if self.nodes[0].getmempoolinfo()["size"] == NTX else None)
             waitFor(30, lambda: True if self.nodes[1].getmempoolinfo()["size"] == NTX else None)
@@ -570,13 +576,13 @@ class MyTest (BitcoinTestFramework):
 
         # stop and start all nodes with mempool persist off and limitfreerelay off but increase the minlimitertxfee to a high
         # value. This will test the forced reaccepting of wallet transactions even though free transactions are not accepted.
-        # Only the node which had txns sent to its wallet should have its txns reaccepted.
+        # Even the node which had txns sent to its wallet will not reaccept txns into the mempool if they are too cheap.
         stop_nodes(self.nodes)
         wait_bitcoinds()
         self.nodes = start_nodes(4, self.options.tmpdir, [["-minlimitertxfee=10.0", "-limitfreerelay=0", "-persistmempool=0"], ["-minlimitertxfee=1.0", "-limitfreerelay=0", "-persistmempool=0"], ["-minlimitertxfee=2.0", "-limitfreerelay=0", "-persistmempool=0"], ["-minlimitertxfee=3.0", "-limitfreerelay=0", "-persistmempool=0"]])
         interconnect_nodes(self.nodes)
-        waitFor(30, lambda: self.nodes[0].getmempoolinfo()["size"] == 100)
-        waitFor(30, lambda: self.nodes[0].getmempoolinfo()["bytes"] > 20000)
+        waitFor(30, lambda: self.nodes[0].getmempoolinfo()["size"] == 0)
+        waitFor(30, lambda: self.nodes[0].getmempoolinfo()["bytes"] == 0)
         waitFor(30, lambda: self.nodes[1].getmempoolinfo()["size"] == 0)
         waitFor(30, lambda: self.nodes[1].getmempoolinfo()["bytes"] == 0)
         waitFor(30, lambda: self.nodes[2].getmempoolinfo()["size"] == 0)
