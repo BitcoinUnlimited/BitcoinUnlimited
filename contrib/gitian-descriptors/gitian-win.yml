@@ -136,7 +136,6 @@ script: |
     make install-strip
     cp -f bch-unlimited*setup*.exe $OUTDIR/
     cd installed
-    mv ${DISTNAME}/bin/*.dll ${DISTNAME}/lib/
     find . -name "lib*.la" -delete
     find . -name "lib*.a" -delete
     rm -rf ${DISTNAME}/lib/pkgconfig
