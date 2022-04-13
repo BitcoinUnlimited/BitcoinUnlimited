@@ -562,9 +562,6 @@ bool EvalScript(vector<vector<uint8_t> > &stack,
 
 
 static const auto bnZero = CScriptNum::fromIntUnchecked(0);
-static const auto bnOne = CScriptNum::fromIntUnchecked(1);
-static const auto bnFalse = CScriptNum::fromIntUnchecked(0);
-static const auto bnTrue = CScriptNum::fromIntUnchecked(1);
 static const StackDataType vchFalse(0);
 static const StackDataType vchZero(0);
 static const StackDataType vchTrue(1, 1);
