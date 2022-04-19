@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "electrum/electrs.h"
+#include "electrum/rostrum.h"
 #include "extversionkeys.h"
 #include "extversionmessage.h"
 #include "test/test_bitcoin.h"
@@ -16,11 +16,11 @@
 
 using namespace electrum;
 
-BOOST_FIXTURE_TEST_SUITE(electrs_tests, BasicTestingSetup)
+BOOST_FIXTURE_TEST_SUITE(rostrum_tests, BasicTestingSetup)
 
-static bool electrs_args_has(const std::string &arg, const std::string &network = "main")
+static bool rostrum_args_has(const std::string &arg, const std::string &network = "main")
 {
-    const std::vector<std::string> args = electrs_args(42, network);
+    const std::vector<std::string> args = rostrum_args(42, network);
     return std::find(begin(args), end(args), arg) != end(args);
 }
 
@@ -29,34 +29,34 @@ BOOST_AUTO_TEST_CASE(issue_1700)
 {
     UnsetArg("-electrum.port");
     SetArg("-electrum.host", "foo");
-    BOOST_CHECK(electrs_args_has("--electrum-rpc-addr=foo:50001"));
+    BOOST_CHECK(rostrum_args_has("--electrum-rpc-addr=foo:50001"));
 
     UnsetArg("-electrum.host");
     SetArg("-electrum.port", "24");
-    BOOST_CHECK(electrs_args_has("--electrum-rpc-addr=0.0.0.0:24"));
+    BOOST_CHECK(rostrum_args_has("--electrum-rpc-addr=0.0.0.0:24"));
 
     SetArg("-electrum.port", "24");
     SetArg("-electrum.host", "foo");
-    BOOST_CHECK(electrs_args_has("--electrum-rpc-addr=foo:24"));
+    BOOST_CHECK(rostrum_args_has("--electrum-rpc-addr=foo:24"));
 
     UnsetArg("-electrum.host");
     UnsetArg("-electrum.port");
-    BOOST_CHECK(electrs_args_has("--electrum-rpc-addr=0.0.0.0:50001"));
-    BOOST_CHECK(electrs_args_has("--electrum-rpc-addr=0.0.0.0:60001", "test"));
+    BOOST_CHECK(rostrum_args_has("--electrum-rpc-addr=0.0.0.0:50001"));
+    BOOST_CHECK(rostrum_args_has("--electrum-rpc-addr=0.0.0.0:60001", "test"));
 }
 
 BOOST_AUTO_TEST_CASE(rawargs)
 {
-    BOOST_CHECK(electrs_args_has("--network=bitcoin"));
-    BOOST_CHECK(!electrs_args_has("--network=scalenet"));
+    BOOST_CHECK(rostrum_args_has("--network=bitcoin"));
+    BOOST_CHECK(!rostrum_args_has("--network=scalenet"));
 
     // Test that we override network and append server-banner
     mapMultiArgs["-electrum.rawarg"].push_back("--network=scalenet");
     mapMultiArgs["-electrum.rawarg"].push_back("--server-banner=\"Hello World!\"");
 
-    BOOST_CHECK(!electrs_args_has("--network=bitcoin"));
-    BOOST_CHECK(electrs_args_has("--network=scalenet"));
-    BOOST_CHECK(electrs_args_has("--server-banner=\"Hello World!\""));
+    BOOST_CHECK(!rostrum_args_has("--network=bitcoin"));
+    BOOST_CHECK(rostrum_args_has("--network=scalenet"));
+    BOOST_CHECK(rostrum_args_has("--server-banner=\"Hello World!\""));
 
     mapMultiArgs.clear();
 }
@@ -64,16 +64,16 @@ BOOST_AUTO_TEST_CASE(rawargs)
 BOOST_AUTO_TEST_CASE(rawargs_verboseness)
 {
     Logging::LogToggleCategory(ELECTRUM, true);
-    BOOST_CHECK(electrs_args_has("-vvvv"));
-    BOOST_CHECK(!electrs_args_has("-v"));
+    BOOST_CHECK(rostrum_args_has("-vvvv"));
+    BOOST_CHECK(!rostrum_args_has("-v"));
 
     mapMultiArgs["-electrum.rawarg"].push_back("-v");
-    BOOST_CHECK(!electrs_args_has("-vvvv"));
-    BOOST_CHECK(electrs_args_has("-v"));
+    BOOST_CHECK(!rostrum_args_has("-vvvv"));
+    BOOST_CHECK(rostrum_args_has("-v"));
 
     mapMultiArgs["-electrum.rawarg"].push_back("-vv");
-    BOOST_CHECK(!electrs_args_has("-vvvv"));
-    BOOST_CHECK(electrs_args_has("-vv"));
+    BOOST_CHECK(!rostrum_args_has("-vvvv"));
+    BOOST_CHECK(rostrum_args_has("-vv"));
     mapMultiArgs.clear();
     Logging::LogToggleCategory(ELECTRUM, false);
 }
@@ -147,8 +147,8 @@ BOOST_AUTO_TEST_CASE(issue_2221)
 {
     mapMultiArgs["-electrum.rawarg"].push_back("--disable-full-compaction");
     mapMultiArgs["-electrum.rawarg"].push_back("--jsonrpc-import");
-    BOOST_CHECK(electrs_args_has("--disable-full-compaction"));
-    BOOST_CHECK(electrs_args_has("--jsonrpc-import"));
+    BOOST_CHECK(rostrum_args_has("--disable-full-compaction"));
+    BOOST_CHECK(rostrum_args_has("--jsonrpc-import"));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

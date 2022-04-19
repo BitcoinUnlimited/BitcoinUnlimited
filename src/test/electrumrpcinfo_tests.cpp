@@ -22,7 +22,7 @@ public:
     int ActiveTipHeight() const override { return height; }
     bool IsInitialBlockDownload() const override { return ibd; }
     bool IsRunning() const override { return isrunning; }
-    std::map<std::string, int64_t> FetchElectrsInfo() const override { return info; }
+    std::map<std::string, int64_t> FetchRostrumInfo() const override { return info; }
 };
 
 BOOST_FIXTURE_TEST_SUITE(electrumrpcinfo_tests, BasicTestingSetup)

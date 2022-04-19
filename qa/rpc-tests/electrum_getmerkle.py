@@ -56,7 +56,7 @@ class ElectrumGetMerkle(BitcoinTestFramework):
         height = n.getblockcount()
         res1 = await cli.call("blockchain.transaction.get_merkle", txid, height)
 
-        # ElectrsCash allows height to be optional (outside of specification)
+        # rostrum allows height to be optional (outside of specification)
         res2 = await cli.call("blockchain.transaction.get_merkle", txid)
         assert_equal(res1, res2)
 

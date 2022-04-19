@@ -18,7 +18,7 @@
 #include "blockstorage/blockstorage.h"
 #include "chain.h"
 #include "dosman.h"
-#include "electrum/electrs.h"
+#include "electrum/rostrum.h"
 #include "expedited.h"
 #include "extversionkeys.h"
 #include "main.h"

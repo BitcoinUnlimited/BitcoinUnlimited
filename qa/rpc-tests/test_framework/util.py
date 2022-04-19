@@ -404,8 +404,7 @@ def initialize_datadir(dirname, n, bitcoinConfDict=None, wallet=None, bins=None)
 
     if UtilOptions.electrumexec is not None:
         if not os.path.isfile(UtilOptions.electrumexec):
-            raise Exception("Electrum server path {} does not exist"
-                .format(UtilOptions.electrumexec))
+            raise Exception(f"Electrum server path {UtilOptions.electrumexec} does not exist")
 
         defaults.update({
             "electrum.exec": UtilOptions.electrumexec

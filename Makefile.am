@@ -4,7 +4,7 @@
 
 ACLOCAL_AMFLAGS = -I build-aux/m4
 SUBDIRS = src
-.PHONY: deploy FORCE electrscash
+.PHONY: deploy FORCE rostrum
 
 GZIP_ENV="-9n"
 export PYTHONPATH
@@ -218,11 +218,11 @@ endif
 check-formatting:
 	$(MAKE) -C src $@
 
-electrscash:
-	$(top_srcdir)/contrib/electrs/build_electrs.py \
+rostrum:
+	$(top_srcdir)/contrib/electrum/build_rostrum.py \
 		--dst=$(top_builddir)/src \
 		--target=$(host) \
-		--builddir=$(top_builddir)/ElectrsCash/target
+		--builddir=$(top_builddir)/rostrum/target
 
 dist_noinst_SCRIPTS = autogen.sh
 
