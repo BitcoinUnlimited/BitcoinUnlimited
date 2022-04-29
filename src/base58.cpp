@@ -313,15 +313,21 @@ CKey CBitcoinSecret::GetKey()
     return ret;
 }
 
-bool CBitcoinSecret::IsValid() const
+bool CBitcoinSecret::IsValid(const CChainParams &chainParams) const
 {
     bool fExpectedFormat = vchData.size() == 32 || (vchData.size() == 33 && vchData[32] == 1);
-    bool fCorrectVersion = vchVersion == Params().Base58Prefix(CChainParams::SECRET_KEY);
+    bool fCorrectVersion = vchVersion == chainParams.Base58Prefix(CChainParams::SECRET_KEY);
     return fExpectedFormat && fCorrectVersion;
 }
 
-bool CBitcoinSecret::SetString(const char *pszSecret) { return CBase58Data::SetString(pszSecret) && IsValid(); }
-bool CBitcoinSecret::SetString(const std::string &strSecret) { return SetString(strSecret.c_str()); }
+bool CBitcoinSecret::SetString(const CChainParams &chainParams, const char *pszSecret)
+{
+    return CBase58Data::SetString(pszSecret) && IsValid(chainParams);
+}
+bool CBitcoinSecret::SetString(const CChainParams &chainParams, const std::string &strSecret)
+{
+    return SetString(chainParams, strSecret.c_str());
+}
 std::string EncodeLegacyAddr(const CTxDestination &dest, const CChainParams &params)
 {
     return boost::apply_visitor(DestinationEncoder(params), dest);

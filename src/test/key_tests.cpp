@@ -113,11 +113,11 @@ BOOST_AUTO_TEST_CASE(internal_test)
 BOOST_AUTO_TEST_CASE(key_test1)
 {
     CBitcoinSecret bsecret1, bsecret2, bsecret1C, bsecret2C, baddress1;
-    BOOST_CHECK(bsecret1.SetString(strSecret1));
-    BOOST_CHECK(bsecret2.SetString(strSecret2));
-    BOOST_CHECK(bsecret1C.SetString(strSecret1C));
-    BOOST_CHECK(bsecret2C.SetString(strSecret2C));
-    BOOST_CHECK(!baddress1.SetString(strAddressBad));
+    BOOST_CHECK(bsecret1.SetString(Params(), strSecret1));
+    BOOST_CHECK(bsecret2.SetString(Params(), strSecret2));
+    BOOST_CHECK(bsecret1C.SetString(Params(), strSecret1C));
+    BOOST_CHECK(bsecret2C.SetString(Params(), strSecret2C));
+    BOOST_CHECK(!baddress1.SetString(Params(), strAddressBad));
 
     CKey key1 = bsecret1.GetKey();
     BOOST_CHECK(key1.IsCompressed() == false);

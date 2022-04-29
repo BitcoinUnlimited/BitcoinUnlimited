@@ -145,7 +145,7 @@ UniValue importprivkey(const UniValue &params, bool fHelp)
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
 
     CBitcoinSecret vchSecret;
-    bool fGood = vchSecret.SetString(strSecret);
+    bool fGood = vchSecret.SetString(Params(), strSecret);
 
     if (!fGood)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key encoding");
@@ -226,7 +226,7 @@ UniValue importprivatekeys(const UniValue &params, bool fHelp)
         string strLabel = "";
 
         CBitcoinSecret vchSecret;
-        bool fGood = vchSecret.SetString(strSecret);
+        bool fGood = vchSecret.SetString(Params(), strSecret);
 
         if (!fGood)
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key encoding");
@@ -663,7 +663,7 @@ UniValue importwallet(const UniValue &params, bool fHelp)
         if (vstr.size() < 2)
             continue;
         CBitcoinSecret vchSecret;
-        if (!vchSecret.SetString(vstr[0]))
+        if (!vchSecret.SetString(Params(), vstr[0]))
             continue;
         CKey key = vchSecret.GetKey();
         CPubKey pubkey = key.GetPubKey();
