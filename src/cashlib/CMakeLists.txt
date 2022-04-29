@@ -20,6 +20,7 @@ add_library( # Sets the name of the library.
 
              # Provides a relative path to your source file(s).
              cashlib.cpp
+             ../base58.cpp
              ../script/interpreter.cpp
              ../script/script.cpp
              ../script/script.h

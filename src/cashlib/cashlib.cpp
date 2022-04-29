@@ -642,7 +642,7 @@ jbyteArray encodeUint256(JNIEnv *env, arith_uint256 value)
 }
 
 
-jbyteArray makeJByteArray(JNIEnv *env, uint8_t *buf, size_t size)
+jbyteArray makeJByteArray(JNIEnv *env, const uint8_t *buf, const size_t size)
 {
     jbyteArray bArray = env->NewByteArray(size);
     jbyte *dest = env->GetByteArrayElements(bArray, 0);
@@ -1018,6 +1018,35 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Pay
     boost::apply_visitor(PubkeyExtractor(data, *cp), dst);
     env->ReleaseByteArrayElements(bArray, data, 0);
     return bArray;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL Java_bitcoinunlimited_libbitcoincash_Key_decodePrivateKey(JNIEnv *env,
+    jobject ths,
+    jbyte chainSelector,
+    jstring secretWIF)
+{
+    const CChainParams *cp = GetChainParams(static_cast<ChainSelector>(chainSelector));
+    if (cp == nullptr)
+    {
+        triggerJavaIllegalStateException(env, "Unknown blockchain selection");
+        return nullptr;
+    }
+    CBitcoinSecret secret;
+    const std::string wif = toString(env, secretWIF);
+    const bool ok = secret.SetString(*cp, wif);
+
+    if (!ok)
+    {
+        triggerJavaIllegalStateException(env, "Invalid private key");
+        return nullptr;
+    }
+    const CKey key = secret.GetKey();
+    if (!key.IsValid())
+    {
+        triggerJavaIllegalStateException(env, "Private key outside allowed range");
+        return nullptr;
+    }
+    return makeJByteArray(env, static_cast<const uint8_t *>(key.begin()), key.size());
 }
 
 // many of the args are long so that the hardened selectors (i.e. 0x80000000) are not negative

@@ -1229,7 +1229,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
         {
             UniValue k = keys[idx];
             CBitcoinSecret vchSecret;
-            bool fGood = vchSecret.SetString(k.get_str());
+            bool fGood = vchSecret.SetString(Params(), k.get_str());
             if (!fGood)
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key");
             CKey key = vchSecret.GetKey();
