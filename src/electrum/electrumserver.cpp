@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "electrum/electrumserver.h"
-#include "electrum/electrs.h"
+#include "electrum/rostrum.h"
 #include "init.h"
 #include "util.h"
 #include "utilprocess.h"
@@ -59,7 +59,7 @@ ElectrumServer::~ElectrumServer()
     }
 }
 
-//! called when electrs produces a line in stdout/stderr
+//! called when rostrum produces a line in stdout/stderr
 static void callb_logger(const std::string &line) { LOGA("Electrum: %s", line); }
 bool ElectrumServer::Start(int rpcport, const std::string &network)
 {
@@ -68,7 +68,7 @@ bool ElectrumServer::Start(int rpcport, const std::string &network)
         LOGA("Electrum: Disabled. Not starting server.");
         return true;
     }
-    return Start(electrs_path(), electrs_args(rpcport, network));
+    return Start(rostrum_path(), rostrum_args(rpcport, network));
 }
 bool ElectrumServer::Start(const std::string &path, const std::vector<std::string> &args)
 {

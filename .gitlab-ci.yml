@@ -164,7 +164,7 @@ build-debian:
             - ./build/qa/*
             - ./qa/*
 
-build-debian-electrscash:
+build-debian-rostrum:
     stage: build
     cache:
       paths:
@@ -193,14 +193,14 @@ build-debian-electrscash:
         - ../configure --cache-file=config.cache
             --prefix=$PWD/../depends/x86_64-unknown-linux-gnu > /dev/null
 
-        - make electrscash
+        - make rostrum
 
     dependencies:
         - build-debian-deps
 
     artifacts:
         paths:
-            - ./build/src/electrscash
+            - ./build/src/rostrum
 
 build-debian-tests:
     stage: build_tests
@@ -240,10 +240,10 @@ test-debian-benchmarks:
     dependencies:
         - build-debian-nodeps
 
-test-debian-qa-electrscash:
+test-debian-qa-rostrum:
     stage: qa_tests
     extends: .cache-debian
-    needs: ["build-debian", "build-debian-electrscash"]
+    needs: ["build-debian", "build-debian-rostrum"]
     script:
         - mkdir -p $CI_PROJECT_DIR/cores
         - mkdir -p $CI_PROJECT_DIR/saved-cores
@@ -251,7 +251,7 @@ test-debian-qa-electrscash:
         - (cd build;
             ./qa/pull-tester/rpc-tests.py --electrum-only --no-ipv6-rpc-listen --gitlab)
     dependencies:
-        - build-debian-electrscash
+        - build-debian-rostrum
         - build-debian
     artifacts:
         when: on_failure

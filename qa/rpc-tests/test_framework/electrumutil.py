@@ -91,7 +91,7 @@ def compare(node, key, expected, is_debug_data = False):
     info = node.getelectruminfo()
     if is_debug_data:
         info = info['debuginfo']
-        key = "electrscash_" + key
+        key = "rostrum_" + key
     logging.debug("expecting %s == %s from %s", key, expected, info)
     if key not in info:
         return False
@@ -175,7 +175,7 @@ def wait_for_electrum_mempool(node, *, count, timeout = 10):
     try:
         waitFor(timeout, lambda: compare(node, "mempool_count", count, True))
     except Exception as e:
-        print("Waited for {} txs, had {}".format(count, node.getelectruminfo()['debuginfo']['electrscash_mempool_count']))
+        print("Waited for {} txs, had {}".format(count, node.getelectruminfo()['debuginfo']['rostrum_mempool_count']))
         raise
 
 """

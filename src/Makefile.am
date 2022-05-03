@@ -161,9 +161,9 @@ BITCOIN_CORE_H = \
   dosman.h \
   dstencode.h \
   expedited.h \
-  electrum/electrs.h \
   electrum/electrumrpcinfo.h \
   electrum/electrumserver.h \
+  electrum/rostrum.h \
   extversionmessage.h \
   extversionkeys.h \
   fast-cpp-csv-parser/csv.h \
@@ -292,9 +292,9 @@ libbitcoin_server_a_SOURCES = \
   DoubleSpendProofStorage.cpp \
   dosman.cpp \
   expedited.cpp \
-  electrum/electrs.cpp \
   electrum/electrumrpcinfo.cpp \
   electrum/electrumserver.cpp \
+  electrum/rostrum.cpp \
   extversionmessage.cpp \
   forks_csv.cpp \
   httprpc.cpp \

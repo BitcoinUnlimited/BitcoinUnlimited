@@ -373,9 +373,6 @@ static void NotifyElectrumCallback(bool initialSync, const CBlockIndex *pBlockIn
 
     if (!GetArg("-electrum.blocknotify", true))
     {
-        // When using with ElectrsCash < 2.0.0, this must be set to false, as
-        // the signal is intepreted as "shutdown", rather than as block
-        // notification.
         return;
     }
 

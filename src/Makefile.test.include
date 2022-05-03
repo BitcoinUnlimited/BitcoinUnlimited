@@ -90,7 +90,7 @@ BITCOIN_TESTS =\
   test/deadlock_tests/suite.h \
   test/DoS_tests.cpp \
   test/dstencode_tests.cpp \
-  test/electrs_tests.cpp \
+  test/rostrum_tests.cpp \
   test/electrumrpcinfo_tests.cpp \
   test/electrumserver_tests.cpp \
   test/exploit_tests.cpp \

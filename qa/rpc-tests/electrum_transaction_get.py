@@ -191,7 +191,7 @@ class ElectrumTransactionGet(ElectrumTestFramework):
                         electrum['vout'][i]['scriptPubKey']['type'])
 
         await asyncio.gather(
-                # ElectrsCash cannot tell if it's nonstandard
+                # rostrum cannot tell if it's nonstandard
                 check_tx(nonstandard_tx, check_output_type = False),
                 check_tx(p2sh_tx),
                 check_tx(p2pkh_tx),

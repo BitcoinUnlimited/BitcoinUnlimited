@@ -86,8 +86,8 @@ DoubleSpendProofStorage.h
 DoubleSpendProofStorage.cpp
 dstencode.cpp
 dstencode.h
-electrum/electrs.cpp
-electrum/electrs.cpp
+electrum/rostrum.cpp
+electrum/rostrum.cpp
 electrum/electrumrpcinfo.cpp
 electrum/electrumrpcinfo.h
 electrum/electrumserver.cpp
@@ -334,7 +334,7 @@ test/compress_tests.cpp
 test/crypto_tests.cpp
 test/dbwrapper_tests.cpp
 test/DoS_tests.cpp
-test/electrs_tests.cpp
+test/rostrum_tests.cpp
 test/electrumrpcinfo_tests.cpp
 test/electrumserver_tests.cpp
 test/excessiveblock_test.cpp

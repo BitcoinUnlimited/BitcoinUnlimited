@@ -9,7 +9,7 @@
 
 namespace electrum
 {
-static constexpr const char *INDEX_HEIGHT_KEY = "electrscash_index_height";
+static constexpr const char *INDEX_HEIGHT_KEY = "rostrum_index_height";
 class ElectrumRPCInfo
 {
 public:
@@ -24,7 +24,7 @@ protected:
     virtual int ActiveTipHeight() const;
     virtual bool IsInitialBlockDownload() const;
     virtual bool IsRunning() const;
-    virtual std::map<std::string, int64_t> FetchElectrsInfo() const;
+    virtual std::map<std::string, int64_t> FetchRostrumInfo() const;
 
 private:
     std::string GetStatus(int64_t index_height) const;

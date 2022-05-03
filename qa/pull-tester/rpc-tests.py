@@ -78,6 +78,7 @@ if 'ENABLE_ZMQ' not in vars():
     ENABLE_ZMQ=0
 
 ENABLE_COVERAGE=0
+CUSTOM_ELECTRUM_PATH = None
 
 #Create a set to store arguments and create the passOn string
 opts = set()
@@ -123,7 +124,8 @@ framework_opts = ('--tracerpc',
                   '--testbinary',
                   '--refbinary')
 test_script_opts = ('--mineblock',
-                    '--extensive')
+                    '--extensive',
+                    '--electrum.exec')
 
 def option_passed(option_without_dashes):
     """check if option was specified in single-dash or double-dash format"""
@@ -137,6 +139,8 @@ if (os.name == 'posix'):
 for arg in sys.argv[1:]:
     if arg == '--coverage':
         ENABLE_COVERAGE = 1
+    elif re.compile("^--electrum\.exec").match(arg):
+        CUSTOM_ELECTRUM_PATH = os.path.join(arg.split(sep='=', maxsplit=1)[1])
     elif (p.match(arg) or arg in ('-h', '-help')):
         if arg not in private_double_opts:
             if arg == '--help' or arg == '-help' or arg == '-h':
@@ -305,7 +309,7 @@ testScriptsExt = [ RpcTest(t) for t in [
     'maxuploadtarget'
 ] ]
 
-testScriptsElectrum = [ RpcTest(WhenElectrumFound(t)) for t in [
+testScriptsElectrum = [ RpcTest(WhenElectrumFound(t, CUSTOM_ELECTRUM_PATH)) for t in [
     'electrum_basics',
     'electrum_blockchain_address',
     'electrum_cashaccount',

@@ -2,8 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "electrum/electrumrpcinfo.h"
-#include "electrum/electrs.h"
 #include "electrum/electrumserver.h"
+#include "electrum/rostrum.h"
 #include "main.h" // chainActive
 #include "rpc/server.h" // HelpExampleCli
 #include "unlimited.h" // IsInitialBlockDownload
@@ -23,16 +23,16 @@ static int64_t get_index_height(const std::map<std::string, int64_t> &info)
 
 UniValue ElectrumRPCInfo::GetElectrumInfo() const
 {
-    std::map<std::string, int64_t> electrsinfo;
+    std::map<std::string, int64_t> rostruminfo;
     try
     {
-        electrsinfo = FetchElectrsInfo();
+        rostruminfo = FetchRostrumInfo();
     }
     catch (const std::runtime_error &e)
     {
         LOGA("Electrum: %s: Failed to fetch electrs info %s", __func__, e.what());
     }
-    int64_t index_height = get_index_height(electrsinfo);
+    int64_t index_height = get_index_height(rostruminfo);
 
     UniValue info(UniValue::VOBJ);
     info.pushKV("status", GetStatus(index_height));
@@ -40,7 +40,7 @@ UniValue ElectrumRPCInfo::GetElectrumInfo() const
     info.pushKV("index_height", index_height);
 
     UniValue debuginfo(UniValue::VOBJ);
-    for (auto &kv : electrsinfo)
+    for (auto &kv : rostruminfo)
     {
         if (kv.first == INDEX_HEIGHT_KEY)
         {
@@ -72,7 +72,7 @@ void ElectrumRPCInfo::ThrowHelp()
 int ElectrumRPCInfo::ActiveTipHeight() const { return chainActive.Height(); }
 bool ElectrumRPCInfo::IsInitialBlockDownload() const { return ::IsInitialBlockDownload(); }
 bool ElectrumRPCInfo::IsRunning() const { return ElectrumServer::Instance().IsRunning(); }
-std::map<std::string, int64_t> ElectrumRPCInfo::FetchElectrsInfo() const { return fetch_electrs_info(); }
+std::map<std::string, int64_t> ElectrumRPCInfo::FetchRostrumInfo() const { return fetch_rostrum_info(); }
 std::string ElectrumRPCInfo::GetStatus(int64_t index_height) const
 {
     if (!this->IsRunning())
