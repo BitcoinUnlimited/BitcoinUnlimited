@@ -56,12 +56,6 @@ check-formatting:
     extends: .cache-linting
     needs: []
     script:
-        - apt-get install -y wget gpg-agent
-        - add-apt-repository ppa:ubuntu-toolchain-r/test #needed for libstdc++ with C++20 support in ubuntu 18.04
-        - wget https://apt.llvm.org/llvm.sh
-        - chmod +x llvm.sh
-        - ./llvm.sh 15
-        - apt-get install clang-format-15
         - ./autogen.sh
         - ./configure --with-incompatible-bdb --enable-glibc-back-compat --enable-reduce-exports
         - make check-formatting
