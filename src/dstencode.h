@@ -15,14 +15,19 @@
 class Config;
 class CChainParams;
 
-std::string EncodeDestination(const CTxDestination &, const CChainParams &, const Config &);
-CTxDestination DecodeDestination(const std::string &addr, const CChainParams &);
-bool IsValidDestinationString(const std::string &addr, const CChainParams &params);
+std::string EncodeDestination(const CTxDestination &,
+    const CChainParams &,
+    const Config &,
+    bool tokenAwareAddress = false);
+CTxDestination DecodeDestination(const std::string &addr, const CChainParams &, bool *tokenAwareAddressOut = nullptr);
+bool IsValidDestinationString(const std::string &addr,
+    const CChainParams &params,
+    bool *tokenAwareAddressOut = nullptr);
 
 // Temporary workaround. Don't rely on global state, pass all parameters in new
 // code.
-std::string EncodeDestination(const CTxDestination &);
-CTxDestination DecodeDestination(const std::string &addr);
-bool IsValidDestinationString(const std::string &addr);
+std::string EncodeDestination(const CTxDestination &, bool tokenAwareAddress = false);
+CTxDestination DecodeDestination(const std::string &addr, bool *tokenAwareAddressOut = nullptr);
+bool IsValidDestinationString(const std::string &addr, bool *tokenAwareAddressOut = nullptr);
 
 #endif // BITCOIN_DSTENCODE_H

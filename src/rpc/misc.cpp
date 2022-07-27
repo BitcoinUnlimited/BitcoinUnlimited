@@ -210,6 +210,8 @@ UniValue validateaddress(const UniValue &params, bool fHelp)
             "the default account\n"
             "  \"hdkeypath\" : \"keypath\"       (string, optional) The HD keypath if the key is HD and available\n"
             "  \"hdmasterkeyid\" : \"<hash160>\" (hex string, optional) The Hash160 of the HD master pubkey\n"
+            "  \"istokenaware\" : true|false,  (boolean) If this address type "
+            "signals support for CashTokens."
             "}\n"
             "\nExamples:\n" +
             HelpExampleCli("validateaddress", "\"1PSSGeFHDnKNxiEyFrD1wcEaHr9hrQDDWc\"") +
@@ -221,14 +223,15 @@ UniValue validateaddress(const UniValue &params, bool fHelp)
     LOCK(cs_main);
 #endif
 
-    CTxDestination dest = DecodeDestination(params[0].get_str());
+    bool tokenAware{};
+    CTxDestination dest = DecodeDestination(params[0].get_str(), &tokenAware);
     bool isValid = IsValidDestination(dest);
 
     UniValue ret(UniValue::VOBJ);
     ret.pushKV("isvalid", isValid);
     if (isValid)
     {
-        std::string currentAddress = EncodeDestination(dest);
+        std::string currentAddress = EncodeDestination(dest, tokenAware);
         ret.pushKV("address", currentAddress);
 
         CScript scriptPubKey = GetScriptForDestination(dest);
@@ -252,6 +255,7 @@ UniValue validateaddress(const UniValue &params, bool fHelp)
                 ret.pushKV("hdmasterkeyid", pwalletMain->mapKeyMetadata[*keyID].hdMasterKeyID.GetHex());
             }
         }
+        ret.pushKV("istokenaware", tokenAware);
 #endif
     }
     return ret;

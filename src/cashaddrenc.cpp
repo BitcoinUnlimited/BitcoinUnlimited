@@ -69,16 +69,16 @@ std::vector<uint8_t> PackAddrData(const T &id, uint8_t type)
 class CashAddrEncoder : public boost::static_visitor<std::string>
 {
 public:
-    CashAddrEncoder(const CChainParams &p) : params(p) {}
+    CashAddrEncoder(const CChainParams &p, bool t) : params(p), tokenAwareType(t) {}
     std::string operator()(const CKeyID &id) const
     {
-        std::vector<uint8_t> data = PackAddrData(id, PUBKEY_TYPE);
+        std::vector<uint8_t> data = PackAddrData(id, tokenAwareType ? TOKEN_PUBKEY_TYPE : PUBKEY_TYPE);
         return cashaddr::Encode(params.CashAddrPrefix(), data);
     }
 
     std::string operator()(const ScriptID &id) const
     {
-        std::vector<uint8_t> data = PackAddrData(id, SCRIPT_TYPE);
+        std::vector<uint8_t> data = PackAddrData(id, tokenAwareType ? TOKEN_SCRIPT_TYPE : SCRIPT_TYPE);
         return cashaddr::Encode(params.CashAddrPrefix(), data);
     }
 
@@ -86,33 +86,48 @@ public:
 
 private:
     const CChainParams &params;
+    const bool tokenAwareType;
 };
 
 } // namespace
 
-std::string EncodeCashAddr(const CTxDestination &dst, const CChainParams &params)
+std::string EncodeCashAddr(const CTxDestination &dst, const CChainParams &params, const bool tokenAwareType)
 {
-    return boost::apply_visitor(CashAddrEncoder(params), dst);
+    return boost::apply_visitor(CashAddrEncoder(params, tokenAwareType), dst);
 }
 
-CTxDestination DecodeCashAddr(const std::string &addr, const CChainParams &params)
+std::string EncodeCashAddr(const std::string &prefix, const CashAddrContent &content)
 {
-    CashAddrContent content = DecodeCashAddrContent(addr, params);
-    if (content.hash.size() == 0)
-    {
-        return CNoDestination{};
-    }
+    std::vector<uint8_t> data = PackAddrData(content.hash, content.type);
+    return cashaddr::Encode(prefix, data);
+}
 
-    return DecodeCashAddrDestination(content);
+CTxDestination DecodeCashAddr(const std::string &addr, const CChainParams &params, bool *tokenAwareTypeOut)
+{
+    CTxDestination ret = CNoDestination{};
+    if (const CashAddrContent content = DecodeCashAddrContent(addr, params); !content.IsNull())
+    {
+        if (tokenAwareTypeOut)
+        {
+            *tokenAwareTypeOut = content.IsTokenAwareType();
+        }
+        ret = DecodeCashAddrDestination(content);
+    }
+    return ret;
 }
 
 CashAddrContent DecodeCashAddrContent(const std::string &addr, const CChainParams &params)
 {
-    std::string prefix;
-    std::vector<uint8_t> payload;
-    std::tie(prefix, payload) = cashaddr::Decode(addr, params.CashAddrPrefix());
+    return DecodeCashAddrContent(addr, params.CashAddrPrefix());
+}
 
-    if (prefix != params.CashAddrPrefix())
+CashAddrContent DecodeCashAddrContent(const std::string &addr, const std::string &prefix)
+{
+    std::string addr_prefix;
+    std::vector<uint8_t> payload;
+    std::tie(addr_prefix, payload) = cashaddr::Decode(addr, prefix /* default prefix*/);
+
+    if (addr_prefix != prefix)
     {
         return {};
     }
@@ -181,6 +196,7 @@ CTxDestination DecodeCashAddrDestination(const CashAddrContent &content)
     switch (content.type)
     {
     case PUBKEY_TYPE:
+    case TOKEN_PUBKEY_TYPE:
         // p2pkh only supports 20-byte hashes
         if (is20Bytes)
         {
@@ -191,6 +207,7 @@ CTxDestination DecodeCashAddrDestination(const CashAddrContent &content)
             return CNoDestination{};
         }
     case SCRIPT_TYPE:
+    case TOKEN_SCRIPT_TYPE:
         if (is20Bytes)
         {
             return ScriptID(uint160(content.hash)); // p2sh
@@ -202,6 +219,7 @@ CTxDestination DecodeCashAddrDestination(const CashAddrContent &content)
     default:
         return CNoDestination{};
     }
+    return CNoDestination{};
 }
 
 // PackCashAddrContent allows for testing PackAddrData in unittests due to

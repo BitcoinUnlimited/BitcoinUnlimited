@@ -24,6 +24,7 @@
 #include "script/bitcoinconsensus.h"
 #endif
 
+#include "test/jsonutil.h"
 #include <fstream>
 #include <stdint.h>
 #include <string>
@@ -33,24 +34,13 @@
 
 #include <univalue.h>
 
+
 using namespace std;
 
 // Uncomment if you want to output updated JSON tests.
 #define UPDATE_JSON_TESTS
 
 static const unsigned int flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC | SCRIPT_ENABLE_SIGHASH_FORKID;
-
-UniValue read_json(const std::string &jsondata)
-{
-    UniValue v;
-
-    if (!v.read(jsondata) || !v.isArray())
-    {
-        BOOST_ERROR("Parse error.");
-        return UniValue(UniValue::VARR);
-    }
-    return v.get_array();
-}
 
 struct ScriptErrorDesc
 {

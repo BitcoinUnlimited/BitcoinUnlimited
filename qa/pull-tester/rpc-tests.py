@@ -193,6 +193,7 @@ if ENABLE_ZMQ:
 
 #Tests
 testScripts = [ RpcTest(t) for t in [
+    'wallet_send_token_cashaddr',
     'feature_p2sh32',
     'wallet_p2sh32',
     'feature_tx_version',

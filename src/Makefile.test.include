@@ -32,7 +32,8 @@ JSON_TEST_FILES = \
   test/data/base58_keys_invalid.json \
   test/data/tx_invalid.json \
   test/data/tx_valid.json \
-  test/data/sighash.json
+  test/data/sighash.json \
+  test/data/cashaddr_token_types.json
 
 RAW_TEST_FILES =
 
@@ -45,7 +46,9 @@ BITCOIN_TEST_SUITE = \
   test/test_bitcoin.cpp \
   test/test_bitcoin.h \
   test/testutil.cpp \
-  test/testutil.h
+  test/testutil.h \
+  test/jsonutil.cpp \
+  test/jsonutil.h
 
 # test_bitcoin binary #
 BITCOIN_TESTS =\
