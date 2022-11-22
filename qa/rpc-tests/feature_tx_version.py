@@ -171,19 +171,20 @@ class TxVersionTest(BitcoinTestFramework):
         # the mempool -- they should be accepted ok and mined ok.  It also creates 3 txns that have nVersion out of
         # range, sends them to mempool -- they should be rejected as out of consensus. It returns the 3 out-of-bounds
         # txns.
+
         tx3, tx0, tx123456 = create_various_version_txns_and_test()
 
         # This time, under Upgrade9, the same txns should be REJECTED if mined in a block
-        badblk = self.create_block(blocks[-1], script_pub_key=anyonecanspend, redeem_script=redeem_script,
-                                   txns=[tx3, tx0, tx123456])
-        missing = {tx3.hash, tx0.hash, tx123456.hash}
-        for txn in badblk.vtx:
-            txn.calc_sha256()
-            missing.discard(txn.hash)
-        assert not missing, "Txs not found in block as expected!"
-
-        # Now, send the block and it should be rejected by consensus
-        self.send_blocks([badblk], success=False, reject_reason="bad-txns-version")
+        for bad_tx in (tx3, tx0, tx123456):
+            badblk = self.create_block(blocks[-1], script_pub_key=anyonecanspend, redeem_script=redeem_script,
+                                       txns=[bad_tx])
+            missing = {bad_tx.hash}
+            for txn in badblk.vtx:
+                txn.calc_sha256()
+                missing.discard(txn.hash)
+            assert not missing, "Tx not found in block as expected!"
+            # Now, send the block and it should be rejected by consensus
+            self.send_blocks([badblk], success=False, reject_reason="bad-txns-version")
 
         # Next, try a few blocks with funny coinbase version as well just for belt-and-suspenders
         bad_versions = [3, 0, -1, 0x7fffffff, 32132, 4, -2, 65536]
