@@ -47,7 +47,7 @@ if sourcePath != outOfSourceBuildPath:
     sys.path.append(outOfSourceBuildPath)
 
 from tests_config import *
-from test_classes import RpcTest, Disabled, Skip, WhenElectrumFound
+from test_classes import RpcTest, Disabled, Skip
 
 def inTravis():
     return (os.environ.get("TRAVIS", None) == "true")
@@ -98,17 +98,13 @@ private_single_opts = ('-h',
                        '-list',
                        '-extended',
                        '-extended-only',
-                       '-electrum-only',
                        '-only-extended',
-                       '-only-electrum',
                        '-force-enable',
                        '-win')
 private_double_opts = ('--list',
                        '--extended',
                        '--extended-only',
-                       '--electrum-only',
                        '--only-extended',
-                       '--only-electrum',
                        '--force-enable',
                        '--win')
 framework_opts = ('--tracerpc',
@@ -124,8 +120,7 @@ framework_opts = ('--tracerpc',
                   '--testbinary',
                   '--refbinary')
 test_script_opts = ('--mineblock',
-                    '--extensive',
-                    '--electrum.exec')
+                    '--extensive')
 
 def option_passed(option_without_dashes):
     """check if option was specified in single-dash or double-dash format"""
@@ -139,8 +134,6 @@ if (os.name == 'posix'):
 for arg in sys.argv[1:]:
     if arg == '--coverage':
         ENABLE_COVERAGE = 1
-    elif re.compile("^--electrum\.exec").match(arg):
-        CUSTOM_ELECTRUM_PATH = os.path.join(arg.split(sep='=', maxsplit=1)[1])
     elif (p.match(arg) or arg in ('-h', '-help')):
         if arg not in private_double_opts:
             if arg == '--help' or arg == '-help' or arg == '-h':
@@ -309,21 +302,6 @@ testScriptsExt = [ RpcTest(t) for t in [
     'maxuploadtarget'
 ] ]
 
-testScriptsElectrum = [ RpcTest(WhenElectrumFound(t, CUSTOM_ELECTRUM_PATH)) for t in [
-    'electrum_basics',
-    'electrum_blockchain_address',
-    'electrum_cashaccount',
-    'electrum_reorg',
-    'electrum_scripthash_gethistory',
-    'electrum_server_features',
-    'electrum_shutdownonerror',
-    'electrum_subscriptions',
-    'electrum_transaction_get',
-    'electrum_doslimit',
-    'electrum_mempool_chain',
-    'electrum_blockchain_utxo'
-] ]
-
 #Enable ZMQ tests
 if ENABLE_ZMQ == 1:
     testScripts.append(RpcTest('zmq_test'))
@@ -337,7 +315,6 @@ def show_wrapper_options():
     print("  -extended/--extended  run the extended set of tests")
     print("  -only-extended / -extended-only\n" + \
           "  --only-extended / --extended-only\n" + \
-          "  --only-electrum / --electrum-only\n" + \
           "                        run ONLY the extended tests")
     print("  -list / --list        only list test names")
     print("  -win / --win          signal running on Windows and run those tests")
@@ -355,19 +332,13 @@ def runtests():
 
     force_enable = option_passed('force-enable') or '-f' in opts
     run_only_extended = option_passed('only-extended') or option_passed('extended-only')
-    run_only_electrum = option_passed('only-electrum') or option_passed('electrum-only')
-    if run_only_electrum and (run_only_extended or option_passed('extended')):
-        raise Exception("electrum only and extended are not compatible options")
 
     if option_passed('list'):
-        if run_only_electrum:
-            for t in testScriptsElectrum:
-                print(t)
-        elif run_only_extended:
+        if run_only_extended:
             for t in testScriptsExt:
                 print(t)
         else:
-            for t in testScripts + testScriptsElectrum:
+            for t in testScripts:
                 print(t)
             if option_passed('extended'):
                 for t in testScriptsExt:
@@ -395,7 +366,7 @@ def runtests():
             for o in opts:
                 if not o.startswith('-'):
                     found = False
-                    for t in testScripts + testScriptsElectrum + testScriptsExt:
+                    for t in testScripts + testScriptsExt:
                         t_rep = str(t).split(' ')
                         if (t_rep[0] == o or t_rep[0] == o + '.py') and len(t_rep) > 1:
                             # it is a test with args - check all args match what was passed, otherwise don't add this test
@@ -422,13 +393,10 @@ def runtests():
 
         # if no explicit tests specified, use the lists
         if not len(tests_to_run):
-            if run_only_electrum:
-                tests_to_run = testScriptsElectrum
-            elif run_only_extended:
+            if run_only_extended:
                 tests_to_run = testScriptsExt
             else:
                 tests_to_run += testScripts
-                tests_to_run += testScriptsElectrum
                 if run_extended:
                     tests_to_run += testScriptsExt
 
