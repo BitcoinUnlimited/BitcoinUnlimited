@@ -158,7 +158,7 @@ void FinalizeNode(NodeId nodeid)
     // Update block sync counters
     {
         CNodeStateAccessor state(nodestate, nodeid);
-        DbgAssert(state != nullptr, return );
+        DbgAssert(state != nullptr, return);
 
         if (state->fSyncStarted)
             nSyncStarted--;

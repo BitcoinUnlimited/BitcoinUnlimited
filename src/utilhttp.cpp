@@ -72,7 +72,7 @@ void response_cb(struct evhttp_request *req, void *args_)
     {
         // evbuffer_remove should not have written more than the size
         // of the buffer we gave it
-        DbgAssert(static_cast<size_t>(s) <= sizeof buffer, return );
+        DbgAssert(static_cast<size_t>(s) <= sizeof buffer, return);
 
         args->res.write(buffer, s);
         s = evbuffer_remove(req->input_buffer, &buffer, sizeof buffer);

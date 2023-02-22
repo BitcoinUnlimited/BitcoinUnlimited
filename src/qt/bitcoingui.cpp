@@ -883,7 +883,7 @@ void BitcoinGUI::message(const QString &title, const QString &message, unsigned 
         // BU: If we want to display for at least 1 second then show it.  Actually, practice it looks like the system
         // tray has a several second minimum.
         if (showTime >= NOTIFY_MIN_SHOW_TIME)
-        notificator->notify((Notificator::Class)nNotifyIcon, strTitle, message, QIcon(), showTime);
+            notificator->notify((Notificator::Class)nNotifyIcon, strTitle, message, QIcon(), showTime);
 }
 
 void BitcoinGUI::changeEvent(QEvent *e)

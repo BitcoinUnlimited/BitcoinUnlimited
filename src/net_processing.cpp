@@ -62,7 +62,7 @@ bool CanDirectFetch(const Consensus::Params &consensusParams)
 void UpdatePreferredDownload(CNode *node)
 {
     CNodeStateAccessor state(nodestate, node->GetId());
-    DbgAssert(state != nullptr, return );
+    DbgAssert(state != nullptr, return);
     nPreferredDownload.fetch_sub(state->fPreferredDownload);
 
     // Whether this node should be marked as a preferred download node.
