@@ -23,13 +23,11 @@ static void SetMTP(std::array<CBlockIndex, 12> &blocks, int64_t mtp) {
     assert(blocks.back().GetMedianTimePast() == mtp);
 }
 
-BOOST_AUTO_TEST_CASE(isMay2022Enabled) {
+BOOST_AUTO_TEST_CASE(isMay2022Activated) {
     const CChainParams config = Params(CBaseChainParams::REGTEST);
     CBlockIndex prev;
 
-    const auto activation = config.GetConsensus().may2022ActivationTime;
-
-    BOOST_CHECK(!IsMay2022Next(config.GetConsensus(), nullptr));
+    const auto activation = MAY2022_ACTIVATION_TIME;
 
     std::array<CBlockIndex, 12> blocks;
     for (size_t i = 1; i < blocks.size(); ++i)
@@ -38,16 +36,13 @@ BOOST_AUTO_TEST_CASE(isMay2022Enabled) {
     }
 
     SetMTP(blocks, activation - 1);
-    BOOST_CHECK(!IsMay2022Next(config.GetConsensus(), &blocks.back()));
-    BOOST_CHECK(!IsMay2022Enabled(config.GetConsensus(), &blocks.back()));
+    BOOST_CHECK(!IsMay2022Activated(config.GetConsensus(), &blocks.back()));
 
     SetMTP(blocks, activation);
-    BOOST_CHECK(IsMay2022Next(config.GetConsensus(), &blocks.back()));
-    BOOST_CHECK(IsMay2022Enabled(config.GetConsensus(), &blocks.back()));
+    BOOST_CHECK(IsMay2022Activated(config.GetConsensus(), &blocks.back()));
 
     SetMTP(blocks, activation + 1);
-    BOOST_CHECK(!IsMay2022Next(config.GetConsensus(), &blocks.back()));
-    BOOST_CHECK(IsMay2022Enabled(config.GetConsensus(), &blocks.back()));
+    BOOST_CHECK(IsMay2022Activated(config.GetConsensus(), &blocks.back()));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

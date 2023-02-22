@@ -140,20 +140,15 @@ bool IsNov2020Activated(const Consensus::Params &consensusparams, const CBlockIn
     }
 }
 
-bool IsMay2022Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
+bool IsMay2022Activated(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
 {
     if (pindexTip == nullptr)
     {
         return false;
     }
-    return pindexTip->IsforkActiveOnNextBlock(miningForkTime.Value());
-}
-
-bool IsMay2022Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
-{
-    if (pindexTip == nullptr)
-    {
-        return false;
+    if (consensusparams.may2022Height) {
+        return pindexTip->nHeight >= consensusparams.may2022Height;
     }
-    return pindexTip->forkAtNextBlock(miningForkTime.Value());
+    // nolnet and regtest don't have height set.
+    return pindexTip->IsforkActiveOnNextBlock(MAY2022_ACTIVATION_TIME);
 }

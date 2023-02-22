@@ -55,10 +55,7 @@ bool IsNov2020Activated(const Consensus::Params &consensusparams, const CBlockIn
 
 // We do not check for may2021 activation because it was relay rules only
 
-/** Test if Nov 15th 2020 fork has activated */
-bool IsMay2022Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
-
-/** Check if the next will be the first block where the new set of rules will be enforced */
-bool IsMay2022Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
+/** Check if May 15th 2022 fork has activated using block height */
+bool IsMay2022Activated(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 
 #endif

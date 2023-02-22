@@ -146,9 +146,8 @@ public:
         consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
         // Nov 15, 2020 hard fork
         consensus.nov2020Height = 661647;
-
-        // May 15, 2022 12:00:00 UTC protocol upgrade
-        consensus.may2022ActivationTime = MAY2022_ACTIVATION_TIME;
+        // May, 20 2022 hard fork
+        consensus.may2022Height = 740237;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -311,9 +310,9 @@ public:
         consensus.may2020Height = 0;
         // Nov, 15 2020 hard fork
         consensus.nov2020Height = 0;
+        // May 15, 2022 hard fork
+        consensus.may2022Height = 0;
 
-        // May 15, 2022 12:00:00 UTC protocol upgrade
-        consensus.may2022ActivationTime = MAY2022_ACTIVATION_TIME;
 
         vFixedSeeds.clear();
         vSeeds.clear();
@@ -393,9 +392,9 @@ public:
         consensus.nov2020ActivationTime = NOV2020_ACTIVATION_TIME;
         // Nov 15, 2020 hard fork¶
         consensus.nov2020Height = 1421481;
+        // May 15 2022 hard fork
+        consensus.may2022Height = 1500205;
 
-        // May 15, 2022 12:00:00 UTC protocol upgrade
-        consensus.may2022ActivationTime = MAY2022_ACTIVATION_TIME;
 
 
         pchMessageStart[0] = 0x0b;
@@ -536,8 +535,8 @@ public:
         // Nov 15, 2020 upgrade
         // FIXME regtest ASERT activation by time?
 
-        // May 15, 2022 12:00:00 UTC protocol upgrade
-        consensus.may2022ActivationTime = MAY2022_ACTIVATION_TIME;
+        // May, 15 2022 hard fork
+        consensus.may2022Height = 0;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;
@@ -646,8 +645,8 @@ public:
         // Nov 15, 2020 hard fork¶
         consensus.nov2020Height = 16844;
 
-        // May 15, 2022 12:00:00 UTC protocol upgrade
-        consensus.may2022ActivationTime = MAY2022_ACTIVATION_TIME;
+        // May, 15 2022 hard fork
+        consensus.may2022Height = 95464;
 
         pchMessageStart[0] = 0xcd;
         pchMessageStart[1] = 0x22;
@@ -782,8 +781,8 @@ public:
         // for now just we just avoid to initialize the optional nov2020Height so that we can
         // switch back to MTP activation for this chain
 
-        // May 15, 2022 12:00:00 UTC protocol upgrade
-        consensus.may2022ActivationTime = MAY2022_ACTIVATION_TIME;
+        // May 15, 2022 hard fork
+        consensus.may2022Height = 10006;
 
         pchMessageStart[0] = 0xba;
         pchMessageStart[1] = 0xc2;

@@ -277,10 +277,6 @@ extern CCriticalSection cs_blockvalidationthread;
 void InterruptBlockValidationThreads();
 
 
-// Fork configuration
-/** This specifies the MTP time of the next fork */
-extern CTweakRef<uint64_t> miningForkTime;
-
 // Mining-Candidate start
 /** Return a Merkle root given a Coinbase hash and Merkle proof */
 uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uint256> &merkleProof);
