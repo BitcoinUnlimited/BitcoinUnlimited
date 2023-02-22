@@ -76,10 +76,16 @@ void PrevectorResize(benchmark::State &state)
     }
 }
 
-#define PREVECTOR_TEST(name, nontrivops, trivops)                                                              \
-    static void Prevector##name##Nontrivial(benchmark::State &state) { PrevectorResize<nontrivial_t>(state); } \
-    BENCHMARK(Prevector##name##Nontrivial, nontrivops);                                                        \
-    static void Prevector##name##Trivial(benchmark::State &state) { PrevectorResize<trivial_t>(state); }       \
+#define PREVECTOR_TEST(name, nontrivops, trivops)                    \
+    static void Prevector##name##Nontrivial(benchmark::State &state) \
+    {                                                                \
+        PrevectorResize<nontrivial_t>(state);                        \
+    }                                                                \
+    BENCHMARK(Prevector##name##Nontrivial, nontrivops);              \
+    static void Prevector##name##Trivial(benchmark::State &state)    \
+    {                                                                \
+        PrevectorResize<trivial_t>(state);                           \
+    }                                                                \
     BENCHMARK(Prevector##name##Trivial, trivops);
 
 PREVECTOR_TEST(Clear, 28300, 88600)

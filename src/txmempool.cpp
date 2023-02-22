@@ -1505,7 +1505,7 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint> *pvNoSpends
             indexed_transaction_set::index<entry_time>::type::iterator it = mapTx.get<entry_time>().begin();
             auto nEntryToDelete = insecure_rand.randrange((uint64_t)mapTx.size());
             std::advance(it, nEntryToDelete);
-            DbgAssert(it != mapTx.get<entry_time>().end(), return );
+            DbgAssert(it != mapTx.get<entry_time>().end(), return);
 
             // Delete the entry and any descendants
             _CalculateDescendants(mapTx.project<0>(it), stage);

@@ -49,8 +49,8 @@ void getP2PKHSignature(const CScript &script, std::vector<uint8_t> &vchRet)
 
 void hashTx(DoubleSpendProof::Spender &spender, const CTransaction &tx, int inputIndex)
 {
-    DbgAssert(!spender.pushData.empty(), return );
-    DbgAssert(!spender.pushData.front().empty(), return );
+    DbgAssert(!spender.pushData.empty(), return);
+    DbgAssert(!spender.pushData.front().empty(), return);
     auto hashType = spender.pushData.front().back();
     if (!(hashType & SIGHASH_ANYONECANPAY))
     {

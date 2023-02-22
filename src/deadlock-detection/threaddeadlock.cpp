@@ -131,7 +131,7 @@ void push_lock(void *c, const CLockLocation &locklocation, LockType locktype, Ow
     }
     else
     {
-        DbgAssert(!"unsupported lock type", return );
+        DbgAssert(!"unsupported lock type", return);
     }
 
     // Begin general deadlock checks for all lock types
