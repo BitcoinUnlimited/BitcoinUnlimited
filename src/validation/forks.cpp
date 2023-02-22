@@ -152,3 +152,14 @@ bool IsMay2022Activated(const Consensus::Params &consensusparams, const CBlockIn
     // nolnet and regtest don't have height set.
     return pindexTip->IsforkActiveOnNextBlock(MAY2022_ACTIVATION_TIME);
 }
+
+// Check if May 15th 2023 fork has activated using MTP
+bool IsMay2023Activated(const Consensus::Params& params, const CBlockIndex* pindexTip) {
+    if (pindexTip == nullptr)
+    {
+        return false;
+    }
+    assert(params.may2023ActivationTime);
+    uint64_t activationTime = GetArg("-upgrade9activationtime", params.may2023ActivationTime);
+    return pindexTip->IsforkActiveOnNextBlock(activationTime);
+}

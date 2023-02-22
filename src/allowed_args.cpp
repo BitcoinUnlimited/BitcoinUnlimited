@@ -603,7 +603,8 @@ static void addDebuggingOptions(AllowedArgs &allowedArgs, HelpMessageMode mode)
         .addArg("maxtipage=<n>", requiredInt,
             strprintf(_("Maximum time since the last block was mined in seconds before we consider ourselves still in "
                         "IBD <n> (default: %u)"),
-                DEFAULT_MAX_TIP_AGE));
+                DEFAULT_MAX_TIP_AGE))
+        .addDebugArg("upgrade9activationtime", optionalInt, "Override May 2023 hard fork activation time");
 }
 
 static void addNodeRelayOptions(AllowedArgs &allowedArgs)
