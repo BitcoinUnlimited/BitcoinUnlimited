@@ -125,21 +125,6 @@ def Skip(test_name, platforms, reason):
     rpctest.skip(platforms, reason)
     return rpctest
 
-def WhenElectrumFound(test_name, custom_electrum_path):
-    '''
-    Keeps test enabled when electrum binary is found. Disables it if not.
-    '''
-    import os
-    if custom_electrum_path is None:
-        # Default to an electrum server in the same dir as bitcoind
-        electrum_path = os.path.join(os.path.dirname(os.environ["BITCOIND"]), "rostrum")
-    else:
-        electrum_path = custom_electrum_path
-
-    if os.path.exists(electrum_path):
-        return test_name
-    return Disabled(test_name, f"Electrum server path {electrum_path} does not exist. Electrum test disabled.")
-
 if __name__ == "__main__":
     import doctest
     doctest.testmod()
