@@ -218,6 +218,9 @@ endif
 check-formatting:
 	$(MAKE) -C src $@
 
+run-formatting:
+	$(MAKE) -C src $@
+
 rostrum:
 	$(top_srcdir)/contrib/electrum/build_rostrum.py \
 		--dst=$(top_builddir)/src \

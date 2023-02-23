@@ -775,6 +775,11 @@ check-formatting:
 	@echo "Checking source formatting stylei with $(CLANG_FORMAT_BIN) ..."
 	(cd $(top_srcdir)/src; ../contrib/devtools/clang-format.py check  $(CLANG_FORMAT_BIN)  `cat ./.formatted-files`)
 
+run-formatting:
+	@echo "Source formatting style with $(CLANG_FORMAT_BIN) ..."
+	(cd $(top_srcdir)/src; ../contrib/devtools/clang-format.py format $(CLANG_FORMAT_BIN) `cat ./.formatted-files`)
+
+
 %.pb.cc %.pb.h: %.proto
 	@test -f $(PROTOC)
 	$(AM_V_GEN) $(PROTOC) --cpp_out=$(@D) --proto_path=$(abspath $(<D) $<)
