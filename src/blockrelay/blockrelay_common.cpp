@@ -29,8 +29,8 @@ void ThinTypeRelay::AddPeers(CNode *pfrom)
     // than the number of peers connected.  If this should happen we'll just stop
     // adding them and return, but if running a debug build we'll assert.
     uint32_t nNodes = nMaxConnections + NODE_PADDING;
-    DbgAssert(setThinBlockPeers.size() <= nNodes, return );
-    DbgAssert(setGraphenePeers.size() <= nNodes, return );
+    DbgAssert(setThinBlockPeers.size() <= nNodes, return);
+    DbgAssert(setGraphenePeers.size() <= nNodes, return);
     if (setThinBlockPeers.size() > nNodes || setGraphenePeers.size() > nNodes)
         return;
 
@@ -53,7 +53,7 @@ void ThinTypeRelay::AddCompactBlockPeer(CNode *pfrom)
     // than the number of peers connected.  If this should happen we'll just stop
     // adding them and return, but if running a debug build we'll assert.
     uint32_t nNodes = nMaxConnections + NODE_PADDING;
-    DbgAssert(setCompactBlockPeers.size() <= nNodes, return );
+    DbgAssert(setCompactBlockPeers.size() <= nNodes, return);
     if (setCompactBlockPeers.size() > nNodes)
         return;
 

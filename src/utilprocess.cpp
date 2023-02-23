@@ -156,7 +156,7 @@ struct SpawnAttrRAII
 
 void SubProcess::Run()
 {
-    DbgAssert(!run_started, return );
+    DbgAssert(!run_started, return);
 #if BOOST_OS_LINUX || BOOST_OS_MACOS
     run_started.store(true);
     RunCleanupRAII cleanup{is_running, run_started, nullptr};

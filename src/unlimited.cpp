@@ -1972,7 +1972,7 @@ void MarkAllContainingChainsInvalid(CBlockIndex *invalidBlock)
     READLOCK(cs_mapBlockIndex);
 
     bool dirty = false;
-    DbgAssert(invalidBlock->nStatus & BLOCK_FAILED_MASK, return );
+    DbgAssert(invalidBlock->nStatus & BLOCK_FAILED_MASK, return);
 
     // Find all the chain tips:
     std::set<CBlockIndex *, CompareBlocksByHeight> setTips;

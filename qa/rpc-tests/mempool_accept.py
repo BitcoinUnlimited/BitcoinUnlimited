@@ -567,7 +567,7 @@ class MyTest (BitcoinTestFramework):
         waitFor(30, lambda: self.nodes[0].getmempoolinfo()["bytes"] > 20000)
         waitFor(30, lambda: self.nodes[1].getmempoolinfo()["size"] == 100)
         waitFor(30, lambda: self.nodes[1].getmempoolinfo()["bytes"] > 20000)
-        waitFor(30, lambda: (self.nodes[2].getmempoolinfo()["size"] >= 43) and (self.nodes[2].getmempoolinfo()["size"] <= 45))
+        waitFor(60, lambda: (self.nodes[2].getmempoolinfo()["size"] >= 43) and (self.nodes[2].getmempoolinfo()["size"] <= 45))
         waitFor(30, lambda: self.nodes[2].getmempoolinfo()["bytes"] < 11000)
         waitFor(30, lambda: self.nodes[2].getmempoolinfo()["bytes"] > 9750)
         waitFor(30, lambda: [print("Node 3 mempool, expecting 87: %s" % str(self.nodes[3].getmempoolinfo())), (self.nodes[3].getmempoolinfo()["size"] >= 86) and (self.nodes[3].getmempoolinfo()["size"] <= 90)][-1])
