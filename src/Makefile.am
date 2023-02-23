@@ -770,9 +770,10 @@ if HARDEN
 	$(AM_V_at) READELF=$(READELF) OBJDUMP=$(OBJDUMP) $(top_srcdir)/contrib/devtools/security-check.py < $(bin_PROGRAMS)
 endif
 
+CLANG_FORMAT_BIN := $(firstword $(shell command -v clang-format-15 clang-format))
 check-formatting:
-	@echo "Checking source formatting style..."
-	(cd $(top_srcdir)/src; ../contrib/devtools/clang-format.py check clang-format-15 `cat ./.formatted-files`)
+	@echo "Checking source formatting stylei with $(CLANG_FORMAT_BIN) ..."
+	(cd $(top_srcdir)/src; ../contrib/devtools/clang-format.py check  $(CLANG_FORMAT_BIN)  `cat ./.formatted-files`)
 
 %.pb.cc %.pb.h: %.proto
 	@test -f $(PROTOC)
