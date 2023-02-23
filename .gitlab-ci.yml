@@ -56,12 +56,6 @@ check-formatting:
     extends: .cache-linting
     needs: []
     script:
-        - apt-get install -y wget gpg-agent
-        - add-apt-repository ppa:ubuntu-toolchain-r/test #needed for libstdc++ with C++20 support in ubuntu 18.04
-        - wget https://apt.llvm.org/llvm.sh
-        - chmod +x llvm.sh
-        - ./llvm.sh 15
-        - apt-get install clang-format-15
         - ./autogen.sh
         - ./configure --with-incompatible-bdb --enable-glibc-back-compat --enable-reduce-exports
         - make check-formatting
@@ -91,6 +85,9 @@ build-debian-nodeps:
             - ./build/src/bitcoin-tx
             - ./build/src/test/test_bitcoin
             - ./build/src/bench/bench_bitcoin
+            - ./build/src/.libs/libbitcoincash.so*
+            - ./build/qa/*
+            - ./qa/*
 
 build-debian-nodeps-qt:
     stage: build
@@ -206,16 +203,16 @@ build-debian-rostrum:
 build-debian-tests:
     stage: build_tests
     extends: .cache-debian
-    needs: ["build-debian"]
+    needs: ["build-debian-nodeps"]
     script:
         - (cd build/src; ./test/test_bitcoin)
     dependencies:
-        - build-debian
+        - build-debian-nodeps
 
 test-debian-qa:
     stage: qa_tests
     #extends: .cache-debian
-    needs: ["build-debian"]
+    needs: ["build-debian-nodeps"]
     script:
         - mkdir -p $CI_PROJECT_DIR/cores
         - mkdir -p $CI_PROJECT_DIR/saved-cores
@@ -223,7 +220,7 @@ test-debian-qa:
         - cd build;
         - ./qa/pull-tester/rpc-tests.py --coverage --no-ipv6-rpc-listen --gitlab
     dependencies:
-        - build-debian
+        - build-debian-nodeps
     artifacts:
         when: on_failure
         paths:
@@ -436,41 +433,6 @@ build-win-64:
     dependencies:
         - build-win-64-depends
 
-# Win32
-.cache-win-32:
-    extends: .ccache_scripts
-    cache:
-        <<: *global_cache_settings
-        key: win_cache-32
-        paths:
-            - ccache/
-            - depends/sources
-            - depends/built
-            - depends/i686-w64-mingw32
-
-build-win-32-depends:
-    stage: build_depends
-    extends: .cache-win-32
-    script:
-        - cd depends
-        - make HOST=i686-w64-mingw32 NO_QT=1 -j `nproc` NO_RUST=1
-    artifacts:
-        paths:
-            - depends/i686-w64-mingw32
-
-build-win-32:
-    stage: build
-    extends: .cache-win-32
-    needs: ["build-win-32-depends"]
-    script:
-        - ./autogen.sh
-        - mkdir build; cd build
-        - ../configure --enable-reduce-exports --prefix=$PWD/../depends/i686-w64-mingw32
-        - make -j `nproc`
-        - ccache --show-stats
-    dependencies:
-        - build-win-32-depends
-
 # OSX
 .cache-osx:
     extends: .ccache_scripts
@@ -516,43 +478,3 @@ build-osx:
             - build/config.log
             - depends/x86_64-apple-darwin16/share/config.site
 
-#Linux32-bit
-.cache-debian-32:
-    extends: .ccache_scripts
-    cache:
-        <<: *global_cache_settings
-        key: debian_cache_32
-        paths:
-            - ccache/
-            - depends/sources
-            - depends/built
-            - depends/i686-pc-linux-gnu
-
-build-debian-32-depends:
-    stage: build_depends
-    extends: .cache-debian-32
-    needs: []
-    script:
-        - cd depends
-        - make HOST=i686-pc-linux-gnu -j `nproc` NO_RUST=1 NO_QT=1
-    artifacts:
-        paths:
-            - depends/i686-pc-linux-gnu
-
-build-debian-32:
-    stage: build
-    extends: .cache-debian-32
-    needs: ["build-debian-32-depends"]
-    script:
-        - ./autogen.sh
-        - mkdir build; cd build
-        - ../configure --prefix=$PWD/../depends/i686-pc-linux-gnu  --enable-zmq --enable-glibc-back-compat --enable-reduce-exports
-        - make -j `nproc`
-        - ccache --show-stats
-    dependencies:
-        - build-debian-32-depends
-    artifacts:
-        when: on_failure
-        paths:
-            - build/config.log
-            - depends/i686-pc-linux-gnu/include
