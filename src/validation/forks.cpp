@@ -146,7 +146,8 @@ bool IsMay2022Activated(const Consensus::Params &consensusparams, const CBlockIn
     {
         return false;
     }
-    if (consensusparams.may2022Height) {
+    if (consensusparams.may2022Height)
+    {
         return pindexTip->nHeight >= consensusparams.may2022Height;
     }
     // nolnet and regtest don't have height set.
@@ -154,7 +155,8 @@ bool IsMay2022Activated(const Consensus::Params &consensusparams, const CBlockIn
 }
 
 // Check if May 15th 2023 fork has activated using MTP
-bool IsMay2023Activated(const Consensus::Params& params, const CBlockIndex* pindexTip) {
+bool IsMay2023Activated(const Consensus::Params &params, const CBlockIndex *pindexTip)
+{
     if (pindexTip == nullptr)
     {
         return false;

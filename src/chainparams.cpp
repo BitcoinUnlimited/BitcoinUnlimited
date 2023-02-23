@@ -406,7 +406,6 @@ public:
         consensus.may2023ActivationTime = MAY2023_ACTIVATION_TIME;
 
 
-
         pchMessageStart[0] = 0x0b;
         pchMessageStart[1] = 0x11;
         pchMessageStart[2] = 0x09;

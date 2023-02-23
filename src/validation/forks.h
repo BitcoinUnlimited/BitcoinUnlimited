@@ -59,6 +59,6 @@ bool IsNov2020Activated(const Consensus::Params &consensusparams, const CBlockIn
 bool IsMay2022Activated(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip);
 
 // Check if May 15th 2023 fork has activated using MTP
-bool IsMay2023Activated(const Consensus::Params&, const CBlockIndex* pindexTip);
+bool IsMay2023Activated(const Consensus::Params &, const CBlockIndex *pindexTip);
 
 #endif
