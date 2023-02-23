@@ -772,10 +772,20 @@ endif
 
 CLANG_FORMAT_BIN := $(firstword $(shell command -v clang-format-15 clang-format))
 check-formatting:
+	@echo "Checking source formatting style..."
+	@if [ "$(CLANG_FORMAT_BIN)" = "" ]; then \
+	    echo "clang-format not installed"; \
+	    exit 1; \
+	fi
 	@echo "Checking source formatting stylei with $(CLANG_FORMAT_BIN) ..."
 	(cd $(top_srcdir)/src; ../contrib/devtools/clang-format.py check  $(CLANG_FORMAT_BIN)  `cat ./.formatted-files`)
 
 run-formatting:
+	@echo "Checking source formatting style..."
+	@if [ "$(CLANG_FORMAT_BIN)" = "" ]; then \
+	    echo "clang-format not installed"; \
+	    exit 1; \
+	fi
 	@echo "Source formatting style with $(CLANG_FORMAT_BIN) ..."
 	(cd $(top_srcdir)/src; ../contrib/devtools/clang-format.py format $(CLANG_FORMAT_BIN) `cat ./.formatted-files`)
 
