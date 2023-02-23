@@ -87,7 +87,7 @@ passOn = ""
 showHelp = False  # if we need to print help
 p = re.compile("^--")
 p_parallel = re.compile('^-parallel=')
-run_parallel = 3
+run_parallel = 3 if psutil.cpu_count() <= 3 else psutil.cpu_count()
 
 # some of the single-dash options applicable only to this runner script
 # are also allowed in double-dash format (but are not passed on to the
