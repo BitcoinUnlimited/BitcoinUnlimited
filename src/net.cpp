@@ -635,11 +635,11 @@ static bool IsPriorityMsg(std::string strCommand)
         return false;
 
     // Various messages types that are considered priority.
-    // NOTE: The absence of BLOCK is not by accident. Full BLOCK messages are problematic for priority queuing.
+    // NOTE: The absence of GETBLOCKS is not by accident. Full GETBLOCKS messages are problematic for priority queuing.
     //       as it is difficult to know the state of the peer in terms of whether they are sync'd to the chain.
-    //       We for instance don't want to be sending BLOCK's as priority messages if the peer is only in the process
-    //       of initial sync. Also, BLOCK's can be quite large and we don't want them to be dominating our priority
-    //       sending process. We prefer small objects that can be forwarded with one SockeSendData() attempt.
+    //       We for instance don't want to be sending GETBLOCKS's as priority messages if the peer is only in the
+    //       process of initial sync. Also, GETBLOCKS's can be quite large and we don't want them to be dominating our
+    //       priority sending process. We prefer small objects that can be forwarded with one SockeSendData() attempt.
     if (strCommand == NetMsgType::HEADERS || strCommand == NetMsgType::GRAPHENEBLOCK ||
         strCommand == NetMsgType::GET_GRAPHENE || strCommand == NetMsgType::GRAPHENETX ||
         strCommand == NetMsgType::GET_GRAPHENE_RECOVERY || strCommand == NetMsgType::GRAPHENE_RECOVERY ||
