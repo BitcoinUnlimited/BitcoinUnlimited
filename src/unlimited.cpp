@@ -447,10 +447,6 @@ void UnlimitedSetup(void)
     maxSigChecks = excessiveBlockSize / BLOCK_MAXBYTES_MAXSIGCHECKS_RATIO;
     LoadTweaks(); // The above options are deprecated so the same parameter defined as a tweak will override them
 
-    // If the user configures it to 1, assume this means default
-    if (miningForkTime.Value() == 1)
-        miningForkTime = Params().GetConsensus().may2022ActivationTime;
-
     if (maxGeneratedBlock > excessiveBlockSize)
     {
         LOGA("Reducing the maximum mined block from the configured %d to your excessive block size %d.  Otherwise "

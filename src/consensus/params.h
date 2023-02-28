@@ -170,12 +170,14 @@ struct Params
     int nov2019Height;
     /** May 15, 2020 actication height */
     int may2020Height;
+    /** May 15, 2022 activation height */
+    int may2022Height;
     /** Nov 15, 2020 MTP activation time will be 12:00:00 UTC */
     uint64_t nov2020ActivationTime;
     /** Nov 15, 2020 actication height */
     boost::optional<int> nov2020Height;
-    /** May 15, 2022 MTP activation time will be 12:00:00 UTC */
-    uint64_t may2022ActivationTime;
+    /** May 15, 2023 MTP activation time will be 12:00:00 UTC */
+    uint64_t may2023ActivationTime;
 };
 } // namespace Consensus
 

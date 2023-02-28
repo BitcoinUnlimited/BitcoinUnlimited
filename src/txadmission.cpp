@@ -713,7 +713,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         featureFlags |= SCRIPT_ENABLE_OP_REVERSEBYTES | SCRIPT_VERIFY_INPUT_SIGCHECKS;
     }
 
-    if (IsMay2022Enabled(chainparams.GetConsensus(), chainActive.Tip()))
+    if (IsMay2022Activated(chainparams.GetConsensus(), chainActive.Tip()))
     {
         featureFlags |= SCRIPT_64_BIT_INTEGERS;
         featureFlags |= SCRIPT_NATIVE_INTROSPECTION;

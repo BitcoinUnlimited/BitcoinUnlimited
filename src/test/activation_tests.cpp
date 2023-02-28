@@ -6,6 +6,7 @@
 #include <chainparams.h>
 #include <config.h>
 #include <validation/forks.h>
+#include <util.h>
 
 #include <test/test_bitcoin.h>
 
@@ -23,13 +24,11 @@ static void SetMTP(std::array<CBlockIndex, 12> &blocks, int64_t mtp) {
     assert(blocks.back().GetMedianTimePast() == mtp);
 }
 
-BOOST_AUTO_TEST_CASE(isMay2022Enabled) {
+BOOST_AUTO_TEST_CASE(isMay2022Activated) {
     const CChainParams config = Params(CBaseChainParams::REGTEST);
     CBlockIndex prev;
 
-    const auto activation = config.GetConsensus().may2022ActivationTime;
-
-    BOOST_CHECK(!IsMay2022Next(config.GetConsensus(), nullptr));
+    const auto activation = MAY2022_ACTIVATION_TIME;
 
     std::array<CBlockIndex, 12> blocks;
     for (size_t i = 1; i < blocks.size(); ++i)
@@ -38,16 +37,53 @@ BOOST_AUTO_TEST_CASE(isMay2022Enabled) {
     }
 
     SetMTP(blocks, activation - 1);
-    BOOST_CHECK(!IsMay2022Next(config.GetConsensus(), &blocks.back()));
-    BOOST_CHECK(!IsMay2022Enabled(config.GetConsensus(), &blocks.back()));
+    BOOST_CHECK(!IsMay2022Activated(config.GetConsensus(), &blocks.back()));
 
     SetMTP(blocks, activation);
-    BOOST_CHECK(IsMay2022Next(config.GetConsensus(), &blocks.back()));
-    BOOST_CHECK(IsMay2022Enabled(config.GetConsensus(), &blocks.back()));
+    BOOST_CHECK(IsMay2022Activated(config.GetConsensus(), &blocks.back()));
 
     SetMTP(blocks, activation + 1);
-    BOOST_CHECK(!IsMay2022Next(config.GetConsensus(), &blocks.back()));
-    BOOST_CHECK(IsMay2022Enabled(config.GetConsensus(), &blocks.back()));
+    BOOST_CHECK(IsMay2022Activated(config.GetConsensus(), &blocks.back()));
+}
+
+
+BOOST_AUTO_TEST_CASE(isMay2023Activated) {
+    const CChainParams config = Params(CBaseChainParams::REGTEST);
+    CBlockIndex prev;
+
+    uint64_t activation = config.GetConsensus().may2023ActivationTime;
+    assert(activation == MAY2023_ACTIVATION_TIME);
+
+    std::array<CBlockIndex, 12> blocks;
+    for (size_t i = 1; i < blocks.size(); ++i)
+    {
+        blocks[i].pprev = &blocks[i - 1];
+    }
+
+    SetMTP(blocks, activation - 1);
+    BOOST_CHECK(!IsMay2023Activated(config.GetConsensus(), &blocks.back()));
+
+    SetMTP(blocks, activation);
+    BOOST_CHECK(IsMay2023Activated(config.GetConsensus(), &blocks.back()));
+
+    SetMTP(blocks, activation + 1);
+    BOOST_CHECK(IsMay2023Activated(config.GetConsensus(), &blocks.back()));
+
+    // For functional tests, the activation time can be overridden.
+    activation = 1600000000;
+    SetArg("-upgrade9activationtime", "1600000000");
+
+    SetMTP(blocks, activation - 1);
+    BOOST_CHECK(!IsMay2023Activated(config.GetConsensus(), &blocks.back()));
+
+    SetMTP(blocks, activation);
+    BOOST_CHECK(IsMay2023Activated(config.GetConsensus(), &blocks.back()));
+
+    SetMTP(blocks, activation + 1);
+    BOOST_CHECK(IsMay2023Activated(config.GetConsensus(), &blocks.back()));
+
+    // Cleanup
+    UnsetArg("-upgrade9activationtime");
 }
 
 BOOST_AUTO_TEST_SUITE_END()

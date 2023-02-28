@@ -140,20 +140,28 @@ bool IsNov2020Activated(const Consensus::Params &consensusparams, const CBlockIn
     }
 }
 
-bool IsMay2022Enabled(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
+bool IsMay2022Activated(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
 {
     if (pindexTip == nullptr)
     {
         return false;
     }
-    return pindexTip->IsforkActiveOnNextBlock(miningForkTime.Value());
+    if (consensusparams.may2022Height)
+    {
+        return pindexTip->nHeight >= consensusparams.may2022Height;
+    }
+    // nolnet and regtest don't have height set.
+    return pindexTip->IsforkActiveOnNextBlock(MAY2022_ACTIVATION_TIME);
 }
 
-bool IsMay2022Next(const Consensus::Params &consensusparams, const CBlockIndex *pindexTip)
+// Check if May 15th 2023 fork has activated using MTP
+bool IsMay2023Activated(const Consensus::Params &params, const CBlockIndex *pindexTip)
 {
     if (pindexTip == nullptr)
     {
         return false;
     }
-    return pindexTip->forkAtNextBlock(miningForkTime.Value());
+    assert(params.may2023ActivationTime);
+    uint64_t activationTime = GetArg("-upgrade9activationtime", params.may2023ActivationTime);
+    return pindexTip->IsforkActiveOnNextBlock(activationTime);
 }
