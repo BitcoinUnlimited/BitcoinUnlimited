@@ -5,6 +5,7 @@
 """Test enforcement of strict tx version. Before upgrade9 it is a relay-only rule
    and after upgrade9 tx versions must be either 1 or 2 by consensus."""
 import time
+import logging
 from typing import Optional
 
 from test_framework import cashaddr
@@ -13,15 +14,14 @@ from test_framework.blocktools import (
     create_coinbase,
     create_tx_with_script,
 )
-from test_framework.messages import (
+from test_framework.nodemessages import (
     CBlock,
     CTransaction,
     FromHex,
 )
-from test_framework.p2p import P2PDataStore
+from test_framework.mininode import P2PDataStore, NetworkThread
 from test_framework.script import (
     CScript,
-    hash160,
     OP_EQUAL,
     OP_HASH160,
     OP_TRUE,
@@ -30,17 +30,23 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
     assert_greater_than_or_equal,
+    hash160,
 )
+from test_framework.bunode import NodeConn
+from test_framework.portseed import p2p_port
 
 DUST = 546
-
+# Reject reason (log string) to expect when tx is rejected due to standardness
+REJECT_REASON_STANDARDNESS = "was not accepted: version"
+# Reject reason (log string) to expect when tx is rejected due to consensus
+REJECT_REASON_CONSENSUS = "bad-txns-version"
 
 class TxVersionTest(BitcoinTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        self.base_extra_args = ['-acceptnonstdtxn=0', '-expire=0', '-whitelist=127.0.0.1']
+        self.base_extra_args = ['-acceptnonstdtxn=0', '-whitelist=127.0.0.1', '-whitelistforcerelay=0', '-debug=mempool']
         self.extra_args = [['-upgrade9activationtime=999999999999'] + self.base_extra_args]
 
     def run_test(self):
@@ -80,7 +86,7 @@ class TxVersionTest(BitcoinTestFramework):
 
         spend_index = 0
 
-        def create_various_version_txns_and_test():
+        def create_various_version_txns_and_test(reject_reason):
             nonlocal spend_index
 
             # Test: Create 2 txns that have nVersion=1 and nVersion=2, send to mempool -- they should be accepted ok and
@@ -113,17 +119,17 @@ class TxVersionTest(BitcoinTestFramework):
                                  nVersion=3)
             spend_index += 1
             assert_equal(tx3.nVersion, 3)
-            self.send_txs([tx3], success=False, reject_reason="was not accepted: version")
+            self.send_txs([tx3], success=False, reject_reason=reject_reason)
             tx0 = self.create_tx(blocks[spend_index].vtx[0], 0, script_pub_key=anyonecanspend, redeem_script=redeem_script,
                                  nVersion=0)
             spend_index += 1
             assert_equal(tx0.nVersion, 0)
-            self.send_txs([tx0], success=False, reject_reason="was not accepted: version")
+            self.send_txs([tx0], success=False, reject_reason=reject_reason)
             tx123456 = self.create_tx(blocks[spend_index].vtx[0], 0, script_pub_key=anyonecanspend, redeem_script=redeem_script,
                                      nVersion=123456)
             spend_index += 1
             assert_equal(tx123456.nVersion, 123456)
-            self.send_txs([tx123456], success=False, reject_reason="was not accepted: version")
+            self.send_txs([tx123456], success=False, reject_reason=reject_reason)
             assert len(node.getrawmempool()) == 0, "Mempool should have 0 txns"
             return tx3, tx0, tx123456
 
@@ -131,7 +137,7 @@ class TxVersionTest(BitcoinTestFramework):
         # the mempool -- they should be accepted ok and mined ok.  It also creates 3 txns that have nVersion out of
         # range, sends them to mempool -- they should be rejected as non-standard. It returns the 3 out-of-bounds
         # txns.
-        tx3, tx0, tx123456 = create_various_version_txns_and_test()
+        tx3, tx0, tx123456 = create_various_version_txns_and_test(REJECT_REASON_STANDARDNESS)
 
         # However, the same txns should be ok if mined in a block
         blocks.append(self.create_block(blocks[-1], script_pub_key=anyonecanspend, redeem_script=redeem_script,
@@ -149,7 +155,7 @@ class TxVersionTest(BitcoinTestFramework):
         self.restart_node(0, extra_args=[f"-upgrade9activationtime={activation_time}"] + self.base_extra_args)
         self.reconnect_p2p()
 
-        self.log.info("Advance blockchain forward to enable upgrade9")
+        logging.info("Advance blockchain forward to enable upgrade9")
         iters = 0
         est_median_time = node.getblockchaininfo()["mediantime"]
         while est_median_time < activation_time:
@@ -164,7 +170,7 @@ class TxVersionTest(BitcoinTestFramework):
         assert_equal(node.getbestblockhash(), blocks[-1].sha256.to_bytes(length=32, byteorder="big").hex())
         # Ensure upgrade9 activated
         assert_greater_than_or_equal(node.getblockchaininfo()["mediantime"], activation_time)
-        self.log.info(f"Iterated {iters} times to bring mediantime ({node.getblockchaininfo()['mediantime']}) up to "
+        logging.info(f"Iterated {iters} times to bring mediantime ({node.getblockchaininfo()['mediantime']}) up to "
                       f"activation_time ({activation_time}) -- Upgrade9 is now activated for the next block!")
 
         # Post-Upgrade9 Test: The below function call creates 2 txns that have nVersion=1 and nVersion=2, sends them to
@@ -172,7 +178,7 @@ class TxVersionTest(BitcoinTestFramework):
         # range, sends them to mempool -- they should be rejected as out of consensus. It returns the 3 out-of-bounds
         # txns.
 
-        tx3, tx0, tx123456 = create_various_version_txns_and_test()
+        tx3, tx0, tx123456 = create_various_version_txns_and_test(REJECT_REASON_CONSENSUS)
 
         # This time, under Upgrade9, the same txns should be REJECTED if mined in a block
         for bad_tx in (tx3, tx0, tx123456):
@@ -184,18 +190,18 @@ class TxVersionTest(BitcoinTestFramework):
                 missing.discard(txn.hash)
             assert not missing, "Tx not found in block as expected!"
             # Now, send the block and it should be rejected by consensus
-            self.send_blocks([badblk], success=False, reject_reason="bad-txns-version")
+            self.send_blocks([badblk], success=False, reject_reason=REJECT_REASON_CONSENSUS)
 
         # Next, try a few blocks with funny coinbase version as well just for belt-and-suspenders
         bad_versions = [3, 0, -1, 0x7fffffff, 32132, 4, -2, 65536]
         for bv in bad_versions:
             badblk = self.create_block(blocks[-1], script_pub_key=anyonecanspend, nVersion_cb=bv)
-            self.send_blocks([badblk], success=False, reject_reason="bad-txns-version")
+            self.send_blocks([badblk], success=False, reject_reason=REJECT_REASON_CONSENSUS)
         # Also do the above, but with a spend_tx
         for bv in bad_versions:
             badblk = self.create_block(blocks[-1], script_pub_key=anyonecanspend, nVersion_cb=1, nVersion_spend=bv,
                                        redeem_script=redeem_script, spend=blocks[spend_index].vtx[0])
-            self.send_blocks([badblk], success=False, reject_reason="bad-txns-version")
+            self.send_blocks([badblk], success=False, reject_reason=REJECT_REASON_CONSENSUS)
 
         # Ensure nothing changed and the tip we expect is blocks[-1]
         assert_equal(node.getbestblockhash(), blocks[-1].hash)
@@ -246,41 +252,24 @@ class TxVersionTest(BitcoinTestFramework):
         return block
 
     def bootstrap_p2p(self):
-        """Add a P2P connection to the node.
-
-        Helper to connect and wait for version handshake."""
-        self.nodes[0].add_p2p_connection(P2PDataStore())
-        # We need to wait for the initial getheaders from the peer before we
-        # start populating our blockstore. If we don't, then we may run ahead
-        # to the next subtest before we receive the getheaders. We'd then send
-        # an INV for the next block and receive two getheaders - one for the
-        # IBD and one for the INV. We'd respond to both and could get
-        # unexpectedly disconnected if the DoS score for that error is 50.
-        self.nodes[0].p2p.wait_for_getheaders(timeout=5)
+        """Add a P2P connection to the node."""
+        self.p2p = P2PDataStore()
+        self.connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], self.p2p)
+        self.p2p.add_connection(self.connection)
+        NetworkThread().start()
+        self.p2p.wait_for_verack()
+        assert(self.p2p.connection.state == "connected")
 
     def reconnect_p2p(self):
-        """Tear down and bootstrap the P2P connection to the node.
-
-        The node gets disconnected several times in this test. This helper
-        method reconnects the p2p and restarts the network thread."""
-        bs, lbh, ts, p2p = None, None, None, None
-        if self.nodes[0].p2ps:
-            p2p = self.nodes[0].p2p
-            bs, lbh, ts = p2p.block_store, p2p.last_block_hash, p2p.tx_store
-        self.nodes[0].disconnect_p2ps()
+        self.connection.handle_close()
         self.bootstrap_p2p()
-        if p2p and (bs or lbh or ts):
-            # Set up the block store again so that p2p node can adequately send headers again for everything
-            # node might want after a restart
-            p2p = self.nodes[0].p2p
-            p2p.block_store, p2p.last_block_hash, p2p.tx_store = bs, lbh, ts
 
     def send_blocks(self, blocks, success=True, reject_reason=None,
                     request_block=True, reconnect=False, timeout=60):
         """Sends blocks to test node. Syncs and verifies that tip has advanced to most recent block.
 
         Call with success = False if the tip shouldn't advance to the most recent block."""
-        self.nodes[0].p2p.send_blocks_and_test(blocks, self.nodes[0], success=success,
+        self.p2p.send_blocks_and_test(blocks, self.nodes[0], success=success,
                                                reject_reason=reject_reason, request_block=request_block,
                                                timeout=timeout, expect_disconnect=reconnect)
         if reconnect:
@@ -290,7 +279,7 @@ class TxVersionTest(BitcoinTestFramework):
         """Sends txns to test node. Syncs and verifies that txns are in mempool
 
         Call with success = False if the txns should be rejected."""
-        self.nodes[0].p2p.send_txs_and_test(txs, self.nodes[0], success=success, expect_disconnect=reconnect,
+        self.p2p.send_txs_and_test(txs, self.nodes[0], success=success, expect_ban=reconnect,
                                             reject_reason=reject_reason)
         if reconnect:
             self.reconnect_p2p()
