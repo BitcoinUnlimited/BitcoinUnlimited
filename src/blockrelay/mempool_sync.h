@@ -123,7 +123,7 @@ public:
     {
         READWRITE(COMPACTSIZE(version));
         READWRITE(nSenderMempoolTxs);
-        if (nSenderMempoolTxs > (maxMessageSizeMultiplier * excessiveBlockSize / MIN_TX_SIZE))
+        if (nSenderMempoolTxs > (maxMessageSizeMultiplier * excessiveBlockSize / MIN_TX_SIZE_UPGRADE9))
             throw std::runtime_error("nSenderMempoolTxs exceeds threshold for excessive block txs");
         if (!pGrapheneSet)
         {

@@ -1035,6 +1035,10 @@ def assert_greater_than(thing1, thing2):
     if thing1 <= thing2:
         raise AssertionError("%s <= %s"%(str(thing1),str(thing2)))
 
+def assert_greater_than_or_equal(thing1, thing2):
+    if thing1 < thing2:
+        raise AssertionError("%s < %s"%(str(thing1),str(thing2)))
+
 def assert_raises(exc, fun, *args, **kwds):
     try:
         fun(*args, **kwds)

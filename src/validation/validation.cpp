@@ -3916,7 +3916,7 @@ bool ProcessNewBlock(CValidationState &state,
         {
             // If the block was not accepted then reset the fProcessing flag to false.
             requester.BlockRejected(inv, pfrom);
-            return error("%s: AcceptBlock FAILED", __func__);
+            return error("%s: AcceptBlock FAILED: %s", __func__, state.GetRejectReason());
         }
         else
         {

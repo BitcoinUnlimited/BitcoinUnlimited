@@ -9,6 +9,7 @@
 #include "blockrelay/graphene_set.h"
 #include "bloom.h"
 #include "config.h"
+#include "consensus/tx_verify.h"
 #include "consensus/validation.h"
 #include "fastfilter.h"
 #include "iblt.h"
@@ -167,10 +168,12 @@ public:
         READWRITE(header);
         READWRITE(vAdditionalTxs);
         READWRITE(nBlockTxs);
-        // This logic assumes a smallest transaction size of MIN_TX_SIZE bytes.  This is optimistic for realistic
-        // transactions and the downside for pathological blocks is just that graphene won't work so we fall back
-        // to xthin
-        if (nBlockTxs > (thinrelay.GetMaxAllowedBlockSize() / MIN_TX_SIZE))
+        // This logic assumes a smallest transaction size equal to the return value of GetMinimumTxSize() in  bytes.
+        // This is optimistic for realistic transactions and the downside for pathological blocks is just that graphene
+        // won't work so we fall back to xthin
+        uint64_t minTxSize =
+            std::max(GetMinimumTxSize(Params().GetConsensus(), chainActive.Tip()), MIN_TX_SIZE_UPGRADE9);
+        if (nBlockTxs > (thinrelay.GetMaxAllowedBlockSize() / minTxSize))
         {
             throw std::runtime_error(strprintf(
                 "Based on number of transactions:(%d) the threshold for max allowed blocksize:(%d) will be exceeded",

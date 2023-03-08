@@ -25,8 +25,10 @@ static const unsigned int MAY2020_MAX_TX_SIGCHECK_COUNT = 3000;
     For blocks < 1MB, there is no largest transaction so it is defacto 1MB.
 */
 static const unsigned int DEFAULT_LARGEST_TRANSACTION = 1000000;
-/** The minimum allowed size for a transaction, in bytes */
-static const unsigned int MIN_TX_SIZE = 100;
+/** The minimum allowed size for a transaction, in bytes, after magnetic anomaly but before upgrade 9 */
+inline constexpr uint64_t MIN_TX_SIZE_MAGNETIC_ANOMALY = 100;
+/** The minimum allowed size for a transaction, in bytes, after upgrade 9 */
+inline constexpr uint64_t MIN_TX_SIZE_UPGRADE9 = 65;
 
 /** This is the default max bloom filter size allowed on the bitcoin network.  In Bitcoin Unlimited we have the ability
  *  to communicate to our peer what max bloom filter size we will accept but still observe this value as a default.

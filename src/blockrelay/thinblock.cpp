@@ -1427,7 +1427,7 @@ bool IsThinBlockValid(CNode *pfrom,
 
     // Check that we havn't exceeded the max allowable block size that would be reconstructed from this
     // set of hashes
-    if (nHashes > (thinrelay.GetMaxAllowedBlockSize() / MIN_TX_SIZE))
+    if (nHashes > (thinrelay.GetMaxAllowedBlockSize() / MIN_TX_SIZE_UPGRADE9))
         return error("Number of hashes in thinblock or xthinblock would reconstruct a block greater than the block "
                      "size limit\n");
 
