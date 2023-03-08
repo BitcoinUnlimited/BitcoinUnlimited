@@ -1089,7 +1089,8 @@ bool IsCompactBlockValid(CNode *pfrom, std::shared_ptr<CompactBlock> compactBloc
     // Check that we havn't exceeded the max allowable block size that would be reconstructed from this
     // set of hashes
     uint64_t nTxnsInBlock = compactBlock->shorttxids.size() + compactBlock->prefilledtxn.size();
-    if (nTxnsInBlock > (thinrelay.GetMaxAllowedBlockSize() / MIN_TX_SIZE))
+    uint64_t minTxSize = std::max(GetMinimumTxSize(Params().GetConsensus(), chainActive.Tip()), MIN_TX_SIZE_UPGRADE9);
+    if (nTxnsInBlock > (thinrelay.GetMaxAllowedBlockSize() / minTxSize))
         return error("Number of hashes in compactblock would reconstruct a block greather than the block size limit\n");
 
     // check block header

@@ -743,20 +743,18 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         }
     }
 
-    // Make sure tx size is acceptable after Nov 15, 2018 fork
-    if (IsNov2018Activated(chainparams.GetConsensus(), chainActive.Tip()))
+    // Make sure tx size is acceptable after Nov 15, 2018 fork and May 2023 fork.
+    const uint64_t minTxSize = GetMinimumTxSize(Params().GetConsensus(), chainActive.Tip());
+    if (minTxSize != 0 && tx->GetTxSize() < minTxSize)
     {
-        if (tx->GetTxSize() < MIN_TX_SIZE)
+        if (debugger)
         {
-            if (debugger)
-            {
-                debugger->AddInvalidReason("txn-undersize");
-                debugger->mineable = false;
-            }
-            else
-            {
-                return state.DoS(0, false, REJECT_INVALID, "txn-undersize");
-            }
+            debugger->AddInvalidReason("txn-undersize");
+            debugger->mineable = false;
+        }
+        else
+        {
+            return state.DoS(0, false, REJECT_INVALID, "txn-undersize");
         }
     }
 

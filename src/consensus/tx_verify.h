@@ -27,6 +27,7 @@ bool ContextualCheckTransaction(const CTransactionRef tx,
 
 namespace Consensus
 {
+struct Params;
 /**
  * Check whether all inputs of this transaction are valid (no double spends and amounts)
  * This does not modify the UTXO set. This does not check scripts and sigs.
@@ -78,5 +79,9 @@ bool EvaluateSequenceLocks(const CBlockIndex &block, std::pair<int, int64_t> loc
 bool SequenceLocks(const CTransactionRef tx, int flags, std::vector<int> *prevHeights, const CBlockIndex &block);
 
 uint64_t GetTransactionSigOpCount(const CTransactionRef ptx, const CCoinsViewCache &coins, const uint32_t flags);
+
+/// Returns the minimum transaction size (100 for post-MagneticAnomaly, 65 for post-Upgrade9), or 0 if before those
+/// two upgrades have activated (no enforced minimum).
+uint64_t GetMinimumTxSize(const Consensus::Params &params, const CBlockIndex *pindexPrev);
 
 #endif // BITCOIN_CONSENSUS_TX_VERIFY_H

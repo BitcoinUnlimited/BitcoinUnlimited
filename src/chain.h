@@ -279,21 +279,21 @@ public:
 
     /** return true for every block from fork block and forward [x,+inf)
      * state: fork activated */
-    bool forkActivated(int time) const;
+    bool forkActivated(int64_t time) const;
 
     /** return true only if we are exactly on the fork block [x,x]
      * state: fork activated */
-    bool forkActivateNow(int time) const;
+    bool forkActivateNow(int64_t time) const;
 
     /** This will check if the Fork will be enabled at the next block
      * i.e. we are at block x - 1, [x-1, +inf]
      * state fork: enabled or activated */
-    bool IsforkActiveOnNextBlock(int time) const;
+    bool IsforkActiveOnNextBlock(int64_t time) const;
 
     /** return true only if 1st condition is true (Median past time > fork time)
      * and not the 2nd, i.e. we are at precisely [x-1,x-1]
      * state: fork enabled but not activateda */
-    bool forkAtNextBlock(int time) const;
+    bool forkAtNextBlock(int64_t time) const;
 
     uint256 GetBlockHash() const { return *phashBlock; }
     int64_t GetBlockTime() const { return (int64_t)nTime; }

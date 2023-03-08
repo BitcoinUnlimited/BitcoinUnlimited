@@ -11,6 +11,7 @@
 #include "script/interpreter.h"
 #include "unlimited.h"
 #include "validation.h"
+#include "validation/forks.h"
 
 // TODO remove the following dependencies
 #include "chain.h"
@@ -32,6 +33,20 @@ bool IsFinalTx(const CTransactionRef tx, int nBlockHeight, int64_t nBlockTime)
             return false;
     }
     return true;
+}
+
+
+uint64_t GetMinimumTxSize(const Consensus::Params &params, const CBlockIndex *pindexPrev)
+{
+    if (IsMay2023Activated(params, pindexPrev))
+    {
+        return MIN_TX_SIZE_UPGRADE9;
+    }
+    else if (IsMay2020Activated(params, pindexPrev))
+    {
+        return MIN_TX_SIZE_MAGNETIC_ANOMALY;
+    }
+    return 0;
 }
 
 std::pair<int, int64_t> CalculateSequenceLocks(const CTransactionRef tx,
@@ -174,16 +189,13 @@ bool ContextualCheckTransaction(const CTransactionRef tx,
             return state.DoS(10, false, REJECT_INVALID, "bad-txns-too-many-sigops");
     }
 
-    // Make sure tx size is equal or higher to 100 bytes if we are on the BCH chain and Nov 15th 2018 activated
-    if (IsNov2018Activated(consensusParams, nHeight))
+    // Enforce minimum tx size, if any
+    const uint64_t minTxSize = GetMinimumTxSize(consensusParams, pindexPrev);
+    if (minTxSize && ::GetSerializeSize(tx, PROTOCOL_VERSION) < minTxSize)
     {
-        if (tx->GetTxSize() < MIN_TX_SIZE)
-        {
-            return state.DoS(
-                10, error("%s: contains transactions that are too small", __func__), REJECT_INVALID, "txn-undersize");
-        }
+        return state.DoS(
+            10, error("%s: contains transactions that are too small", __func__), REJECT_INVALID, "bad-txns-undersize");
     }
-
 
     return true;
 }

@@ -166,10 +166,11 @@ CTransactionRef BlockAssembler::coinbaseTx(const CScript &scriptPubKeyIn, int _n
     }
 
     // Make sure the coinbase is big enough.
-    uint64_t nCoinbaseSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-    if (nCoinbaseSize < MIN_TX_SIZE && IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()))
+    const uint64_t nCoinbaseSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
+    const uint64_t minTxSize = GetMinimumTxSize(Params().GetConsensus(), chainActive.Tip());
+    if (nCoinbaseSize < minTxSize)
     {
-        tx.vin[0].scriptSig << std::vector<uint8_t>(MIN_TX_SIZE - nCoinbaseSize - 1);
+        tx.vin[0].scriptSig << std::vector<uint8_t>(minTxSize - nCoinbaseSize - 1);
     }
 
     return MakeTransactionRef(std::move(tx));
@@ -421,15 +422,8 @@ bool BlockAssembler::TestForBlock(CTxMemPool::txiter iter)
     if (!IsFinalTx(iter->GetSharedTx(), nHeight, nLockTimeCutoff))
         return false;
 
-    // On BCH if Nov 15th 2019 has been activaterd make sure tx size
-    // is greater or equal than 100 bytes
-    if (IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()))
-    {
-        if (iter->GetTxSize() < MIN_TX_SIZE)
-            return false;
-    }
-
-    return true;
+    const uint64_t minTxSize = GetMinimumTxSize(Params().GetConsensus(), chainActive.Tip());
+    return iter->GetTxSize() >= minTxSize;
 }
 
 void BlockAssembler::AddToBlock(std::vector<const CTxMemPoolEntry *> *vtxe, CTxMemPool::txiter iter)
@@ -696,10 +690,11 @@ void IncrementExtraNonce(CBlockRef pblock, unsigned int &nExtraNonce)
     assert(txCoinbase.vin[0].scriptSig.size() <= MAX_COINBASE_SCRIPTSIG_SIZE);
 
     // On BCH if Nov15th 2018 has been activated make sure the coinbase is big enough
-    uint64_t nCoinbaseSize = ::GetSerializeSize(txCoinbase, SER_NETWORK, PROTOCOL_VERSION);
-    if (nCoinbaseSize < MIN_TX_SIZE && IsNov2018Activated(Params().GetConsensus(), chainActive.Tip()))
+    const uint64_t nCoinbaseSize = ::GetSerializeSize(txCoinbase, SER_NETWORK, PROTOCOL_VERSION);
+    const uint64_t minTxSize = GetMinimumTxSize(Params().GetConsensus(), chainActive.Tip());
+    if (minTxSize != 0 && nCoinbaseSize < minTxSize)
     {
-        txCoinbase.vin[0].scriptSig << std::vector<uint8_t>(MIN_TX_SIZE - nCoinbaseSize - 1);
+        txCoinbase.vin[0].scriptSig << std::vector<uint8_t>(minTxSize - nCoinbaseSize - 1);
     }
 
     pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));

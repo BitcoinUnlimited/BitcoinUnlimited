@@ -65,7 +65,7 @@ def serialize_script_num(value):
 # Create a coinbase transaction, assuming no miner fees.
 # If pubkey is passed in, the coinbase output will be a P2PK output;
 # otherwise an anyone-can-spend output.
-def create_coinbase(height, pubkey = None, scriptPubKey = None):
+def create_coinbase(height, pubkey = None, scriptPubKey = None, pad_to_size = True):
     assert not (pubkey and scriptPubKey), "cannot both have pubkey and custom scriptPubKey"
     coinbase = CTransaction()
     coinbase.vin.append(CTxIn(COutPoint(0, 0xffffffff),
@@ -83,9 +83,10 @@ def create_coinbase(height, pubkey = None, scriptPubKey = None):
     coinbase.vout = [ coinbaseoutput ]
 
     # Make sure the coinbase is at least 100 bytes
-    coinbase_size = len(coinbase.serialize())
-    if coinbase_size < 100:
-        coinbase.vin[0].scriptSig += b'x' * (100 - coinbase_size)
+    if pad_to_size:
+        coinbase_size = len(coinbase.serialize())
+        if coinbase_size < 100:
+            coinbase.vin[0].scriptSig += b'x' * (100 - coinbase_size)
 
     coinbase.calc_sha256()
     return coinbase
@@ -262,7 +263,7 @@ def pad_raw_tx(rawtx_hex, min_size=MIN_TX_SIZE):
     return ToHex(tx)
 
 def create_tx_with_script(prevtx, n, script_sig=b"",
-                          amount=1, script_pub_key=CScript()):
+                          amount=1, script_pub_key=CScript(), pad_to_size = True):
     """Return one-input, one-output transaction object
        spending the prevtx's n-th output with the given amount.
 
@@ -272,7 +273,8 @@ def create_tx_with_script(prevtx, n, script_sig=b"",
     assert(n < len(prevtx.vout))
     tx.vin.append(CTxIn(COutPoint(prevtx.sha256, n), script_sig, 0xffffffff))
     tx.vout.append(CTxOut(amount, script_pub_key))
-    pad_tx(tx)
+    if pad_to_size:
+        pad_tx(tx)
     tx.calc_sha256()
     return tx
 

@@ -151,7 +151,7 @@ void CBlockIndex::BuildSkip()
 
 /** return true for every block from fork block and forward [x,+inf)
  * state: fork activated */
-bool CBlockIndex::forkActivated(int time) const
+bool CBlockIndex::forkActivated(int64_t time) const
 {
     if (time == 0)
         return false;
@@ -165,7 +165,7 @@ bool CBlockIndex::forkActivated(int time) const
 
 /** return true only if we are exactly on the fork block [x,x]
  * state: fork activated */
-bool CBlockIndex::forkActivateNow(int time) const
+bool CBlockIndex::forkActivateNow(int64_t time) const
 {
     if (time == 0)
         return false;
@@ -175,7 +175,7 @@ bool CBlockIndex::forkActivateNow(int time) const
 /** This will check if the Fork will be enabled at the next block
  * i.e. we are at block x - 1, [x-1, +inf]
  * state fork: enabled or activated */
-bool CBlockIndex::IsforkActiveOnNextBlock(int time) const
+bool CBlockIndex::IsforkActiveOnNextBlock(int64_t time) const
 {
     if (time == 0)
         return false;
@@ -189,7 +189,7 @@ bool CBlockIndex::IsforkActiveOnNextBlock(int time) const
 
 /* return true only if we current block is the activation blocl (i.e. [x-1,x-1])
  * state: fork enabled but not activated */
-bool CBlockIndex::forkAtNextBlock(int time) const
+bool CBlockIndex::forkAtNextBlock(int64_t time) const
 {
     if (time == 0)
         return false;
