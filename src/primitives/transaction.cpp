@@ -11,6 +11,8 @@
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 
+#include <algorithm>
+#include <cstring>
 
 std::string COutPoint::ToString() const { return strprintf("COutPoint(%s, %u)", hash.ToString().substr(0, 10), n); }
 CTxIn::CTxIn(COutPoint prevoutIn, CScript scriptSigIn, uint32_t nSequenceIn)
@@ -102,6 +104,33 @@ bool CTransaction::IsEquivalentTo(const CTransaction &tx) const
     for (unsigned int i = 0; i < tx2.vin.size(); i++)
         tx2.vin[i].scriptSig = CScript();
     return CTransaction(tx1) == CTransaction(tx2);
+}
+
+void CMutableTransaction::SortInputsBip69()
+{
+    std::sort(vin.begin(), vin.end(),
+        [](const CTxIn &a, const CTxIn &b)
+        {
+            // COutPoint operator< does sort in accordance with Bip69, so just use that.
+            return a.prevout < b.prevout;
+        });
+}
+
+void CMutableTransaction::SortOutputsBip69()
+{
+    std::sort(vout.begin(), vout.end(),
+        [](const CTxOut &a, const CTxOut &b)
+        {
+            if (a.nValue == b.nValue)
+            {
+                // Note: prevector operator< does NOT properly order scriptPubKeys lexicographically. So instead we
+                // fall-back to using std::memcmp.
+                const auto &spkA = a.scriptPubKey, &spkB = b.scriptPubKey;
+                const int cmp = std::memcmp(spkA.data(), spkB.data(), std::min(spkA.size(), spkB.size()));
+                return cmp < 0 || (cmp == 0 && spkA.size() < spkB.size());
+            }
+            return a.nValue < b.nValue;
+        });
 }
 
 CAmount CTransaction::GetValueOut() const

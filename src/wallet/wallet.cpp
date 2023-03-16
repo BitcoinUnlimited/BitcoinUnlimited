@@ -2357,15 +2357,6 @@ bool InputSortBIP69(const CTxIn &a, const CTxIn &b)
     return a.prevout.hash < b.prevout.hash;
 };
 
-bool OutputSortBIP69(const CTxOut &a, const CTxOut &b)
-{
-    if (a.nValue == b.nValue)
-    {
-        return a.scriptPubKey < b.scriptPubKey;
-    }
-    return a.nValue < b.nValue;
-};
-
 void sortInputsBIP69(std::vector<CTxIn> &vin, std::vector<unsigned int> &inputOrder)
 {
     std::sort(inputOrder.begin(), inputOrder.end(),
@@ -2374,27 +2365,26 @@ void sortInputsBIP69(std::vector<CTxIn> &vin, std::vector<unsigned int> &inputOr
     std::sort(vin.begin(), vin.end(), InputSortBIP69);
 }
 
-void sortOutputsBIP69(std::vector<CTxOut> &vout, int *pChangePosRet)
+static void sortOutputsBIP69(CMutableTransaction &tx, int *pChangePosRet)
 {
     CTxOut savedChangeOut;
     if (pChangePosRet)
     {
         // Caller has a change position they are keeping track of, so note which CTxOut it is.
-        savedChangeOut = vout[*pChangePosRet];
+        savedChangeOut = tx.vout[*pChangePosRet];
     }
 
-    // outputs do not need the sort changes tracked
-    std::sort(vout.begin(), vout.end(), OutputSortBIP69);
+    tx.SortOutputsBip69();
 
     if (pChangePosRet)
     {
         // Figure out where the change position ended up after the sort. Note
         // that std::find is ok here because all CTxOuts that compare equal
         // are identical and indistinguishable.
-        const auto it = std::find(vout.begin(), vout.end(), savedChangeOut);
+        const auto it = std::find(tx.vout.begin(), tx.vout.end(), savedChangeOut);
         // ensure that std::sort did not drop the output
-        assert(it != vout.end());
-        *pChangePosRet = it - vout.begin();
+        assert(it != tx.vout.end());
+        *pChangePosRet = it - tx.vout.begin();
     }
 }
 
@@ -2698,9 +2688,9 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
                     if (sign && !involvesPublicLabel && useBIP69.Value() == true)
                     {
                         sortInputsBIP69(txNew.vin, inputOrder);
-                        sortOutputsBIP69(txNew.vout, nChangePosRet >= 0 && unsigned(nChangePosRet) < txNew.vout.size() ?
-                                                         &nChangePosRet :
-                                                         nullptr);
+                        sortOutputsBIP69(txNew, nChangePosRet >= 0 && unsigned(nChangePosRet) < txNew.vout.size() ?
+                                                    &nChangePosRet :
+                                                    nullptr);
                     }
 
                     // Sign
