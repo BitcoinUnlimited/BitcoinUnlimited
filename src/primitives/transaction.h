@@ -290,6 +290,17 @@ struct CMutableTransaction
      * fly, as opposed to GetHash() in CTransaction, which uses a cached result.
      */
     uint256 GetHash() const;
+
+    /// Mutates this txn. Sorts the inputs according to BIP-69
+    void SortInputsBip69();
+    /// Mutates this txn. Sorts the outputs according to BIP-69
+    void SortOutputsBip69();
+    /// Convenience: Calls the above two functions.
+    void SortBip69()
+    {
+        SortInputsBip69();
+        SortOutputsBip69();
+    }
 };
 
 /** Properties of a transaction that are discovered during tx evaluation */
