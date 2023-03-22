@@ -221,7 +221,7 @@ public:
         return EncodeBase58Check(data);
     }
 
-    std::string operator()(const CScriptID &id) const
+    std::string operator()(const ScriptID &id) const
     {
         std::vector<uint8_t> data = m_params.Base58Prefix(CChainParams::SCRIPT_ADDRESS);
         data.insert(data.end(), id.begin(), id.end());
@@ -245,7 +245,7 @@ public:
         return EncodeBase58Check(data);
     }
 
-    std::string operator()(const CScriptID &id) const
+    std::string operator()(const ScriptID &id) const
     {
         std::vector<uint8_t> data = bitpay_script_prefix;
         data.insert(data.end(), id.begin(), id.end());
@@ -276,7 +276,7 @@ CTxDestination DecodeDestination(const std::string &str, const CChainParams &par
         std::equal(script_prefix.begin(), script_prefix.end(), data.begin()))
     {
         memcpy(hash.begin(), &data[script_prefix.size()], 20);
-        return CScriptID(hash);
+        return ScriptID(hash);
     }
 
     // Decode Bitpay forms
@@ -291,7 +291,7 @@ CTxDestination DecodeDestination(const std::string &str, const CChainParams &par
         std::equal(bitpay_script_prefix.begin(), bitpay_script_prefix.end(), data.begin()))
     {
         memcpy(hash.begin(), &data[bitpay_script_prefix.size()], 20);
-        return CScriptID(hash);
+        return ScriptID(hash);
     }
     return CNoDestination();
 }

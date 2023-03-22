@@ -953,7 +953,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_bitcoinunlimited_libbitcoincash_PayAdd
     }
     else if (typ == 3 /* P2PSH */)
     {
-        dst = CScriptID(tmp);
+        dst = ScriptID(tmp);
     }
     else
     {
@@ -987,7 +987,7 @@ public:
         dest[0] = 2;
         memcpy(dest + 1, id.begin(), 20); // pubkey is 20 bytes
     }
-    void operator()(const CScriptID &id) const
+    void operator()(const ScriptID &id) const
     {
         dest[0] = 3;
         memcpy(dest + 1, id.begin(), 20); // pubkey is 20 bytes

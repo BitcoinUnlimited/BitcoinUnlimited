@@ -85,7 +85,7 @@ private:
 public:
     TestAddrTypeVisitor(const std::string &_exp_addrType) : exp_addrType(_exp_addrType) {}
     bool operator()(const CKeyID &id) const { return (exp_addrType == "pubkey"); }
-    bool operator()(const CScriptID &id) const { return (exp_addrType == "script"); }
+    bool operator()(const ScriptID &id) const { return (exp_addrType == "script"); }
     bool operator()(const CNoDestination &no) const { return (exp_addrType == "none"); }
 };
 
@@ -102,10 +102,10 @@ public:
         uint160 exp_key(exp_payload);
         return exp_key == id;
     }
-    bool operator()(const CScriptID &id) const
+    bool operator()(const ScriptID &id) const
     {
-        uint160 exp_key(exp_payload);
-        return exp_key == id;
+        const uint160 exp_key(exp_payload);
+        return id == exp_key;
     }
     bool operator()(const CNoDestination &no) const { return exp_payload.size() == 0; }
 };
@@ -162,7 +162,7 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_parse)
             // Must be valid public key
             destination = DecodeLegacyAddr(exp_base58string, Params());
             BOOST_CHECK_MESSAGE(IsValidDestination(destination), "!IsValid:" + strTest);
-            BOOST_CHECK_MESSAGE((boost::get<CScriptID>(&destination) != nullptr) == (exp_addrType == "script"),
+            BOOST_CHECK_MESSAGE((boost::get<ScriptID>(&destination) != nullptr) == (exp_addrType == "script"),
                 "isScript mismatch" + strTest);
             BOOST_CHECK_MESSAGE(
                 boost::apply_visitor(TestAddrTypeVisitor(exp_addrType), destination), "addrType mismatch" + strTest);
@@ -219,7 +219,7 @@ BOOST_AUTO_TEST_CASE(base58_keys_valid_gen)
             }
             else if (exp_addrType == "script")
             {
-                dest = CScriptID(uint160(exp_payload));
+                dest = ScriptID(uint160(exp_payload));
             }
             else if (exp_addrType == "none")
             {

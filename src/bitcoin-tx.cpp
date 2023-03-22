@@ -347,7 +347,7 @@ static void MutateTxAddOutScript(CMutableTransaction &tx, const string &strInput
 
     if (bScriptHash)
     {
-        scriptPubKey = GetScriptForDestination(CScriptID(scriptPubKey));
+        scriptPubKey = GetScriptForDestination(ScriptID(scriptPubKey, false /* no p2sh_32 */));
     }
 
     // construct TxOut, append to transaction output list
@@ -527,12 +527,14 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
 
             // if redeemScript given and private keys given,
             // add redeemScript to the tempKeystore so it can be signed:
-            if (fGivenKeys && scriptPubKey.IsPayToScriptHash() && prevOut.exists("redeemScript"))
+            bool is_p2sh_32;
+            if (fGivenKeys && scriptPubKey.IsPayToScriptHash(SCRIPT_ENABLE_P2SH_32, nullptr, &is_p2sh_32) &&
+                prevOut.exists("redeemScript"))
             {
                 UniValue v = prevOut["redeemScript"];
                 vector<unsigned char> rsData(ParseHexUV(v, "redeemScript"));
                 CScript redeemScript(rsData.begin(), rsData.end());
-                tempKeystore.AddCScript(redeemScript);
+                tempKeystore.AddCScript(redeemScript, is_p2sh_32);
             }
         }
     }
@@ -564,13 +566,13 @@ static void MutateTxSign(CMutableTransaction &tx, const string &flagStr)
         txin.scriptSig.clear();
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if (!fHashSingle || (i < mergedTx.vout.size()))
-            SignSignature(keystore, prevPubKey, mergedTx, i, amount, nHashType);
+            SignSignature(SCRIPT_ENABLE_P2SH_32, keystore, prevPubKey, mergedTx, i, amount, nHashType);
 
         // ... and merge in other signatures:
         for (const CTransaction &txv : txVariants)
         {
             txin.scriptSig = CombineSignatures(prevPubKey, MutableTransactionSignatureChecker(&mergedTx, i, amount),
-                txin.scriptSig, txv.vin[i].scriptSig);
+                txin.scriptSig, txv.vin[i].scriptSig, SCRIPT_ENABLE_P2SH_32);
         }
 
         MutableTransactionSignatureChecker tsc(&mergedTx, i, amount);

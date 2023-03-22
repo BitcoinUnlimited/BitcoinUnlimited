@@ -45,7 +45,7 @@ class DstTypeChecker : public boost::static_visitor<void>
 {
 public:
     void operator()(const CKeyID &id) { isKey = true; }
-    void operator()(const CScriptID &id) { isScript = true; }
+    void operator()(const ScriptID &id) { isScript = true; }
     void operator()(const CNoDestination &) {}
     static bool IsScriptDst(const CTxDestination &d)
     {
@@ -112,8 +112,7 @@ BOOST_AUTO_TEST_CASE(check_packaddr_throws)
 
 BOOST_AUTO_TEST_CASE(encode_decode)
 {
-    std::vector<CTxDestination> toTest = {
-        CNoDestination{}, CKeyID(uint160S("badf00d")), CScriptID(uint160S("f00dbad"))};
+    std::vector<CTxDestination> toTest = {CNoDestination{}, CKeyID(uint160S("badf00d")), ScriptID(uint160S("f00dbad"))};
 
     for (auto dst : toTest)
     {
@@ -158,7 +157,7 @@ BOOST_AUTO_TEST_CASE(random_dst)
     {
         uint160 hash = insecure_GetRandUInt160(rand);
         const CTxDestination dst_key = CKeyID(hash);
-        const CTxDestination dst_scr = CScriptID(hash);
+        const CTxDestination dst_scr = ScriptID(hash);
 
         const std::string encoded_key = EncodeCashAddr(dst_key, params);
         const CTxDestination decoded_key = DecodeCashAddr(encoded_key, params);
@@ -304,7 +303,7 @@ BOOST_AUTO_TEST_CASE(test_addresses)
         const CTxDestination dstKey = CKeyID(uint160(hash[i]));
         BOOST_CHECK_EQUAL(pubkey[i], EncodeCashAddr(dstKey, params));
 
-        const CTxDestination dstScript = CScriptID(uint160(hash[i]));
+        const CTxDestination dstScript = ScriptID(uint160(hash[i]));
         BOOST_CHECK_EQUAL(script[i], EncodeCashAddr(dstScript, params));
     }
 }

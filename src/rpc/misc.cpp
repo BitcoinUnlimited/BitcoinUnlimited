@@ -160,7 +160,7 @@ public:
         return obj;
     }
 
-    UniValue operator()(const CScriptID &scriptID) const
+    UniValue operator()(const ScriptID &scriptID) const
     {
         UniValue obj(UniValue::VOBJ);
         CScript subscript;
@@ -170,7 +170,7 @@ public:
             std::vector<CTxDestination> addresses;
             txnouttype whichType;
             int nRequired;
-            ExtractDestinations(subscript, whichType, addresses, nRequired);
+            ExtractDestinations(subscript, whichType, addresses, nRequired, 0 /* no p2sh_32 support in wallet */);
             obj.pushKV("script", GetTxnOutputType(whichType));
             obj.pushKV("hex", HexStr(subscript.begin(), subscript.end()));
             UniValue a(UniValue::VARR);
@@ -360,7 +360,7 @@ UniValue createmultisig(const UniValue &params, bool fHelp)
 
     // Construct using pay-to-script-hash:
     CScript inner = _createmultisig_redeemScript(params);
-    CScriptID innerID(inner);
+    ScriptID innerID(inner, false /* no p2sh_32 */);
 
     UniValue result(UniValue::VOBJ);
     result.pushKV("address", EncodeDestination(innerID));

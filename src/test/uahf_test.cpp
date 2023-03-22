@@ -74,6 +74,7 @@ BOOST_AUTO_TEST_CASE(uahf_sighash)
     CCoinsView coinsDummy;
     CCoinsViewCache coins(&coinsDummy);
     std::vector<CMutableTransaction> dummyTransactions = SetupDummyInputs(keystore, coins);
+    const uint32_t scriptFlags = SCRIPT_ENABLE_P2SH_32;
 
     CMutableTransaction t;
     t.vin.resize(1);
@@ -91,7 +92,7 @@ BOOST_AUTO_TEST_CASE(uahf_sighash)
         TransactionSignatureCreator tsc(&keystore, &tx, 0, 90 * CENT, SIGHASH_ALL);
         const CScript &scriptPubKey = dummyTransactions[0].vout[0].scriptPubKey;
         CScript &scriptSigRes = t.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
         BOOST_CHECK(worked);
         BOOST_CHECK(IsTxProbablyNewSigHash(t) == false);
     }
@@ -100,7 +101,7 @@ BOOST_AUTO_TEST_CASE(uahf_sighash)
         TransactionSignatureCreator tsc(&keystore, &tx, 0, 90 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = dummyTransactions[0].vout[0].scriptPubKey;
         CScript &scriptSigRes = t.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
         BOOST_CHECK(worked);
         BOOST_CHECK(IsTxProbablyNewSigHash(t) == true);
     }

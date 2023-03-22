@@ -163,6 +163,8 @@ BOOST_AUTO_TEST_CASE(multisig_verify)
 
 BOOST_AUTO_TEST_CASE(multisig_IsStandard)
 {
+    const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS & ~SCRIPT_ENABLE_P2SH_32; // no p2sh_32
+
     CKey key[4];
     for (int i = 0; i < 4; i++)
         key[i].MakeNewKey(true);
@@ -171,21 +173,21 @@ BOOST_AUTO_TEST_CASE(multisig_IsStandard)
 
     CScript a_and_b;
     a_and_b << OP_2 << ToByteVector(key[0].GetPubKey()) << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
-    BOOST_CHECK(::IsStandard(a_and_b, whichType));
+    BOOST_CHECK(::IsStandard(a_and_b, whichType, flags));
 
     CScript a_or_b;
     a_or_b << OP_1 << ToByteVector(key[0].GetPubKey()) << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
-    BOOST_CHECK(::IsStandard(a_or_b, whichType));
+    BOOST_CHECK(::IsStandard(a_or_b, whichType, flags));
 
     CScript escrow;
     escrow << OP_2 << ToByteVector(key[0].GetPubKey()) << ToByteVector(key[1].GetPubKey())
            << ToByteVector(key[2].GetPubKey()) << OP_3 << OP_CHECKMULTISIG;
-    BOOST_CHECK(::IsStandard(escrow, whichType));
+    BOOST_CHECK(::IsStandard(escrow, whichType, flags));
 
     CScript one_of_four;
     one_of_four << OP_1 << ToByteVector(key[0].GetPubKey()) << ToByteVector(key[1].GetPubKey())
                 << ToByteVector(key[2].GetPubKey()) << ToByteVector(key[3].GetPubKey()) << OP_4 << OP_CHECKMULTISIG;
-    BOOST_CHECK(!::IsStandard(one_of_four, whichType));
+    BOOST_CHECK(!::IsStandard(one_of_four, whichType, flags));
 
     CScript malformed[6];
     malformed[0] << OP_3 << ToByteVector(key[0].GetPubKey()) << ToByteVector(key[1].GetPubKey()) << OP_2
@@ -200,7 +202,7 @@ BOOST_AUTO_TEST_CASE(multisig_IsStandard)
     malformed[5] << OP_1 << ToByteVector(key[0].GetPubKey()) << ToByteVector(key[1].GetPubKey());
 
     for (int i = 0; i < 6; i++)
-        BOOST_CHECK(!::IsStandard(malformed[i], whichType));
+        BOOST_CHECK(!::IsStandard(malformed[i], whichType, flags));
 }
 
 BOOST_AUTO_TEST_CASE(multisig_Sign)
@@ -242,7 +244,8 @@ BOOST_AUTO_TEST_CASE(multisig_Sign)
 
     for (int i = 0; i < 3; i++)
     {
-        BOOST_CHECK_MESSAGE(SignSignature(keystore, txFrom, txTo[i], 0), strprintf("SignSignature %d", i));
+        BOOST_CHECK_MESSAGE(
+            SignSignature(SCRIPT_ENABLE_P2SH_32, keystore, txFrom, txTo[i], 0), strprintf("SignSignature %d", i));
     }
 }
 
@@ -252,6 +255,7 @@ BOOST_AUTO_TEST_CASE(cltv_freeze)
     CKey key[4];
     for (int i = 0; i < 2; i++)
         key[i].MakeNewKey(true);
+    const uint32_t scriptFlags = SCRIPT_ENABLE_P2SH_32;
 
     // Create and unpack a CLTV script
     vector<valtype> solutions;
@@ -266,13 +270,13 @@ BOOST_AUTO_TEST_CASE(cltv_freeze)
     CScriptNum nFreezeLockTime = CScriptNum::fromIntUnchecked(50000);
     CScript s1 = GetScriptForFreeze(nFreezeLockTime, newKey1);
 
-    BOOST_CHECK(Solver(s1, whichType, solutions));
+    BOOST_CHECK(Solver(s1, whichType, solutions, scriptFlags));
     BOOST_CHECK(whichType == TX_CLTV);
     BOOST_CHECK(solutions.size() == 2);
     BOOST_CHECK(CScriptNum(solutions[0], false, CScriptNum::MAXIMUM_ELEMENT_SIZE_64_BIT) == nFreezeLockTime);
 
     nRequiredReturn = 0;
-    ExtractDestinations(s1, type, addresses, nRequiredReturn);
+    ExtractDestinations(s1, type, addresses, nRequiredReturn, scriptFlags);
 
     for (const CTxDestination &addr : addresses)
         BOOST_CHECK(EncodeDestination(newAddr1) == EncodeDestination(addr));
@@ -284,13 +288,13 @@ BOOST_AUTO_TEST_CASE(cltv_freeze)
     nFreezeLockTime = CScriptNum::fromIntUnchecked(1482255731);
     CScript s2 = GetScriptForFreeze(nFreezeLockTime, newKey2);
 
-    BOOST_CHECK(Solver(s2, whichType, solutions));
+    BOOST_CHECK(Solver(s2, whichType, solutions, scriptFlags));
     BOOST_CHECK(whichType == TX_CLTV);
     BOOST_CHECK(solutions.size() == 2);
     BOOST_CHECK(CScriptNum(solutions[0], false, CScriptNum::MAXIMUM_ELEMENT_SIZE_64_BIT) == nFreezeLockTime);
 
     nRequiredReturn = 0;
-    ExtractDestinations(s2, type, addresses, nRequiredReturn);
+    ExtractDestinations(s2, type, addresses, nRequiredReturn, scriptFlags);
 
     for (const CTxDestination &addr : addresses)
         BOOST_CHECK(newAddr2 == addr);
@@ -315,7 +319,7 @@ BOOST_AUTO_TEST_CASE(opreturn_send)
     CScript s = GetScriptLabelPublic(inMsg);
     outMsg = getLabelPublic(s);
     BOOST_CHECK(inMsg == outMsg);
-    BOOST_CHECK(Solver(s, whichType, solutions));
+    BOOST_CHECK(Solver(s, whichType, solutions, SCRIPT_ENABLE_P2SH_32));
     BOOST_CHECK(whichType == TX_LABELPUBLIC);
     BOOST_CHECK(solutions.size() == 2);
 
@@ -325,7 +329,7 @@ BOOST_AUTO_TEST_CASE(opreturn_send)
     s = GetScriptLabelPublic(inMsg);
     outMsg = getLabelPublic(s);
     BOOST_CHECK(inMsg == outMsg);
-    BOOST_CHECK(Solver(s, whichType, solutions));
+    BOOST_CHECK(Solver(s, whichType, solutions, SCRIPT_ENABLE_P2SH_32));
     BOOST_CHECK(whichType == TX_LABELPUBLIC);
 
     inMsg = "hello world hello world hello world hello world hello world"
@@ -336,7 +340,7 @@ BOOST_AUTO_TEST_CASE(opreturn_send)
     s = GetScriptLabelPublic(inMsg);
     outMsg = getLabelPublic(s);
     BOOST_CHECK(inMsg == outMsg);
-    BOOST_CHECK(Solver(s, whichType, solutions));
+    BOOST_CHECK(Solver(s, whichType, solutions, SCRIPT_ENABLE_P2SH_32));
     BOOST_CHECK(whichType == TX_LABELPUBLIC);
     BOOST_CHECK(solutions.size() == 2);
 }

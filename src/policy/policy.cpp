@@ -33,10 +33,10 @@
  *   DUP CHECKSIG DROP ... repeated 100 times... OP_1
  */
 
-bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType)
+bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType, uint32_t flags)
 {
     std::vector<std::vector<unsigned char> > vSolutions;
-    if (!Solver(scriptPubKey, whichType, vSolutions))
+    if (!Solver(scriptPubKey, whichType, vSolutions, flags))
         return false;
 
     if (whichType == TX_MULTISIG)
@@ -63,7 +63,7 @@ bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType)
     return whichType != TX_NONSTANDARD;
 }
 
-bool IsStandardTx(const CTransactionRef tx, std::string &reason)
+bool IsStandardTx(const CTransactionRef &tx, std::string &reason, uint32_t flags)
 {
     if (tx->nVersion > CTransaction::MAX_STANDARD_VERSION || tx->nVersion < CTransaction::MIN_STANDARD_VERSION)
     {
@@ -109,7 +109,7 @@ bool IsStandardTx(const CTransactionRef tx, std::string &reason)
     txnouttype whichType;
     for (const CTxOut &txout : tx->vout)
     {
-        if (!::IsStandard(txout.scriptPubKey, whichType))
+        if (!::IsStandard(txout.scriptPubKey, whichType, flags))
         {
             reason = "scriptpubkey";
             return false;
@@ -142,7 +142,7 @@ bool IsStandardTx(const CTransactionRef tx, std::string &reason)
     return true;
 }
 
-bool AreInputsStandard(const CTransactionRef tx, const CCoinsViewCache &mapInputs, bool may2020Enabled)
+bool AreInputsStandard(const CTransactionRef tx, const CCoinsViewCache &mapInputs, bool may2020Enabled, uint32_t flags)
 {
     if (tx->IsCoinBase())
         return true; // Coinbases don't use vin normally
@@ -157,7 +157,7 @@ bool AreInputsStandard(const CTransactionRef tx, const CCoinsViewCache &mapInput
             std::vector<std::vector<unsigned char> > vSolutions;
             // get the scriptPubKey corresponding to this input:
             const CScript &prevScript = prev.scriptPubKey;
-            if (!Solver(prevScript, whichType, vSolutions))
+            if (!Solver(prevScript, whichType, vSolutions, flags))
                 return false;
         }
 

@@ -209,7 +209,8 @@ TxoGroup CoinSelection(/*const*/ SpendableTxos &available,
         const CScript &scriptPubKey = large->second.tx->vout[large->second.i].scriptPubKey;
         CScript scriptSigRes; // = txNew.vin[nIn].scriptSig;
         CWallet dummyWallet;
-        bool signSuccess = ProduceSignature(DummySignatureCreator(&dummyWallet), scriptPubKey, scriptSigRes);
+        bool signSuccess = ProduceSignature(
+            DummySignatureCreator(&dummyWallet), scriptPubKey, scriptSigRes, 0 /* no p2sh_32 support in wallet */);
         int inputLen = signSuccess ? scriptSigRes.size() : P2PKH_INPUT_SIZE;
         CAmount fee = feeRate.GetFee(inputLen);
         // We will take the "large" txo and decrement it each time through this loop.

@@ -78,17 +78,22 @@ static const unsigned int STANDARD_NOT_MANDATORY_VERIFY_FLAGS =
 /** Used as the flags parameter to sequence and nLocktime checks in non-consensus code. */
 static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS = LOCKTIME_VERIFY_SEQUENCE | LOCKTIME_MEDIAN_TIME_PAST;
 
-bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType);
+bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType, uint32_t flags);
+
 /**
  * Check for standard transaction types
  * @return True if all outputs (scriptPubKeys) use only standard transaction forms
  */
-bool IsStandardTx(const CTransactionRef tx, std::string &reason);
+bool IsStandardTx(const CTransactionRef &tx, std::string &reason, uint32_t flags);
+
 /**
  * Check for standard transaction types
  * @param[in] mapInputs    Map of previous transactions that have outputs we're spending
  * @return True if all inputs (scriptSigs) use only standard transaction forms
  */
-bool AreInputsStandard(const CTransactionRef tx, const CCoinsViewCache &mapInputs, bool isMay2020Enabled);
+bool AreInputsStandard(const CTransactionRef tx,
+    const CCoinsViewCache &mapInputs,
+    bool isMay2020Enabled,
+    uint32_t flags);
 
 #endif // BITCOIN_POLICY_POLICY_H

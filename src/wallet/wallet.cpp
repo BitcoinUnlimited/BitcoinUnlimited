@@ -232,9 +232,15 @@ bool CWallet::LoadCryptedKey(const CPubKey &vchPubKey, const std::vector<unsigne
     return CCryptoKeyStore::AddCryptedKey(vchPubKey, vchCryptedSecret);
 }
 
-bool CWallet::AddCScript(const CScript &redeemScript)
+bool CWallet::AddCScript(const CScript &redeemScript, bool is_p2sh_32)
 {
-    if (!CCryptoKeyStore::AddCScript(redeemScript))
+    if (is_p2sh_32)
+    {
+        // Warn of internal invalid usage
+        LOGA("WARNING: p2sh_32 is not currently supported in wallet %s\n", __func__);
+        return false;
+    }
+    if (!CCryptoKeyStore::AddCScript(redeemScript, is_p2sh_32))
         return false;
     if (!fFileBacked)
         return true;
@@ -250,7 +256,7 @@ bool CWallet::LoadCScript(const CScript &redeemScript)
      */
     if (redeemScript.size() > MAX_SCRIPT_ELEMENT_SIZE)
     {
-        std::string strAddr = EncodeDestination(CScriptID(redeemScript));
+        std::string strAddr = EncodeDestination(ScriptID(redeemScript, false /* no p2sh_32 in wallet */));
         LOGA("%s: Warning: This wallet contains a redeemScript of size %i "
              "which exceeds maximum size %i thus can never be redeemed. "
              "Do not use address %s.\n",
@@ -258,24 +264,35 @@ bool CWallet::LoadCScript(const CScript &redeemScript)
         return true;
     }
 
-    return CCryptoKeyStore::AddCScript(redeemScript);
+    return CCryptoKeyStore::AddCScript(redeemScript, false /* no p2sh_32 in wallet */);
 }
 
-bool CWallet::LoadFreezeScript(CPubKey newKey, CScriptNum nFreezeLockTime, std::string strLabel, std::string &address)
+bool CWallet::LoadFreezeScript(CPubKey newKey,
+    CScriptNum nFreezeLockTime,
+    std::string strLabel,
+    std::string &address,
+    bool is_p2sh_32)
 {
+    if (is_p2sh_32)
+    {
+        // Warn of internal invalid usage
+        LOGA("WARNING: p2sh_32 is not currently supported in wallet %s\n", __func__);
+        return false;
+    }
     // Template rpcdump.cpp::ImportAddress();
 
     // Get Freeze Script
     CScript freezeScript = GetScriptForFreeze(nFreezeLockTime, newKey);
+    const ScriptID freezeScriptID = ScriptID(freezeScript, is_p2sh_32);
 
     // Test and Add Script to wallet
-    if (!this->HaveCScript(freezeScript) && !this->AddCScript(freezeScript))
+    if (!this->HaveCScript(freezeScriptID) && !this->AddCScript(freezeScript, is_p2sh_32))
     {
         LOGA("LoadFreezeScript: Error adding p2sh freeze redeemScript to wallet. \n ");
         return false;
     }
     // If just added then return P2SH for user
-    address = EncodeDestination(CScriptID(freezeScript));
+    address = EncodeDestination(freezeScriptID);
     LOGA("CLTV Freeze Script Load \n %s => %s \n ", ::ScriptToAsmStr(freezeScript), address.c_str());
     return true;
 }
@@ -1145,7 +1162,7 @@ bool CWallet::IsChange(const CTxOut &txout) const
     if (::IsMine(*this, txout.scriptPubKey, chainActive.Tip()))
     {
         CTxDestination address;
-        if (!ExtractDestination(txout.scriptPubKey, address))
+        if (!ExtractDestination(txout.scriptPubKey, address, 0 /* no p2sh_32 in wallet */))
             return true;
 
         LOCK(cs_wallet);
@@ -1341,7 +1358,8 @@ void CWalletTx::GetAmounts(list<COutputEntry> &listReceived,
         // In either case, we need to get the destination address
         CTxDestination address;
 
-        if (!ExtractDestination(txout.scriptPubKey, address) && !txout.scriptPubKey.IsUnspendable())
+        if (!ExtractDestination(txout.scriptPubKey, address, 0 /* no p2sh_32 in wallet */) &&
+            !txout.scriptPubKey.IsUnspendable())
         {
             LOGA("CWalletTx::GetAmounts: Unknown transaction type found, txid %s\n", this->GetHash().ToString());
             address = CNoDestination();
@@ -2714,14 +2732,16 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
                         CAmount amountIn = coin.first->vout[coin.second].nValue;
                         CScript &scriptSigRes = txNew.vin[nIn].scriptSig;
                         bool signSuccess;
+                        const uint32_t scriptFlags = 0; /* wallet does not support p2sh_32 */
                         if (sign)
                         {
                             signSuccess = ProduceSignature(
                                 TransactionSignatureCreator(this, &txNewConst, nIn, amountIn, sighashType),
-                                scriptPubKey, scriptSigRes);
+                                scriptPubKey, scriptSigRes, scriptFlags);
                         }
                         else
-                            signSuccess = ProduceSignature(DummySignatureCreator(this), scriptPubKey, scriptSigRes);
+                            signSuccess =
+                                ProduceSignature(DummySignatureCreator(this), scriptPubKey, scriptSigRes, scriptFlags);
 
                         if (!signSuccess)
                         {
@@ -3238,7 +3258,7 @@ std::map<CTxDestination, CAmount> CWallet::GetAddressBalances()
                 CTxDestination addr;
                 if (!IsMine(pcoin->vout[i]))
                     continue;
-                if (!ExtractDestination(pcoin->vout[i].scriptPubKey, addr))
+                if (!ExtractDestination(pcoin->vout[i].scriptPubKey, addr, 0 /* no p2sh_32 in wallet */))
                     continue;
 
                 CAmount n = IsSpent(walletEntry.first, i) ? 0 : pcoin->vout[i].nValue;
@@ -3272,7 +3292,8 @@ set<set<CTxDestination> > CWallet::GetAddressGroupings()
                 CTxDestination address;
                 if (!IsMine(txin)) /* If this input isn't mine, ignore it */
                     continue;
-                if (!ExtractDestination(mapWallet[txin.prevout.hash].vout[txin.prevout.n].scriptPubKey, address))
+                if (!ExtractDestination(mapWallet[txin.prevout.hash].vout[txin.prevout.n].scriptPubKey, address,
+                        0 /* no p2sh_32 in wallet */))
                     continue;
                 grouping.insert(address);
                 any_mine = true;
@@ -3286,7 +3307,7 @@ set<set<CTxDestination> > CWallet::GetAddressGroupings()
                     if (IsChange(txout))
                     {
                         CTxDestination txoutAddr;
-                        if (!ExtractDestination(txout.scriptPubKey, txoutAddr))
+                        if (!ExtractDestination(txout.scriptPubKey, txoutAddr, 0 /* no p2sh_32 in wallet */))
                             continue;
                         grouping.insert(txoutAddr);
                     }
@@ -3305,7 +3326,7 @@ set<set<CTxDestination> > CWallet::GetAddressGroupings()
             if (IsMine(pcoin->vout[i]))
             {
                 CTxDestination address;
-                if (!ExtractDestination(pcoin->vout[i].scriptPubKey, address))
+                if (!ExtractDestination(pcoin->vout[i].scriptPubKey, address, 0 /* no p2sh_32 in wallet */))
                     continue;
                 grouping.insert(address);
                 groupings.insert(grouping);
@@ -3497,7 +3518,7 @@ public:
         txnouttype type;
         std::vector<CTxDestination> vDest;
         int nRequired;
-        if (ExtractDestinations(script, type, vDest, nRequired))
+        if (ExtractDestinations(script, type, vDest, nRequired, 0 /* no p2sh_32 in wallet */))
         {
             for (const CTxDestination &dest : vDest)
             {
@@ -3512,7 +3533,7 @@ public:
             vKeys.push_back(keyId);
     }
 
-    void operator()(const CScriptID &scriptId)
+    void operator()(const ScriptID &scriptId)
     {
         CScript script;
         if (keystore.GetCScript(scriptId, script))

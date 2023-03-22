@@ -522,7 +522,7 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog *dialog)
 
         // Bytes
         CTxDestination address;
-        if (ExtractDestination(out.tx->vout[out.i].scriptPubKey, address))
+        if (ExtractDestination(out.tx->vout[out.i].scriptPubKey, address, 0 /* no p2sh_32 */))
         {
             CPubKey pubkey;
             CKeyID *keyid = boost::get<CKeyID>(&address);
@@ -758,7 +758,7 @@ void CoinControlDialog::updateView()
             // address
             CTxDestination outputAddress;
             QString sAddress = "";
-            if (ExtractDestination(out.tx->vout[out.i].scriptPubKey, outputAddress))
+            if (ExtractDestination(out.tx->vout[out.i].scriptPubKey, outputAddress, 0 /* no p2sh_32 */))
             {
                 sAddress = QString::fromStdString(EncodeDestination(outputAddress));
 

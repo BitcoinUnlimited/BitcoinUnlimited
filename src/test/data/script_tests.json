@@ -1650,11 +1650,25 @@
     "Valid Segwit Recovery with v0 P2SH-P2WPKH"
 ],
 [
+    "0x16 0x001491b24bf9f5288532960ac687abb035127b1d28a5",
+    "HASH256 0x20 0x3ebf47c95c3fdb3b7ea73fe366549c8c59fe097dfd46237ac82c5cab0dc00dff EQUAL",
+    "CLEANSTACK,P2SH,P2SH_32",
+    "CLEANSTACK",
+    "Invalid Segwit Recovery with nonsensical v0 P2SH_32-P2WPKH"
+],
+[
     "0 0x16 0x001491b24bf9f5288532960ac687abb035127b1d28a5",
     "HASH160 0x14 0x17743beb429c55c942d2ec703b98c4d57c2df5c6 EQUAL",
     "CLEANSTACK,P2SH",
     "CLEANSTACK",
     "v0 P2SH-P2WPKH Segwit Recovery with extra stack item"
+],
+[
+    "0 0x16 0x001491b24bf9f5288532960ac687abb035127b1d28a5",
+    "HASH256 0x20 0x3ebf47c95c3fdb3b7ea73fe366549c8c59fe097dfd46237ac82c5cab0dc00dff EQUAL",
+    "CLEANSTACK,P2SH,P2SH_32",
+    "CLEANSTACK",
+    "Invalid and nonsensical v0 P2SH_32-P2WPKH Segwit Recovery with extra stack item"
 ],
 [
     "0x22 0x00205a0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
@@ -1739,6 +1753,13 @@
     "CLEANSTACK,P2SH",
     "OK",
     "Valid segwit recovery, in spite of false value being left on stack (0)"
+],
+[
+    "0x04 0x00020000",
+    "HASH256 0x20 0x94e34f4cb55063341d5d1436a317fce53f7ab4353a8e15f4de545e12c97a30dd EQUAL",
+    "CLEANSTACK,P2SH,P2SH_32",
+    "EVAL_FALSE",
+    "Attempt to do the same as above, false value being left on stack (0), but with p2sh_32 should fail."
 ],
 [
     "0x04 0x00020080",

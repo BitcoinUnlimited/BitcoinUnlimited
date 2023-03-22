@@ -40,7 +40,7 @@ std::string getLabelPublic(const CScript &scriptPubKey)
 {
     vector<valtype> vSolutions;
     txnouttype whichType;
-    if (Solver(scriptPubKey, whichType, vSolutions))
+    if (Solver(scriptPubKey, whichType, vSolutions, SCRIPT_ENABLE_P2SH_32))
     {
         if (whichType == TX_LABELPUBLIC)
         {
@@ -63,14 +63,31 @@ bool isFreezeCLTV(const CKeyStore &keystore, const CScript &scriptPubKey, CScrip
 {
     vector<valtype> vSolutions;
     txnouttype whichType;
-    if (Solver(scriptPubKey, whichType, vSolutions))
+    if (Solver(scriptPubKey, whichType, vSolutions, SCRIPT_ENABLE_P2SH_32))
     {
         if (whichType == TX_SCRIPTHASH)
         {
-            CScriptID scriptID = CScriptID(uint160(vSolutions[0]));
+            ScriptID scriptID;
+            if (vSolutions[0].size() == uint160::size())
+            {
+                // p2sh
+                scriptID = uint160(vSolutions[0]);
+            }
+            else if (vSolutions[0].size() == uint256::size())
+            {
+                // p2sh32
+                scriptID = uint256(vSolutions[0]);
+            }
+            else
+            {
+                // Defensive programming: Should never happen.
+                // Solver returned a script hash that is neither 20 bytes nor 32 bytes.
+                DbgAssert(false, );
+                return false;
+            }
             CScript subscript;
             if (keystore.GetCScript(scriptID, subscript))
-                Solver(subscript, whichType, vSolutions);
+                Solver(subscript, whichType, vSolutions, SCRIPT_ENABLE_P2SH_32);
         }
 
         if (whichType == TX_CLTV)
@@ -91,7 +108,7 @@ static isminetype IsMine(const CKeyStore &keystore,
 {
     vector<valtype> vSolutions;
     txnouttype whichType;
-    if (!Solver(scriptPubKey, whichType, vSolutions))
+    if (!Solver(scriptPubKey, whichType, vSolutions, SCRIPT_ENABLE_P2SH_32))
     {
         if (keystore.HaveWatchOnly(scriptPubKey))
             return ISMINE_WATCH_UNSOLVABLE;
@@ -123,7 +140,23 @@ static isminetype IsMine(const CKeyStore &keystore,
     break;
     case TX_SCRIPTHASH:
     {
-        CScriptID scriptID = CScriptID(uint160(vSolutions[0]));
+        ScriptID scriptID;
+        if (vSolutions[0].size() == uint160::size())
+        {
+            // p2sh
+            scriptID = uint160(vSolutions[0]);
+        }
+        else if (vSolutions[0].size() == uint256::size())
+        {
+            // p2sh32
+            scriptID = uint256(vSolutions[0]);
+        }
+        else
+        {
+            // Defensive programming: Should never happen.
+            // "Solver returned a script hash that is neither 20 bytes nor 32 bytes.
+            DbgAssert(false, return ISMINE_NO);
+        }
         CScript subscript;
         if (keystore.GetCScript(scriptID, subscript))
         {
@@ -188,8 +221,9 @@ static isminetype IsMine(const CKeyStore &keystore,
     {
         // TODO: This could be optimized some by doing some work after the above solver
         CScript scriptSig;
-        return ProduceSignature(DummySignatureCreator(&keystore), scriptPubKey, scriptSig) ? ISMINE_WATCH_SOLVABLE :
-                                                                                             ISMINE_WATCH_UNSOLVABLE;
+        return ProduceSignature(DummySignatureCreator(&keystore), scriptPubKey, scriptSig, SCRIPT_ENABLE_P2SH_32) ?
+                   ISMINE_WATCH_SOLVABLE :
+                   ISMINE_WATCH_UNSOLVABLE;
     }
     return ISMINE_NO;
 }

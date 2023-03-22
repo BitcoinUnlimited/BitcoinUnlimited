@@ -76,7 +76,7 @@ public:
         return cashaddr::Encode(params.CashAddrPrefix(), data);
     }
 
-    std::string operator()(const CScriptID &id) const
+    std::string operator()(const ScriptID &id) const
     {
         std::vector<uint8_t> data = PackAddrData(id, SCRIPT_TYPE);
         return cashaddr::Encode(params.CashAddrPrefix(), data);
@@ -170,21 +170,35 @@ CashAddrContent DecodeCashAddrContent(const std::string &addr, const CChainParam
 
 CTxDestination DecodeCashAddrDestination(const CashAddrContent &content)
 {
-    if (content.hash.size() != 20)
+    const bool is20Bytes{content.hash.size() == 20};
+
+    if (!is20Bytes && content.hash.size() != 32)
     {
-        // Only 20 bytes hash are supported now.
+        // Only accept 20 or 32 byte hashes. A 20-byte hash is for p2sh and/or p2pkh; a 32-byte hash is for p2sh_32.
         return CNoDestination{};
     }
-
-    uint160 hash;
-    std::copy(begin(content.hash), end(content.hash), hash.begin());
 
     switch (content.type)
     {
     case PUBKEY_TYPE:
-        return CKeyID(hash);
+        // p2pkh only supports 20-byte hashes
+        if (is20Bytes)
+        {
+            return CKeyID(uint160(content.hash));
+        }
+        else
+        {
+            return CNoDestination{};
+        }
     case SCRIPT_TYPE:
-        return CScriptID(hash);
+        if (is20Bytes)
+        {
+            return ScriptID(uint160(content.hash)); // p2sh
+        }
+        else
+        {
+            return ScriptID(uint256(content.hash)); // p2sh_32
+        }
     default:
         return CNoDestination{};
     }

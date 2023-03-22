@@ -137,6 +137,7 @@ public:
         const CKeyMetadata &keyMeta);
     bool WriteMasterKey(unsigned int nID, const CMasterKey &kMasterKey);
 
+    // TODO (calin): Support p2sh_32 as well someday?
     bool WriteCScript(const uint160 &hash, const CScript &redeemScript);
 
     bool WriteWatchOnly(const CScript &script);

@@ -13,7 +13,7 @@
 #include "script/standard.h"
 #include "uint256.h"
 
-typedef std::vector<uint8_t> valtype;
+using valtype = std::vector<uint8_t>;
 
 TransactionSignatureCreator::TransactionSignatureCreator(const CKeyStore *keystoreIn,
     const CTransaction *txToIn,
@@ -103,12 +103,13 @@ static bool SignN(const std::vector<valtype> &multisigdata,
 static bool SignStep(const BaseSignatureCreator &creator,
     const CScript &scriptPubKey,
     CScript &scriptSigRet,
-    txnouttype &whichTypeRet)
+    txnouttype &whichTypeRet,
+    uint32_t scriptFlags)
 {
     scriptSigRet.clear();
 
     std::vector<valtype> vSolutions;
-    if (!Solver(scriptPubKey, whichTypeRet, vSolutions))
+    if (!Solver(scriptPubKey, whichTypeRet, vSolutions, scriptFlags))
     {
         return false;
     }
@@ -144,7 +145,22 @@ static bool SignStep(const BaseSignatureCreator &creator,
         return true;
 
     case TX_SCRIPTHASH:
-        return creator.KeyStore().GetCScript(uint160(vSolutions[0]), scriptSigRet);
+    {
+        ScriptID scriptid;
+        if (vSolutions[0].size() == 20)
+        {
+            scriptid = uint160(vSolutions[0]); // p2sh_20
+        }
+        else if (vSolutions[0].size() == 32)
+        {
+            scriptid = uint256(vSolutions[0]); // p2sh_32
+        }
+        else
+        {
+            assert(!"Unexpected state in SignStep() for vSolutions[0]!"); // should never happen
+        }
+        return creator.KeyStore().GetCScript(scriptid, scriptSigRet);
+    }
 
     case TX_MULTISIG:
         scriptSigRet << OP_0; // workaround CHECKMULTISIG bug
@@ -154,10 +170,13 @@ static bool SignStep(const BaseSignatureCreator &creator,
     return false;
 }
 
-bool ProduceSignature(const BaseSignatureCreator &creator, const CScript &fromPubKey, CScript &scriptSig)
+bool ProduceSignature(const BaseSignatureCreator &creator,
+    const CScript &fromPubKey,
+    CScript &scriptSig,
+    uint32_t scriptFlags)
 {
     txnouttype whichType;
-    if (!SignStep(creator, fromPubKey, scriptSig, whichType))
+    if (!SignStep(creator, fromPubKey, scriptSig, whichType, scriptFlags))
     {
         return false;
     }
@@ -170,7 +189,7 @@ bool ProduceSignature(const BaseSignatureCreator &creator, const CScript &fromPu
         CScript subscript = scriptSig;
 
         txnouttype subType;
-        bool fSolved = SignStep(creator, subscript, scriptSig, subType) && subType != TX_SCRIPTHASH;
+        bool fSolved = SignStep(creator, subscript, scriptSig, subType, scriptFlags) && subType != TX_SCRIPTHASH;
         // Append serialized subscript whether or not it is completely signed:
         scriptSig << valtype(subscript.begin(), subscript.end());
         if (!fSolved)
@@ -184,11 +203,11 @@ bool ProduceSignature(const BaseSignatureCreator &creator, const CScript &fromPu
     // Additionally, while this constant is currently being raised it will eventually settle to a very high const
     // value.  There is no reason to break layering by using the tweak only to take that out later.
     ScriptImportedState sis(&creator.Checker(), CTransactionRef(nullptr), std::vector<CTxOut>(), 0, 0);
-    return VerifyScript(
-        scriptSig, fromPubKey, STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_SIGHASH_FORKID, MAX_OPS_PER_SCRIPT, sis);
+    return VerifyScript(scriptSig, fromPubKey, scriptFlags, MAX_OPS_PER_SCRIPT, sis);
 }
 
-bool SignSignature(const CKeyStore &keystore,
+bool SignSignature(uint32_t scriptFlags,
+    const CKeyStore &keystore,
     const CScript &fromPubKey,
     CMutableTransaction &txTo,
     unsigned int nIn,
@@ -202,10 +221,11 @@ bool SignSignature(const CKeyStore &keystore,
     CTransaction txToConst(txTo);
     TransactionSignatureCreator creator(&keystore, &txToConst, nIn, amount, nHashType, nSigType);
 
-    return ProduceSignature(creator, fromPubKey, txin.scriptSig);
+    return ProduceSignature(creator, fromPubKey, txin.scriptSig, scriptFlags);
 }
 
-bool SignSignature(const CKeyStore &keystore,
+bool SignSignature(uint32_t scriptFlags,
+    const CKeyStore &keystore,
     const CTransaction &txFrom,
     CMutableTransaction &txTo,
     unsigned int nIn,
@@ -217,7 +237,7 @@ bool SignSignature(const CKeyStore &keystore,
     assert(txin.prevout.n < txFrom.vout.size());
     const CTxOut &txout = txFrom.vout[txin.prevout.n];
 
-    return SignSignature(keystore, txout.scriptPubKey, txTo, nIn, txout.nValue, nHashType);
+    return SignSignature(scriptFlags, keystore, txout.scriptPubKey, txTo, nIn, txout.nValue, nHashType);
 }
 
 static CScript PushAll(const std::vector<valtype> &values)
@@ -299,7 +319,8 @@ static CScript CombineSignatures(const CScript &scriptPubKey,
     const txnouttype txType,
     const std::vector<valtype> &vSolutions,
     std::vector<valtype> &sigs1,
-    std::vector<valtype> &sigs2)
+    std::vector<valtype> &sigs2,
+    const uint32_t flags)
 {
     switch (txType)
     {
@@ -337,10 +358,10 @@ static CScript CombineSignatures(const CScript &scriptPubKey,
 
             txnouttype txType2;
             std::vector<std::vector<uint8_t> > vSolutions2;
-            Solver(pubKey2, txType2, vSolutions2);
+            Solver(pubKey2, txType2, vSolutions2, flags);
             sigs1.pop_back();
             sigs2.pop_back();
-            CScript result = CombineSignatures(pubKey2, checker, txType2, vSolutions2, sigs1, sigs2);
+            CScript result = CombineSignatures(pubKey2, checker, txType2, vSolutions2, sigs1, sigs2, flags);
             result << spk;
             return result;
         }
@@ -357,11 +378,12 @@ static CScript CombineSignatures(const CScript &scriptPubKey,
 CScript CombineSignatures(const CScript &scriptPubKey,
     const BaseSignatureChecker &checker,
     const CScript &scriptSig1,
-    const CScript &scriptSig2)
+    const CScript &scriptSig2,
+    const uint32_t flags)
 {
     txnouttype txType;
     std::vector<std::vector<uint8_t> > vSolutions;
-    Solver(scriptPubKey, txType, vSolutions);
+    Solver(scriptPubKey, txType, vSolutions, flags);
 
     std::vector<valtype> stack1;
     // scriptSig should have no ops in them, only data pushes.  Send MAX_OPS_PER_SCRIPT to mirror existing
@@ -370,7 +392,7 @@ CScript CombineSignatures(const CScript &scriptPubKey,
     std::vector<valtype> stack2;
     EvalScript(stack2, scriptSig2, SCRIPT_VERIFY_STRICTENC, MAX_OPS_PER_SCRIPT, ScriptImportedState());
 
-    return CombineSignatures(scriptPubKey, checker, txType, vSolutions, stack1, stack2);
+    return CombineSignatures(scriptPubKey, checker, txType, vSolutions, stack1, stack2, flags);
 }
 
 namespace
@@ -382,7 +404,7 @@ public:
     DummySignatureChecker() {}
     bool CheckSig(const std::vector<uint8_t> &scriptSig,
         const std::vector<uint8_t> &vchPubKey,
-        const CScript &scriptCode) const
+        const CScript &scriptCode) const override
     {
         return true;
     }
