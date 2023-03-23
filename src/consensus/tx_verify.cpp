@@ -181,6 +181,15 @@ bool ContextualCheckTransaction(const CTransactionRef tx,
     const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
     auto consensusParams = params.GetConsensus();
 
+    if (IsMay2023Activated(consensusParams, pindexPrev))
+    {
+        // CHIP 2021-01 Restrict Transaction Version
+        if (tx->nVersion > CTransaction::MAX_CONSENSUS_VERSION || tx->nVersion < CTransaction::MIN_CONSENSUS_VERSION)
+        {
+            return state.DoS(100, false, REJECT_INVALID, "bad-txns-version");
+        }
+    }
+
     if (IsMay2020Activated(consensusParams, nHeight) == false)
     {
         // Check that the transaction doesn't have an excessive number of sigops

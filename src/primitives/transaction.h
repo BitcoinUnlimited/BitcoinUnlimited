@@ -181,13 +181,22 @@ private:
 
 public:
     // Default transaction version.
-    static const int32_t CURRENT_VERSION = 1;
+    static constexpr int32_t CURRENT_VERSION = 1;
 
-    // Changing the default transaction version requires a two step process: first
-    // adapting relay policy by bumping MAX_STANDARD_VERSION, and then later date
-    // bumping the default CURRENT_VERSION at which point both CURRENT_VERSION and
-    // MAX_STANDARD_VERSION will be equal.
-    static const int32_t MAX_STANDARD_VERSION = 2;
+    // Note: These two values are used until Upgrade9 activates (May 2023),
+    // after which time they will no longer be relevant since version
+    // enforcement will be done by the consensus layer.
+    static constexpr int32_t MIN_STANDARD_VERSION = 1, MAX_STANDARD_VERSION = 2;
+
+    // Changing the default transaction version requires a two step process:
+    // First adapting relay policy by bumping MAX_CONSENSUS_VERSION, and then
+    // later date bumping the default CURRENT_VERSION at which point both
+    // CURRENT_VERSION and MAX_CONSENSUS_VERSION will be equal.
+    //
+    // Note: These values are ignored until Upgrade9 (May 2023) is activated,
+    // after which time versions outside the range [MIN_CONSENSUS_VERSION,
+    // MAX_CONSENSUS_VERSION] are rejected by consensus.
+    static constexpr int32_t MIN_CONSENSUS_VERSION = 1, MAX_CONSENSUS_VERSION = 2;
 
     // The local variables are made const to prevent unintended modification
     // without updating the cached hash value. However, CTransaction is not
