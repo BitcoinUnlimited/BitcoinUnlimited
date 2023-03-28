@@ -101,6 +101,7 @@ BITCOIN_TESTS =\
   test/getarg_tests.cpp \
   test/graphene_tests.cpp \
   test/hash_tests.cpp \
+  test/heapoptional_tests.cpp \
   test/iblt_tests.cpp \
   test/key_tests.cpp \
   test/lcg_tests.cpp \
