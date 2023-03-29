@@ -33,6 +33,7 @@ enum
     SIGHASH_ALL = 1,
     SIGHASH_NONE = 2,
     SIGHASH_SINGLE = 3,
+    SIGHASH_UTXOS = 0x20, ///< New in Upgrade9 (May 2023), must only be accepted if flags & SCRIPT_ENABLE_TOKENS
     SIGHASH_FORKID = 0x40,
     SIGHASH_ANYONECANPAY = 0x80,
 };
@@ -151,7 +152,9 @@ enum
     // Enable p2sh32 (uses OP_HASH256 rather than OP_HASH160)
     SCRIPT_ENABLE_P2SH_32 = (1U << 26),
 
-
+    // Enable native tokens support, including all consensus rules & native
+    // introspection op-codes related to them.
+    SCRIPT_ENABLE_TOKENS = (1U << 27),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);

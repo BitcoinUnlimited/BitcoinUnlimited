@@ -109,6 +109,16 @@ bool IsStandardTx(const CTransactionRef &tx, std::string &reason, uint32_t flags
     txnouttype whichType;
     for (const CTxOut &txout : tx->vout)
     {
+        if (!(flags & SCRIPT_ENABLE_TOKENS) && txout.tokenDataPtr)
+        {
+            // Pre-token activation:
+            // Txn has token data that actually deserialized as token data, but tokens are not activated yet.
+            // Treat the txn as non-standard to keep old pre-activation mempool behavior (which would have disallowed
+            // these as non-standard).
+            reason = "txn-tokens-before-activation";
+            return false;
+        }
+
         if (!::IsStandard(txout.scriptPubKey, whichType, flags))
         {
             reason = "scriptpubkey";
@@ -153,6 +163,15 @@ bool AreInputsStandard(const CTransactionRef tx, const CCoinsViewCache &mapInput
         {
             CoinAccessor coin(mapInputs, tx->vin[i].prevout);
             const CTxOut &prev = coin->out;
+
+            if (!(flags & SCRIPT_ENABLE_TOKENS) && prev.tokenDataPtr)
+            {
+                // Input happened to have serialized token data but tokens are not activated yet. Reject this txn as
+                // non-standard -- note this input would fail to be spent anyway later on in the pipeline, but we prefer
+                // to tell the caller that the txn is non-standard so as to to emulate the behavior of unupgraded nodes.
+                return false;
+            }
+
 
             std::vector<std::vector<unsigned char> > vSolutions;
             // get the scriptPubKey corresponding to this input:

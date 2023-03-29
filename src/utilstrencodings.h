@@ -10,6 +10,8 @@
 #ifndef BITCOIN_UTILSTRENCODINGS_H
 #define BITCOIN_UTILSTRENCODINGS_H
 
+#include "span.h"
+
 #include <stdint.h>
 #include <string>
 #include <vector>
@@ -104,6 +106,18 @@ inline std::string HexStr(const T &vch, bool fSpaces = false)
 }
 
 /**
+ * Convert a span of bytes to a lower-case hexadecimal string.
+ */
+inline std::string HexStr(const Span<const uint8_t> input, bool fSpaces = false)
+{
+    return HexStr(input.begin(), input.end(), fSpaces);
+}
+
+inline std::string HexStr(const Span<const char> input, bool fSpaces = false)
+{
+    return HexStr(MakeUInt8Span(input), fSpaces);
+}
+/**
  * Format a paragraph of text to a fixed width, adding spaces for
  * indentation to any added line.
  */
@@ -171,5 +185,29 @@ bool ConvertBits(O &out, I it, I end)
 
     return true;
 }
+
+/**
+ * Converts the given character to its lowercase equivalent.
+ * This function is locale independent. It only converts uppercase
+ * characters in the standard 7-bit ASCII range.
+ * This is a feature, not a limitation.
+ *
+ * @param[in] c     the character to convert to lowercase.
+ * @return          the lowercase equivalent of c; or the argument
+ *                  if no conversion is possible.
+ */
+inline constexpr uint8_t ToLower(uint8_t c) noexcept { return (c >= 'A' && c <= 'Z' ? (c - 'A') + 'a' : c); }
+
+/**
+ * Returns the lowercase equivalent of the given string.
+ * This function is locale independent. It only converts uppercase
+ * characters in the standard 7-bit ASCII range.
+ * This is a feature, not a limitation.
+ *
+ * @param[in] str   the string to convert to lowercase.
+ * @returns         lowercased equivalent of str
+ */
+std::string ToLower(const std::string &str);
+
 
 #endif // BITCOIN_UTILSTRENCODINGS_H

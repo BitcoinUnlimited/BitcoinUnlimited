@@ -8,6 +8,8 @@
 #include "DoubleSpendProofStorage.h"
 #include "blockstorage/blockstorage.h"
 #include "connmgr.h"
+#include "consensus/coinaccessorimpl.h"
+#include "consensus/tokens.h"
 #include "consensus/tx_verify.h"
 #include "core_io.h"
 #include "dosman.h"
@@ -710,6 +712,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     if (IsMay2023Activated(chainparams.GetConsensus(), chainActive.Tip()))
     {
         featureFlags |= SCRIPT_ENABLE_P2SH_32;
+        featureFlags |= SCRIPT_ENABLE_TOKENS;
     }
 
     uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;
@@ -1178,6 +1181,32 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                     strprintf("%d > %d", nFees, std::max((int64_t)100L * nSize, maxTxFee.Value()) * 100));
             }
         }
+
+        // Check token spends (if any) are within consensus
+        {
+            int64_t firstTokenBlockHeight;
+            if (flags & SCRIPT_ENABLE_TOKENS)
+            { // Assumption: this can only be true if Upgrade9 activated
+                LOCK(cs_main);
+                firstTokenBlockHeight =
+                    g_upgrade9_block_tracker.GetActivationBlock(chainActive.Tip(),
+                                                Params().GetConsensus())
+                        ->nHeight +
+                    1LL; // First block to actually use token rules is 1 + activation block
+            }
+            else
+            {
+                // not activated yet -- far future
+                firstTokenBlockHeight = std::numeric_limits<int64_t>::max();
+            }
+
+            if (!CheckTxTokens(*tx, state, TokenCoinAccessorImpl(view), flags, firstTokenBlockHeight))
+            {
+                // State filled-in by CheckTxTokens
+                return false;
+            }
+        }
+
 
         // Check again against just the consensus-critical mandatory script
         // verification flags, in case of bugs in the standard flags that cause

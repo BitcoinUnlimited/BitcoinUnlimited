@@ -24,6 +24,216 @@
 #include <utility>
 #include <vector>
 
+template <typename Stream>
+class OverrideStream
+{
+    Stream *stream;
+
+    const int nType;
+    const int nVersion;
+
+public:
+    OverrideStream(Stream *stream_, int nType_, int nVersion_) : stream(stream_), nType(nType_), nVersion(nVersion_) {}
+
+    template <typename T>
+    OverrideStream<Stream> &operator<<(const T &obj)
+    {
+        // Serialize to this stream
+        ::Serialize(*this, obj);
+        return (*this);
+    }
+
+    template <typename T>
+    OverrideStream<Stream> &operator>>(T &&obj)
+    {
+        // Unserialize from this stream
+        ::Unserialize(*this, obj);
+        return (*this);
+    }
+
+    void write(const char *pch, size_t nSize) { stream->write(pch, nSize); }
+
+    void read(char *pch, size_t nSize) { stream->read(pch, nSize); }
+
+    int GetVersion() const { return nVersion; }
+    int GetType() const { return nType; }
+    void ignore(size_t size) { return stream->ignore(size); }
+};
+
+template <typename S>
+OverrideStream<S> WithOrVersion(S *s, int nVersionFlag)
+{
+    return OverrideStream<S>(s, s->GetType(), s->GetVersion() | nVersionFlag);
+}
+
+/**
+ * Minimal stream for overwriting and/or appending to an existing byte vector.
+ *
+ * The referenced vector will grow as necessary.
+ */
+template <typename VecT>
+class GenericVectorWriter
+{
+    const int nType;
+    const int nVersion;
+    VecT &vchData;
+    size_t nPos;
+
+    // ensure this is a vector of character-like objects
+    static_assert(std::is_pod_v<typename VecT::value_type> && sizeof(typename VecT::value_type) == 1);
+
+public:
+    /**
+     * @param[in]  nTypeIn Serialization Type
+     * @param[in]  nVersionIn Serialization Version (including any flags)
+     * @param[in]  vchDataIn  Referenced byte vector to overwrite/append
+     * @param[in]  nPosIn Starting position. Vector index where writes should
+     * start. The vector will initially grow as necessary to  max(nPosIn,
+     * vec.size()). So to append, use vec.size().
+     */
+    GenericVectorWriter(int nTypeIn, int nVersionIn, VecT &vchDataIn, size_t nPosIn)
+        : nType(nTypeIn), nVersion(nVersionIn), vchData(vchDataIn), nPos(nPosIn)
+    {
+        if (nPos > vchData.size())
+        {
+            vchData.resize(nPos);
+        }
+    }
+    /**
+     * (other params same as above)
+     * @param[in]  args  A list of items to serialize starting at nPosIn.
+     */
+    template <typename... Args>
+    GenericVectorWriter(int nTypeIn, int nVersionIn, VecT &vchDataIn, size_t nPosIn, Args &&...args)
+        : GenericVectorWriter(nTypeIn, nVersionIn, vchDataIn, nPosIn)
+    {
+        ::SerializeMany(*this, std::forward<Args>(args)...);
+    }
+    void write(const char *pch, size_t nSize)
+    {
+        assert(nPos <= vchData.size());
+        size_t nOverwrite = std::min(nSize, vchData.size() - nPos);
+        if (nOverwrite)
+        {
+            std::memcpy(vchData.data() + nPos, reinterpret_cast<const uint8_t *>(pch), nOverwrite);
+        }
+        if (nOverwrite < nSize)
+        {
+            vchData.insert(vchData.end(), reinterpret_cast<const uint8_t *>(pch) + nOverwrite,
+                reinterpret_cast<const uint8_t *>(pch) + nSize);
+        }
+        nPos += nSize;
+    }
+    template <typename T>
+    GenericVectorWriter &operator<<(const T &obj)
+    {
+        // Serialize to this stream
+        ::Serialize(*this, obj);
+        return *this;
+    }
+    int GetVersion() const { return nVersion; }
+    int GetType() const { return nType; }
+    size_t size() const { return vchData.size(); }
+    void seek(size_t nSize)
+    {
+        nPos += nSize;
+        if (nPos > vchData.size())
+        {
+            vchData.resize(nPos);
+        }
+    }
+};
+
+using CVectorWriter = GenericVectorWriter<std::vector<uint8_t> >; //! for compat. with existing code
+
+/**
+ * Minimal stream for reading from an existing vector-like object by reference
+ */
+template <typename VecT>
+class GenericVectorReader
+{
+    int m_type;
+    int m_version;
+    const VecT &m_data;
+    size_t m_pos = 0;
+
+    // ensure this is a vector of character-like objects
+    static_assert(std::is_pod_v<typename VecT::value_type> && sizeof(typename VecT::value_type) == 1);
+
+public:
+    /**
+     * @param[in]  type Serialization Type
+     * @param[in]  version Serialization Version (including any flags)
+     * @param[in]  data Referenced byte vector to overwrite/append
+     * @param[in]  pos Starting position. Vector index where reads should start.
+     */
+    GenericVectorReader(int type, int version, const VecT &data, size_t pos)
+        : m_type(type), m_version(version), m_data(data), m_pos(pos)
+    {
+        if (m_pos > m_data.size())
+        {
+            throw std::ios_base::failure("VectorReader(...): end of data (m_pos > m_data.size())");
+        }
+    }
+
+    /**
+     * (other params same as above)
+     * @param[in]  args  A list of items to deserialize starting at pos.
+     */
+    template <typename... Args>
+    GenericVectorReader(int type, int version, const VecT &data, size_t pos, Args &&...args)
+        : GenericVectorReader(type, version, data, pos)
+    {
+        ::UnserializeMany(*this, std::forward<Args>(args)...);
+    }
+
+    template <typename T>
+    GenericVectorReader &operator>>(T &&obj)
+    {
+        // Unserialize from this stream
+        ::Unserialize(*this, obj);
+        return *this;
+    }
+
+    int GetVersion() const { return m_version; }
+    void SetVersion(int version) { m_version = version; }
+
+    int GetType() const { return m_type; }
+    void SetType(int type) { m_type = type; }
+
+    size_t size() const { return m_data.size() - m_pos; }
+    bool empty() const { return m_data.size() == m_pos; }
+
+    void read(char *dst, size_t n)
+    {
+        if (n == 0)
+        {
+            return;
+        }
+
+        // Read from the beginning of the buffer
+        size_t pos_next = m_pos + n;
+        if (pos_next > m_data.size())
+        {
+            throw std::ios_base::failure("VectorReader::read(): end of data");
+        }
+        std::memcpy(dst, m_data.data() + m_pos, n);
+        m_pos = pos_next;
+    }
+
+    void ignore(size_t n)
+    {
+        // Ignore bytes in the read buffer
+        if (n == 0)
+            return;
+        size_t pos_next = m_pos + n;
+        if (pos_next > m_data.size())
+            throw std::ios_base::failure("VectorReader::ignore(): end of data");
+        m_pos = pos_next;
+    }
+};
+
+using VectorReader = GenericVectorReader<std::vector<uint8_t> >; //! for compat. with existing code
 
 /** Double ended buffer combining vector and stream-like interfaces.
  *

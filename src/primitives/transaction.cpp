@@ -14,7 +14,11 @@
 #include <algorithm>
 #include <cstring>
 
-std::string COutPoint::ToString() const { return strprintf("COutPoint(%s, %u)", hash.ToString().substr(0, 10), n); }
+std::string COutPoint::ToString(bool fVerbose) const
+{
+    const std::string::size_type cutoff = fVerbose ? std::string::npos : 10;
+    return strprintf("COutPoint(%s, %u)", hash.ToString().substr(0, cutoff), n);
+}
 CTxIn::CTxIn(COutPoint prevoutIn, CScript scriptSigIn, uint32_t nSequenceIn)
 {
     prevout = prevoutIn;
@@ -29,32 +33,35 @@ CTxIn::CTxIn(uint256 hashPrevTx, uint32_t nOut, CScript scriptSigIn, uint32_t nS
     nSequence = nSequenceIn;
 }
 
-std::string CTxIn::ToString() const
+std::string CTxIn::ToString(bool fVerbose) const
 {
+    const std::string::size_type cutoff = fVerbose ? std::string::npos : 24;
     std::string str;
     str += "CTxIn(";
-    str += prevout.ToString();
+    str += prevout.ToString(fVerbose);
     if (prevout.IsNull())
+    {
         str += strprintf(", coinbase %s", HexStr(scriptSig));
+    }
     else
-        str += strprintf(", scriptSig=%s", HexStr(scriptSig).substr(0, 24));
+    {
+        str += strprintf(", scriptSig=%s", HexStr(scriptSig).substr(0, cutoff));
+    }
     if (nSequence != SEQUENCE_FINAL)
+    {
         str += strprintf(", nSequence=%u", nSequence);
+    }
     str += ")";
     return str;
 }
 
-CTxOut::CTxOut(const CAmount &nValueIn, CScript scriptPubKeyIn)
-{
-    nValue = nValueIn;
-    scriptPubKey = scriptPubKeyIn;
-}
 
 uint256 CTxOut::GetHash() const { return SerializeHash(*this); }
-std::string CTxOut::ToString() const
+std::string CTxOut::ToString(bool fVerbose) const
 {
-    return strprintf(
-        "CTxOut(nValue=%d.%08d, scriptPubKey=%s)", nValue / COIN, nValue % COIN, HexStr(scriptPubKey).substr(0, 30));
+    const std::string::size_type cutoff = fVerbose ? std::string::npos : 30;
+    return strprintf("CTxOut(nValue=%d.%08d, scriptPubKey=%s%s)", nValue / COIN, nValue % COIN,
+        HexStr(scriptPubKey).substr(0, cutoff), tokenDataPtr ? (" " + tokenDataPtr->ToString(fVerbose)) : "");
 }
 
 CMutableTransaction::CMutableTransaction() : nVersion(CTransaction::CURRENT_VERSION), nLockTime(0) {}
@@ -172,15 +179,21 @@ unsigned int CTransaction::CalculateModifiedSize(unsigned int nSize) const
     return nSize;
 }
 
-std::string CTransaction::ToString() const
+std::string CTransaction::ToString(bool fVerbose) const
 {
+    const std::string::size_type cutoff = fVerbose ? std::string::npos : 10;
     std::string str;
-    str += strprintf("CTransaction(hash=%s, ver=%d, vin.size=%u, vout.size=%u, nLockTime=%u)\n",
-        GetHash().ToString().substr(0, 10), nVersion, vin.size(), vout.size(), nLockTime);
-    for (unsigned int i = 0; i < vin.size(); i++)
-        str += "    " + vin[i].ToString() + "\n";
-    for (unsigned int i = 0; i < vout.size(); i++)
-        str += "    " + vout[i].ToString() + "\n";
+    str += strprintf("CTransaction(txid=%s, ver=%d, vin.size=%u, vout.size=%u, "
+                     "nLockTime=%u)\n",
+        GetHash().ToString().substr(0, cutoff), nVersion, vin.size(), vout.size(), nLockTime);
+    for (const auto &nVin : vin)
+    {
+        str += "    " + nVin.ToString(fVerbose) + "\n";
+    }
+    for (const auto &nVout : vout)
+    {
+        str += "    " + nVout.ToString(fVerbose) + "\n";
+    }
     return str;
 }
 

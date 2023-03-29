@@ -487,11 +487,15 @@ libbitcoin_consensus_a_SOURCES = \
   consensus/merkle.h \
   consensus/params.h \
   consensus/validation.h \
+  consensus/tokens.cpp \
+  consensus/tokens.h \
   hashwrapper.cpp \
   hashwrapper.h \
   prevector.h \
   primitives/block.cpp \
   primitives/block.h \
+  primitives/token.cpp \
+  primitives/token.h \
   primitives/transaction.cpp \
   primitives/transaction.h \
   pubkey.cpp \

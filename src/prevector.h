@@ -410,10 +410,11 @@ public:
             return _union.capacity;
         }
     }
+    static constexpr size_t static_capacity() { return N; }
 
     T &operator[](size_type pos) { return *item_ptr(pos); }
     const T &operator[](size_type pos) const { return *item_ptr(pos); }
-    void resize(size_type new_size)
+    void resize(size_type new_size, const T &value = T{})
     {
         size_type cur_size = size();
         if (cur_size == new_size)
@@ -430,7 +431,7 @@ public:
             change_capacity(new_size);
         }
         ptrdiff_t increase = new_size - cur_size;
-        fill(item_ptr(cur_size), increase);
+        fill(item_ptr(cur_size), increase, value);
         _size += increase;
     }
 

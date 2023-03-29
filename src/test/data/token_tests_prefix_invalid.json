@@ -1,0 +1,277 @@
+[
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb00",
+    "error": "Invalid token prefix: must encode at least one token. Bitfield: 0b0",
+    "bchn_exception_message": "Invalid token bitfield: 0x00"
+  },
+  {
+    "prefix": "ef",
+    "error": "Invalid token prefix: insufficient length. The minimum possible length is 34. Missing bytes: 33",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbb1001",
+    "error": "Invalid token prefix: insufficient length. The minimum possible length is 34. Missing bytes: 27",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "error": "Invalid token prefix: insufficient length. The minimum possible length is 34. Missing bytes: 1",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb80",
+    "error": "Invalid token prefix: reserved bit is set. Bitfield: 0b10000000",
+    "bchn_exception_message": "Invalid token bitfield: 0x80"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbba0",
+    "error": "Invalid token prefix: reserved bit is set. Bitfield: 0b10100000",
+    "bchn_exception_message": "Invalid token bitfield: 0xa0"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb9001",
+    "error": "Invalid token prefix: reserved bit is set. Bitfield: 0b10010000",
+    "bchn_exception_message": "Invalid token bitfield: 0x90"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb23",
+    "error": "Invalid token prefix: capability must be none (0), mutable (1), or minting (2). Capability value: 3",
+    "bchn_exception_message": "Invalid token bitfield: 0x23"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb24",
+    "error": "Invalid token prefix: capability must be none (0), mutable (1), or minting (2). Capability value: 4",
+    "bchn_exception_message": "Invalid token bitfield: 0x24"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb25",
+    "error": "Invalid token prefix: capability must be none (0), mutable (1), or minting (2). Capability value: 5",
+    "bchn_exception_message": "Invalid token bitfield: 0x25"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb26",
+    "error": "Invalid token prefix: capability must be none (0), mutable (1), or minting (2). Capability value: 6",
+    "bchn_exception_message": "Invalid token bitfield: 0x26"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb27",
+    "error": "Invalid token prefix: capability must be none (0), mutable (1), or minting (2). Capability value: 7",
+    "bchn_exception_message": "Invalid token bitfield: 0x27"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb28",
+    "error": "Invalid token prefix: capability must be none (0), mutable (1), or minting (2). Capability value: 8",
+    "bchn_exception_message": "Invalid token bitfield: 0x28"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb29",
+    "error": "Invalid token prefix: capability must be none (0), mutable (1), or minting (2). Capability value: 9",
+    "bchn_exception_message": "Invalid token bitfield: 0x29"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2a",
+    "error": "Invalid token prefix: capability must be none (0), mutable (1), or minting (2). Capability value: 10",
+    "bchn_exception_message": "Invalid token bitfield: 0x2a"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2b",
+    "error": "Invalid token prefix: capability must be none (0), mutable (1), or minting (2). Capability value: 11",
+    "bchn_exception_message": "Invalid token bitfield: 0x2b"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2c",
+    "error": "Invalid token prefix: capability must be none (0), mutable (1), or minting (2). Capability value: 12",
+    "bchn_exception_message": "Invalid token bitfield: 0x2c"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2d",
+    "error": "Invalid token prefix: capability must be none (0), mutable (1), or minting (2). Capability value: 13",
+    "bchn_exception_message": "Invalid token bitfield: 0x2d"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2e",
+    "error": "Invalid token prefix: capability must be none (0), mutable (1), or minting (2). Capability value: 14",
+    "bchn_exception_message": "Invalid token bitfield: 0x2e"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2f",
+    "error": "Invalid token prefix: capability must be none (0), mutable (1), or minting (2). Capability value: 15",
+    "bchn_exception_message": "Invalid token bitfield: 0x2f"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb1101",
+    "error": "Invalid token prefix: capability requires an NFT. Bitfield: 0b10001",
+    "bchn_exception_message": "Invalid token bitfield: 0x11"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb1201",
+    "error": "Invalid token prefix: capability requires an NFT. Bitfield: 0b10010",
+    "bchn_exception_message": "Invalid token bitfield: 0x12"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb40",
+    "error": "Invalid token prefix: commitment requires an NFT. Bitfield: 0b1000000",
+    "bchn_exception_message": "Invalid token bitfield: 0x40"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb5001",
+    "error": "Invalid token prefix: commitment requires an NFT. Bitfield: 0b1010000",
+    "bchn_exception_message": "Invalid token bitfield: 0x50"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb60",
+    "error": "Invalid token prefix: invalid non-fungible token commitment. Error reading CompactSize-prefixed bin: invalid CompactSize. Error reading CompactSize: requires at least one byte.",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb61",
+    "error": "Invalid token prefix: invalid non-fungible token commitment. Error reading CompactSize-prefixed bin: invalid CompactSize. Error reading CompactSize: requires at least one byte.",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb62",
+    "error": "Invalid token prefix: invalid non-fungible token commitment. Error reading CompactSize-prefixed bin: invalid CompactSize. Error reading CompactSize: requires at least one byte.",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb60fd0100cc",
+    "error": "Invalid token prefix: invalid non-fungible token commitment. Error reading CompactSize-prefixed bin: invalid CompactSize. Error reading CompactSize: CompactSize is not minimally encoded. Value: 1, encoded length: 3, canonical length: 1",
+    "bchn_exception_message": "non-canonical ReadCompactSize"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb60fe01000000cc",
+    "error": "Invalid token prefix: invalid non-fungible token commitment. Error reading CompactSize-prefixed bin: invalid CompactSize. Error reading CompactSize: CompactSize is not minimally encoded. Value: 1, encoded length: 5, canonical length: 1",
+    "bchn_exception_message": "non-canonical ReadCompactSize"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb60ff0100000000000000cc",
+    "error": "Invalid token prefix: invalid non-fungible token commitment. Error reading CompactSize-prefixed bin: invalid CompactSize. Error reading CompactSize: CompactSize is not minimally encoded. Value: 1, encoded length: 9, canonical length: 1",
+    "bchn_exception_message": "non-canonical ReadCompactSize"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb6000",
+    "error": "Invalid token prefix: if encoded, commitment length must be greater than 0.",
+    "bchn_exception_message": "token commitment may not be empty"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb700001",
+    "error": "Invalid token prefix: if encoded, commitment length must be greater than 0.",
+    "bchn_exception_message": "token commitment may not be empty"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb6001",
+    "error": "Invalid token prefix: invalid non-fungible token commitment. Error reading CompactSize-prefixed bin: insufficient bytes. Required bytes: 1, remaining bytes: 0",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb6101",
+    "error": "Invalid token prefix: invalid non-fungible token commitment. Error reading CompactSize-prefixed bin: insufficient bytes. Required bytes: 1, remaining bytes: 0",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb6102cc",
+    "error": "Invalid token prefix: invalid non-fungible token commitment. Error reading CompactSize-prefixed bin: insufficient bytes. Required bytes: 2, remaining bytes: 1",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb6202cc",
+    "error": "Invalid token prefix: invalid non-fungible token commitment. Error reading CompactSize-prefixed bin: insufficient bytes. Required bytes: 2, remaining bytes: 1",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb10",
+    "error": "Invalid token prefix: invalid fungible token amount encoding. Error reading CompactSize: requires at least one byte.",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb10fd00",
+    "error": "Invalid token prefix: invalid fungible token amount encoding. Error reading CompactSize: insufficient bytes. CompactSize prefix 253 requires at least 3 bytes. Remaining bytes: 2",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb10fe000000",
+    "error": "Invalid token prefix: invalid fungible token amount encoding. Error reading CompactSize: insufficient bytes. CompactSize prefix 254 requires at least 5 bytes. Remaining bytes: 4",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb10ff00000000000000",
+    "error": "Invalid token prefix: invalid fungible token amount encoding. Error reading CompactSize: insufficient bytes. CompactSize prefix 255 requires at least 9 bytes. Remaining bytes: 8",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb7001cc",
+    "error": "Invalid token prefix: invalid fungible token amount encoding. Error reading CompactSize: requires at least one byte.",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb7001ccfd00",
+    "error": "Invalid token prefix: invalid fungible token amount encoding. Error reading CompactSize: insufficient bytes. CompactSize prefix 253 requires at least 3 bytes. Remaining bytes: 2",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb7001ccfe000000",
+    "error": "Invalid token prefix: invalid fungible token amount encoding. Error reading CompactSize: insufficient bytes. CompactSize prefix 254 requires at least 5 bytes. Remaining bytes: 4",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb7001ccff00000000000000",
+    "error": "Invalid token prefix: invalid fungible token amount encoding. Error reading CompactSize: insufficient bytes. CompactSize prefix 255 requires at least 9 bytes. Remaining bytes: 8",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb30",
+    "error": "Invalid token prefix: invalid fungible token amount encoding. Error reading CompactSize: requires at least one byte.",
+    "bchn_exception_message": "end of data"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb1000",
+    "error": "Invalid token prefix: if encoded, fungible token amount must be greater than 0.",
+    "bchn_exception_message": "token amount may not be 0"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb3000",
+    "error": "Invalid token prefix: if encoded, fungible token amount must be greater than 0.",
+    "bchn_exception_message": "token amount may not be 0"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb10fd0100",
+    "error": "Invalid token prefix: invalid fungible token amount encoding. Error reading CompactSize: CompactSize is not minimally encoded. Value: 1, encoded length: 3, canonical length: 1",
+    "bchn_exception_message": "non-canonical ReadCompactSize"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb10fe01000000",
+    "error": "Invalid token prefix: invalid fungible token amount encoding. Error reading CompactSize: CompactSize is not minimally encoded. Value: 1, encoded length: 5, canonical length: 1",
+    "bchn_exception_message": "non-canonical ReadCompactSize"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb10ff0100000000000000",
+    "error": "Invalid token prefix: invalid fungible token amount encoding. Error reading CompactSize: CompactSize is not minimally encoded. Value: 1, encoded length: 9, canonical length: 1",
+    "bchn_exception_message": "non-canonical ReadCompactSize"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb30fd0100",
+    "error": "Invalid token prefix: invalid fungible token amount encoding. Error reading CompactSize: CompactSize is not minimally encoded. Value: 1, encoded length: 3, canonical length: 1",
+    "bchn_exception_message": "non-canonical ReadCompactSize"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb30fe01000000",
+    "error": "Invalid token prefix: invalid fungible token amount encoding. Error reading CompactSize: CompactSize is not minimally encoded. Value: 1, encoded length: 5, canonical length: 1",
+    "bchn_exception_message": "non-canonical ReadCompactSize"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb30ff0100000000000000",
+    "error": "Invalid token prefix: invalid fungible token amount encoding. Error reading CompactSize: CompactSize is not minimally encoded. Value: 1, encoded length: 9, canonical length: 1",
+    "bchn_exception_message": "non-canonical ReadCompactSize"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb10ff0000000000000080",
+    "error": "Invalid token prefix: exceeds maximum fungible token amount of 9223372036854775807. Encoded amount: 9223372036854775808",
+    "bchn_exception_message": "amount out of range"
+  },
+  {
+    "prefix": "efbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb30ff0000000000000080",
+    "error": "Invalid token prefix: exceeds maximum fungible token amount of 9223372036854775807. Encoded amount: 9223372036854775808",
+    "bchn_exception_message": "amount out of range"
+  }
+]
