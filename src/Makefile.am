@@ -232,6 +232,8 @@ BITCOIN_CORE_H = \
   ui_interface.h \
   undo.h \
   unlimited.h \
+  util/defer.h \
+  util/heapoptional.h \
   utilhttp.h \
   utilprocess.h \
   stat.h \
