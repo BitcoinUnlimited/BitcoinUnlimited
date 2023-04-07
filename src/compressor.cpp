@@ -10,6 +10,8 @@
 #include "pubkey.h"
 #include "script/standard.h"
 
+#include <utility>
+
 bool CScriptCompressor::IsToKeyID(CKeyID &hash) const
 {
     if (script.size() == 25 && script[0] == OP_DUP && script[1] == OP_HASH160 && script[2] == 20 &&
@@ -21,11 +23,25 @@ bool CScriptCompressor::IsToKeyID(CKeyID &hash) const
     return false;
 }
 
-bool CScriptCompressor::IsToScriptID(CScriptID &hash) const
+bool CScriptCompressor::IsToScriptID(ScriptID &hash) const
 {
-    if (script.size() == 23 && script[0] == OP_HASH160 && script[1] == 20 && script[22] == OP_EQUAL)
+    if (std::vector<uint8_t> payload; script.IsPayToScriptHash(0 /* no p2psh_32 */, &payload))
     {
-        memcpy(&hash, &script[2], 20);
+        if (payload.size() == uint160::size())
+        {
+            hash = uint160{payload};
+        }
+        else if (payload.size() == uint256::size())
+        {
+            // not reached in current code, but left in for future expansion
+            assert(!"Current code should not be compressing p2sh_32 in TxOutCompression");
+            hash = uint256{payload};
+        }
+        else
+        {
+            assert(!"Unexpected ScriptID payload size: expected a payload of size 20 or 32 bytes");
+            return false; // not reached
+        }
         return true;
     }
     return false;
@@ -53,15 +69,22 @@ bool CScriptCompressor::Compress(std::vector<unsigned char> &out) const
     {
         out.resize(21);
         out[0] = 0x00;
-        memcpy(&out[1], &keyID, 20);
+        static_assert(keyID.size() == 20);
+        std::memcpy(&out[1], keyID.data(), 20);
         return true;
     }
-    CScriptID scriptID;
+    ScriptID scriptID;
     if (IsToScriptID(scriptID))
     {
-        out.resize(21);
-        out[0] = 0x01;
-        memcpy(&out[1], &scriptID, 20);
+        // Note: the scriptID will always be of size() == 20 here in current
+        // code. If we wanted to add p2sh_32 support, we should just remove
+        // this assert() and add another special script byte (maybe 0x6) to
+        // indicate p2sh_32, and bump nSpecialScripts. Note that doing that
+        // *would* break txdb and undo file compatibility, however!
+        assert(scriptID.IsP2SH_20() && scriptID.size() == 20);
+        out.resize(scriptID.size() + 1u);
+        out[0] = 0x01; // 0x1 == p2sh_20
+        std::memcpy(&out[1], std::as_const(scriptID).data(), scriptID.size());
         return true;
     }
     CPubKey pubkey;
@@ -96,7 +119,7 @@ bool CScriptCompressor::Decompress(unsigned int nSize, const std::vector<unsigne
 {
     switch (nSize)
     {
-    case 0x00:
+    case 0x00: // p2pkh
         script.resize(25);
         script[0] = OP_DUP;
         script[1] = OP_HASH160;
@@ -105,12 +128,13 @@ bool CScriptCompressor::Decompress(unsigned int nSize, const std::vector<unsigne
         script[23] = OP_EQUALVERIFY;
         script[24] = OP_CHECKSIG;
         return true;
-    case 0x01:
-        script.resize(23);
-        script[0] = OP_HASH160;
-        script[1] = 20;
-        memcpy(&script[2], &in[0], 20);
-        script[22] = OP_EQUAL;
+    case 0x01: // p2sh_20
+        assert(in.size() == uint160::size()); // 20 bytes expected
+        script.resize(in.size() + 3);
+        script[0] = OP_HASH160; // if adding p2sh_32, add conditional for OP_HASH256 here.
+        script[1] = in.size();
+        std::memcpy(&script[2], in.data(), in.size());
+        script[in.size() + 2] = OP_EQUAL;
         return true;
     case 0x02:
     case 0x03:

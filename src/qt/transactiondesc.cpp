@@ -184,7 +184,7 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
                     labelPublic = tmp_labelPublic;
 
                 CTxDestination txout_address;
-                if (ExtractDestination(txout.scriptPubKey, txout_address))
+                if (ExtractDestination(txout.scriptPubKey, txout_address, 0 /* no p2sh_32 */))
                 {
                     if (address == txout_address)
                     {
@@ -245,7 +245,7 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
                     {
                         // Offline transaction
                         CTxDestination address;
-                        if (ExtractDestination(txout.scriptPubKey, address))
+                        if (ExtractDestination(txout.scriptPubKey, address, 0 /* no p2sh_31 */))
                         {
                             strHTML += "<b>" + tr("To") + ":</b> ";
                             strHTML += GUIUtil::HtmlEscape(EncodeDestination(address));
@@ -410,7 +410,7 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
 
                     const CTxOut &vout = prev.out;
                     CTxDestination address;
-                    if (ExtractDestination(vout.scriptPubKey, address))
+                    if (ExtractDestination(vout.scriptPubKey, address, 0 /* no p2sh_32 */))
                     {
                         if (wallet->mapAddressBook.count(address) && !wallet->mapAddressBook[address].name.empty())
                             strHTML += GUIUtil::HtmlEscape(wallet->mapAddressBook[address].name) + " ";

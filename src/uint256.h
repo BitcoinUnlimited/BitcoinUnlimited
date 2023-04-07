@@ -24,13 +24,13 @@ protected:
     {
         WIDTH = BITS / 8
     };
-    uint8_t data[WIDTH];
+    uint8_t m_data[WIDTH];
 
 public:
     base_blob()
     {
         static_assert((BITS & 7) == 0, "Number of bits must fit in byte boundaries");
-        memset(data, 0, sizeof(data));
+        memset(m_data, 0, sizeof(m_data));
     }
     //! Construct from a std::vector by copying bytes directly
     explicit base_blob(const std::vector<unsigned char> &vch);
@@ -41,21 +41,21 @@ public:
     bool IsNull() const
     {
         for (int i = 0; i < WIDTH; i++)
-            if (data[i] != 0)
+            if (m_data[i] != 0)
                 return false;
         return true;
     }
 
-    void SetNull() { memset(data, 0, sizeof(data)); }
+    void SetNull() { memset(m_data, 0, sizeof(m_data)); }
     //! Compare in lexical (string) byte ordering
-    inline int LexicalCompare(const base_blob &other) const { return memcmp(data, other.data, sizeof(data)); }
+    inline int LexicalCompare(const base_blob &other) const { return memcmp(m_data, other.m_data, sizeof(m_data)); }
     //! Numerical comparison returns -1 if this is < other, 1 if this > other, 0 if equal
     inline int Compare(const base_blob &other) const
     {
-        for (size_t i = 0; i < sizeof(data); i++)
+        for (size_t i = 0; i < sizeof(m_data); i++)
         {
-            uint8_t a = data[sizeof(data) - 1 - i];
-            uint8_t b = other.data[sizeof(data) - 1 - i];
+            uint8_t a = m_data[sizeof(m_data) - 1 - i];
+            uint8_t b = other.m_data[sizeof(m_data) - 1 - i];
             if (a > b)
             {
                 return 1;
@@ -81,23 +81,26 @@ public:
     void SetHex(const std::string &str);
     std::string ToString() const;
 
-    unsigned char *begin() { return &data[0]; }
-    unsigned char *end() { return &data[WIDTH]; }
-    const unsigned char *begin() const { return &data[0]; }
-    const unsigned char *end() const { return &data[WIDTH]; }
-    size_t size() const { return sizeof(data); }
+    constexpr const uint8_t *data() const noexcept { return &m_data[0]; }
+    constexpr uint8_t *data() noexcept { return &m_data[0]; }
+
+    unsigned char *begin() { return &m_data[0]; }
+    unsigned char *end() { return &m_data[WIDTH]; }
+    const unsigned char *begin() const { return &m_data[0]; }
+    const unsigned char *end() const { return &m_data[WIDTH]; }
+    static constexpr unsigned size() noexcept { return WIDTH; }
     void reverse()
     {
         uint8_t tmp[WIDTH];
         for (int i = 0; i < WIDTH; i++)
-            tmp[i] = data[WIDTH - 1 - i];
+            tmp[i] = m_data[WIDTH - 1 - i];
         for (int i = 0; i < WIDTH; i++)
-            data[i] = tmp[i];
+            m_data[i] = tmp[i];
     }
 
     uint64_t GetUint64(int pos) const
     {
-        const uint8_t *ptr = data + pos * 8;
+        const uint8_t *ptr = m_data + pos * 8;
         return ((uint64_t)ptr[0]) | ((uint64_t)ptr[1]) << 8 | ((uint64_t)ptr[2]) << 16 | ((uint64_t)ptr[3]) << 24 |
                ((uint64_t)ptr[4]) << 32 | ((uint64_t)ptr[5]) << 40 | ((uint64_t)ptr[6]) << 48 |
                ((uint64_t)ptr[7]) << 56;
@@ -106,13 +109,13 @@ public:
     template <typename Stream>
     void Serialize(Stream &s) const
     {
-        s.write((char *)data, sizeof(data));
+        s.write((char *)m_data, sizeof(m_data));
     }
 
     template <typename Stream>
     void Unserialize(Stream &s)
     {
-        s.read((char *)data, sizeof(data));
+        s.read((char *)m_data, sizeof(m_data));
     }
 };
 
@@ -150,7 +153,7 @@ public:
      * when the value can easily be influenced from outside as e.g. a network adversary could
      * provide values to trigger worst-case behavior.
      */
-    uint64_t GetCheapHash() const { return ReadLE64(data); }
+    uint64_t GetCheapHash() const { return ReadLE64(m_data); }
     /** A more secure, salted hash function.
      * @note This hash is not stable between little and big endian.
      */

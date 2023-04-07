@@ -7,6 +7,7 @@
 #include "key.h"
 #include "keystore.h"
 #include "net.h"
+#include "policy/policy.h"
 #include "random.h"
 #include "respend/respendrelayer.h"
 #include "script/script.h"
@@ -95,6 +96,7 @@ BOOST_FIXTURE_TEST_CASE(triggers_correctly, TestChain100Setup)
     CCoinsView coinsDummy;
     CCoinsViewCache coins(pcoinsTip);
     std::vector<CMutableTransaction> dummyTransactions = SetupDummyInputs(keystore, *pcoinsTip);
+    const uint32_t scriptFlags = STANDARD_SCRIPT_VERIFY_FLAGS;
 
     // Create a basic signed transactions and add them to the pool. We will use these transactions
     // to create the spend and respend transactions.
@@ -113,7 +115,7 @@ BOOST_FIXTURE_TEST_CASE(triggers_correctly, TestChain100Setup)
         TransactionSignatureCreator tsc(&keystore, &tx1, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = dummyTransactions[0].vout[0].scriptPubKey;
         CScript &scriptSigRes = t1.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
         BOOST_CHECK(worked);
     }
     pool.addUnchecked(tx1.GetHash(), entry.FromTx(tx1));
@@ -132,7 +134,7 @@ BOOST_FIXTURE_TEST_CASE(triggers_correctly, TestChain100Setup)
         TransactionSignatureCreator tsc(&keystore, &tx2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = dummyTransactions[0].vout[1].scriptPubKey;
         CScript &scriptSigRes = t2.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
         BOOST_CHECK(worked);
     }
     pool.addUnchecked(tx2.GetHash(), entry.FromTx(tx2));
@@ -157,12 +159,12 @@ BOOST_FIXTURE_TEST_CASE(triggers_correctly, TestChain100Setup)
         TransactionSignatureCreator tsc(&keystore, &spend1, 0, 100 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = tx1.vout[0].scriptPubKey;
         CScript &scriptSigRes = s1.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
         BOOST_CHECK(worked);
 
         const CScript &scriptPubKey2 = tx2.vout[0].scriptPubKey;
         CScript &scriptSigRes2 = s1.vin[1].scriptSig;
-        worked = ProduceSignature(tsc, scriptPubKey2, scriptSigRes2);
+        worked = ProduceSignature(tsc, scriptPubKey2, scriptSigRes2, scriptFlags);
         BOOST_CHECK(worked);
     }
     CTransaction spend1a(s1);
@@ -186,7 +188,7 @@ BOOST_FIXTURE_TEST_CASE(triggers_correctly, TestChain100Setup)
         TransactionSignatureCreator tsc(&keystore, &spend2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = tx1.vout[0].scriptPubKey;
         CScript &scriptSigRes = s2.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
         BOOST_CHECK(worked);
     }
     CTransaction spend2a(s2);
@@ -230,7 +232,7 @@ BOOST_FIXTURE_TEST_CASE(triggers_correctly, TestChain100Setup)
         TransactionSignatureCreator tsc(&keystore, &spend2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = tx1.vout[0].scriptPubKey;
         CScript &scriptSigRes = s2.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
         BOOST_CHECK(worked);
     }
     CTransaction spend2b(s2);
@@ -265,7 +267,7 @@ BOOST_FIXTURE_TEST_CASE(triggers_correctly, TestChain100Setup)
         TransactionSignatureCreator tsc(&keystore, &spend2, 0, 50 * CENT, SIGHASH_ALL);
         const CScript &scriptPubKey = tx1.vout[0].scriptPubKey;
         CScript &scriptSigRes = s2.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
         BOOST_CHECK(worked);
     }
     CTransaction spend2c(s2);
@@ -380,7 +382,7 @@ BOOST_FIXTURE_TEST_CASE(triggers_correctly, TestChain100Setup)
         TransactionSignatureCreator tsc(&keystore, &tx3, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = dummyTransactions[0].vout[0].scriptPubKey;
         CScript &scriptSigRes = t3.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
         BOOST_CHECK(worked);
     }
     CTransaction spendt1(t1);

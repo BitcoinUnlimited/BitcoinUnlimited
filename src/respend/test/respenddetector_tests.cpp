@@ -5,6 +5,7 @@
 #include "DoubleSpendProofStorage.h"
 #include "key.h"
 #include "keystore.h"
+#include "policy/policy.h"
 #include "primitives/transaction.h"
 #include "respend/respendaction.h"
 #include "respend/respenddetector.h"
@@ -225,6 +226,7 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
     CCoinsView coinsDummy;
     CCoinsViewCache coins(&coinsDummy);
     std::vector<CMutableTransaction> dummyTransactions = SetupDummyInputs(keystore, coins);
+    const uint32_t scriptFlags = STANDARD_SCRIPT_VERIFY_FLAGS;
 
     // Create a basic signed transactions and add them to the pool. We will use these transactions
     // to create the spend and respend transactions.
@@ -246,7 +248,7 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
         TransactionSignatureCreator tsc(&keystore, &tx1, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = dummyTransactions[0].vout[0].scriptPubKey;
         CScript &scriptSigRes = t1.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
         BOOST_CHECK(worked);
     }
     CTransaction tx1a(t1);
@@ -268,7 +270,7 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
         TransactionSignatureCreator tsc(&keystore, &tx2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = dummyTransactions[0].vout[1].scriptPubKey;
         CScript &scriptSigRes = t2.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
         BOOST_CHECK(worked);
     }
     CTransaction tx2a(t2);
@@ -294,7 +296,7 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
         TransactionSignatureCreator tsc(&keystore, &spend1, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = tx1a.vout[0].scriptPubKey;
         CScript &scriptSigRes = s1.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
         BOOST_CHECK(worked);
     }
     CTransaction spend1a(s1);
@@ -318,7 +320,7 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
         TransactionSignatureCreator tsc(&keystore, &spend2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = tx1a.vout[0].scriptPubKey;
         CScript &scriptSigRes = s2.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
         BOOST_CHECK(worked);
     }
     CTransaction spend2a(s2);

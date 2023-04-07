@@ -596,7 +596,8 @@ void WalletModel::listCoins(std::map<QString, std::vector<COutput> > &mapCoins) 
         }
 
         CTxDestination address;
-        if (!out.fSpendable || !ExtractDestination(cout.tx->vout[cout.i].scriptPubKey, address))
+        if (!out.fSpendable ||
+            !ExtractDestination(cout.tx->vout[cout.i].scriptPubKey, address, 0 /* no p2sh_32 in wallet */))
             continue;
         mapCoins[QString::fromStdString(EncodeDestination(address))].push_back(out);
     }

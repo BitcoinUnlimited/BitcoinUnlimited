@@ -148,6 +148,9 @@ enum
     // Flag for Native Introspection opcodes.
     SCRIPT_NATIVE_INTROSPECTION = (1U << 25),
 
+    // Enable p2sh32 (uses OP_HASH256 rather than OP_HASH160)
+    SCRIPT_ENABLE_P2SH_32 = (1U << 26),
+
 
 };
 
@@ -233,9 +236,9 @@ public:
 
     bool CheckSig(const std::vector<uint8_t> &scriptSig,
         const std::vector<uint8_t> &vchPubKey,
-        const CScript &scriptCode) const;
-    bool CheckLockTime(const CScriptNum &nLockTime) const;
-    bool CheckSequence(const CScriptNum &nSequence) const;
+        const CScript &scriptCode) const override;
+    bool CheckLockTime(const CScriptNum &nLockTime) const override;
+    bool CheckSequence(const CScriptNum &nSequence) const override;
     size_t GetBytesHashed() const { return nBytesHashed; }
     size_t GetNumSigops() const { return nSigops; }
 };

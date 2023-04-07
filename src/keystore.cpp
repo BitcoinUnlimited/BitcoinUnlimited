@@ -36,23 +36,27 @@ bool CBasicKeyStore::AddKeyPubKey(const CKey &key, const CPubKey &pubkey)
     return true;
 }
 
-bool CBasicKeyStore::AddCScript(const CScript &redeemScript)
+bool CBasicKeyStore::AddCScript(const CScript &redeemScript, bool is_p2sh32)
 {
     if (redeemScript.size() > MAX_SCRIPT_ELEMENT_SIZE)
         return error("CBasicKeyStore::AddCScript(): redeemScripts > %i bytes are invalid", MAX_SCRIPT_ELEMENT_SIZE);
 
     LOCK(cs_KeyStore);
-    mapScripts[CScriptID(redeemScript)] = redeemScript;
+    // Maybe add BOTH the ps2h_20 and p2sh_32 versions to the map and remove the bool is_p2sh32 arg?
+    // For now we don't do this since the wallet and other subsystems should not implicitly use p2sh32 (for now).
+    // RPC tx signing does indeed use p2sh32 optionally and in that case the boolean flag that is passed-in is an
+    // acceptable API choice.
+    mapScripts[ScriptID(redeemScript, is_p2sh32)] = redeemScript;
     return true;
 }
 
-bool CBasicKeyStore::HaveCScript(const CScriptID &hash) const
+bool CBasicKeyStore::HaveCScript(const ScriptID &hash) const
 {
     LOCK(cs_KeyStore);
     return mapScripts.count(hash) > 0;
 }
 
-bool CBasicKeyStore::GetCScript(const CScriptID &hash, CScript &redeemScriptOut) const
+bool CBasicKeyStore::GetCScript(const ScriptID &hash, CScript &redeemScriptOut) const
 {
     LOCK(cs_KeyStore);
     ScriptMap::const_iterator mi = mapScripts.find(hash);

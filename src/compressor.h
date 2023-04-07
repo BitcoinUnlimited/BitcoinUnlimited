@@ -13,7 +13,7 @@
 
 class CKeyID;
 class CPubKey;
-class CScriptID;
+class ScriptID;
 
 /** Compact serializer for scripts.
  *
@@ -48,7 +48,7 @@ protected:
      * form).
      */
     bool IsToKeyID(CKeyID &hash) const;
-    bool IsToScriptID(CScriptID &hash) const;
+    bool IsToScriptID(ScriptID &hash) const;
     bool IsToPubKey(CPubKey &pubkey) const;
 
     bool Compress(std::vector<unsigned char> &out) const;

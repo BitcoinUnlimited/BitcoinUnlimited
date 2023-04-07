@@ -278,14 +278,15 @@ void ImportScript(const CScript &script, const std::string &strLabel, bool isRed
 
     if (isRedeemScript)
     {
-        if (!pwalletMain->HaveCScript(script) && !pwalletMain->AddCScript(script))
+        const ScriptID id(script, false /* no p2sh_32 in wallet */);
+        if (!pwalletMain->HaveCScript(id) && !pwalletMain->AddCScript(script, false /* no p2sh_32 in wallet */))
             throw JSONRPCError(RPC_WALLET_ERROR, "Error adding p2sh redeemScript to wallet");
-        ImportAddress(CScriptID(script), strLabel);
+        ImportAddress(id, strLabel);
     }
     else
     {
         CTxDestination destination;
-        if (ExtractDestination(script, destination))
+        if (ExtractDestination(script, destination, 0 /* no p2sh_32 in wallet */))
         {
             pwalletMain->SetAddressBook(destination, strLabel, "receive");
         }

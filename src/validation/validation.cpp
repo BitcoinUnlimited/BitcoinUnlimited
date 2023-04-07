@@ -2002,7 +2002,20 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
         flags |= SCRIPT_NATIVE_INTROSPECTION;
     }
 
+    if (IsMay2023Activated(consensusparams, pindex->pprev))
+    {
+        flags |= SCRIPT_ENABLE_P2SH_32;
+    }
+
     return flags;
+}
+
+uint32_t GetMemPoolScriptFlags(const Consensus::Params &params, const CBlockIndex *pindex, uint32_t *nextBlockFlags)
+{
+    const uint32_t flags = GetBlockScriptFlags(pindex, params);
+    if (nextBlockFlags)
+        *nextBlockFlags = flags;
+    return flags | STANDARD_SCRIPT_VERIFY_FLAGS;
 }
 
 /**

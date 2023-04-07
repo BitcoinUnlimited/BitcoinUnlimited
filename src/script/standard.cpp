@@ -12,14 +12,16 @@
 #include "util.h"
 #include "utilstrencodings.h"
 
-using namespace std;
-
-typedef vector<uint8_t> valtype;
+using valtype = std::vector<uint8_t>;
 
 bool fAcceptDatacarrier = DEFAULT_ACCEPT_DATACARRIER;
 unsigned nMaxDatacarrierBytes = MAX_OP_RETURN_RELAY;
 
-CScriptID::CScriptID(const CScript &in) : uint160(Hash160(in.begin(), in.end())) {}
+ScriptID::ScriptID(const CScript &in, bool is32)
+    : var(is32 ? var_t{Hash(in.begin(), in.end())} : var_t{Hash160(in.begin(), in.end())})
+{
+}
+
 const char *GetTxnOutputType(txnouttype t)
 {
     switch (t)
@@ -227,21 +229,19 @@ static bool MatchMultisig(const CScript &script, unsigned int &required, std::ve
     return (it + 1 == script.end());
 }
 
-
 /**
  * Return public keys or hashes from scriptPubKey, for 'standard' transaction types.
  */
-bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, std::vector<valtype> &vSolutionsRet)
+bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, std::vector<valtype> &vSolutionsRet, uint32_t flags)
 {
     vSolutionsRet.clear();
 
     // Shortcut for pay-to-script-hash, which are more constrained than the other types:
     // it is always OP_HASH160 20 [20 byte hash] OP_EQUAL
-    if (scriptPubKey.IsPayToScriptHash())
+    if (valtype hashBytes; scriptPubKey.IsPayToScriptHash(flags, &hashBytes))
     {
         typeRet = TX_SCRIPTHASH;
-        vector<unsigned char> hashBytes(scriptPubKey.begin() + 2, scriptPubKey.begin() + 22);
-        vSolutionsRet.push_back(hashBytes);
+        vSolutionsRet.push_back(std::move(hashBytes));
         return true;
     }
 
@@ -306,11 +306,11 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, std::vector<valtyp
     return false;
 }
 
-bool ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet)
+bool ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet, uint32_t flags)
 {
-    vector<valtype> vSolutions;
+    std::vector<valtype> vSolutions;
     txnouttype whichType;
-    if (!Solver(scriptPubKey, whichType, vSolutions))
+    if (!Solver(scriptPubKey, whichType, vSolutions, flags))
         return false;
 
     if (whichType == TX_PUBKEY)
@@ -329,7 +329,23 @@ bool ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet)
     }
     else if (whichType == TX_SCRIPTHASH)
     {
-        addressRet = CScriptID(uint160(vSolutions[0]));
+        const auto sol_size = vSolutions[0].size();
+        if (sol_size == uint160::size())
+        {
+            // legacy p2sh
+            addressRet = ScriptID(uint160(vSolutions[0]));
+        }
+        else if (sol_size == uint256::size())
+        {
+            // newer p2sh_32
+            addressRet = ScriptID(uint256(vSolutions[0]));
+        }
+        else
+        {
+            // Expected solution size to either be 20 or 32 bytes!
+            DbgAssert(false, );
+            return false; // not reached
+        }
         return true;
     }
     else if (whichType == TX_CLTV)
@@ -347,13 +363,14 @@ bool ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet)
 
 bool ExtractDestinations(const CScript &scriptPubKey,
     txnouttype &typeRet,
-    vector<CTxDestination> &addressRet,
-    int &nRequiredRet)
+    std::vector<CTxDestination> &addressRet,
+    int &nRequiredRet,
+    uint32_t flags)
 {
     addressRet.clear();
     typeRet = TX_NONSTANDARD;
-    vector<valtype> vSolutions;
-    if (!Solver(scriptPubKey, typeRet, vSolutions))
+    std::vector<valtype> vSolutions;
+    if (!Solver(scriptPubKey, typeRet, vSolutions, flags))
         return false;
     if (typeRet == TX_NULL_DATA)
     {
@@ -382,7 +399,7 @@ bool ExtractDestinations(const CScript &scriptPubKey,
         // Freeze TX_CLTV also here
         nRequiredRet = 1;
         CTxDestination address;
-        if (!ExtractDestination(scriptPubKey, address))
+        if (!ExtractDestination(scriptPubKey, address, flags))
             return false;
         addressRet.push_back(address);
     }
@@ -412,10 +429,23 @@ public:
         return true;
     }
 
-    bool operator()(const CScriptID &scriptID) const
+    bool operator()(const ScriptID &scriptID) const
     {
         script->clear();
-        *script << OP_HASH160 << ToByteVector(scriptID) << OP_EQUAL;
+        if (scriptID.IsP2SH_20())
+        {
+            *script << OP_HASH160 << ToByteVector(scriptID) << OP_EQUAL;
+        }
+        else if (scriptID.IsP2SH_32())
+        {
+            *script << OP_HASH256 << ToByteVector(scriptID) << OP_EQUAL;
+        }
+        else
+        {
+            // Script should be either 20 or 32 bytes
+            DbgAssert(false, );
+            return false; // not reached
+        }
         return true;
     }
 };
@@ -456,7 +486,7 @@ CScript GetScriptForFreeze(CScriptNum nFreezeLockTime, const CPubKey &pubKey)
  * Create an OP_RETURN script (thanks coinspark)
  *
  */
-CScript GetScriptLabelPublic(const string &labelPublic)
+CScript GetScriptLabelPublic(const std::string &labelPublic)
 {
     int sizeLabelPublic = labelPublic.size();
 

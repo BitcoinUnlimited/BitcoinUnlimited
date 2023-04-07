@@ -31,15 +31,17 @@ BOOST_FIXTURE_TEST_SUITE(sigopcount_tests, BasicTestingSetup)
 
 void CheckScriptSigOps(const CScript &script, uint32_t accurate_sigops, uint32_t inaccurate_sigops, uint32_t datasigops)
 {
-    const uint32_t nodatasigflags = STANDARD_SCRIPT_VERIFY_FLAGS & ~SCRIPT_ENABLE_CHECKDATASIG;
+    const uint32_t nodatasigflags =
+        (STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_P2SH_32) & ~SCRIPT_ENABLE_CHECKDATASIG;
     const uint32_t datasigflags = STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_CHECKDATASIG;
+    const bool is_p2sh_32 = datasigflags & SCRIPT_ENABLE_P2SH_32;
 
     BOOST_CHECK_EQUAL(script.GetSigOpCount(nodatasigflags, false), inaccurate_sigops);
     BOOST_CHECK_EQUAL(script.GetSigOpCount(datasigflags, false), inaccurate_sigops + datasigops);
     BOOST_CHECK_EQUAL(script.GetSigOpCount(nodatasigflags, true), accurate_sigops);
     BOOST_CHECK_EQUAL(script.GetSigOpCount(datasigflags, true), accurate_sigops + datasigops);
 
-    const CScript p2sh = GetScriptForDestination(CScriptID(script));
+    const CScript p2sh = GetScriptForDestination(ScriptID(script, is_p2sh_32));
     const CScript scriptSig = CScript() << OP_0 << Serialize(script);
     BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(nodatasigflags, scriptSig), accurate_sigops);
     BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(datasigflags, scriptSig), accurate_sigops + datasigops);
@@ -78,7 +80,8 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount)
     const CScript s3 = GetScriptForMultisig(1, keys);
     CheckScriptSigOps(s3, 3, 20, 0);
 
-    const CScript p2sh = GetScriptForDestination(CScriptID(s3));
+    const CScript p2sh =
+        GetScriptForDestination(ScriptID(s3, false /* p2sh_32 not in STANDARD_SCRIPT_VERIFY_FLAGS (yet) */));
     CheckScriptSigOps(p2sh, 0, 0, 0);
 
     CScript scriptSig2;
@@ -194,7 +197,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
     {
         CScript redeemScript = CScript() << 1 << ToByteVector(pubkey) << ToByteVector(pubkey) << 2
                                          << OP_CHECKMULTISIGVERIFY;
-        CScript scriptPubKey = GetScriptForDestination(CScriptID(redeemScript));
+        CScript scriptPubKey = GetScriptForDestination(ScriptID(redeemScript, false /* no p2sh_32 */));
         CScript scriptSig = CScript() << OP_0 << OP_0 << ToByteVector(redeemScript);
 
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig);

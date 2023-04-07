@@ -690,18 +690,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
     {
         fRequireStandard = false;
     }
-    if (fRequireStandard && !IsStandardTx(tx, reason))
-    {
-        if (debugger)
-        {
-            debugger->AddInvalidReason(reason);
-        }
-        else
-        {
-            state.SetDebugMessage("IsStandardTx failed");
-            return state.DoS(0, false, REJECT_NONSTANDARD, reason);
-        }
-    }
 
     uint32_t featureFlags = 0;
     // FIXME OP_REVERSEBYTES should be considered as always active and hence
@@ -719,7 +707,25 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         featureFlags |= SCRIPT_NATIVE_INTROSPECTION;
     }
 
+    if (IsMay2023Activated(chainparams.GetConsensus(), chainActive.Tip()))
+    {
+        featureFlags |= SCRIPT_ENABLE_P2SH_32;
+    }
+
     uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;
+
+    if (fRequireStandard && !IsStandardTx(tx, reason, flags))
+    {
+        if (debugger)
+        {
+            debugger->AddInvalidReason(reason);
+        }
+        else
+        {
+            state.SetDebugMessage("IsStandardTx failed");
+            return state.DoS(0, false, REJECT_NONSTANDARD, reason);
+        }
+    }
 
     // Disable DISALLOW_SEGWIT in case we accept non standard transactions.
     if (!fRequireStandard)
@@ -891,7 +897,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         }
 
         // Check for non-standard pay-to-script-hash in inputs
-        if (fRequireStandard && !AreInputsStandard(tx, view, may2020Enabled))
+        if (fRequireStandard && !AreInputsStandard(tx, view, may2020Enabled, flags))
         {
             if (debugger)
             {

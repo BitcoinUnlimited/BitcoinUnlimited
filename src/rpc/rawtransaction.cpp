@@ -47,12 +47,13 @@ void ScriptPubKeyToJSON(const CScript &scriptPubKey, UniValue &out, bool fInclud
     txnouttype type;
     vector<CTxDestination> addresses;
     int nRequired;
+    const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_P2SH_32;
 
     out.pushKV("asm", ScriptToAsmStr(scriptPubKey));
     if (fIncludeHex)
         out.pushKV("hex", HexStr(scriptPubKey.begin(), scriptPubKey.end()));
 
-    if (!ExtractDestinations(scriptPubKey, type, addresses, nRequired))
+    if (!ExtractDestinations(scriptPubKey, type, addresses, nRequired, flags))
     {
         out.pushKV("type", GetTxnOutputType(type));
         return;
@@ -1081,7 +1082,8 @@ UniValue decodescript(const UniValue &params, bool fHelp)
     {
         // P2SH cannot be wrapped in a P2SH. If this script is already a P2SH,
         // don't return the address for a P2SH of the P2SH.
-        r.pushKV("p2sh", EncodeDestination(CScriptID(script)));
+        r.pushKV("p2sh", EncodeDestination(ScriptID(script, false)));
+        r.pushKV("p2sh_32", EncodeDestination(ScriptID(script, true)));
     }
 
     return r;
@@ -1199,6 +1201,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
     // Fetch previous transactions (inputs):
     CCoinsView viewDummy;
     CCoinsViewCache view(&viewDummy);
+    uint32_t scriptFlags = 0;
     std::vector<CTxOut> spentCoins; // Used during script evaluation
     {
         READLOCK(mempool.cs_txmempool);
@@ -1217,6 +1220,9 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
         }
 
         view.SetBackend(viewDummy); // switch back to avoid locking mempool for too long
+                                    //
+        // Grab script flags which we will need for signature verification, etc
+        scriptFlags = GetMemPoolScriptFlags(Params().GetConsensus(), chainActive.Tip());
     }
 
     bool fGivenKeys = false;
@@ -1291,7 +1297,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
 
             // if redeemScript given and not using the local wallet (private keys
             // given), add redeemScript to the tempKeystore so it can be signed:
-            if (fGivenKeys && scriptPubKey.IsPayToScriptHash())
+            if (bool isP2SH32{}; fGivenKeys && scriptPubKey.IsPayToScriptHash(scriptFlags, nullptr, &isP2SH32))
             {
                 RPCTypeCheckObj(prevOut, {{"txid", UniValue::VSTR}, {"vout", UniValue::VNUM},
                                              {"scriptPubKey", UniValue::VSTR}, {"redeemScript", UniValue::VSTR}});
@@ -1300,7 +1306,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
                 {
                     vector<unsigned char> rsData(ParseHexV(v, "redeemScript"));
                     CScript redeemScript(rsData.begin(), rsData.end());
-                    tempKeystore.AddCScript(redeemScript);
+                    tempKeystore.AddCScript(redeemScript, isP2SH32);
                 }
             }
         }
@@ -1387,7 +1393,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if (!fHashSingle || (i < mergedTx.vout.size()))
         {
-            SignSignature(keystore, prevPubKey, mergedTx, i, amount, nHashType, sigType);
+            SignSignature(scriptFlags, keystore, prevPubKey, mergedTx, i, amount, nHashType, sigType);
         }
 
         // ... and merge in other signatures:
@@ -1397,7 +1403,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             {
                 txin.scriptSig = CombineSignatures(prevPubKey,
                     TransactionSignatureChecker(&txConst, i, amount, SCRIPT_ENABLE_SIGHASH_FORKID), txin.scriptSig,
-                    txv.vin[i].scriptSig);
+                    txv.vin[i].scriptSig, scriptFlags);
             }
             ScriptError serror = SCRIPT_ERR_OK;
             MutableTransactionSignatureChecker tsc(&mergedTx, i, amount, SCRIPT_ENABLE_SIGHASH_FORKID);
@@ -1414,7 +1420,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             for (const CMutableTransaction &txv : txVariants)
             {
                 txin.scriptSig = CombineSignatures(prevPubKey, TransactionSignatureChecker(&txConst, i, amount, 0),
-                    txin.scriptSig, txv.vin[i].scriptSig);
+                    txin.scriptSig, txv.vin[i].scriptSig, scriptFlags);
             }
             ScriptError serror = SCRIPT_ERR_OK;
             MutableTransactionSignatureChecker tsc(&mergedTx, i, amount, 0);

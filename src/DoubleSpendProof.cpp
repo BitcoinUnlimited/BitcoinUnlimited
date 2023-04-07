@@ -32,7 +32,7 @@ static bool IsPayToPubKeyHash(const CScript &script)
     txnouttype outtype = TX_NONSTANDARD;
     std::vector<CTxDestination> dests;
     int nReq = 0;
-    if (!ExtractDestinations(script, outtype, dests, nReq))
+    if (!ExtractDestinations(script, outtype, dests, nReq, 0 /* no p2sh_32 */))
         return false;
     if (outtype != TX_PUBKEYHASH || dests.size() != 1 || nReq != 1)
         return false;

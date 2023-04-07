@@ -6,6 +6,7 @@
 #include "core_io.h"
 
 #include "dstencode.h"
+#include "policy/policy.h"
 #include "primitives/transaction.h"
 #include "script/script.h"
 #include "script/standard.h"
@@ -165,12 +166,13 @@ void ScriptPubKeyToUniv(const CScript &scriptPubKey, UniValue &out, bool fInclud
     txnouttype type;
     vector<CTxDestination> addresses;
     int nRequired;
+    const uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_P2SH_32;
 
     out.pushKV("asm", ScriptToAsmStr(scriptPubKey));
     if (fIncludeHex)
         out.pushKV("hex", HexStr(scriptPubKey.begin(), scriptPubKey.end()));
 
-    if (!ExtractDestinations(scriptPubKey, type, addresses, nRequired))
+    if (!ExtractDestinations(scriptPubKey, type, addresses, nRequired, flags))
     {
         out.pushKV("type", GetTxnOutputType(type));
         return;

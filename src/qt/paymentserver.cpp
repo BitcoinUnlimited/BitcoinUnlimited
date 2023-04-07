@@ -629,7 +629,7 @@ bool PaymentServer::processPaymentRequest(const PaymentRequestPlus &request, Sen
     {
         // Extract and check destination addresses
         CTxDestination dest;
-        if (ExtractDestination(sendingTo.first, dest))
+        if (ExtractDestination(sendingTo.first, dest, 0 /* no p2sh_32 */))
         {
             // Append destination address
             addresses.append(QString::fromStdString(EncodeDestination(dest)));

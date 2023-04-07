@@ -125,6 +125,10 @@ bool ReceivedBlockTransactions(ConstCBlockRef pblock,
     const CDiskBlockPos &pos);
 
 uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params &consensusparams);
+/// Returns the script flags which are basically GetBlockScriptFlags | STANDARD_SCRIPT_VERIFY_FLAGS
+uint32_t GetMemPoolScriptFlags(const Consensus::Params &params,
+    const CBlockIndex *pindex,
+    uint32_t *nextBlockFlags = nullptr /* out param: block flags without standard */);
 
 /** Undo the effects of this block (with given index) on the UTXO set represented by coins.
  *  In case pfClean is provided, operation will try to be tolerant about errors, and *pfClean

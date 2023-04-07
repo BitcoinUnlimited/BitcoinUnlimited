@@ -200,7 +200,7 @@ void PaymentServerTests::paymentServerTests()
     for (const std::pair<CScript, CAmount>& sendingTo : sendingTos)
     {
         CTxDestination dest;
-        if (ExtractDestination(sendingTo.first, dest))
+        if (ExtractDestination(sendingTo.first, dest, 0 /* no p2sh_32 */))
             QCOMPARE(PaymentServer::verifyAmount(sendingTo.second), false);
     }
 

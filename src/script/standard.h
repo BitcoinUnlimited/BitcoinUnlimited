@@ -19,13 +19,56 @@ static const bool DEFAULT_ACCEPT_DATACARRIER = true;
 class CKeyID;
 class CScript;
 
-/** A reference to a CScript: the Hash160 of its serialization (see script.h) */
-class CScriptID : public uint160
+/** A reference to a CScript: the Hash160 or Hash256 of its serialization (see script.h) */
+class ScriptID
 {
+    using var_t = boost::variant<uint160, uint256>;
+    var_t var;
+
 public:
-    CScriptID() : uint160() {}
-    CScriptID(const CScript &in);
-    CScriptID(const uint160 &in) : uint160(in) {}
+    ScriptID() noexcept : var{uint160()} {}
+    ScriptID(const CScript &in, bool is32);
+    ScriptID(const uint160 &in) noexcept : var{in} {}
+    ScriptID(const uint256 &in) noexcept : var{in} {}
+
+    ScriptID &operator=(const uint160 &in) noexcept
+    {
+        var = in;
+        return *this;
+    }
+    ScriptID &operator=(const uint256 &in) noexcept
+    {
+        var = in;
+        return *this;
+    }
+
+    bool operator==(const ScriptID &o) const { return var == o.var; }
+    bool operator<(const ScriptID &o) const { return var < o.var; }
+    bool operator==(const uint160 &o) const { return IsP2SH_20() && boost::get<uint160>(var) == o; }
+    bool operator==(const uint256 &o) const { return IsP2SH_32() && boost::get<uint256>(var) == o; }
+
+    uint8_t *begin()
+    {
+        return boost::apply_visitor([](auto &&alt) { return alt.begin(); }, var);
+    }
+    uint8_t *end()
+    {
+        return boost::apply_visitor([](auto &&alt) { return alt.end(); }, var);
+    }
+    uint8_t *data()
+    {
+        return boost::apply_visitor([](auto &&alt) { return alt.data(); }, var);
+    }
+    const uint8_t *begin() const { return const_cast<ScriptID *>(this)->begin(); }
+    const uint8_t *end() const { return const_cast<ScriptID *>(this)->end(); }
+    const uint8_t *data() const { return const_cast<ScriptID *>(this)->data(); }
+
+    size_t size() const { return end() - begin(); }
+    uint8_t &operator[](size_t i) { return data()[i]; }
+    const uint8_t &operator[](size_t i) const { return data()[i]; }
+
+    bool IsP2SH_20() const { return boost::get<uint160>(&var) != nullptr; }
+    bool IsP2SH_32() const { return boost::get<uint256>(&var) != nullptr; }
 };
 
 static const unsigned int MAX_OP_RETURN_RELAY = 223; //! bytes (+1 for OP_RETURN, +2 for the pushdata opcodes)
@@ -75,19 +118,23 @@ public:
  * A txout script template with a specific destination. It is either:
  *  * CNoDestination: no destination set
  *  * CKeyID: TX_PUBKEYHASH destination
- *  * CScriptID: TX_SCRIPTHASH destination
- *  A CTxDestination is the internal data type encoded in a bitcoin address
+ *  * ScriptID: TX_SCRIPTHASH destination
+ *  A CTxDestination is the internal data type encoded in a Bitcoin Cash address
  */
-typedef boost::variant<CNoDestination, CKeyID, CScriptID> CTxDestination;
+using CTxDestination = boost::variant<CNoDestination, CKeyID, ScriptID>;
 
 const char *GetTxnOutputType(txnouttype t);
 
-bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, std::vector<std::vector<unsigned char> > &vSolutionsRet);
-bool ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet);
+bool Solver(const CScript &scriptPubKey,
+    txnouttype &typeRet,
+    std::vector<std::vector<unsigned char> > &vSolutionsRet,
+    uint32_t flags);
+bool ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet, uint32_t flags);
 bool ExtractDestinations(const CScript &scriptPubKey,
     txnouttype &typeRet,
     std::vector<CTxDestination> &addressRet,
-    int &nRequiredRet);
+    int &nRequiredRet,
+    uint32_t flags);
 
 const char *GetTxnOutputType(txnouttype t);
 bool IsValidDestination(const CTxDestination &dest);

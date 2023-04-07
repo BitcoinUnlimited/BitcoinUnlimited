@@ -800,7 +800,20 @@ public:
      */
     unsigned int GetSigOpCount(const uint32_t flags, const CScript &scriptSig) const;
 
-    bool IsPayToScriptHash() const;
+    /**
+     * @brief IsPayToScriptHash - Returns true if this script follows the p2sh_20 (or p2sh_32) scriptPubKey template.
+     * @param flags - If SCRIPT_ENABLE_P2SH_32 is in flags, then we will also detect p2sh_32, otherwise we will never
+     *                detect p2sh_32 and return false for any p2sh_32 scriptPubKeys.
+     * @param hash_out - Optional out param. If not nullptr, and if the return value is true, then *hash_out will
+     *                   receive a copy of the actual hash bytes embedded in the scriptPubKey. Note that *hash_out is
+     *                   not modified on false return, and is only modified on true return.
+     * @param is_p2sh_32 - Optional out param.  If not nullptr, *is_p2sh_32 is set to false always unless
+     *                     SCRIPT_ENABLE_P2SH_32 is set in `flags` and the scriptPubKey in question follows the p2sh_32,
+     *                     scriptPubKey template, in which case *is_p2sh_32 is set to true.
+     * @return true if the script is p2sh_20, or true if flags contains SCRIPT_ENABLE_P2SH_32 and the script is p2sh_32,
+     *         false otherwise.
+     */
+    bool IsPayToScriptHash(uint32_t flags, std::vector<uint8_t> *hash_out = nullptr, bool *is_p2sh_32 = nullptr) const;
     bool IsWitnessProgram(int &version, std::vector<uint8_t> &program) const;
     bool IsWitnessProgram() const;
 

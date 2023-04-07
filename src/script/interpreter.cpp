@@ -2440,7 +2440,7 @@ bool VerifyScript(const CScript &scriptSig,
     }
 
     // Additional validation for spend-to-script-hash transactions:
-    if ((flags & SCRIPT_VERIFY_P2SH) && scriptPubKey.IsPayToScriptHash())
+    if (bool p2sh_32; (flags & SCRIPT_VERIFY_P2SH) && scriptPubKey.IsPayToScriptHash(flags, nullptr, &p2sh_32))
     {
         // scriptSig must be literals-only or validation fails
         if (!scriptSig.IsPushOnly())
@@ -2460,9 +2460,15 @@ bool VerifyScript(const CScript &scriptSig,
         sm.PopStack();
 
         // Bail out early if SCRIPT_DISALLOW_SEGWIT_RECOVERY is not set, the
-        // redeem script is a p2sh segwit program, and it was the only item
+        // redeem script is a p2sh_20 segwit program, and it was the only item
         // pushed onto the stack.
-        if ((flags & SCRIPT_DISALLOW_SEGWIT_RECOVERY) == 0 && sm.getStack().empty() && pubKey2.IsWitnessProgram())
+        //
+        // Note; We *never* allow this "unconditional" segwit recovery for
+        // p2sh_32 since segwit funds can only be inadvertently locked into
+        // p2sh_20 (legacy BTC) scripts, thus this special case for segwit
+        // recovery should never apply to p2sh_32.
+        if ((flags & SCRIPT_DISALLOW_SEGWIT_RECOVERY) == 0 && !p2sh_32 && sm.getStack().empty() &&
+            pubKey2.IsWitnessProgram())
         {
             return set_success(serror);
         }

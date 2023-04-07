@@ -768,6 +768,7 @@ UniValue getreceivedbyaccount(const UniValue &params, bool fHelp)
 
     // Tally
     CAmount nAmount = 0;
+    const uint32_t scriptFlags = GetMemPoolScriptFlags(Params().GetConsensus(), chainActive.Tip());
     for (map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end();
          ++it)
     {
@@ -778,8 +779,8 @@ UniValue getreceivedbyaccount(const UniValue &params, bool fHelp)
         for (const CTxOut &txout : wtx.vout)
         {
             CTxDestination address;
-            if (ExtractDestination(txout.scriptPubKey, address) && IsMine(*pwalletMain, address, chainActive.Tip()) &&
-                setAddress.count(address))
+            if (ExtractDestination(txout.scriptPubKey, address, scriptFlags) &&
+                IsMine(*pwalletMain, address, chainActive.Tip()) && setAddress.count(address))
                 if (wtx.GetDepthInMainChain() >= nMinDepth)
                     nAmount += txout.nValue;
         }
@@ -1265,8 +1266,8 @@ UniValue addmultisigaddress(const UniValue &params, bool fHelp)
 
     // Construct using pay-to-script-hash:
     CScript inner = _createmultisig_redeemScript(params);
-    CScriptID innerID(inner);
-    pwalletMain->AddCScript(inner);
+    ScriptID innerID(inner, false /* no p2sh_32 in wallet */);
+    pwalletMain->AddCScript(inner, false /* no p2sh_32 in wallet */);
 
     pwalletMain->SetAddressBook(innerID, strAccount, "send");
     return EncodeDestination(innerID);
@@ -1306,6 +1307,7 @@ UniValue ListReceived(const UniValue &params, bool fByAccounts)
 
     // Tally
     std::map<CTxDestination, tallyitem> mapTally;
+    const uint32_t scriptFlags = GetMemPoolScriptFlags(Params().GetConsensus(), chainActive.Tip());
     for (std::map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end();
          ++it)
     {
@@ -1322,7 +1324,7 @@ UniValue ListReceived(const UniValue &params, bool fByAccounts)
         for (const CTxOut &txout : wtx.vout)
         {
             CTxDestination address;
-            if (!ExtractDestination(txout.scriptPubKey, address))
+            if (!ExtractDestination(txout.scriptPubKey, address, scriptFlags))
                 continue;
 
             isminefilter mine = IsMine(*pwalletMain, address, chainActive.Tip());
@@ -2794,6 +2796,7 @@ UniValue listunspent(const UniValue &params, bool fHelp)
     // cause AvailableCoins to give inconsistent results
     LOCK2(cs_main, pwalletMain->cs_wallet);
     pwalletMain->AvailableCoins(vecOutputs, false, nullptr, true);
+    const uint32_t scriptFlags = GetMemPoolScriptFlags(Params().GetConsensus(), chainActive.Tip());
     for (const COutput &out : vecOutputs)
     {
         if (out.nDepth < nMinDepth || out.nDepth > nMaxDepth)
@@ -2802,7 +2805,7 @@ UniValue listunspent(const UniValue &params, bool fHelp)
         if (destinations.size())
         {
             CTxDestination address;
-            if (!ExtractDestination(out.tx->vout[out.i].scriptPubKey, address))
+            if (!ExtractDestination(out.tx->vout[out.i].scriptPubKey, address, scriptFlags))
                 continue;
 
             if (!destinations.count(address))
@@ -2815,19 +2818,19 @@ UniValue listunspent(const UniValue &params, bool fHelp)
         entry.pushKV("txid", out.tx->GetHash().GetHex());
         entry.pushKV("vout", out.i);
         CTxDestination address;
-        if (ExtractDestination(out.tx->vout[out.i].scriptPubKey, address))
+        if (ExtractDestination(out.tx->vout[out.i].scriptPubKey, address, scriptFlags))
         {
             entry.pushKV("address", EncodeDestination(address));
             if (pwalletMain->mapAddressBook.count(address))
                 entry.pushKV("account", pwalletMain->mapAddressBook[address].name);
         }
         entry.pushKV("scriptPubKey", HexStr(pk.begin(), pk.end()));
-        if (pk.IsPayToScriptHash())
+        if (pk.IsPayToScriptHash(scriptFlags))
         {
             CTxDestination address2;
-            if (ExtractDestination(pk, address2))
+            if (ExtractDestination(pk, address2, scriptFlags))
             {
-                const CScriptID &hash = boost::get<CScriptID>(address2);
+                const ScriptID &hash = boost::get<ScriptID>(address2);
                 CScript redeemScript;
                 if (pwalletMain->GetCScript(hash, redeemScript))
                     entry.pushKV("redeemScript", HexStr(redeemScript.begin(), redeemScript.end()));

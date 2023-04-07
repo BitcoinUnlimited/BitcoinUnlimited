@@ -70,17 +70,24 @@ public:
 };
 
 /** Produce a script signature using a generic signature creator. */
-bool ProduceSignature(const BaseSignatureCreator &creator, const CScript &scriptPubKey, CScript &scriptSig);
+bool ProduceSignature(const BaseSignatureCreator &creator,
+    const CScript &scriptPubKey,
+    CScript &scriptSig,
+    uint32_t scriptFlags);
 
 /** Produce a script signature for a transaction. */
-bool SignSignature(const CKeyStore &keystore,
+bool SignSignature(uint32_t scriptFlags,
+    const CKeyStore &keystore,
     const CScript &fromPubKey,
     CMutableTransaction &txTo,
     unsigned int nIn,
     const CAmount &amount,
     uint32_t nHashType = SIGHASH_ALL | SIGHASH_FORKID,
     uint32_t nSigType = SIGTYPE_ECDSA);
-bool SignSignature(const CKeyStore &keystore,
+bool SignSignature(
+
+    uint32_t scriptFlags,
+    const CKeyStore &keystore,
     const CTransaction &txFrom,
     CMutableTransaction &txTo,
     unsigned int nIn,
@@ -91,7 +98,8 @@ bool SignSignature(const CKeyStore &keystore,
 CScript CombineSignatures(const CScript &scriptPubKey,
     const BaseSignatureChecker &checker,
     const CScript &scriptSig1,
-    const CScript &scriptSig2);
+    const CScript &scriptSig2,
+    const uint32_t scriptFlags);
 
 template <typename BYTEARRAY>
 std::vector<unsigned char> signmessage(const BYTEARRAY &data, const CKey &key)

@@ -219,7 +219,7 @@ bool CBloomFilter::MatchAndInsertOutputs(const CTransactionRef &tx)
                 {
                     txnouttype type;
                     vector<vector<unsigned char> > vSolutions;
-                    if (Solver(txout.scriptPubKey, type, vSolutions) &&
+                    if (Solver(txout.scriptPubKey, type, vSolutions, 0 /* no p2sh_32 */) &&
                         (type == TX_PUBKEY || type == TX_MULTISIG || type == TX_CLTV))
                         insert(COutPoint(hash, i));
                 }

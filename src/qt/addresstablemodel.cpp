@@ -383,7 +383,8 @@ QString AddressTableModel::addRow(const QString &type,
         // Generate and load freeze script if nFreezeLockTime > 0
         if (nFreezeLockTime > 0)
         {
-            if (!wallet->LoadFreezeScript(newKey, nFreezeLockTime, strLabel, strAddress))
+            if (!wallet->LoadFreezeScript(
+                    newKey, nFreezeLockTime, strLabel, strAddress, false /* no p2sh_32 support in wallet */))
                 return QString();
         }
         else
