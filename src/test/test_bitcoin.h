@@ -77,7 +77,7 @@ struct TestChain100Setup : public TestingSetup
     // scriptPubKey, and try to add it to the current chain.
     CBlock CreateAndProcessBlock(const std::vector<CMutableTransaction> &txns, const CScript &scriptPubKey);
 
-    ~TestChain100Setup();
+    virtual ~TestChain100Setup();
 
     std::vector<CTransaction> coinbaseTxns; // For convenience, coinbase transactions
     CKey coinbaseKey; // private/public key needed to spend coinbase transactions
