@@ -9,26 +9,48 @@
 #include "config.h"
 #include "script/standard.h"
 
-std::string EncodeDestination(const CTxDestination &dst, const CChainParams &params, const Config &cfg)
+std::string EncodeDestination(const CTxDestination &dst,
+    const CChainParams &params,
+    const Config &cfg,
+    bool tokenAwareAddress)
 {
-    return cfg.UseCashAddrEncoding() ? EncodeCashAddr(dst, params) : EncodeLegacyAddr(dst, params);
+    if (cfg.UseCashAddrEncoding())
+    {
+        return EncodeCashAddr(dst, params, tokenAwareAddress);
+    }
+    if (tokenAwareAddress)
+    {
+        throw std::runtime_error("Legacy addresses don't support token-awareness");
+    }
+    return EncodeLegacyAddr(dst, params);
 }
 
-CTxDestination DecodeDestination(const std::string &addr, const CChainParams &params)
+CTxDestination DecodeDestination(const std::string &addr, const CChainParams &params, bool *tokenAwareAddressOut)
 {
-    CTxDestination dst = DecodeCashAddr(addr, params);
+    CTxDestination dst = DecodeCashAddr(addr, params, tokenAwareAddressOut);
     if (IsValidDestination(dst))
     {
         return dst;
     }
+    if (tokenAwareAddressOut)
+        *tokenAwareAddressOut = false; // legacy is never a token-aware address
     return DecodeLegacyAddr(addr, params);
 }
 
-bool IsValidDestinationString(const std::string &addr, const CChainParams &params)
+bool IsValidDestinationString(const std::string &addr, const CChainParams &params, bool *tokenAwareAddressOut)
 {
-    return IsValidDestination(DecodeDestination(addr, params));
+    return IsValidDestination(DecodeDestination(addr, params, tokenAwareAddressOut));
 }
 
-std::string EncodeDestination(const CTxDestination &dst) { return EncodeDestination(dst, Params(), GetConfig()); }
-CTxDestination DecodeDestination(const std::string &addr) { return DecodeDestination(addr, Params()); }
-bool IsValidDestinationString(const std::string &addr) { return IsValidDestinationString(addr, Params()); }
+std::string EncodeDestination(const CTxDestination &dst, bool tokenAwareAddress)
+{
+    return EncodeDestination(dst, Params(), GetConfig(), tokenAwareAddress);
+}
+CTxDestination DecodeDestination(const std::string &addr, bool *tokenAwareAddressOut)
+{
+    return DecodeDestination(addr, Params(), tokenAwareAddressOut);
+}
+bool IsValidDestinationString(const std::string &addr, bool *tokenAwareAddressOut)
+{
+    return IsValidDestinationString(addr, Params(), tokenAwareAddressOut);
+}
