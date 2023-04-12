@@ -1931,8 +1931,6 @@ bool AcceptBlock(ConstCBlockRef pblock,
 
 uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params &consensusparams)
 {
-    AssertLockHeld(cs_main);
-
     uint32_t flags = SCRIPT_VERIFY_NONE;
 
     // Start enforcing P2SH (Bip16)
@@ -1979,7 +1977,7 @@ uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params 
     // Since Nov 15, 2018 HF activates sig push only, clean stack rules
     // are enforced and CHECKDATASIG has been introduced on the BCH chain
     // (see  BIP 62 and CHECKDATASIG specification or more details)
-    if (IsNov2018Activated(consensusparams, chainActive.Tip()))
+    if (IsNov2018Activated(consensusparams, pindex->pprev))
     {
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
         flags |= SCRIPT_VERIFY_CLEANSTACK;

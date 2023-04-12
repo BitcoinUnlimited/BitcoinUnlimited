@@ -471,3 +471,14 @@ class P2SH32Test(BitcoinTestFramework):
 
 if __name__ == '__main__':
     P2SH32Test().main()
+
+from test_framework.util import standardFlags
+# Create a convenient function for an interactive python debugging session
+def Test():
+    t = P2SH32Test()
+    t.drop_to_pdb = True
+    bitcoinConf = {
+        "debug": ["net", "blk", "thin", "mempool", "req", "bench", "evict"],
+    }
+    flags = standardFlags()
+    t.main(flags, bitcoinConf, None)
