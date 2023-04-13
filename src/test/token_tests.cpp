@@ -114,7 +114,8 @@ struct TestVector_PrefixTokenEncoding_Valid {
 
 static std::vector<TestVector_PrefixTokenEncoding_Valid> GenVectors_PrefixTokenEncoding_Valid() {
     std::string spkHex;
-    const std::string expectedId{HexStr(std::vector(32, uint8_t(0xbb)))};
+    const std::vector<uint8_t> v(32, 0xbb);
+    const std::string expectedId{HexStr(v)};
     auto genSpk = [&spkHex] { return spkHex = GenRandomScriptPubKeyHexForAStandardDestination(); };
     return {{
         { "no NFT; 1 fungible", // name
@@ -374,7 +375,8 @@ BOOST_AUTO_TEST_CASE(prefix_token_encoding_test_vectors_valid) {
         BOOST_TEST_MESSAGE("Generated txo: " + txo.ToString());
 
         std::vector<uint8_t> vch;
-        GenericVectorWriter(SER_NETWORK, INIT_PROTO_VERSION, vch, 0) << CTxOutCompressor(txo);
+        GenericVectorWriter gvw{SER_NETWORK, INIT_PROTO_VERSION, vch, 0};
+        gvw << CTxOutCompressor(txo);
         BOOST_CHECK(bool(txo.tokenDataPtr));
         const size_t uncomp_size = GetSerializeSize(txo, SER_NETWORK, INIT_PROTO_VERSION);
         const ssize_t bytes_saved_with_token = ssize_t(uncomp_size) - ssize_t(vch.size());
@@ -397,7 +399,8 @@ BOOST_AUTO_TEST_CASE(prefix_token_encoding_test_vectors_valid) {
         txo2.SetNull();
         BOOST_CHECK(txo != txo2);
         vch.clear();
-        GenericVectorWriter(SER_NETWORK, INIT_PROTO_VERSION, vch, 0) << CTxOutCompressor(txo);
+        GenericVectorWriter gvw2{SER_NETWORK, INIT_PROTO_VERSION, vch, 0};
+        gvw2 << CTxOutCompressor(txo);
         const size_t uncomp_size2 = GetSerializeSize(txo, SER_NETWORK, INIT_PROTO_VERSION);
         const ssize_t bytes_saved_no_token = ssize_t(uncomp_size2) - ssize_t(vch.size());
         BOOST_CHECK(bytes_saved_no_token >= 0);
@@ -447,7 +450,8 @@ BOOST_AUTO_TEST_CASE(txout_compressor_edge_case) {
         if (i) txo.scriptPubKey.resize(MAX_SCRIPT_SIZE + 1, 0xff);
         txo.tokenDataPtr = pdata;
         std::vector<uint8_t> buffer;
-        GenericVectorWriter(SER_NETWORK, INIT_PROTO_VERSION, buffer, 0) << CTxOutCompressor(txo);
+        GenericVectorWriter gvw{SER_NETWORK, INIT_PROTO_VERSION, buffer, 0};
+        gvw << CTxOutCompressor(txo);
         GenericVectorReader vr(SER_NETWORK, INIT_PROTO_VERSION, buffer, 0);
         BOOST_CHECK_NO_THROW(::Unserialize(vr, REF(CTxOutCompressor(txo2))));
         if (!i) {
@@ -491,7 +495,8 @@ BOOST_AUTO_TEST_CASE(prefix_token_encoding_test_vectors_invalid) {
                 BOOST_CHECK(!txo.tokenDataPtr);
                 BOOST_CHECK(!txo.IsNull());
                 BOOST_CHECK(txo.HasUnparseableTokenData());
-                GenericVectorWriter(SER_NETWORK, INIT_PROTO_VERSION, compressedTxoVec, 0) << CTxOutCompressor(txo);
+                GenericVectorWriter gvw{SER_NETWORK, INIT_PROTO_VERSION, compressedTxoVec, 0};
+                gvw << CTxOutCompressor(txo);
                 token::last_unwrap_exception.reset();
                 CTxOut txo2;
                 BOOST_CHECK(txo != txo2);
@@ -512,7 +517,8 @@ BOOST_AUTO_TEST_CASE(prefix_token_encoding_test_vectors_invalid) {
             BOOST_TEST_MESSAGE("Doing ser/unser test for 'invalid' test vector: \"" + name + "\" ...");
             {
                 std::vector<uint8_t> serializedTxoVec;
-                GenericVectorWriter(SER_NETWORK, INIT_PROTO_VERSION, serializedTxoVec, 0) << txo;
+                GenericVectorWriter gvw{SER_NETWORK, INIT_PROTO_VERSION, serializedTxoVec, 0};
+                gvw << txo;
                 BOOST_CHECK(serializedTxoVec.size() > compressedTxoVec.size());
                 CTxOut txo2;
                 BOOST_CHECK(txo != txo2);
@@ -877,7 +883,8 @@ BOOST_AUTO_TEST_CASE(check_consensus_misc_activation) {
         auto hextxo = "0102030000000000" + HexStr(csize) + spk;
         const auto txodata = ParseHex(hextxo);
         CTxOut txo;
-        GenericVectorReader(SER_NETWORK, INIT_PROTO_VERSION, txodata, 0) >> txo;
+        GenericVectorReader gvr(SER_NETWORK, INIT_PROTO_VERSION, txodata, 0);
+        gvr >> txo;
         tx.vout.emplace_back(txo);
         tx.nLockTime = 0;
         BOOST_CHECK(txo.HasUnparseableTokenData());
@@ -907,7 +914,8 @@ BOOST_AUTO_TEST_CASE(check_consensus_misc_activation) {
         auto hextxo = "0102030000000000" + HexStr(csize) + spk;
         const auto txodata = ParseHex(hextxo);
         CTxOut txoIn;
-        GenericVectorReader(SER_NETWORK, INIT_PROTO_VERSION, txodata, 0) >> txoIn;
+        GenericVectorReader gvr(SER_NETWORK, INIT_PROTO_VERSION, txodata, 0);
+        gvr >> txoIn;
         CTxOut txoOut(txoIn.nValue, CScript() << OP_1);
         tx.vout.emplace_back(txoOut);
         tx.nLockTime = 0;
