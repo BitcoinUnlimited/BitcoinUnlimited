@@ -23,7 +23,8 @@ namespace
 {
 std::vector<std::string> GetNetworks()
 {
-    return {CBaseChainParams::MAIN, CBaseChainParams::TESTNET, CBaseChainParams::REGTEST};
+    return {CBaseChainParams::MAIN, CBaseChainParams::TESTNET, CBaseChainParams::UNL, CBaseChainParams::TESTNET4,
+        CBaseChainParams::SCALENET, CBaseChainParams::CHIPNET, CBaseChainParams::REGTEST};
 }
 
 uint160 insecure_GetRandUInt160(FastRandomContext &rand)
@@ -151,18 +152,23 @@ BOOST_AUTO_TEST_CASE(invalid_on_wrong_network)
     {
         for (auto otherNet : GetNetworks())
         {
-            if (net == otherNet)
+            const auto netParams = Params(net);
+            const auto otherNetParams = Params(otherNet);
+
+            if (netParams.CashAddrPrefix() == otherNetParams.CashAddrPrefix())
+            {
+                // networks such as scalenet, testnet4, testnet3, and chipnet all have the same prefix, so skip
                 continue;
+            }
 
             for (int tokenAware = 0; tokenAware < 2; ++tokenAware)
             {
-                const auto netParams = Params(net);
                 std::string encoded = EncodeCashAddr(dst, netParams, tokenAware);
 
-                const auto otherNetParams = Params(otherNet);
                 CTxDestination decoded = DecodeCashAddr(encoded, otherNetParams);
                 BOOST_CHECK(decoded != dst);
-                BOOST_CHECK(decoded == invalidDst);
+                BOOST_CHECK_MESSAGE(decoded == invalidDst,
+                    strprintf("Checking that addresses for net \"%s\" are invalid for net \"%s\"", net, otherNet));
             }
         }
     }

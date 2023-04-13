@@ -70,5 +70,6 @@ static const int MAX_URI_LENGTH = 255;
 #define QAPP_APP_NAME_SCALENET "Bitcoin-Qt-scalenet"
 #define QAPP_APP_NAME_NOLNET "Bitcoin-Qt-nolimit" // BU
 #define QAPP_APP_NAME_BUCASH "Bitcoin-Qt-BUcash"
+#define QAPP_APP_NAME_CHIPNET "Bitcoin-Qt-chipnet"
 
 #endif // BITCOIN_QT_GUICONSTANTS_H

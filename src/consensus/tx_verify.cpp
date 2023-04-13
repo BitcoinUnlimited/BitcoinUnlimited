@@ -42,7 +42,7 @@ uint64_t GetMinimumTxSize(const Consensus::Params &params, const CBlockIndex *pi
     {
         return MIN_TX_SIZE_UPGRADE9;
     }
-    else if (IsMay2020Activated(params, pindexPrev))
+    else if (IsNov2018Activated(params, pindexPrev))
     {
         return MIN_TX_SIZE_MAGNETIC_ANOMALY;
     }

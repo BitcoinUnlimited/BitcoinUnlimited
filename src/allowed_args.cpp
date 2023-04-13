@@ -247,6 +247,7 @@ static void addChainSelectionOptions(AllowedArgs &allowedArgs)
         .addArg("testnet", optionalBool, _("Use the test3 chain"))
         .addArg("testnet4", optionalBool, _("Use the test4 chain"))
         .addArg("scalenet", optionalBool, _("Use the scaling test chain"))
+        .addArg("chipnet", optionalBool, _("Use the upcoming upgrade activation chain"))
         .addDebugArg("regtest", optionalBool,
             "Enter regression test mode, which uses a special chain in which blocks can be solved instantly. "
             "This is intended for regression testing tools and app development.");
@@ -389,9 +390,9 @@ static void addConnectionOptions(AllowedArgs &allowedArgs)
             strprintf("Enforce minimum protocol version to limit use of bloom filters (default: %u)", 0))
         .addArg("port=<port>", requiredInt,
             strprintf(_("Listen for connections on <port> (default: %u, "
-                        "testnet: %u, testnet4: %u, scalenet: %u, nol: %u, regtest: %u)"),
+                        "testnet: %u, testnet4: %u, scalenet: %u, nol: %u, chipnet: %u, regtest: %u)"),
                 DEFAULT_MAINNET_PORT, DEFAULT_TESTNET_PORT, DEFAULT_TESTNET4_PORT, DEFAULT_SCALENET_PORT,
-                DEFAULT_NOLNET_PORT, DEFAULT_REGTESTNET_PORT))
+                DEFAULT_NOLNET_PORT, DEFAULT_CHIPNET_PORT, DEFAULT_REGTESTNET_PORT))
         .addArg("proxy=<ip:port>", requiredStr, _("Connect through SOCKS5 proxy"))
         .addArg("proxyrandomize", optionalBool,
             strprintf(
@@ -700,10 +701,11 @@ static void addRpcServerOptions(AllowedArgs &allowedArgs)
               "specified multiple times"))
         .addArg("rpcport=<port>", requiredInt,
             strprintf(_("Listen for JSON-RPC connections on <port> (default: %u, testnet: %u, testnet4: %u, scalenet: "
-                        "%u, nol: %u, regtest: %u)"),
+                        "%u, nol: %u, chipnet: %u, regtest: %u)"),
                 BaseParams(CBaseChainParams::MAIN).RPCPort(), BaseParams(CBaseChainParams::TESTNET).RPCPort(),
                 BaseParams(CBaseChainParams::TESTNET4).RPCPort(), BaseParams(CBaseChainParams::SCALENET).RPCPort(),
-                BaseParams(CBaseChainParams::UNL).RPCPort(), BaseParams(CBaseChainParams::REGTEST).RPCPort()))
+                BaseParams(CBaseChainParams::UNL).RPCPort(), BaseParams(CBaseChainParams::CHIPNET).RPCPort(),
+                BaseParams(CBaseChainParams::REGTEST).RPCPort()))
         .addArg("rpcallowip=<ip>", requiredStr,
             _("Allow JSON-RPC connections from specified source. Valid for <ip> are a single IP (e.g. 1.2.3.4), a "
               "network/netmask (e.g. 1.2.3.4/255.255.255.0) or a network/CIDR (e.g. 1.2.3.4/24). This option can be "
