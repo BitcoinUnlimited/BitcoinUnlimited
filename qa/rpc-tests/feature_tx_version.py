@@ -175,10 +175,10 @@ class TxVersionTest(BitcoinTestFramework):
 
         # Post-Upgrade9 Test: The below function call creates 2 txns that have nVersion=1 and nVersion=2, sends them to
         # the mempool -- they should be accepted ok and mined ok.  It also creates 3 txns that have nVersion out of
-        # range, sends them to mempool -- they should be rejected as out of consensus. It returns the 3 out-of-bounds
-        # txns.
+        # range, sends them to mempool -- they should be still be rejected non-standard (can removed from standardness after upgrade9).
+        # It returns the 3 out-of-bounds txns.
 
-        tx3, tx0, tx123456 = create_various_version_txns_and_test(REJECT_REASON_CONSENSUS)
+        tx3, tx0, tx123456 = create_various_version_txns_and_test(REJECT_REASON_STANDARDNESS)
 
         # This time, under Upgrade9, the same txns should be REJECTED if mined in a block
         for bad_tx in (tx3, tx0, tx123456):
