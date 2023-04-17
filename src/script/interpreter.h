@@ -284,6 +284,31 @@ public:
     {
     }
     ScriptImportedState() {}
+
+    /// Get a reference to the coin being spent for input at index `inputIdx`.
+    ///
+    /// Returned coin may be be IsSpent() if coin is missing (such as in a *limited* context
+    /// where all sibling coin info is unavailable).
+    const CTxOut &coin(unsigned int inputIdx) const
+    {
+        // Defensive programming: A class invariant is that the number of coins equals the number of
+        // inputs in tx().vin().  However, we use .at() here in case the underlying tx is mutable and
+        // is being misused.. and it mutates such that there are now more inputs in the tx than there
+        // are coins in our coins view.
+        return spentCoins.at(inputIdx);
+    }
+
+    /// Get the coin (utxo) token data for this input or any input. Returned wrapped pointer
+    /// may be nullptr if input has no token data.
+    ///
+    const token::OutputDataPtr &coinTokenData(unsigned int inputIdx) const { return coin(inputIdx).tokenDataPtr; }
+
+    /// Get the amount for this input or any input.
+    ///
+    const CAmount &coinAmount(unsigned int inputIdx) const { return coin(inputIdx).nValue; }
+
+    /// Get the scriptSig for this input or any input (tx().vin[i].scriptSig)
+    const CScript &scriptSig(unsigned int inputIdx) const { return tx->vin.at(inputIdx).scriptSig; }
 };
 
 class ScriptImportedStateSig : public ScriptImportedState

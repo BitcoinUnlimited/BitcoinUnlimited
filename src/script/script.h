@@ -249,11 +249,11 @@ enum opcodetype
     OP_UTXOTOKENAMOUNT = 0xd0,
     OP_OUTPUTTOKENCATEGORY = 0xd1,
     OP_OUTPUTTOKENCOMMITMENT = 0xd2,
+    OP_OUTPUTTOKENAMOUNT = 0xd3,
 
     OP_RESERVED3 = 0xd4,
     OP_RESERVED4 = 0xd5,
 
-    OP_OUTPUTTOKENAMOUNT = 0xd3,
     // The first op_code value after all defined opcodes
     FIRST_UNDEFINED_OP_VALUE,
 
