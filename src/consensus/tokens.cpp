@@ -143,7 +143,8 @@ bool CheckTxTokens(const CTransaction &tx, CValidationState &state, const TokenC
         Map<token::Id, size_t> inputMutables; // id -> count map seen in inputs that have "Mutable" capability (0x02)
         // Note: for `NFT`, we use a reference here to save on redundant copying. Assumption is that all the
         // commitments in the ins are unchanging heap data (true assumption currently).
-        using NFT = std::tuple<const token::NFTCommitment &>;
+        // Note BU: This assumption does not hold for current prevector implentation in BCHUnlimited, so take the copy hit.
+        using NFT = std::tuple<const token::NFTCommitment>;
         Map<token::Id, Map<NFT, size_t>> inputImmutables; // id -> NFT -> count seen in inputs
 
         // Scan the inputs, tallying amounts seen and NFTs seen
