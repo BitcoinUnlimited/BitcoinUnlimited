@@ -78,7 +78,7 @@ static const unsigned int STANDARD_NOT_MANDATORY_VERIFY_FLAGS =
 /** Used as the flags parameter to sequence and nLocktime checks in non-consensus code. */
 static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS = LOCKTIME_VERIFY_SEQUENCE | LOCKTIME_MEDIAN_TIME_PAST;
 
-bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType, uint32_t flags);
+bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType, uint32_t flags, std::string* reason = nullptr);
 
 /**
  * Check for standard transaction types

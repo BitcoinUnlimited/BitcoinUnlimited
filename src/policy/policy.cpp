@@ -33,7 +33,7 @@
  *   DUP CHECKSIG DROP ... repeated 100 times... OP_1
  */
 
-bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType, uint32_t flags)
+bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType, uint32_t flags, std::string* reason)
 {
     std::vector<std::vector<unsigned char> > vSolutions;
     if (!Solver(scriptPubKey, whichType, vSolutions, flags))
@@ -57,7 +57,12 @@ bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType, uint32_t fla
     else if (whichType == TX_NULL_DATA || whichType == TX_LABELPUBLIC)
     {
         if (!fAcceptDatacarrier || scriptPubKey.size() > nMaxDatacarrierBytes)
+        {
+            if (reason != nullptr)
+                *reason = "oversize-op-return";
+
             return false;
+        }
     }
 
     return whichType != TX_NONSTANDARD;
@@ -119,9 +124,11 @@ bool IsStandardTx(const CTransactionRef &tx, std::string &reason, uint32_t flags
             return false;
         }
 
-        if (!::IsStandard(txout.scriptPubKey, whichType, flags))
+        if (!::IsStandard(txout.scriptPubKey, whichType, flags, &reason))
         {
-            reason = "scriptpubkey";
+            if (reason.empty()) {
+                reason = "scriptpubkey";
+            }
             return false;
         }
 
