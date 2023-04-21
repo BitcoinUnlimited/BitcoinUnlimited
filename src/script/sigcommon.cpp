@@ -32,6 +32,14 @@ uint256 GetPrevoutHash(const CTransaction &txTo)
     return ss.GetHash();
 }
 
+uint256 GetUtxosHash(const ScriptImportedState &context)
+{
+    CHashWriter ss(SER_GETHASH, 0);
+    for (auto &txout : context.spentCoins)
+        ss << txout;
+    return ss.GetHash();
+}
+
 uint256 GetSequenceHash(const CTransaction &txTo)
 {
     CHashWriter ss(SER_GETHASH, 0);
@@ -215,11 +223,13 @@ static uint256 SignatureHashBitcoinCash(const CScript &scriptCode,
     unsigned int nIn,
     uint32_t nHashType,
     const CAmount &amount,
-    size_t *nHashedOut)
+    size_t *nHashedOut,
+    const ScriptImportedState *sis)
 {
     uint256 hashPrevouts;
     uint256 hashSequence;
     uint256 hashOutputs;
+    uint256 hashUtxos;
 
     if (!(nHashType & SIGHASH_ANYONECANPAY))
     {
@@ -231,6 +241,7 @@ static uint256 SignatureHashBitcoinCash(const CScript &scriptCode,
     {
         hashSequence = GetSequenceHash(txTo);
     }
+
 
     if ((nHashType & 0x1f) != SIGHASH_SINGLE && (nHashType & 0x1f) != SIGHASH_NONE)
     {
@@ -248,11 +259,42 @@ static uint256 SignatureHashBitcoinCash(const CScript &scriptCode,
     ss << txTo.nVersion;
     // Input prevouts/nSequence (none/all, depending on flags)
     ss << hashPrevouts;
+
+    if (nHashType & SIGHASH_UTXOS)
+    {
+        assert(sis != nullptr);
+        if (sis->flags & SCRIPT_ENABLE_TOKENS)
+        {
+            hashUtxos = GetUtxosHash(*sis);
+            ss << hashUtxos;
+        }
+    }
+
     ss << hashSequence;
     // The input being signed (replacing the scriptSig with scriptCode +
     // amount). The prevout may already be contained in hashPrevout, and the
     // nSequence may already be contain in hashSequence.
     ss << txTo.vin[nIn].prevout;
+
+    if (sis != nullptr && !sis->spentCoins.empty())
+    {
+        // In the context of ProduceSignature, as implemented, the spentCoins is empty.
+        // We do not have this context.
+
+        if (sis->coinTokenData(nIn) && (sis->flags & SCRIPT_ENABLE_TOKENS))
+        {
+            // New! For tokens (Upgrade9). If we had tokenData we inject it as a blob of:
+            //    token::PREFIX_BYTE + ser_token_data
+            // right *before* scriptCode's length byte.  This *intentionally* makes it so that unupgraded software
+            // cannot send tokens (and thus cannot unintentionally burn tokens).
+            //
+            // Note: The serialization operation for token::OutputData may throw if the data it is serializing is not
+            // sane.  The data will always be sane when verifying or producing sigs in production. However, the below
+            // may throw in tests that intentionally sabotage the tokenData to be inconsistent.
+            ss << token::PREFIX_BYTE << *sis->coinTokenData(nIn);
+        }
+    }
+
     ss << static_cast<const CScriptBase &>(scriptCode);
     ss << amount;
     ss << txTo.vin[nIn].nSequence;
@@ -274,11 +316,12 @@ uint256 SignatureHash(const CScript &scriptCode,
     unsigned int nIn,
     uint32_t nHashType,
     const CAmount &amount,
-    size_t *nHashedOut)
+    size_t *nHashedOut,
+    const ScriptImportedState *sis)
 {
     if (nHashType & SIGHASH_FORKID)
     {
-        return SignatureHashBitcoinCash(scriptCode, txTo, nIn, nHashType, amount, nHashedOut);
+        return SignatureHashBitcoinCash(scriptCode, txTo, nIn, nHashType, amount, nHashedOut, sis);
     }
     return SignatureHashLegacy(scriptCode, txTo, nIn, nHashType, amount, nHashedOut);
 }

@@ -258,7 +258,7 @@ void DoTest(const CScript &scriptPubKey,
     CMutableTransaction tx = BuildSpendingTransaction(scriptSig, txCredit);
     CMutableTransaction tx2 = tx;
     MutableTransactionSignatureChecker tsc(&tx, 0, txCredit.vout[0].nValue, flags);
-    ScriptImportedState sis(&tsc, MakeTransactionRef(tx), {txCredit.vout[0]}, 0, txCredit.vout[0].nValue);
+    ScriptImportedState sis(&tsc, MakeTransactionRef(tx), {txCredit.vout[0]}, 0, txCredit.vout[0].nValue, flags);
     bool result = VerifyScript(scriptSig, scriptPubKey, flags, MAX_OPS_PER_SCRIPT, sis, &err);
     BOOST_CHECK_MESSAGE(result == expect, message);
     BOOST_CHECK_MESSAGE(err == scriptError, std::string(FormatScriptError(err)) + " where " +
@@ -2478,7 +2478,8 @@ class SigPubkeyHashChecker : public BaseSignatureChecker
 public:
     virtual bool CheckSig(const std::vector<unsigned char> &scriptSig,
         const std::vector<unsigned char> &vchPubKey,
-        const CScript &scriptCode) const override
+        const CScript &scriptCode,
+        const ScriptImportedState *sis) const override
     {
         CPubKey pub = CPubKey(vchPubKey);
         uint256 hash = pub.GetHash();

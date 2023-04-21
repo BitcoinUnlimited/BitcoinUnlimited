@@ -118,7 +118,7 @@ BOOST_AUTO_TEST_CASE(tx_valid)
 
                 unsigned int verify_flags = ParseScriptFlags(test[2].get_str());
                 TransactionSignatureChecker tsc(&tx, i, amount, verify_flags);
-                ScriptImportedState sis(&tsc, txref, std::vector<CTxOut>(), i, amount);
+                ScriptImportedState sis(&tsc, txref, std::vector<CTxOut>(), i, amount, verify_flags);
                 BOOST_CHECK_MESSAGE(VerifyScript(tx.vin[i].scriptSig, mapprevOutScriptPubKeys[tx.vin[i].prevout],
                                         verify_flags, MAX_OPS_PER_SCRIPT, sis, &err),
                     strTest);
@@ -211,7 +211,7 @@ BOOST_AUTO_TEST_CASE(tx_invalid)
 
                 unsigned int verify_flags = ParseScriptFlags(test[2].get_str());
                 TransactionSignatureChecker tsc(&tx, i, amount, verify_flags);
-                ScriptImportedState sis(&tsc, txref, std::vector<CTxOut>(), i, amount);
+                ScriptImportedState sis(&tsc, txref, std::vector<CTxOut>(), i, amount, verify_flags);
                 fValid = VerifyScript(tx.vin[i].scriptSig, mapprevOutScriptPubKeys[tx.vin[i].prevout], verify_flags,
                     MAX_OPS_PER_SCRIPT, sis, &err);
             }

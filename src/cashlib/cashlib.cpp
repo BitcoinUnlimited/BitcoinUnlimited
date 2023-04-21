@@ -344,7 +344,7 @@ public:
 SLAPI void *CreateNoContextScriptMachine(unsigned int flags)
 {
     ScriptMachineData *smd = new ScriptMachineData();
-    smd->sis = std::make_shared<ScriptImportedState>(nullptr, smd->tx, std::vector<CTxOut>(), 0, 0);
+    smd->sis = std::make_shared<ScriptImportedState>(nullptr, smd->tx, std::vector<CTxOut>(), 0, 0, flags);
     smd->sm = new ScriptMachine(flags, *smd->sis, 0xffffffff, 0xffffffff);
     return (void *)smd;
 }
@@ -395,7 +395,7 @@ SLAPI void *CreateScriptMachine(unsigned int flags,
     smd->tx = txref;
     // Its ok to get the bare tx pointer: the life of the CTransaction is the same as TransactionSignatureChecker
     smd->checker = std::make_shared<TransactionSignatureChecker>(smd->tx.get(), inputIdx, inputAmount, flags);
-    smd->sis = std::make_shared<ScriptImportedState>(&(*smd->checker), smd->tx, coins, inputIdx, inputAmount);
+    smd->sis = std::make_shared<ScriptImportedState>(&(*smd->checker), smd->tx, coins, inputIdx, inputAmount, flags);
     // max ops and max sigchecks are set to the maximum value with the intention that the caller will check these if
     // needed because many uses of the script machine are for debugging and experimental scripts.
     smd->sm = new ScriptMachine(flags, *smd->sis, 0xffffffff, 0xffffffff);

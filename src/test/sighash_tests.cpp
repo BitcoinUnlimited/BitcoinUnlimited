@@ -226,7 +226,11 @@ BOOST_AUTO_TEST_CASE(sighash_from_data)
             continue;
         }
 
-        sh = SignatureHash(scriptCode, tx, nIn, nHashType, 0, 0);
+        std::vector<CTxOut> coins(nIn + 1);
+        coins[nIn].nValue = 0;
+        coins[nIn].scriptPubKey = scriptCode;
+        ScriptImportedState sis(nullptr, MakeTransactionRef(tx), coins, nIn, 0, SCRIPT_ENABLE_SIGHASH_FORKID);
+        sh = SignatureHash(scriptCode, tx, nIn, nHashType, 0, nullptr, &sis);
         assert(sh != SIGNATURE_HASH_ERROR);
         BOOST_CHECK_MESSAGE(sh.GetHex() == sigHashHex, strTest);
     }

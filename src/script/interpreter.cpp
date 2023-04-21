@@ -409,7 +409,7 @@ static bool IsDefinedHashtypeSignature(const valtype &vchSig)
     {
         return false;
     }
-    uint32_t nHashType = GetHashType(vchSig) & ~(SIGHASH_ANYONECANPAY | SIGHASH_FORKID);
+    uint32_t nHashType = GetHashType(vchSig) & ~(SIGHASH_ANYONECANPAY | SIGHASH_FORKID | SIGHASH_UTXOS);
     if (nHashType < SIGHASH_ALL || nHashType > SIGHASH_SINGLE)
         return false;
 
@@ -1575,7 +1575,7 @@ bool ScriptMachine::Step()
                     }
                     if (!sis.checker)
                         return set_error(serror, SCRIPT_ERR_DATA_REQUIRED);
-                    bool fSuccess = sis.checker->CheckSig(vchSig, vchPubKey, scriptCode);
+                    bool fSuccess = sis.checker->CheckSig(vchSig, vchPubKey, scriptCode, &sis);
 
                     if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) && vchSig.size())
                     {
@@ -2448,7 +2448,8 @@ bool BaseSignatureChecker::VerifySignature(const std::vector<uint8_t> &vchSig,
 
 bool TransactionSignatureChecker::CheckSig(const vector<uint8_t> &vchSigIn,
     const vector<uint8_t> &vchPubKey,
-    const CScript &scriptCode) const
+    const CScript &scriptCode,
+    const ScriptImportedState *sis) const
 {
     CPubKey pubkey(vchPubKey);
     if (!pubkey.IsValid())
@@ -2473,7 +2474,7 @@ bool TransactionSignatureChecker::CheckSig(const vector<uint8_t> &vchSigIn,
     {
         if (nHashType & SIGHASH_FORKID)
         {
-            sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, &nHashed);
+            sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, &nHashed, sis);
         }
         else
         {

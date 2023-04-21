@@ -154,7 +154,7 @@ class FalseScriptImportedState : public ScriptImportedState
 {
 public:
     BaseSignatureChecker checker;
-    FalseScriptImportedState() : ScriptImportedState(&checker, CTransactionRef(), std::vector<CTxOut>(), 0, 0) {}
+    FalseScriptImportedState() : ScriptImportedState(&checker, CTransactionRef(), std::vector<CTxOut>(), 0, 0, 0) {}
 };
 
 extern FalseScriptImportedState fsis;

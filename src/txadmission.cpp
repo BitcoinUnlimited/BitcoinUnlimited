@@ -693,29 +693,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         fRequireStandard = false;
     }
 
-    uint32_t featureFlags = 0;
-    // FIXME OP_REVERSEBYTES should be considered as always active and hence
-    // we don't need SCRIPT_ENABLE_OP_REVERSEBYTES, whereas we should unconditionally
-    // add SCRIPT_VERIFY_INPUT_SIGCHECKS to the features flags, for more details see
-    // https://gitlab.com/bitcoinunlimited/BCHUnlimited/-/merge_requests/2622#note_882081432
-    if (may2020Enabled)
-    {
-        featureFlags |= SCRIPT_ENABLE_OP_REVERSEBYTES | SCRIPT_VERIFY_INPUT_SIGCHECKS;
-    }
-
-    if (IsMay2022Activated(chainparams.GetConsensus(), chainActive.Tip()))
-    {
-        featureFlags |= SCRIPT_64_BIT_INTEGERS;
-        featureFlags |= SCRIPT_NATIVE_INTROSPECTION;
-    }
-
-    if (IsMay2023Activated(chainparams.GetConsensus(), chainActive.Tip()))
-    {
-        featureFlags |= SCRIPT_ENABLE_P2SH_32;
-        featureFlags |= SCRIPT_ENABLE_TOKENS;
-    }
-
-    uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;
+    uint32_t featureFlags = GetBlockScriptFlags(chainActive.Tip(), chainparams.GetConsensus());
+    uint32_t flags = featureFlags | STANDARD_SCRIPT_VERIFY_FLAGS;
 
     if (fRequireStandard && !IsStandardTx(tx, reason, flags))
     {

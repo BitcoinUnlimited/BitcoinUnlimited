@@ -303,9 +303,9 @@ void ChipTestingSetup::RunTestVector(const TestVector &test) {
             reason = state.GetRejectReason();
             if (reason.empty() && !ok2 && missingInputs) reason = "Missing inputs";
             BOOST_CHECK_MESSAGE(ok2 == expectNonStd,
-                                strprintf("(%s nonstandard) %s Wrong result. %s.", activeStr, tv.ident,
+                                strprintf("(%s nonstandard) %s Wrong result. %s. Reason: %s, tx: %s", activeStr, tv.ident,
                                           expectNonStd ? "Pass expected, test failed."
-                                                       : "Fail expected, test passed."));
+                                                       : "Fail expected, test passed.", reason, tv.tx->ToString(true)));
             goodNonstandardReason = expectNonStd || tv.nonstandardReason == reason;
             if (!goodNonstandardReason)
             {

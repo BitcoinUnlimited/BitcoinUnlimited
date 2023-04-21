@@ -70,6 +70,7 @@ bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType, uint32_t fla
 
 bool IsStandardTx(const CTransactionRef &tx, std::string &reason, uint32_t flags)
 {
+    reason.clear();
     if (tx->nVersion > CTransaction::MAX_STANDARD_VERSION || tx->nVersion < CTransaction::MIN_STANDARD_VERSION)
     {
         // Note that this standardness check may be safely removed after Upgrade9 activates since at that point nVersion

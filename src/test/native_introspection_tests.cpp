@@ -38,7 +38,8 @@ static std::vector<ScriptImportedState> createForAllInputs(CTransactionRef tx,
             }
             k = k + 1;
         }
-        ret.push_back(ScriptImportedState(&bsc, tx, coins, i, amnt)); // private c'tor, must use push_back
+        // private c'tor, must use push_back
+        ret.push_back(ScriptImportedState(&bsc, tx, coins, i, amnt, STANDARD_SCRIPT_VERIFY_FLAGS));
     }
     return ret;
 }

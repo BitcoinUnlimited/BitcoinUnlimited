@@ -43,13 +43,13 @@ static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey, bool f
     txTo.vout[0].nValue = 1;
 
     MutableTransactionSignatureChecker tsc(&txTo, 0, txFrom.vout[0].nValue);
-    ScriptImportedState sis(&tsc, MakeTransactionRef(txTo), std::vector<CTxOut>(), 0, txFrom.vout[0].nValue);
 
     uint32_t flags = fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE;
     if (fStrict && fP2SH32)
     {
         flags |= SCRIPT_ENABLE_P2SH_32;
     }
+    ScriptImportedState sis(&tsc, MakeTransactionRef(txTo), std::vector<CTxOut>(), 0, txFrom.vout[0].nValue, flags);
 
     return VerifyScript(scriptSig, scriptPubKey, flags, MAX_OPS_PER_SCRIPT, sis, &err);
 }

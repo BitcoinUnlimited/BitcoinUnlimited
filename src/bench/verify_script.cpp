@@ -86,7 +86,7 @@ static void VerifyScriptBench(benchmark::State &state)
 
     // Benchmark.
     MutableTransactionSignatureChecker tsc(&txSpend, 0, txCredit.vout[0].nValue);
-    ScriptImportedState sis(&tsc, MakeTransactionRef(txSpend), {txCredit.vout[0]}, 0, txCredit.vout[0].nValue);
+    ScriptImportedState sis(&tsc, MakeTransactionRef(txSpend), {txCredit.vout[0]}, 0, txCredit.vout[0].nValue, flags);
     while (state.KeepRunning())
     {
         ScriptError err;

@@ -19,6 +19,8 @@ class CPubKey;
 class CScript;
 class CTransaction;
 class uint256;
+class ScriptImportedState;
+class CBlockIndex;
 
 /** Signature types */
 enum
@@ -157,6 +159,7 @@ enum
     SCRIPT_ENABLE_TOKENS = (1U << 27),
 };
 
+
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);
 
 /**
@@ -179,7 +182,9 @@ uint256 SignatureHash(const CScript &scriptCode,
     unsigned int nIn,
     uint32_t nHashType,
     const CAmount &amount,
-    size_t *nHashedOut = nullptr);
+    size_t *nHashedOut = nullptr,
+    const ScriptImportedState *sis = nullptr);
+
 
 class BaseSignatureChecker
 {
@@ -195,7 +200,8 @@ public:
     //! Verifies a signature given the pubkey, signature, script, and transaction (member var)
     virtual bool CheckSig(const std::vector<uint8_t> &scriptSig,
         const std::vector<uint8_t> &vchPubKey,
-        const CScript &scriptCode) const
+        const CScript &scriptCode,
+        const ScriptImportedState *sis = nullptr) const
     {
         return false;
     }
@@ -239,7 +245,8 @@ public:
 
     bool CheckSig(const std::vector<uint8_t> &scriptSig,
         const std::vector<uint8_t> &vchPubKey,
-        const CScript &scriptCode) const override;
+        const CScript &scriptCode,
+        const ScriptImportedState *sis) const override;
     bool CheckLockTime(const CScriptNum &nLockTime) const override;
     bool CheckSequence(const CScriptNum &nSequence) const override;
     size_t GetBytesHashed() const { return nBytesHashed; }
@@ -274,13 +281,15 @@ public:
     // CScript scriptCode;
     unsigned int nIn = 0;
     CAmount amount = 0;
+    uint32_t flags = 0;
 
     ScriptImportedState(const BaseSignatureChecker *c,
         CTransactionRef t,
         const std::vector<CTxOut> &coins,
         unsigned int inputIdx,
-        unsigned int inputAmount)
-        : checker(c), tx(t), spentCoins(coins), nIn(inputIdx), amount(inputAmount)
+        unsigned int inputAmount,
+        uint32_t _flags)
+        : checker(c), tx(t), spentCoins(coins), nIn(inputIdx), amount(inputAmount), flags(_flags)
     {
     }
     ScriptImportedState() {}
@@ -319,33 +328,36 @@ public:
     ScriptImportedStateSig(const CMutableTransaction *txToIn,
         unsigned int inIndex,
         const CAmount &amountIn,
-        unsigned int flags = SCRIPT_ENABLE_SIGHASH_FORKID)
+        unsigned int _flags = SCRIPT_ENABLE_SIGHASH_FORKID)
     {
         tx = MakeTransactionRef(*txToIn);
         nIn = inIndex;
         amount = amountIn;
+        flags = _flags;
         tsc.Init(&(*tx), nIn, amount, flags);
         checker = &tsc;
     }
     ScriptImportedStateSig(const CTransaction *txToIn,
         unsigned int inIndex,
         const CAmount &amountIn,
-        unsigned int flags = SCRIPT_ENABLE_SIGHASH_FORKID)
+        unsigned int _flags = SCRIPT_ENABLE_SIGHASH_FORKID)
     {
         tx = MakeTransactionRef(*txToIn);
         nIn = inIndex;
         amount = amountIn;
+        flags = _flags;
         tsc.Init(&(*tx), nIn, amount, flags);
         checker = &tsc;
     }
     ScriptImportedStateSig(const CTransactionRef txToIn,
         unsigned int inIndex,
         const CAmount &amountIn,
-        unsigned int flags = SCRIPT_ENABLE_SIGHASH_FORKID)
+        unsigned int _flags = SCRIPT_ENABLE_SIGHASH_FORKID)
     {
         tx = txToIn;
         nIn = inIndex;
         amount = amountIn;
+        flags = _flags;
         tsc.Init(&(*tx), nIn, amount, flags);
         checker = &tsc;
     }

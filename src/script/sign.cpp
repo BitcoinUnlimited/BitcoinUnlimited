@@ -37,6 +37,7 @@ bool TransactionSignatureCreator::CreateSig(std::vector<uint8_t> &vchSig,
         return false;
     }
 
+    // Right now, we do not support signing with SIGHASH_UTXOs, so no ScriptImportedState is needed
     uint256 hash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount);
     if (nSigType == SIGTYPE_ECDSA)
     {
@@ -202,7 +203,7 @@ bool ProduceSignature(const BaseSignatureCreator &creator,
     // We can hard-code maxOps because this client has no templates capable of producing and signing longer scripts.
     // Additionally, while this constant is currently being raised it will eventually settle to a very high const
     // value.  There is no reason to break layering by using the tweak only to take that out later.
-    ScriptImportedState sis(&creator.Checker(), CTransactionRef(nullptr), std::vector<CTxOut>(), 0, 0);
+    ScriptImportedState sis(&creator.Checker(), CTransactionRef(nullptr), std::vector<CTxOut>(), 0, 0, scriptFlags);
     return VerifyScript(scriptSig, fromPubKey, scriptFlags, MAX_OPS_PER_SCRIPT, sis);
 }
 
@@ -404,7 +405,8 @@ public:
     DummySignatureChecker() {}
     bool CheckSig(const std::vector<uint8_t> &scriptSig,
         const std::vector<uint8_t> &vchPubKey,
-        const CScript &scriptCode) const override
+        const CScript &scriptCode,
+        const ScriptImportedState *sis) const override
     {
         return true;
     }
