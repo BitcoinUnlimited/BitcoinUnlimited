@@ -221,7 +221,7 @@ static isminetype IsMine(const CKeyStore &keystore,
     {
         // TODO: This could be optimized some by doing some work after the above solver
         CScript scriptSig;
-        return ProduceSignature(DummySignatureCreator(&keystore), scriptPubKey, scriptSig, SCRIPT_ENABLE_P2SH_32) ?
+        return ProduceSignature(DummySignatureCreator(&keystore, SCRIPT_ENABLE_P2SH_32), scriptPubKey, scriptSig) ?
                    ISMINE_WATCH_SOLVABLE :
                    ISMINE_WATCH_UNSOLVABLE;
     }

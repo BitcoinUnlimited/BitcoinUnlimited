@@ -51,7 +51,7 @@ static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey, bool f
     }
     ScriptImportedState sis(&tsc, MakeTransactionRef(txTo), std::vector<CTxOut>(), 0, txFrom.vout[0].nValue, flags);
 
-    return VerifyScript(scriptSig, scriptPubKey, flags, MAX_OPS_PER_SCRIPT, sis, &err);
+    return VerifyScript(scriptSig, scriptPubKey, MAX_OPS_PER_SCRIPT, sis, &err);
 }
 
 

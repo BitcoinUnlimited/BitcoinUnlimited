@@ -149,11 +149,27 @@ std::ostream &operator<<(std::ostream &os, const uint256 &num);
 
 CService ipaddress(uint32_t i, uint32_t port);
 
+class FalseSignatureChecker : public BaseSignatureChecker
+{
+public:
+    FalseSignatureChecker() = default;
+    bool CheckSig(const std::vector<uint8_t> &scriptSig,
+        const std::vector<uint8_t> &vchPubKey,
+        const CScript &scriptCode,
+        const ScriptImportedState *sis = nullptr) const override
+    {
+        return false;
+    }
+
+    bool CheckLockTime(const CScriptNum &nLockTime) const override { return false; }
+    bool CheckSequence(const CScriptNum &nSequence) const override { return false; }
+};
+
 // Has a signature checker that returns false
 class FalseScriptImportedState : public ScriptImportedState
 {
 public:
-    BaseSignatureChecker checker;
+    FalseSignatureChecker checker;
     FalseScriptImportedState() : ScriptImportedState(&checker, CTransactionRef(), std::vector<CTxOut>(), 0, 0, 0) {}
 };
 

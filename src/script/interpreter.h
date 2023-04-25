@@ -201,13 +201,10 @@ public:
     virtual bool CheckSig(const std::vector<uint8_t> &scriptSig,
         const std::vector<uint8_t> &vchPubKey,
         const CScript &scriptCode,
-        const ScriptImportedState *sis = nullptr) const
-    {
-        return false;
-    }
+        const ScriptImportedState *sis = nullptr) const = 0;
 
-    virtual bool CheckLockTime(const CScriptNum &nLockTime) const { return false; }
-    virtual bool CheckSequence(const CScriptNum &nSequence) const { return false; }
+    virtual bool CheckLockTime(const CScriptNum &nLockTime) const = 0;
+    virtual bool CheckSequence(const CScriptNum &nSequence) const = 0;
     virtual ~BaseSignatureChecker() {}
 };
 
@@ -288,8 +285,8 @@ public:
         const std::vector<CTxOut> &coins,
         unsigned int inputIdx,
         unsigned int inputAmount,
-        uint32_t _flags)
-        : checker(c), tx(t), spentCoins(coins), nIn(inputIdx), amount(inputAmount), flags(_flags)
+        uint32_t flagsIn)
+        : checker(c), tx(t), spentCoins(coins), nIn(inputIdx), amount(inputAmount), flags(flagsIn)
     {
     }
     ScriptImportedState() {}
@@ -618,7 +615,6 @@ bool EvalScript(std::vector<std::vector<uint8_t> > &stack,
     uint32_t *sighashtype = nullptr);
 bool VerifyScript(const CScript &scriptSig,
     const CScript &scriptPubKey,
-    unsigned int flags,
     unsigned int maxOps,
     const ScriptImportedState &sis,
     ScriptError *error = nullptr,

@@ -16,14 +16,15 @@
 using valtype = std::vector<uint8_t>;
 
 TransactionSignatureCreator::TransactionSignatureCreator(const CKeyStore *keystoreIn,
+    const uint32_t scriptFlags,
+    const std::vector<CTxOut> spentCoins,
     const CTransaction *txToIn,
     unsigned int nInIn,
     const CAmount &amountIn,
     uint32_t nHashTypeIn,
     uint32_t nSigTypeIn)
-    : BaseSignatureCreator(keystoreIn), txTo(txToIn), nIn(nInIn), amount(amountIn), nHashType(nHashTypeIn),
-      nSigType(nSigTypeIn),
-      checker(txTo, nIn, amount, (nHashTypeIn & SIGHASH_FORKID) ? SCRIPT_ENABLE_SIGHASH_FORKID : 0)
+    : BaseSignatureCreator(keystoreIn, scriptFlags, spentCoins), txTo(txToIn), nIn(nInIn), amount(amountIn),
+      nHashType(nHashTypeIn), nSigType(nSigTypeIn), checker(txTo, nIn, amount, scriptFlags)
 {
 }
 
@@ -37,8 +38,12 @@ bool TransactionSignatureCreator::CreateSig(std::vector<uint8_t> &vchSig,
         return false;
     }
 
-    // Right now, we do not support signing with SIGHASH_UTXOs, so no ScriptImportedState is needed
-    uint256 hash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount);
+    // Right now, imported state is only partial, enough to support SIGHASH_UTXOs
+    // We can hard-code maxOps because this client has no templates capable of producing and signing longer scripts.
+    // Additionally, while this constant is currently being raised it will eventually settle to a very high const
+    // value.  There is no reason to break layering by using the tweak only to take that out later.
+    ScriptImportedState sis(&this->Checker(), CTransactionRef(nullptr), spentCoins, 0, 0, scriptFlags);
+    uint256 hash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, nullptr, &sis);
     if (nSigType == SIGTYPE_ECDSA)
     {
         if (!key.SignECDSA(hash, vchSig))
@@ -104,13 +109,12 @@ static bool SignN(const std::vector<valtype> &multisigdata,
 static bool SignStep(const BaseSignatureCreator &creator,
     const CScript &scriptPubKey,
     CScript &scriptSigRet,
-    txnouttype &whichTypeRet,
-    uint32_t scriptFlags)
+    txnouttype &whichTypeRet)
 {
     scriptSigRet.clear();
 
     std::vector<valtype> vSolutions;
-    if (!Solver(scriptPubKey, whichTypeRet, vSolutions, scriptFlags))
+    if (!Solver(scriptPubKey, whichTypeRet, vSolutions, creator.ScriptFlags()))
     {
         return false;
     }
@@ -171,13 +175,10 @@ static bool SignStep(const BaseSignatureCreator &creator,
     return false;
 }
 
-bool ProduceSignature(const BaseSignatureCreator &creator,
-    const CScript &fromPubKey,
-    CScript &scriptSig,
-    uint32_t scriptFlags)
+bool ProduceSignature(const BaseSignatureCreator &creator, const CScript &fromPubKey, CScript &scriptSig)
 {
     txnouttype whichType;
-    if (!SignStep(creator, fromPubKey, scriptSig, whichType, scriptFlags))
+    if (!SignStep(creator, fromPubKey, scriptSig, whichType))
     {
         return false;
     }
@@ -190,7 +191,7 @@ bool ProduceSignature(const BaseSignatureCreator &creator,
         CScript subscript = scriptSig;
 
         txnouttype subType;
-        bool fSolved = SignStep(creator, subscript, scriptSig, subType, scriptFlags) && subType != TX_SCRIPTHASH;
+        bool fSolved = SignStep(creator, subscript, scriptSig, subType) && subType != TX_SCRIPTHASH;
         // Append serialized subscript whether or not it is completely signed:
         scriptSig << valtype(subscript.begin(), subscript.end());
         if (!fSolved)
@@ -203,8 +204,9 @@ bool ProduceSignature(const BaseSignatureCreator &creator,
     // We can hard-code maxOps because this client has no templates capable of producing and signing longer scripts.
     // Additionally, while this constant is currently being raised it will eventually settle to a very high const
     // value.  There is no reason to break layering by using the tweak only to take that out later.
-    ScriptImportedState sis(&creator.Checker(), CTransactionRef(nullptr), std::vector<CTxOut>(), 0, 0, scriptFlags);
-    return VerifyScript(scriptSig, fromPubKey, scriptFlags, MAX_OPS_PER_SCRIPT, sis);
+    ScriptImportedState sis(
+        &creator.Checker(), CTransactionRef(nullptr), creator.SpentCoins(), 0, 0, creator.ScriptFlags());
+    return VerifyScript(scriptSig, fromPubKey, MAX_OPS_PER_SCRIPT, sis);
 }
 
 bool SignSignature(uint32_t scriptFlags,
@@ -214,15 +216,17 @@ bool SignSignature(uint32_t scriptFlags,
     unsigned int nIn,
     const CAmount &amount,
     uint32_t nHashType,
-    uint32_t nSigType)
+    uint32_t nSigType,
+    const std::vector<CTxOut> spentCoins)
 {
     assert(nIn < txTo.vin.size());
     CTxIn &txin = txTo.vin[nIn];
 
     CTransaction txToConst(txTo);
-    TransactionSignatureCreator creator(&keystore, &txToConst, nIn, amount, nHashType, nSigType);
+    TransactionSignatureCreator creator(
+        &keystore, scriptFlags, spentCoins, &txToConst, nIn, amount, nHashType, nSigType);
 
-    return ProduceSignature(creator, fromPubKey, txin.scriptSig, scriptFlags);
+    return ProduceSignature(creator, fromPubKey, txin.scriptSig);
 }
 
 bool SignSignature(uint32_t scriptFlags,
@@ -231,14 +235,16 @@ bool SignSignature(uint32_t scriptFlags,
     CMutableTransaction &txTo,
     unsigned int nIn,
     uint32_t nHashType,
-    uint32_t nSigType)
+    uint32_t nSigType,
+    const std::vector<CTxOut> spentCoins)
 {
     assert(nIn < txTo.vin.size());
     CTxIn &txin = txTo.vin[nIn];
     assert(txin.prevout.n < txFrom.vout.size());
     const CTxOut &txout = txFrom.vout[txin.prevout.n];
 
-    return SignSignature(scriptFlags, keystore, txout.scriptPubKey, txTo, nIn, txout.nValue, nHashType);
+    return SignSignature(
+        scriptFlags, keystore, txout.scriptPubKey, txTo, nIn, txout.nValue, nHashType, nSigType, spentCoins);
 }
 
 static CScript PushAll(const std::vector<valtype> &values)
@@ -406,10 +412,13 @@ public:
     bool CheckSig(const std::vector<uint8_t> &scriptSig,
         const std::vector<uint8_t> &vchPubKey,
         const CScript &scriptCode,
-        const ScriptImportedState *sis) const override
+        const ScriptImportedState *sis = nullptr) const override
     {
         return true;
     }
+
+    bool CheckLockTime(const CScriptNum &nLockTime) const override { return false; }
+    bool CheckSequence(const CScriptNum &nSequence) const override { return false; }
 };
 const DummySignatureChecker dummyChecker;
 } // namespace

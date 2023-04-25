@@ -93,7 +93,7 @@ static int verify_script(const unsigned char *scriptPubKey,
         // Regardless of the verification result, the tx did not error.
         set_error(err, bitcoinconsensus_ERR_OK);
 
-        return VerifyScript(tx.vin[nIn].scriptSig, CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), flags, maxOps,
+        return VerifyScript(tx.vin[nIn].scriptSig, CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), maxOps,
             ScriptImportedStateSig(&tx, nIn, amount, flags), nullptr);
     }
     catch (const std::exception &)

@@ -1386,7 +1386,7 @@ static CMutableTransaction CreateAndSignTx(const CKey senderKey, const CTransact
     CBasicKeyStore keystore;
     keystore.AddKey(senderKey);
     keystore.AddCScript(GetScriptForRawPubKey(senderKey.GetPubKey()), false /* not p2sh_32 */); // support p2sh wrapping p2pk for this key
-    BOOST_CHECK(SignSignature(scriptFlags, keystore, *inputTx, tx, 0, SIGHASH_ALL | SIGHASH_FORKID));
+    BOOST_CHECK(SignSignature(scriptFlags, keystore, *inputTx, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, SIGTYPE_ECDSA, {inputCoin}));
 
     return tx;
 }
@@ -1617,8 +1617,6 @@ BOOST_FIXTURE_TEST_CASE(with_mempool_check_oversized_token_commitment, TestChain
 
 // Test basic behavior of SIGHASH_UTXOS as a valid signing scheme. It should fail consensus if the upgrade is not
 // active, but work otherwise if used correctly in client code (requires a full and valid ScriptExecutionContext).
-#if 0
-// TODO: Eanble this test when SIGHASH_UTXOS is implemented
 BOOST_FIXTURE_TEST_CASE(sighash_utxos_test, TestChain100Setup) {
     size_t coinbase_txn_idx = 0;
     CScript const p2pk_scriptPubKey = CScript() << ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG;
@@ -1630,47 +1628,71 @@ BOOST_FIXTURE_TEST_CASE(sighash_utxos_test, TestChain100Setup) {
         CreateAndProcessBlock({}, p2pk_scriptPubKey);
         CreateAndProcessBlock({}, p2pk_scriptPubKey);
 
-        CMutableTransaction spend_tx;
-        spend_tx.nVersion = 1;
-        spend_tx.vin.resize(2);
-        spend_tx.vin[0].prevout = COutPoint(coinbaseTxns[coinbase_txn_idx++].GetHash(), 0);
-        spend_tx.vin[1].prevout = COutPoint(coinbaseTxns[coinbase_txn_idx++].GetHash(), 0);
-        spend_tx.vout.resize(1);
-        spend_tx.vout[0].nValue =   coinbaseTxns[coinbase_txn_idx - 2u].vout[0].nValue
-                                  + coinbaseTxns[coinbase_txn_idx - 1u].vout[0].nValue
-                                  - 1000;
-        spend_tx.vout[0].scriptPubKey = p2pk_scriptPubKey;
+        const int inputAmountSum
+            = coinbaseTxns[coinbase_txn_idx].vout[0].nValue
+            + coinbaseTxns[coinbase_txn_idx + 1].vout[0].nValue;
 
-        const auto real_contexts = [&] {
-            LOCK(cs_main); // access to pcoinsTip shoule be done with cs_main held
-            return ScriptExecutionContext::createForAllInputs(spend_tx, *pcoinsTip);
-        }();
+        CMutableTransaction spend_tx_mut;
+        spend_tx_mut.nVersion = 1;
+        spend_tx_mut.vin.resize(2);
+        spend_tx_mut.vin[0].prevout = COutPoint(coinbaseTxns[coinbase_txn_idx++].GetHash(), 0);
+        spend_tx_mut.vin[1].prevout = COutPoint(coinbaseTxns[coinbase_txn_idx++].GetHash(), 0);
+        spend_tx_mut.vout.resize(1);
+        spend_tx_mut.vout[0].nValue = inputAmountSum - 1000;
+        spend_tx_mut.vout[0].scriptPubKey = p2pk_scriptPubKey;
+
+        CTransaction spend_tx(spend_tx_mut);
+
+        const uint32_t signingFlags = STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_TOKENS;
 
         // "Manually" sign the txn with SIGHASH_UTXOS for each input
         for (unsigned inp = 0; inp < spend_tx.vin.size(); ++inp) {
             std::vector<uint8_t> vchSig;
-            const ScriptExecutionContext limited_context{inp,  // input number
-                                                         coinbaseTxns[coinbase_txn_idx - 2u + inp].vout[0],  // coin
-                                                         spend_tx}; // tx context
+
+            const auto checker = TransactionSignatureChecker(
+                    &spend_tx,
+                    inp,
+                    CAmount(inputAmountSum),
+                    signingFlags);
+
+            const ScriptImportedState limited_context(
+                    &checker,
+                    MakeTransactionRef(spend_tx),
+                    {}, // input coins mssing
+                    inp,
+                    inputAmountSum,
+                    signingFlags);
+
+
             uint256 sigHash, sigHashNoUtxos, sigHashNoUtxos2;
             const auto sigHashType = SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_UTXOS;
-            const uint32_t signingFlags = STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_TOKENS;
+            const auto inputAmount = coinbaseTxns[coinbase_txn_idx - 2u + inp].vout[0].nValue;
             // Check that a limited context doesn't work for SIGHASH_UTXOS (it throws due to missing input data)
-            BOOST_REQUIRE_THROW(SignatureHash(p2pk_scriptPubKey, limited_context, sigHashType, nullptr, signingFlags),
-                                SignatureHashMissingUtxoDataError);
+           BOOST_CHECK_THROW(SignatureHash(p2pk_scriptPubKey, spend_tx, inp, sigHashType, inputAmount, nullptr, &limited_context), std::exception);
+
+
+            ScriptImportedState full_context(
+                    &checker,
+                    MakeTransactionRef(spend_tx),
+                    {
+                        coinbaseTxns[coinbase_txn_idx - 2u].vout[0],
+                        coinbaseTxns[coinbase_txn_idx - 1u].vout[0],
+                    },
+                    inp,
+                    inputAmountSum,
+                    signingFlags);
             // But a full context does work.
-            sigHash = SignatureHash(p2pk_scriptPubKey, real_contexts[inp], sigHashType, nullptr, signingFlags);
+            sigHash = SignatureHash(p2pk_scriptPubKey, spend_tx, inp, sigHashType, inputAmount, nullptr, &full_context);
 
             // Also get a sighash without the flag to test that it is indeed different
-            sigHashNoUtxos = SignatureHash(p2pk_scriptPubKey, real_contexts[inp], sigHashType.withUtxos(false), nullptr,
-                                           signingFlags);
+            sigHashNoUtxos = SignatureHash(p2pk_scriptPubKey, spend_tx, inp, sigHashType & ~SIGHASH_UTXOS, inputAmount, nullptr, &full_context);
             BOOST_CHECK(sigHashNoUtxos != sigHash);
 
             // Get a sighash but with SCRIPT_ENABLE_TOKENS disabled while the sighash type is still set to .withUtxos().
             // This "works" but yields a different, nonsensical signature hash not equivalent to the valid one.
             // (This codepath cannot happen in normal signing code, but is worth testing here)
-            sigHashNoUtxos2 = SignatureHash(p2pk_scriptPubKey, real_contexts[inp], sigHashType, nullptr,
-                                           signingFlags & ~SCRIPT_ENABLE_TOKENS);
+            full_context.flags &= ~SCRIPT_ENABLE_TOKENS;
+            sigHashNoUtxos2 = SignatureHash(p2pk_scriptPubKey, spend_tx, inp, sigHashType, inputAmount, nullptr, &full_context);
             BOOST_CHECK(sigHashNoUtxos2 != sigHash);
             BOOST_CHECK(sigHashNoUtxos2 != sigHashNoUtxos);
 
@@ -1679,7 +1701,8 @@ BOOST_FIXTURE_TEST_CASE(sighash_utxos_test, TestChain100Setup) {
                         ? coinbaseKey.SignSchnorr(sigHash, vchSig)
                         : coinbaseKey.SignECDSA(sigHash, vchSig) );
             vchSig.push_back(static_cast<uint8_t>(sigHashType)); // must append sighash byte to sig
-            spend_tx.vin[inp].scriptSig << vchSig;
+            spend_tx_mut.vin[inp].scriptSig << vchSig;
+            spend_tx = CTransaction(spend_tx_mut);
         }
 
         // Attempt to mine the above in a block
@@ -1698,7 +1721,6 @@ BOOST_FIXTURE_TEST_CASE(sighash_utxos_test, TestChain100Setup) {
         }
     }
 }
-#endif
 
 // Test the lower-level CheckTxTokens() function for more esoteric failure modes that shouldn't normally
 // happen (most of these are caught by the deserializer), but we should check that the function fails

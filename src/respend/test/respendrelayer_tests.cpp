@@ -112,10 +112,10 @@ BOOST_FIXTURE_TEST_CASE(triggers_correctly, TestChain100Setup)
     t1.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
     CTransaction tx1(t1);
     {
-        TransactionSignatureCreator tsc(&keystore, &tx1, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
+        TransactionSignatureCreator tsc(&keystore, scriptFlags, {}, &tx1, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = dummyTransactions[0].vout[0].scriptPubKey;
         CScript &scriptSigRes = t1.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
         BOOST_CHECK(worked);
     }
     pool.addUnchecked(tx1.GetHash(), entry.FromTx(tx1));
@@ -131,10 +131,10 @@ BOOST_FIXTURE_TEST_CASE(triggers_correctly, TestChain100Setup)
     t2.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
     CTransaction tx2(t2);
     {
-        TransactionSignatureCreator tsc(&keystore, &tx2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
+        TransactionSignatureCreator tsc(&keystore, scriptFlags, {}, &tx2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = dummyTransactions[0].vout[1].scriptPubKey;
         CScript &scriptSigRes = t2.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
         BOOST_CHECK(worked);
     }
     pool.addUnchecked(tx2.GetHash(), entry.FromTx(tx2));
@@ -156,15 +156,16 @@ BOOST_FIXTURE_TEST_CASE(triggers_correctly, TestChain100Setup)
 
     CTransaction spend1(s1);
     {
-        TransactionSignatureCreator tsc(&keystore, &spend1, 0, 100 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
+        TransactionSignatureCreator tsc(
+            &keystore, scriptFlags, {}, &spend1, 0, 100 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = tx1.vout[0].scriptPubKey;
         CScript &scriptSigRes = s1.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
         BOOST_CHECK(worked);
 
         const CScript &scriptPubKey2 = tx2.vout[0].scriptPubKey;
         CScript &scriptSigRes2 = s1.vin[1].scriptSig;
-        worked = ProduceSignature(tsc, scriptPubKey2, scriptSigRes2, scriptFlags);
+        worked = ProduceSignature(tsc, scriptPubKey2, scriptSigRes2);
         BOOST_CHECK(worked);
     }
     CTransaction spend1a(s1);
@@ -185,10 +186,11 @@ BOOST_FIXTURE_TEST_CASE(triggers_correctly, TestChain100Setup)
 
     CTransaction spend2(s2);
     {
-        TransactionSignatureCreator tsc(&keystore, &spend2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
+        TransactionSignatureCreator tsc(
+            &keystore, scriptFlags, {}, &spend2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = tx1.vout[0].scriptPubKey;
         CScript &scriptSigRes = s2.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
         BOOST_CHECK(worked);
     }
     CTransaction spend2a(s2);
@@ -229,10 +231,11 @@ BOOST_FIXTURE_TEST_CASE(triggers_correctly, TestChain100Setup)
 
     // Create another dsproof for against the same original first tx...it should not be possible
     {
-        TransactionSignatureCreator tsc(&keystore, &spend2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
+        TransactionSignatureCreator tsc(
+            &keystore, scriptFlags, {}, &spend2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = tx1.vout[0].scriptPubKey;
         CScript &scriptSigRes = s2.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
         BOOST_CHECK(worked);
     }
     CTransaction spend2b(s2);
@@ -264,10 +267,11 @@ BOOST_FIXTURE_TEST_CASE(triggers_correctly, TestChain100Setup)
     }
     {
         // create a tx without a fork id
-        TransactionSignatureCreator tsc(&keystore, &spend2, 0, 50 * CENT, SIGHASH_ALL);
+        auto noforkidFlags = scriptFlags & ~SCRIPT_ENABLE_SIGHASH_FORKID;
+        TransactionSignatureCreator tsc(&keystore, noforkidFlags, {}, &spend2, 0, 50 * CENT, SIGHASH_ALL);
         const CScript &scriptPubKey = tx1.vout[0].scriptPubKey;
         CScript &scriptSigRes = s2.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
         BOOST_CHECK(worked);
     }
     CTransaction spend2c(s2);
@@ -379,10 +383,10 @@ BOOST_FIXTURE_TEST_CASE(triggers_correctly, TestChain100Setup)
     t3.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
     CTransaction tx3(t3);
     {
-        TransactionSignatureCreator tsc(&keystore, &tx3, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
+        TransactionSignatureCreator tsc(&keystore, scriptFlags, {}, &tx3, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = dummyTransactions[0].vout[0].scriptPubKey;
         CScript &scriptSigRes = t3.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
         BOOST_CHECK(worked);
     }
     CTransaction spendt1(t1);

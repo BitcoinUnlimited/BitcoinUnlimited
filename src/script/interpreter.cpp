@@ -2598,12 +2598,12 @@ bool TransactionSignatureChecker::CheckSequence(const CScriptNum &nSequence) con
 
 bool VerifyScript(const CScript &scriptSig,
     const CScript &scriptPubKey,
-    unsigned int flags,
     unsigned int maxOps,
     const ScriptImportedState &sis,
     ScriptError *serror,
     ScriptMachineResourceTracker *tracker)
 {
+    const uint32_t flags = sis.flags;
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
 
     if ((flags & SCRIPT_VERIFY_SIGPUSHONLY) != 0 && !scriptSig.IsPushOnly())

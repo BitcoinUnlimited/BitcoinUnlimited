@@ -145,6 +145,8 @@ CBlock TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransa
     {
         pblock->vtx.push_back(MakeTransactionRef(tx));
     }
+    // Since txs are not coming from the mempool, xval needs to be off.
+    pblock->fXVal = false;
 
     // enfore LTOR ordering of transactions
     std::sort(pblock->vtx.begin() + 1, pblock->vtx.end(), NumericallyLessTxHashComparator());

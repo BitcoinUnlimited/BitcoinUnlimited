@@ -107,8 +107,7 @@ ScriptError VerifyWithFlag(const CTransaction &output, const CMutableTransaction
     CTransaction inputi(input);
     TransactionSignatureChecker tsc(&inputi, 0, input.vout[0].nValue);
     ScriptImportedState sis(&tsc, nullptr, std::vector<CTxOut>(), 0, input.vout[0].nValue, flags);
-    bool ret =
-        VerifyScript(inputi.vin[0].scriptSig, output.vout[0].scriptPubKey, flags, MAX_OPS_PER_SCRIPT, sis, &error);
+    bool ret = VerifyScript(inputi.vin[0].scriptSig, output.vout[0].scriptPubKey, MAX_OPS_PER_SCRIPT, sis, &error);
     BOOST_CHECK_EQUAL((ret == true), (error == SCRIPT_ERR_OK));
 
     return error;
@@ -279,18 +278,19 @@ public:
     }
 
     //! Verifies a signature given the pubkey, signature, script, and transaction (member var)
-    virtual bool CheckSig(const std::vector<unsigned char> &scriptSig,
+    bool CheckSig(const std::vector<unsigned char> &scriptSig,
         const std::vector<unsigned char> &vchPubKey,
-        const CScript &scriptCode) const
+        const CScript &scriptCode,
+        const ScriptImportedState *sis = nullptr) const override
     {
         if (scriptSig.size() > 0)
             return true;
         return false;
     }
 
-    virtual bool CheckLockTime(const CScriptNum &nLockTime) const { return true; }
-    virtual bool CheckSequence(const CScriptNum &nSequence) const { return true; }
-    virtual ~AlwaysGoodSignatureChecker() {}
+    bool CheckLockTime(const CScriptNum &nLockTime) const override { return true; }
+    bool CheckSequence(const CScriptNum &nSequence) const override { return true; }
+    ~AlwaysGoodSignatureChecker() override {}
 };
 
 unsigned int evalForSigChecks(const CScript &scriptSig,
@@ -303,7 +303,7 @@ unsigned int evalForSigChecks(const CScript &scriptSig,
     ScriptMachineResourceTracker tracker;
     ScriptImportedState sis(checker ? checker : &sigChecker, nullptr, std::vector<CTxOut>(), 0, 0, flags);
 
-    bool worked = VerifyScript(scriptSig, scriptPubKey, flags, 0xffffffff, sis, &serror, &tracker);
+    bool worked = VerifyScript(scriptSig, scriptPubKey, 0xffffffff, sis, &serror, &tracker);
     if (!worked)
     {
         printf("unexpected verify failure: %d: %s\n", (int)serror, ScriptErrorString(serror));

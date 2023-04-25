@@ -20,11 +20,36 @@ static valtype SignatureWithHashType(valtype vchSig, SigHashType sigHash)
     return vchSig;
 }
 
-static valtype randomHashTypes()
+static valtype randomHashTypes(uint32_t flags)
 {
     valtype res;
+    auto is_valid_combo_after_upgrade9 = [flags](uint32_t hashtype)
+    {
+        if ((flags & SCRIPT_ENABLE_SIGHASH_FORKID) && !(hashtype & SIGHASH_FORKID))
+        {
+            return false;
+        }
+        if ((hashtype & SIGHASH_FORKID) && !(flags & SCRIPT_ENABLE_SIGHASH_FORKID))
+        {
+            return false;
+        }
+        if (hashtype & SIGHASH_UTXOS)
+        {
+            // upgrade9 not enabled in test
+            return false;
+        }
+        return true;
+    };
+
     for (size_t i = 0; i < 16; i++)
-        res.emplace_back(InsecureRand32() & 0xff);
+    {
+        uint32_t hashType = 0;
+        do
+        {
+            hashType = InsecureRand32() & 0xff;
+        } while (!is_valid_combo_after_upgrade9(hashType));
+        res.emplace_back(hashType);
+    }
     return res;
 }
 
@@ -35,7 +60,7 @@ static void CheckSignatureErrorForAllSigHashType(const valtype &vchSig,
     ScriptError err = SCRIPT_ERR_OK;
     BOOST_CHECK(!CheckDataSignatureEncoding(vchSig, flags, &err));
     BOOST_CHECK_EQUAL(err, expected_error);
-    for (int i : randomHashTypes())
+    for (int i : randomHashTypes(flags))
     {
         valtype sig = SignatureWithHashType(vchSig, SigHashType(i));
         BOOST_CHECK(!CheckSignatureEncoding(sig, flags, &err));

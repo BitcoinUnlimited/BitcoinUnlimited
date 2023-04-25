@@ -265,6 +265,12 @@ static uint256 SignatureHashBitcoinCash(const CScript &scriptCode,
         assert(sis != nullptr);
         if (sis->flags & SCRIPT_ENABLE_TOKENS)
         {
+            if (sis->spentCoins.empty())
+            {
+                std::stringstream ss;
+                ss << __func__ << " error: SIGHASH_UTXOS requested, but missing utxo data";
+                throw std::runtime_error(ss.str());
+            }
             hashUtxos = GetUtxosHash(*sis);
             ss << hashUtxos;
         }
@@ -278,9 +284,6 @@ static uint256 SignatureHashBitcoinCash(const CScript &scriptCode,
 
     if (sis != nullptr && !sis->spentCoins.empty())
     {
-        // In the context of ProduceSignature, as implemented, the spentCoins is empty.
-        // We do not have this context.
-
         if (sis->coinTokenData(nIn) && (sis->flags & SCRIPT_ENABLE_TOKENS))
         {
             // New! For tokens (Upgrade9). If we had tokenData we inject it as a blob of:

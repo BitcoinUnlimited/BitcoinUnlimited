@@ -106,7 +106,7 @@ BOOST_AUTO_TEST_CASE(opcodes_basic)
     tx.vout[2].scriptPubKey = CScript() << OP_4;
     tx.nVersion = 101;
     tx.nLockTime = 10;
-    BaseSignatureChecker bsc;
+    FalseSignatureChecker bsc;
     CTransactionRef txref = MakeTransactionRef(tx);
     const auto context = createForAllInputs(txref, coins, bsc);
     BOOST_CHECK(context.size() == tx.vin.size());
