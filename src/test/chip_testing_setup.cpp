@@ -358,3 +358,11 @@ void ChipTestingSetup::RunTestsForChip(const std::string &chipName) {
         BOOST_CHECK_MESSAGE(false, strprintf("No tests found for '%s' CHIP!", chipName));
     }
 }
+
+BOOST_FIXTURE_TEST_SUITE(chip_testing_setup, BasicTestingSetup)
+BOOST_AUTO_TEST_CASE(chip_dummy_test)
+{
+    // This is a dummy test, we need to use BOOST_FIXTURE_TEST_SUITE cause is the string
+    // `make check` search for when isntrumenting the executions of unit tests
+}
+BOOST_AUTO_TEST_SUITE_END()
