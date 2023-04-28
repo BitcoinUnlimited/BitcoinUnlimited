@@ -106,6 +106,7 @@ BITCOIN_TESTS =\
   test/finalization_tests.cpp \
   test/forkscsv_tests.cpp \
   test/getarg_tests.cpp \
+  test/getmintxsize_tests.cpp \
   test/graphene_tests.cpp \
   test/hash_tests.cpp \
   test/heapoptional_tests.cpp \

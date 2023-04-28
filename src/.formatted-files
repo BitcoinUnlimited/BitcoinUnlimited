@@ -343,6 +343,7 @@ test/finalization_tests.cpp
 test/fork_tests.cpp
 test/fastfilter_tests.cpp
 test/getarg_tests.cpp
+test/getmintxsize_tests.cpp
 test/hash_tests.cpp
 test/key_tests.cpp
 test/limitedmap_tests.cpp
