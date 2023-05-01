@@ -636,14 +636,8 @@ public:
         // November 13, 2017 hard fork
         consensus.daaHeight = 3000;
 
-        // May, 15 2018 hard fork
-        consensus.may2018Height = 4000;
-
         // November 15, 2018 protocol upgrade
         consensus.nov2018Height = 4000;
-
-        // May, 15 2019 hard fork
-        consensus.may2019Height = 5000;
 
         // Nov, 15 2019 hard fork
         consensus.nov2019Height = 5000;
@@ -657,11 +651,13 @@ public:
         // Nov 15, 2020 12:00:00 UTC protocol upgrade
         // we need to let this one around because scalenet is still used for asert activation
         consensus.nov2020ActivationTime = 1605441600;
+
         // Nov 15, 2020 hard fork¶
         consensus.nov2020Height = 16844;
 
         // May, 15 2022 hard fork
         consensus.may2022Height = 95464;
+
         // May 15, 2023 hard fork
         consensus.may2023ActivationTime = MAY2023_ACTIVATION_TIME;
 
@@ -687,9 +683,10 @@ public:
         vFixedSeeds.clear();
         vSeeds.clear();
         // nodes with support for servicebits filtering should be at the top
-        vSeeds.emplace_back(CDNSSeedData("bitcoinforks.org", "testnet4-seed-bch.bitcoinforks.org", true));
         vSeeds.emplace_back(CDNSSeedData("toom.im", "testnet4-seed-bch.toom.im", true));
         vSeeds.emplace_back(CDNSSeedData("loping.net", "seed.tbch4.loping.net", true));
+        vSeeds.emplace_back(CDNSSeedData("flowee.cash", "testnet4-seed.flowee.cash", true));
+        vSeeds.emplace_back(CDNSSeedData("bitjson.com", "testnet4.bitjson.com", true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 196);
@@ -713,16 +710,20 @@ public:
         // Nov 15th, 2020 new aserti3-2d DAA
         checkpoints[ 16845] = uint256S("0x00000000fb325b8f34fe80c96a5f708a08699a68bbab82dba4474d86bd743077");
         // May 15th 2021 upgrade
-        checkpoints[ 54700] = uint256S("0x0000000000a2c2fc11a3b72adbd10a3f02a1f8745da55a85321523043639829a");
+        checkpoints[ 54700] = uint256S("0x00000000009af4379d87f17d0f172ee4769b48839a5a3a3e81d69da4322518b8");
+        checkpoints[ 68117] = uint256S("0x0000000000a2c2fc11a3b72adbd10a3f02a1f8745da55a85321523043639829a");
         // May 15th 2022 upgrade
         checkpoints[ 95465] = uint256S("0x00000000a77206a2265cabc47cc2c34706ba1c5e5a5743ac6681b83d43c91a01");
+        checkpoints[115252] = uint256S("0x00000000ae25e85d9e22cd6c8d72c2f5d4b0222289d801b7f633aeae3f8c6367");
+        checkpoints[121428] = uint256S("0x00000000002cf277337c504f7ce708cce851d5d20cad2936fedf3be95a9ca5eb");
+        checkpoints[128070] = uint256S("0x00000000044f34642fa3d91e34678737cc10a821a4696f50c187091c3df480c2");
         // clang-format on
 
         // Data as of block
-        // 00000000009758d51aaf3bdc018b8b5c6e1725f742c850d44a0585ec168c409d
-        // (height 54516)
-        checkpointData.nTimeLastCheckpoint = 1628025276;
-        checkpointData.nTransactionsLastCheckpoint = 56602;
+        // 00000000010532578431caaad666e01ef7f744a90140192c661b285d2eeacfc8
+        // (height 123647)
+        checkpointData.nTimeLastCheckpoint = 1669510845;
+        checkpointData.nTransactionsLastCheckpoint = 126464;
         checkpointData.fTransactionsPerDay = 144;
     }
 };
