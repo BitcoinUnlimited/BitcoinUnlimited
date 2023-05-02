@@ -196,4 +196,58 @@ bool IsBlockFinalized(const CBlockIndex *pindex);
 //! Check whether the block associated with this index entry is pruned or not.
 bool IsBlockPruned(const CBlockIndex *pblockindex);
 
+/// This class manages tracking exactly at what block a particular upgrade activated, relative to a block index it is
+/// given.  Works correcly even if there is a reorg and/or if the active chain is not being considered.  It was written
+/// originally for Upgrade9 activation height tracking, but it is generic enough in that it can be re-used for any
+/// future upgrade, if needed.
+struct ActivationBlockTracker
+{
+    /// Typedef for a function pointer to one of the Is*Enabled() functions in consensus/activation.h
+    /// e.g.: IsUpgrade9Enabled
+    using Predicate = bool (*)(const Consensus::Params &, const CBlockIndex *);
+
+    ActivationBlockTracker(Predicate isUpgradeXEnabledFunc) : predicate(isUpgradeXEnabledFunc) {}
+
+    /**
+     * @brief GetActivationBlock - Given a block index for which the upgrade in question is already activated, returns
+     *                             the activation block for the upgrade. (The activation block is the first block which
+     *                             is an ancestor of `pindex` for which `predicate()` returns `true`.
+     * @pre pindex **must** have the upgrade activated for itself (e.g. it must be a block index that returns `true` for
+     *             `predicate(params, pindex)`. For efficiency, this precondition is not checked!
+     * @param params - Consensus params for the global chain, e.g. config.GetChainParams().GetConsensus()
+     * @param pindex - Usually the current tip, but not necessarily. pindex need not live on the active chain.
+     * @return The block that the upgrade activated. The activation block is the last block mined under the OLD rules,
+     *         and the first block for which `predicate()` returns `true`.  The block after this one would be really
+     *         the first block where e.g. tokens are enabled if we are considering upgrade9, for example.  May return
+     *         pindex itself.  If this function's precondition is met (`pindex` has the upgrade activated), will never
+     *         return nullptr.  Otherwise if the precondition is not satisfied, this function's behavior is undefined.
+     */
+    const CBlockIndex *GetActivationBlock(const CBlockIndex *pindex, const Consensus::Params &params)
+        EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+
+    /**
+     * For testing purposes.  We cache the activation block index for efficiency. If block indices are freed then this
+     * needs to be called to ensure no dangling pointer when a new block tree is created.
+     */
+    void ResetActivationBlockCache() noexcept EXCLUSIVE_LOCKS_REQUIRED(cs_main) { cachedActivationBlock = nullptr; }
+
+    /**
+     * For testing purposes.  Get the current cached activation block.
+     */
+    const CBlockIndex *GetActivationBlockCache() const noexcept EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+    {
+        return cachedActivationBlock;
+    }
+
+    Predicate GetPredicate() const { return predicate; }
+
+private:
+    const CBlockIndex *cachedActivationBlock GUARDED_BY(cs_main) = nullptr;
+    const Predicate predicate;
+};
+
+/// Global object to track the exact height when Upgrade9 activated (needed by Token consensus rules).
+extern ActivationBlockTracker g_upgrade9_block_tracker;
+
+
 #endif

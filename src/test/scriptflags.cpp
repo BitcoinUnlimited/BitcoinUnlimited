@@ -41,6 +41,7 @@ static std::map<std::string, uint32_t> mapFlagNames =
     {"64_BIT_INTEGERS", SCRIPT_64_BIT_INTEGERS},
     {"NATIVE_INTROSPECTION", SCRIPT_NATIVE_INTROSPECTION},
     {"P2SH_32", SCRIPT_ENABLE_P2SH_32},
+    {"TOKENS", SCRIPT_ENABLE_TOKENS},
 };
 // clang-format on
 

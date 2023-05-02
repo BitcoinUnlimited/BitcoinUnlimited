@@ -8,13 +8,16 @@
 #define BITCOIN_PRIMITIVES_TRANSACTION_H
 
 #include "amount.h"
+#include "primitives/token.h"
 #include "script/script.h"
 #include "serialize.h"
 #include "tweak.h"
 #include "uint256.h"
 
+#include <algorithm>
 #include <atomic>
 #include <memory>
+#include <utility>
 
 extern CTweak<unsigned int> nDustThreshold;
 
@@ -54,7 +57,7 @@ public:
 
     friend bool operator==(const COutPoint &a, const COutPoint &b) { return (a.hash == b.hash && a.n == b.n); }
     friend bool operator!=(const COutPoint &a, const COutPoint &b) { return !(a == b); }
-    std::string ToString() const;
+    std::string ToString(bool fVerbose = false) const;
 };
 
 /** An input of a transaction.  It contains the location of the previous
@@ -115,7 +118,7 @@ public:
     }
 
     friend bool operator!=(const CTxIn &a, const CTxIn &b) { return !(a == b); }
-    std::string ToString() const;
+    std::string ToString(bool fVerbose = false) const;
 };
 
 /** An output of a transaction.  It contains the public key that the next input
@@ -126,9 +129,18 @@ class CTxOut
 public:
     CAmount nValue;
     CScript scriptPubKey;
+    token::OutputDataPtr tokenDataPtr; ///< may be null (indicates no token data for this output)
 
     CTxOut() { SetNull(); }
-    CTxOut(const CAmount &nValueIn, CScript scriptPubKeyIn);
+    CTxOut(const CAmount &nValueIn, CScript scriptPubKeyIn, const token::OutputDataPtr &tokenDataIn = {})
+        : nValue(nValueIn), scriptPubKey(scriptPubKeyIn), tokenDataPtr(tokenDataIn)
+    {
+    }
+
+    CTxOut(CAmount nValueIn, const CScript &scriptPubKeyIn, token::OutputDataPtr &&tokenDataIn)
+        : nValue(nValueIn), scriptPubKey(scriptPubKeyIn), tokenDataPtr(std::move(tokenDataIn))
+    {
+    }
 
     ADD_SERIALIZE_METHODS;
 
@@ -136,16 +148,34 @@ public:
     inline void SerializationOp(Stream &s, Operation ser_action)
     {
         READWRITE(nValue);
-        READWRITE(*(CScriptBase *)(&scriptPubKey));
+        if (!ser_action.ForRead() && !this->tokenDataPtr)
+        {
+            // fast-path for writing with no token data, just write out the scriptPubKey directly
+            READWRITE(*(CScriptBase *)(&scriptPubKey));
+        }
+        else
+        {
+            token::WrappedScriptPubKey wspk;
+            SER_WRITE(token::WrapScriptPubKey(wspk, this->tokenDataPtr, this->scriptPubKey, s.GetVersion()));
+            READWRITE(wspk);
+            SER_READ(token::UnwrapScriptPubKey(wspk, this->tokenDataPtr, this->scriptPubKey, s.GetVersion()));
+        }
     }
 
     void SetNull()
     {
         nValue = -1;
         scriptPubKey.clear();
+        tokenDataPtr.reset();
     }
 
     bool IsNull() const { return (nValue == -1); }
+
+    bool HasUnparseableTokenData() const
+    {
+        return !tokenDataPtr && !scriptPubKey.empty() && scriptPubKey[0] == token::PREFIX_BYTE;
+    }
+
     uint256 GetHash() const;
 
     CAmount GetDustThreshold() const
@@ -158,11 +188,11 @@ public:
     bool IsDust() const { return (nValue < GetDustThreshold()); }
     friend bool operator==(const CTxOut &a, const CTxOut &b)
     {
-        return (a.nValue == b.nValue && a.scriptPubKey == b.scriptPubKey);
+        return (a.nValue == b.nValue && a.scriptPubKey == b.scriptPubKey && a.tokenDataPtr == b.tokenDataPtr);
     }
 
     friend bool operator!=(const CTxOut &a, const CTxOut &b) { return !(a == b); }
-    std::string ToString() const;
+    std::string ToString(bool fVerbose = false) const;
 };
 
 struct CMutableTransaction;
@@ -259,9 +289,29 @@ public:
     unsigned int CalculateModifiedSize(unsigned int nSize = 0) const;
 
     bool IsCoinBase() const { return (vin.size() == 1 && vin[0].prevout.IsNull()); }
+
+
+    /// @return true if this transaction has any vouts with non-null token::OutputData
+    bool HasTokenOutputs() const
+    {
+        return std::any_of(vout.begin(), vout.end(), [](const CTxOut &out) { return bool(out.tokenDataPtr); });
+    }
+
+    /// @return true if any vouts have scriptPubKey[0] == token::PREFIX_BYTE,
+    /// and if the vout has tokenDataPtr == nullptr.  This indicates badly
+    /// formatted and/or unparseable token data embedded in the scriptPubKey.
+    /// Before token activation we allow such scriptPubKeys to appear in
+    /// vouts, but after activation of native tokens such txns are rejected by
+    /// consensus (see: CheckTxTokens() in consensus/tokens.cpp).
+    bool HasOutputsWithUnparseableTokenData() const
+    {
+        return std::any_of(vout.begin(), vout.end(), [](const CTxOut &out) { return out.HasUnparseableTokenData(); });
+    }
+
+
     friend bool operator==(const CTransaction &a, const CTransaction &b) { return a.hash == b.hash; }
     friend bool operator!=(const CTransaction &a, const CTransaction &b) { return a.hash != b.hash; }
-    std::string ToString() const;
+    std::string ToString(bool fVerbose = false) const;
 
     // Return the size of the transaction in bytes.
     size_t GetTxSize() const;

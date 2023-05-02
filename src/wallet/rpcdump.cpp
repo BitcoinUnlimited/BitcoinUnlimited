@@ -344,29 +344,31 @@ UniValue importaddress(const UniValue &params, bool fHelp)
     if (params.size() > 3)
         fP2SH = params[3].get_bool();
 
-    LOCK2(cs_main, pwalletMain->cs_wallet);
-
-    CTxDestination dest = DecodeDestination(params[0].get_str());
-    if (IsValidDestination(dest))
     {
-        if (fP2SH)
+        LOCK(pwalletMain->cs_wallet);
+
+        CTxDestination dest = DecodeDestination(params[0].get_str());
+        if (IsValidDestination(dest))
         {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Cannot use the p2sh flag with an address - use "
-                                                           "a script instead");
+            if (fP2SH)
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Cannot use the p2sh flag with an address - use "
+                                                               "a script instead");
+            }
+            ImportAddress(dest, strLabel);
         }
-        ImportAddress(dest, strLabel);
-    }
-    else if (IsHex(params[0].get_str()))
-    {
-        std::vector<uint8_t> data(ParseHex(params[0].get_str()));
-        ImportScript(CScript(data.begin(), data.end()), strLabel, fP2SH);
-    }
-    else
-    {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Bitcoin address or script");
+        else if (IsHex(params[0].get_str()))
+        {
+            std::vector<uint8_t> data(ParseHex(params[0].get_str()));
+            ImportScript(CScript(data.begin(), data.end()), strLabel, fP2SH);
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Bitcoin address or script");
+        }
     }
 
-    if (fRescanLocal)
+    if (fRescanLocal) // These functions lock cs_wallet themselves when needed
     {
         pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true);
         pwalletMain->ReacceptWalletTransactions();

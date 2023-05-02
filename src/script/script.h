@@ -243,13 +243,23 @@ enum opcodetype
     // (205) Pop the top item from the stack as an output index (Script Number). Push the locking bytecode of the output
     // at that index to the stack.
     OP_OUTPUTBYTECODE = 0xcd,
-    // 206
-    OP_NATIVE_INTROSPECTION_RESERVED1 = 0xce,
-    // 207
-    OP_NATIVE_INTROSPECTION_RESERVED2 = 0xcf,
+    // Native Introspection of tokens (SCRIPT_ENABLE_TOKENS must be set)
+    OP_UTXOTOKENCATEGORY = 0xce,
+    OP_UTXOTOKENCOMMITMENT = 0xcf,
+    OP_UTXOTOKENAMOUNT = 0xd0,
+    OP_OUTPUTTOKENCATEGORY = 0xd1,
+    OP_OUTPUTTOKENCOMMITMENT = 0xd2,
 
+    OP_RESERVED3 = 0xd4,
+    OP_RESERVED4 = 0xd5,
+
+    OP_OUTPUTTOKENAMOUNT = 0xd3,
     // The first op_code value after all defined opcodes
     FIRST_UNDEFINED_OP_VALUE,
+
+    // Invalid opcode if executed, but used for special token prefix if at
+    // position 0 in scriptPubKey. See: primitives/token.h
+    SPECIAL_TOKEN_PREFIX = 0xef,
 
     OP_INVALIDOPCODE = 0xff,
 };

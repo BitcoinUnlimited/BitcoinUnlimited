@@ -15,3 +15,4 @@ UniValue read_json(const std::string &jsondata) {
     }
     return v.get_array();
 }
+

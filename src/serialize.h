@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "prevector.h"
+#include "span.h"
 
 // BU Allow a maximum message size of 256MB
 // BU does not use this value for json encoding size calculations
@@ -43,6 +44,12 @@ struct deserialize_type
 {
 };
 constexpr deserialize_type deserialize{};
+
+//! Safely convert odd char pointer types to standard ones.
+inline char *CharCast(char *c) { return c; }
+inline char *CharCast(uint8_t *c) { return (char *)c; }
+inline const char *CharCast(const char *c) { return c; }
+inline const char *CharCast(const uint8_t *c) { return (const char *)c; }
 
 /**
  * Used to bypass the rule against non-const reference to temporary
@@ -207,6 +214,22 @@ enum
 };
 
 #define READWRITE(...) (::SerReadWriteMany(s, ser_action, __VA_ARGS__))
+#define SER_READ(code)                      \
+    do                                      \
+    {                                       \
+        if constexpr (ser_action.ForRead()) \
+        {                                   \
+            code;                           \
+        }                                   \
+    } while (0)
+#define SER_WRITE(code)                      \
+    do                                       \
+    {                                        \
+        if constexpr (!ser_action.ForRead()) \
+        {                                    \
+            code;                            \
+        }                                    \
+    } while (0)
 
 /**
  * Implement three methods for serializable objects. These are actually wrappers over
@@ -351,6 +374,22 @@ inline void Unserialize(Stream &s, bool &a)
 {
     char f = ser_readdata8(s);
     a = f;
+}
+
+template <typename Stream>
+inline void Serialize(Stream &s, const Span<const uint8_t> &span)
+{
+    s.write(CharCast(span.data()), span.size());
+}
+template <typename Stream>
+inline void Serialize(Stream &s, const Span<uint8_t> &span)
+{
+    s.write(CharCast(span.data()), span.size());
+}
+template <typename Stream>
+inline void Unserialize(Stream &s, Span<uint8_t> &span)
+{
+    s.read(CharCast(span.data()), span.size());
 }
 
 

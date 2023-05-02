@@ -72,8 +72,16 @@ public:
     }
 
     template <typename Stream>
+    static void SerializeWrapped(Stream &s, const token::WrappedScriptPubKey &wspk)
+    {
+        CScript tmp(wspk.data(), wspk.data() + wspk.size());
+        s << CScriptCompressor(tmp);
+    }
+
+    template <typename Stream>
     void Unserialize(Stream &s)
     {
+        static constexpr unsigned int MAX_VECTOR_ALLOCATE = 5000000;
         unsigned int nSize = 0;
         s >> VARINT(nSize);
         if (nSize < nSpecialScripts)
@@ -84,17 +92,23 @@ public:
             return;
         }
         nSize -= nSpecialScripts;
-        if (nSize > MAX_SCRIPT_SIZE)
+        script.resize(0);
+        for (unsigned pos = 0, chunk; pos < nSize; pos += chunk)
         {
-            // Overly long script, replace with a short invalid one
-            script << OP_RETURN;
-            s.ignore(nSize);
+            // Read-in 5MB at a time to prevent over-allocation on bad/garbled data. This algorithm is similar to
+            // the one unsed in Unserialize_vector in serialize.h.
+            chunk = std::min(nSize - pos, MAX_VECTOR_ALLOCATE);
+            script.resize_uninitialized(pos + chunk);
+            s >> REF(Span{script.data() + pos, chunk});
         }
-        else
-        {
-            script.resize(nSize);
-            s >> REF(CFlatData(script));
-        }
+    }
+
+    template <typename Stream>
+    static void UnserializeWrapped(Stream &s, token::WrappedScriptPubKey &wspk)
+    {
+        CScript tmp;
+        s >> REF(CScriptCompressor(tmp));
+        wspk.assign(tmp.begin(), tmp.end());
     }
 };
 
@@ -125,8 +139,23 @@ public:
             READWRITE(VARINT(nVal));
             txout.nValue = DecompressAmount(nVal);
         }
-        CScriptCompressor cscript(REF(txout.scriptPubKey));
-        READWRITE(cscript);
+
+        token::WrappedScriptPubKey wspk;
+        SER_WRITE(token::WrapScriptPubKey(wspk, txout.tokenDataPtr, txout.scriptPubKey, s.GetVersion()));
+
+        SER_READ(CScriptCompressor::UnserializeWrapped(s, wspk));
+        SER_WRITE(CScriptCompressor::SerializeWrapped(s, wspk));
+
+        SER_READ(token::UnwrapScriptPubKey(wspk, txout.tokenDataPtr, txout.scriptPubKey, s.GetVersion()));
+
+        if (txout.scriptPubKey.size() > MAX_SCRIPT_SIZE)
+        {
+            // Overly long script, replace with a short invalid one
+            // - This logic originally lived in ScriptCompression::Unserialize but was moved here
+            // - Note the expression below is explicitly an assignment and not a `.resize(1, OP_RETURN)` so as to
+            //   force the release of >10KB of memory obj.scriptPubKey has allocated.
+            SER_READ(txout.scriptPubKey = CScript() << OP_RETURN);
+        }
     }
 };
 
