@@ -7,6 +7,8 @@
 #define BITCOIN_COINCONTROL_H
 
 #include "primitives/transaction.h"
+#include "pubkey.h" // Required for CTxDestination
+#include "script/standard.h" // CTxDestination, CNoDestination
 
 /** Coin Control Features. */
 class CCoinControl
@@ -19,6 +21,10 @@ public:
     bool fAllowWatchOnly;
     //! Minimum absolute fee (not per kilobyte)
     CAmount nMinimumTotalFee;
+    //! Allow spending of coins that have tokens on them
+    bool m_allow_tokens;
+    //! Only select coins that have tokens on them (requires m_allow_tokens == true)
+    bool m_tokens_only;
 
     CCoinControl() { SetNull(); }
     void SetNull()
@@ -28,6 +34,8 @@ public:
         fAllowWatchOnly = false;
         setSelected.clear();
         nMinimumTotalFee = 0;
+        m_allow_tokens = false;
+        m_tokens_only = false;
     }
 
     bool HasSelected() const { return (setSelected.size() > 0); }
@@ -43,6 +51,15 @@ public:
     void ListSelected(std::vector<COutPoint> &vOutpoints) const
     {
         vOutpoints.assign(setSelected.begin(), setSelected.end());
+    }
+
+    void SetTokensOnly(const bool tokens_only)
+    {
+        m_tokens_only = tokens_only;
+        if (tokens_only)
+        {
+            m_allow_tokens = true;
+        }
     }
 
 private:

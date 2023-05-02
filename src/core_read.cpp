@@ -230,3 +230,101 @@ vector<unsigned char> ParseHexUV(const UniValue &v, const string &strName)
         throw runtime_error(strName + " must be hexadecimal string (not '" + strHex + "')");
     return ParseHex(strHex);
 }
+
+token::SafeAmount DecodeSafeAmount(const UniValue &obj)
+{
+    // Incoming amount may be a string (to encode very large amounts > 53bit), or an integer
+    if (obj.isStr() || obj.isNum())
+    {
+        // use the univalue parser (better than atoi64())
+        const UniValue objAsNumeric{UniValue::VNUM, obj.getValStr()};
+        // may throw on parse error (not an integer number string)
+        const auto optAmt = token::SafeAmount::fromInt(objAsNumeric.get_int64());
+        if (!optAmt)
+            throw std::runtime_error("Invalid \"amount\" in tokenData");
+        return *optAmt;
+    }
+    // else ...
+    throw std::runtime_error("Expected a number or a string for \"amount\" in tokenData");
+}
+
+token::OutputData DecodeTokenDataUV(const UniValue &obj)
+{
+    token::Id category;
+    token::SafeAmount amount;
+    bool hasNFT{}, isMutable{}, isMinting{};
+    token::NFTCommitment comm;
+
+    if (!obj.isObject())
+        throw std::runtime_error("Bad tokenData; expected JSON object");
+    const UniValue &o = obj.get_obj();
+
+    if (o.exists("category"))
+    {
+        category = token::Id(ParseHashStr(o["category"].get_str(), "category"));
+    }
+    else
+    {
+        throw std::runtime_error("Missing \"category\" in tokenData");
+    }
+    if (o.exists("amount"))
+    {
+        // may be a string (to encode very large amounts) or an integer
+        amount = DecodeSafeAmount(o["amount"]);
+    }
+
+    if (o.exists("nft"))
+    {
+        if (!o["nft"].isObject())
+            throw std::runtime_error("Bad tokenData; expected JSON object for the \"nft\" key");
+        const UniValue &o_nft = o["nft"].get_obj();
+
+        hasNFT = true;
+
+        if (o_nft.exists("capability"))
+        {
+            // optional, defaults to "none"
+            const auto lc_cap = ToLower(o_nft["capability"].get_str());
+            if (lc_cap == "none")
+            { /* pass */
+            }
+            else if (lc_cap == "mutable")
+                isMutable = true;
+            else if (lc_cap == "minting")
+                isMinting = true;
+            else
+            {
+                throw std::runtime_error("Invalid \"capability\" in tokenData; must be one of: "
+                                         "\"none\", \"minting\", or \"mutable\"");
+            }
+        }
+
+        if (o_nft.exists("commitment"))
+        {
+            // optional, defaults to "empty"
+            std::vector<uint8_t> vec;
+            const auto val = o_nft["commitment"];
+            if (!IsHex(val.get_str()) ||
+                (vec = ParseHex(val.get_str())).size() > token::MAX_CONSENSUS_COMMITMENT_LENGTH)
+            {
+                throw std::runtime_error("Invalid \"commitment\" in tokenData");
+            }
+            comm.assign(vec.begin(), vec.end());
+        }
+    }
+
+    if (!hasNFT && amount.getint64() == 0)
+    {
+        throw std::runtime_error("Fungible amount must be >0 for fungible-only tokens");
+    }
+
+    token::OutputData ret(category, amount, comm);
+    ret.SetNFT(hasNFT, isMutable, isMinting);
+
+    if (!ret.IsValidBitfield())
+    {
+        throw std::runtime_error(strprintf("Invalid bitfield: %x", ret.GetBitfieldByte()));
+    }
+
+    return ret;
+}

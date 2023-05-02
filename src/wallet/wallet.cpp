@@ -1976,6 +1976,22 @@ void CWallet::AvailableCoins(vector<COutput> &vCoins,
 
             for (unsigned int i = 0; i < pcoin->vout.size(); i++)
             {
+                if (pcoin->vout[i].tokenDataPtr)
+                {
+                    const bool allowTokens = coinControl ? coinControl->m_allow_tokens : false;
+                    if (!allowTokens)
+                    {
+                        continue;
+                    }
+                }
+                else
+                {
+                    const bool tokensOnly = coinControl ? coinControl->m_tokens_only : false;
+                    if (tokensOnly)
+                    {
+                        continue;
+                    }
+                }
                 isminetype mine = IsMine(pcoin->vout[i]);
                 if (!(IsSpent(wtxid, i)) && mine != ISMINE_NO && !IsLockedCoin((*it).first, i) &&
                     (pcoin->vout[i].nValue > 0 || fIncludeZeroValue) &&

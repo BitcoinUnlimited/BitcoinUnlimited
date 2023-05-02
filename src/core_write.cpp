@@ -239,3 +239,39 @@ void TxToUniv(const CTransaction &tx, const uint256 &hashBlock, UniValue &entry)
     // the hex-encoded transaction. used the name "hex" to be consistent with the verbose output of "getrawtransaction".
     entry.pushKV("hex", EncodeHexTx(tx));
 }
+
+UniValue SafeAmountToUniv(const token::SafeAmount val)
+{
+    UniValue uv = val.getint64();
+    // This value may exceed the maximal safe JSON integer (~53 bits). Insist it be a string always instead.
+    // We will use UniValue's string serializer for ints since it is fast and locale-independent.
+    std::string numStr = uv.getValStr(); // note: to avoid UB, we must copy to temp obj first to assign it back to `uv`
+    uv = std::move(numStr);
+    return uv;
+}
+
+UniValue TokenDataToUniv(const token::OutputData &tok)
+{
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("category", tok.GetId().ToString());
+    obj.pushKV("amount", SafeAmountToUniv(tok.GetAmount()));
+    if (tok.HasNFT())
+    {
+        UniValue nft_obj(UniValue::VOBJ);
+
+        nft_obj.pushKV("capability",
+            [&tok]
+            {
+                if (tok.IsMutableNFT())
+                    return "mutable";
+                else if (tok.IsMintingNFT())
+                    return "minting";
+                else
+                    return "none";
+            }());
+        nft_obj.pushKV("commitment", HexStr(tok.GetCommitment()));
+
+        obj.pushKV("nft", std::move(nft_obj));
+    }
+    return obj;
+}

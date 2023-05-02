@@ -107,6 +107,10 @@ void TxToJSON(const CTransaction &tx, const int64_t txTime, const uint256 hashBl
         UniValue o(UniValue::VOBJ);
         ScriptPubKeyToJSON(txout.scriptPubKey, o, true);
         out.pushKV("scriptPubKey", o);
+        if (tx.vout[i].tokenDataPtr)
+        {
+            out.pushKV("tokenData", TokenDataToUniv(*tx.vout[i].tokenDataPtr));
+        }
         vout.push_back(out);
     }
     entry.pushKV("vout", vout);
@@ -199,6 +203,14 @@ UniValue getrawtransaction(const UniValue &params, bool fHelp)
             "           \"bitcoinaddress\"        (string) bitcoin address\n"
             "           ,...\n"
             "         ]\n"
+            "       },\n"
+            "       \"tokenData\" : {           (json object optional)\n"
+            "         \"category\" : \"hex\",   (string) token id\n"
+            "         \"amount\" : \"xxx\",       (string) fungible amount (is a string to support >53-bit amounts)\n"
+            "         \"nft\" : {               (json object optional)\n"
+            "           \"capability\" : \"xxx\", (string) one of \"none\", \"mutable\", \"minting\"\n"
+            "           \"commitment\" : \"hex\"  (string) NFT commitment\n"
+            "         }\n"
             "       }\n"
             "     }\n"
             "     ,...\n"
@@ -363,7 +375,15 @@ UniValue getrawblocktransactions(const UniValue &params, bool fHelp)
             "             \"bitcoinaddress\"        (string) bitcoin address\n"
             "             ,...\n"
             "           ]\n"
+            "         },\n"
+            "       \"tokenData\" : {           (json object optional)\n"
+            "         \"category\" : \"hex\",   (string) token id\n"
+            "         \"amount\" : \"xxx\",       (string) fungible amount (is a string to support >53-bit amounts)\n"
+            "         \"nft\" : {               (json object optional)\n"
+            "           \"capability\" : \"xxx\", (string) one of \"none\", \"mutable\", \"minting\"\n"
+            "           \"commitment\" : \"hex\"  (string) NFT commitment\n"
             "         }\n"
+            "       }\n"
             "       }\n"
             "      ,...\n"
             "      ],\n"
@@ -515,7 +535,15 @@ UniValue getrawtransactionssince(const UniValue &params, bool fHelp)
             "               \"bitcoinaddress\"        (string) bitcoin address\n"
             "               ,...\n"
             "             ]\n"
-            "           }\n"
+            "           },\n"
+            "       \"tokenData\" : {           (json object optional)\n"
+            "         \"category\" : \"hex\",   (string) token id\n"
+            "         \"amount\" : \"xxx\",       (string) fungible amount (is a string to support >53-bit amounts)\n"
+            "         \"nft\" : {               (json object optional)\n"
+            "           \"capability\" : \"xxx\", (string) one of \"none\", \"mutable\", \"minting\"\n"
+            "           \"commitment\" : \"hex\"  (string) NFT commitment\n"
+            "         }\n"
+            "       }\n"
             "         }\n"
             "         ,...\n"
             "        ],\n"
@@ -839,6 +867,9 @@ UniValue createrawtransaction(const UniValue &params, bool fHelp)
         throw runtime_error(
             "createrawtransaction [{\"txid\":\"id\",\"vout\":n},...] {\"address\":amount,\"data\":\"hex\",...} ( "
             "locktime )\n"
+            "createrawtransaction [{\"txid\":\"id\",\"vout\":n},...] {\"address\": {\"amount\": amount, \"tokenData\": "
+            "{ \"category\": \"hex\", \"amount\": amount, \"nft\": \"capability\": \"str\", \"commitment\": \"hex\" "
+            "}}} ( locktime )\n"
             "\nCreate a transaction spending the given inputs and creating new outputs.\n"
             "Outputs can be addresses or data.\n"
             "Returns hex-encoded raw transaction.\n"
@@ -961,9 +992,26 @@ UniValue createrawtransaction(const UniValue &params, bool fHelp)
             }
 
             CScript scriptPubKey = GetScriptForDestination(destination);
-            CAmount nAmount = AmountFromValue(sendTo[name_]);
 
-            CTxOut out(nAmount, scriptPubKey);
+            CAmount nAmount;
+            token::OutputDataPtr tokenDataPtr;
+            if (sendTo[name_].isObject())
+            {
+                const UniValue &o = sendTo[name_].get_obj();
+                // parse object { "amount" : n,  "tokenData" : { ... } }
+                nAmount = AmountFromValue(o["amount"]);
+                if (o.exists("tokenData"))
+                {
+                    tokenDataPtr = DecodeTokenDataUV(o["tokenData"]);
+                }
+            }
+            else
+            {
+                // parse amount directly
+                nAmount = AmountFromValue(sendTo[name_]);
+            }
+
+            CTxOut out(nAmount, scriptPubKey, std::move(tokenDataPtr));
             rawTx.vout.push_back(out);
         }
     }
@@ -974,54 +1022,63 @@ UniValue createrawtransaction(const UniValue &params, bool fHelp)
 UniValue decoderawtransaction(const UniValue &params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
-        throw runtime_error("decoderawtransaction \"hexstring\"\n"
-                            "\nReturn a JSON object representing the serialized, hex-encoded transaction.\n"
+        throw runtime_error(
+            "decoderawtransaction \"hexstring\"\n"
+            "\nReturn a JSON object representing the serialized, hex-encoded transaction.\n"
 
-                            "\nArguments:\n"
-                            "1. \"hex\"      (string, required) The transaction hex string\n"
+            "\nArguments:\n"
+            "1. \"hex\"      (string, required) The transaction hex string\n"
 
-                            "\nResult:\n"
-                            "{\n"
-                            "  \"txid\" : \"id\",        (string) The transaction id\n"
-                            "  \"size\" : n,             (numeric) The transaction size\n"
-                            "  \"version\" : n,          (numeric) The version\n"
-                            "  \"locktime\" : ttt,       (numeric) The lock time\n"
-                            "  \"vin\" : [               (array of json objects)\n"
-                            "     {\n"
-                            "       \"txid\": \"id\",    (string) The transaction id\n"
-                            "       \"vout\": n,         (numeric) The output number\n"
-                            "       \"scriptSig\": {     (json object) The script\n"
-                            "         \"asm\": \"asm\",  (string) asm\n"
-                            "         \"hex\": \"hex\"   (string) hex\n"
-                            "       },\n"
-                            "       \"sequence\": n     (numeric) The script sequence number\n"
-                            "     }\n"
-                            "     ,...\n"
-                            "  ],\n"
-                            "  \"vout\" : [             (array of json objects)\n"
-                            "     {\n"
-                            "       \"value\" : x.xxx,            (numeric) The value in " +
-                            CURRENCY_UNIT +
-                            "\n"
-                            "       \"n\" : n,                    (numeric) index\n"
-                            "       \"scriptPubKey\" : {          (json object)\n"
-                            "         \"asm\" : \"asm\",          (string) the asm\n"
-                            "         \"hex\" : \"hex\",          (string) the hex\n"
-                            "         \"reqSigs\" : n,            (numeric) The required sigs\n"
-                            "         \"type\" : \"pubkeyhash\",  (string) The type, eg 'pubkeyhash'\n"
-                            "         \"addresses\" : [           (json array of string)\n"
-                            "           \"12tvKAXCxZjSmdNbao16dKXC8tRWfcF5oc\"   (string) bitcoin address\n"
-                            "           ,...\n"
-                            "         ]\n"
-                            "       }\n"
-                            "     }\n"
-                            "     ,...\n"
-                            "  ],\n"
-                            "}\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"txid\" : \"id\",        (string) The transaction id\n"
+            "  \"size\" : n,             (numeric) The transaction size\n"
+            "  \"version\" : n,          (numeric) The version\n"
+            "  \"locktime\" : ttt,       (numeric) The lock time\n"
+            "  \"vin\" : [               (array of json objects)\n"
+            "     {\n"
+            "       \"txid\": \"id\",    (string) The transaction id\n"
+            "       \"vout\": n,         (numeric) The output number\n"
+            "       \"scriptSig\": {     (json object) The script\n"
+            "         \"asm\": \"asm\",  (string) asm\n"
+            "         \"hex\": \"hex\"   (string) hex\n"
+            "       },\n"
+            "       \"sequence\": n     (numeric) The script sequence number\n"
+            "     }\n"
+            "     ,...\n"
+            "  ],\n"
+            "  \"vout\" : [             (array of json objects)\n"
+            "     {\n"
+            "       \"value\" : x.xxx,            (numeric) The value in " +
+            CURRENCY_UNIT +
+            "\n"
+            "       \"n\" : n,                    (numeric) index\n"
+            "       \"scriptPubKey\" : {          (json object)\n"
+            "         \"asm\" : \"asm\",          (string) the asm\n"
+            "         \"hex\" : \"hex\",          (string) the hex\n"
+            "         \"reqSigs\" : n,            (numeric) The required sigs\n"
+            "         \"type\" : \"pubkeyhash\",  (string) The type, eg 'pubkeyhash'\n"
+            "         \"addresses\" : [           (json array of string)\n"
+            "           \"12tvKAXCxZjSmdNbao16dKXC8tRWfcF5oc\"   (string) bitcoin address\n"
+            "           ,...\n"
+            "         ]\n"
+            "       },\n"
+            "       \"tokenData\" : {           (json object optional)\n"
+            "         \"category\" : \"hex\",   (string) token id\n"
+            "         \"amount\" : \"xxx\",       (string) fungible amount (is a string to support >53-bit amounts)\n"
+            "         \"nft\" : {               (json object optional)\n"
+            "           \"capability\" : \"xxx\", (string) one of \"none\", \"mutable\", \"minting\"\n"
+            "           \"commitment\" : \"hex\"  (string) NFT commitment\n"
+            "         }\n"
+            "       }\n"
+            "     }\n"
+            "     ,...\n"
+            "  ],\n"
+            "}\n"
 
-                            "\nExamples:\n" +
-                            HelpExampleCli("decoderawtransaction", "\"hexstring\"") +
-                            HelpExampleRpc("decoderawtransaction", "\"hexstring\""));
+            "\nExamples:\n" +
+            HelpExampleCli("decoderawtransaction", "\"hexstring\"") +
+            HelpExampleRpc("decoderawtransaction", "\"hexstring\""));
 
     LOCK(cs_main);
     RPCTypeCheck(params, {UniValue::VSTR});
@@ -1140,6 +1197,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
             "       \"ALL\"\n"
             "       \"NONE\"\n"
             "       \"SINGLE\"\n"
+            "       \"UTXOS\"\n"
             "       followed by ANYONECANPAY and/or FORKID/NOFORKID flags separated with |, for example\n"
             "       \"ALL|ANYONECANPAY|FORKID\"\n"
             "       \"NONE|FORKID\"\n"
@@ -1340,6 +1398,8 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
                 nHashType |= SIGHASH_ANYONECANPAY;
             else if (boost::iequals(s, "FORKID"))
                 nHashType |= SIGHASH_FORKID;
+            else if (boost::iequals(s, "UTXOS"))
+                nHashType |= SIGHASH_UTXOS;
             else if (boost::iequals(s, "NOFORKID"))
             {
                 // Still support signing legacy chain transactions
@@ -1393,7 +1453,7 @@ UniValue signrawtransaction(const UniValue &params, bool fHelp)
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if (!fHashSingle || (i < mergedTx.vout.size()))
         {
-            SignSignature(scriptFlags, keystore, prevPubKey, mergedTx, i, amount, nHashType, sigType);
+            SignSignature(scriptFlags, keystore, prevPubKey, mergedTx, i, amount, nHashType, sigType, spentCoins);
         }
 
         // ... and merge in other signatures:
