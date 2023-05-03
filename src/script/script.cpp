@@ -309,6 +309,23 @@ const char *GetOpName(opcodetype opcode)
         return "OP_OUTPUTBYTECODE";
         break;
 
+    // Token introspection
+    case OP_UTXOTOKENCATEGORY:
+        return "OP_UTXOTOKENCATEGORY";
+    case OP_UTXOTOKENCOMMITMENT:
+        return "OP_UTXOTOKENCOMMITMENT";
+    case OP_UTXOTOKENAMOUNT:
+        return "OP_UTXOTOKENAMOUNT";
+    case OP_OUTPUTTOKENCATEGORY:
+        return "OP_OUTPUTTOKENCATEGORY";
+    case OP_OUTPUTTOKENCOMMITMENT:
+        return "OP_OUTPUTTOKENCOMMITMENT";
+    case OP_OUTPUTTOKENAMOUNT:
+        return "OP_OUTPUTTOKENAMOUNT";
+
+    // Token prefix byte
+    case SPECIAL_TOKEN_PREFIX:
+        return "SPECIAL_TOKEN_PREFIX";
 
     case OP_INVALIDOPCODE:
         return "OP_INVALIDOPCODE";

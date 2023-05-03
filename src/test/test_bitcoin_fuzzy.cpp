@@ -362,8 +362,9 @@ protected:
         ScriptMachineResourceTracker stats;
         CScript script_sig(scriptsig_raw.begin(), scriptsig_raw.end());
         CScript script_pubkey(scriptpubkey_raw.begin(), scriptpubkey_raw.end());
-        const bool result =
-            VerifyScript(script_sig, script_pubkey, flags, MAX_OPS_PER_SCRIPT, ScriptImportedState(), &error, &stats);
+        ScriptImportedState sis;
+        sis.flags = flags;
+        const bool result = VerifyScript(script_sig, script_pubkey, MAX_OPS_PER_SCRIPT, sis, &error, &stats);
 
         if (produce_output)
         {

@@ -10,6 +10,7 @@
 #include "script/sign.h"
 #include "script/standard.h"
 #include "txmempool.h"
+#include "validation/validation.h"
 #include "validationinterface.h"
 
 #include <stdexcept>
@@ -97,7 +98,8 @@ public:
 
     bool CheckSig(const std::vector<uint8_t> &vchSigIn,
         const std::vector<uint8_t> &vchPubKey,
-        const CScript &scriptCode) const override
+        const CScript &scriptCode,
+        const ScriptImportedState *sis) const override
     {
         CPubKey pubkey(vchPubKey);
         if (!pubkey.IsValid())
@@ -345,10 +347,13 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
     CTransaction noTx;
     CTransactionRef noTxRef = MakeTransactionRef(noTx);
 
+    uint32_t featureFlags =
+        GetBlockScriptFlags(chainActive.Tip(), Params().GetConsensus()) | STANDARD_SCRIPT_VERIFY_FLAGS;
+
     DSPSignatureChecker checker1(this, m_spender1, amount);
-    ScriptImportedState sis1(&checker1, noTxRef, std::vector<CTxOut>(), m_prevOutIndex, amount);
+    ScriptImportedState sis1(&checker1, noTxRef, std::vector<CTxOut>(), m_prevOutIndex, amount, featureFlags);
     ScriptError_t error;
-    if (!VerifyScript(inScript, prevOutScript, 0 /*flags*/, MAX_OPS_PER_SCRIPT, sis1, &error))
+    if (!VerifyScript(inScript, prevOutScript, MAX_OPS_PER_SCRIPT, sis1, &error))
     {
         LOG(DSPROOF, "DoubleSpendProof failed validating first tx due to %s\n", ScriptErrorString(error));
         return Invalid;
@@ -361,8 +366,8 @@ DoubleSpendProof::Validity DoubleSpendProof::validate(const CTxMemPool &pool, co
         inScript << pubkey;
     }
     DSPSignatureChecker checker2(this, m_spender2, amount);
-    ScriptImportedState sis2(&checker2, noTxRef, std::vector<CTxOut>(), m_prevOutIndex, amount);
-    if (!VerifyScript(inScript, prevOutScript, 0 /*flags*/, MAX_OPS_PER_SCRIPT, sis2, &error))
+    ScriptImportedState sis2(&checker2, noTxRef, std::vector<CTxOut>(), m_prevOutIndex, amount, featureFlags);
+    if (!VerifyScript(inScript, prevOutScript, MAX_OPS_PER_SCRIPT, sis2, &error))
     {
         LOG(DSPROOF, "DoubleSpendProof failed validating second tx due to %s\n", ScriptErrorString(error));
         return Invalid;

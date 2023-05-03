@@ -245,10 +245,10 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
 
     CTransaction tx1(t1);
     {
-        TransactionSignatureCreator tsc(&keystore, &tx1, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
+        TransactionSignatureCreator tsc(&keystore, scriptFlags, {}, &tx1, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = dummyTransactions[0].vout[0].scriptPubKey;
         CScript &scriptSigRes = t1.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
         BOOST_CHECK(worked);
     }
     CTransaction tx1a(t1);
@@ -267,10 +267,10 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
                             << OP_CHECKSIG;
     CTransaction tx2(t2);
     {
-        TransactionSignatureCreator tsc(&keystore, &tx2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
+        TransactionSignatureCreator tsc(&keystore, scriptFlags, {}, &tx2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = dummyTransactions[0].vout[1].scriptPubKey;
         CScript &scriptSigRes = t2.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
         BOOST_CHECK(worked);
     }
     CTransaction tx2a(t2);
@@ -293,10 +293,11 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
 
     CTransaction spend1(s1);
     {
-        TransactionSignatureCreator tsc(&keystore, &spend1, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
+        TransactionSignatureCreator tsc(
+            &keystore, scriptFlags, {}, &spend1, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = tx1a.vout[0].scriptPubKey;
         CScript &scriptSigRes = s1.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
         BOOST_CHECK(worked);
     }
     CTransaction spend1a(s1);
@@ -317,10 +318,11 @@ BOOST_AUTO_TEST_CASE(dsproof_orphan_handling)
 
     CTransaction spend2(s2);
     {
-        TransactionSignatureCreator tsc(&keystore, &spend2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
+        TransactionSignatureCreator tsc(
+            &keystore, scriptFlags, {}, &spend2, 0, 50 * CENT, SIGHASH_ALL | SIGHASH_FORKID);
         const CScript &scriptPubKey = tx1a.vout[0].scriptPubKey;
         CScript &scriptSigRes = s2.vin[0].scriptSig;
-        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes, scriptFlags);
+        bool worked = ProduceSignature(tsc, scriptPubKey, scriptSigRes);
         BOOST_CHECK(worked);
     }
     CTransaction spend2a(s2);

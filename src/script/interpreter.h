@@ -19,6 +19,8 @@ class CPubKey;
 class CScript;
 class CTransaction;
 class uint256;
+class ScriptImportedState;
+class CBlockIndex;
 
 /** Signature types */
 enum
@@ -157,6 +159,7 @@ enum
     SCRIPT_ENABLE_TOKENS = (1U << 27),
 };
 
+
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError *serror);
 
 /**
@@ -179,7 +182,9 @@ uint256 SignatureHash(const CScript &scriptCode,
     unsigned int nIn,
     uint32_t nHashType,
     const CAmount &amount,
-    size_t *nHashedOut = nullptr);
+    size_t *nHashedOut = nullptr,
+    const ScriptImportedState *sis = nullptr);
+
 
 class BaseSignatureChecker
 {
@@ -195,13 +200,11 @@ public:
     //! Verifies a signature given the pubkey, signature, script, and transaction (member var)
     virtual bool CheckSig(const std::vector<uint8_t> &scriptSig,
         const std::vector<uint8_t> &vchPubKey,
-        const CScript &scriptCode) const
-    {
-        return false;
-    }
+        const CScript &scriptCode,
+        const ScriptImportedState *sis = nullptr) const = 0;
 
-    virtual bool CheckLockTime(const CScriptNum &nLockTime) const { return false; }
-    virtual bool CheckSequence(const CScriptNum &nSequence) const { return false; }
+    virtual bool CheckLockTime(const CScriptNum &nLockTime) const = 0;
+    virtual bool CheckSequence(const CScriptNum &nSequence) const = 0;
     virtual ~BaseSignatureChecker() {}
 };
 
@@ -239,7 +242,8 @@ public:
 
     bool CheckSig(const std::vector<uint8_t> &scriptSig,
         const std::vector<uint8_t> &vchPubKey,
-        const CScript &scriptCode) const override;
+        const CScript &scriptCode,
+        const ScriptImportedState *sis) const override;
     bool CheckLockTime(const CScriptNum &nLockTime) const override;
     bool CheckSequence(const CScriptNum &nSequence) const override;
     size_t GetBytesHashed() const { return nBytesHashed; }
@@ -274,16 +278,43 @@ public:
     // CScript scriptCode;
     unsigned int nIn = 0;
     CAmount amount = 0;
+    uint32_t flags = 0;
 
     ScriptImportedState(const BaseSignatureChecker *c,
         CTransactionRef t,
         const std::vector<CTxOut> &coins,
         unsigned int inputIdx,
-        unsigned int inputAmount)
-        : checker(c), tx(t), spentCoins(coins), nIn(inputIdx), amount(inputAmount)
+        unsigned int inputAmount,
+        uint32_t flagsIn)
+        : checker(c), tx(t), spentCoins(coins), nIn(inputIdx), amount(inputAmount), flags(flagsIn)
     {
     }
     ScriptImportedState() {}
+
+    /// Get a reference to the coin being spent for input at index `inputIdx`.
+    ///
+    /// Returned coin may be be IsSpent() if coin is missing (such as in a *limited* context
+    /// where all sibling coin info is unavailable).
+    const CTxOut &coin(unsigned int inputIdx) const
+    {
+        // Defensive programming: A class invariant is that the number of coins equals the number of
+        // inputs in tx().vin().  However, we use .at() here in case the underlying tx is mutable and
+        // is being misused.. and it mutates such that there are now more inputs in the tx than there
+        // are coins in our coins view.
+        return spentCoins.at(inputIdx);
+    }
+
+    /// Get the coin (utxo) token data for this input or any input. Returned wrapped pointer
+    /// may be nullptr if input has no token data.
+    ///
+    const token::OutputDataPtr &coinTokenData(unsigned int inputIdx) const { return coin(inputIdx).tokenDataPtr; }
+
+    /// Get the amount for this input or any input.
+    ///
+    const CAmount &coinAmount(unsigned int inputIdx) const { return coin(inputIdx).nValue; }
+
+    /// Get the scriptSig for this input or any input (tx().vin[i].scriptSig)
+    const CScript &scriptSig(unsigned int inputIdx) const { return tx->vin.at(inputIdx).scriptSig; }
 };
 
 class ScriptImportedStateSig : public ScriptImportedState
@@ -294,33 +325,36 @@ public:
     ScriptImportedStateSig(const CMutableTransaction *txToIn,
         unsigned int inIndex,
         const CAmount &amountIn,
-        unsigned int flags = SCRIPT_ENABLE_SIGHASH_FORKID)
+        unsigned int _flags = SCRIPT_ENABLE_SIGHASH_FORKID)
     {
         tx = MakeTransactionRef(*txToIn);
         nIn = inIndex;
         amount = amountIn;
+        flags = _flags;
         tsc.Init(&(*tx), nIn, amount, flags);
         checker = &tsc;
     }
     ScriptImportedStateSig(const CTransaction *txToIn,
         unsigned int inIndex,
         const CAmount &amountIn,
-        unsigned int flags = SCRIPT_ENABLE_SIGHASH_FORKID)
+        unsigned int _flags = SCRIPT_ENABLE_SIGHASH_FORKID)
     {
         tx = MakeTransactionRef(*txToIn);
         nIn = inIndex;
         amount = amountIn;
+        flags = _flags;
         tsc.Init(&(*tx), nIn, amount, flags);
         checker = &tsc;
     }
     ScriptImportedStateSig(const CTransactionRef txToIn,
         unsigned int inIndex,
         const CAmount &amountIn,
-        unsigned int flags = SCRIPT_ENABLE_SIGHASH_FORKID)
+        unsigned int _flags = SCRIPT_ENABLE_SIGHASH_FORKID)
     {
         tx = txToIn;
         nIn = inIndex;
         amount = amountIn;
+        flags = _flags;
         tsc.Init(&(*tx), nIn, amount, flags);
         checker = &tsc;
     }
@@ -581,7 +615,6 @@ bool EvalScript(std::vector<std::vector<uint8_t> > &stack,
     uint32_t *sighashtype = nullptr);
 bool VerifyScript(const CScript &scriptSig,
     const CScript &scriptPubKey,
-    unsigned int flags,
     unsigned int maxOps,
     const ScriptImportedState &sis,
     ScriptError *error = nullptr,

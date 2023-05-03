@@ -649,7 +649,7 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         debugger->txid = tx->GetHash().ToString();
     }
 
-    if (!CheckTransaction(tx, state) || !ContextualCheckTransaction(tx, state, chainActive.Tip(), chainparams))
+    if (!CheckTransaction(tx, state))
     {
         if (state.GetDebugMessage() == "")
             state.SetDebugMessage("CheckTransaction failed");
@@ -693,29 +693,8 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         fRequireStandard = false;
     }
 
-    uint32_t featureFlags = 0;
-    // FIXME OP_REVERSEBYTES should be considered as always active and hence
-    // we don't need SCRIPT_ENABLE_OP_REVERSEBYTES, whereas we should unconditionally
-    // add SCRIPT_VERIFY_INPUT_SIGCHECKS to the features flags, for more details see
-    // https://gitlab.com/bitcoinunlimited/BCHUnlimited/-/merge_requests/2622#note_882081432
-    if (may2020Enabled)
-    {
-        featureFlags |= SCRIPT_ENABLE_OP_REVERSEBYTES | SCRIPT_VERIFY_INPUT_SIGCHECKS;
-    }
-
-    if (IsMay2022Activated(chainparams.GetConsensus(), chainActive.Tip()))
-    {
-        featureFlags |= SCRIPT_64_BIT_INTEGERS;
-        featureFlags |= SCRIPT_NATIVE_INTROSPECTION;
-    }
-
-    if (IsMay2023Activated(chainparams.GetConsensus(), chainActive.Tip()))
-    {
-        featureFlags |= SCRIPT_ENABLE_P2SH_32;
-        featureFlags |= SCRIPT_ENABLE_TOKENS;
-    }
-
-    uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS | featureFlags;
+    uint32_t featureFlags = GetBlockScriptFlags(chainActive.Tip(), chainparams.GetConsensus());
+    uint32_t flags = featureFlags | STANDARD_SCRIPT_VERIFY_FLAGS;
 
     if (fRequireStandard && !IsStandardTx(tx, reason, flags))
     {
@@ -729,6 +708,22 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
             return state.DoS(0, false, REJECT_NONSTANDARD, reason);
         }
     }
+
+    if (!ContextualCheckTransaction(tx, state, chainActive.Tip(), chainparams))
+    {
+        if (state.GetDebugMessage() == "")
+            state.SetDebugMessage("ContextualCheckTransaction failed");
+        if (debugger)
+        {
+            debugger->AddInvalidReason(state.GetRejectReason());
+            state = CValidationState();
+        }
+        else
+        {
+            return false;
+        }
+    }
+
 
     // Disable DISALLOW_SEGWIT in case we accept non standard transactions.
     if (!fRequireStandard)
@@ -749,21 +744,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
         else
         {
             return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
-        }
-    }
-
-    // Make sure tx size is acceptable after Nov 15, 2018 fork and May 2023 fork.
-    const uint64_t minTxSize = GetMinimumTxSize(Params().GetConsensus(), chainActive.Tip());
-    if (minTxSize != 0 && tx->GetTxSize() < minTxSize)
-    {
-        if (debugger)
-        {
-            debugger->AddInvalidReason("txn-undersize");
-            debugger->mineable = false;
-        }
-        else
-        {
-            return state.DoS(0, false, REJECT_INVALID, "txn-undersize");
         }
     }
 
@@ -912,6 +892,33 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                 return state.Invalid(false, REJECT_NONSTANDARD, "bad-txns-nonstandard-inputs");
             }
         }
+
+
+        // Check token spends (if any) are within consensus
+        {
+            int64_t firstTokenBlockHeight;
+            if (flags & SCRIPT_ENABLE_TOKENS)
+            { // Assumption: this can only be true if Upgrade9 activated
+                LOCK(cs_main);
+                firstTokenBlockHeight =
+                    g_upgrade9_block_tracker.GetActivationBlock(chainActive.Tip(),
+                                                Params().GetConsensus())
+                        ->nHeight +
+                    1LL; // First block to actually use token rules is 1 + activation block
+            }
+            else
+            {
+                // not activated yet -- far future
+                firstTokenBlockHeight = std::numeric_limits<int64_t>::max();
+            }
+
+            if (!CheckTxTokens(*tx, state, TokenCoinAccessorImpl(view), flags, firstTokenBlockHeight))
+            {
+                // State filled-in by CheckTxTokens
+                return false;
+            }
+        }
+
 
         CAmount nValueOut = tx->GetValueOut();
         CAmount nFees = nValueIn - nValueOut;
@@ -1181,32 +1188,6 @@ bool ParallelAcceptToMemoryPool(Snapshot &ss,
                     strprintf("%d > %d", nFees, std::max((int64_t)100L * nSize, maxTxFee.Value()) * 100));
             }
         }
-
-        // Check token spends (if any) are within consensus
-        {
-            int64_t firstTokenBlockHeight;
-            if (flags & SCRIPT_ENABLE_TOKENS)
-            { // Assumption: this can only be true if Upgrade9 activated
-                LOCK(cs_main);
-                firstTokenBlockHeight =
-                    g_upgrade9_block_tracker.GetActivationBlock(chainActive.Tip(),
-                                                Params().GetConsensus())
-                        ->nHeight +
-                    1LL; // First block to actually use token rules is 1 + activation block
-            }
-            else
-            {
-                // not activated yet -- far future
-                firstTokenBlockHeight = std::numeric_limits<int64_t>::max();
-            }
-
-            if (!CheckTxTokens(*tx, state, TokenCoinAccessorImpl(view), flags, firstTokenBlockHeight))
-            {
-                // State filled-in by CheckTxTokens
-                return false;
-            }
-        }
-
 
         // Check again against just the consensus-critical mandatory script
         // verification flags, in case of bugs in the standard flags that cause

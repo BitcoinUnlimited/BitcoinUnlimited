@@ -15,6 +15,7 @@
 #include "pubkey.h"
 #include "script/script.h"
 #include "script/script_error.h"
+#include "script/sighashtype.h"
 #include "uint256.h"
 #include "util.h"
 const std::string strMessageMagic = "Bitcoin Signed Message:\n";
@@ -408,7 +409,7 @@ static bool IsDefinedHashtypeSignature(const valtype &vchSig)
     {
         return false;
     }
-    uint32_t nHashType = GetHashType(vchSig) & ~(SIGHASH_ANYONECANPAY | SIGHASH_FORKID);
+    uint32_t nHashType = GetHashType(vchSig) & ~(SIGHASH_ANYONECANPAY | SIGHASH_FORKID | SIGHASH_UTXOS);
     if (nHashType < SIGHASH_ALL || nHashType > SIGHASH_SINGLE)
         return false;
 
@@ -425,6 +426,35 @@ static bool CheckSignatureEncodingSigHashChoice(const vector<unsigned char> &vch
     if (vchSig.size() == 0)
     {
         return true;
+    }
+
+    // from BCHN
+    if (check_sighash && flags & SCRIPT_VERIFY_STRICTENC)
+    {
+        const auto hashType = GetSigHashType(vchSig);
+        const bool usesFork = hashType.hasForkId();
+        const bool forkEnabled = flags & SCRIPT_ENABLE_SIGHASH_FORKID;
+        if (!forkEnabled && usesFork)
+        {
+            return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
+        }
+
+        if (forkEnabled && !usesFork)
+        {
+            return set_error(serror, SCRIPT_ERR_MUST_USE_FORKID);
+        }
+
+        if (hashType.hasUtxos())
+        {
+            const bool upgrade9Enabled = flags & SCRIPT_ENABLE_TOKENS;
+            // 1. Pre-Upgrade9 we do NOT accept SIGHASH_UTXOS
+            // 2. We also cannot accept SIGHASH_UTXOS if not using SIGHASH_FORKID (belt-and-suspenders check)
+            // 3. Also, as per CashTokens spec, we disallow the combination of SIGHASH_UTXOS and SIGHASH_ANYONECANPAY
+            if (!upgrade9Enabled || !usesFork || !forkEnabled || hashType.hasAnyoneCanPay())
+            {
+                return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
+            }
+        }
     }
 
     if (vchSig.size() == 64 + ((check_sighash == true) ? 1 : 0)) // 64 sig length plus 1 sighashtype
@@ -643,6 +673,7 @@ bool ScriptMachine::Step()
     bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
     const bool integers64Bit = (flags & SCRIPT_64_BIT_INTEGERS) != 0;
     const bool nativeIntrospection = (flags & SCRIPT_NATIVE_INTROSPECTION) != 0;
+    const bool nativeTokens = (flags & SCRIPT_ENABLE_TOKENS) != 0;
 
     const size_t maxIntegerSize =
         integers64Bit ? CScriptNum::MAXIMUM_ELEMENT_SIZE_64_BIT : CScriptNum::MAXIMUM_ELEMENT_SIZE_32_BIT;
@@ -1544,7 +1575,7 @@ bool ScriptMachine::Step()
                     }
                     if (!sis.checker)
                         return set_error(serror, SCRIPT_ERR_DATA_REQUIRED);
-                    bool fSuccess = sis.checker->CheckSig(vchSig, vchPubKey, scriptCode);
+                    bool fSuccess = sis.checker->CheckSig(vchSig, vchPubKey, scriptCode, &sis);
 
                     if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) && vchSig.size())
                     {
@@ -1993,6 +2024,19 @@ bool ScriptMachine::Step()
                 break; // end of Native Introspection opcodes (Nullary)
 
                 // Native Introspection opcodes (Unary, consume top item)
+                case OP_UTXOTOKENCATEGORY:
+                case OP_UTXOTOKENCOMMITMENT:
+                case OP_UTXOTOKENAMOUNT:
+                case OP_OUTPUTTOKENCATEGORY:
+                case OP_OUTPUTTOKENCOMMITMENT:
+                case OP_OUTPUTTOKENAMOUNT:
+                    // These require native tokens (upgrade9)
+                    if (!nativeTokens)
+                    {
+                        return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
+                    }
+                    [[fallthrough]];
+                // Native Introspection opcodes (Unary, consume top item)
                 case OP_UTXOVALUE:
                 case OP_UTXOBYTECODE:
                 case OP_OUTPOINTTXHASH:
@@ -2018,14 +2062,37 @@ bool ScriptMachine::Step()
                     // consume top element
                     popstack(stack);
 
+                    auto get_bytecode = [&nativeTokens](const CTxOut &txout) -> std::vector<uint8_t>
+                    {
+                        std::vector<uint8_t> ret;
+                        if (!nativeTokens && txout.tokenDataPtr)
+                        {
+                            // Special pre-activation case for upgrade9; If they ask for the bytecode, and
+                            // there is PATFO token data we must return what a naive node would return here:
+                            // The full serialized spk blob pre-activation [TOKEN_PREFIX + tokenData + spk]
+                            token::WrappedScriptPubKey wspk;
+                            token::WrapScriptPubKey(wspk, txout.tokenDataPtr, txout.scriptPubKey, INIT_PROTO_VERSION);
+                            ret.assign(wspk.begin(), wspk.end());
+                        }
+                        else
+                        {
+                            // Post-activation or if no PATFO token data; Return just the scriptPubKey.
+                            ret.assign(txout.scriptPubKey.begin(), txout.scriptPubKey.end());
+                        }
+                        return ret;
+                    };
+
                     switch (opcode)
                     {
-                    case OP_UTXOVALUE:
+                    case OP_UTXOVALUE: // All the opcodes dealing with input
                     case OP_UTXOBYTECODE:
                     case OP_OUTPOINTTXHASH:
                     case OP_OUTPOINTINDEX:
                     case OP_INPUTBYTECODE:
                     case OP_INPUTSEQUENCENUMBER:
+                    case OP_UTXOTOKENCATEGORY:
+                    case OP_UTXOTOKENCOMMITMENT:
+                    case OP_UTXOTOKENAMOUNT:
                     {
                         int32_t idx = top.getint32();
                         if (idx < 0 || size_t(idx) >= sis.tx->vin.size())
@@ -2033,8 +2100,76 @@ bool ScriptMachine::Step()
                             return set_error(serror, SCRIPT_ERR_INVALID_TX_INPUT_INDEX);
                         }
                         const CTxIn &input = sis.tx->vin[idx];
+                        const CTxOut &prevout = sis.spentCoins[idx];
                         switch (opcode)
                         {
+                        case OP_UTXOTOKENCOMMITMENT:
+                        {
+                            if (const auto &pdata = prevout.tokenDataPtr; !pdata || !pdata->HasNFT())
+                            {
+                                // no token data, or has token data but is not an NFT, push CScriptNum 0 (empty vec)
+                                stack.push_back(CScriptNum::fromIntUnchecked(0).getvch());
+                            }
+                            else
+                            {
+                                // Has token data, push commitment bytes, if they are <= MAX_SCRIPT_ELEMENT_SIZE
+                                const auto &commitment = pdata->GetCommitment();
+                                if (commitment.size() > MAX_SCRIPT_ELEMENT_SIZE)
+                                {
+                                    // This branch can normally only be taken in tests
+                                    return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+                                }
+                                // Push the bytes verbatim to the stack
+                                stack.emplace_back(commitment.begin(), commitment.end());
+                            }
+                        }
+                        break;
+
+                        case OP_UTXOTOKENAMOUNT:
+                        {
+                            if (const auto &pdata = prevout.tokenDataPtr; !pdata)
+                            {
+                                // no token data, push VM number 0 (empty vector)
+                                stack.push_back(CScriptNum::fromIntUnchecked(0).getvch());
+                            }
+                            else
+                            {
+                                // push the amount as a CScriptNum amount. Note it can be zero for NFT-only
+                                // tokens, in which case an empty vector {} will be pushed.
+                                auto const bn = CScriptNum::fromInt(pdata->GetAmount().getint64()).value();
+                                stack.push_back(bn.getvch());
+                            }
+                        }
+                        break;
+
+                        case OP_UTXOTOKENCATEGORY:
+                        {
+                            if (const auto &pdata = prevout.tokenDataPtr; !pdata)
+                            {
+                                // no token data, push CScriptNum 0 (empty vec)
+                                stack.push_back(CScriptNum::fromIntUnchecked(0).getvch());
+                            }
+                            else
+                            {
+                                // has token data, push token id (32 bytes) + *maybe* 0x1 or 0x2 (1 byte)
+                                const auto &tokId = pdata->GetId();
+                                valtype vch;
+                                // only push the capability if it's one of: 0x1 (mutable) or 0x2 (minting)
+                                const bool pushCapByte = pdata->IsMintingNFT() || pdata->IsMutableNFT();
+                                vch.reserve(tokId.size() + pushCapByte);
+                                vch.insert(vch.end(), tokId.begin(), tokId.end());
+                                if (pushCapByte)
+                                    vch.push_back(static_cast<uint8_t>(pdata->GetCapability()));
+                                if (vch.size() > MAX_SCRIPT_ELEMENT_SIZE)
+                                {
+                                    // This branch cannot be taken in the current code, but is left in defensively.
+                                    return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+                                }
+                                stack.push_back(std::move(vch));
+                            }
+                        }
+                        break;
+
                         case OP_UTXOVALUE:
                         {
                             const auto bn = CScriptNum::fromInt(sis.spentCoins[idx].nValue);
@@ -2048,7 +2183,7 @@ bool ScriptMachine::Step()
                         break;
                         case OP_UTXOBYTECODE:
                         {
-                            const auto &utxoScript = sis.spentCoins[idx].scriptPubKey;
+                            const auto &utxoScript = get_bytecode(sis.spentCoins[idx]); //.scriptPubKey;
                             if (utxoScript.size() > MAX_SCRIPT_ELEMENT_SIZE)
                             {
                                 return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
@@ -2092,6 +2227,9 @@ bool ScriptMachine::Step()
 
                     case OP_OUTPUTVALUE:
                     case OP_OUTPUTBYTECODE:
+                    case OP_OUTPUTTOKENCATEGORY:
+                    case OP_OUTPUTTOKENCOMMITMENT:
+                    case OP_OUTPUTTOKENAMOUNT:
                     {
                         int32_t idx = top.getint32();
                         if (idx < 0 || size_t(idx) >= sis.tx->vout.size())
@@ -2101,6 +2239,73 @@ bool ScriptMachine::Step()
                         const CTxOut &output = sis.tx->vout[idx];
                         switch (opcode)
                         {
+                        case OP_OUTPUTTOKENCATEGORY:
+                        {
+                            if (const auto &pdata = output.tokenDataPtr; !pdata)
+                            {
+                                // no token data, push CScriptNum 0 (empty vec)
+                                stack.push_back(CScriptNum::fromIntUnchecked(0).getvch());
+                            }
+                            else
+                            {
+                                // has token data, push token id (32 bytes) + *maybe* 0x1 or 0x2 (1 byte)
+                                const auto &tokId = pdata->GetId();
+                                valtype vch;
+                                // only push the capability if it's one of: 0x1 (mutable) or 0x2 (minting)
+                                const bool pushCapByte = pdata->IsMintingNFT() || pdata->IsMutableNFT();
+                                vch.reserve(tokId.size() + pushCapByte);
+                                vch.insert(vch.end(), tokId.begin(), tokId.end());
+                                if (pushCapByte)
+                                    vch.push_back(static_cast<uint8_t>(pdata->GetCapability()));
+                                if (vch.size() > MAX_SCRIPT_ELEMENT_SIZE)
+                                {
+                                    // This branch cannot be taken in the current code, but is left in defensively.
+                                    return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+                                }
+                                stack.push_back(std::move(vch));
+                            }
+                        }
+                        break;
+
+                        case OP_OUTPUTTOKENCOMMITMENT:
+                        {
+                            if (const auto &pdata = output.tokenDataPtr; !pdata || !pdata->HasNFT())
+                            {
+                                // no token data, or has token data but is not an NFT, push CScriptNum 0 (empty vec)
+                                stack.push_back(CScriptNum::fromIntUnchecked(0).getvch());
+                            }
+                            else
+                            {
+                                // Has token data, push commitment bytes, if they are <= MAX_SCRIPT_ELEMENT_SIZE
+                                const auto &commitment = pdata->GetCommitment();
+                                if (commitment.size() > MAX_SCRIPT_ELEMENT_SIZE)
+                                {
+                                    // This branch can normally only be taken in tests
+                                    return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+                                }
+                                // Push the bytes verbatim to the stack
+                                stack.emplace_back(commitment.begin(), commitment.end());
+                            }
+                        }
+                        break;
+
+                        case OP_OUTPUTTOKENAMOUNT:
+                        {
+                            if (const auto &pdata = output.tokenDataPtr; !pdata)
+                            {
+                                // no token data, push VM number 0 (empty vector)
+                                stack.push_back(CScriptNum::fromIntUnchecked(0).getvch());
+                            }
+                            else
+                            {
+                                // push the amount as a CScriptNum amount. Note it can be zero for NFT-only
+                                // tokens, in which case an empty vector {} will be pushed.
+                                auto const bn = CScriptNum::fromInt(pdata->GetAmount().getint64()).value();
+                                stack.push_back(bn.getvch());
+                            }
+                        }
+                        break;
+
                         case OP_OUTPUTVALUE:
                         {
                             const auto bn = CScriptNum::fromInt(output.nValue);
@@ -2114,11 +2319,12 @@ bool ScriptMachine::Step()
                         break;
                         case OP_OUTPUTBYTECODE:
                         {
-                            if (output.scriptPubKey.size() > MAX_SCRIPT_ELEMENT_SIZE)
+                            auto outputScript = get_bytecode(output);
+                            if (outputScript.size() > MAX_SCRIPT_ELEMENT_SIZE)
                             {
                                 return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
                             }
-                            stack.emplace_back(output.scriptPubKey.begin(), output.scriptPubKey.end());
+                            stack.emplace_back(outputScript.begin(), outputScript.end());
                         }
                         break;
                         default:
@@ -2242,7 +2448,8 @@ bool BaseSignatureChecker::VerifySignature(const std::vector<uint8_t> &vchSig,
 
 bool TransactionSignatureChecker::CheckSig(const vector<uint8_t> &vchSigIn,
     const vector<uint8_t> &vchPubKey,
-    const CScript &scriptCode) const
+    const CScript &scriptCode,
+    const ScriptImportedState *sis) const
 {
     CPubKey pubkey(vchPubKey);
     if (!pubkey.IsValid())
@@ -2267,7 +2474,7 @@ bool TransactionSignatureChecker::CheckSig(const vector<uint8_t> &vchSigIn,
     {
         if (nHashType & SIGHASH_FORKID)
         {
-            sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, &nHashed);
+            sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, &nHashed, sis);
         }
         else
         {
@@ -2391,12 +2598,12 @@ bool TransactionSignatureChecker::CheckSequence(const CScriptNum &nSequence) con
 
 bool VerifyScript(const CScript &scriptSig,
     const CScript &scriptPubKey,
-    unsigned int flags,
     unsigned int maxOps,
     const ScriptImportedState &sis,
     ScriptError *serror,
     ScriptMachineResourceTracker *tracker)
 {
+    const uint32_t flags = sis.flags;
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
 
     if ((flags & SCRIPT_VERIFY_SIGPUSHONLY) != 0 && !scriptSig.IsPushOnly())

@@ -26,9 +26,16 @@ class BaseSignatureCreator
 {
 protected:
     const CKeyStore *keystore;
+    const uint32_t scriptFlags;
+    const std::vector<CTxOut> spentCoins;
 
 public:
-    BaseSignatureCreator(const CKeyStore *keystoreIn) : keystore(keystoreIn) {}
+    BaseSignatureCreator(const CKeyStore *keystoreIn,
+        const uint32_t scriptFlagsIn,
+        const std::vector<CTxOut> spentCoinsIn)
+        : keystore(keystoreIn), scriptFlags(scriptFlagsIn), spentCoins(spentCoinsIn)
+    {
+    }
     const CKeyStore &KeyStore() const { return *keystore; };
     virtual ~BaseSignatureCreator() {}
     virtual const BaseSignatureChecker &Checker() const = 0;
@@ -37,6 +44,9 @@ public:
     virtual bool CreateSig(std::vector<unsigned char> &vchSig,
         const CKeyID &keyid,
         const CScript &scriptCode) const = 0;
+
+    uint32_t ScriptFlags() const { return scriptFlags; }
+    const std::vector<CTxOut> &SpentCoins() const { return spentCoins; }
 };
 
 /** A signature creator for transactions. */
@@ -51,6 +61,8 @@ class TransactionSignatureCreator : public BaseSignatureCreator
 
 public:
     TransactionSignatureCreator(const CKeyStore *keystoreIn,
+        const uint32_t scriptFlags,
+        const std::vector<CTxOut> spentCoins,
         const CTransaction *txToIn,
         unsigned int nInIn,
         const CAmount &amountIn,
@@ -64,16 +76,16 @@ public:
 class DummySignatureCreator : public BaseSignatureCreator
 {
 public:
-    DummySignatureCreator(const CKeyStore *keystoreIn) : BaseSignatureCreator(keystoreIn) {}
+    DummySignatureCreator(const CKeyStore *keystoreIn, const uint32_t scriptFlags)
+        : BaseSignatureCreator(keystoreIn, scriptFlags, {})
+    {
+    }
     const BaseSignatureChecker &Checker() const;
     bool CreateSig(std::vector<unsigned char> &vchSig, const CKeyID &keyid, const CScript &scriptCode) const;
 };
 
 /** Produce a script signature using a generic signature creator. */
-bool ProduceSignature(const BaseSignatureCreator &creator,
-    const CScript &scriptPubKey,
-    CScript &scriptSig,
-    uint32_t scriptFlags);
+bool ProduceSignature(const BaseSignatureCreator &creator, const CScript &scriptPubKey, CScript &scriptSig);
 
 /** Produce a script signature for a transaction. */
 bool SignSignature(uint32_t scriptFlags,
@@ -83,7 +95,8 @@ bool SignSignature(uint32_t scriptFlags,
     unsigned int nIn,
     const CAmount &amount,
     uint32_t nHashType = SIGHASH_ALL | SIGHASH_FORKID,
-    uint32_t nSigType = SIGTYPE_ECDSA);
+    uint32_t nSigType = SIGTYPE_ECDSA,
+    const std::vector<CTxOut> spentCoins = {});
 bool SignSignature(
 
     uint32_t scriptFlags,
@@ -92,7 +105,8 @@ bool SignSignature(
     CMutableTransaction &txTo,
     unsigned int nIn,
     uint32_t nHashType = SIGHASH_ALL | SIGHASH_FORKID,
-    uint32_t nSigType = SIGTYPE_ECDSA);
+    uint32_t nSigType = SIGTYPE_ECDSA,
+    const std::vector<CTxOut> spentCoins = {});
 
 /** Combine two script signatures using a generic signature checker, intelligently, possibly with OP_0 placeholders. */
 CScript CombineSignatures(const CScript &scriptPubKey,

@@ -38,7 +38,8 @@ static std::vector<ScriptImportedState> createForAllInputs(CTransactionRef tx,
             }
             k = k + 1;
         }
-        ret.push_back(ScriptImportedState(&bsc, tx, coins, i, amnt)); // private c'tor, must use push_back
+        // private c'tor, must use push_back
+        ret.push_back(ScriptImportedState(&bsc, tx, coins, i, amnt, STANDARD_SCRIPT_VERIFY_FLAGS));
     }
     return ret;
 }
@@ -105,7 +106,7 @@ BOOST_AUTO_TEST_CASE(opcodes_basic)
     tx.vout[2].scriptPubKey = CScript() << OP_4;
     tx.nVersion = 101;
     tx.nLockTime = 10;
-    BaseSignatureChecker bsc;
+    FalseSignatureChecker bsc;
     CTransactionRef txref = MakeTransactionRef(tx);
     const auto context = createForAllInputs(txref, coins, bsc);
     BOOST_CHECK(context.size() == tx.vin.size());

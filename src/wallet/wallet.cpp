@@ -83,6 +83,28 @@ struct CompareValueOnly
     }
 };
 
+/**
+ * Script verify flags affect signature creation / sighash.
+ *
+ * If SCRIPT_ENABLE_P2SH_32 is not enabled, then the solver will
+ * not recognize P2SH32 and we will not sign it.
+ *
+ * If SCRIPT_ENABLE_TOKENS is not enabled, then sighash won't try
+ * to support SIGHASH_UTXOS.
+ *
+ * If SCRIPT_VERIFY_P2SH is not enabled, we won't be able to verify
+ * that we produce a valid signature for P2SH and P2SH signature
+ * creation will fail.
+ *
+ * We currently do not support P2SH32 or tokens in the wallet, so
+ * these are explicitly removed (even though not part of
+ * MANDATORY_SCRIPT_VERIFY_FLAGS right now).
+ */
+uint32_t WalletVerifyScriptFlags()
+{
+    return MANDATORY_SCRIPT_VERIFY_FLAGS & ~SCRIPT_ENABLE_P2SH_32 & ~SCRIPT_ENABLE_TOKENS;
+};
+
 std::string COutput::ToString() const
 {
     return strprintf("COutput(%s, %d, %d) [%s]", tx->GetHash().ToString(), i, nDepth, FormatMoney(tx->vout[i].nValue));
@@ -1162,7 +1184,7 @@ bool CWallet::IsChange(const CTxOut &txout) const
     if (::IsMine(*this, txout.scriptPubKey, chainActive.Tip()))
     {
         CTxDestination address;
-        if (!ExtractDestination(txout.scriptPubKey, address, 0 /* no p2sh_32 in wallet */))
+        if (!ExtractDestination(txout.scriptPubKey, address, WalletVerifyScriptFlags()))
             return true;
 
         LOCK(cs_wallet);
@@ -1358,7 +1380,7 @@ void CWalletTx::GetAmounts(list<COutputEntry> &listReceived,
         // In either case, we need to get the destination address
         CTxDestination address;
 
-        if (!ExtractDestination(txout.scriptPubKey, address, 0 /* no p2sh_32 in wallet */) &&
+        if (!ExtractDestination(txout.scriptPubKey, address, WalletVerifyScriptFlags()) &&
             !txout.scriptPubKey.IsUnspendable())
         {
             LOGA("CWalletTx::GetAmounts: Unknown transaction type found, txid %s\n", this->GetHash().ToString());
@@ -2732,16 +2754,19 @@ bool CWallet::CreateTransaction(const vector<CRecipient> &vecSend,
                         CAmount amountIn = coin.first->vout[coin.second].nValue;
                         CScript &scriptSigRes = txNew.vin[nIn].scriptSig;
                         bool signSuccess;
-                        const uint32_t scriptFlags = 0; /* wallet does not support p2sh_32 */
                         if (sign)
                         {
-                            signSuccess = ProduceSignature(
-                                TransactionSignatureCreator(this, &txNewConst, nIn, amountIn, sighashType),
-                                scriptPubKey, scriptSigRes, scriptFlags);
+                            signSuccess = ProduceSignature(TransactionSignatureCreator(this, WalletVerifyScriptFlags(),
+                                                               {}, &txNewConst, nIn, amountIn, sighashType),
+                                scriptPubKey, scriptSigRes);
                         }
                         else
+                        {
+                            // Dummy signature does not have forkid.
+                            const uint32_t verifyFlags = WalletVerifyScriptFlags() & ~SCRIPT_ENABLE_SIGHASH_FORKID;
                             signSuccess =
-                                ProduceSignature(DummySignatureCreator(this), scriptPubKey, scriptSigRes, scriptFlags);
+                                ProduceSignature(DummySignatureCreator(this, verifyFlags), scriptPubKey, scriptSigRes);
+                        }
 
                         if (!signSuccess)
                         {
@@ -3258,7 +3283,7 @@ std::map<CTxDestination, CAmount> CWallet::GetAddressBalances()
                 CTxDestination addr;
                 if (!IsMine(pcoin->vout[i]))
                     continue;
-                if (!ExtractDestination(pcoin->vout[i].scriptPubKey, addr, 0 /* no p2sh_32 in wallet */))
+                if (!ExtractDestination(pcoin->vout[i].scriptPubKey, addr, WalletVerifyScriptFlags()))
                     continue;
 
                 CAmount n = IsSpent(walletEntry.first, i) ? 0 : pcoin->vout[i].nValue;
@@ -3293,7 +3318,7 @@ set<set<CTxDestination> > CWallet::GetAddressGroupings()
                 if (!IsMine(txin)) /* If this input isn't mine, ignore it */
                     continue;
                 if (!ExtractDestination(mapWallet[txin.prevout.hash].vout[txin.prevout.n].scriptPubKey, address,
-                        0 /* no p2sh_32 in wallet */))
+                        WalletVerifyScriptFlags()))
                     continue;
                 grouping.insert(address);
                 any_mine = true;
@@ -3307,7 +3332,7 @@ set<set<CTxDestination> > CWallet::GetAddressGroupings()
                     if (IsChange(txout))
                     {
                         CTxDestination txoutAddr;
-                        if (!ExtractDestination(txout.scriptPubKey, txoutAddr, 0 /* no p2sh_32 in wallet */))
+                        if (!ExtractDestination(txout.scriptPubKey, txoutAddr, WalletVerifyScriptFlags()))
                             continue;
                         grouping.insert(txoutAddr);
                     }
@@ -3326,7 +3351,7 @@ set<set<CTxDestination> > CWallet::GetAddressGroupings()
             if (IsMine(pcoin->vout[i]))
             {
                 CTxDestination address;
-                if (!ExtractDestination(pcoin->vout[i].scriptPubKey, address, 0 /* no p2sh_32 in wallet */))
+                if (!ExtractDestination(pcoin->vout[i].scriptPubKey, address, WalletVerifyScriptFlags()))
                     continue;
                 grouping.insert(address);
                 groupings.insert(grouping);
@@ -3518,7 +3543,7 @@ public:
         txnouttype type;
         std::vector<CTxDestination> vDest;
         int nRequired;
-        if (ExtractDestinations(script, type, vDest, nRequired, 0 /* no p2sh_32 in wallet */))
+        if (ExtractDestinations(script, type, vDest, nRequired, WalletVerifyScriptFlags()))
         {
             for (const CTxDestination &dest : vDest)
             {

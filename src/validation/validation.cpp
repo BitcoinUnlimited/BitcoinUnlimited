@@ -1932,6 +1932,8 @@ bool AcceptBlock(ConstCBlockRef pblock,
 uint32_t GetBlockScriptFlags(const CBlockIndex *pindex, const Consensus::Params &consensusparams)
 {
     uint32_t flags = SCRIPT_VERIFY_NONE;
+    if (pindex == nullptr)
+        return flags; // No features deployed in genesis block
 
     // Start enforcing P2SH (Bip16)
     if (pindex->nHeight >= consensusparams.BIP16Height)

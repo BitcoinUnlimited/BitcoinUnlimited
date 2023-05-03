@@ -81,9 +81,11 @@ const char *ScriptErrorString(const ScriptError serror)
     case SCRIPT_ERR_MINIMALDATA:
         return "Data push larger than necessary";
     case SCRIPT_ERR_SIG_PUSHONLY:
-        return "Only non-push operators allowed in signatures";
+        return "Only push operators allowed in signatures";
     case SCRIPT_ERR_SIG_HIGH_S:
         return "Non-canonical signature: S value is unnecessarily high";
+    case SCRIPT_ERR_MINIMALNUM:
+        return "Number encoding must be minimal";
     case SCRIPT_ERR_SIG_NULLFAIL:
         return "Signature must be zero for failed CHECK(MULTI)SIG operation";
     case SCRIPT_ERR_SIG_BADLENGTH:

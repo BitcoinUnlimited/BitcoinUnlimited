@@ -77,7 +77,7 @@ struct TestChain100Setup : public TestingSetup
     // scriptPubKey, and try to add it to the current chain.
     CBlock CreateAndProcessBlock(const std::vector<CMutableTransaction> &txns, const CScript &scriptPubKey);
 
-    ~TestChain100Setup();
+    virtual ~TestChain100Setup();
 
     std::vector<CTransaction> coinbaseTxns; // For convenience, coinbase transactions
     CKey coinbaseKey; // private/public key needed to spend coinbase transactions
@@ -149,12 +149,28 @@ std::ostream &operator<<(std::ostream &os, const uint256 &num);
 
 CService ipaddress(uint32_t i, uint32_t port);
 
+class FalseSignatureChecker : public BaseSignatureChecker
+{
+public:
+    FalseSignatureChecker() = default;
+    bool CheckSig(const std::vector<uint8_t> &scriptSig,
+        const std::vector<uint8_t> &vchPubKey,
+        const CScript &scriptCode,
+        const ScriptImportedState *sis = nullptr) const override
+    {
+        return false;
+    }
+
+    bool CheckLockTime(const CScriptNum &nLockTime) const override { return false; }
+    bool CheckSequence(const CScriptNum &nSequence) const override { return false; }
+};
+
 // Has a signature checker that returns false
 class FalseScriptImportedState : public ScriptImportedState
 {
 public:
-    BaseSignatureChecker checker;
-    FalseScriptImportedState() : ScriptImportedState(&checker, CTransactionRef(), std::vector<CTxOut>(), 0, 0) {}
+    FalseSignatureChecker checker;
+    FalseScriptImportedState() : ScriptImportedState(&checker, CTransactionRef(), std::vector<CTxOut>(), 0, 0, 0) {}
 };
 
 extern FalseScriptImportedState fsis;

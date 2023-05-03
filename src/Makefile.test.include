@@ -35,7 +35,8 @@ JSON_TEST_FILES = \
   test/data/sighash.json \
   test/data/cashaddr_token_types.json \
   test/data/token_tests_prefix_invalid.json \
-  test/data/token_tests_prefix_valid.json
+  test/data/token_tests_prefix_valid.json \
+  test/data/expected_test_fail_reasons.json
 
 RAW_TEST_FILES =
 
@@ -80,6 +81,7 @@ BITCOIN_TESTS =\
   test/bswap_tests.cpp \
   test/cashaddr_tests.cpp \
   test/cashaddrenc_tests.cpp \
+  test/chip_testing_setup.cpp \
   test/coins_tests.cpp \
   test/compactblocks_tests.cpp \
   test/compress_tests.cpp \
@@ -151,6 +153,7 @@ BITCOIN_TESTS =\
   test/thinblock_util_tests.cpp \
   test/timedata_tests.cpp \
   test/token_tests.cpp \
+  test/token_transaction_tests.cpp \
   test/transaction_tests.cpp \
   test/txlookup_tests.cpp \
   test/txvalidationcache_tests.cpp \

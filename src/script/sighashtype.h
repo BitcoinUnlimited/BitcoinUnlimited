@@ -73,11 +73,29 @@ public:
         return (sigHash & SIGHASH_ANYONECANPAY) != 0;
     }
 
+    SigHashType withUtxos(bool utxos = true) const {
+        return SigHashType((sigHash & ~SIGHASH_UTXOS) | (utxos ? SIGHASH_UTXOS : 0));
+    }
+
+    bool hasUtxos() const { return sigHash & SIGHASH_UTXOS; }
+
     uint32_t getRawSigHashType() const { return sigHash; }
 
     template <typename Stream> void Serialize(Stream &s) const {
         ::Serialize(s, getRawSigHashType());
     }
 };
+
+
+inline SigHashType GetSigHashType(const std::vector<uint8_t> &vchSig)
+{
+    if (vchSig.size() == 0)
+    {
+        return SigHashType(0);
+    }
+
+    return SigHashType(vchSig[vchSig.size() - 1]);
+}
+
 
 #endif // BITCOIN_SCRIPT_HASH_TYPE_H

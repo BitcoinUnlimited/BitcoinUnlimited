@@ -181,9 +181,24 @@ public:
     CAmount GetDustThreshold() const
     {
         if (scriptPubKey.IsUnspendable())
-            return (CAmount)0;
+            return CAmount(0);
 
-        return (CAmount)nDustThreshold.Value();
+        if (nDustThreshold.Value() != 546 /* DEFAULT_DUST_THRESHOLD */)
+        {
+            // TODO: nDustThreshold is not adjusted to dust size wrt tokens
+            return CAmount(nDustThreshold.Value());
+        }
+
+        const int32_t txVersion = 1; // should be same as CTransaction::CURRENT_VERSION
+        size_t nSize = ::GetSerializeSize(*this, SER_NETWORK, txVersion);
+
+        // A typical spendable txout is 34 bytes big, and will
+        // need a CTxIn of at least 148 bytes to spend
+        nSize += (32 + 4 + 1 + 107 + 4); // 148
+
+        // Same as DEFAULT_DUST_THRESHOLD if txout is 34 bytes. More
+        // for token outputs.
+        return CAmount(3 * nSize);
     }
     bool IsDust() const { return (nValue < GetDustThreshold()); }
     friend bool operator==(const CTxOut &a, const CTxOut &b)
