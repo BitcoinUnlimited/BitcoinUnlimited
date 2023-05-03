@@ -6,6 +6,7 @@
 
 #include "amount.h"
 #include "chain.h"
+#include "coincontrol.h"
 #include "core_io.h"
 #include "dstencode.h"
 #include "init.h"
@@ -2720,7 +2721,7 @@ UniValue listunspent(const UniValue &params, bool fHelp)
     if (!EnsureWalletIsAvailable(fHelp))
         return NullUniValue;
 
-    if (fHelp || params.size() > 3)
+    if (fHelp || params.size() > 4)
         throw runtime_error(
             "listunspent ( minconf maxconf  [\"address\",...] )\n"
             "\nReturns array of unspent transaction outputs\n"
@@ -2736,6 +2737,9 @@ UniValue listunspent(const UniValue &params, bool fHelp)
             "      \"address\"   (string) bitcoin address\n"
             "      ,...\n"
             "    ]\n"
+            "4. queryoptions     (json object) JSON with querty options\n"
+            "                    tokensOnly (boolean, default=false) Whether to only show UTXOs with CashTokens on "
+            "them\n"
             "\nResult\n"
             "[                   (array of json object)\n"
             "  {\n"
@@ -2762,7 +2766,7 @@ UniValue listunspent(const UniValue &params, bool fHelp)
                                           "\"[\\\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\\\","
                                           "\\\"1LtvqCaApEdUGFkpKMM4MstjcaL4dKg8SP\\\"]\""));
 
-    RPCTypeCheck(params, {UniValue::VNUM, UniValue::VNUM, UniValue::VARR});
+    RPCTypeCheck(params, {UniValue::VNUM, UniValue::VNUM, UniValue::VARR, UniValue::VOBJ});
 
     int nMinDepth = 1;
     if (params.size() > 0)
@@ -2788,6 +2792,18 @@ UniValue listunspent(const UniValue &params, bool fHelp)
             destinations.insert(address);
         }
     }
+    std::unique_ptr<CCoinControl> coinControl;
+    if (params.size() > 3)
+    {
+        // query options
+        const UniValue &options = params[3].get_obj();
+        if (options.exists("tokensOnly"))
+        {
+            const bool tokensOnly = options["tokensOnly"].get_bool();
+            coinControl.reset(new CCoinControl());
+            coinControl->SetTokensOnly(tokensOnly);
+        }
+    }
 
     UniValue results(UniValue::VARR);
     vector<COutput> vecOutputs;
@@ -2795,7 +2811,7 @@ UniValue listunspent(const UniValue &params, bool fHelp)
     // Nothing relies on cs_main, but by locking it here, we ensure that a chain reorg doesn't
     // cause AvailableCoins to give inconsistent results
     LOCK2(cs_main, pwalletMain->cs_wallet);
-    pwalletMain->AvailableCoins(vecOutputs, false, nullptr, true);
+    pwalletMain->AvailableCoins(vecOutputs, false, coinControl.get(), true);
     const uint32_t scriptFlags = GetMemPoolScriptFlags(Params().GetConsensus(), chainActive.Tip());
     for (const COutput &out : vecOutputs)
     {
@@ -2814,6 +2830,7 @@ UniValue listunspent(const UniValue &params, bool fHelp)
 
         CAmount nValue = out.tx->vout[out.i].nValue;
         const CScript &pk = out.tx->vout[out.i].scriptPubKey;
+        const token::OutputDataPtr &tokenDataPtr = out.tx->vout[out.i].tokenDataPtr;
         UniValue entry(UniValue::VOBJ);
         entry.pushKV("txid", out.tx->GetHash().GetHex());
         entry.pushKV("vout", out.i);
@@ -2840,6 +2857,10 @@ UniValue listunspent(const UniValue &params, bool fHelp)
         entry.pushKV("amount", ValueFromAmount(nValue));
         entry.pushKV("confirmations", out.nDepth);
         entry.pushKV("spendable", out.fSpendable);
+        if (tokenDataPtr)
+        {
+            entry.pushKV("tokenData", TokenDataToUniv(*tokenDataPtr));
+        }
         results.push_back(entry);
     }
 
