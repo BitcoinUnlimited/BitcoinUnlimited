@@ -165,6 +165,12 @@ bool ValidateNetwork(const string& networkname)
         return true;
     else if (networkname == CBaseChainParams::TESTNET)
         return true;
+    else if (networkname == CBaseChainParams::TESTNET4)
+        return true;
+    else if (networkname == CBaseChainParams::SCALENET)
+        return true;
+    else if (networkname == CBaseChainParams::CHIPNET)
+        return true;
     else if (networkname == CBaseChainParams::REGTEST)
         return true;
     else

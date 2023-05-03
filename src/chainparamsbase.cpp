@@ -16,6 +16,7 @@ const std::string CBaseChainParams::UNL = "nol";
 const std::string CBaseChainParams::TESTNET = "test";
 const std::string CBaseChainParams::TESTNET4 = "test4";
 const std::string CBaseChainParams::SCALENET = "scale";
+const std::string CBaseChainParams::CHIPNET = "chipnet";
 const std::string CBaseChainParams::REGTEST = "regtest";
 
 /**
@@ -84,6 +85,19 @@ public:
 };
 static CBaseScaleNetParams scaleNetParams;
 
+/**
+ * CHIP Network
+ */
+class CBaseChipNetParams : public CBaseChainParams
+{
+public:
+    CBaseChipNetParams()
+    {
+        nRPCPort = 48332;
+        strDataDir = "chipnet";
+    }
+};
+static CBaseChipNetParams chipNetParams;
 /*
  * Regression test
  */
@@ -118,6 +132,8 @@ CBaseChainParams &BaseParams(const std::string &chain)
         return testNet4Params;
     else if (chain == CBaseChainParams::SCALENET)
         return scaleNetParams;
+    else if (chain == CBaseChainParams::CHIPNET)
+        return chipNetParams;
     else if (chain == CBaseChainParams::REGTEST)
         return regTestParams;
     else
@@ -138,9 +154,12 @@ std::string ChainNameFromCommandLine()
     num_selected += fScaleNet;
     bool fUnl = GetBoolArg("-chain_nol", false);
     num_selected += fUnl;
+    bool fChip = GetBoolArg("-chipnet", false);
+    num_selected += fChip;
 
     if (num_selected > 1)
-        throw std::runtime_error("Invalid combination of -regtest, -testnet, -testnet4, -scalenet and -chain_nol.");
+        throw std::runtime_error(
+            "Invalid combination of -regtest, -testnet, -testnet4, -scalenet, -chipnet and -chain_nol.");
     if (fRegTest)
         return CBaseChainParams::REGTEST;
     if (fTestNet)
@@ -151,6 +170,8 @@ std::string ChainNameFromCommandLine()
         return CBaseChainParams::SCALENET;
     if (fUnl)
         return CBaseChainParams::UNL;
+    if (fChip)
+        return CBaseChainParams::CHIPNET;
     return CBaseChainParams::MAIN;
 }
 

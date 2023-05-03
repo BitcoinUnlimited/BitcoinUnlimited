@@ -77,6 +77,9 @@ BOOST_AUTO_TEST_CASE(forkscsv_validation_test)
     BOOST_CHECK(ValidateNetwork(CBaseChainParams::MAIN));
     BOOST_CHECK(ValidateNetwork(CBaseChainParams::UNL));
     BOOST_CHECK(ValidateNetwork(CBaseChainParams::TESTNET));
+    BOOST_CHECK(ValidateNetwork(CBaseChainParams::TESTNET4));
+    BOOST_CHECK(ValidateNetwork(CBaseChainParams::SCALENET));
+    BOOST_CHECK(ValidateNetwork(CBaseChainParams::CHIPNET));
     BOOST_CHECK(ValidateNetwork(CBaseChainParams::REGTEST));
     BOOST_CHECK(!ValidateNetwork("nonexistent_net"));
     BOOST_CHECK(!ValidateNetwork(""));

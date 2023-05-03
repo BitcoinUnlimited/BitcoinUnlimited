@@ -665,9 +665,15 @@ fs::path static StartupShortcutPath()
 {
     std::string chain = ChainNameFromCommandLine();
     if (chain == CBaseChainParams::MAIN)
-        return GetSpecialFolderPath(CSIDL_STARTUP) / "Bitcoin.lnk";
-    if (chain == CBaseChainParams::TESTNET) // Remove this special case when CBaseChainParams::TESTNET = "testnet4"
-        return GetSpecialFolderPath(CSIDL_STARTUP) / "Bitcoin (testnet).lnk";
+        return GetSpecialFolderPath(CSIDL_STARTUP) / "BCHUnlimited.lnk";
+    if (chain == CBaseChainParams::TESTNET)
+        return GetSpecialFolderPath(CSIDL_STARTUP) / "BCHUnlimited (testnet).lnk";
+    if (chain == CBaseChainParams::TESTNET4)
+        return GetSpecialFolderPath(CSIDL_STARTUP) / "BCHUnlimited (testnet4).lnk";
+    if (chain == CBaseChainParams::SCALENET)
+        return GetSpecialFolderPath(CSIDL_STARTUP) / "BCHUnlimited (scalenet).lnk";
+    if (chain == CBaseChainParams::CHIPNET)
+        return GetSpecialFolderPath(CSIDL_STARTUP) / "BCHUnlimited (chipnet).lnk";
     return GetSpecialFolderPath(CSIDL_STARTUP) / strprintf("Bitcoin (%s).lnk", chain);
 }
 
