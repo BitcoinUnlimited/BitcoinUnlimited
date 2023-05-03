@@ -257,9 +257,9 @@ test-ubuntu-qa-rostrum:
 
         - export NODE_PATH=`pwd`/build/src/bitcoind
         - export ROSTRUM_PATH=`pwd`/build/src/rostrum
-        - wget https://gitlab.com/bitcoinunlimited/rostrum/-/archive/master/rostrum-master.tar.gz
+        - wget https://gitlab.com/bitcoinunlimited/rostrum/-/archive/master/rostrum-v8.1.0.tar.gz -O rostrum-master.tar.gz
         - tar -zxf rostrum-master.tar.gz
-        - ./rostrum-master/test/functional/test_runner.py --no-ipv6-rpc-listen --gitlab
+        - ./rostrum-master-a4c27192175e6db0fb5f2a5791df83197f2430d4/test/functional/test_runner.py --no-ipv6-rpc-listen --gitlab
     dependencies:
         - build-debian-rostrum
         - build-debian
