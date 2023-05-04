@@ -13,6 +13,7 @@ EXTRA_DIST += \
 	test/bitcoin-util-test.py \
 	test/data/bitcoin-util-test.json \
 	test/data/blanktx.hex \
+	test/data/chip_test_vectors.json.h \
 	test/data/tt-delin1-out.hex \
 	test/data/tt-delout1-out.hex \
 	test/data/tt-locktime317000-out.hex \
@@ -43,6 +44,7 @@ RAW_TEST_FILES =
 GENERATED_TEST_FILES = $(JSON_TEST_FILES:.json=.json.h) $(RAW_TEST_FILES:.raw=.raw.h)
 
 BITCOIN_TEST_SUITE = \
+  test/chip_testing_setup.h \
   test/scriptflags.cpp \
   test/scriptflags.h \
   test/scriptnum10.h \

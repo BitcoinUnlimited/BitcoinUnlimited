@@ -148,6 +148,7 @@ BITCOIN_CORE_H = \
   compressor.h \
   config.h \
   connmgr.h \
+  consensus/coinaccessorimpl.h \
   consensus/consensus.h \
   consensus/tx_verify.h \
   core_io.h \
@@ -213,6 +214,7 @@ BITCOIN_CORE_H = \
   script/sign.h \
   script/standard.h \
   script/ismine.h \
+  span.h \
   streams.h \
   support/allocators/secure.h \
   support/allocators/zeroafterfree.h \
@@ -234,6 +236,7 @@ BITCOIN_CORE_H = \
   unlimited.h \
   util/defer.h \
   util/heapoptional.h \
+  util/string.h \
   utilhttp.h \
   utilprocess.h \
   stat.h \
