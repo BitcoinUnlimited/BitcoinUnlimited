@@ -307,12 +307,6 @@ void ChipTestingSetup::RunTestVector(const TestVector &test) {
                                           expectNonStd ? "Pass expected, test failed."
                                                        : "Fail expected, test passed.", reason, tv.tx->ToString(true)));
             goodNonstandardReason = expectNonStd || tv.nonstandardReason == reason;
-            if (!goodNonstandardReason)
-            {
-                mempool.Remove(tv.tx->GetHash());
-                bool ok3 = AcceptToMemoryPool(mempool, state, tv.tx,false,  &missingInputs, false, TransactionClass::NONSTANDARD);
-                printf("problem\n");  // DBG
-            }
             BOOST_CHECK_MESSAGE(goodNonstandardReason,
                                 strprintf("(%s nonstandard) %s Unexpected reject reason. Expected \"%s\", got \"%s\". "
                                           "Libauth's reason: \"%s\".", activeStr, tv.ident, tv.nonstandardReason,
