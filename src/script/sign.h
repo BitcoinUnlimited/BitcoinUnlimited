@@ -76,8 +76,8 @@ public:
 class DummySignatureCreator : public BaseSignatureCreator
 {
 public:
-    DummySignatureCreator(const CKeyStore *keystoreIn, const uint32_t scriptFlags)
-        : BaseSignatureCreator(keystoreIn, scriptFlags, {})
+    DummySignatureCreator(const CKeyStore *keystoreIn, const uint32_t _scriptFlags)
+        : BaseSignatureCreator(keystoreIn, _scriptFlags, {})
     {
     }
     const BaseSignatureChecker &Checker() const;

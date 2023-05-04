@@ -16,15 +16,15 @@
 using valtype = std::vector<uint8_t>;
 
 TransactionSignatureCreator::TransactionSignatureCreator(const CKeyStore *keystoreIn,
-    const uint32_t scriptFlags,
-    const std::vector<CTxOut> spentCoins,
+    const uint32_t _scriptFlags,
+    const std::vector<CTxOut> _spentCoins,
     const CTransaction *txToIn,
     unsigned int nInIn,
     const CAmount &amountIn,
     uint32_t nHashTypeIn,
     uint32_t nSigTypeIn)
-    : BaseSignatureCreator(keystoreIn, scriptFlags, spentCoins), txTo(txToIn), nIn(nInIn), amount(amountIn),
-      nHashType(nHashTypeIn), nSigType(nSigTypeIn), checker(txTo, nIn, amount, scriptFlags)
+    : BaseSignatureCreator(keystoreIn, _scriptFlags, _spentCoins), txTo(txToIn), nIn(nInIn), amount(amountIn),
+      nHashType(nHashTypeIn), nSigType(nSigTypeIn), checker(txTo, nIn, amount, _scriptFlags)
 {
 }
 

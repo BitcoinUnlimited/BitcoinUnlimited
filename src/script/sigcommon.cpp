@@ -267,9 +267,9 @@ static uint256 SignatureHashBitcoinCash(const CScript &scriptCode,
         {
             if (sis->spentCoins.empty())
             {
-                std::stringstream ss;
-                ss << __func__ << " error: SIGHASH_UTXOS requested, but missing utxo data";
-                throw std::runtime_error(ss.str());
+                std::stringstream ss2;
+                ss2 << __func__ << " error: SIGHASH_UTXOS requested, but missing utxo data";
+                throw std::runtime_error(ss2.str());
             }
             hashUtxos = GetUtxosHash(*sis);
             ss << hashUtxos;
