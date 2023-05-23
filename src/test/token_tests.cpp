@@ -1291,7 +1291,6 @@ BOOST_AUTO_TEST_CASE(prefix_token_encoding_json_test_vectors_invalid) {
 /// block with sufficient PoW, and adding it to the chain.
 static bool MineTransactions(const std::vector<CMutableTransaction> transactions, CValidationState &state) {
     const uint32_t scriptFlags = []{
-        LOCK(cs_main);
         return GetMemPoolScriptFlags(::Params().GetConsensus(), chainActive.Tip());
     }();
     BOOST_TEST_MESSAGE(strprintf("%s: scriptFlags = %s", __func__, FormatScriptFlags(scriptFlags)));
@@ -1299,7 +1298,6 @@ static bool MineTransactions(const std::vector<CMutableTransaction> transactions
     // Send the transactions to the mempool
     auto mempoolInitSize = mempool.size();
     {
-        LOCK(cs_main);
         for (const auto &tx : transactions) {
             auto txref = MakeTransactionRef(tx);
             bool missingInputs = false;
@@ -1322,9 +1320,14 @@ static bool MineTransactions(const std::vector<CMutableTransaction> transactions
     const CBlockRef shared_pblock = MakeBlock(::GetConfig().GetChainParams(), false /* replaceCoinbase */,
                                    true /* includeMempool */);
     {
-        LOCK(cs_main);
-        BOOST_CHECK(TestBlockValidity(state, ::GetConfig().GetChainParams(), shared_pblock,
-                                      chainActive.Tip(), true, true));
+        bool result = false;
+        {
+            LOCK(cs_main);
+            result = TestBlockValidity(state, ::GetConfig().GetChainParams(), shared_pblock, chainActive.Tip(),
+                                       true, true);
+        }
+        BOOST_CHECK(result);
+
         if (!state.IsValid()) {
             BOOST_TEST_MESSAGE(state.GetRejectReason());
             return false;
@@ -1377,7 +1380,6 @@ static CMutableTransaction CreateAndSignTx(const CKey senderKey, const CTransact
     }
 
     const uint32_t scriptFlags = []{
-        LOCK(cs_main);
         return GetMemPoolScriptFlags(::Params().GetConsensus(), chainActive.Tip());
     }();
     BOOST_TEST_MESSAGE(strprintf("%s: scriptFlags = %s", __func__, FormatScriptFlags(scriptFlags)));
