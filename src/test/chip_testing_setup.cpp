@@ -90,7 +90,6 @@ void ChipTestingSetup::LoadChipsVectors() {
     }
     BOOST_CHECK( ! allChipsTests.empty());
     unsigned coinHeights = []{
-        LOCK(cs_main);
         return chainActive.Tip()->nHeight;
     }();
     for (size_t j = 0; j < allChipsTests.size(); ++j) {
@@ -266,14 +265,13 @@ void ChipTestingSetup::RunTestVector(const TestVector &test) {
                                      test.name, num, tv.ident, tv.description, ::GetSerializeSize(*tv.tx, SER_NETWORK, INIT_PROTO_VERSION),
                                      tv.inputCoins.size()));
         Defer cleanup([&]{
-            LOCK(cs_main);
             mempool.clear();
             for (auto & [outpt, _] : tv.inputCoins) {
                 // clear utxo set of the temp coins we added for this tx
                 pcoinsTip->SpendCoin(outpt);
             }
         });
-        LOCK(cs_main);
+
         for (const auto &[outpt, entry] : tv.inputCoins) {
             // add each coin that the tx spends to the utxo set
             Coin cpy = entry.coin;

@@ -76,15 +76,22 @@ BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup)
     CBlock block;
 
     // Test 1: block with both of those transactions should be rejected.
+    printf("create\n");
     block = CreateAndProcessBlock(spends, scriptPubKey);
+    printf("check\n");
     BOOST_CHECK(chainActive.Tip()->GetBlockHash() != block.GetHash());
 
+    printf("tomempool\n");
     // Test 2: ... and should be rejected if spend1 is in the memory pool
     BOOST_CHECK(ToMemPool(spends[0]));
+    printf("create2\n");
     block = CreateAndProcessBlock(spends, scriptPubKey);
+    printf("check2\n");
     BOOST_CHECK(chainActive.Tip()->GetBlockHash() != block.GetHash());
+    printf("clear\n");
     mempool.clear();
 
+    printf("3\n");
     // Test 3: ... and should be rejected if spend2 is in the memory pool
     BOOST_CHECK(ToMemPool(spends[1]));
     block = CreateAndProcessBlock(spends, scriptPubKey);
