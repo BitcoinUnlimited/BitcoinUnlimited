@@ -268,6 +268,32 @@ void AssertLockHeldInternal(const char *pszName, const char *pszFile, unsigned i
     throw std::logic_error("AssertLockHeld failure");
 }
 
+void AssertWriteLockHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs)
+{
+    std::lock_guard<std::mutex> lock(lockdata.dd_mutex);
+    uint64_t tid = getTid();
+    auto self_iter = lockdata.locksheldbythread.find(tid);
+    if (self_iter == lockdata.locksheldbythread.end() || self_iter->second.empty() == true)
+    {
+        // this thread is not holding any locks
+        fprintf(stderr, "Assertion failed: exclusive lock %s not held in %s:%i; locks held:\n%s", pszName, pszFile,
+            nLine, _LocksHeld().c_str());
+        throw std::logic_error("AssertWriteLockHeld failure");
+    }
+    for (auto &entry : self_iter->second)
+    {
+        if (entry.first == cs && entry.second.GetExclusive() == OwnershipType::EXCLUSIVE)
+        {
+            // found the lock so return
+            return;
+        }
+    }
+    // this thread is holding locks but none are the one we are checking for
+    fprintf(stderr, "Assertion failed: exclusive lock %s not held in %s:%i; locks held:\n%s", pszName, pszFile, nLine,
+        _LocksHeld().c_str());
+    throw std::logic_error("AssertWriteLockHeld failure");
+}
+
 void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs)
 {
     std::lock_guard<std::mutex> lock(lockdata.dd_mutex);

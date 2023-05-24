@@ -34,19 +34,6 @@ void EnterCritical(const char *pszName,
 }
 
 void LeaveCritical(void *cs) { remove_lock_critical_exit(cs); }
-void AssertWriteLockHeldInternal(const char *pszName,
-    const char *pszFile,
-    unsigned int nLine,
-    CSharedCriticalSection *cs)
-{
-    if (cs->try_lock()) // It would be better to check that this thread has the lock
-    {
-        fprintf(stderr, "Assertion failed: lock %s not held in %s:%i; locks held:\n%s", pszName, pszFile, nLine,
-            LocksHeld().c_str());
-        fflush(stderr);
-        abort();
-    }
-}
 
 void AssertRecursiveWriteLockHeldInternal(const char *pszName,
     const char *pszFile,

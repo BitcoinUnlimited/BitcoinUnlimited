@@ -188,10 +188,8 @@ void AssertLockHeldInternal(const char *pszName, const char *pszFile, unsigned i
     ASSERT_EXCLUSIVE_LOCK(cs);
 void AssertLockNotHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs);
 /** Asserts in debug builds if a shared critical section is not exclusively held. */
-void AssertWriteLockHeldInternal(const char *pszName,
-    const char *pszFile,
-    unsigned int nLine,
-    CSharedCriticalSection *cs) ASSERT_EXCLUSIVE_LOCK(cs);
+void AssertWriteLockHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs)
+    ASSERT_EXCLUSIVE_LOCK(cs);
 void AssertRecursiveWriteLockHeldinternal(const char *pszName,
     const char *pszFile,
     unsigned int nLine,
@@ -210,10 +208,8 @@ void static inline LeaveCritical(void *cs) {}
 void static inline AssertLockHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs)
     ASSERT_EXCLUSIVE_LOCK(cs){};
 void static inline AssertLockNotHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs) {}
-void static inline AssertWriteLockHeldInternal(const char *pszName,
-    const char *pszFile,
-    unsigned int nLine,
-    CSharedCriticalSection *cs) ASSERT_EXCLUSIVE_LOCK(cs)
+void static inline AssertWriteLockHeldInternal(const char *pszName, const char *pszFile, unsigned int nLine, void *cs)
+    ASSERT_EXCLUSIVE_LOCK(cs)
 {
 }
 void static inline AssertRecursiveWriteLockHeldinternal(const char *pszName,
