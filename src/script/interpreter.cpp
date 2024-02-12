@@ -1718,7 +1718,7 @@ bool ScriptMachine::Step()
                             if (!sis.checker)
                                 return set_error(serror, SCRIPT_ERR_DATA_REQUIRED);
                             // Check signature
-                            if (!sis.checker->CheckSig(vchSig, vchPubKey, scriptCode))
+                            if (!sis.checker->CheckSig(vchSig, vchPubKey, scriptCode, &sis))
                             {
                                 // This can fail if the signature is empty, which also is a NULLFAIL error as the
                                 // bitfield should have been null in this situation.
@@ -1782,7 +1782,7 @@ bool ScriptMachine::Step()
                             if (!sis.checker)
                                 return set_error(serror, SCRIPT_ERR_DATA_REQUIRED);
                             // Check signature
-                            bool fOk = sis.checker->CheckSig(vchSig, vchPubKey, scriptCode);
+                            bool fOk = sis.checker->CheckSig(vchSig, vchPubKey, scriptCode, &sis);
 
                             if (fOk)
                             {
