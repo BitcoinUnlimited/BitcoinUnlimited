@@ -240,7 +240,7 @@ test-debian-benchmarks:
 
 test-ubuntu-qa-rostrum:
     stage: qa_tests
-    image: python:latest
+    image: python:3.11
     needs: ["build-debian", "build-debian-rostrum"]
     variables:
         PIP_CACHE_DIR: $CI_PROJECT_DIR/cache-pip
