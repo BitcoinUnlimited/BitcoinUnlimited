@@ -8,10 +8,10 @@ PROJECT_NAME = "rostrum"
 GIT_REPO = "https://gitlab.com/BitcoinUnlimited/{}.git".format(PROJECT_NAME)
 # When released put a tag here 'v2.0.0'
 # When in development, put 'master' here.
-GIT_BRANCH = "v8.1.0"
+GIT_BRANCH = "v10.0.0"
 # When released put a hash here: "aa95d64d050c286356dadb78d19c2e687dec85cf"
 # When in development, put 'None' here
-EXPECT_HEAD = "a4c27192175e6db0fb5f2a5791df83197f2430d4"
+EXPECT_HEAD = "d644375887083f7c7508053471df9070b38ba3d3"
 
 ROOT_DIR = os.path.realpath(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
