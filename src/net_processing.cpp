@@ -2199,7 +2199,7 @@ bool ProcessMessages(CNode *pfrom)
                         pfrom->fDisconnect = true;
                         dosMan.Misbehaving(pfrom, 1);
                         return error(
-                            "recieved early handshake message after successfully connected, disconnecting peer=%s",
+                            "received early handshake message after successfully connected, disconnecting peer=%s",
                             pfrom->GetLogName());
                     }
                 }
