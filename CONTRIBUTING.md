@@ -5,6 +5,7 @@ The Bitcoin Unlimited project operates an open contributor model where anyone is
 
 Small features and patches can be contributed simply by issuing a pull request (PR) to this repository and working with the Bitcoin Unlimited Developer if any questions arise during the merge process.  Larger features should be proposed (and may be proposed before implemention) to the Bitcoin Unlimited members by writing a BUIP and submitting it to the bitcoin unlimited forum at: https://bitco.in/forum/forums/bitcoin-unlimited.15/.  If a proposal is accepted, then a contributor may issue a PR which will be merged.
 
+Note: This repository primarily targets developers and integrators. If you are an end-user looking for installation or wallet usage instructions, please check the releases page or the project website for user-focused guidance.
 
 Contributor Workflow
 --------------------
@@ -108,3 +109,4 @@ Release Policy
 --------------
 
 The project leader is the release manager for each Bitcoin Unlimited release.
+
